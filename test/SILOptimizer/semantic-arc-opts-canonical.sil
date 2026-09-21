@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts -onone-simplification -simplify-instruction=begin_borrow %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

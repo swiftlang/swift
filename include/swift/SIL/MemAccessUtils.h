@@ -245,18 +245,6 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
 
-/// Whether \p instruction accesses storage whose representation is either (1)
-/// unidentified such as by reading a pointer or (2) global.
-bool mayAccessPointer(SILInstruction *instruction);
-
-/// Whether this instruction loads or copies a value whose storage does not
-/// increment the stored value's reference count.
-bool mayLoadWeakOrUnowned(SILInstruction* instruction);
-
-/// Conservatively, whether this instruction could involve a synchronization
-/// point like a memory barrier, lock or syscall.
-bool maySynchronize(SILInstruction* instruction);
-
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//

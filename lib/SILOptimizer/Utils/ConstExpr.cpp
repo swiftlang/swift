@@ -14,25 +14,19 @@
 
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "llvm/ADT/PointerEmbeddedInt.h"
-#include "llvm/Support/TrailingObjects.h"
 
 using namespace swift;
 
@@ -1244,6 +1238,13 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   if (it != calculatedValues.end())
     return it->second;
 
+  // SILUndef represents an undefined value (e.g. an uninitialized slot). Return
+  // a non-fatal "unknown" value so that aggregate constructions (struct, tuple)
+  // that include undef operands can proceed with partially-known results.
+  if (isa<SILUndef>(value))
+    return getUnknown(evaluator, value,
+                      UnknownReason::ReturnedByUnevaluatedInstruction);
+
   if (!recursivelyComputeValueIfNotInState) {
     return getUnknown(evaluator, value, UnknownReason::UntrackedSILValue);
   }
@@ -1356,7 +1357,7 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
     // Ignore markers, loads, and other things that aren't stores to this stack
     // value.
     if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<DestroyAddrInst>(user) || DebugValueInst::hasAddrVal(user))
+        isa<DestroyAddrInst>(user) || isa<DebugValueInst>(user))
       continue;
 
     // TODO: Allow BeginAccess/EndAccess users.
@@ -1678,7 +1679,8 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
       isa<EndBorrowInst>(inst) || isa<DebugStepInst>(inst) ||
-      isa<ExtendLifetimeInst>(inst) ||
+      isa<ExtendLifetimeInst>(inst) || isa<EndLifetimeInst>(inst) ||
+      isa<EndFormalScopeInst>(inst) ||
       // Skip instrumentation
       isInstrumentation(inst))
     return std::nullopt;

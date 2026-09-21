@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -target %target-future-triple -parse-as-library -emit-silgen %s
 
 // Also check if there's any weird accidental interactions with modes which affect default isolation:

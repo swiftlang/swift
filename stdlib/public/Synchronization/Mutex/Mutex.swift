@@ -45,7 +45,7 @@ public struct Mutex<Value: ~Copyable>: ~Copyable {
   ///
   /// - Parameter initialValue: The initial value to give to the mutex.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init(_ initialValue: consuming sending Value) {
     value = _Cell(initialValue)
@@ -82,7 +82,7 @@ extension Mutex where Value: ~Copyable {
   ///
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func withLock<Result: ~Copyable, E: Error>(
     _ body: (inout sending Value) throws(E) -> sending Result
@@ -128,7 +128,7 @@ extension Mutex where Value: ~Copyable {
   ///   `mtx_trylock()`) is platform-dependent and may differ from Swift's
   ///   behavior.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(
     _ body: (inout sending Value) throws(E) -> sending Result
@@ -148,21 +148,21 @@ extension Mutex where Value: ~Copyable {
 @available(SwiftStdlib 6.0, *)
 extension Mutex where Value == Void {
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func _unsafeLock() {
     handle._lock()
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func _unsafeTryLock() -> Bool {
     handle._tryLock()
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func _unsafeUnlock() {
     handle._unlock()
@@ -172,7 +172,7 @@ extension Mutex where Value == Void {
 @available(SwiftStdlib 6.0, *)
 extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   public borrowing func unsafeLock() {
@@ -180,7 +180,7 @@ extension _MutexHandle {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   public borrowing func unsafeTryLock() -> Bool {
@@ -188,7 +188,7 @@ extension _MutexHandle {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   public borrowing func unsafeUnlock() {

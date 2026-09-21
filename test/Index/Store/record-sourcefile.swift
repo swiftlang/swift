@@ -26,12 +26,12 @@
 // CHECK: instance-property/subscript/Swift | subscript(_:) | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: instance-method/acc-get/Swift | getter:subscript(_:) | s:{{.*}} | <no-cgname> | Def,RelChild,RelAcc -
 // CHECK: protocol/Swift | P1 | s:{{.*}} | <no-cgname> | Def -
-// CHECK: type-alias/associated-type/Swift | AT | s:{{.*}} | <no-cgname> | Def,Ref,RelChild -
-// CHECK: type-alias/Swift | TA | s:{{.*}} | <no-cgname> | Def,RelChild -
+// CHECK: type-alias/associated-type(internal)/Swift | AT | s:{{.*}} | <no-cgname> | Def,Ref,RelChild -
+// CHECK: type-alias(internal)/Swift | TA | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: class/Swift | C1 | s:{{.*}} | <no-cgname> | Def,Ref,RelBase,RelCont -
-// CHECK: instance-method/Swift | method() | s:{{.*}} | <no-cgname> | Def,Ref,Call,Dyn,RelChild,RelRec,RelCall,RelCont -
+// CHECK: instance-method(internal)/Swift | method() | s:{{.*}} | <no-cgname> | Def,Ref,Call,Dyn,RelChild,RelRec,RelCall,RelCont -
 // CHECK: class/Swift | C2 | s:{{.*}} | <no-cgname> | Def,Ref - RelChild,RelBase
-// CHECK: instance-method/Swift | method() | s:{{.*}} | <no-cgname> | Def,Dyn,RelChild,RelOver -
+// CHECK: instance-method(internal)/Swift | method() | s:{{.*}} | <no-cgname> | Def,Dyn,RelChild,RelOver -
 // CHECK: function/Swift | takeC1(x:) | s:{{.*}} | <no-cgname> | Def -
 // CHECK: instance-method(test)/Swift | testFoo() | s:{{.*}} | <no-cgname> | Def,Dyn,RelChild -
 // CHECK: ------------
@@ -108,18 +108,18 @@ struct S1 {
 
 // CHECK: [[@LINE+1]]:10 | protocol/Swift | [[P1_USR:s:.*]] | Def | rel: 0
 protocol P1 {
-// CHECK: [[@LINE+2]]:18 | type-alias/associated-type/Swift | s:{{.*}} | Def,RelChild | rel: 1
+// CHECK: [[@LINE+2]]:18 | type-alias/associated-type(internal)/Swift | s:{{.*}} | Def,RelChild | rel: 1
 // CHECK-NEXT: RelChild | [[P1_USR]]
   associatedtype AT
-// CHECK: [[@LINE+3]]:13 | type-alias/Swift | s:{{.*}} | Def,RelChild | rel: 1
+// CHECK: [[@LINE+3]]:13 | type-alias(internal)/Swift | s:{{.*}} | Def,RelChild | rel: 1
 // CHECK-NEXT: RelChild | [[P1_USR]]
-// CHECK: [[@LINE+1]]:18 | type-alias/associated-type/Swift | s:{{.*}} | Ref | rel: 0
+// CHECK: [[@LINE+1]]:18 | type-alias/associated-type(internal)/Swift | s:{{.*}} | Ref | rel: 0
   typealias TA = AT
 }
 
 // CHECK: [[@LINE+1]]:7 | class/Swift | [[C1_USR:s:.*]] | Def | rel: 0
 class C1 {
-// CHECK: [[@LINE+2]]:8 | instance-method/Swift | [[C1_foo_USR:s:.*]] | Def,Dyn,RelChild | rel: 1
+// CHECK: [[@LINE+2]]:8 | instance-method(internal)/Swift | [[C1_foo_USR:s:.*]] | Def,Dyn,RelChild | rel: 1
 // CHECK-NEXT: RelChild | [[C1_USR]]
   func method() {}
 }
@@ -127,7 +127,7 @@ class C1 {
 // CHECK: [[@LINE+2]]:12 | class/Swift | [[C1_USR]] | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | [[C2_USR]]
 class C2 : C1 {
-// CHECK: [[@LINE+3]]:17 | instance-method/Swift | s:{{.*}} | Def,Dyn,RelChild,RelOver | rel: 2
+// CHECK: [[@LINE+3]]:17 | instance-method(internal)/Swift | s:{{.*}} | Def,Dyn,RelChild,RelOver | rel: 2
 // CHECK-NEXT: RelOver | [[C1_foo_USR]]
 // CHECK-NEXT: RelChild | [[C2_USR]]
   override func method() {}
@@ -136,7 +136,7 @@ class C2 : C1 {
 // CHECK: [[@LINE+2]]:6 | function/Swift | [[takeC1_USR:s:.*]] | Def | rel: 0
 // CHECK: [[@LINE+1]]:16 | class/Swift | s:{{.*}} | Ref,RelCont | rel: 1
 func takeC1(x: C1) {
-// CHECK: [[@LINE+3]]:5 | instance-method/Swift | s:{{.*}} | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
+// CHECK: [[@LINE+3]]:5 | instance-method(internal)/Swift | s:{{.*}} | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
 // CHECK-NEXT: RelCall,RelCont | [[takeC1_USR]]
 // CHECK-NEXT: RelRec | [[C1_USR]]
   x.method()

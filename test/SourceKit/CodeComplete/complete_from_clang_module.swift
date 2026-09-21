@@ -5,7 +5,7 @@ import Foo
 
 // CHECK-LABEL:      key.name: "fooIntVar",
 // CHECK-NEXT:       key.description: "fooIntVar",
-// CHECK-NEXT:       key.typename: "Int32",
+// CHECK-NEXT:       key.typename: "CInt",
 // CHECK-NEXT:       key.doc.brief: "Aaa.  fooIntVar.  Bbb.",
 // CHECK-NEXT:       key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,

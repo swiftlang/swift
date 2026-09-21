@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
@@ -24,7 +21,6 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/Test.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SCCIterator.h"
 
 using namespace swift;
@@ -34,12 +30,6 @@ static bool hasBranchArguments(TermInst *T, unsigned edgeIdx) {
     assert(edgeIdx == 0);
     return BI->getNumArgs() != 0;
   }
-  if (auto CBI = dyn_cast<CondBranchInst>(T)) {
-    assert(edgeIdx <= 1);
-    return edgeIdx == CondBranchInst::TrueIdx ? !CBI->getTrueArgs().empty()
-                                              : !CBI->getFalseArgs().empty();
-  }
-  // No other terminator have branch arguments.
   return false;
 }
 
@@ -74,21 +64,13 @@ void swift::changeBranchTarget(TermInst *T, unsigned edgeIdx,
     SILBasicBlock *trueDest = CBI->getTrueBB();
     SILBasicBlock *falseDest = CBI->getFalseBB();
 
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-    if (edgeIdx == CondBranchInst::FalseIdx) {
+    if (edgeIdx == CondBranchInst::FalseIdx)
       falseDest = newDest;
-      for (auto arg : CBI->getTrueArgs())
-        trueArgs.push_back(arg);
-    } else {
+    else
       trueDest = newDest;
-      for (auto arg : CBI->getFalseArgs())
-        falseArgs.push_back(arg);
-    }
 
-    B.createCondBranch(CBI->getLoc(), CBI->getCondition(), trueDest, trueArgs,
-                       falseDest, falseArgs, CBI->getTrueBBCount(),
-                       CBI->getFalseBBCount());
+    B.createCondBranch(CBI->getLoc(), CBI->getCondition(), trueDest, falseDest,
+                       CBI->getTrueBBCount(), CBI->getFalseBBCount());
     CBI->dropAllReferences();
     CBI->eraseFromParent();
     return;
@@ -123,11 +105,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
   }
 
   case SILInstructionKind::CondBranchInst: {
-    auto CBI = cast<CondBranchInst>(T);
+    // A cond_br passes no branch arguments (SIL has no critical edges).
     assert(edgeIdx < 2);
-    auto OpdArgs = edgeIdx ? CBI->getFalseArgs() : CBI->getTrueArgs();
-    for (auto V : OpdArgs)
-      args.push_back(V);
     return;
   }
       
@@ -729,12 +708,6 @@ void swift::findJointPostDominatingSet(
               // For this purpose also the initial blocks count as "visited",
               // although they are not added to the visitedBlocks set.
               !initialBlocks.contains(succBlock)
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
-              // Ignore blocks which end in an unreachable. This is a very
-              // simple check, but covers most of the cases, e.g. block which
-              // calls fatalError().
-              && !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)
-#endif
             ) {
             assert(succBlock->getSinglePredecessorBlock() == predBlock &&
                    "CFG must not contain critical edge");

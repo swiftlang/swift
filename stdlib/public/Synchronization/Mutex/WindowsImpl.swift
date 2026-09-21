@@ -21,21 +21,21 @@ public struct _MutexHandle: ~Copyable {
   let value: _Cell<SRWLOCK>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     unsafe value = _Cell(SRWLOCK())
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     unsafe AcquireSRWLockExclusive(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     // Windows BOOLEAN gets imported as 'UInt8'...
@@ -43,7 +43,7 @@ public struct _MutexHandle: ~Copyable {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _unlock() {
     unsafe ReleaseSRWLockExclusive(value._address)

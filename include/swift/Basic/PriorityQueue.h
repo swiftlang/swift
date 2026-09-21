@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_PRIORITYQUEUE_H
 
 #include <cassert>
+#include <limits>
 
 namespace swift {
 

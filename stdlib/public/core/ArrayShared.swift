@@ -70,7 +70,7 @@ func _deallocateUninitializedArray<Element>(
 }
 
 #if !INTERNAL_CHECKS_ENABLED
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("array.finalize_intrinsic")
 @_effects(readnone)
 @_effects(escaping array.value** => return.value**)
@@ -86,7 +86,7 @@ func _finalizeUninitializedArray<Element>(
 #else
 // When asserts are enabled, _endCOWMutation writes to _native.isImmutable
 // So we cannot have @_effects(readnone)
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("array.finalize_intrinsic")
 public // COMPILER_INTRINSIC
 func _finalizeUninitializedArray<Element>(
@@ -180,7 +180,7 @@ internal func _growArrayCapacity(_ capacity: Int) -> Int {
   return capacity * 2
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _growArrayCapacity(
   oldCapacity: Int, minimumCapacity: Int, growForAppend: Bool
 ) -> Int {
@@ -283,7 +283,10 @@ extension _ArrayBufferProtocol {
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
     let tailCount = dest.count - headCount - newCount
-    _internalInvariant(headCount + tailCount <= sourceCount)
+
+    _precondition(headCount + tailCount <= sourceCount,
+      "invalid array buffer: count differed in successive reads")
+    _internalInvariant(tailCount >= 0, "dest is too small to update in place")
 
     let oldCount = sourceCount - headCount - tailCount
     let destStart = unsafe dest.firstElementAddress
@@ -329,7 +332,8 @@ extension _ArrayBufferProtocol {
         initializing: destStart)
       unsafe initializeNewElements(newStart, newCount)
       let tailStart = headEnd + oldCount
-      let tailEnd = endIndex
+      // Don't re-read `endIndex` since that calls `-count` on bridged NSArray
+      let tailEnd = headStart + sourceCount
       unsafe _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
     }
     self = Self(_buffer: dest, shiftedToStartIndex: startIndex)

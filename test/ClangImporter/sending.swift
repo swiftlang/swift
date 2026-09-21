@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature SendingArgsAndResults -verify -import-objc-header %S/Inputs/sending.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -swift-version 6 -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature SendingArgsAndResults -verify -import-objc-header %S/Inputs/sending.h
+
+// expected-warning@<unknown> * {{libc not found for }}
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_SendingArgsAndResults
@@ -27,21 +29,28 @@ func funcTestSendingResult() async {
   // Just to show that without the sending param, we generate diagnostics.
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
-  await sendToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
+  await sendToMain(x2) // expected-warning {{sending 'x2' risks causing data races}}
   // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestSendingArg() async {
   let x = NonSendableCStruct()
-  sendUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
+  useValue(x) // expected-note {{access can happen concurrently}}
+}
+
+func funcTestSendingArgPrecededAttr() async {
+  let x = NonSendableCStruct()
+  sendUserDefinedIntoGlobalFunctionPrecededAttr(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestSendingClosureArg() async {
   sendingWithCompletionHandler { (x: sending NonSendableCStruct) in
-    sendUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+    sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
     useValue(x) // expected-note {{access can happen concurrently}}
   }
@@ -49,7 +58,7 @@ func funcTestSendingClosureArg() async {
   let x = sendingWithLazyReturn { () -> sending NonSendableCStruct in
     NonSendableCStruct()
   }
-  sendUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }

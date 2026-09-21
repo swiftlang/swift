@@ -10,7 +10,7 @@ repair the failed test. If the updated file was originally created by `split-fil
 
 def uvt_lit_plugin(result, test, commands):
     if (
-        not any(e.endswith("swift-frontend") for e in result.command.args)
+        not any(e.endswith("swift-frontend") or e.endswith("sil-opt") for e in result.command.args)
         or not "-verify" in result.command.args
     ):
         return None

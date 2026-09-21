@@ -3,7 +3,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out > %t/output.txt
 // RUN: %FileCheck %s < %t/output.txt
-// RUN: grep "check-prefix=CHECK-51" %t/output.txt && %FileCheck %s --check-prefix=CHECK-51 < %t/output.txt
+// RUN: not grep "check-prefix=CHECK-51" %t/output.txt || %FileCheck %s --check-prefix=CHECK-51 < %t/output.txt
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

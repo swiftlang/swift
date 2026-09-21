@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,6 +29,8 @@ internal import Musl
 internal import Android
 #elseif os(WASI)
 internal import WASILibc
+#elseif os(Emscripten)
+internal import EmscriptenLibc
 #elseif os(Windows)
 internal import CRT
 internal import WinSDK
@@ -42,7 +44,7 @@ internal import ObjectiveC
 import _Concurrency
 #endif
 
-#if os(WASI)
+#if os(WASI) || os(Emscripten)
 let platformSupportsChildProcesses = false
 #else
 let platformSupportsChildProcesses = true
@@ -1031,12 +1033,22 @@ class _ParentProcess {
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
+  internal let _shardCount: Int?
+  internal let _shardIndex: Int
   internal var _args: [String]
 
-  init(runTestsInProcess: Bool, args: [String], filter: String?) {
+  init(
+    runTestsInProcess: Bool,
+    args: [String],
+    filter: String?,
+    shardCount: Int? = nil,
+    shardIndex: Int = 0
+  ) {
     self._runTestsInProcess = runTestsInProcess
     self._filter = filter
     self._args = args
+    self._shardCount = shardCount
+    self._shardIndex = shardIndex
   }
 
   func _spawnChild() {
@@ -1567,6 +1579,14 @@ class _ParentProcess {
 
             continue
           }
+          if let shardCount = _shardCount,
+             shardCount > 1,
+             (fullTestName.hashValue % shardCount).magnitude != _shardIndex {
+            // This is deterministic across test runs only if
+            // SWIFT_DETERMINISTIC_HASHING is set to 1, and
+            // our lit test harness does set it.
+            continue
+          }
 
           switch runOneTest(
             fullTestName: fullTestName,
@@ -1642,6 +1662,14 @@ class _ParentProcess {
           if let filter = _filter,
              findSubstring(fullTestName, filter) == nil {
 
+            continue
+          }
+          if let shardCount = _shardCount,
+             shardCount > 1,
+             (fullTestName.hashValue % shardCount).magnitude != _shardIndex {
+            // This is deterministic across test runs only if
+            // SWIFT_DETERMINISTIC_HASHING is set to 1, and
+            // our lit test harness does set it.
             continue
           }
 
@@ -1766,6 +1794,8 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
+    var shardCount: Int?
+    var shardIndex: Int = 0
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
@@ -1781,6 +1811,16 @@ public func runAllTests() {
         i += 2
         continue
       }
+      if arg == "--stdlib-unittest-shard-count" {
+        shardCount = Int(CommandLine.arguments[i + 1])
+        i += 2
+        continue
+      }
+      if arg == "--stdlib-unittest-shard-index" {
+        shardIndex = Int(CommandLine.arguments[i + 1]) ?? 0
+        i += 2
+        continue
+      }
       if arg == "--help" {
         let message =
 "optional arguments:\n" +
@@ -1789,7 +1829,9 @@ public func runAllTests() {
 "                        Useful for running under a debugger.\n" +
 "--stdlib-unittest-filter FILTER-STRING\n" +
 "                        only run tests whose names contain FILTER-STRING as\n" +
-"                        a substring."
+"                        a substring.\n" +
+"--stdlib-unittest-shard-count N / --stdlib-unittest-shard-index I\n" +
+"                        run only the I-th of N disjoint shards of the tests.\n"
         print(message)
         return
       }
@@ -1801,7 +1843,9 @@ public func runAllTests() {
     }
 
     let parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter,
+      shardCount: shardCount, shardIndex: shardIndex
+    )
     parent.run()
   }
 }
@@ -1836,6 +1880,8 @@ public func runAllTestsAsync() async {
   } else {
     var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
+    var shardCount: Int?
+    var shardIndex: Int = 0
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
@@ -1851,6 +1897,16 @@ public func runAllTestsAsync() async {
         i += 2
         continue
       }
+      if arg == "--stdlib-unittest-shard-count" {
+        shardCount = Int(CommandLine.arguments[i + 1])
+        i += 2
+        continue
+      }
+      if arg == "--stdlib-unittest-shard-index" {
+        shardIndex = Int(CommandLine.arguments[i + 1]) ?? 0
+        i += 2
+        continue
+      }
       if arg == "--help" {
         let message =
 "optional arguments:\n" +
@@ -1859,7 +1915,9 @@ public func runAllTestsAsync() async {
 "                        Useful for running under a debugger.\n" +
 "--stdlib-unittest-filter FILTER-STRING\n" +
 "                        only run tests whose names contain FILTER-STRING as\n" +
-"                        a substring."
+"                        a substring.\n" +
+"--stdlib-unittest-shard-count N / --stdlib-unittest-shard-index I\n" +
+"                        run only the I-th of N disjoint shards of the tests.\n"
         print(message)
         return
       }
@@ -1871,7 +1929,8 @@ public func runAllTestsAsync() async {
     }
 
     let parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter,
+      shardCount: shardCount, shardIndex: shardIndex)
     await parent.runAsync()
   }
 }
@@ -2156,8 +2215,13 @@ public final class TestSuite {
       return self
     }
 
-    public func crashOutputMatches(_ string: String) -> _TestBuilder {
-      _data._crashOutputMatches.append(string)
+    public func crashOutputMatches(
+      _ string: String,
+      when predicate: Bool = true
+    ) -> _TestBuilder {
+      if predicate {
+        _data._crashOutputMatches.append(string)
+      }
       return self
     }
 
@@ -2289,7 +2353,7 @@ public enum TestRequirement: CustomStringConvertible {
       !version.isAvailable
     case .crashTesting:
       switch _getRunningOSVersion() {
-      case .wasi:
+      case .wasi, .emscripten:
         true
       default:
         false
@@ -2324,6 +2388,7 @@ public enum OSVersion : CustomStringConvertible {
   case windows
   case haiku
   case wasi
+  case emscripten
 
   public var description: String {
     switch self {
@@ -2363,6 +2428,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Haiku"
     case .wasi:
       return "WASI"
+    case .emscripten:
+      return "Emscripten"
     }
   }
 }
@@ -2413,6 +2480,8 @@ func _getOSVersion() -> OSVersion {
   return .haiku
 #elseif os(WASI)
   return .wasi
+#elseif os(Emscripten)
+  return .emscripten
 #else
   let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -2513,6 +2582,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case haikuAny(reason: String)
 
   case wasiAny(reason: String)
+
+  case emscriptenAny(reason: String)
 
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
@@ -2639,6 +2710,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .wasiAny(reason: let reason):
       return "wasiAny(*, reason: \(reason))"
+
+    case .emscriptenAny(reason: let reason):
+      return "emscriptenAny(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -3028,6 +3102,14 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .wasiAny:
       switch _getRunningOSVersion() {
       case .wasi:
+        return true
+      default:
+        return false
+      }
+
+    case .emscriptenAny:
+      switch _getRunningOSVersion() {
+      case .emscripten:
         return true
       default:
         return false

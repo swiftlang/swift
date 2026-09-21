@@ -3,7 +3,7 @@
 import StdOptional
 import CxxStdlib
 
-func takeCopyable<T: Copyable>(_ x: T) {} // expected-note {{'where T: Copyable' is implicit here}}
+func takeCopyable<T: Copyable>(_ x: T) {} // expected-note* {{'where T: Copyable' is implicit here}}
 
 func takeCxxOptional<T: CxxOptional>(_ x: T) {
   _ = x.hasValue
@@ -19,4 +19,37 @@ let nonNilOptNonCopyable = getNonNilOptionalHasDeletedCopyCtor()
 takeCopyable(nonNilOptNonCopyable) // expected-error {{conform to 'Copyable'}}
 var _ = nonNilOptNonCopyable.pointee
 
+let optVectorNonCopyable = getNonNilOptionalMoveOnlyVector()
+takeCopyable(optVectorNonCopyable) // expected-error {{conform to 'Copyable'}}
+var _ = optVectorNonCopyable.pointee
+var _ = optVectorNonCopyable.pointee[0].value
+
 let _ = returnsConvertsToTemplated() // shouldn't crash the compiler
+
+func testNulloptAssign(_ opt: inout StdOptionalInt) {
+  opt = std.nullopt
+  // expected-error@-1 {{cannot assign value of type}}
+  // expected-note@-2 {{use the 'nil' literal instead}} {{9-20=nil}}
+}
+
+func testNulloptInit() {
+  let _: StdOptionalInt = std.nullopt
+  // expected-error@-1 {{cannot convert value of type}}
+  // expected-note@-2 {{use the 'nil' literal instead}} {{27-38=nil}}
+}
+
+func testNulloptReturn() -> StdOptionalInt {
+  return std.nullopt
+  // expected-error@-1 {{cannot convert return expression of type}}
+  // expected-note@-2 {{use the 'nil' literal instead}} {{10-21=nil}}
+}
+
+func testNulloptDefaultArg(_ x: StdOptionalInt = std.nullopt) {}
+// expected-error@-1 {{default argument value of type}}
+// expected-note@-2 {{use the 'nil' literal instead}} {{50-61=nil}}
+
+func testNulloptTernary() -> StdOptionalInt {
+  return true ? StdOptionalInt(1) : std.nullopt
+  // expected-error@-1 {{cannot convert return expression of type}}
+  // expected-note@-2 {{use the 'nil' literal instead}}
+}

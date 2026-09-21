@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name vtable_thunks_reabstraction_final %s | %FileCheck %s
 

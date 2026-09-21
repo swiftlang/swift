@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types %s -dead-store-elimination -enable-sil-verify-all | %FileCheck %s
 // RUN: %target-sil-opt -sil-print-types %s -compute-side-effects -dead-store-elimination -enable-sil-verify-all | %FileCheck %s --check-prefix=CHECK-SEA-DSE
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -161,6 +160,25 @@ bb0(%0 : $AB, %1 : $Int):
   store %1 to %2 : $*Int
   %18 = tuple ()
   return %18 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_store_across_borrow_scopes :
+// CHECK-NOT:     store
+// CHECK:         end_borrow
+// CHECK:         begin_borrow
+// CHECK:         store %1
+// CHECK:       end sil function 'dead_store_across_borrow_scopes'
+sil [ossa] @dead_store_across_borrow_scopes : $@convention(thin) (@owned AB, Int) -> @owned AB {
+bb0(%0 : @owned $AB, %1 : $Int):
+  %2 = begin_borrow %0
+  %3 = ref_element_addr %2, #AB.value
+  store %1 to [trivial] %3
+  end_borrow %2
+  %6 = begin_borrow %0
+  %7 = ref_element_addr %6, #AB.value
+  store %1 to [trivial] %7
+  end_borrow %6
+  return %0
 }
 
 // We should be able to remove the local store that is not read.
@@ -365,7 +383,7 @@ bb0(%0 : $*Builtin.Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = integer_literal $Builtin.Int32, 1
   store %1 to %0 : $*Builtin.Int32
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb3
 
 bb1:
   store %2 to %0 : $*Builtin.Int32
@@ -374,16 +392,17 @@ bb1:
 bb2:
   %9999 = tuple()
   return %9999 : $()
+
+bb3:
+  br bb2
 }
 
-// We cannot remove the local store as the debug_value w/ address value
-// could be promoted and thus act as a read on the memory location..
-//
-// CHECK-LABEL: blocking_debug_value_addr_on_dead_store
-// CHECK: bb0
-// CHECK: {{ store}}
-// CHECK: debug_value %{{.*}} : $*Int
-sil hidden @blocking_debug_value_addr_on_dead_store : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @debug_value_addr_on_dead_store
+// CHECK-NOT:     store
+// CHECK:         debug_value %2 : $Int, var, name "a"
+// CHECK-NOT:     store
+// CHECK:       } // end sil function 'debug_value_addr_on_dead_store'
+sil @debug_value_addr_on_dead_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"
   %1 = integer_literal $Builtin.Int64, 1
@@ -888,7 +907,7 @@ bb2:
   %18 = struct_element_addr %2 : $*S1, #S1.a
   store %17 to %18 : $*Int
   %9 = struct_extract %0 : $Bool, #Bool.value
-  cond_br %9, bb1, bb3
+  cond_br %9, bb4, bb3
 
 bb3:
   %21 = integer_literal $Builtin.Int64, 2
@@ -898,6 +917,9 @@ bb3:
   %25 = tuple ()
   dealloc_stack %2 : $*S1
   return %25 : $()
+
+bb4:
+  br bb1
 }
 
 // Remove dead stores in loop blocks, as the store in exit block kills them.
@@ -931,7 +953,7 @@ bb2:
   %18 = struct_element_addr %2 : $*S1, #S1.a
   store %17 to %18 : $*Int
   %9 = struct_extract %0 : $Bool, #Bool.value
-  cond_br %9, bb1, bb3
+  cond_br %9, bb4, bb3
 
 bb3:
   %21 = integer_literal $Builtin.Int64, 2
@@ -941,6 +963,9 @@ bb3:
   %25 = tuple ()
   dealloc_stack %2 : $*S1
   return %25 : $()
+
+bb4:
+  br bb1
 }
 
 // Remove dead store in the tuple data structure.
@@ -1355,7 +1380,7 @@ bb0(%0 : $Bool, %1 : $Int):
 
 bb1:
   %12 = struct_extract %0 : $Bool, #Bool.value
-  cond_br %12, bb1, bb2
+  cond_br %12, bb3, bb2
 
 bb2:
   %14 = integer_literal $Builtin.Int64, 2
@@ -1365,6 +1390,9 @@ bb2:
   %18 = tuple ()
   dealloc_stack %2 : $*S1
   return %18 : $()
+
+bb3:
+  br bb1
 }
 
 // Make sure the load in bb1 prevents the store in bb0 to be eliminated. we have a bug
@@ -1494,13 +1522,16 @@ bb1(%2 : $foo):
   %6 = ref_element_addr %2 : $foo, #foo.a
   store %5 to %6 : $*Int
   %9 = alloc_ref $foo
-  cond_br undef, bb1(%9: $foo), bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %7 = ref_element_addr %2 : $foo, #foo.a
   store %5 to %7 : $*Int
   %14 = tuple ()
   return %14 : $()
+
+bb3:
+  br bb1(%9 : $foo)
 }
 
 // CHECK-LABEL: test_is_unique

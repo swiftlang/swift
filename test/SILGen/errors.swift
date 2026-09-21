@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-stdlib -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
@@ -48,6 +49,7 @@ func dont_make_a_cat() throws -> Cat {
 // CHECK-NEXT: [[BOX2:%.*]] = load [take] [[BOXBUF]]
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: dealloc_stack [[BOXBUF]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: throw [[BOX2]]
 func dont_return<T>(_ argument: T) throws -> T {
   throw HomeworkError.TooMuch
@@ -89,6 +91,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Return block.
 // CHECK:    [[RETURN]]([[T0:%.*]] : @owned $Cat):
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[T0]] : $Cat
 
 //   Catch dispatch block.
@@ -112,6 +115,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[MOVED_T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
@@ -187,14 +191,14 @@ func all_together_now(_ flag: Bool) -> Cat {
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
 // CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
 //
 // CHECK: [[CAST_NO_BB]]:
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB]]
 //
-// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $any Error):
-// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors20all_together_now_twoyAA3CatCSgSbKF'
 func all_together_now_two(_ flag: Bool) throws -> Cat? {
   do {
@@ -224,14 +228,14 @@ func all_together_now_two(_ flag: Bool) throws -> Cat? {
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
 // CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
 //
 // CHECK: [[CAST_NO_BB]]:
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB]]
 //
-// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $any Error):
-// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors22all_together_now_threeyAA3CatCSgSbKF'
 func all_together_now_three(_ flag: Bool) throws -> Cat? {
   do {
@@ -274,14 +278,14 @@ func all_together_now_three(_ flag: Bool) throws -> Cat? {
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
 // CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
 //
 // CHECK: [[CAST_NO_BB]]:
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB]]
 //
-// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $any Error):
-// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors21all_together_now_fouryAA3CatCSgSbKF'
 func all_together_now_four(_ flag: Bool) throws -> Cat? {
   do {
@@ -297,6 +301,7 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 // Return block.
 // CHECK:    [[RETURN:bb[0-9]+]]([[RETVAL:%.*]] : @owned $Cat):
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RETVAL]] : $Cat
 
 //   Catch dispatch block.
@@ -317,6 +322,7 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 // CHECK:    [[MATCH_ATE]]([[T0:%.*]] : @owned $Cat):
 // CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[MOVED_T0]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
@@ -328,6 +334,7 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 // CHECK:    [[MATCH_HID]]([[T0:%.*]] : @owned $Cat):
 // CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[MOVED_T0]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
@@ -340,6 +347,7 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 // CHECK-NEXT: [[BORROWED_CAT:%.*]] = begin_borrow [[CAT]] : $Cat
 // CHECK-NEXT: [[COPIED_CAT:%.*]] = copy_value [[BORROWED_CAT]] : $Cat
 // CHECK-NEXT: end_borrow [[BORROWED_CAT]] : $Cat
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_value [[CAT]] : $Cat
 // CHECK-NEXT: destroy_value [[ERROR]] : $any Error
 // CHECK-NEXT: br [[RETURN]]([[COPIED_CAT]] : $Cat)
@@ -362,7 +370,8 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 // CHECK-NEXT: br [[RETHROW]]
 
 // Rethrow
-// CHECK: [[RETHROW]]([[ERROR:%.*]] : @owned $any Error):
+// CHECK: [[RETHROW]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: throw [[ERROR]] : $any Error
 func all_together_now_five(_ flag: Bool) throws -> Cat {
   do {
@@ -412,6 +421,8 @@ class HasThrowingInit {
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
 
 
@@ -619,18 +630,20 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:            struct_extract [[BB]]
 // CHECK:         [[ELT0:%.*]] = ref_tail_addr
 //   Element 0.
+// CHECK:         [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ELT0_PTR:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[IDX0]] : $Builtin.Word
 // CHECK:         [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK:         try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
 // CHECK:       [[NORM_0]]([[CAT0:%.*]] : @owned $Cat):
-// CHECK-NEXT:    store [[CAT0]] to [init] [[ELT0]]
+// CHECK-NEXT:    store [[CAT0]] to [init] [[ELT0_PTR]]
 //   Element 1.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK-NEXT:    [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ELT1:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:    store [[ARG_COPY]] to [init] [[ELT1]]
 //   Element 2.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 2
-// CHECK-NEXT:    [[ELT2:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ELT2:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK-NEXT:    try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_2:bb[0-9]+]], error [[ERR_2:bb[0-9]+]]
@@ -638,7 +651,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    store [[CAT2]] to [init] [[ELT2]]
 //   Element 3.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 3
-// CHECK-NEXT:    [[ELT3:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ELT3:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK-NEXT:    try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_3:bb[0-9]+]], error [[ERR_3:bb[0-9]+]]
@@ -651,6 +664,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    try_apply [[TAKE_FN]]([[FIN_ARRAY]]) : $@convention(thin) (@guaranteed Array<Cat>) -> @error any Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:       [[NORM_CALL]]([[T0:%.*]] : $()):
 // CHECK-NEXT:    destroy_value [[FIN_ARRAY]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return
 //   Failure from element 0.
@@ -663,7 +677,7 @@ func test_variadic(_ cat: Cat) throws {
 //   Failure from element 2.
 // CHECK:       [[ERR_2]]([[ERROR:%.*]] : @owned $any Error):
 // CHECK-NEXT:    destroy_addr [[ELT1]]
-// CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    destroy_addr [[ELT0_PTR]]
 // CHECK:         end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F
@@ -673,7 +687,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:       [[ERR_3]]([[ERROR:%.*]] : @owned $any Error):
 // CHECK-NEXT:    destroy_addr [[ELT2]]
 // CHECK-NEXT:    destroy_addr [[ELT1]]
-// CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    destroy_addr [[ELT0_PTR]]
 // CHECK-NEXT:    end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F
@@ -685,6 +699,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $any Error)
 //   Rethrow.
 // CHECK:       [[RETHROW]]([[ERROR:%.*]] : @owned $any Error):
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors13test_variadicyyAA3CatCKF'
 
@@ -810,6 +825,8 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 // CHECK-NEXT: destroy_value [[INDEX_COPY_1]] : $String
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
@@ -827,6 +844,8 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: destroy_value [[INDEX_COPY_2]] : $String
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: destroy_value [[INDEX_COPY_1]] : $String
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA6BridgeVz_SStKF'
 
@@ -880,6 +899,7 @@ func testOptionalTryThatNeverThrows() {
 // CHECK-NEXT: store [[CAT_ENUM]] to [init] [[PB]] : $*Optional<Cat>
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[LIFETIME]]
 // CHECK-NEXT: destroy_value [[BOX]] : ${ var Optional<Cat> }
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
@@ -907,6 +927,7 @@ func testOptionalTryVar() {
 // CHECK-NEXT: destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT: dealloc_stack [[BOX]] : $*Optional<T>
 // CHECK-NOT: destroy_addr %0 : $*T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $any Error):
@@ -930,9 +951,11 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[LIFETIME]]
 // CHECK-NEXT: destroy_value [[BOX]] : $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK-NOT: destroy_addr %0 : $*T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $any Error):
@@ -960,15 +983,18 @@ func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
 // CHECK-NEXT: destroy_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $any Error):
-// CHECK-NEXT: destroy_value [[ERROR]]
+// The 'try?' landing pad takes no argument: each throw site discards its own
+// in-flight error before branching here.
+// CHECK: [[FAILURE:bb[0-9]+]]:
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : @owned $any Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $any Error)
+// CHECK-NEXT: destroy_value [[ERROR]]
+// CHECK-NEXT: br [[FAILURE]]
 // CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : @owned $any Error):
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $any Error)
+// CHECK-NEXT: br [[FAILURE]]
 // CHECK: } // end sil function '$s6errors23testOptionalTryMultipleyyF'
 func testOptionalTryMultiple() {
   _ = try? (make_a_cat(), make_a_cat())
@@ -994,6 +1020,7 @@ func testOptionalTryNeverFails() {
 // CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
 // CHECK-NEXT:   [[ENUM:%.+]] = enum $Optional<()>, #Optional.some!enumelt, [[VALUE]]
 // CHECK-NEXT:   store [[ENUM]] to [trivial] [[PB]] :
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   end_borrow [[LIFETIME]]
 // CHECK-NEXT:   destroy_value [[BOX]] : ${ var Optional<()> }
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
@@ -1013,6 +1040,7 @@ func testOptionalTryNeverFailsVar() {
 // CHECK-NEXT:   destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT:   dealloc_stack [[BOX]] : $*Optional<T>
 // CHECK-NOT:   destroy_addr %0 : $*T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: } // end sil function '$s6errors36testOptionalTryNeverFailsAddressOnlyyyxlF'
@@ -1028,8 +1056,10 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT:   copy_addr %0 to [init] [[BOX_DATA]] : $*T
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   end_borrow [[LIFETIME]]
 // CHECK-NEXT:   destroy_value [[BOX]] : $<τ_0_0> { var Optional<τ_0_0> } <T>
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK: } // end sil function '$s6errors13OtherErrorSubCACycfC'

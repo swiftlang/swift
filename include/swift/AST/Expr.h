@@ -600,6 +600,9 @@ public:
   /// Whether this expression is a valid parent for a given TypeExpr.
   bool isValidParentOfTypeExpr(Expr *typeExpr) const;
 
+  /// Returns whether this expression comes from expanding a synthetic macro.
+  bool isFromSyntheticMacroExpansion(const DeclContext *DC) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getType,
@@ -4156,6 +4159,9 @@ public:
   /// Whether this closure is Sendable.
   bool isSendable() const;
 
+  /// Whether this closure could be called at most once.
+  bool isCalledOnce() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
@@ -4186,6 +4192,13 @@ public:
   void setActorIsolation(ActorIsolation actorIsolation) {
     this->actorIsolation = actorIsolation;
   }
+
+  /// Determine the section into which this closure should be placed, based on
+  /// an explicit `@section` attribute or the inference rules for `@section`.
+  ///
+  /// \returns the name of the section, or \c std::nullopt if this closure
+  /// belongs in the platform-appropriate default section.
+  std::optional<StringRef> getSection() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
@@ -4642,10 +4655,12 @@ struct CaptureListEntry {
 
   explicit CaptureListEntry(PatternBindingDecl *PBD);
 
-  static CaptureListEntry
-  createParsed(ASTContext &Ctx, ReferenceOwnership ownershipKind,
-               SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
-               SourceLoc equalLoc, Expr *initializer, DeclContext *DC);
+  static CaptureListEntry createParsed(ASTContext &Ctx,
+                                       ReferenceOwnership ownershipKind,
+                                       SourceRange ownershipRange,
+                                       bool isSending, Identifier name,
+                                       SourceLoc nameLoc, SourceLoc equalLoc,
+                                       Expr *initializer, DeclContext *DC);
 
   VarDecl *getVar() const;
   bool isSimpleSelfCapture(bool excludeWeakCaptures = true) const;
@@ -5562,26 +5577,27 @@ class ArrowExpr : public Expr {
   SourceLoc ThrowsLoc;
   SourceLoc ArrowLoc;
   Expr *Args;
+  Expr *Yields;
   Expr *Result;
   Expr *ThrownType;
 
 public:
   ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
-            Expr *ThrownType, SourceLoc ArrowLoc, Expr *Result)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
-      Result(Result), ThrownType(ThrownType)
-  { }
+            Expr *ThrownType, Expr *Yields, SourceLoc ArrowLoc, Expr *Result)
+      : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Yields(Yields),
+        Result(Result), ThrownType(ThrownType) {}
 
   ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, Expr *ThrownType,
             SourceLoc ArrowLoc)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
-      Args(nullptr), Result(nullptr), ThrownType(ThrownType)
-  { }
+      : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr),
+        Yields(nullptr), Result(nullptr), ThrownType(ThrownType) {}
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
+  Expr *getYieldsExpr() const { return Yields; }
+  void setYieldsExpr(Expr *E) { Yields = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
   Expr *getThrownTypeExpr() const { return ThrownType; }
@@ -6781,8 +6797,16 @@ void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
+/// Disambiguate between the \c Expr and \c DeclContext overloads, both of
+/// which \c AbstractClosureExpr inherits.
+void simple_display(llvm::raw_ostream &out, const AbstractClosureExpr *CE);
+
 SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 SourceLoc extractNearestSourceLoc(const Expr *expr);
+
+/// Disambiguate between the \c Expr and \c DeclContext overloads, both of
+/// which \c AbstractClosureExpr inherits.
+SourceLoc extractNearestSourceLoc(const AbstractClosureExpr *expr);
 
 } // end namespace swift
 

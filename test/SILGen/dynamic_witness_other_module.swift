@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module %S/Inputs/dynamic_witness_other_module_other.swift -emit-module-path %t
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -I %t
 // RUN: %target-swift-emit-silgen %s -I %t | %FileCheck %s
 // RUN: %target-swift-emit-ir %s -I %t > /dev/null
 

@@ -22,7 +22,6 @@
 #include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -31,7 +30,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LanguageMode.h"
 #include "llvm/ADT/SmallVector.h"
 using namespace swift;
@@ -60,17 +58,19 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   // Determine the input and result types of this function.
   auto fnType = type->castTo<AnyFunctionType>();
   auto parameters = fnType->getParams();
+  auto yields = fnType->getYields();
   Type resultType =
       dropResultOptionality(fnType->getResult(), uncurryLevel - 1);
 
   // Produce the resulting function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    parameters, resultType,
+                                    parameters, yields, resultType,
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+  return FunctionType::get(parameters, yields, resultType,
+                           fnType->getExtInfo());
 }
 
 Type swift::getMemberTypeForComparison(const ValueDecl *member,
@@ -105,8 +105,8 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     auto funcTy = memberType->castTo<AnyFunctionType>();
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    memberType =
-        FunctionType::get(funcTy->getParams(), funcTy->getResult(), info);
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                                   funcTy->getResult(), info);
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();
@@ -252,14 +252,15 @@ static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
 
   auto deploymentContext = AvailabilityContext::forDeploymentTarget(ctx);
-  auto constraints = getAvailabilityConstraintsForDecl(decl, deploymentContext);
-  for (auto constraint : constraints) {
-    switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  auto restrictions = deploymentContext.allRestrictionsForDecl(decl);
+  for (auto restriction : restrictions) {
+    switch (restriction.getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
       return true;
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
-    case AvailabilityConstraint::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::Deprecated:
       break;
     }
   }
@@ -966,9 +967,9 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     for (auto *ctx : superContexts) {
       ctx->synthesizeSemanticMembersIfNeeded(membersName);
     }
-    auto lookupOptions = NL_QualifiedDefault;
+    NLOptions lookupOptions = NLFlags::QualifiedDefault;
     if (ignoreMissingImports)
-      lookupOptions |= NL_IgnoreMissingImports;
+      lookupOptions |= NLFlags::IgnoreMissingImports;
 
     dc->lookupQualified(superContexts, DeclNameRef(membersName), decl->getLoc(),
                         lookupOptions, members);
@@ -1127,9 +1128,10 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       diags.diagnose(decl, diag::override_of_non_open, decl);
     }
   } else if (baseHasOpenAccess &&
-             classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() < AccessLevel::Public &&
-             !decl->isSemanticallyFinal()) {
+             !decl->isSemanticallyFinal() &&
+             classDecl->hasOpenAccess(dc) &&
+             classDecl->getFormalAccessScope(dc).isPublic()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
                                  /*setter*/ false, decl,
@@ -1601,8 +1603,12 @@ namespace  {
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
+    UNINTERESTING_ATTR(COM)
+    UNINTERESTING_ATTR(Called)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(Coroutine)
+    UNINTERESTING_ATTR(CxxDecl)
     UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(DynamicCallable)
@@ -1670,6 +1676,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
+    UNINTERESTING_ATTR(Target)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
@@ -1839,13 +1846,13 @@ enum class OverrideAvailability {
   Ignored,
 };
 
-static std::pair<OverrideAvailability, std::optional<AvailabilityConstraint>>
+static std::pair<OverrideAvailability, std::optional<AvailabilityRestriction>>
 getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
+  // FIXME: [availability] Adopt getRequirementMatchAvailabilityRestriction().
   auto &ctx = override->getASTContext();
 
-  // Availability is contravariant so make sure the availability of of an
-  // overridden declaration is fully contained in the availability of the
-  // overriding declaration.
+  // Availability is contravariant so make sure the overriding declaration is
+  // at least as available as the overridden declaration.
   auto baseAvailability = AvailabilityContext::forDeclSignature(base);
 
   // The override is allowed to be less available than the base decl as long as
@@ -1856,32 +1863,30 @@ getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
 
   // In order to maintain source compatibility, universally unavailable decls
   // are allowed to override universally unavailable bases.
-  AvailabilityConstraintFlags flags;
-  flags |= AvailabilityConstraintFlag::
+  AvailabilityRestrictionFlags flags;
+  flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  if (auto constraint =
-          getAvailabilityConstraintsForDecl(override, baseAvailability, flags)
-              .getPrimaryConstraint()) {
-    if (constraint->isUnavailable())
-      return {OverrideAvailability::OverrideUnavailable, constraint};
+  if (auto restriction =
+          baseAvailability.unsatisfiedRestrictionForDecl(override, flags)) {
+    if (restriction->isUnavailable())
+      return {OverrideAvailability::OverrideUnavailable, restriction};
 
-    return {OverrideAvailability::OverrideLessAvailable, constraint};
+    return {OverrideAvailability::OverrideLessAvailable, restriction};
   }
 
   // Check whether the base is unavailable from the perspective of the override.
   auto overrideAvailability = AvailabilityContext::forDeclSignature(override);
-  if (auto baseConstraint =
-          getAvailabilityConstraintsForDecl(base, overrideAvailability, flags)
-              .getPrimaryConstraint()) {
-    if (baseConstraint->isUnavailable())
-      return {OverrideAvailability::BaseUnavailable, baseConstraint};
+  if (auto baseRestriction =
+          overrideAvailability.restrictionForDecl(base, flags)) {
+    if (baseRestriction->isUnavailable())
+      return {OverrideAvailability::BaseUnavailable, baseRestriction};
   }
 
   return {OverrideAvailability::Compatible, std::nullopt};
 }
 
-static std::pair<OverrideAvailability, std::optional<AvailabilityConstraint>>
+static std::pair<OverrideAvailability, std::optional<AvailabilityRestriction>>
 checkOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   auto &ctx = override->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
@@ -2128,7 +2133,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(
-                overrideThrownError, baseThrownError, overrideFn)) {
+                overrideThrownError, baseThrownError)) {
     case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects, override,
                      "throwing");

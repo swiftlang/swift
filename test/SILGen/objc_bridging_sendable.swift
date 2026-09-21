@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_bridging_sendable.h %s
+
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_bridging_sendable.h %s | %FileCheck %s
 
 // REQUIRES: objc_interop

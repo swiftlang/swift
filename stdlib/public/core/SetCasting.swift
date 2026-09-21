@@ -13,7 +13,7 @@
 //===--- Compiler conversion/casting entry points for Set<Element> --------===//
 
 extension Set {
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @export(implementation) // Introduced in 5.1
   @inline(__always)
   internal init?<C: Collection>(
     _mapping source: C,

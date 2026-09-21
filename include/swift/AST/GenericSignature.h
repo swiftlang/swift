@@ -162,6 +162,18 @@ public:
   /// pointer is \c nullptr. The result is cached.
   CanGenericSignature getCanonicalSignature() const;
 
+  /// Whether this signature is more generic than \p outerSig in a way that
+  /// affects ABI.
+  ///
+  /// Differences that don't affect ABI are ignored, such as requirements that
+  /// only add conformances to marker protocols. Either signature may be null.
+  ///
+  /// This is the notion Embedded Swift uses to decide whether a member is
+  /// "generic" relative to the context that declares it: a method of a generic
+  /// class that only uses the class's own generic parameters is not more
+  /// generic than the class, and needs no separate specialization.
+  bool isABIMoreGenericThan(GenericSignature outerSig) const;
+
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
 
@@ -323,6 +335,17 @@ public:
       SmallVector<Requirement, 2> &reqs,
       SmallVector<InverseRequirement, 2> &inverses) const;
 
+  /// A version of `getRequirementsWithInverses` for the ASTPrinter, to help
+  /// with the migration from the legacy SuppressedAssociatedTypes and the new
+  /// SuppressedAssociatedTypesWithDefaults (aka SE-503).
+  ///
+  /// Do not introduce new uses of this function. It should be removed!
+  ///
+  /// \param reqs will include extra requirements for the ASTPrinter.
+  void getRequirementsWithInversesForPrinting(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses) const;
+
   /// Iterate over all generic parameters, passing a flag to the callback
   /// indicating if the generic parameter is canonical or not.
   void forEachParam(
@@ -334,6 +357,12 @@ public:
 
   /// Check if the generic signature has a parameter pack.
   bool hasParameterPack() const;
+
+  /// Determine whether an entity with the given generic signature can be
+  /// emitted in Embedded Swift.
+  ///
+  /// This captures the restrictions needed to avoid unspecialized generics.
+  bool canBeEmittedInEmbeddedSwift() const;
 
   /// Compute the number of conformance requirements in this signature.
   unsigned getNumConformanceRequirements() const {
@@ -551,17 +580,31 @@ private:
   /// Return the reduced version of the given type under this generic
   /// signature.
   CanType getReducedType(Type type) const;
+
+  /// Transform the requirements into a form where implicit Copyable and
+  /// Escapable conformances are omitted, and their absence is explicitly
+  /// noted.
+  ///
+  /// \param ForPrinting controls whether some Requirements are not omitted,
+  /// for the ASTPrinter's needs.
+  void getRequirementsWithInversesImpl(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses,
+      bool ForPrinting) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);
 
 inline bool CanGenericSignature::isActuallyCanonicalOrNull() const {
-  return getPointer() == nullptr ||
-         getPointer() ==
-             llvm::DenseMapInfo<GenericSignatureImpl *>::getEmptyKey() ||
-         getPointer() ==
-             llvm::DenseMapInfo<GenericSignatureImpl *>::getTombstoneKey() ||
-         getPointer()->isCanonical();
+#if LLVM_VERSION_MAJOR <= 21
+  if (getPointer() ==
+          llvm::DenseMapInfo<GenericSignatureImpl *>::getEmptyKey() ||
+      getPointer() ==
+          llvm::DenseMapInfo<GenericSignatureImpl *>::getTombstoneKey())
+    return true;
+#endif
+
+  return getPointer() == nullptr || getPointer()->isCanonical();
 }
 
 int compareAssociatedTypes(AssociatedTypeDecl *assocType1,

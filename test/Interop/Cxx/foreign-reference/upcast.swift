@@ -2,6 +2,10 @@
 
 // REQUIRES: executable_test
 
+// Temporarily disable when running with an older runtime (rdar://181060167)
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 import Upcast
 

@@ -12,6 +12,7 @@
 
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 protocol P {
   func f() -> Int

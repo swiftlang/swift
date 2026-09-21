@@ -1,8 +1,10 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // CHECK-LABEL: @$s4main14receive_simpleyyxxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
 // CHECK:       bb0(%0 : $*Pack{repeat each T}):
 // CHECK-NEXT:    debug_value
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func receive_simple<each T>(_ args: repeat each T) {}
@@ -10,6 +12,7 @@ func receive_simple<each T>(_ args: repeat each T) {}
 // CHECK-LABEL: @$s4main20receive_simple_ownedyyxxQpnRvzlF : $@convention(thin) <each T> (@pack_owned Pack{repeat each T}) -> () {
 // CHECK:       bb0(%0 : $*Pack{repeat each T}):
 // CHECK-NEXT:    debug_value
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
@@ -20,7 +23,7 @@ func receive_simple<each T>(_ args: repeat each T) {}
 // CHECK:       bb2:
 // CHECK-NEXT:    [[IDX:%.*]] = builtin "sub_Word"([[LAST_IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    destroy_addr [[ELT_ADDR]] : $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    br bb1([[IDX]] : $Builtin.Word)
@@ -108,7 +111,7 @@ func scalar_test1(i: Int, f: Float, s: String) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T
@@ -122,6 +125,7 @@ func scalar_test1(i: Int, f: Float, s: String) {
 // CHECK-NEXT:    destroy_addr [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_pack [[PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func pack_test0<each T>(args: repeat each T) {
@@ -141,7 +145,7 @@ func pack_test0<each T>(args: repeat each T) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T
@@ -154,6 +158,7 @@ func pack_test0<each T>(args: repeat each T) {
 // CHECK-NEXT:    apply [[FN]]<Pack{repeat each T}>([[PACK]])
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_pack [[PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func pack_test1<each T>(args: repeat each T) {
@@ -180,7 +185,7 @@ func pack_test1<each T>(args: repeat each T) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[INDEX:%.*]] = pack_pack_index 1, [[EXPANSION_INDEX]] of $Pack{Int, repeat each T, String}
 // CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[EXPANSION_INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
@@ -204,6 +209,9 @@ func pack_test1<each T>(args: repeat each T) {
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_stack [[INT_ADDR]] : $*Int
 // CHECK-NEXT:    dealloc_pack [[PACK]] : $*Pack{Int, repeat each T, String}
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func pack_test2<each T>(args: repeat each T, i: Int, s: String) {

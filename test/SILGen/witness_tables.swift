@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name witness_tables  -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-silgen -module-name witness_tables  -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop > %t.sil
 // RUN: %FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: %FileCheck -check-prefix=SYMBOL %s < %t.sil

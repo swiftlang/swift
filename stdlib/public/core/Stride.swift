@@ -225,7 +225,7 @@ extension Strideable {
 }
 
 extension Strideable where Self: FixedWidthInteger & SignedInteger {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -243,7 +243,7 @@ extension Strideable where Self: FixedWidthInteger & SignedInteger {
 }
 
 extension Strideable where Self: FixedWidthInteger & UnsignedInteger {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -285,6 +285,33 @@ extension Strideable where Self: FloatingPoint, Self == Stride {
       return (i + 1, start.addingProduct(Stride(i + 1), distance))
     }
     return (nil, current.value.advanced(by: distance))
+  }
+}
+
+extension Strideable {
+  @export(implementation)
+  internal mutating func _advance(
+    by distance: inout Stride, limitedBy limit: Self
+  ) {
+    if distance >= 0 {
+      guard limit >= self else {
+        self = self.advanced(by: distance)
+        distance = 0
+        return
+      }
+      let d = Swift.min(distance, self.distance(to: limit))
+      self = self.advanced(by: d)
+      distance -= d
+    } else {
+      guard limit <= self else {
+        self = self.advanced(by: distance)
+        distance = 0
+        return
+      }
+      let d = Swift.max(distance, self.distance(to: limit))
+      self = self.advanced(by: d)
+      distance -= d
+    }
   }
 }
 

@@ -73,6 +73,12 @@ namespace swift {
   struct Diag {
     /// The diagnostic ID corresponding to this diagnostic.
     DiagID ID;
+
+    // 0 corresponds to diag::invalid_diagnostic. Unfortunately we can't define
+    // this out-of-line due to the template, and we can't include the diagnostic
+    // since that's a header cycle.
+    Diag() : ID(static_cast<DiagID>(0)) {}
+    Diag(DiagID id) : ID(id) {}
   };
 
   namespace detail {
@@ -436,6 +442,16 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilLanguageMode(LanguageMode mode);
 
+    /// Conditionally limit the diagnostic behavior to warning until the
+    /// specified language mode. If \p mode is \c std::nullopt, no limit is
+    /// imposed.
+    InFlightDiagnostic &
+    warnUntilLanguageMode(std::optional<LanguageMode> mode) {
+      if (!mode)
+        return *this;
+      return warnUntilLanguageMode(*mode);
+    }
+
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
     ///
@@ -765,9 +781,12 @@ namespace swift {
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
 
-    /// If this diagnostic is a warning belonging to a diagnostic group,
-    /// figure out if there is a source-level (`@warn`) control for this group
-    /// for this diagnostic's source location.
+    /// Determine any user-configured behavior for this diagnostic's group,
+    /// combining the command-line warning controls (`-Werror`, `-Wwarning`,
+    /// `-warnings-as-errors`) with any source-level (`@diagnose`) control at
+    /// the diagnostic's source location.
+    ///
+    /// Caller must ensure \p diag's effective behavior is a warning.
     std::optional<DiagnosticBehavior>
     determineUserControlledWarningBehavior(const Diagnostic &diag,
                                            SourceManager &sourceMgr) const;

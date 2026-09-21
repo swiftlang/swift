@@ -25,6 +25,10 @@ struct FunctionPassContext : MutatingContext {
     return bridgedPassContext.continueWithNextSubpassRun(inst.bridged)
   }
 
+  func continueWithNextSubpassRun(forValue value: Value?) -> Bool {
+    return bridgedPassContext.continueWithNextSubpassRun(value.bridged)
+  }
+
   func createSimplifyContext(preserveDebugInfo: Bool,
                              notifyInstructionChanged: @escaping (Instruction) -> ()
   ) -> SimplifyContext {
@@ -69,14 +73,6 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func eliminateDeadAllocations(in function: Function) -> Bool {
-    if bridgedPassContext.eliminateDeadAllocations(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
-  }
-
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
     if bridgedPassContext.specializeClassMethodInst(cm.bridged) {
       notifyInstructionsChanged()
@@ -88,6 +84,19 @@ struct FunctionPassContext : MutatingContext {
 
   func specializeWitnessMethodInst(_ wm: WitnessMethodInst) -> Bool {
     if bridgedPassContext.specializeWitnessMethodInst(wm.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
+  /// Rewrite `kpi`'s pattern so it no longer depends on the instruction's
+  /// substitution map, specializing the accessor thunks of any computed
+  /// component. Returns true if `kpi` was replaced, in which case the original
+  /// instruction has been erased.
+  func specializeKeyPathInst(_ kpi: KeyPathInst) -> Bool {
+    if bridgedPassContext.specializeKeyPathInst(kpi.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true

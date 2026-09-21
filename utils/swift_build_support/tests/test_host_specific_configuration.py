@@ -185,9 +185,9 @@ class ToolchainTestCase(unittest.TestCase):
             'build_tvos_simulator')
     test_should_skip_building_watchos =\
         generate_should_skip_building_platform(
-            'watchos-armv7k',
+            'watchos-arm64_32',
             'WATCHOS',
-            'swift-test-stdlib-watchos-armv7k',
+            'swift-test-stdlib-watchos-arm64_32',
             'build_watchos_device')
     test_should_skip_building_watchos_sim =\
         generate_should_skip_building_platform(
@@ -427,7 +427,7 @@ class ToolchainTestCase(unittest.TestCase):
             'build_tvos_device')
     test_should_build_and_run_benchmarks_watchos_armv7k =\
         generate_should_build_benchmarks(
-            'watchos-armv7k',
+            'watchos-arm64_32',
             'build_watchos_device')
     # NOTE: other platforms/architectures do not support benchmarks
 

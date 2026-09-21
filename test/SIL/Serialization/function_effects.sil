@@ -4,7 +4,6 @@
 // RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name effects
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name effects -emit-sorted-sil | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift

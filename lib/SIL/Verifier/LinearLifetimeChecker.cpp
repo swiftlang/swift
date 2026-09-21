@@ -22,8 +22,6 @@
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
 #include "LinearLifetimeCheckerPrivate.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -31,9 +29,6 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -74,8 +69,6 @@ struct State {
   /// It also handles any asserts/messages that need to be emitted if we are
   /// supposed to fail hard.
   LinearLifetimeChecker::ErrorBuilder &errorBuilder;
-
-  InstructionIndices *instIndices;
 
   /// The blocks that we have already visited.
   BasicBlockSet visitedBlocks;
@@ -120,7 +113,6 @@ struct State {
   llvm::SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-        InstructionIndices *instIndices,
         std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         std::optional<function_ref<void(Operand *)>>
             nonConsumingUseOutsideLifetimeCallback,
@@ -129,7 +121,6 @@ struct State {
         ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginInst(value->getDefiningInsertionPoint()),
         errorBuilder(errorBuilder),
-        instIndices(instIndices),
         visitedBlocks(value->getFunction()),
         leakingBlockCallback(leakingBlockCallback),
         nonConsumingUseOutsideLifetimeCallback(
@@ -140,7 +131,6 @@ struct State {
 
   State(SILBasicBlock *beginBlock,
         LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-        InstructionIndices *instIndices,
         std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         std::optional<function_ref<void(Operand *)>>
             nonConsumingUseOutsideLifetimeCallback,
@@ -148,7 +138,6 @@ struct State {
         ArrayRef<Operand *> extendLifetimeUses,
         ArrayRef<Operand *> nonConsumingUses)
       : value(), beginInst(&*beginBlock->begin()), errorBuilder(errorBuilder),
-        instIndices(instIndices),
         visitedBlocks(beginBlock->getParent()),
         leakingBlockCallback(leakingBlockCallback),
         nonConsumingUseOutsideLifetimeCallback(
@@ -615,23 +604,7 @@ void State::checkDataflowEndState(DeadEndBlocks *deBlocks) {
 }
 
 bool State::dominates(SILInstruction *before, SILInstruction *after) {
-  SILBasicBlock *block = before->getParent();
-  ASSERT(block == after->getParent());
-
-  if (!instIndices) {
-    // If we don't have instruction indices we have to fall back to linear search.
-    // This is the case if the LinearLifetimeChecker is used inside optimizations
-    // (and not for verification).
-    for (auto iter = before->getIterator(); iter != block->end(); ++iter) {
-      if (&*iter == after)
-        return true;
-    }
-    return false;
-  }
-  // Note that it might happen that for absurdly large basic blocks, the instruction
-  // indices are "maxed out". In this case we cannot compute the before-after
-  // relation efficiently and we conservatively return true.
-  return instIndices->get(before) <= instIndices->get(after);
+  return before == after || before->strictlyDominatesInBlock(after);
 }
 
 //===----------------------------------------------------------------------===//
@@ -666,7 +639,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     }
   }
 
-  State state(value, errorBuilder, instIndices, leakingBlockCallback,
+  State state(value, errorBuilder, leakingBlockCallback,
               nonConsumingUseOutsideLifetimeCallback, consumingUses,
               extendLifetimeUses, nonConsumingUses);
 

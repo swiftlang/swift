@@ -60,6 +60,17 @@ KeyPathGenericWitnessTable swift_keyPathGenericWitnessTable = {
 /****************************************************************************/
 /** Projection functions ****************************************************/
 /****************************************************************************/
+//
+// `swift_readAtKeyPath`, `swift_modifyAtWritableKeyPath`, and
+// `swift_modifyAtReferenceWritableKeyPath` are the thin yield-once coroutine
+// ramp functions used to project through a key path.  Their ABI is fixed for
+// non-embedded Swift, so we keep them here as small C++ adapters that call
+// into Swift-side `_impl` helpers (see KeyPath.swift).
+//
+// In embedded Swift the C++ runtime is not compiled in and these entry points
+// are instead provided by `_read`/`_modify` accessors emitted with
+// `@convention(method)`; SILGen selects the right convention based on the
+// enabled feature set (see `SILGenModule::getKeyPathProjectionCoroutine`).
 
 namespace {
   struct AddrAndOwner {

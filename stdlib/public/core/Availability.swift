@@ -29,7 +29,7 @@ import SwiftShims
 /// that are unnecessary due to the current deployment target. We call through
 /// to the _stdlib_isOSVersionAtLeast_AEIC function below to work around this,
 /// as the optimizer is able to perform this optimization for a
-/// @_alwaysEmitIntoClient function. We can't use @_alwaysEmitIntoClient
+/// @export(implementation) function. We can't use @export(implementation)
 /// directly on this call because it would break ABI for existing apps.
 ///
 /// `@_transparent` breaks the interpreter mode on macOS, as it creates a direct
@@ -66,7 +66,7 @@ public func _stdlib_isOSVersionAtLeast(
 
 @_semantics("availability.osversion")
 @_effects(readnone)
-@_alwaysEmitIntoClient
+@export(implementation)
 #if hasFeature(Macros)
 @_noLocks
 #endif
@@ -203,7 +203,7 @@ public typealias _SwiftStdlibVersion = SwiftShims._SwiftStdlibVersion
 ///     if #available(Swift 6.2, *) { }
 ///
 @available(SwiftStdlib 5.7, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _isSwiftRuntimeVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -234,33 +234,33 @@ internal func _isExecutableLinkedOnOrAfter(
 }
 
 extension _SwiftStdlibVersion {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v5_6_0: Self { Self(_value: 0x050600) }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v5_7_0: Self { Self(_value: 0x050700) }
 
   // Note: As of now, there is no bincompat level defined for the versions
   // below. If you need to use one of these in a call to
   // `_isExecutableLinkedOnOrAfter`, then you'll need to define the
   // corresponding version in the runtime.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v5_8_0: Self { Self(_value: 0x050800) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v5_9_0: Self { Self(_value: 0x050900) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v5_10_0: Self { Self(_value: 0x050A00) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v6_0_0: Self { Self(_value: 0x060000) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v6_1_0: Self { Self(_value: 0x060100) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v6_2_0: Self { Self(_value: 0x060200) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v6_3_0: Self { Self(_value: 0x060300) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v6_4_0: Self { Self(_value: 0x060400) }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var v6_5_0: Self { Self(_value: 0x060500) }
 
   private static var _current: Self { .v6_5_0 }
@@ -280,7 +280,7 @@ extension _SwiftStdlibVersion {
   }
 #endif
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(
     _ major: Builtin.Word,
     _ minor: Builtin.Word,

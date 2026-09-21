@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 func test2() throws { // Not OK
   // The literal closure below is in a generic error context, even though
@@ -15,6 +16,8 @@ func test2() throws { // Not OK
     // CHECK: bb{{[0-9]+}}:
     // CHECK: bb{{[0-9]+}}:
     // CHECK:      end_borrow [[ERROR_BORROW]]
+    // CHECK-NEXT: br [[FORWARD_ERROR:bb[0-9]+]]
+    // CHECK: [[FORWARD_ERROR]]:
     // CHECK-NEXT: store [[ERROR]] to [init]
     // CHECK-NEXT: throw_addr
 
@@ -55,6 +58,7 @@ func test3<E: Error>(e: E) {
   // CHECK-NEXT:   dealloc_stack [[V4]]
   // CHECK-NEXT:   dealloc_stack [[V3]]
   // CHECK-NEXT:   dealloc_stack [[V2]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   throw [[V7]]
   // CHECK-NEXT: } // end sil function '$s{{.+}}5test31eyx_ts5ErrorRzlFyyxYKcfU_'
   let _: () throws -> Void = { () throws(E) -> Void in

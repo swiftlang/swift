@@ -16,62 +16,62 @@
 // it is nil.
 
 // Case 1: non-Optional sharer is first in declaration order.
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedByOrNull(pointer: .param(2), count: "len"))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedByOrNull(pointer: .param(2), count: "len"), nullableAsEmptySpan: true)
 public func nonOptionalFirst(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 2: Optional sharer is first in declaration order. Generated code
 // should bind `len` from `p2` (the non-Optional one) anyway.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .param(2), count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .param(2), count: "len"), nullableAsEmptySpan: true)
 public func optionalFirst(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 3: all sharers Optional — `??`-chain extraction, nil-aware checks on
 // every non-extractor sharer.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedByOrNull(pointer: .param(2), count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedByOrNull(pointer: .param(2), count: "len"), nullableAsEmptySpan: true)
 public func allOptional(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 4: three sharers with mixed nullability.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .param(2), count: "len"), .countedByOrNull(pointer: .param(3), count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .param(2), count: "len"), .countedByOrNull(pointer: .param(3), count: "len"), nullableAsEmptySpan: true)
 public func threeMixed(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ p3: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 5: three sharers, all Optional — `??`-chain across all three.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedByOrNull(pointer: .param(2), count: "len"), .countedByOrNull(pointer: .param(3), count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedByOrNull(pointer: .param(2), count: "len"), .countedByOrNull(pointer: .param(3), count: "len"), nullableAsEmptySpan: true)
 public func threeAllOptional(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ p3: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 6: parameter + return value sharing a count, mixed nullability.
 // Return uses `len`; parameter extracts it.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .return, count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .return, count: "len"), nullableAsEmptySpan: true)
 public func paramOptionalReturn(_ p1: UnsafePointer<CInt>?, _ len: CInt) -> UnsafePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafePointer<CInt>?' (aka 'Optional<UnsafePointer<Int32>>')}}
 }
 
 // Case 7: two parameters and a return sharing a count, mixed.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .param(2), count: "len"), .countedByOrNull(pointer: .return, count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .countedBy(pointer: .param(2), count: "len"), .countedByOrNull(pointer: .return, count: "len"), nullableAsEmptySpan: true)
 public func twoParamsAndReturn(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt) -> UnsafePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafePointer<CInt>?' (aka 'Optional<UnsafePointer<Int32>>')}}
 }
 
 // Case 8: nonescaping (Span) variants — verifies that the unsafe-prefix
 // handling for ?.count differs for Span vs UBP.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), nullableAsEmptySpan: true)
 public func spansAllOptional(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 9: MutableSpan parameters, mixed nullability. Mutable pointers with
 // `.nonescaping` import as `inout MutableSpan<...>` (and `inout MutableSpan<...>?`
 // for the OrNull-Nullable variants).
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), nullableAsEmptySpan: true)
 public func mutSpansMixed(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt) {
 }
 
 // Case 10: all-Optional MutableSpan parameters — `??`-chain extraction
 // across MutableSpan? values, nil-aware checks (no `unsafe` prefix needed
 // because MutableSpan?.count is safe).
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), nullableAsEmptySpan: true)
 public func mutSpansAllOrNull(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt) {
 }
 
@@ -79,7 +79,7 @@ public func mutSpansAllOrNull(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMut
 // parameters of mixed nullability. The non-Optional `.countedBy` sharer is
 // the extractor; the Optional sharer's check is nil-aware. Return is a
 // non-Optional MutableSpan (since `.countedBy` hides nullability).
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
 public func mutSpansMixedReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 }
@@ -87,7 +87,7 @@ public func mutSpansMixedReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeM
 // Case 12: MutableSpan? return value — `.countedByOrNull` on the return
 // keeps the wrapper's return type Optional, exercising the early-return-nil
 // path alongside the shared-count infrastructure.
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedByOrNull(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedByOrNull(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
 public func mutSpansMixedOrNullReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 }
@@ -97,21 +97,21 @@ public func mutSpansMixedOrNullReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: U
 // `len` from p2's count and hides the `len` parameter; the compound sharer
 // references the bound `len` in its nil-aware bounds check. Both buffers
 // are OrNull-Nullable, so both checks are nil-aware.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len + offset"), .countedByOrNull(pointer: .param(2), count: "len"))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len + offset"), .countedByOrNull(pointer: .param(2), count: "len"), nullableAsEmptySpan: true)
 public func compoundAndSimple(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt, _ offset: CInt) {
 }
 
 // Case 14: same indirect sharing, but with `.nonescaping` on both so they
 // render as Span? — exercises the nil-aware compound check on Span?
 // (where `?.count` is safe and no `unsafe` prefix is needed).
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len + offset"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len + offset"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), nullableAsEmptySpan: true)
 public func compoundAndSimpleSpans(_ p1: UnsafePointer<CInt>?, _ p2: UnsafePointer<CInt>?, _ len: CInt, _ offset: CInt) {
 }
 
 // Case 15: same again with MutableSpan? — verifies the compound nil-aware
 // check works against an extracted simple-count basis when both buffers are
 // inout MutableSpan?.
-@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len + offset"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)))
+@_SwiftifyImport(.countedByOrNull(pointer: .param(1), count: "len + offset"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), nullableAsEmptySpan: true)
 public func compoundAndSimpleMutSpans(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt, _ offset: CInt) {
 }
 

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Foundation
 import SwiftRemoteMirror
 
 internal protocol RemoteProcess: AnyObject {
@@ -41,21 +42,24 @@ internal protocol RemoteProcess: AnyObject {
   static var GetStringLength: GetStringLengthFunction { get }
   static var GetSymbolAddress: GetSymbolAddressFunction { get }
 
-  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?)
+  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?, offset: Int?)
   func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void)
   func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void)
+
+  /// Releases the strong reference this process passed to its reflection
+  /// context, breaking the resulting cycle so the process can be destroyed.
+  /// The context must not be used afterwards.
+  func releaseContextRef()
+
+  var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] { get }
 }
 
 extension RemoteProcess {
-  internal func toOpaqueRef() -> UnsafeMutableRawPointer {
-    return Unmanaged.passRetained(self).toOpaque()
-  }
-
   internal static func fromOpaque(_ ptr: UnsafeRawPointer) -> Self {
     return Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   }
+}
 
-  internal func release() {
-    Unmanaged.passUnretained(self).release()
-  }
+internal func warn(_ message: String) {
+  FileHandle.standardError.write(Data("swift-inspect: \(message)\n".utf8))
 }

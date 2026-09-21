@@ -13,17 +13,12 @@
 #ifndef SWIFT_SIL_LINEARLIFETIMECHECKER_H
 #define SWIFT_SIL_LINEARLIFETIMECHECKER_H
 
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
 
@@ -63,11 +58,6 @@ private:
   // may still be useful for checking memory lifetime for address uses.
   DeadEndBlocks *deadEndBlocks;
 
-  // If not null, `instIndices` are used for efficiently computing dominance
-  // relations between instructions in the same basic block.
-  // If null, the algorithm falls back to linear search.
-  InstructionIndices *instIndices;
-
 public:
   /// \p deadEndBlocks should be provided for lifetimes that do not require
   /// consuming uses on dead-end paths, which end in an unreachable terminator.
@@ -79,8 +69,8 @@ public:
   /// paths. Owned OSSA lifetimes may still be missing destroys on dead-end
   /// paths. Once owned values are fully enforced, the same invariant will hold
   /// for all OSSA values.
-  LinearLifetimeChecker(DeadEndBlocks *deadEndBlocks, InstructionIndices *instIndices)
-      : deadEndBlocks(deadEndBlocks), instIndices(instIndices) {}
+  LinearLifetimeChecker(DeadEndBlocks *deadEndBlocks)
+      : deadEndBlocks(deadEndBlocks) {}
 
   /// Returns true that \p value forms a linear lifetime with consuming uses \p
   /// consumingUses, non consuming uses \p nonConsumingUses. Returns false

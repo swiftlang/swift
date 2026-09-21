@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 enum ValueEnum {
   case a(String)

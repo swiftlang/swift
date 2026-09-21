@@ -1,6 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t -enable-library-evolution %s
 // RUN: %target-swift-emit-silgen -I %t -enable-library-evolution %s | %FileCheck %s
 
 import resilient_struct
@@ -25,7 +26,7 @@ public class DoesNotNeedIVarDestroyer : Base {
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base
 // CHECK-NEXT: #NeedsIVarDestroyer.x!getter: (NeedsIVarDestroyer) -> () -> resilient_struct.ResilientInt
 // CHECK-NEXT: #NeedsIVarDestroyer.x!setter: (NeedsIVarDestroyer) -> (resilient_struct.ResilientInt) -> ()
-// CHECK-NEXT: #NeedsIVarDestroyer.x!modify: (NeedsIVarDestroyer) -> () -> ()
+// CHECK-NEXT: #NeedsIVarDestroyer.x!modify: (NeedsIVarDestroyer) -> @yield_once () yields (inout resilient_struct.ResilientInt) -> ()
 // CHECK-NEXT: #NeedsIVarDestroyer.deinit!deallocator
 // CHECK-NEXT: #NeedsIVarDestroyer!ivardestroyer
 // CHECK-NEXT: }
@@ -34,6 +35,6 @@ public class DoesNotNeedIVarDestroyer : Base {
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!getter: (DoesNotNeedIVarDestroyer) -> () -> MyResilientInt
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!setter: (DoesNotNeedIVarDestroyer) -> (MyResilientInt) -> ()
-// CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!modify: (DoesNotNeedIVarDestroyer) -> () -> ()
+// CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!modify: (DoesNotNeedIVarDestroyer) -> @yield_once () yields (inout MyResilientInt) -> ()
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.deinit!deallocator
 // CHECK-NEXT: }

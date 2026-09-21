@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -emit-silgen
 
 func useValue<T>(_ x: T) {}

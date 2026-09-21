@@ -34,10 +34,10 @@ bb1(%idx : $Builtin.Word):
 
 bb2:
   %pi = dynamic_pack_index %idx of $Pack{repeat Wrapper<each T>}
-  %opening = open_pack_element %pi of <each T> at <Pack{repeat each T}>, shape $T, uuid "31FF306C-BF88-11ED-A03F-ACDE48001122"
-  %in = pack_element_get %pi of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") T>
-  %out = pack_element_get %pi of %1 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") T>
-  copy_addr %in to [init] %out : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") T>
+  %opening = open_pack_element %pi of <each T> at <Pack{repeat each T}>, shape $T, id 1
+  %in = pack_element_get %pi of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element(1) T>
+  %out = pack_element_get %pi of %1 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element(1) T>
+  copy_addr %in to [init] %out : $*Wrapper<@pack_element(1) T>
   %next = builtin "add_Word"(%idx : $Builtin.Word, %one : $Builtin.Word) : $Builtin.Word
   br bb1(%next : $Builtin.Word)
 
@@ -59,13 +59,13 @@ bb1(%idx : $Builtin.Word):
 
 bb2:
   %pi = dynamic_pack_index %idx of $Pack{repeat Wrapper<each T>}
-  %opening = open_pack_element %pi of <each T> at <Pack{repeat each T}>, shape $T, uuid "31FF306C-BF88-11ED-A03F-ACDE48001123"
-  %in = pack_element_get %pi of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
-  %out = pack_element_get %pi of %1 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  %opening = open_pack_element %pi of <each T> at <Pack{repeat each T}>, shape $T, id 2
+  %in = pack_element_get %pi of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element(2) T>
+  %out = pack_element_get %pi of %1 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element(2) T>
   // Make sure that these don't crash.
-  retain_value_addr %in : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
-  release_value_addr %in : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
-  copy_addr %in to [init] %out : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  retain_value_addr %in : $*Wrapper<@pack_element(2) T>
+  release_value_addr %in : $*Wrapper<@pack_element(2) T>
+  copy_addr %in to [init] %out : $*Wrapper<@pack_element(2) T>
   %next = builtin "add_Word"(%idx : $Builtin.Word, %one : $Builtin.Word) : $Builtin.Word
   br bb1(%next : $Builtin.Word)
 

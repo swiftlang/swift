@@ -17,8 +17,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Unicode.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
@@ -34,7 +32,6 @@
 #include "swift/SIL/StackAllocation.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace Lowering;
@@ -112,11 +109,9 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {
-#ifndef NDEBUG
   for (auto result : getResults()) {
-    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
+    ASSERT(result->use_empty() && "Uses of SILInstruction remain at deletion.");
   }
-#endif
   getParent()->erase(this);
 }
 
@@ -128,6 +123,20 @@ void SILInstruction::moveFront(SILBasicBlock *Block) {
 /// the basic block that Later lives in, right before Later.
 void SILInstruction::moveBefore(SILInstruction *Later) {
   SILBasicBlock::moveInstruction(this, Later);
+}
+
+bool SILInstruction::strictlyDominatesInBlock(const SILInstruction *other) const {
+  ASSERT(getParent() == other->getParent() &&
+         "Instructions must be in the same block");
+  uint32_t myIdx = getRawIndexInList();
+  uint32_t otherIdx = other->getRawIndexInList();
+
+  if (myIdx == 0 || otherIdx == 0) {
+    getParent()->recomputeInstructionIndices();
+    myIdx = getRawIndexInList();
+    otherIdx = other->getRawIndexInList();
+  }
+  return myIdx < otherIdx;
 }
 
 namespace swift::test {
@@ -183,14 +192,9 @@ void SILInstruction::dropNonOperandReferences() {
     return;
   }
 
-  // If we have a DebugValueInst with a debug reconstruction block, drop it.
-  if (auto *DVI = dyn_cast<DebugValueInst>(this)) {
-    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
-      DebugBB->dropAllReferences();
-      DebugBB->eraseAllInstructions(getModule());
-      DVI->setDebugReconstructionBlock(nullptr);
-    }
-  }
+  // If we have a DebugValueInst with a debug reconstruction block, free it.
+  if (auto *DVI = dyn_cast<DebugValueInst>(this))
+    DVI->setDebugReconstructionBlock(nullptr);
 }
 
 namespace {
@@ -221,6 +225,45 @@ public:
 
 SILInstructionResultArray SILInstruction::getResultsImpl() const {
   return AllResultsAccessor().visit(const_cast<SILInstruction *>(this));
+}
+
+void SILInstruction::assignNewIndexInList() {
+  // Start with index 0 ("uncomputed"). We will assign a real value only if
+  // we can derive one from the neighbors without a full block recomputation.
+  clearIndexInList();
+
+  SILInstruction *prev = getPreviousInstruction();
+  uint64_t prevIdx = 0;
+  if (prev) {
+    prevIdx = prev->getRawIndexInList();
+    if (prevIdx == 0)
+      return; // Predecessor has no index — we cannot derive one either.
+  }
+
+  SILInstruction *next = getNextInstruction();
+  if (next) {
+    uint64_t nextIdx = next->getRawIndexInList();
+    if (nextIdx == 0)
+      return; // Successor has no index — gap size is unknown.
+
+    ASSERT(nextIdx > prevIdx);
+    uint64_t gap = nextIdx - prevIdx;
+    if (gap >= 2 * SILBasicBlock::instructionIndexStride) {
+      // Enough room to place this instruction at the standard stride distance
+      // from the predecessor, leaving space for future insertions on either side.
+      asSILNode()->setIndexInList(prevIdx + SILBasicBlock::instructionIndexStride);
+    } else if (gap >= 2) {
+      // Gap is tight but non-zero: increment by one so both neighbors remain
+      // correctly ordered. Future insertions here will likely need a recompute.
+      asSILNode()->setIndexInList(prevIdx + 1);
+    }
+    // gap == 1: neighbors are adjacent, no integer can fit between them.
+    // Leave the index as 0; strictlyDominatesInBlock will trigger a full recompute.
+  } else {
+    // This is the last instruction in the block: append at stride distance
+    // after the predecessor (no upper bound to worry about).
+    asSILNode()->setIndexInList(prevIdx + SILBasicBlock::instructionIndexStride);
+  }
 }
 
 // Initialize the static members of SILInstruction.
@@ -423,13 +466,11 @@ namespace {
     }
     
     bool visitDestroyValueInst(const DestroyValueInst *RHS) {
-      auto *left = cast<DestroyValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitDebugValue(const DebugValueInst *RHS) {
-      auto *left = cast<DebugValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {
@@ -858,6 +899,13 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitCOMMethodInst(COMMethodInst *RHS) {
+      auto *X = cast<COMMethodInst>(LHS);
+      return X->getMember() == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType() == RHS->getType();
+    }
+
     bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
       auto *X = cast<ObjCSuperMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
@@ -885,6 +933,10 @@ namespace {
     }
 
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
+      return true;
+    }
+
+    bool visitOpenCOMExistentialInst(const OpenCOMExistentialInst *RHS) {
       return true;
     }
 
@@ -1355,6 +1407,9 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(TaskAddPriorityEscalationHandler,
                    TaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
+      BUILTIN_CASE(TaskAddCancellationHandlerWithReason, TaskAddCancellationHandler)
+      BUILTIN_CASE(TaskPushDeadline, TaskPushDeadline)
+      BUILTIN_CASE(TaskCancellationScopePush, TaskCancellationScopePush)
 #undef BUILTIN_CASE
 
       default:
@@ -1467,6 +1522,8 @@ SILInstruction::getStackDeallocation() const {
                    BuiltinTaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskRemoveCancellationHandler,
                    BuiltinTaskAddCancellationHandler)
+      BUILTIN_CASE(TaskPopDeadline, BuiltinTaskPushDeadline)
+      BUILTIN_CASE(TaskCancellationScopePop, BuiltinTaskCancellationScopePush)
 #undef BUILTIN_CASE
 
       default:
@@ -1505,7 +1562,6 @@ bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
     return false;
   }
   case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::DebugValueInst: 
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.
@@ -1587,6 +1643,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
+      isa<OpenCOMExistentialInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) ||
       isa<OpenExistentialBoxInst>(this) ||
@@ -1788,6 +1845,10 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto TRangeEnd = TypedRange.end();
   assert(MVResults.size() == unsigned(std::distance(TRangeBegin, TRangeEnd)));
   for (unsigned i : indices(MVResults)) {
+    // Avoid quadratic complexity for multi-value instructions with many results.
+    if (i >= 8)
+      break;
+
     assert(SILValue(&MVResults[i]) == (*this)[i]);
     assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());
     assert(SILValue(&MVResults[i]) == (*VRangeIter));
@@ -1879,6 +1940,7 @@ void SILInstruction::forEachDefinedLocalEnvironment(
   }
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenCOMExistentialInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
@@ -2047,6 +2109,14 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
+
+      // A `@called(once)` closure's context is consumed directly by the
+      // `apply`/`try_apply` its passed to.
+      if (isCalledOnce() && isa<ApplyInst, TryApplyInst>(use->getUser())) {
+        liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
+        continue;
+      }
+
       auto forward = ForwardingOperand(use);
       if (!forward) {
         // There shouldn't be any non-forwarding consumptions of a nonescaping
@@ -2085,11 +2155,24 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   liveness.computeBoundary(boundary);
 
   for (auto *inst : boundary.lastUsers) {
-    // Only destroy_values were added to liveness, so only destroy_values can be
-    // the last users.
-    auto *dvi = cast<DestroyValueInst>(inst);
-    auto keepGoing = func(&dvi->getOperandRef());
-    if (!keepGoing) {
+    Operand *consumingOperand = nullptr;
+    // Non-`@called(once)` values end their lifetime only at `destroy_value`.
+    if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
+      consumingOperand = &dvi->getOperandRef();
+    } else if (isCalledOnce()) {
+      // `@called(once)` is consumed by an apply, look up the operand where
+      // it appears.
+      for (auto &operand : inst->getAllOperands()) {
+        if (operand.isConsuming() && lookThroughOwnershipAndForwardingInsts(
+                                         operand.get()) == SILValue(this)) {
+          consumingOperand = &operand;
+          break;
+        }
+      }
+    }
+
+    ASSERT(consumingOperand && "found no consuming operand?!");
+    if (!func(consumingOperand)) {
       return false;
     }
   }
@@ -2351,3 +2434,12 @@ ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
 #include "swift/SIL/SILNodes.def"
 
 #endif
+
+namespace swift::test {
+static FunctionTest InstructionsIdentical(
+    "instructions-identical", [](auto &function, auto &arguments, auto &test) {
+      auto *lhs = arguments.takeInstruction();
+      auto *rhs = arguments.takeInstruction();
+      llvm::outs() << (lhs->isIdenticalTo(rhs) ? "true" : "false") << '\n';
+    });
+} // namespace swift::test

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -verify -enable-experimental-feature DoExpressions %s
 
 // REQUIRES: swift_feature_DoExpressions

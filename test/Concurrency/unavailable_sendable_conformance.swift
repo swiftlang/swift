@@ -37,6 +37,17 @@ class LocalSubclass: LocalNonSendable, @unchecked Sendable {}
 // expected-warning@-1 {{'LocalSubclass' inherits an unavailable 'Sendable' conformance; conforming here risks data races}}
 // expected-note@-2 {{'LocalSubclass' inherits unavailable conformance to protocol 'Sendable' from superclass here}}
 
+@MainActor
+class IsolatedLocalNonSendable {}
+
+@available(*, unavailable)
+extension IsolatedLocalNonSendable: @unchecked Sendable {}
+
+@MainActor
+class IsolatedLocalSubclass: IsolatedLocalNonSendable, @unchecked Sendable {}
+// expected-warning@-1 {{'IsolatedLocalSubclass' inherits an unavailable 'Sendable' conformance; conforming here risks data races}}
+// expected-note@-2 {{'IsolatedLocalSubclass' inherits unavailable conformance to protocol 'Sendable' from superclass here}}
+
 extension NonSendableViaComposition: @unchecked Sendable {}
 // expected-warning@-1 {{'NonSendableViaComposition' was declared with an unavailable 'Sendable' conformance in 'SendableConformances'; conforming here risks data races}}
 // expected-note@SendableConformances.NonSendableViaComposition:2 {{'NonSendableViaComposition' declares unavailable conformance to protocol 'Sendable' here}}

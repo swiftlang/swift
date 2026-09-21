@@ -15,8 +15,8 @@
 
 // expected-expansion@+13:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ p: inout MutableSpan<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ p: inout MutableSpan<CInt>) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
@@ -35,14 +35,14 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -enable-experimental-feature Embedded > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 2b8bfdc1396a0dd0376855c2b2e2103e5b25c5430ddc4232d58e53ae5f4baff9
+// GENERATED-HASH: 578524af05531714a4450a0fa1453fe9277e7f25fd3fb5042c52e86a70083dcb
 import Test
 
-func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
+func call_simple(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe simple(len, p)
 }
 
 @_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: inout MutableSpan<Int32>) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: inout MutableSpan<CInt>) {
   return simple(&p)
 }

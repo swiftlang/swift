@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -O -emit-sil -import-objc-header %S/Inputs/keypaths_objc.h
+// RUN: %target-swift-frontend %s -O -emit-sil -enable-sil-opaque-values -import-objc-header %S/Inputs/keypaths_objc.h
 // REQUIRES: objc_interop
 
 import Foundation

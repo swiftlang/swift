@@ -163,30 +163,86 @@ public func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContex
   if phi.predecessors.isEmpty {
     return false
   }
-  let uniqueIncomingValue = phi.incomingValues.first!
-  if !uniqueIncomingValue.parentFunction.hasOwnership {
-    // For the SSAUpdater it's only required to simplify phis in OSSA.
-    // This avoids that we need to handle cond_br instructions below.
-    return false
-  }
-  if phi.incomingValues.contains(where: { $0 != uniqueIncomingValue }) {
+  guard let uniqueIncomingValue = getUniqueIncomingValue(of: phi, context),
+        // For the SSAUpdater it's only required to simplify phis in OSSA.
+        // This avoids that we need to handle `cond_br` instructions below.
+        uniqueIncomingValue.parentFunction.hasOwnership
+  else {
     return false
   }
   if let borrowedFrom = phi.borrowedFrom {
     borrowedFrom.replace(with: uniqueIncomingValue, context)
-  } else {
-    phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
   }
+  // Beside its `borrowed_from` instruction, a reborrow phi can also be used as enclosing value
+  // in `borrowed_from` instructions of other reborrow phis in the same block.
+  // Those uses need to be replaced, too.
+  phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
 
+  erasePhiArgument(phi: phi, context)
+  return true
+}
+
+/// Removes the `phi` argument from its block and from the branches of all predecessors:
+///
+/// ```
+///   bb1:
+///     br bb3(%1, %2)
+///   bb2:
+///     br bb3(%3, %4)
+///   bb3(%5 : $T, %6 : $T):   // Predecessors: bb1, bb2
+/// ```
+/// ->
+/// ```
+///   bb1:
+///     br bb3(%1)
+///   bb2:
+///     br bb3(%3)
+///   bb3(%5 : $T):
+/// ```
+///
+/// The phi must not have any uses.
+/// If `erasingIncomingInstructions` is true, the instructions which define the incoming values
+/// are erased, too. Those instructions must not have any uses beside the branch operands.
+///
+public func erasePhiArgument(phi: Phi, erasingIncomingInstructions: Bool = false,
+                             _ context: some MutatingContext) {
   let block = phi.value.parentBlock
   for incomingOp in phi.incomingOperands {
+    let incomingInst = erasingIncomingInstructions ? incomingOp.value.definingInstruction : nil
     let existingBranch = incomingOp.instruction as! BranchInst
-    let argsWithRemovedPhiOp = existingBranch.operands.filter{ $0 != incomingOp }.map{ $0.value }
-    Builder(before: existingBranch, context).createBranch(to: block, arguments: argsWithRemovedPhiOp)
+    Builder(before: existingBranch, context).createBranch(to: block,
+                                                          arguments: existingBranch.arguments(excluding: incomingOp))
     context.erase(instruction: existingBranch)
+    if let incomingInst {
+      context.erase(instruction: incomingInst)
+    }
   }
   block.eraseArgument(at: phi.value.index, context)
-  return true
+}
+
+private extension BranchInst {
+  /// Returns the branch arguments without the argument for `excludedOperand`.
+  ///
+  /// Used to re-create the branch when a phi argument of the target block is removed.
+  func arguments(excluding excludedOperand: Operand) -> [Value] {
+    return Array(operands.filter{ $0 != excludedOperand }.values)
+  }
+}
+
+private func getUniqueIncomingValue(of phi: Phi, _ context: some MutatingContext) -> Value? {
+  var uniqueIncomingValue: Value? = nil
+
+  for incomingValue in phi.incomingValues {
+    if incomingValue.lookThroughBorrowedFrom == phi.value {
+      // Ignore self-cycles of phi-terms in loops.
+      continue
+    }
+    if let existingValue = uniqueIncomingValue, incomingValue != existingValue {
+      return nil
+    }
+    uniqueIncomingValue = incomingValue
+  }
+  return uniqueIncomingValue
 }
 
 /// Replaces phis with the unique incoming values if all incoming values are the same.
@@ -272,4 +328,18 @@ let updateBorrowedFromTest = Test("update_borrowed_from") {
   function, arguments, context in
 
   updateBorrowedFrom(in: function, context)
+}
+
+let replacePhisWithIncomingValuesTest = Test("replace_phis_with_incoming_values") {
+  function, arguments, context in
+
+  var phis = [Phi]()
+  for block in function.blocks {
+    for arg in block.arguments {
+      if let phi = Phi(arg) {
+        phis.append(phi)
+      }
+    }
+  }
+  replacePhisWithIncomingValues(phis: phis, context)
 }

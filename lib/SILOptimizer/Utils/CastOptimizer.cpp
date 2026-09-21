@@ -36,13 +36,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include <optional>
 
 using namespace swift;
@@ -648,7 +642,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 
   SILType SubstFnTy = bridgedFunc->getLoweredType().substGenericArgs(
       M, subMap, TypeExpansionContext(*F));
-  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(),
+                                   SILAddressConventions::forFunction(*F));
 
   // Check that this is a case that the authors of this code thought it could
   // handle.

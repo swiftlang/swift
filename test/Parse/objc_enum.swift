@@ -4,7 +4,7 @@
   case Zim, Zang, Zung
 }
 
-@objc enum Generic<T>: Int32 { // expected-error{{'@objc' enum cannot be generic}} {{1-7=}}
+@objc enum Generic<T>: Int32 { // expected-error{{enum cannot be marked '@objc' because it is generic}} {{1-7=}}
   case Zim, Zang, Zung
 }
 
@@ -16,7 +16,7 @@
   case Zim, Zang, Zung
 }
 
-@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}}
+@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' must be an integer type expressible in Objective-C}}
   case Zim = 1.0, Zang = 1.5, Zung = 2.0
 }
 

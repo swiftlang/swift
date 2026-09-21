@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // Make sure we do not call the getter to get the oldValue and pass it to didSet
@@ -49,5 +50,6 @@ let foo = Foo(value: "Hello")
 
 // CHECK: bb2:
 // CHECK-NEXT: end_access [[BEGIN_ACCESS]] : $*T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: unwind
 foo.value = "World"

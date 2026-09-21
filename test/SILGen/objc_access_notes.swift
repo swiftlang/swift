@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 -access-notes-path %S/Inputs/objc_access_notes.accessnotes -verify
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 -access-notes-path %S/Inputs/objc_access_notes.accessnotes -verify | %FileCheck %s
 
 // Verify that the access notes are necessary for the test to pass.
@@ -161,6 +162,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[READ]] {{.*}}
   // CHECK-NEXT:   end_access [[READ]] : $*Gizmo
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter
@@ -174,7 +176,7 @@ class Hoozit : Gizmo {
   // CHECK:   [[RES:%.*]] = apply [[FR]]([[VALUE_COPY]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK:   return [[RES]] : $(), loc {{.*}}, scope {{.*}} // id: {{.*}} line:[[@LINE-34]]:7:auto_gen
+  // CHECK:   return [[RES]] : $(), loc {{.*}}, scope {{.*}} // id: {{.*}} line:[[@LINE-35]]:7:auto_gen
   // CHECK: } // end sil function '$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvsTo'
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvs
@@ -212,6 +214,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[READ]]
   // CHECK-NEXT:   end_access [[READ]] : $*Gizmo
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal

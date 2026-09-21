@@ -26,7 +26,7 @@ import Swift
 /// You may pass this executor explicitly to a ``Task`` initializer as a task
 /// executor preference, in order to ensure and document that task be executed
 /// on the global executor, instead e.g. inheriting the enclosing actor's
-/// executor. Refer to ``withTaskExecutorPreference(_:operation:)`` for a
+/// executor. Refer to ``withTaskExecutorPreference(_:isolation:operation:)`` for a
 /// detailed discussion of task executor preferences.
 ///
 /// Customizing the global concurrent executor is currently not supported.

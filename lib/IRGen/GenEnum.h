@@ -15,6 +15,7 @@
 
 #include "TypeInfo.h"
 #include "LoadableTypeInfo.h"
+#include <optional>
 
 namespace llvm {
   class BasicBlock;
@@ -239,9 +240,11 @@ public:
 
   /// Map the given element to the appropriate index in the
   /// discriminator type.
-  /// Returns -1 if this is not supported by the enum implementation.
-  virtual int64_t getDiscriminatorIndex(EnumElementDecl *target) const {
-    return -1;
+  /// `std::nullopt` signals an invalid index or that this is not supported by
+  /// the enum implementation.
+  virtual std::optional<uint64_t>
+  getDiscriminatorIndex(EnumElementDecl *target) const {
+    return std::nullopt;
   }
 
   /// Emit field names for enum reflection.

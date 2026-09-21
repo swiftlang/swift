@@ -32,7 +32,7 @@ extension DistributedActor {
   ///
   /// - Note: Because this check is performed against the actor's serial executor,
   ///   if another actor uses the same serial executor--by using
-  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   that actor's serial executor as its own `Actor.unownedExecutor`--this
   ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
@@ -50,6 +50,10 @@ extension DistributedActor {
     guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
       return
     }
+
+    precondition(__isLocalActor(self),
+        "Incorrect actor executor assumption; Cannot be isolated to remote distributed actor reference of type '\(self)'. \(message())",
+        file: file, line: line)
 
     let unownedExecutor = unsafe self.unownedExecutor
     let expectationCheck = unsafe _taskIsCurrentExecutor(unownedExecutor._executor)
@@ -77,10 +81,10 @@ extension DistributedActor {
   /// * In `-O` builds (the default for Xcode's Release configuration),
   ///   the isolation check is not performed and there are no effects.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
-  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
-  ///   check will succeed , as from a concurrency safety perspective, the
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own `Actor.unownedExecutor`--this
+  ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
@@ -96,6 +100,13 @@ extension DistributedActor {
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() else {
+      return
+    }
+
+    guard __isLocalActor(self) else {
+      assertionFailure(
+          "Incorrect actor executor assumption; Cannot be isolated to remote distributed actor reference of type '\(self)'. \(message())",
+          file: file, line: line)
       return
     }
 
@@ -129,16 +140,16 @@ extension DistributedActor {
   ///
   /// If the current context is not running on the actor's serial executor,
   /// this method will crash with a fatal error (similar
-  /// to ``preconditionIsolated()``).
+  /// to ``preconditionIsolated(_:file:line:)``).
   ///
   /// This method can only be used from synchronous functions, as asynchronous
   /// functions should instead perform a normal method call to the actor, which
   /// will hop task execution to the target actor if necessary.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   another actor's executor as its own ``DistributedActor/unownedExecutor``
-  ///   --this check will succeed , as from a concurrency safety perspective,
+  ///   --this check will succeed.  From a concurrency safety perspective,
   ///   the serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
@@ -153,7 +164,7 @@ extension DistributedActor {
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated func assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line

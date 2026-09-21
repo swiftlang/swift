@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser, OS=macosx
-// REQUIRES: swift_feature_FreestandingMacros
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/src
@@ -17,7 +16,6 @@
 
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -enable-experimental-feature FreestandingMacros \
 // RUN:   -parse-as-library \
 // RUN:   -dump-macro-expansions \
 // RUN:   -plugin-path %t/plugins \

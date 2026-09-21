@@ -149,6 +149,9 @@ public:
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
 
+  /// Enables the LifetimeResolution passes and infrastructure.
+  bool EnableLifetimeResolution = false;
+
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
   /// only consumer that has this disabled today (as it disables WMO
@@ -333,6 +336,13 @@ public:
   /// Abort if SIL region isolation detects an unknown pattern.
   /// For compiler developers only.
   bool AbortOnUnknownRegionIsolationPatternError = false;
+
+  /// Emit notes explaining why a disconnected value ended up in an isolated
+  /// region, for the SendNonSendable diagnostic. When true, isolation-history
+  /// is enabled for every function in the module; when false, only functions
+  /// carrying @diagnose(RegionIsolationIsolationHistory, as: <not ignored>)
+  /// participate. Defaults to false.
+  bool EmitIsolationHistory = false;
 
   SILOptions() {}
 

@@ -13,9 +13,8 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/StackList.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
@@ -165,6 +164,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
     }
   }
   updateGuaranteedPhis(pm, updateSSAPhis);
+  replacePhisWithIncomingValues(pm, updateSSAPhis);
 }
 
 void BasicBlockCloner::sinkAddressProjections() {

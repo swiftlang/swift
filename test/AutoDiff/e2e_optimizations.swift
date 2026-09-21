@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
-// REQUIRES: swift_in_compiler
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O %s -Xllvm -sil-print-transform-blocks=false | %FileCheck %s
 
 // Checks for inlining depends on code-size but cow check adds some
 // amount of extra code

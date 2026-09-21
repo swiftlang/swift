@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=none -enable-sil-verify-all %s -loop-invariant-code-motion | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -42,6 +41,8 @@ struct Pair  {
 // globalArray
 sil_global @globalArray : $Storage
 
+sil_global public_external [let] @gg : $AnyObject
+
 // CHECK-LABEL: @memset
 
 // CHECK: bb0
@@ -75,7 +76,10 @@ bb2(%54 : $Builtin.Word):
   fix_lifetime %59: $Builtin.NativeObject
   store %1 to %99 : $*Int
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
-  cond_br %101, bb1, bb2(%58 : $Builtin.Word)
+  cond_br %101, bb1, bb3
+
+bb3:
+  br bb2(%58 : $Builtin.Word)
 }
 
 // CHECK-LABEL: @must_move_condfail
@@ -116,14 +120,17 @@ bb2(%48 : $Builtin.Word):
   %60 = integer_literal $Builtin.Word, 100
   %61 = unchecked_ref_cast %6 : $Builtin.NativeObject to $C
   %62 = ref_tail_addr %61 : $C, $Builtin.NativeObject
-  %63 = index_addr %62 : $*Builtin.NativeObject, %52 : $Builtin.Word
+  %63 = index_addr [projection] %62 : $*Builtin.NativeObject, %52 : $Builtin.Word
   %64 = load %63 : $*Builtin.NativeObject
   %96 = unchecked_ref_cast %64 : $Builtin.NativeObject to $Storage
   %97 = ref_tail_addr %96 : $Storage, $Int
-  %99 = index_addr %97 : $*Int, %48 : $Builtin.Word
+  %99 = index_addr [projection] %97 : $*Int, %48 : $Builtin.Word
   store %1 to %99 : $*Int
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
-  cond_br %101, bb1, bb2(%58 : $Builtin.Word)
+  cond_br %101, bb1, bb3
+
+bb3:
+  br bb2(%58 : $Builtin.Word)
 }
 
 
@@ -144,14 +151,29 @@ bb0(%0 : $*Builtin.Int1, %1 : $Int):
 bb1:
   %5 = load %0 : $*Builtin.Int1
   %6 = integer_literal $Builtin.Word, 101
-  cond_br %5, bb2, bb3
+  cond_br %5, bb8, bb9
+
+bb8:
+  br bb2
+
+bb9:
+  br bb3
 
 bb2:
-  cond_br %5, bb4, bb1
+  cond_br %5, bb4, bb5
+
+bb5:
+  br bb1
 
 // Inner loop.
 bb3:
-  cond_br %5, bb2, bb3
+  cond_br %5, bb6, bb7
+
+bb6:
+  br bb2
+
+bb7:
+  br bb3
 
 bb4:
   %10 = tuple ()
@@ -176,15 +198,30 @@ bb0(%0 : $*Builtin.Int1, %1 : $Int):
 bb1:
   %5 = load %0 : $*Builtin.Int1
   %6 = integer_literal $Builtin.Word, 101
-  cond_br %5, bb2, bb3
+  cond_br %5, bb8, bb9
+
+bb8:
+  br bb2
+
+bb9:
+  br bb3
 
 bb2:
-  cond_br %5, bb4, bb1
+  cond_br %5, bb4, bb5
+
+bb5:
+  br bb1
 
 // Inner loop.
 bb3:
   store %2 to %0 : $*Builtin.Int1
-  cond_br %5, bb2, bb3
+  cond_br %5, bb6, bb7
+
+bb6:
+  br bb2
+
+bb7:
+  br bb3
 
 bb4:
   %10 = tuple ()
@@ -210,7 +247,10 @@ bb1:
   %f2 = function_ref @user : $@convention(thin) (Int) -> ()
   %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
   %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   %r1 = tuple ()
@@ -236,7 +276,10 @@ bb1:
   store %0 to %313 : $*Int32
   %f = function_ref @use_addr : $@convention(thin) (@inout Int32) -> ()
   %a = apply %f(%313) : $@convention(thin) (@inout Int32) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   dealloc_stack %313 : $*Int32
@@ -247,6 +290,12 @@ bb2:
 public protocol P : AnyObject {
   func foo() -> Int32
   func boo() -> Int32
+}
+
+// Not class-constrained, so an existential of this type is address-only and
+// `existential_metatype` can read it in place.
+public protocol OpaqueP {
+  func foo() -> Int32
 }
 
 // Check that LICM does not hoist a metatype instruction before
@@ -268,12 +317,15 @@ bb0(%0 : $*Builtin.Int1, %1 : $P):
 
 // Loop
 bb1(%existential : $P):
-  %2 = open_existential_ref %existential : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self
-  %3 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self).Type
-  %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self, #P.foo, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
-  %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %2 = open_existential_ref %existential : $P to $@opened(1, P) Self
+  %3 = metatype $@thick (@opened(1, P) Self).Type
+  %4 = witness_method $@opened(1, P) Self, #P.foo, %2 : $@opened(1, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %5 = apply %4<@opened(1, P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   %6 = load %0 : $*Builtin.Int1
-  cond_br %6, bb3, bb1(%existential : $P)
+  cond_br %6, bb3, bb5
+
+bb5:
+  br bb1(%existential : $P)
 
 bb3:
   br bb4
@@ -291,19 +343,22 @@ bb4:
 // CHECK: existential_metatype
 // CHECK: cond_br
 // CHECK: bb2:
-sil @dont_hoist_existential_meta_type : $@convention(thin) (@in P) -> () {
-bb0(%0 : $*P):
-  %1 = alloc_stack $P
+sil @dont_hoist_existential_meta_type : $@convention(thin) (@in OpaqueP) -> () {
+bb0(%0 : $*OpaqueP):
+  %1 = alloc_stack $OpaqueP
   br bb1
 
 bb1:
-  copy_addr %0 to [init] %1 : $*P
-  %2 = existential_metatype $@thick P.Type, %1 : $*P
-  cond_br undef, bb1, bb2
+  copy_addr %0 to [init] %1 : $*OpaqueP
+  %2 = existential_metatype $@thick OpaqueP.Type, %1 : $*OpaqueP
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
-  dealloc_stack %1 : $*P
-  destroy_addr %0 : $*P
+  dealloc_stack %1 : $*OpaqueP
+  destroy_addr %0 : $*OpaqueP
   %52 = tuple ()
   return %52 : $()
 }
@@ -348,7 +403,10 @@ bb2:
   %4 = load %0 : $*Builtin.Int32
   %6 = apply %unknown_value_fn() : $@convention(thin) () -> Builtin.Int32
   %33 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %6 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %33, bb2, bb3
+  cond_br %33, bb4, bb3
+
+bb4:
+  br bb2
 
 bb3:
   %9999 = tuple()
@@ -377,7 +435,10 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  cond_br undef, bb4, bb1
+  cond_br undef, bb4, bb5
+
+bb5:
+  br bb1
 
 bb3:
   %x = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
@@ -404,7 +465,10 @@ bb1:
   %b = end_cow_mutation %m : $RefElemClass
   %f = function_ref @potential_escape : $@convention(thin) (@guaranteed RefElemClass) -> ()
   %a = apply %f(%b) : $@convention(thin) (@guaranteed RefElemClass) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   return %b : $RefElemClass
@@ -647,13 +711,13 @@ bb3:
 // CHECK:   [[V3:%[0-9]+]] = struct $Int32
 // CHECK: bb2:
 // CHECK-NOT:   store
-// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb3
+// CHECK:   cond_br undef, bb7, bb3
 // CHECK: bb3:
 // CHECK:   store [[V3]] to %0
 // CHECK:   br bb6
 // CHECK: bb4:
 // CHECK-NOT:   store
-// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb5
+// CHECK:   cond_br undef, bb8, bb5
 // CHECK: bb5:
 // CHECK:   store [[V3]] to %0
 // CHECK:   br bb6
@@ -670,7 +734,7 @@ bb0(%0 : $*Int32, %1 : $Int32):
   br bb1(%5 : $Int32)                             // id: %6
 
 // %7                                             // user: %8
-bb1(%7 : $Int32):                                 // Preds: bb0 bb2 bb4
+bb1(%7 : $Int32):                                 // Preds: bb0 bb7 bb8
   %8 = struct_extract %7 : $Int32, #Int32._value  // user: %9
   %9 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int32, %3 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %10
   %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %11
@@ -678,14 +742,14 @@ bb1(%7 : $Int32):                                 // Preds: bb0 bb2 bb4
   cond_br undef, bb2, bb4                         // id: %12
 
 bb2:                                              // Preds: bb1
-  cond_br undef, bb1(%11 : $Int32), bb3           // id: %13
+  cond_br undef, bb7, bb3                         // id: %13
 
 bb3:                                              // Preds: bb2
   store %11 to %0 : $*Int32                       // id: %14
   br bb6                                          // id: %15
 
 bb4:                                              // Preds: bb1
-  cond_br undef, bb1(%11 : $Int32), bb5           // id: %16
+  cond_br undef, bb8, bb5                         // id: %16
 
 bb5:                                              // Preds: bb4
   store %11 to %0 : $*Int32                       // id: %17
@@ -694,6 +758,12 @@ bb5:                                              // Preds: bb4
 bb6:                                              // Preds: bb3 bb5
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20
+
+bb7:                                              // Preds: bb2
+  br bb1(%11 : $Int32)                            // id: %21
+
+bb8:                                              // Preds: bb4
+  br bb1(%11 : $Int32)                            // id: %22
 } // end sil function 'hoist_loads_and_stores'
 
 // ==================================================================
@@ -1096,8 +1166,6 @@ struct State {
 // CHECK:     [[PRELOADADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
 // CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
 // ...Split element 0
-// CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
-// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
 // CHECK:     [[HOISTADR2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
 // CHECK:     [[ELT0B:%.*]] = load [[HOISTADR2]] : $*Int64
 // ...Split element 2
@@ -1106,6 +1174,8 @@ struct State {
 // ...Split State.singlevalue
 // CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
 // CHECK:     [[SINGLEVAL:%.*]] = load [[SINGLEADR]] : $*Int64
+// CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
+// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
 // ...Hoisted element 0
 // CHECK:     br bb1([[PRELOAD]] : $Int64)
 // ...Loop
@@ -1370,9 +1440,9 @@ bb3:
 // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
 // CHECK: [[ELT_1:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 1
 // CHECK: [[V1:%.*]] = load %4 : $*(Int64, Int64)
+// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
 // CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
 // CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
-// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
 // CHECK: [[ARG0_0:%.*]] = tuple_extract [[ARG0]] : $(Int64, Int64), 0
 // CHECK:   br bb1([[V1]] : $(Int64, Int64))
 // CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):
@@ -1520,7 +1590,7 @@ public struct UInt64Wrapper {
 // that it now loads the UInt64Wrapper instead of Builtin.Int64
 // CHECK-LABEL: sil @testTailProjection : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[A:%.*]] = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+// CHECK:   [[A:%.*]] = index_addr [projection] %4 : $*UInt64Wrapper, %1 : $Builtin.Word
 // CHECK:   store %{{.*}} to [[A]] : $*UInt64Wrapper
 // CHECK:   load %5 : $*UInt64Wrapper
 // CHECK:   br bb1
@@ -1544,7 +1614,7 @@ bb0:
   %2 = integer_literal $Builtin.Word, 2
   %3 = alloc_ref [tail_elems $UInt64Wrapper * %2 : $Builtin.Word] $Storage
   %4 = ref_tail_addr %3 : $Storage, $UInt64Wrapper
-  %5 = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+  %5 = index_addr [projection] %4 : $*UInt64Wrapper, %1 : $Builtin.Word
   %6 = struct $UInt64 (%0 : $Builtin.Int64)
   %7 = struct $UInt64Wrapper (%6 : $UInt64)
   store %7 to %5 : $*UInt64Wrapper
@@ -1590,11 +1660,14 @@ bb1:
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @g_init : $@convention(c) () -> ()
   %4 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %r1 = tuple ()
   return %r1 : $()
+
+bb3:
+  br bb1
 }
 
 struct Outer {
@@ -1656,11 +1729,14 @@ bb1:
   %4 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
   %5 = function_ref @g_init : $@convention(c) () -> ()
   %6 = builtin "once"(%4 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %r1 = tuple ()
   return %r1 : $()
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_load_copy :
@@ -1903,6 +1979,36 @@ bb2:
 bb3:
   destroy_addr %1
   dealloc_stack %1
+  %r = tuple()
+  return %r : $()
+}
+
+// Hoisting `store [assign]` is currently not supported, because it would require to
+// insert a `destroy_value` for the overwritten value at the original store location.
+// CHECK-LABEL: sil [ossa] @dont_hoist_store_assign :
+// CHECK-NOT:     load [take]
+// CHECK:       bb2:
+// CHECK:         store %{{[0-9]+}} to [assign] %2
+// CHECK:       bb3:
+// CHECK-LABEL: } // end sil function 'dont_hoist_store_assign'
+sil [ossa] @dont_hoist_store_assign : $@convention(thin) (@guaranteed String) -> () {
+bb0(%0 : @guaranteed $String):
+  %1 = alloc_box ${ var String }
+  %2 = project_box %1, 0
+  %3 = copy_value %0
+  store %3 to [init] %2
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %6 = copy_value %0
+  store %6 to [assign] %2
+  br bb1
+
+bb3:
+  destroy_value %1
   %r = tuple()
   return %r : $()
 }
@@ -2388,3 +2494,676 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_speculatively_hoist_load_borrow :
+// CHECK:       bb2:
+// CHECK-NEXT:    load_borrow
+// CHECK-LABEL: } // end sil function 'dont_speculatively_hoist_load_borrow'
+sil [ossa] @dont_speculatively_hoist_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @gg : $*AnyObject
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = load_borrow %0
+  fix_lifetime %3
+  end_borrow %3
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %r = tuple ()
+  return %r 
+}
+
+// ==================================================================
+// Test trivial alloc_stack and store hoisting
+
+sil [ossa] @use_addr2 : $@convention(thin) (@inout Builtin.Int32) -> () {
+[global: ]
+[%0: write, read]
+}
+sil [ossa] @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> () {
+[global: ]
+[%0: read]
+}
+sil [ossa] @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word {
+[global: ]
+}
+
+sil [ossa] @unknown_effect : $@convention(thin) () -> ()
+
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store
+// CHECK:           apply
+// CHECK:         {{^}}bb2:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @hoist_dominating_store : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  br bb1(%1)
+
+bb1(%idx : $Builtin.Word):
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  dealloc_stack %313
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store_and_alloc
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store
+// CHECK:           apply
+// CHECK:         {{^}}bb2:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @hoist_dominating_store_and_alloc : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.Word):
+  br bb1(%1)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store_load
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store
+// CHECK:           apply
+// CHECK:           load
+// CHECK:         {{^}}bb2:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @hoist_dominating_store_load : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> Builtin.Int32 {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.Word):
+  br bb1(%1)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %a = load [trivial] %index_addr
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  return %a
+}
+
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store_non_alloc_base
+// CHECK:         {{^}}bb0
+// CHECK:           store
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store
+// CHECK:           apply
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil [ossa] @hoist_dominating_store_non_alloc_base : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word, @inout Builtin.FixedArray<4, Builtin.Int32>) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.Word, %2 : $*Builtin.FixedArray<4, Builtin.Int32>):
+  br bb1(%1)
+
+bb1(%idx : $Builtin.Word):
+  store %0 to [trivial] %2
+  %base = vector_base_addr %2
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+
+// CHECK-LABEL:   sil [ossa] @dont_hoist_multi_store
+// CHECK:         {{^}}bb0
+// CHECK:         {{^}}bb1
+// CHECK:           alloc_stack
+// CHECK:           store
+// CHECK:           apply
+// CHECK:           store
+// CHECK:           dealloc_stack
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil [ossa] @dont_hoist_multi_store : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  store %1 to [trivial] %313
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// We do not currently hoist the store and alloc_stack if the store does not write directly to the alloc_stack.
+//
+// CHECK-LABEL:   sil [ossa] @dont_hoist_access_path
+// CHECK:         {{^}}bb0
+// CHECK:         {{^}}bb1
+// CHECK:           alloc_stack
+// CHECK:           struct_element_addr
+// CHECK:           store
+// CHECK:           dealloc_stack
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil [ossa] @dont_hoist_access_path : $@convention(thin) (Int, S, Builtin.Word) -> () {
+bb0(%0 : $Int, %1 : @unowned $S, %2 : $Builtin.Word):
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $S
+  %i_addr = struct_element_addr %313, #S.i
+  store %0 to [trivial] %i_addr
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @dont_hoist_write_effect
+// CHECK:         {{^}}bb0
+// CHECK:         {{^}}bb1
+// CHECK:           alloc_stack
+// CHECK:           store
+// CHECK:           apply
+// CHECK:           dealloc_stack
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil [ossa] @dont_hoist_write_effect : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %f = function_ref @use_addr2 : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@inout Builtin.Int32) -> ()
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+
+// CHECK-LABEL:   sil [ossa] @dont_hoist_unknown_effect
+// CHECK:         {{^}}bb0
+// CHECK:         {{^}}bb1
+// CHECK:           alloc_stack
+// CHECK:           store
+// CHECK:           apply
+// CHECK:           dealloc_stack
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil [ossa] @dont_hoist_unknown_effect : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %unknown = function_ref @unknown_effect : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+
+// CHECK-LABEL:   sil [ossa] @dont_hoist_with_preceding_read
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store %1
+// CHECK:         {{^}}bb1
+// CHECK:           apply
+// CHECK:           store %0
+// CHECK:         {{^}}bb2:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @dont_hoist_with_preceding_read : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %1 to [trivial] %313
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  store %0 to [trivial] %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  dealloc_stack %313
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @hoist_with_conditional_read_in_branch
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store %0
+// CHECK:         {{^}}bb1
+// CHECK:           apply
+// CHECK:         {{^}}bb6:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @hoist_with_conditional_read_in_branch : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  store %0 to [trivial] %313
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  cond_br undef, bb2, bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb1(%idx2)
+
+bb6:
+  dealloc_stack %313
+  %52 = tuple ()
+  return %52 : $()
+}
+
+
+// CHECK-LABEL:   sil [ossa] @dont_hoist_with_conditional_store_in_branch
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store %1
+// CHECK-NOT:       store %0
+// CHECK:         {{^}}bb1
+// CHECK:         {{^}}bb3
+// CHECK:           store %0
+// CHECK:         {{^}}bb4
+// CHECK:         {{^}}bb5
+// CHECK:           apply
+// CHECK:         {{^}}bb6:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @dont_hoist_with_conditional_store_in_branch : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  store %1 to [trivial] %313
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %base = vector_base_addr %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %index_addr = index_addr %base, %idx
+
+  cond_br undef, bb2, bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  store %0 to [trivial] %313
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  br bb1(%idx2)
+
+bb6:
+  dealloc_stack %313
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// If a store in a non-dominating block dominates all reads in the loop we may
+// be able to hoist it speculatively. To do so we have to ensure that the stored
+// value could not be read after the loop, at least in cases where the branch it
+// was hoisted from never executed. If the base address is an alloc_stack that
+// has been hoisted out of the loop, all uses will either be in the loop or
+// dealloc_stack; this case is common and cheap to check
+//
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store_speculatively
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK:           store %0
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store %0
+// CHECK:         {{^}}bb6:
+// CHECK:           dealloc_stack
+// CHECK:           return
+sil [ossa] @hoist_dominating_store_speculatively : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+
+  cond_br undef, bb2, bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  %base = vector_base_addr %313
+  %index_addr = index_addr %base, %idx
+  store %0 to [trivial] %313
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  dealloc_stack %313
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb1(%idx2)
+
+bb6:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// If the access base of the store lives outside the loop, we could have to
+// analyse the memory effects of all instructions between the end of the loop
+// and the end of its lifetime to know it is safe to hoist the store. We
+// currently do not, so bail.
+// 
+// CHECK-LABEL:   sil [ossa] @dont_hoist_dominating_store_speculatively_outer_alloc_stack
+// CHECK:         {{^}}bb0
+// CHECK:           alloc_stack
+// CHECK-NOT:       store %0
+// CHECK:         {{^}}bb3
+// CHECK:           store %0
+// CHECK:         {{^}}bb6:
+// CHECK:           dealloc_stack
+// CHECK:           return
+// CHECK:         } // end sil function 'dont_hoist_dominating_store_speculatively_outer_alloc_stack'
+sil [ossa] @dont_hoist_dominating_store_speculatively_outer_alloc_stack : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
+  %313 = alloc_stack $Builtin.FixedArray<4, Builtin.Int32>
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+
+  cond_br undef, bb2, bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %base = vector_base_addr %313
+  %index_addr = index_addr %base, %idx
+  store %0 to [trivial] %313
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb1(%idx2)
+
+bb6:
+  dealloc_stack %313
+  %52 = tuple ()
+  return %52 : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @dont_hoist_dominating_store_speculatively_non_alloc_stack_base
+// CHECK:         {{^}}bb0
+// CHECK-NOT:       alloc_stack
+// CHECK-NOT:       store %0
+// CHECK:         {{^}}bb3
+// CHECK:           store %0
+// CHECK:         {{^}}bb4
+// CHECK:         {{^}}bb6:
+// CHECK:           return
+// CHECK:         } // end sil function 'dont_hoist_dominating_store_speculatively_non_alloc_stack_base'
+sil [ossa] @dont_hoist_dominating_store_speculatively_non_alloc_stack_base : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word, @inout Builtin.FixedArray<4, Builtin.Int32>) -> () {
+bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word, %3 : $*Builtin.FixedArray<4, Builtin.Int32>):
+  br bb1(%2)
+
+bb1(%idx : $Builtin.Word):
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+
+  cond_br undef, bb2, bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %base = vector_base_addr %3
+  %index_addr = index_addr %base, %idx
+  store %0 to [trivial] %3
+  %f = function_ref @read_addr : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  %a = apply %f(%index_addr) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> ()
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb1(%idx2)
+
+bb6:
+  %52 = tuple ()
+  return %52 : $()
+}
+
+sil @read_in : $@convention(thin) (@in Int32) -> () {
+[%0: read v**]
+[global: ]
+}
+
+// CHECK-LABEL: sil [ossa] @in_read_only_trivial_no_deinit : $@convention(thin) (Int32, Int32) -> () {
+// CHECK:       bb0(%0 : $Int32, %1 : $Int32):
+// CHECK:       bb1:
+// CHECK:         = alloc_stack
+// CHECK:         store
+// CHECK:       {{^}}bb2
+// CHECK-NOT:     store
+// CHECK:       bb4:
+// CHECK:         dealloc_stack
+// CHECK:       bb5:
+// CHECK-LABEL: } // end sil function 'in_read_only_trivial_no_deinit'
+sil [ossa] @in_read_only_trivial_no_deinit : $@convention(thin) (Int32, Int32) -> () {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %1, #Int32._value
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = builtin "cmp_eq_Int32"(%4, %5) : $Builtin.Int1
+  cond_br %6, bb5, bb1
+
+bb1:
+  %11 = function_ref @read_in : $@convention(thin) (@in Int32) -> ()
+  br bb2(%5)
+
+bb2(%13 : $Builtin.Int32):
+  %8 = alloc_stack $Int32
+  store %0 to [trivial] %8
+  %16 = apply %11(%8) : $@convention(thin) (@in Int32) -> ()
+  %18 = builtin "sadd_with_overflow_Int32"(%13, %2, %3) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18, 0
+  %20 = builtin "cmp_eq_Int32"(%19, %4) : $Builtin.Int1
+  dealloc_stack %8
+  cond_br %20, bb4, bb3
+
+bb3:
+  br bb2(%19)
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %26 = tuple ()
+  return %26
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_invariant_store_or_alloc : $@convention(thin) (Builtin.Word, Builtin.Word) -> Builtin.Word {
+// CHECK:       bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+// CHECK:       bb1({{.*}}):
+// CHECK:         = alloc_stack
+// CHECK:         store
+// CHECK:         dealloc_stack
+// CHECK:       bb2:
+// CHECK:       } // end sil function 'dont_hoist_invariant_store_or_alloc'
+sil [ossa] @dont_hoist_invariant_store_or_alloc : $@convention(thin) (Builtin.Word, Builtin.Word) -> Builtin.Word {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+  br bb1(%1)
+
+bb1(%idx : $Builtin.Word):
+  %313 = alloc_stack $Builtin.Word
+  store %idx to [trivial] %313
+  %next_idx = function_ref @next_idx : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %idx2 = apply %next_idx (%idx) : $@convention(thin) (Builtin.Word) -> Builtin.Word
+  %a = load [trivial] %313
+  dealloc_stack %313
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1(%idx2)
+
+bb2:
+  return %a
+}

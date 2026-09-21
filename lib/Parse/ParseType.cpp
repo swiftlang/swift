@@ -20,14 +20,11 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Nullability.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParserResult.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -410,6 +407,47 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   return makeParserResult(attrs.applyAttributesToType(*this, repr));
 }
 
+ParserStatus Parser::parseYieldTypes(TupleTypeRepr *&yieldTypes) {
+  if (!Tok.isContextualKeyword("yields"))
+    return makeParserSuccess();
+
+  if (!Context.LangOpts.hasFeature(Feature::CoroutineFunctions)) {
+    diagnose(Tok, diag::yields_requires_coroutine_functions);
+    return makeParserError();
+  }
+
+  consumeToken();
+
+  Parser::StructureMarkerRAII ParsingYieldTypes(*this, Tok);
+  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
+
+  SmallVector<TupleTypeReprElement, 8> ElementsR;
+  ParserStatus status =
+      parseList(tok::r_paren, LPLoc, RPLoc,
+                /*AllowSepAfterLast=*/true,
+                diag::expected_rparen_tuple_type_list, [&]() -> ParserStatus {
+                  TupleTypeReprElement element;
+
+                  // Parse the type annotation.
+                  auto type = parseType(diag::expected_yield_type);
+                  if (type.hasCodeCompletion())
+                    return makeParserCodeCompletionStatus();
+                  if (type.isNull())
+                    return makeParserError();
+                  element.Type = type.get();
+
+                  // Record the ',' location.
+                  if (Tok.is(tok::comma))
+                    element.TrailingCommaLoc = Tok.getLoc();
+
+                  ElementsR.push_back(element);
+                  return makeParserSuccess();
+                });
+
+  yieldTypes =
+      TupleTypeRepr::create(Context, ElementsR, SourceRange(LPLoc, RPLoc));
+  return status;
+}
 
 /// parseTypeScalar
 ///   type-scalar:
@@ -417,7 +455,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'async'? 'throws'? '->' type-scalar
+///     type-composition 'async'? 'throws'? '->' ('yields' type-scalar)?
+///     type-scalar
 ///
 ParserResult<TypeRepr> Parser::parseTypeScalar(
     Diag<> MessageID, ParseTypeReason reason) {
@@ -480,11 +519,13 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   TypeRepr *thrownTy = nullptr;
+  TupleTypeRepr *yieldsTy = nullptr;
   if (isAtFunctionTypeArrow()) {
     status |= parseEffectsSpecifiers(SourceLoc(),
                                      asyncLoc, /*reasync=*/nullptr,
                                      throwsLoc, /*rethrows=*/nullptr,
                                      thrownTy);
+    status |= parseYieldTypes(yieldsTy);
   }
 
   // Handle type-function if we have an arrow.
@@ -579,10 +620,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-                                         thrownTy, arrowLoc, SecondHalf.get(),
-                                         patternGenerics, patternSubsTypes,
-                                         invocationSubsTypes);
+    tyR = new (Context)
+        FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc, thrownTy,
+                         yieldsTy, arrowLoc, SecondHalf.get(), patternGenerics,
+                         patternSubsTypes, invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
@@ -977,15 +1018,80 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
+    if (opaqueLoc.isInvalid() && anyLoc.isInvalid()) {
+      return type;
+    }
+
+    // Unwrap any layers of optionality, keeping track of what we peeled off.
+    SmallVector<TypeRepr *, 2> optionals;
+    TypeRepr *base = type;
+    InverseTypeRepr *inverseToReapply = nullptr;
+
+    if (auto *inv = dyn_cast<InverseTypeRepr>(base)) {
+      inverseToReapply = inv;
+      base = inv->getConstraint();
+    }
+
+    while (true) {
+      if (auto *opt = dyn_cast<OptionalTypeRepr>(base)) {
+        optionals.push_back(base);
+        base = opt->getBase();
+      } else if (auto *iuo =
+                     dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(base)) {
+        optionals.push_back(base);
+        base = iuo->getBase();
+      } else {
+        break;
+      }
+    }
+
+    if (inverseToReapply) {
+      base = new (Context) InverseTypeRepr(inverseToReapply->getTildeLoc(), base);
+    }
+
+    // If this was a composition with `some` or `any`, the optional sugar is
+    // parsed as bound to the elements, not to the whole composition. Check the
+    // last element so that if we have something like `some P & Q?`, we can
+    // diagnose it specifically with a fix-it.
+    if (auto *comp = dyn_cast<CompositionTypeRepr>(base)) {
+      if (!comp->getTypes().empty()) {
+        auto *last = comp->getTypes().back();
+        auto *lastForDiag = last;
+        if (auto *inv = dyn_cast<InverseTypeRepr>(lastForDiag)) {
+          lastForDiag = inv->getConstraint();
+        }
+        if (isa<OptionalTypeRepr>(lastForDiag) ||
+            isa<ImplicitlyUnwrappedOptionalTypeRepr>(lastForDiag)) {
+          diagnose(last->getEndLoc(),
+                   diag::confusing_some_any_optional_composition)
+              .fixItInsert(comp->getStartLoc(), "(")
+              .fixItInsert(last->getEndLoc(), ")");
+        }
+      }
+    }
+
+    // Apply the opaque or existential typing.
+    TypeRepr *result = base;
     if (opaqueLoc.isValid() &&
         (anyLoc.isInvalid() || SourceMgr.isBeforeInBuffer(opaqueLoc, anyLoc))) {
-      type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
+      result = new (Context) OpaqueReturnTypeRepr(opaqueLoc, result);
     } else if (anyLoc.isValid()) {
-      type = new (Context) ExistentialTypeRepr(anyLoc, type);
+      result = new (Context) ExistentialTypeRepr(anyLoc, result);
     }
-    return type;
+
+    // Re-wrap the optionals.
+    for (auto *optRepr : llvm::reverse(optionals)) {
+      if (auto *opt = dyn_cast<OptionalTypeRepr>(optRepr)) {
+        result = new (Context) OptionalTypeRepr(result, opt->getQuestionLoc());
+      } else if (auto *iuo =
+                     dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(optRepr)) {
+        result = new (Context) ImplicitlyUnwrappedOptionalTypeRepr(
+            result, iuo->getExclamationLoc());
+      }
+    }
+    return result;
   };
-  
+
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())
@@ -1668,10 +1774,22 @@ bool Parser::canParseGenericArguments() {
   }
 
   do {
+    // With LiteralExpressions enabled, a generic argument may be a
+    // parenthesized value expression such as '(1 + 2)'. Treat a parenthesized
+    // group as a value expression only when it is immediately followed by ','
+    // or '>'; otherwise parse it as a type so that parenthesized and function
+    // types like '(Int, Int) -> Bool' are still recognized.
+    bool parsedValueExpr = false;
     if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-        Tok.is(tok::l_paren))
+        Tok.is(tok::l_paren)) {
+      CancellableBacktrackingScope backtrack(*this);
       skipSingle();
-    else if (!canParseType())
+      if (Tok.is(tok::comma) || startsWithGreater(Tok)) {
+        backtrack.cancelBacktrack();
+        parsedValueExpr = true;
+      }
+    }
+    if (!parsedValueExpr && !canParseType())
       return false;
 
     // Parse the comma, if the list continues.
@@ -2070,6 +2188,12 @@ bool Parser::isAtFunctionTypeArrow() {
       return true;
 
     return false;
+  } else if (Tok.isContextualKeyword("yields") &&
+             peekToken().is(tok::l_paren)) {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    skipSingle();
+    return isAtFunctionTypeArrow();
   }
 
   // Don't look for '->' in code completion. The user may write it later.

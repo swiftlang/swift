@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name implicitly_unwrapped_optional -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name implicitly_unwrapped_optional -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 func foo(f f: (() -> ())!) {

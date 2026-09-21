@@ -16,13 +16,11 @@
 
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
-#include <functional>
 #include <optional>
 #include <vector>
 
@@ -2406,6 +2404,9 @@ NodePointer
 swift::Demangle::demangleOldSymbolAsNode(StringRef MangledName,
                                          NodeFactory &Factory) {
   OldDemangler demangler(MangledName, Factory);
-  return demangler.demangleTopLevel();
+  NodePointer result = demangler.demangleTopLevel();
+  if (Factory.isTooComplex())
+    return nullptr;
+  return result;
 }
 

@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -O | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // Make sure that when we invoke Unmanaged._withUnsafeGuaranteedRef, we do not
 // have any ref count overhead.

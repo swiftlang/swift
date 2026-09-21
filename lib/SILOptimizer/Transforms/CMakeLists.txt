@@ -4,7 +4,6 @@ target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementOpts.cpp
   AccessEnforcementReleaseSinking.cpp 
   AccessEnforcementWMO.cpp
-  AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
   COWOpts.cpp
   ConditionForwarding.cpp
@@ -20,11 +19,8 @@ target_sources(swiftSILOptimizer PRIVATE
   PartialApplySimplification.cpp
   PerformanceInliner.cpp
   PhiArgumentOptimizations.cpp
-  PruneVTables.cpp
-  RedundantOverflowCheckRemoval.cpp
   SILCodeMotion.cpp
   SILLowerAggregateInstrs.cpp
-  SILMem2Reg.cpp
   SILSROA.cpp
   DestroyAddrHoisting.cpp
   SimplifyCFG.cpp

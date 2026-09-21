@@ -452,7 +452,7 @@ extension Dictionary._Variant {
 }
 
 extension Dictionary._Variant {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func mapValues<T, E: Error>(
     _ transform: (Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {
@@ -462,6 +462,18 @@ extension Dictionary._Variant {
     }
 #endif
     return try asNative.mapValues(transform)
+  }
+
+  @export(implementation)
+  internal func mapKeyedValues<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return try asCocoa.mapKeyedValues(transform)
+    }
+#endif
+    return try asNative.mapKeyedValues(transform)
   }
 
 #if !$Embedded
@@ -482,7 +494,7 @@ extension Dictionary._Variant {
   }
 #endif
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func merge<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value

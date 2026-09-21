@@ -93,7 +93,6 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 do {
   class SubTestNoActor : Test {
     @objc override func withMainActorId(_: @escaping (Any) -> Void) {}
-    // expected-warning@-1 {{declaration 'withMainActorId' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
   }
 
   class SubTestWithActor : Test {
@@ -145,15 +144,12 @@ func test_sendable_attr_in_type_context(test: Test) {
 
 class TestConformanceWithStripping : InnerSendableTypes {
   func testComposition(_: MyValue) {
-    // expected-warning@-1 {{sendability of function types in instance method 'testComposition' does not match requirement in protocol 'InnerSendableTypes'; this is an error in the Swift 6 language mode}}
   }
 
   func test(_ options: [String: Any]) {
-    // expected-warning@-1 {{sendability of function types in instance method 'test' does not match requirement in protocol 'InnerSendableTypes'; this is an error in the Swift 6 language mode}}
   }
 
   func test(withCallback name: String, handler: @escaping @MainActor ([String : Any], (any Error)?) -> Void) { // Ok
-    // expected-warning@-1 {{sendability of function types in instance method 'test(withCallback:handler:)' does not match requirement in protocol 'InnerSendableTypes'; this is an error in the Swift 6 language mode}}
   }
 }
 

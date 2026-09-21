@@ -20,6 +20,7 @@
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
@@ -27,12 +28,10 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/ParseDeclName.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -46,6 +45,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
@@ -58,6 +58,20 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 
 using namespace swift;
 using namespace importer;
+
+void ImportNameVersion::dump(llvm::raw_ostream &out) const {
+  if (*this == raw())
+    out << "raw";
+  else
+    out << asClangVersionTuple().getAsString();
+  if (supportsConcurrency())
+    out << " (concurrency)";
+}
+
+void ImportNameVersion::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
+}
 
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
@@ -324,7 +338,10 @@ static void printFullContextPrefix(ImportedName name, ImportNameVersion version,
   assert(newDeclContextNamed && "should of been set");
   auto parentName = Impl.importFullName(newDeclContextNamed, version);
   printFullContextPrefix(parentName, version, os, Impl);
-  os << parentName.getDeclName() << ".";
+  auto baseNameStr = parentName.getDeclName().getBaseName().userFacingName();
+  printIdentifierEscapingIfNeeded(baseNameStr, os,
+                                  PrintNameContext::TypeMember);
+  os << ".";
 }
 
 void ClangImporter::Implementation::printSwiftName(ImportedName name,
@@ -357,7 +374,13 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     printFullContextPrefix(name, version, os, *this);
 
   // Base name.
-  os << name.getDeclName().getBaseName();
+  auto baseName = name.getDeclName().getBaseName();
+  if (baseName.isSpecial()) {
+    os << baseName.userFacingName();
+  } else {
+    printIdentifierEscapingIfNeeded(baseName.userFacingName(), os,
+                                    PrintNameContext::Normal);
+  }
 
   // Determine the number of argument labels we'll be producing.
   auto argumentNames = name.getDeclName().getArgumentNames();
@@ -380,10 +403,13 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     }
 
     if (currentArgName < argumentNames.size()) {
-      if (argumentNames[currentArgName].empty())
+      if (argumentNames[currentArgName].empty()) {
         os << "_";
-      else
-        os << argumentNames[currentArgName].str();
+      } else {
+        auto labelStr = argumentNames[currentArgName].str();
+        printIdentifierEscapingIfNeeded(
+            labelStr, os, PrintNameContext::FunctionParameterExternal);
+      }
       os << ":";
       ++currentArgName;
       continue;
@@ -416,13 +442,9 @@ namespace {
     using OverriddenName = std::pair<const DeclType *, ImportedName>;
     llvm::SmallPtrSet<DeclName, 4> known;
     (void)known.insert(DeclName());
-    overriddenNames.erase(
-        std::remove_if(overriddenNames.begin(), overriddenNames.end(),
-                       [&](OverriddenName overridden) {
-                         return !known.insert(overridden.second.getDeclName())
-                                     .second;
-                       }),
-        overriddenNames.end());
+    llvm::erase_if(overriddenNames, [&](OverriddenName overridden) {
+      return !known.insert(overridden.second.getDeclName()).second;
+    });
 
     if (overriddenNames.size() < 2)
       return;
@@ -546,6 +568,10 @@ struct AnySwiftNameAttr {
 
   friend bool operator==(AnySwiftNameAttr lhs, AnySwiftNameAttr rhs) {
     return lhs.name == rhs.name && lhs.isAsync == rhs.isAsync;
+  }
+
+  friend bool operator!=(AnySwiftNameAttr lhs, AnySwiftNameAttr rhs) {
+    return !(lhs == rhs);
   }
 };
 
@@ -848,6 +874,35 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
   return static_cast<bool>(determineFactoryInitializerKind(method));
 }
 
+/// Determine whether this C/C++ function or method can be imported as an
+/// initializer of the type named by \p parsedName.
+static bool shouldImportAsInitializer(const clang::FunctionDecl *D,
+                                      const ParsedDeclName &parsedName) {
+  if (isa<clang::CXXConstructorDecl>(D))
+    return true;
+  if (auto *method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    if (!method->isStatic())
+      return false;
+
+    clang::QualType resultType = method->getReturnType();
+    if (resultType->isPointerType() || resultType->isReferenceType())
+      resultType = resultType->getPointeeType();
+
+    const clang::CXXRecordDecl *resultRecord = resultType->getAsCXXRecordDecl();
+    if (!resultRecord)
+      return false;
+    resultRecord = resultRecord->getCanonicalDecl();
+
+    if (parsedName.isMember())
+      return resultRecord->getName() == parsedName.ContextNames.front();
+
+    return resultRecord == method->getParent()->getCanonicalDecl();
+  }
+
+  // Free functions only support the "Type.init(...)" form.
+  return parsedName.isMember();
+}
+
 /// Attempt to omit needless words from the given function name.
 static bool omitNeedlessWordsInFunctionName(
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
@@ -1117,6 +1172,65 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   return false;
 }
 
+static bool overridesVirtualMethods(const clang::CXXMethodDecl *method) {
+  return method->isVirtual() && method->size_overridden_methods() > 0;
+}
+
+static std::pair<std::optional<AnySwiftNameAttr>, bool>
+getOverridingMethodSwiftName(const clang::CXXMethodDecl *method,
+                             ImportNameVersion version) {
+  bool seen = false;
+  std::optional<AnySwiftNameAttr> firstName;
+  for (const auto *overridden : method->overridden_methods()) {
+    auto [name, ambiguous] =
+        overridesVirtualMethods(overridden)
+            ? getOverridingMethodSwiftName(overridden, version)
+            : std::make_pair(findSwiftNameAttr(overridden, version), false);
+
+    if (ambiguous)
+      return {std::nullopt, true};
+
+    if (!seen) {
+      firstName = name;
+      seen = true;
+    } else if (name != firstName) {
+      return {std::nullopt, true};
+    }
+  }
+  return {firstName, false};
+}
+
+bool ClangImporter::Implementation::isAmbiguouslyOverridden(
+    const clang::CXXRecordDecl *Record, const clang::CXXMethodDecl *Method) {
+  if (!Method->isVirtual())
+    // This isn't virtual, so it can't be overridden.
+    return false;
+
+  auto [it, inserted] = ambiguousVirtualOverrides.try_emplace(Record);
+  if (!inserted)
+    return it->second.contains(Method);
+
+  // First time we are looking this up in Record. Build the set of ambiguously
+  // overridden virtual methods for it and cache the result.
+  bool result = false;
+  for (const auto *RecordMethod : Record->methods()) {
+    if (!overridesVirtualMethods(RecordMethod))
+      continue;
+
+    auto [_, ambiguous] =
+        getOverridingMethodSwiftName(RecordMethod, CurrentVersion);
+
+    if (ambiguous) {
+      for (const auto *overridden : RecordMethod->overridden_methods()) {
+        it->second.insert(overridden);
+        if (overridden == Method)
+          result = true;
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<ForeignErrorConvention::Info>
 NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                                   StringRef &baseName,
@@ -1218,12 +1332,12 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
 }
 
 bool swift::isCompletionHandlerParamName(StringRef paramName) {
-  return paramName == "completionHandler" ||
-      paramName == "withCompletionHandler" ||
-      paramName == "completion" || paramName == "withCompletion" ||
-      paramName == "completionBlock" || paramName == "withCompletionBlock" ||
-      paramName == "reply" || paramName == "withReply" ||
-      paramName == "replyTo" || paramName == "withReplyTo";
+  return llvm::StringSwitch<bool>(paramName)
+      .Cases({"completionHandler", "withCompletionHandler", "completion",
+              "withCompletion", "completionBlock", "withCompletionBlock"},
+             true)
+      .Cases({"reply", "withReply", "replyTo", "withReplyTo"}, true)
+      .Default(false);
 }
 
 // Determine whether the given type is a nullable NSError type.
@@ -1489,17 +1603,6 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     argumentNames.emplace_back();
 }
 
-static StringRef renameUnsafeMethod(ASTContext &ctx,
-                                    const clang::NamedDecl *decl,
-                                    StringRef name) {
-  if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
-    return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
-  }
-
-  return name;
-}
-
 std::optional<StringRef>
 NameImporter::findCustomName(const clang::Decl *decl,
                              ImportNameVersion version) {
@@ -1666,6 +1769,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!parsedName || parsedName.isOperator())
       return result;
 
+    // swift_name can't rename a declaration to `deinit`; forming a FuncDecl
+    // with that special name asserts. Ignore it and import under the original
+    // name.
+    if (parsedName.BaseNameKind == DeclBaseName::Kind::Destructor) {
+      skipCustomName = true;
+      result.info.hasInvalidCustomName = true;
+    }
+
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
@@ -1674,7 +1785,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (parsedName.BaseName == "init" && parsedName.IsFunctionName) {
+      if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+          parsedName.IsFunctionName) {
         if (!shouldImportAsInitializer(method, version, initPrefixLength)) {
           // We cannot import this as an initializer anyway.
           return ImportedName();
@@ -1699,19 +1811,39 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         skipCustomName = true;
         result.info.hasInvalidCustomName = true;
       }
-    }
+    } else if (auto *func = dyn_cast<clang::FunctionDecl>(D)) {
+      if (auto *cxxMethod = dyn_cast<clang::CXXMethodDecl>(func)) {
+        // `swift_name` attribute is not supported in virtual methods overrides
+        if (cxxMethod->isVirtual() && cxxMethod->size_overridden_methods() > 0)
+          skipCustomName = true;
+      }
 
-    // `swift_name` attribute is not supported in virtual methods overrides
-    if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
-      if (method->isVirtual() && method->size_overridden_methods() > 0)
+      // `swift_name` attribute is not supported in virtual methods overrides
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(D);
+          method && overridesVirtualMethods(method))
         skipCustomName = true;
+
+      if (!skipCustomName &&
+          parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+          !shouldImportAsInitializer(func, parsedName))
+        skipCustomName = true;
+
+      if (!skipCustomName &&
+          parsedName.BaseNameKind == DeclBaseName::Kind::Constructor) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(func))
+          if (method->isStatic() &&
+              getUncachedForeignReferenceTypeInfo(method->getParent())
+                  .isReference())
+            // This lets a Swift subclass of this FRT initialize itself using
+            // base's constructor.
+            result.info.initKind = CtorInitializerKind::ConvenienceFactory;
+      }
     }
 
     if (!skipCustomName) {
       result.info.hasCustomName = true;
       result.declName = parsedName.formDeclName(
-          swiftCtx, /*isSubscript=*/false,
-          isa<clang::ClassTemplateSpecializationDecl>(D));
+          swiftCtx, isa<clang::ClassTemplateSpecializationDecl>(D));
 
       if (result.declName && result.declName.isSimpleName()) {
         const clang::FunctionDecl *fnDecl = dyn_cast<clang::FunctionDecl>(D);
@@ -1731,14 +1863,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       // Handle globals treated as members.
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
-        result.effectiveContext = parsedName.ContextName;
+        result.effectiveContext =
+            swiftCtx.AllocateCopy(parsedName.fullContextName());
         if (parsedName.SelfIndex) {
           result.info.hasSelfIndex = true;
           result.info.selfIndex = *parsedName.SelfIndex;
         }
         result.info.importAsMember = true;
 
-        if (parsedName.BaseName == "init")
+        if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor)
           result.info.initKind = CtorInitializerKind::Factory;
       }
 
@@ -1781,7 +1914,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
             // Update the name to reflect the new parameter labels.
             result.declName = formDeclName(
                 swiftCtx, parsedName.BaseName, parsedName.ArgumentLabels,
-                /*isFunction=*/true, isInitializer, /*isSubscript=*/false,
+                /*isFunction=*/true,
+                isInitializer ? DeclBaseName::Kind::Constructor
+                              : DeclBaseName::Kind::Normal,
                 isa<clang::ClassTemplateSpecializationDecl>(D));
           } else if (nameAttr->isAsync) {
             // The custom name was for an async import, but we didn't in fact
@@ -2140,11 +2275,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
 
       // Drop "With" if present after the "init".
-      bool droppedWith = false;
-      if (argName.starts_with("With")) {
-        argName = argName.substr(4);
-        droppedWith = true;
-      }
+      bool droppedWith = argName.consume_front("With");
 
       // Lowercase the remaining argument name.
       argName = camel_case::toLowercaseWord(argName, selectorSplitScratch);
@@ -2221,8 +2352,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty()) {
-      if (baseName.starts_with(removePrefix)) {
-        baseName = baseName.substr(removePrefix.size());
+      if (baseName.consume_front(removePrefix)) {
         strippedPrefix = true;
       } else if (givenName) {
         // Calculate the new prefix.
@@ -2262,7 +2392,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (objcProto->hasDefinition()) {
       if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
-        baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
+        baseNameWithProtocolSuffix += ProtocolSuffix;
         baseName = baseNameWithProtocolSuffix;
       }
     }
@@ -2287,7 +2417,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
-                                                       swiftCtx, this, version);
+                                                       this, version);
       baseName = swiftCtx.getIdentifier(name).get();
     }
   }
@@ -2338,48 +2468,30 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         newName += "Consuming";
       baseName = newName;
     }
-    if (method->isImplicit() &&
-        baseName.starts_with("__synthesizedVirtualCall_")) {
+    constexpr llvm::StringLiteral virtualCallPrefix =
+        "__synthesizedVirtualCall_";
+    if (method->isImplicit() && baseName.starts_with(virtualCallPrefix)) {
       // If this is a thunk for a virtual method of a C++ reference type, we
       // strip away the underscored prefix. This method should be visible and
       // callable from Swift.
-      newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
+      newName = baseName.substr(virtualCallPrefix.size());
       baseName = newName;
     }
-    if (method->isVirtual()) {
-      // The name should be imported from the base method
-      if (method->size_overridden_methods() > 0) {
-        DeclName overriddenName;
-        bool foundDivergentMethod = false;
-        for (auto overriddenMethod : method->overridden_methods()) {
-          ImportedName importedName =
-              importName(overriddenMethod, version, givenName);
-          if (!overriddenName) {
-            overriddenName = importedName.getDeclName();
-          } else if (overriddenName.compare(importedName.getDeclName())) {
-            importerImpl->insertUnavailableMethod(method->getParent(),
-                                                  importedName.getDeclName());
-            foundDivergentMethod = true;
-          }
-        }
 
-        if (foundDivergentMethod) {
-          // The method we want to mark as unavailable will be generated
-          // lazily, when we clone the methods from base classes to the derived
-          // class method->getParent().
-          // Since we don't have the actual method here, we store this
-          // information to be accessed when we generate the actual method.
-          importerImpl->insertUnavailableMethod(method->getParent(),
-                                                overriddenName);
+    if (overridesVirtualMethods(method)) {
+      auto [effectiveName, isAmbiguous] =
+          getOverridingMethodSwiftName(method, version);
+      if (isAmbiguous)
+        return ImportedName();
+
+      if (effectiveName) {
+        ParsedDeclName parsed = parseDeclName(effectiveName->name);
+        if (!parsed)
           return ImportedName();
-        }
-
-        baseName = overriddenName.getBaseIdentifier().str();
-        // Also inherit argument names from base method
+        baseName = parsed.BaseName;
         argumentNames.clear();
-        llvm::for_each(overriddenName.getArgumentNames(), [&](Identifier arg) {
-          argumentNames.push_back(arg.str());
-        });
+        for (auto label : parsed.ArgumentLabels)
+          argumentNames.push_back(label);
       }
     }
   }
@@ -2477,11 +2589,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  baseName = renameUnsafeMethod(swiftCtx, D, baseName);
-
-  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
-                                 isInitializer, /*isSubscript=*/false,
-                                 isa<clang::ClassTemplateSpecializationDecl>(D));
+  result.declName =
+      formDeclName(swiftCtx, baseName, argumentNames, isFunction,
+                   isInitializer ? DeclBaseName::Kind::Constructor
+                                 : DeclBaseName::Kind::Normal,
+                   isa<clang::ClassTemplateSpecializationDecl>(D));
   return result;
 }
 
@@ -2522,16 +2634,33 @@ Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
 }
 
 Identifier
-NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                              const clang::MacroInfo *macro) {
+NameImporter::importMacroName(const clang::IdentifierInfo *II,
+                              const clang::MacroInfo *MI,
+                              const clang::Module *M,
+                              Identifier *invalidCustomName) {
+  if (invalidCustomName)
+    *invalidCustomName = Identifier();
+
   // If we're supposed to ignore this macro, return an empty identifier.
-  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro,
-                          getClangPreprocessor()))
+  if (::shouldIgnoreMacro(II->getName(), MI, getClangPreprocessor()))
     return Identifier();
 
-  // No transformation is applied to the name.
-  StringRef name = clangIdentifier->getName();
-  return swiftCtx.getIdentifier(name);
+  // Honor an APINotes 'SwiftName:' override, if one applies. A macro constant
+  // can only be renamed to a simple identifier, so reject function, operator,
+  // and member names, which are meaningless here.
+  if (auto notes = getClangSema().ProcessAPINotes(M, II, MI->getDefinitionLoc())) {
+    if (!notes->SwiftName.empty()) {
+      ParsedDeclName ident = parseDeclName(notes->SwiftName);
+      if (ident && !ident.isOperator() && !ident.IsFunctionName &&
+          !ident.isMember())
+        return swiftCtx.getIdentifier(ident.BaseName);
+      if (invalidCustomName)
+        *invalidCustomName = swiftCtx.getIdentifier(notes->SwiftName);
+    }
+  }
+
+  // Otherwise, no transformation is applied to the name.
+  return swiftCtx.getIdentifier(II->getName());
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,

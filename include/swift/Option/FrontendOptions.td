@@ -100,7 +100,8 @@ def backup_module_interface_path_EQ :
   Alias<backup_module_interface_path>;
 
 def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
+  Flags<[HelpHidden]>,
+  HelpText<"Deprecated: Emit textual output in a parseable format">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
@@ -130,6 +131,10 @@ def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
   HelpText<"Output module source info file">;
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
+
+def prefix_map_sourceinfo : Flag<["-"], "prefix-map-sourceinfo">,
+  HelpText<"Apply path remapping from -file-prefix-map to generated "
+           " swiftsourceinfo files and sets the last modified timestamp to 0">;
 
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
@@ -225,6 +230,22 @@ def disable_testable_attr_requires_testable_module :
 def disable_clang_spi :
   Flag<["-"], "disable-clang-spi">,
   HelpText<"Don't import Clang SPIs as Swift SPIs">;
+
+def enable_objc_msgsend_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def enable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
 
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
@@ -426,9 +447,20 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "enable-experimental-async-top-level">,
     HelpText<"Enable experimental concurrency in top-level code">;
 
+  def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
+      HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
+
   def public_autolink_library :
     Separate<["-"], "public-autolink-library">,
     HelpText<"Add public dependent library">;
+
+  def enable_com_interop
+    : Flag<["-"], "enable-experimental-com-interop">,
+      HelpText<"Enable COM interop code generation and configuration directives">;
+
+  def com_interop_model
+    : Joined<["-"], "com-interop-model=">,
+      HelpText<"Select the COM interop model: 'microsoft' or 'corefoundation'">;
 }
 
 // HIDDEN FLAGS
@@ -456,23 +488,23 @@ def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=
 def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
   HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
-def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+def solver_enable_diagnose_valid_salvage : Flag<["-"], "solver-enable-diagnose-valid-salvage">,
   HelpText<"Reject valid solutions in diagnostic mode">;
 
-def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+def solver_disable_diagnose_valid_salvage : Flag<["-"], "solver-disable-diagnose-valid-salvage">,
   HelpText<"Accept valid solutions in diagnostic mode">;
+
+def solver_enable_crash_fail_diagnostic : Flag<["-"], "solver-enable-crash-fail-diagnostic">,
+  HelpText<"Trigger assertion failure on 'failed to produce diagnostic for expression'">;
+
+def solver_disable_crash_fail_diagnostic : Flag<["-"], "solver-disable-crash-fail-diagnostic">,
+  HelpText<"Do not trigger assertion failure on 'failed to produce diagnostic for expression'">;
 
 def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
   HelpText<"Enable transitive conformance constraint optimization">;
 
 def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
   HelpText<"Disable transitive conformance constraint optimization">;
-
-def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
-  HelpText<"Enable experimental optimizations to speed up type variable binding">;
-
-def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
-  HelpText<"Disable experimental optimizations to speed up type variable binding">;
 
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
@@ -552,6 +584,10 @@ def max_substitution_count : Joined<["-"], "max-substitution-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum step count for type substitution operations">;
 
+def max_associated_type_inference_iterations : Joined<["-"], "max-associated-type-inference-iterations=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Maximum number of iterations to attempt in the type witness solver">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
@@ -587,12 +623,18 @@ def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-typ
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
+def debug_assert_after_type_checking : Flag<["-"], "debug-assert-after-type-checking">,
+  DebugCrashOpt, HelpText<"Force an assertion failure after type checking">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
-  DebugCrashOpt, HelpText<"Force an assertion failure after parsing">;
+  DebugCrashOpt, Flags<[HelpHidden]>,
+  HelpText<"Deprecated alias for -debug-assert-after-type-checking">;
 def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
   DebugCrashOpt, HelpText<"Force a crash immediately">;
+def debug_crash_after_type_checking : Flag<["-"], "debug-crash-after-type-checking">,
+  DebugCrashOpt, HelpText<"Force a crash after type checking">;
 def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
-  DebugCrashOpt, HelpText<"Force a crash after parsing">;
+  DebugCrashOpt, Flags<[HelpHidden]>,
+  HelpText<"Deprecated alias for -debug-crash-after-type-checking">;
 
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
    HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
@@ -615,6 +657,10 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
 def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;
+
+def disable_implicit_com_module_import
+  : Flag<["-"], "disable-implicit-com-module-import">,
+    HelpText<"Disable the implicit import of the COM module.">;
 
 def disable_implicit_cxx_module_import : Flag<["-"],
   "disable-implicit-cxx-module-import">,
@@ -665,10 +711,6 @@ def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
 
 def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
   HelpText<"Disable all Swift autolink directives">;
-
-def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
@@ -957,6 +999,11 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
 def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-interface-error">,
   HelpText<"Downgrade error to warning when typechecking emitted module interfaces">;
 
+def no_downgrade_typecheck_interface_error
+    : Flag<["-"], "no-downgrade-typecheck-interface-error">,
+      HelpText<"Report errors when typechecking emitted module interfaces, "
+               "even for a module blocklisted as having a broken interface">;
+
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
@@ -984,19 +1031,31 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
-def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
-  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
+def solver_disable_type_var_joins : Flag<["-"], "solver-disable-type-var-joins">,
+  HelpText<"Disable experimental support for joins of types containing type variables">;
 
-def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
-  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
+def solver_enable_type_var_joins : Flag<["-"], "solver-enable-type-var-joins">,
+  HelpText<"Enable experimental support for joins of types containing type variables">;
 
 def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
   HelpText<"Disable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
 
 def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
-  HelpText<"Enble various constraint solver performance optimizations that have been "
+  HelpText<"Enable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
+
+def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-supertypes">,
+  HelpText<"Disable an inefficient form of inference in the solver, which allows certain optimizations">;
+
+def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
+  HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
+
+def solver_enable_promote_supertypes : Flag<["-"], "solver-enable-promote-supertypes">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_promote_supertypes : Flag<["-"], "solver-disable-promote-supertypes">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -1117,6 +1176,14 @@ def sil_region_isolation_assert_on_unknown_pattern :
   Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
   HelpText<"Abort if SIL region isolation detects an unknown pattern. "
            "For compiler developers only.">;
+
+def sil_region_isolation_emit_isolation_history
+    : Flag<["-"], "sil-region-isolation-emit-isolation-history">,
+      HelpText<
+          "Emit notes explaining why a disconnected value ended up in an "
+          "isolated region. Enables isolation-history for every function in "
+          "the module; otherwise, isolation-history is opt-in per function "
+          "via @diagnose(RegionIsolationIsolationHistory, ...).">;
 
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
@@ -1281,6 +1348,10 @@ def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata
 def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-pointer">,
    HelpText<"Emit a pointer to the corresponding type metadata into non-public "
             "non-generic type descriptors.">;
+
+def disable_emit_singleton_metadata_pointer : Flag<["-"], "disable-emit-singleton-metadata-pointer">,
+   HelpText<"Do not emit a pointer to the corresponding type metadata into "
+            "non-public non-generic type descriptors.">;
 
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
@@ -1500,6 +1571,13 @@ def disable_lifetime_dependence_diagnostics :
   Flag<["-"], "disable-lifetime-dependence-diagnostics">,
   HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
 
+def enable_lifetime_resolution :
+  Flag<["-"], "enable-lifetime-resolution">,
+  HelpText<"Enable lifetime resolution in SIL.">;
+def disable_lifetime_resolution :
+  Flag<["-"], "disable-lifetime-resolution">,
+  HelpText<"Disable lifetime resolution in SIL.">;
+
 def enable_aggressive_reg2mem :
   Flag<["-"], "enable-aggressive-reg2mem">,
   HelpText<"Enable a more aggressive reg2mem heuristic">;
@@ -1620,6 +1698,11 @@ def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
+
+def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
+  HelpText<"Read the input files from disk and overlay them on the CAS file "
+           "system. This disables caching, since the content of the input "
+           "files no longer contributes to the cache key">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,

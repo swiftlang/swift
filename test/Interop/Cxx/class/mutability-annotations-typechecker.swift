@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S%{fs-sep}Inputs %s -enable-experimental-cxx-interop -verify -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}mutability-annotations.h
 
+// expected-warning@<unknown> * {{libc not found for }}
+// expected-warning@<unknown> * {{libstdc++ not found for }}
+
 import MutabilityAnnotations
 
 let obj = HasConstMethodAnnotatedAsMutating(a: 42) // expected-note {{change 'let' to 'var' to make it mutable}}

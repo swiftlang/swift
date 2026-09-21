@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -1677,10 +1676,12 @@ bb0(%0 : $*Builtin.FixedArray<10, Int>, %1 : $Int, %2 : $Int):
   %3 = vector_base_addr %0
   %4 = integer_literal $Builtin.Word, 1
   %5 = index_addr %3, %4
+  %6 = integer_literal $Builtin.Word, 0
+  %7 = index_addr %3, %6
   store %1 to [trivial] %5
-  store %2 to [trivial] %3
-  %6 = load [trivial] %5
-  return %6
+  store %2 to [trivial] %7
+  %10 = load [trivial] %5
+  return %10
 }
 
 sil @forwardPtr : $@convention(thin) (Builtin.RawPointer) -> UnsafeMutableRawBufferPointer {

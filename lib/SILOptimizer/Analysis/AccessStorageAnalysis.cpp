@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-sea"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
@@ -202,7 +201,7 @@ static SILValue getCallerArg(FullApplySite fullApply, unsigned paramIndex) {
     return SILValue();
 
   unsigned appliedIndex =
-    paramIndex - ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
+    paramIndex - ApplySite(PAI).getSubstCalleeArgIndexOfFirstAppliedArg();
   if (appliedIndex < PAI->getNumArguments())
     return PAI->getArgument(appliedIndex);
 

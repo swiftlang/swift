@@ -141,6 +141,13 @@ static bool printModuleInterfaceDecl(Decl *D,
                                      const PrintOptions &Options,
                                      bool PrintSynthesizedExtensions,
                                      StringRef LeadingComment = StringRef()) {
+  // A module's list of decls to display holds both the PatternBindingDecl of a
+  // module-scope variable and the VarDecls it binds. Printing both prints the
+  // variable twice, so let the print options pick one of the two forms, the
+  // same way member printing does.
+  if (!D->shouldPrintInContext(Options))
+    return false;
+
   if (!Options.shouldPrint(D)) {
     Printer.callAvoidPrintDeclPost(D);
     return false;
@@ -629,7 +636,14 @@ void swift::ide::printModuleInterface(
       }
     };
 
-    if (auto clangNode = getEffectiveClangNode(D)) {
+    auto originatingDeclOrSelf = [](Decl *aux) -> Decl * {
+      Decl *res = aux->getMacroExpansionOriginatingDecl();
+      if (!res)
+        return aux;
+      return res;
+    };
+
+    if (auto clangNode = getEffectiveClangNode(originatingDeclOrSelf(D))) {
       if (auto namespaceDecl =
               dyn_cast_or_null<clang::NamespaceDecl>(clangNode.getAsDecl())) {
         // An imported namespace decl will contain members from all redecls, so
@@ -641,8 +655,16 @@ void swift::ide::printModuleInterface(
           // add the decl "D" to every module that has a redecl. But we only
           // want to add "D" once to prevent duplicate printing.
           clang::SourceLocation loc = redecl->getLocation();
-          assert(loc.isValid() &&
-                 "expected a valid SourceLocation for a non-empty namespace");
+          // Clang synthesizes implicit namespace redecls that have no source
+          // location, e.g. the implicit `std` that holds the implicitly
+          // declared `std::align_val_t`. There is nothing in the source to
+          // print or to order such a redecl by, and the location is used below
+          // as a sort key, so skip it.
+          if (loc.isInvalid()) {
+            assert(redecl->isImplicit() &&
+                   "expected a valid SourceLocation for an explicit namespace");
+            continue;
+          }
           auto *owningModule = Importer.getClangOwningModule(redecl);
           auto found = ClangDecls.find(owningModule);
           if (found != ClangDecls.end() &&
@@ -724,6 +746,11 @@ void swift::ide::printModuleInterface(
     std::stable_sort(P.second.begin(), P.second.end(),
                      [&](std::pair<Decl *, clang::SourceLocation> LHS,
                          std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
+      // Sort peer macros immediately after their originating decl.
+      if (RHS.first == LHS.first->getMacroExpansionOriginatingDecl())
+        return false;
+      if (LHS.first == RHS.first->getMacroExpansionOriginatingDecl())
+        return true;
       return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
                                                           RHS.second);
     });

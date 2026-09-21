@@ -152,7 +152,7 @@ static  bool fixupReferenceCounts(
       auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
       builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
 
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -213,7 +213,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -260,7 +260,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -297,7 +297,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -538,12 +538,8 @@ static void collectPartiallyAppliedArguments(
     SmallVectorImpl<ParameterConvention> &CapturedArgConventions,
     SmallVectorImpl<SILValue> &FullArgs) {
   ApplySite Site(PAI);
-  SILFunctionConventions CalleeConv(Site.getSubstCalleeType(),
-                                    PAI->getModule());
   for (auto &Arg : PAI->getArgumentOperands()) {
-    unsigned CalleeArgumentIndex = Site.getCalleeArgIndex(Arg);
-    assert(CalleeArgumentIndex >= CalleeConv.getSILArgIndexOfFirstParam());
-    auto ParamInfo = CalleeConv.getParamInfoForSILArg(CalleeArgumentIndex);
+    auto ParamInfo = Site.getParamInfoForOperand(Arg);
     CapturedArgConventions.push_back(ParamInfo.getConvention());
     FullArgs.push_back(Arg.get());
   }
@@ -771,8 +767,9 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     break;
-    
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
@@ -1116,6 +1113,7 @@ class MandatoryInlining : public SILModuleTransform {
 
       case IsThunk_t::IsNotThunk:
       case IsThunk_t::IsBackDeployedThunk:
+      case IsThunk_t::IsDistributedProxyAdapterThunk:
         // For correctness, inlining _stdlib_isOSVersionAtLeast() when it is
         // declared transparent is mandatory in the thunks of @backDeployed
         // functions. These thunks will not contain calls to other transparent

@@ -19,7 +19,7 @@ struct S {
   subscript(_: Int) -> some Sequence {...}
 }
 \end{Verbatim}
-Opaque result declarations come into existence when we evaluate the \IndexDefinition{opaque result type request}\Request{opaque result type request}. This request receives a value declaration as input. In the evaluation function, we check if the declaration's return type contains any occurrences of \texttt{some}. If not, we're done; otherwise, we construct an opaque result declaration.
+Opaque result declarations come into existence when we evaluate the \IndexDefinition{opaque result type request}\Request{opaque result type request}. This request receives a \index{value declaration!opaque result type}value declaration as input. In the evaluation function, we check if the declaration's return type contains any occurrences of \texttt{some}. If not, we're done; otherwise, we construct an opaque result declaration.
 
 \paragraph{Opaque result generic signatures.}
 An opaque result declaration points back to its \IndexDefinition{owner declaration}\emph{owner declaration}, which is the \index{value declaration}value declaration that declares this opaque result type. There is a one-to-one correspondence between opaque result declarations, and their owner declarations. Since the \texttt{some} keyword may appear any number of times in the owner declaration's return type, an opaque result declaration will in general declare one or more \IndexDefinition{opaque result type}\emph{opaque result types}.
@@ -35,7 +35,7 @@ If the owner declaration is not actually generic, all new generic parameters hav
 
 \item For each new generic parameter, we also add a requirement with this generic parameter on the left-hand side, and the constraint type on the right-hand side.
 
-When the constraint type is a \index{protocol type!opaque result type}protocol type, a \index{protocol composition type!opaque result type}protocol composition type, or a \index{parameterized protocol type!opaque result type}parameterized protocol type, this will be a \index{conformance requirement!opaque result type}conformance requirement. When we have a protocol composition or parameterized protocol type, the request will \index{requirement decomposition}decompose the requirement into simpler requirements automatically (\SecRef{requirement desugaring}).
+When the constraint type is a \index{protocol type!opaque result type}protocol type, a \index{protocol composition type!opaque result type}protocol composition type, or a \index{parameterized protocol type!opaque result type}parameterized protocol type, this will be a \index{conformance requirement!opaque result type}conformance requirement. When we have a protocol composition or parameterized protocol type, the request will \index{requirement decomposition!opaque result type}decompose the requirement into simpler requirements automatically (\SecRef{requirement desugaring}).
 
 Otherwise, the constraint type must be a \index{class type!opaque result type}class type, and we add a \index{superclass requirement!opaque result type}superclass requirement instead.
 
@@ -46,7 +46,7 @@ The opaque result generic signature does not depend on the underlying type of it
 \begin{example}
 The below is a list of the opaque result generic signatures that we obtain in a few simple instances. We will revisit some of these examples later.
 \begin{enumerate}
-\item Here we get a completely unconstrained opaque result type, because \Index{Any@\texttt{Any}}\texttt{Any} is the empty protocol composition; a conformance requirement to \texttt{Any} is a no-op:
+\item Here we get a completely unconstrained opaque result type, because \Index{Any@\texttt{Any}!opaque result type}\texttt{Any} is the empty protocol composition; a conformance requirement to \texttt{Any} is a no-op:
 \begin{Verbatim}
 func fullyOpaque() -> some Any {...}
 \end{Verbatim}
@@ -167,7 +167,7 @@ Applying this substitution map to the \index{same-type requirement!opaque result
 \paragraph{History.}
 Opaque result types were first introduced in \IndexSwift{5.1}Swift 5.1 \cite{se0244}, so they actually predate opaque parameter declarations~\cite{se0341}. The initial implementation only allowed \texttt{some} to appear once at the outermost level of a type representation. \IndexSwift{5.7}Swift~5.7 generalized this to allow \texttt{some} to appear one or more times, nested in arbitrary types \cite{se0328}. Swift~5.7 also introduced opaque result types that depend on availability~\cite{se0360}.
 
-\section{Opaque Archetypes}\label{opaquearchetype}
+\section{Opaque Archetypes}\label{sec:opaque archetypes}
 
 Once we have the opaque result generic signature, we can proceed to \index{type resolution!opaque archetype}type resolution, where we build the \index{interface type!opaque result type}interface type of the \index{owner declaration}owner declaration. To get the interface type for an occurrence of \texttt{some} in return position, we take the corresponding generic parameter in the opaque result generic signature, and form the \IndexDefinition{opaque archetype}\emph{opaque archetype} representing this generic parameter. This opaque archetype then appears in the interface type of the owner declaration.
 
@@ -177,8 +177,8 @@ An opaque archetype similarly packages up a type parameter with a generic signat
 
 \begin{definition}
 If $d$~is an opaque result declaration and \tT~is a \index{reduced type parameter!opaque archetype}reduced \index{type parameter!opaque archetype}type parameter for the opaque result generic signature of~$d$, we will denote the opaque archetype for~\tT\ by~$\Ot_d$, or~$\Ot$ when $d$~is implied from context. (The symbol \index{$\Ot$}
-\index{$\Ot$!z@\igobble|seealso{opaque archetype}}
-``$\circlearrowright$'' is, of course, an amalgamation of ``o'' for opaque and  ``\texttt{->}'' for result type.) 
+\index{$\Ot$!z@\igobble|seealso{opaque archetype}}\index{opaque archetype!notation}
+``$\circlearrowright$'' is, of course, an amalgamation of ``o'' for opaque and  ``\texttt{->}'' for result type.)
 \end{definition}
 
 \begin{example}\label{some equatable example}
@@ -208,16 +208,16 @@ Recall that both arguments to ``\texttt{==}'' must have the same type, and this 
 \SubstMapC{&\SubstType{\rT}{$\Ox$}}{\\
 &\SubstConf{\rT}{$\Ox$}{Equatable}}
 \end{align*}
-Our input generic signature states a conformance requirement, so we need to \index{global conformance lookup!opaque archetype}look up the conformance of $\Ox$ to \texttt{Equatable} when we build our substitution map. We extended global conformance lookup to archetypes in \SecRef{local requirements}. It behaves identically with primary and opaque archetypes. When given an opaque archetype whose opaque result generic signature states a conformance requirement, global conformance lookup will output an \index{abstract conformance!opaque archetype}abstract conformance whose subject type is this opaque archetype:
+Our input generic signature states a conformance requirement, so we need to \index{global conformance lookup!opaque archetype}look up the conformance of $\Ox$ to \texttt{Equatable} when we build our substitution map. We extended global conformance lookup to archetypes in \SecRef{sec:local requirements}. It behaves identically with primary and opaque archetypes. When given an opaque archetype whose opaque result generic signature states a conformance requirement, global conformance lookup will output an \index{abstract conformance!opaque archetype}abstract conformance whose subject type is this opaque archetype:
 \[
 \Proto{Equatable} \otimes \Ox = \ConfReq{$\Ox$}{Equatable}
 \]
 \end{example}
 
-We shorten this by saying we get an \IndexDefinition{opaque abstract conformance}\emph{opaque abstract conformance}. Next, we will demonstrate \index{type witness!opaque archetype}type witness projection from an opaque abstract conformance. To do that, we constrain our opaque result type to a protocol with associated types. 
+We shorten this by saying we get an \IndexDefinition{opaque abstract conformance}\emph{opaque abstract conformance}. Next, we will demonstrate \index{type witness!opaque archetype}type witness projection from an opaque abstract conformance. To do that, we constrain our opaque result type to a protocol with associated types.
 
 \begin{example}\label{opaque type witness example}
-In the final line of the below listing, the call expression \texttt{someSequence()} has the type~$\Ox$. We will deduce the type of \texttt{pick(someSequence())}:
+In the final line of the below listing, the \index{call expression}call expression \texttt{someSequence()} has the type~$\Ox$. We will deduce the type of \texttt{pick(someSequence())}:
 \begin{Verbatim}
 func someSequence() -> some Sequence {
   return [1, 2, 3]
@@ -254,7 +254,7 @@ Therefore, at run time, a value of type $\Opaque{\rT.Element}$ is actually an \t
 Recall our discussion of type declarations from \ChapRef{chap:decls}. We didn't mention it at the time, but an opaque result declaration is actually a special kind of type declaration, so we must also give it a \index{declared interface type!opaque result type}declared interface type. We say that the declared interface type of an opaque result declaration is the \index{owner declaration}owner declaration's return type. Note that this type will \emph{contain} at least one opaque archetype, but it may not necessarily \emph{be} an opaque archetype. Thus, an opaque result declaration can be said to ``declare'' all opaque archetypes that appear in its declared interface type, which can otherwise contain arbitrary structure. In the implementation, the declared interface type of a type declaration must be set to \emph{something}, and setting it to \emph{this} turns out to be convenient for the implementation.
 
 \paragraph{Type substitution.}
-Under \AlgRef{type subst algo}, a primary archetype~$\archetype{T}$ behaves like the type parameter \tT\ that it represents, in the sense that if we have a substitution map~$\Sigma$, then $\archetype{T} \otimes \Sigma = \tT \otimes \Sigma$. Opaque archetypes are rather different: applying a substitution map to an opaque archetype produces a new opaque archetype.
+Under \AlgRef{alg:substitute type}, a primary archetype~$\archetype{T}$ behaves like the type parameter \tT\ that it represents, in the sense that if we have a substitution map~$\Sigma$, then $\archetype{T} \otimes \Sigma = \tT \otimes \Sigma$. Opaque archetypes are rather different: applying a substitution map to an opaque archetype produces a new opaque archetype.
 
 In full generality, an opaque archetype is really a \emph{triple} $(\tT, d, \Sigma)$ where \tT\ is a reduced type parameter in the opaque result generic signature of~$d$, and $\Sigma$ is a substitution map \index{input generic signature!opaque archetype}for the \index{outer generic signature}outer generic signature of~$d$. (If the owner declaration of~$d$ is not generic, $\Sigma$ is always the \index{empty substitution map!opaque archetype}empty substitution map, and all of the below trivializes.)
 
@@ -319,12 +319,12 @@ The \index{output generic signature!opaque result type}output generic signature 
 
 We saw that if we take an opaque archetype for the identity substitution map, and apply a substitution map $\Sigma$, we get a new opaque archetype for this substitution map~$\Sigma$. More \index{type substitution!opaque archetype}generally, if an opaque archetype carries an arbitrary substitution map, applying another \index{opaque archetype!type substitution}substitution map to this archetype will \index{substitution map composition}compose the two substitution maps.
 
-\begin{algorithm}[Apply substitution map to opaque archetype]\label{opaquearchetypesubst}
-Receives an opaque archetype~$\Opaque{T}_d \otimes \Sigma$ and a substitution map $\Sigma^\prime$ as input. Outputs $(\Ot_d\otimes\Sigma)\otimes\Sigma^\prime$.
+\begin{algorithm}[Apply substitution map to opaque archetype]\label{alg:substitute opaque archetype}
+Receives an opaque archetype~$\Opaque{T}_d \otimes \Sigma$ and a substitution map $\Sigma'$ as input. Outputs $(\Ot_d\otimes\Sigma)\otimes\Sigma'$.
 \begin{enumerate}
 \item Decompose $\Ot_d \otimes \Sigma$ into a triple $(\tT, d, \Sigma)$ for some type parameter \tT, opaque result declaration $d$, and substitution map $\Sigma$.
-\item Construct $\Sigma \otimes \Sigma^\prime$ (\DefRef{subst map composition}).
-\item Construct an opaque archetype from the triple $(\tT, d, \Sigma\otimes\Sigma^\prime)$, and return it. (This opaque archetype is written as $\Ot_d \otimes (\Sigma\otimes\Sigma^\prime)$ in our notation, for reasons that are now hopefully clear.) 
+\item Construct the substitution map composition $\Sigma \otimes \Sigma'$ (\DefRef{subst map composition}).
+\item Construct an opaque archetype from the triple $(\tT, d, \Sigma\otimes\Sigma')$, and return it. (This opaque archetype is written as $\Ot_d \otimes (\Sigma\otimes\Sigma')$ in our notation, for reasons that are now hopefully clear.)
 \end{enumerate}
 \end{algorithm}
 Notice how if we start with $\Ot_d = \Ot_d\otimes 1_G$ and apply a substitution map~$\Sigma$, the above algorithm reduces to directly constructing a new opaque archetype with this substitution map, because $1_G \otimes \Sigma = \Sigma$:
@@ -346,7 +346,7 @@ We amend \DefRef{interface type def} as follows. Suppose that $\Ot_d \otimes \Si
 \[
 \Ot_d \otimes \Sigma \in \TypeObj{H}
 \]
-Thus, an opaque archetype is an interface type for the \index{output generic signature!opaque archetype}output generic signature of its \index{substitution map!opaque archetype}substitution map. In particular, if $\Sigma$ is the identity substitution map~$1_G$, then:
+Thus, an opaque archetype is an \index{interface type!opaque archetype}interface type for the \index{output generic signature!opaque archetype}output generic signature of its \index{substitution map!opaque archetype}substitution map. In particular, if $\Sigma$ is the identity substitution map~$1_G$, then:
 \[
 \Ot \otimes 1_G = \Ot \in \TypeObj{G}
 \]
@@ -368,7 +368,7 @@ However, this time, $\Ot \otimes \Sigma$ is another opaque archetype, and $\PP \
 \]
 More generally, the subject type of an opaque abstract conformance might have a non-identity substitution map, at which point the notation becomes slightly awkward:
 \[
-\ConfReq{$(\Ot \otimes \Sigma)$}{P} \otimes \Sigma^\prime := \ConfReq{$(\Ot \otimes (\Sigma \otimes \Sigma^\prime))$}{P}
+\ConfReq{$(\Ot \otimes \Sigma)$}{P} \otimes \Sigma' := \ConfReq{$(\Ot \otimes (\Sigma \otimes \Sigma'))$}{P}
 \]
 The key fact is applying a substitution map to an opaque abstract conformance always outputs another opaque abstract conformance. This is unlike the situation with abstract conformances whose subject types are type parameters or primary archetypes.
 
@@ -433,13 +433,13 @@ Every opaque archetype is instantiated from an \IndexDefinition{opaque generic e
 
 While every opaque archetype represents a reduced type parameter, it is not the case that every reduced type parameter in the opaque result generic signature is represented by an opaque archetype. We recall that a generic parameter in the \index{opaque result generic signature}opaque result generic signature is either part of the outer generic signature, or it represents an opaque result type. Thus, if we consider the \IndexDefinition{root generic parameter}\emph{root} generic parameter that remains after we peel off any \index{dependent member type!base type}dependent member types, we see the opaque result generic signature has two varieties of reduced type parameter:
 \begin{enumerate}
-\item If a type parameter is rooted in a generic parameter of the owner declaration, we say it is an \index{outer type parameter!opaque result type}\emph{outer} type parameter.
+\item If a type parameter is rooted in a generic parameter of the owner declaration, we say it is an \IndexDefinition{outer type parameter!opaque result type}\emph{outer} type parameter.
 \item All other valid type parameters are rooted in one of the new generic parameters added by the opaque result declaration, so they represent opaque result types.
 \end{enumerate}
 Only reduced type parameters of the second kind are represented by opaque archetypes; a type parameter of the first kind is handled differently below.
 
 \begin{algorithm}[Map type parameter into opaque generic environment]\label{map into opaque alg}
-As input, takes an \index{opaque generic environment}opaque generic environment $(d, \Sigma)$ for some opaque result declaration~$d$ and substitution map~$\Sigma$, and a type parameter \tT. Outputs $\Ot_d \otimes \Sigma$ if the archetype exists, otherwise an interface or contextual type for the output generic signature of $\Sigma$.
+As input, takes an \index{opaque generic environment}opaque generic environment $(d, \Sigma)$ for some opaque result declaration~$d$ and substitution map~$\Sigma$, and a type parameter \tT. Outputs $\Ot_d \otimes \Sigma$ if the archetype exists, otherwise an interface or contextual type for the \index{output generic signature!opaque result type}output generic signature of $\Sigma$.
 \begin{enumerate}
 \item Let $O$ be the opaque result generic signature of~$d$.
 \item (Reduce) Set \IndexQuery{getReducedType}$\tX\leftarrow\Query{getReducedType}{O,\,\tT}$.
@@ -529,7 +529,7 @@ Since $|\texttt{\rO.Element}|=2$ and $|\texttt{\rT.A.A}|=3$, \AlgRef{type parame
 \end{example}
 
 \begin{definition}
-In addition to storing its depth and index, a \index{generic parameter type!opaque result type}generic parameter type stores a \emph{weight}, which is either 0 or 1. The generic parameters of an ordinary generic signature have weight~0, so in particular, the \index{outer type parameter!weight}outer generic parameters of the \index{opaque result generic signature!weight}opaque result generic signature have weight~0. Generic parameters that represent \index{opaque result type!weight}opaque result types in the opaque result generic signature have weight~1.
+In addition to storing its depth and index, a \index{generic parameter type!opaque result type}generic parameter type stores a \emph{weight}, which is either 0 or 1. The generic parameters of an ordinary generic signature have weight~0, so in particular, the \index{outer type parameter!opaque result type}outer generic parameters of the \index{opaque result generic signature!weight}opaque result generic signature have weight~0. Generic parameters that represent \index{opaque result type!weight}opaque result types in the opaque result generic signature have weight~1.
 \end{definition}
 
 The \emph{weighted type parameter order} compares weight before comparing length, so that outer type parameters (weight~0) always precede opaque result types (weight~1).
@@ -537,9 +537,9 @@ The \emph{weighted type parameter order} compares weight before comparing length
 \begin{algorithm}[Weighted type parameter order]
 \IndexDefinition{opaque archetype order}Takes two \index{type parameter order!opaque result type}type parameters \tT\ and \tU\ as input. Returns one of ``$<$'', ``$>$'', or ``$=$'' as output.
 \begin{enumerate}
-\item Let $\tT^\prime$ and $\tU^\prime$ denote the root generic parameters of \tT\ and \tU, respectively.
-\item If $\tT^\prime$ has weight~0 and $\tU^\prime$ has weight~1, return ``$<$''.
-\item If $\tT^\prime$ has weight~1 and $\tU^\prime$ has weight~0, return ``$>$''.
+\item Let $\tT'$ and $\tU'$ denote the root generic parameters of \tT\ and \tU, respectively.
+\item If $\tT'$ has weight~0 and $\tU'$ has weight~1, return ``$<$''.
+\item If $\tT'$ has weight~1 and $\tU'$ has weight~0, return ``$>$''.
 \item Otherwise both have equal weight. Compare \tT\ and \tU\ with \AlgRef{type parameter order}.
 \end{enumerate}
 \end{algorithm}
@@ -561,7 +561,7 @@ In fact, the above has a clear interpretation in terms of the following opaque r
 <τ_0_0, τ_1_0 where τ_0_0: Sequence, τ_0_1: Equatable,
                     τ_0_1 == τ_0_0.Element>
 \end{verbatim}
-This one could be resolved with relatively little effort. 
+This one could be resolved with relatively little effort.
 \end{example}
 
 \begin{example}
@@ -576,7 +576,7 @@ We infer the requirement $\ConfReq{\rT}{Hashable}$ when we build the generic sig
 
 \section{Opaque Type Witnesses}\label{reference opaque archetype}
 
-Recall the discussion of \index{type witness!opaque result type}type witnesses from \SecRef{type witnesses}, and \index{associated type inference!opaque result type}associated type inference from \SecRef{associated type inference}. We will now see that if a \index{value requirement}value requirement in a protocol returns an associated type, and a \index{candidate value witness!opaque result type}candidate value witness returns an opaque archetype, associated type inference will deduce that the type witness is this opaque archetype. Therefore, an \index{opaque archetype!type witness}opaque archetype can witness an associated type requirement in a conformance. 
+Recall the discussion of \index{type witness!opaque result type}type witnesses from \SecRef{type witnesses}, and \index{associated type inference!opaque result type}associated type inference from \SecRef{associated type inference}. We will now see that if a \index{value requirement}value requirement in a protocol returns an associated type, and a \index{candidate value witness!opaque result type}candidate value witness returns an opaque archetype, associated type inference will deduce that the type witness is this opaque archetype. Therefore, an \index{opaque archetype!type witness}opaque archetype can witness an associated type requirement in a conformance.
 
 \begin{example}\label{opaque archetype witness example}
 The \index{normal conformance!opaque type witness}normal conformance \index{horse}$\ConfReq{Horses}{Sequence}$ shown below witnesses the \nElement\ and \nIterator\ associated types with a pair of opaque archetypes:
@@ -721,7 +721,7 @@ We can generate a textual interface for \ExRef{opaque archetype witness example}
 \begin{Verbatim}
 public struct Horses : Swift.Sequence {
   public func makeIterator() -> some Swift.IteratorProtocol
-  
+
   public typealias Element =
     (@_opaqueReturnTypeOf("$s5horse6HorsesV12makeIteratorQryF", 0) __)
       .Element
@@ -741,14 +741,14 @@ public protocol P {
 }
 extension p.P {
   public func f() -> some Any
-  
+
 }
 public struct S : p.P {
   public typealias A =
     @_opaqueReturnTypeOf("$s1p1PPAAE1fQryF", 0) __<p.S>
 }
 \end{Verbatim}
-Notice how we refer to the opaque archetype with a substitution map. Let's use the \index{demangler}\texttt{swift-demangle} tool to print out the mangled name of the owner declaration:
+Notice how we refer to the opaque archetype with a substitution map. Let's use the \index{demangler}\texttt{swift-demangle} tool to print out the \index{mangling}mangled name of the owner declaration:
 \begin{Verbatim}
 $ swift-demangle s1p1PPAAE1fQryF
 s1p1PPAAE1fQryF ---> (extension in p):p.P.f() -> some
@@ -790,29 +790,29 @@ As input, takes a mangled name~$s$, an integer~\texttt{i}, and an optional list 
 
 \section{Runtime Representation}\label{opaque result runtime}
 
-Back in \ChapRef{chap:introduction}, we learned that Swift implements separate compilation of generic functions by encoding the function's generic signature in the calling convention. The caller constructs a runtime representation of each replacement type and conformance in the substitution map, and the callee manipulates generic values abstractly, using the metadata and witness tables provided by the caller. The implementation of opaque result types is analogous, but ``backwards.''
+Back in \ChapRef{chap:introduction}, we learned that Swift implements separate compilation of generic functions by encoding the function's generic signature in the calling convention. The caller constructs a runtime representation of each replacement type and conformance in the substitution map, and the callee manipulates generic values abstractly, using the metadata and witness tables provided by the caller. The implementation of \index{opaque result type!runtime representation}opaque result types is analogous, but ``backwards.''
 
 The caller of a function with an opaque result type must manipulate the resulting value abstractly, using \index{runtime type metadata!opaque result type}runtime type metadata. To this end, the compiler emits an \IndexDefinition{opaque type descriptor}\emph{opaque type descriptor} when compiling the callee. The opaque type descriptor references the runtime type metadata for the opaque archetype's underlying type.
 
 We will first define the underlying type of an opaque archetype in a precise way.
-To simplify the discussion, we only consider the case where the underlying type of an opaque result type does not depend on \index{availability}availability, so there is only one \index{underlying type substitution map}underlying type substitution map. Say we have an opaque result declaration~$d$ with opaque result generic signature~$O$, underlying type substitution map $\Sigma^\prime$, and outer generic signature~$G$.
+To simplify the discussion, we only consider the case where the underlying type of an opaque result type does not depend on \index{availability}availability, so there is only one \index{underlying type substitution map}underlying type substitution map. Say we have an opaque result declaration~$d$ with opaque result generic signature~$O$, underlying type substitution map $\Sigma'$, and outer generic signature~$G$.
 
 \begin{definition}
 Let $\Ot_d \otimes \Sigma$ be an opaque archetype. The \IndexDefinition{underlying type!opaque archetype}\emph{underlying type} of $\Ot_d \otimes \Sigma$ is the following substituted type:
 \[
-\tT \otimes \Sigma^\prime \otimes \Sigma
+\tT \otimes \Sigma' \otimes \Sigma
 \]
 If $\Sigma \in \SubMapObj{G}{H}$, then $\Ot_d \otimes \Sigma \in \TypeObj{H}$, by definition. As we expect, the underlying type of $\Ot_d \otimes \Sigma$ is also an element of $\TypeObj{H}$. Indeed:
 \begin{gather*}
-\tT \otimes \Sigma^\prime \in \TypeObj{O}\\
-\tT \otimes \Sigma^\prime \otimes \Sigma \in \TypeObj{H}
+\tT \otimes \Sigma' \in \TypeObj{O}\\
+\tT \otimes \Sigma' \otimes \Sigma \in \TypeObj{H}
 \end{gather*}
 Analogously, if $\Sigma \in \SubMapObjCtx{G}{H}$, then the underlying type of $\Ot_d \otimes \Sigma$ is an element of $\TypeObjCtx{H}$.
 \end{definition}
 
 \begin{definition}
 We also define the \IndexDefinition{underlying conformance}\emph{underlying conformance} of an \index{opaque abstract conformance!underlying conformance}opaque abstract conformance $\ConfReq{$(\Ot_d \otimes \Sigma)$}{P}$ as follows:
-\[\TP \otimes \Sigma^\prime \otimes \Sigma\]
+\[\TP \otimes \Sigma' \otimes \Sigma\]
 That is, we apply the underlying type substitution map to the abstract conformance for the type parameter \tT\ of our opaque archetype. Once again, by the definition of substitution map composition, if $\ConfReq{$(\Ot_d \otimes \Sigma)$}{P} \in \ConfObj{H}$, then its underlying conformance is also an element of $\ConfObj{H}$. (Likewise for $\ConfObjCtx{H}$.)
 \end{definition}
 
@@ -825,7 +825,7 @@ func someSequence2<T>(_ t: T) -> some Sequence {
 \end{Verbatim}
 Here is the underlying type substitution map:
 \begin{align*}
-\Sigma^\prime := \SubstMapC{
+\Sigma' := \SubstMapC{
 &\SubstType{\rT}{\rT}\\
 &\SubstType{\rO}{Array<\rT>}
 }{\\
@@ -834,11 +834,11 @@ Here is the underlying type substitution map:
 \end{align*}
 Now, let $\Sigma := \SubstMap{\SubstType{\rT}{Int}}$ be a substitution map for the outer generic signature \texttt{<\rT>}. The underlying type of $\Oy \otimes \Sigma$ is the following:
 \[
-\rO \otimes \Sigma^\prime \otimes \Sigma = \texttt{Array<\rT>} \otimes \Sigma = \texttt{Array<Int>}
+\rO \otimes \Sigma' \otimes \Sigma = \texttt{Array<\rT>} \otimes \Sigma = \texttt{Array<Int>}
 \]
 The underlying type of $\Opaque{\rO.Element} \otimes \Sigma$ is:
 \[
-\texttt{\rO.Element} \otimes \Sigma^\prime \otimes \Sigma = \texttt{\rT} \otimes \Sigma = \texttt{Int}
+\texttt{\rO.Element} \otimes \Sigma' \otimes \Sigma = \texttt{\rT} \otimes \Sigma = \texttt{Int}
 \]
 \end{example}
 
@@ -859,7 +859,7 @@ print(pick(someSequence2(123)))
 
 The entry point for \texttt{someSequence2()} takes three parameters: a buffer to hold the return value of type $\Oy$, the type metadata for \rT\ which here is \texttt{Int}, and a pointer to a value of type \rT.
 
-To determine the size of the return value buffer, we generate a call to the appropriate Swift runtime entry point, handing it the opaque type descriptor for \texttt{someSequence2()}, and the type metadata for \rT. At run time, this outputs type metadata for the underlying type, which is \texttt{Array<Int>}. We recover the type's size from its metadata, and generate a dynamic stack allocation with the result.
+To determine the \index{size}size of the return value buffer, we generate a call to the appropriate Swift runtime entry point, handing it the opaque type descriptor for \texttt{someSequence2()}, and the type metadata for \rT. At run time, this outputs type metadata for the underlying type, which is \texttt{Array<Int>}. We recover the type's size from its metadata, and generate a dynamic stack allocation with the result.
 
 We then hand the result of \texttt{someSequence2()} to \texttt{pick()}. The entry point for \texttt{pick()} takes four parameters: a buffer for the return value of type \texttt{\rT.Element}, the type metadata for \rT, and a witness table for $\ConfReq{\rT}{Sequence}$. For the latter, we must pass in the witness table for $\ConfReq{$\Oy \otimes \Sigma$}{Sequence}$. To obtain this witness table, we generate a call to the other Swift runtime entry point, again handing it the opaque type descriptor, and the type metadata for \texttt{Int}. This runtime entry point outputs the witness table for the underlying conformance, $\ConfReq{Array<Int>}{Sequence}$.
 
@@ -893,7 +893,7 @@ Suppose that $f$ is the function declaration currently being lowered, and $\Ot_d
 
 In \index{whole module optimization}whole module mode, every source file is primary, so the optimization is most effective in that case. The \verb|@inlinable| restriction ensures we avoid leaking implementation details when we serialize the SIL representation of an \verb|@inlinable| function as part of a \index{binary module}binary module (\SecRef{module system}). This serialized representation cannot depend on the underlying types of any non-\verb|@inlinable| functions, even within the same module.
 
-When the above visibility condition holds, we can obtain the underlying type substitution map~$\Sigma^\prime$ for~$d$, and safely assume that the underlying type of~$\Ot$ will always be equal to~$\tT \otimes \Sigma^\prime$ inside~$f$. However, there is one more thing to check.
+When the above visibility condition holds, we can obtain the underlying type substitution map~$\Sigma'$ for~$d$, and safely assume that the underlying type of~$\Ot$ will always be equal to~$\tT \otimes \Sigma'$ inside~$f$. However, there is one more thing to check.
 
 The \index{access control}\emph{access control} keywords (\texttt{fileprivate}, \texttt{internal}, \texttt{public}) determine not only the visibility of declarations from \index{name lookup!access control}name lookup at compile time, but also the visibility of symbols in the generated \index{object file}object file. In particular, we can only replace an opaque archetype with its underlying type if every nominal type appearing in the underlying type is visible. For example, if our opaque result type~$d$ is declared in another source file and its underlying type involves a \texttt{private struct}, we cannot directly reference the underlying type, even if we are allowed to know what this type is.
 
@@ -904,13 +904,13 @@ The three mutually-recursive \IndexDefinition{replace opaque archetypes with und
 \begin{algorithm}[Specialize opaque archetypes within a type]\label{unwrap opaque type algorithm}
 Receives a type expansion context and a type.
 \begin{itemize}
-\item For an \index{opaque archetype}\textbf{opaque archetype} $\Ot_d \otimes \Sigma$: 
+\item For an \index{opaque archetype}\textbf{opaque archetype} $\Ot_d \otimes \Sigma$:
 \begin{enumerate}
-\item If its underlying type is visible, substitute in underlying type, and recurse if this underlying type further contains opaque archetypes.
-\item Otherwise, recursively transform~$\Sigma$ and form a new opaque archetype.
+\item If its underlying type is visible, substitute in underlying type, and recursively transform the underlying type if it contains further opaque archetypes.
+\item Otherwise, recursively transform~$\Sigma$ with \AlgRef{unwrap opaque substitution map algorithm} and form a new opaque archetype with the transformed substitution map.
 \end{enumerate}
 
-\item For an \index{existential archetype}\textbf{existential archetype} $\Et \otimes \Sigma$: recursively transform $\Sigma$. (We will meet these in \SecRef{open existential archetypes}.)
+\item For an \index{existential archetype}\textbf{existential archetype} $\Et \otimes \Sigma$:  transform $\Sigma$ with \AlgRef{unwrap opaque substitution map algorithm}. (We will meet existential archetypes in \SecRef{sec:opening existentials}.)
 
 \item For \textbf{every other type} \tX: recursively transform the child types of \tX\ if any, and construct a new type with the transformed children.
 \end{itemize}
@@ -919,26 +919,26 @@ Receives a type expansion context and a type.
 \begin{algorithm}[Specialize opaque archetypes within a conformance]\label{unwrap opaque conformance algorithm}
 Receives a type expansion context and a conformance.
 \begin{itemize}
-\item For a \index{specialized conformance!opaque archetype}\textbf{specialized conformance} $\XP \otimes \Sigma$: recursively transform~$\Sigma$ and return a new specialized conformance.
+\item For a \index{specialized conformance!opaque archetype}\textbf{specialized conformance} $\XP \otimes \Sigma$: transform~$\Sigma$ with \AlgRef{unwrap opaque substitution map algorithm} and return a new specialized conformance.
 
 \item For an \index{opaque abstract conformance}\textbf{opaque abstract conformance} $\ConfReq{$(\Ot \otimes \Sigma)$}{P}$:
   \begin{enumerate}
-  \item If its underlying conformance is visible, substitute in the underlying conformance. Recurse if the conforming type again contains opaque archetypes.
-  \item Otherwise, recursively transform~$\Sigma$.
+  \item If its underlying conformance is visible, substitute in the underlying conformance. Recurse if its conforming type again contains opaque archetypes.
+  \item Otherwise, recursively transform~$\Sigma$ with \AlgRef{unwrap opaque substitution map algorithm}.
 \end{enumerate}
-\item For an \index{existential abstract conformance}\textbf{existential abstract conformance} $\ConfReq{$(\Et \otimes \Sigma)$}{P}$: recursively transform~$\Sigma$ and form a new existential abstract conformance.
+\item For an \index{existential abstract conformance}\textbf{existential abstract conformance} $\ConfReq{$(\Et \otimes \Sigma)$}{P}$: transform~$\Sigma$ with \AlgRef{unwrap opaque substitution map algorithm} and form a new existential abstract conformance.
 \end{itemize}
 \end{algorithm}
 
 \begin{algorithm}[Specialize opaque archetypes within a substitution map]\label{unwrap opaque substitution map algorithm}
-Receives a type expansion context and substitution map.
+Receives a type expansion context and substitution map $\Sigma$.
 \begin{itemize}
-\item Recursively transform each replacement type and conformance with \AlgRef{unwrap opaque type algorithm} and \AlgRef{unwrap opaque conformance algorithm}, and form a new substitution map.
+\item Recursively transform each replacement type of $\Sigma$ with \AlgRef{unwrap opaque type algorithm}, and each conformance with \AlgRef{unwrap opaque conformance algorithm}, and form a new substitution map.
 \end{itemize}
 \end{algorithm}
 
 \paragraph{Circularity.}
-We encountered \index{non-terminating computation}non-terminating compile-time computation in our prior discussion of conditional and recursive conformances (\SecRef{sec:conditional conformances}, \SecRef{recursive conformances}). This issue can also arise with opaque result types, because nothing in our discussion so far precludes the possibility of an \index{opaque result type!circularity}opaque result type whose underlying type is \index{circular reference}defined in terms of itself. If this were to happen, our algorithm for replacing an opaque archetype with its underlying type would run forever, if implemented as described. However, in reality, we attempt to detect this and \index{diagnostic!opaque result type}diagnose an error, as we will see now.
+We encountered \index{termination}\index{non-terminating computation}non-terminating compile-time computation in our prior discussion of conditional and recursive conformances (\SecRef{sec:conditional conformances}, \SecRef{recursive conformances}). This issue can also arise with opaque result types, because nothing in our discussion so far precludes the possibility of an \index{opaque result type!circularity}opaque result type whose underlying type is \index{circular reference}defined in terms of itself. If this were to happen, our algorithm for replacing an opaque archetype with its underlying type would run forever, if implemented as described. However, in reality, we attempt to \index{termination check}detect this and \index{diagnostic!opaque result type}diagnose an error, as we will see now.
 
 \begin{example}
 The simplest example is when a function with an opaque result type calls itself on all control flow paths. Here, the opaque result types of \texttt{f1a()} and \texttt{f1b()} are defined in terms of each other:
@@ -978,7 +978,7 @@ In the future, it would be nice to \index{limitation!opaque result type}diagnose
 
 Finally, while the default limits should be sufficient for all reasonable programs, it is possible to change them with a pair of \index{frontend flag}frontend flags:
 \begin{itemize}
-\item \IndexFlag{max-substitution-depth}\texttt{-max-substitution-depth} is the maximum number of recursive calls, in the sense where the underlying type of an opaque archetype involves another opaque archetype, which involves another, and so on. The default value is 500.
+\item \IndexFlag{max-substitution-depth}\texttt{-max-substitution-depth} is the maximum number of recursive calls to \AlgRef{unwrap opaque type algorithm}. The default value is 500.
 
 \item \IndexFlag{max-substitution-count}\texttt{-max-substitution-count} is the total number of opaque archetypes that can be visited within a single type before we give up. The default value is 120,000.
 \end{itemize}
@@ -987,6 +987,7 @@ Finally, while the default limits should be sufficient for all reasonable progra
 
 Key source files:
 \begin{itemize}
+\item \SourceFile{include/swift/AST/Decl.h}
 \item \SourceFile{lib/Sema/MiscDiagnostics.cpp}
 \item \SourceFile{lib/Sema/TypeCheckGeneric.cpp}
 \end{itemize}
@@ -1036,9 +1037,10 @@ Recall from \SecRef{src:archetypes} that every archetype has a \texttt{getInterf
 See also \SecRef{src:archetypes}.
 \begin{itemize}
 \item \texttt{forOpaqueType()} is a static factory method that returns the unique opaque generic environment for the given opaque result declaration and substitution map.
-\item \texttt{getKind()} returns \texttt{GenericEnvironment::Kind::Opaque} for an \IndexSource{opaque generic environment}opaque generic environment. The generic environment of an opaque archetype is always one.
+\item \texttt{getKind()} returns \texttt{GenericEnvironment::Kind::Opaque} in this case.
 \item \texttt{getOpaqueTypeDecl()} returns the opaque result declaration for this environment.
 \item \texttt{getOuterSubstitutions()} returns this generic environment's substitution map.
+\item \texttt{mapTypeIntoEnvironment()} implements \AlgRef{map into opaque alg}.
 \end{itemize}
 
 \subsection*{Opaque Type Witnesses}
@@ -1056,7 +1058,7 @@ This is \AlgRef{resolve opaque archetype algorithm}, to resolve the special \ver
 See also \SecRef{src:compilation model}.
 \begin{itemize}
 \item \texttt{addUnvalidatedDeclWithOpaqueResultType()} records a declaration as having an opaque result type in the per-source file list. Invoked by the parser.
-\item \texttt{getOpaqueReturnTypeDecls()} walks this above list, constructs each opaque result declaration, and populates the per-source file lookup table with the mangled name of each owner declaration. This is Step 1~and~2 of \AlgRef{resolve opaque archetype algorithm}.
+\item \texttt{getOpaqueReturnTypeDecls()} populates the per-source file lookup table with the mangled name of each owner declaration. This is Step 1~and~2 of \AlgRef{resolve opaque archetype algorithm}.
 \item \texttt{lookupOpaqueResultType()} returns an opaque result declaration for the given \IndexSource{mangling}mangled name. This is Step~3 of \AlgRef{resolve opaque archetype algorithm}.
 \end{itemize}
 

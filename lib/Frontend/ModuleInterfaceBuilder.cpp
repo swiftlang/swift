@@ -17,27 +17,20 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/PreprocessorOptions.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/xxhash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/Errc.h"
 #include "llvm/Support/Regex.h"
-#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/LockFileManager.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using FileDependency = SerializationOptions::FileDependency;
@@ -184,7 +177,7 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
       auto buf = getDepBuf();
       if (!buf)
         return true;
-      uint64_t hash = xxHash64(buf->getBuffer());
+      uint64_t hash = xxh3_64bits(buf->getBuffer());
       Deps.push_back(FileDependency::hashBased(DepNameToStore, IsSDKRelative,
                                                Status->getSize(), hash));
     } else {
@@ -287,7 +280,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
-      !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
+      !Invocation.getIRGenOptions().ForceLoadSymbolName.empty() &&
+      !Invocation.getIRGenOptions().DisableForceLoadSymbols;
   SerializationOpts.PublicDependentLibraries =
       Invocation.getIRGenOptions().PublicLinkLibraries;
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;

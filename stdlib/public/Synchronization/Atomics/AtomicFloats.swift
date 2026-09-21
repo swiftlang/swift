@@ -34,7 +34,7 @@ extension Float16: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming Float16
@@ -53,7 +53,7 @@ extension Float16: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -86,7 +86,7 @@ extension Float: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming Float
@@ -105,7 +105,7 @@ extension Float: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -138,7 +138,7 @@ extension Double: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming Double
@@ -157,7 +157,7 @@ extension Double: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation

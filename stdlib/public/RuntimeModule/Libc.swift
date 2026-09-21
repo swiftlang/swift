@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal import BacktracingImpl.OS.Libc
+@_implementationOnly import BacktracingImpl.OS.Libc
 
 let _swift_open = swift.runtime.backtrace._swift_open
 let _swift_get_errno = swift.runtime.backtrace._swift_get_errno

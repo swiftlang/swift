@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -stack-promotion -sil-opt-profile-repeat=10 %s -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // CHECK: {{.*}} ms: total runtime of all passes
 

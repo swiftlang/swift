@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -module-name Swift %s | %FileCheck %s
 
@@ -54,6 +55,7 @@ func get(holder holder: inout Holder) -> C {
 // CHECK-NEXT:   [[T1:%.*]] = load [trivial] [[T0]] : $*@sil_unmanaged C
 // CHECK-NEXT:   [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
 // CHECK-NEXT:   end_access [[READ]] : $*Holder
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[T2]]
 
 func project(fn fn: () -> Holder) -> C {
@@ -69,4 +71,5 @@ func project(fn fn: () -> Holder) -> C {
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
 // CHECK-NEXT: [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
 // CHECK-NEXT: destroy_value [[FNC]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[T2]]

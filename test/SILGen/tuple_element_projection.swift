@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name test %s
+
 // RUN: %target-swift-emit-silgen -module-name test %s | %FileCheck %s
 
 func returnStringAnyPair() -> (String, Any) {

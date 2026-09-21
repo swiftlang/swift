@@ -14,13 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/STLExtras.h"
+#include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/SIL/SILDifferentiabilityWitness.h"
+
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SIL/ApplySite.h"
-#include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
@@ -133,8 +138,7 @@ void forEachApplyDirectResult(
 
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
-  SILFunctionConventions convs(function.getLoweredFunctionType(),
-                               function.getModule());
+  SILFunctionConventions convs = function.getConventions();
   auto indResults = function.getIndirectResults();
   auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
   auto retVal = retInst->getOperand();
@@ -176,8 +180,6 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
 
 void collectAllDirectResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
-  SILFunctionConventions convs(function.getLoweredFunctionType(),
-                               function.getModule());
   auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
   auto retVal = retInst->getOperand();
   if (auto *tupleInst = dyn_cast<TupleInst>(retVal))
@@ -452,7 +454,7 @@ SILValue emitProjectTopLevelSubcontext(
 
 /// Returns the AbstractFunctionDecl corresponding to `F`. If there isn't one,
 /// returns `nullptr`.
-static AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F) {
+AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F) {
   auto *DC = F->getDeclContext();
   if (!DC)
     return nullptr;
@@ -548,6 +550,10 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "SILGen should create differentiability witnesses for all function "
          "definitions with explicit differentiable attributes");
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
+
   return SILDifferentiabilityWitness::createDeclaration(
       module,
       // Witness for @_alwaysEmitIntoClient original function must be emitted,
@@ -556,7 +562,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
       original->isAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
                                          : SILLinkage::PublicExternal,
       original, kind, minimalConfig->parameterIndices,
-      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
+      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature,
+      isDefaultDerivative);
 }
 
 } // end namespace autodiff

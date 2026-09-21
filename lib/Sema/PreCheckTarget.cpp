@@ -26,6 +26,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -523,7 +524,7 @@ diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
 /// used for the lookup. If the lookup doesn't find any results, returns
 /// `nullptr`.
 static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
-                                NameLookupOptions lookupOptions) {
+                                NLOptions lookupOptions) {
   auto &Context = DC->getASTContext();
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -631,8 +632,8 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
 
     // For the purpose of diagnosing inaccessible results, try the lookup again
     // but ignore access control.
-    NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+    NLOptions relookupOptions = lookupOptions;
+    relookupOptions |= NLFlags::IgnoreAccessControl;
     auto inaccessibleResults =
         TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
     if (inaccessibleResults) {
@@ -872,11 +873,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   auto &Context = DC->getASTContext();
 
   // Perform standard value name lookup.
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   // TODO: Include all of the possible members to give a solver a
   //       chance to diagnose name shadowing which requires explicit
   //       name/module qualifier to access top-level name.
-  lookupOptions |= NameLookupFlags::IncludeOuterResults;
+  lookupOptions |= NLFlags::IncludeOuterResults;
 
   Expr *result = ::resolveDeclRefExpr(UDRE, DC, lookupOptions);
   if (!result && Context.LangOpts.hasFeature(Feature::MemberImportVisibility,
@@ -884,7 +885,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     // If we didn't find a result, try again but this time relax
     // MemberImportVisibility restrictions. Note that diagnosing the missing
     // import is already handled by resolveDeclRefExpr().
-    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    lookupOptions |= NLFlags::IgnoreMissingImports;
     result = ::resolveDeclRefExpr(UDRE, DC, lookupOptions);
   }
 
@@ -1000,6 +1001,9 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
                                          lookupOptions, corrections);
     }
+
+    // Claim any notes as children to the error.
+    CompoundDiagnosticTransaction transaction(Context.Diags);
 
     if (auto typo = corrections.claimUniqueCorrection()) {
       auto diag = Context.Diags.diagnose(
@@ -1404,8 +1408,15 @@ public:
           parent = nextParent;
         }
         
+        // A subscript only accepts `&` on an argument when its parameters may
+        // be declared `inout`.
+        bool inoutSubscriptArg =
+            isa<SubscriptExpr>(parent) &&
+            Ctx.LangOpts.hasFeature(
+                Feature::SubscriptParametersWithOwnership);
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
-            isa<MacroExpansionExpr>(parent)) {
+            isa<MacroExpansionExpr>(parent) || inoutSubscriptArg) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.
@@ -2131,7 +2142,7 @@ bool PreCheckTarget::correctInterpolationIfStrange(
             Context.Diags
                 .diagnose(argLabelLoc,
                           diag::string_interpolation_label_changing)
-                .highlightChars(argLabelLoc, argLoc);
+                .highlight(SourceRange(argLabelLoc));
             Context.Diags
                 .diagnose(argLabelLoc,
                           diag::string_interpolation_remove_label,
@@ -2195,6 +2206,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   if (auto *typeContext = DC->getInnermostTypeContext()) {
     auto *nominal = typeContext->getSelfNominalTypeDecl();
+    if (!nominal)
+      return nullptr;
+
     auto *classDecl = dyn_cast<ClassDecl>(nominal);
 
     if (!classDecl) {
@@ -2526,6 +2540,12 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       assert(ThrownTypeRepr && "Parser ensures that this never fails");
     }
 
+    TupleTypeRepr *YieldsTypeRepr = nullptr;
+    if (auto yieldsTypeExpr = AE->getYieldsExpr()) {
+      YieldsTypeRepr = extractInputTypeRepr(yieldsTypeExpr);
+      assert(YieldsTypeRepr && "Parser ensures that this never fails");
+    }
+
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
@@ -2533,10 +2553,9 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       ResultTypeRepr = makeErrorTypeRepr(AE->getResultExpr());
     }
 
-    auto NewTypeRepr = new (Ctx)
-        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
-                         ResultTypeRepr);
+    auto NewTypeRepr = new (Ctx) FunctionTypeRepr(
+        nullptr, ArgsTypeRepr, AE->getAsyncLoc(), AE->getThrowsLoc(),
+        ThrownTypeRepr, YieldsTypeRepr, AE->getArrowLoc(), ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
@@ -2900,6 +2919,19 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
       return MacroWalking::ArgumentsAndExpansion;
     }
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // Fold sequence expressions (e.g. 'P1 & P2') into BinaryExprs so that the
+      // type-sugar folding in walkToExprPost can recognize them. This matches
+      // the main PreCheckExpression walker, without it a parenthesized
+      // composition that was parsed as a value expression (such as a generic
+      // argument '(P1 & P2, ...)') does not simplify to a type.
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        auto *folded = TypeChecker::foldSequence(seqExpr, DC);
+        folded = folded->walk(*this);
+        if (!folded)
+          return Action::Stop();
+        return Action::SkipNode(folded);
+      }
+
       // Resolve unqualified name references
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);

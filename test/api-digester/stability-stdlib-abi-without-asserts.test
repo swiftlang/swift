@@ -94,7 +94,6 @@ Func RangeReplaceableCollection.filter(_:) has been removed
 Func Sequence._filter(_:) has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.map(_:) has been removed
-Func Sequence.reduce(_:_:) has been removed
 Func Dictionary.filter(_:) has been removed
 Func Set.filter(_:) has been removed
 Func String._slowWithCString(encodedAs:_:) has been removed

@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/hidden)
@@ -9,8 +8,8 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/hidden/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 
 // Check that loading plugins respects VFS overlays
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -enable-experimental-feature Macros -load-plugin-library %t/vfs/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS %t/macro.swift -vfsoverlay %t/overlay.yaml
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -enable-experimental-feature Macros -plugin-path %t/vfs -module-name MacroUser -DTEST_DIAGNOSTICS %t/macro.swift -vfsoverlay %t/overlay.yaml
+// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -load-plugin-library %t/vfs/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS %t/macro.swift -vfsoverlay %t/overlay.yaml
+// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -plugin-path %t/vfs -module-name MacroUser -DTEST_DIAGNOSTICS %t/macro.swift -vfsoverlay %t/overlay.yaml
 
 //--- macro.swift
 // expected-no-diagnostics

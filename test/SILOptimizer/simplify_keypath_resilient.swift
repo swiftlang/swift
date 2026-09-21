@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -enable-library-evolution -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -enable-library-evolution -emit-sil -enable-sil-opaque-values | %FileCheck %s
 
 public enum E: Hashable {
   case e

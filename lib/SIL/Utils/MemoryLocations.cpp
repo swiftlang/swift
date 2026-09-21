@@ -11,10 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memory-locations"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemoryLocations.h"
 #include "swift/Basic/SmallBitVector.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -199,6 +197,9 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   if (loc->getType().isEmpty(*function))
     return;
 
+  if (loc->getType().aggregateHasUnreferenceableStorage())
+    return;
+
   unsigned currentLocIdx = locations.size();
   locations.push_back(Location(loc, isTrivial(loc->getType(), function), currentLocIdx));
   SmallVector<SILValue, 8> collectedVals;
@@ -338,9 +339,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       }
       case SILInstructionKind::DebugValueInst:
-        if (cast<DebugValueInst>(user)->hasAddrVal())
-          break;
-        return false;
+        break;
       case SILInstructionKind::ApplyInst: {
         auto *apply = cast<ApplyInst>(user);
         if (apply->hasAddressResult()) {
@@ -397,6 +396,9 @@ bool MemoryLocations::analyzeAddrProjection(
 
   SILFunction *f = projection->getFunction();
   if (projection->getType().isEmpty(*f))
+    return false;
+
+  if (projection->getType().aggregateHasUnreferenceableStorage())
     return false;
 
   auto key = std::make_pair(parentLocIdx, fieldNr);
@@ -505,6 +507,13 @@ bool MemoryLocations::isTrivial(SILType type, SILFunction *inFunction) {
 }
 
 bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
+
+  // An opened existential can be a trivial type. In case an optimization found
+  // the concrete type of the existential, it might have removed the
+  // destroy_addr of such a location, but the type is still the opened
+  // archetype.
+  if (type.is<ExistentialArchetypeType>())
+    return true;
 
   if (inFunction->getTypeProperties(type).isInfinite()) {
     return type.isTrivial(*inFunction);

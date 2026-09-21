@@ -4,6 +4,24 @@
 
 import SwiftUI
 
+// Stand-in for SwiftUI's `@State`, which became a macro in recent SDKs and would
+// otherwise require the SwiftUIMacros plugin. This test exercises type-checking
+// diagnostics, not `@State` itself; the box reproduces `@State`'s nonmutating
+// setter and `Binding` projected value.
+@propertyWrapper
+struct FakeState<Value> {
+  final class Box { var value: Value; init(_ value: Value) { self.value = value } }
+  private let box: Box
+  init(wrappedValue: Value) { box = Box(wrappedValue) }
+  var wrappedValue: Value {
+    get { box.value }
+    nonmutating set { box.value = newValue }
+  }
+  var projectedValue: Binding<Value> {
+    Binding(get: { box.value }, set: { box.value = $0 })
+  }
+}
+
 enum ColorScheme: CaseIterable, Hashable, Equatable, Identifiable {
 // expected-error@-1 {{type 'ColorScheme' does not conform to protocol 'Identifiable'}}
 // expected-note@-2 {{add stubs for conformance}}
@@ -27,8 +45,8 @@ struct IconPicker : View {
 }
 
 struct CountdownEditor : View {
-  @State var symbol: String = "timer"
-  @State var selectedColor: ColorScheme = ColorScheme.pink
+  @FakeState var symbol: String = "timer"
+  @FakeState var selectedColor: ColorScheme = ColorScheme.pink
 
   var body: some View {
     NavigationLink(destination: IconPicker()) {

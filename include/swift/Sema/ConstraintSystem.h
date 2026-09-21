@@ -20,7 +20,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/NameLookup.h"
@@ -31,6 +30,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
+#include "swift/Sema/ConformanceCache.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintLocator.h"
@@ -50,7 +50,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 namespace swift {
 
@@ -298,7 +297,7 @@ using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 namespace constraints {
 
 template <typename T = Expr> T *castToExpr(ASTNode node) {
-  return cast<T>(cast<Expr *>(node));
+  return cast<T>(cast_or_null<Expr *>(node));
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
@@ -666,6 +665,10 @@ struct MemberLookupResult {
     /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
 
+    /// This is a member of a protocol metatype extension being accessed
+    /// through the metatype of a conforming type.
+    UR_MetatypeExtensionMemberOnConformingType,
+
     /// This is a mutating member, being used on an rvalue.
     UR_MutatingMemberOnRValue,
 
@@ -839,7 +842,7 @@ private:
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
   /// Allocator used for data that is local to this constraint system.
-  llvm::BumpPtrAllocator Allocator;
+  ConstraintSolverAllocator Allocator;
 
   /// Arena used for memory management of constraint-checker-related
   /// allocations.
@@ -1027,10 +1030,6 @@ private:
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>, 4>
       OpenedTypes;
 
-  /// A dictionary of all conformances that have been looked up by the solver.
-  llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
-      Conformances;
-
   /// A cache for unavailability checks peformed by the solver.
   llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
       UnavailableDecls;
@@ -1109,6 +1108,10 @@ public:
   /// ad-hoc distributed `SerializationRequirement` conformances).
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
+
+  /// This is not trail-protected state; it's just a cache for some
+  /// information about Decls.
+  ConformanceCache CC;
 
 private:
   /// Describes the current solver state.
@@ -2065,7 +2068,7 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix, unsigned impact = 1,
+  bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
   void recordPotentialHole(TypeVariableType *typeVar);
@@ -2796,37 +2799,9 @@ public:
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
-
-  /// We memoize the computation in the below.
-  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
-      ConformanceTransitiveForSupertypeCache;
-
-  /// Suppose we are given a type T with the given conversion behavior,
-  /// and a protocol P, with the following setup:
-  /// - T conv $T0
-  /// - $T0 conforms P
-  /// The question is, does this imply that T must conform to P? This
-  /// returns true if so, false otherwise.
-  ///
-  /// Also see Subtyping.h, checkTranstiveSupertypeConformance().
-  bool isConformanceTransitiveForSupertype(ConversionBehavior behavior,
-                                           ProtocolDecl *proto);
-
-  /// We memoize the computation in the below.
-  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
-      ConformanceTransitiveForSubtypeCache;
-
-  /// Suppose we are given a type T with the given conversion behavior,
-  /// and a protocol P, with the following setup:
-  /// - $T0 conv T
-  /// - $T0 conforms P
-  /// The question is, does this imply that T must conform to P? This
-  /// returns true if so, false otherwise.
-  ///
-  /// Also see Subtyping.h, checkTranstiveSubtypeConformance().
-  bool isConformanceTransitiveForSubtype(ConversionBehavior behavior,
-                                         ProtocolDecl *proto);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P) {
+    return CC.lookupConformance(type, P);
+  }
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
@@ -3134,13 +3109,6 @@ public:
                                               Type initializerType,
                                               Type propertyType);
 
-  /// Propagate constraints in an effort to enforce local
-  /// consistency to reduce the time to solve the system.
-  ///
-  /// \returns true if the system is known to be inconsistent (have no
-  /// solutions).
-  bool propagateConstraints();
-
   /// The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
@@ -3153,31 +3121,6 @@ public:
     Error
   };
 
-  class TypeMatchResult {
-    SolutionKind Kind;
-
-  public:
-    inline bool isSuccess() const { return Kind == SolutionKind::Solved; }
-    inline bool isFailure() const { return Kind == SolutionKind::Error; }
-    inline bool isAmbiguous() const { return Kind == SolutionKind::Unsolved; }
-
-    static TypeMatchResult success() {
-      return {SolutionKind::Solved};
-    }
-
-    static TypeMatchResult failure() {
-      return {SolutionKind::Error};
-    }
-
-    static TypeMatchResult ambiguous() {
-      return {SolutionKind::Unsolved};
-    }
-
-    operator SolutionKind() { return Kind; }
-  private:
-    TypeMatchResult(SolutionKind result) : Kind(result) {}
-  };
-
   /// Attempt to repair typing failures and record fixes if needed.
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
@@ -3186,12 +3129,12 @@ public:
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
-  TypeMatchResult
+  SolutionKind
   matchPackTypes(PackType *pack1, PackType *pack2,
                  ConstraintKind kind, TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
-  TypeMatchResult
+  SolutionKind
   matchPackExpansionTypes(PackExpansionType *expansion1,
                           PackExpansionType *expansion2,
                           ConstraintKind kind, TypeMatchOptions flags,
@@ -3200,22 +3143,29 @@ public:
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
-  TypeMatchResult matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+  SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+                               ConstraintKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
+
+  /// Match the @Sendable bit between two functions.
+  SolutionKind matchFunctionSendability(FunctionType *func1,
+                                        FunctionType *func2,
+                                        ConstraintKind kind,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
+
+  /// Match the execution semantics between two functions currently
+  /// represented by `@called(once)` bit.
+  SolutionKind
+  matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
-  /// Match the @Sendable bit between two functions.
-  TypeMatchResult matchFunctionSendability(FunctionType *func1,
-                                           FunctionType *func2,
-                                           ConstraintKind kind,
-                                           TypeMatchOptions flags,
-                                           ConstraintLocatorBuilder locator);
-
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
-  TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                     ConstraintKind kind, TypeMatchOptions flags,
-                                     ConstraintLocatorBuilder locator);
+  SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
+                                  ConstraintKind kind, TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator);
   
   /// Subroutine of \c matchTypes()
   bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
@@ -3229,14 +3179,14 @@ public:
 
   /// Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
-  TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
+  SolutionKind matchSuperclassTypes(Type type1, Type type2,
+                                    TypeMatchOptions flags,
+                                    ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two types that
   /// refer to the same declaration via their generic arguments.
-  TypeMatchResult matchDeepEqualityTypes(Type type1, Type type2,
-                                         ConstraintLocatorBuilder locator);
+  SolutionKind matchDeepEqualityTypes(Type type1, Type type2,
+                                      ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
@@ -3245,23 +3195,23 @@ public:
   /// Usually this uses Subtype, but when matching the instance type of a
   /// metatype with the instance type of an existential metatype, since we
   /// want an actual conformance check.
-  TypeMatchResult matchExistentialTypes(Type type1, Type type2,
-                                        ConstraintKind kind,
-                                        TypeMatchOptions flags,
-                                        ConstraintLocatorBuilder locator);
+  SolutionKind matchExistentialTypes(Type type1, Type type2,
+                                     ConstraintKind kind,
+                                     TypeMatchOptions flags,
+                                     ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), used to bind a type to a
   /// type variable.
-  TypeMatchResult matchTypesBindTypeVar(
+  SolutionKind matchTypesBindTypeVar(
       TypeVariableType *typeVar, Type type, ConstraintKind kind,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator,
-      llvm::function_ref<TypeMatchResult()> formUnsolvedResult);
+      llvm::function_ref<SolutionKind()> formUnsolvedResult);
 
   /// Matches two function result types for a function application. This is
   /// usually a bind, but also handles e.g IUO unwraps.
-  TypeMatchResult matchFunctionResultTypes(Type expectedResult, Type fnResult,
-                                           TypeMatchOptions flags,
-                                           ConstraintLocatorBuilder locator);
+  SolutionKind matchFunctionResultTypes(Type expectedResult, Type fnResult,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   enum ImpliedResultConversionKind : unsigned {
     /// Usual subtyping rules apply.
@@ -3298,21 +3248,9 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// the specific types being matched.
   ///
   /// \returns the result of attempting to solve this constraint.
-  TypeMatchResult matchTypes(Type type1, Type type2, ConstraintKind kind,
-                             TypeMatchOptions flags,
-                             ConstraintLocatorBuilder locator);
-
-  TypeMatchResult getTypeMatchSuccess() {
-    return TypeMatchResult::success();
-  }
-
-  TypeMatchResult getTypeMatchFailure(ConstraintLocatorBuilder locator) {
-    return TypeMatchResult::failure();
-  }
-
-  TypeMatchResult getTypeMatchAmbiguous() {
-    return TypeMatchResult::ambiguous();
-  }
+  SolutionKind matchTypes(Type type1, Type type2, ConstraintKind kind,
+                          TypeMatchOptions flags,
+                          ConstraintLocatorBuilder locator);
 
 public:
   // Build a disjunction that attempts both T? and T for a particular
@@ -3763,7 +3701,7 @@ public:
   ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
-  std::optional<TypeMatchResult>
+  std::optional<SolutionKind>
   matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
                      ConstraintKind bodyResultConstraintKind,
                      Type contextualType, ConstraintLocatorBuilder locator);
@@ -3778,7 +3716,7 @@ public:
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
-  TypeMatchResult applyPropertyWrapperToParameter(
+  SolutionKind applyPropertyWrapperToParameter(
       Type wrapperType,
       Type paramType,
       ParamDecl *param,
@@ -4118,19 +4056,16 @@ public:
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
-  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
-    assert(disjunction->getKind() == ConstraintKind::Disjunction);
-    auto found = AppliedDisjunctions.find(disjunction->getLocator());
-    if (found == AppliedDisjunctions.end())
-      return nullptr;
-    return found->second;
-  }
+  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction);
 
   /// The overload sets that have already been resolved along the current path.
   const llvm::DenseMap<ConstraintLocator *, SelectedOverload> &
   getResolvedOverloads() const {
     return ResolvedOverloads;
   }
+
+  /// Emit a fallback diagnostic.
+  void produceFallbackDiagnostic(SourceLoc loc) const;
 
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
@@ -4146,6 +4081,10 @@ public:
   /// Determine whether given locator represents an argument to declaration
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
+
+  /// Determine whether the given locator represents an argument to a
+  /// subscript.
+  bool isArgumentOfSubscript(ConstraintLocatorBuilder locator);
 
   /// Visit each subexpression that will be part of the constraint system
   /// of the given expression, including those in closure bodies that will be
@@ -4548,8 +4487,6 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
 
-bool isPackExpansionType(Type type);
-
 /// Check whether the type is a tuple consisting of a single unlabeled element
 /// of \c PackExpansionType or a type variable that represents a pack expansion
 /// type.
@@ -4616,9 +4553,6 @@ bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
 bool exprNeedsParensOutsideFollowingOperator(
     DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
     llvm::function_ref<Expr *(const Expr *)> getParent);
-
-/// Determine whether this is a SIMD operator.
-bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 

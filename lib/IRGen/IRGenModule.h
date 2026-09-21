@@ -29,7 +29,6 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -40,7 +39,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,6 +51,7 @@
 #include "llvm/Target/TargetMachine.h"
 
 #include <atomic>
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class Constant;
@@ -715,7 +714,7 @@ public:
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
-  SILModuleConventions silConv;
+  const SILAddressConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
   ModuleDecl *ClangImporterModule = nullptr;
   std::unique_ptr<llvm::raw_fd_ostream> RemarkStream;
@@ -782,7 +781,6 @@ public:
     llvm::PointerType *FullBoxMetadataPtrTy;  /// %swift.full_boxmetadata*
     llvm::PointerType *FullHeapMetadataPtrTy; /// %swift.full_heapmetadata*
     llvm::PointerType *FullTypeMetadataPtrTy; /// %swift.full_type*
-    llvm::PointerType *FunctionPtrTy;
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
     llvm::PointerType *Int32PtrTy;     /// i32 *
@@ -820,6 +818,10 @@ public:
     llvm::PointerType *WitnessTablePtrTy;
     llvm::PointerType *WitnessTablePtrPtrTy; /// i8***
     llvm::PointerType *WitnessTableTy;
+  };
+  union {
+    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *Int8ProgramSpacePtrTy; /// i8* in same address space as programs
   };
 
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
@@ -1139,6 +1141,7 @@ public:
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
+  const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
@@ -1251,6 +1254,26 @@ public:
                                    ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
+  /// In embedded Swift, describe a key path object at compile time instead of
+  /// calling `swift_getKeyPath` at runtime.  Returns a bitcast pointer to the
+  /// key path class, or null if this instruction's pattern can't be described
+  /// this way.
+  ///
+  /// If the key path captures values, the result is a *template*: its argument
+  /// areas are zeroed and the caller must allocate a copy and fill them in (see
+  /// `KeyPathInst::needsRuntimeInstantiation`).  Passing `argDataOffsets`
+  /// collects the byte offset of each capturing component's argument data
+  /// within the object, in component order.
+  llvm::Constant *
+  emitStaticKeyPathInstance(KeyPathInst *KPI,
+                            SmallVectorImpl<uint32_t> *argDataOffsets = nullptr);
+  /// True if `KPI` can be described at compile time in the current
+  /// compilation, rather than instantiated by `swift_getKeyPath`.  Currently
+  /// limited to Embedded Swift; `KeyPathInst::getStaticInstanceClassType` is
+  /// the single policy point for which patterns qualify.  Note that qualifying
+  /// does not imply the result is an immortal constant: see
+  /// `emitStaticKeyPathInstance` for capturing key paths.
+  bool canEmitStaticKeyPathInstance(KeyPathInst *KPI);
   llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
                                                 ConstantInit forDefinition);
   llvm::Constant *
@@ -1446,6 +1469,10 @@ private:
   llvm::DenseMap<ProtocolDecl *, llvm::Constant *> ObjCProtocolSymRefs;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
+  /// Cache of statically-instantiated key path objects (embedded Swift).
+  /// Keyed by the (uniqued) `KeyPathPattern *` so multiple `keypath_inst`s
+  /// referring to the same pattern share one immortal global.
+  llvm::DenseMap<KeyPathPattern*, llvm::Constant*> StaticKeyPathInstances;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {
@@ -1608,6 +1635,12 @@ public:
   llvm::Constant *
   getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
+  /// Get (creating if necessary) a single shared local stub function which
+  /// calls swift_deletedMethodError(). Used to fill function-pointer slots
+  /// whose witness can never be reached, so that reaching one traps instead of
+  /// requiring us to emit a real (dead) implementation.
+  llvm::Function *getOrCreateDeadMethodErrorStub();
+
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *AnyExistentialMetadata = nullptr;
@@ -1632,6 +1665,14 @@ private:                                                                       \
   std::optional<FunctionPointer> FixedClassInitializationFn;
 
   llvm::Constant *FixLifetimeFn = nullptr;
+
+  /// A local stub function that simply calls swift_deletedMethodError(),
+  /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
+  llvm::Function *DeadMethodErrorStub = nullptr;
+  /// A Coroutine Function Pointer wrapping the above, suited for
+  /// filling vtable/witness slots that point to "callee-allocated"
+  /// (new ABI) coroutines.
+  llvm::Constant *DeletedCalleeAllocatedCoroutineMethodErrorCoroFP = nullptr;
 
   mutable std::optional<SpareBitVector> HeapPointerSpareBits;
 
@@ -1667,6 +1708,9 @@ public:
 public:
   llvm::LLVMContext &getLLVMContext() const { return *LLVMContext; }
 
+  /// Form the target-native bytes for a COM identity.
+  llvm::Constant *getCOMIdentityConstant(llvm::StringRef identity);
+
   void emitSourceFile(SourceFile &SF);
   void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);
 
@@ -1688,6 +1732,9 @@ public:
   void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
+
+  void addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                       StringRef targetString);
 
   llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
 

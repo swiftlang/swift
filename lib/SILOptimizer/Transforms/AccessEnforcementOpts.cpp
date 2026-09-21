@@ -79,19 +79,16 @@
 
 #define DEBUG_TYPE "access-enforcement-opts"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 
 using namespace swift;
@@ -1023,10 +1020,8 @@ canMerge(PostDominanceInfo *postDomTree,
 
 static bool extendOwnership(BeginAccessInst *parentInst,
                             BeginAccessInst *childInst,
-                            InstructionDeleter &deleter,
-                            DeadEndBlocks &deBlocks) {
-  GuaranteedOwnershipExtension extension(deleter, deBlocks,
-                                         parentInst->getFunction());
+                            InstructionDeleter &deleter) {
+  GuaranteedOwnershipExtension extension(deleter, parentInst->getFunction());
   auto status = extension.checkAddressOwnership(parentInst, childInst);
   switch (status) {
   case GuaranteedOwnershipExtension::Invalid:
@@ -1044,8 +1039,7 @@ static bool extendOwnership(BeginAccessInst *parentInst,
 /// Perform access merging.
 static bool
 mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
-              const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs,
-              DeadEndBlocks &deBlocks) {
+              const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs) {
 
   if (mergePairs.empty()) {
     LLVM_DEBUG(llvm::dbgs() << "Skipping SCC Analysis...\n");
@@ -1098,7 +1092,7 @@ mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
     if (!canMerge(postDomTree, blockToSCCMap, parentIns, childIns))
       continue;
 
-    if (!extendOwnership(parentIns, childIns, deleter, deBlocks))
+    if (!extendOwnership(parentIns, childIns, deleter))
       continue;
 
     LLVM_DEBUG(llvm::dbgs()
@@ -1145,8 +1139,6 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
 
     LoopRegionFunctionInfo *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
-    DeadEndBlocksAnalysis *deBlocksAnalysis =
-        PM->getAnalysis<DeadEndBlocksAnalysis>();
     AccessStorageAnalysis *ASA = getAnalysis<AccessStorageAnalysis>();
     AccessConflictAndMergeAnalysis a(LRFI, PO, ASA);
     if (!a.analyze())
@@ -1178,8 +1170,7 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     PostDominanceAnalysis *postDomAnalysis =
         getAnalysis<PostDominanceAnalysis>();
     PostDominanceInfo *postDomTree = postDomAnalysis->get(F);
-    DeadEndBlocks *deBlocks = deBlocksAnalysis->get(F);
-    if (mergeAccesses(F, postDomTree, result.mergePairs, *deBlocks))
+    if (mergeAccesses(F, postDomTree, result.mergePairs))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };

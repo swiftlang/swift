@@ -161,7 +161,7 @@ extension LifetimeDependence {
 
   // Construct a LifetimeDependence from a return value. This only
   // constructs a dependence for ~Escapable results that do not have a
-  // lifetime dependence (@lifetime(immortal), @_unsafeNonescapableResult).
+  // lifetime dependence (@_lifetime(immortal), @_unsafeNonescapableResult).
   //
   // This is necessary because inserting a mark_dependence placeholder for such an unsafe dependence would illegally
   // have the same base and value operand.
@@ -229,6 +229,59 @@ extension LifetimeDependence {
   }
 }
 
+/// If `reference` is a copy or borrow of a value loaded out of memory,
+/// the address it was loaded from.
+///
+/// A loaded reference is a temporary whose  lifetime is typically narrower
+/// than that of the storage it came from: walking a chain like `a.b.c`
+/// destroys each intermediate reference as soon as the next one has been
+/// loaded. A dependence must therefore be rooted in the storage rather than
+/// in the temporary.
+private func loadedAddress(of reference: Value) -> Value? {
+  // `referenceRoot` skips ownership forwarding and transitions, so this sees through the copy_value/begin_borrow that a
+  // load of a class reference is typically wrapped in.
+  var value = reference.referenceRoot
+  while true {
+    switch value.definingInstruction {
+    case let load as LoadInstruction:
+      return load.address
+    // `referenceRoot` stops at the instructions that strengthen a weak or
+    // unowned reference, so look through those as well: the strengthened
+    // reference still originates in the weak or unowned storage, and reaching
+    // that storage is what lets the caller recognize the field as a
+    // non-strong one.
+    case let strengthen as StrongCopyUnownedValueInst:
+      value = strengthen.operand.value.referenceRoot
+    case let strengthen as StrongCopyUnmanagedValueInst:
+      value = strengthen.operand.value.referenceRoot
+    case let strengthen as StrongCopyWeakValueInst:
+      value = strengthen.operand.value.referenceRoot
+    default:
+      return nil
+    }
+  }
+}
+
+/// The guaranteed value that `reference` was forwarded from, if it has one.
+private func guaranteedReferenceRoot(of reference: Value) -> Value? {
+  let root = reference.referenceRoot
+  return root.ownership == .guaranteed ? root : nil
+}
+
+/// If `value` is the result of a call that returns `@guaranteed`, the argument
+/// that the result is a borrow of.
+private func guaranteedResultBase(of value: Value) -> Value? {
+  guard value.isGuaranteedApplyResult,
+        let apply = value.definingInstruction as? ApplyInst,
+        // A borrow accessor for a global has no `self`; its result borrows
+        // immortal storage. Let the caller handle that.
+        apply.functionConvention.hasSelfParameter,
+        let selfArgument = apply.arguments.last else {
+    return nil
+  }
+  return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
+}
+
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -275,7 +328,37 @@ extension LifetimeDependence.Scope {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
       self.init(base: projectBox.operand.value, context)
-    case .class, .tail, .pointer, .index:
+    case let .class(refElementAddr):
+      // A class instance holds its stored properties at a stable address for
+      // as long as the instance is alive, so a borrow of one of them is valid
+      // for as long as the reference is. Attribute the dependence to that
+      // reference, which has a scope, rather than to the property's storage,
+      // which does not. This requires the field to be:
+      //
+      // - a `let`, so the storage can never be reassigned out from under the
+      //   borrow, and
+      // - a strong reference, so the parent actually keeps the referent alive.
+      //   `weak`, `unowned`, and `unowned(unsafe)` fields, whose types are
+      //   `ReferenceStorageType`s, do not.
+      guard refElementAddr.fieldIsLet, !refElementAddr.type.isReferenceStorageType else {
+        self = .unknown(accessBase.address!)
+        return
+      }
+      if let parentStorage = loadedAddress(of: refElementAddr.instance) {
+        // The reference was itself loaded out of memory, so recur to root the dependence in that storage. Each
+        // intermediate reference in a chain like `a.b.c` is destroyed as soon as the next one has been loaded, which
+        // would give a scope too narrow to contain the dependent value.
+        self.init(base: parentStorage, context)
+      } else if let guaranteedRoot =
+                    guaranteedReferenceRoot(of: refElementAddr.instance) {
+        // The reference was forwarded from a guaranteed value rather than
+        // loaded out of memory, as happens for a `struct_extract` of a
+        // borrowed struct.
+        self.init(base: guaranteedRoot, context)
+      } else {
+        self.init(base: refElementAddr.instance, context)
+      }
+    case .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
     case .unidentified:
       self = .unknown(address)
@@ -330,6 +413,11 @@ extension LifetimeDependence.Scope {
   // LifetimeDependenceself.init(markDep) with a gatherDependenceScopes() utility used by both
   // LifetimeDependenceInsertion and LifetimeDependenceScopeFixup.
   private init(guaranteed base: Value, _ context: some Context) {
+    // Introduce a dependency on the base of a borrow accessor call.
+    if let accessorBase = guaranteedResultBase(of: base) {
+      self.init(base: accessorBase, context)
+      return
+    }
     var iter = base.getBorrowIntroducers(context).makeIterator()
     // If no borrow introducer was found, then this is a borrow of a trivial value. Since we can assume a single
     // introducer here, then this is the only condition under which we have a trivial introducer.
@@ -363,6 +451,9 @@ extension LifetimeDependence.Scope {
       self = .local(varScope)
     } else if let ga = GlobalAccessBase(address: value) {
       self = .global(ga)
+    } else if let accessorBase = guaranteedResultBase(of: value) {
+      // A trivial `borrow` accessor result, rooted on the base of the accessor.
+      self.init(base: accessorBase, context)
     } else {
       self = .unknown(value)
     }
@@ -527,6 +618,8 @@ extension LifetimeDependence.Scope {
         break
       }
     }
+    // Insert dead-end paths with no destroy_addr.
+    extendToDeadEnds(range: &range, context)
     return range
   }
 
@@ -567,28 +660,61 @@ extension LifetimeDependence.Scope {
       }
       var range = InstructionRange(begin: initializingStore, context)
       range.insert(contentsOf: deallocInsts)
-
-      // Insert unreachable paths with no dealloc_stack.
-      var forwardUnreachableWalk = BasicBlockWorklist(context)
-      defer { forwardUnreachableWalk.deinitialize() }
-
-      // TODO: ensure complete dealloc_stack on all paths in SIL verification, then assert exitBlock.isEmpty.
-      for exitBlock in range.exitBlocks {
-        forwardUnreachableWalk.pushIfNotVisited(exitBlock)
-      }
-      while let b = forwardUnreachableWalk.pop() {
-        if let unreachableInst = b.terminator as? UnreachableInst {
-          // Note: 'unreachableInst' is not necessarilly dominated by 'initializingStore'. This marks the range invalid,
-          // but leaves it in a usable state that includes all blocks covered by the temporary allocation. The extra
-          // blocks (backward up to the function entry) are irrelevant becase we already know that 'initializingStore'
-          // dominates dependent uses.
-          range.insert(unreachableInst)
-        }
-        for succBlock in b.successors {
-          forwardUnreachableWalk.pushIfNotVisited(succBlock)
-        }
-      }
+      // Insert dead-end paths with no dealloc_stack.
+      extendToDeadEnds(range: &range, context)
       return range
+    }
+  }
+
+  // Extend a range from its exit blocks forward to all blocks dominated by the range's exits. This is needed for ranges
+  // that represent a scope that must include dead-end paths. It assumes that exit blocks are on dead-end paths.
+  //
+  // TODO: This is a messy, costly computation of dominance frontiers. It can be avoided by fixing OSSA lifetime
+  // completion so that all paths from an alloc_stack to a function exit include destroy_addr and dealloc_stack. Then
+  // this utility can simply be deleted.
+  private static func extendToDeadEnds(range: inout InstructionRange, _ context: Context) {
+    // First find all blocks forward reachable from an exit block.
+    var forwardReachableExitBlocks = Stack<BasicBlock>(context)
+    var forwardReachableExitBlockSet = BasicBlockSet(context)
+    defer {
+      forwardReachableExitBlocks.deinitialize()
+      forwardReachableExitBlockSet.deinitialize()
+    }
+    let pushExitBlock = { (block: BasicBlock) in
+      if forwardReachableExitBlockSet.insert(block) {
+        forwardReachableExitBlocks.append(block)
+      }
+    }
+    var marker = forwardReachableExitBlocks.top
+    for exitBlock in range.exitBlocks {
+      pushExitBlock(exitBlock)
+    }
+    while marker != forwardReachableExitBlocks.top {
+      let prevMarker = marker
+      marker = forwardReachableExitBlocks.top
+      for forwardExitBlock in forwardReachableExitBlocks.segment(low: prevMarker, high: marker) {
+        for succBlock in forwardExitBlock.successors {
+          pushExitBlock(succBlock)
+        }
+      }
+    }
+    // Now find and forward-propagate all reachable-from-exit blocks that have a predecessor that is not
+    // reachable-from-exit. This includes blocks that are not dominated by exits or that are reachable via a destroy.
+    var forwardUnreachableWalk = BasicBlockWorklist(context)
+    defer { forwardUnreachableWalk.deinitialize() }
+    for forwardReachableExitBlock in forwardReachableExitBlocks {
+      if forwardReachableExitBlock.predecessors.contains(
+           where: { !range.blockRange.contains($0) && !forwardReachableExitBlockSet.contains($0) }) {
+        forwardUnreachableWalk.transitivelyAddBlockWithSuccessors(startingAt: forwardReachableExitBlock)
+      }
+    }
+    // Finally, add the blocks dominated by exit blocks to 'range'.
+    for forwardReachableExitBlock in forwardReachableExitBlocks {
+      if (forwardUnreachableWalk.hasBeenPushed(forwardReachableExitBlock)) {
+        // The reachable-from-exit block is not dominate by exits, so ignore it.
+        continue
+      }
+      range.insert(forwardReachableExitBlock.terminator)
     }
   }
 }
@@ -730,6 +856,12 @@ extension LifetimeDependenceDefUseWalker {
     if let apply = operand.instruction as? FullApplySite {
       return visitAppliedUse(of: operand, by: apply)
     }
+    // withoutActuallyEscaping captures a noescape closure while returning an escaping closure.
+    if let pa = operand.instruction as? PartialApplyInst,
+       let closureFunction = pa.referencedFunction,
+       closureFunction.isWithoutActuallyEscapingThunk {
+      return .continueWalk
+    }
     if operand.instruction is ReturnInstruction, !operand.value.isEscapable {
       return returnedDependence(result: operand)
     }
@@ -816,6 +948,13 @@ extension LifetimeDependenceDefUseWalker {
   }
 
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
+    // OwnershipUseVisitor calls pointerEscapingUse for an escaping mark_dependence. If, however, the dependent value is
+    // escapable, then it can be ignored by lifetime dependence analysis, which generally ignores escapable
+    // values. SILGen may generate an escaping mark_dependence for patterns that don't otherwise have proper ownership
+    // support, e.g. createWithoutActuallyEscapingClosure().
+    if let mdi = operand.instruction as? MarkDependenceInst, operand == mdi.baseOperand, mdi.mayEscape {
+      return .continueWalk
+    }
     return escapingDependence(on: operand)
   }
 
@@ -1180,7 +1319,7 @@ extension LifetimeDependenceDefUseWalker {
 
 let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
     function, arguments, context in
-  let markDep = arguments.takeValue() as! MarkDependenceInst
+  let markDep = arguments.takeInstruction() as! MarkDependenceInstruction
   guard let dependence = LifetimeDependence(markDep, context) else {
     print("Invalid Dependence")
     return
@@ -1192,6 +1331,7 @@ let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
   }
   defer { range.deinitialize() }
   print(range)
+  print(range.blockRange)
 }
 
 private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
@@ -1520,6 +1660,24 @@ struct LifetimeDependenceRootWalker : LifetimeDependenceUseDefValueWalker, Lifet
     }
     let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
     return walkUp(value: newLifetime, newOwner)
+  }
+}
+
+private extension PointerToAddressInst {
+  // If this address is the result of a call to unsafe[Mutable]Address, return the 'self' operand of the apply. This
+  // represents the base value into which this address projects.
+  func isResultOfUnsafeAddressor() -> Operand? {
+    if isStrict,
+       let extract = pointer as? StructExtractInst,
+       extract.`struct`.type.isAnyUnsafePointer,
+       let addressorApply = extract.`struct` as? ApplyInst,
+       let addressorFunc = addressorApply.referencedFunction,
+       addressorFunc.isAddressor
+    {
+      let selfArgIdx = addressorFunc.selfArgumentIndex!
+      return addressorApply.argumentOperands[selfArgIdx]
+    }
+    return nil
   }
 }
 

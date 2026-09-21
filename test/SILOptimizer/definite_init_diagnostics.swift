@@ -1163,7 +1163,7 @@ struct S1_44078 {
   init?(x: Int, y: Int) {
     self.a = x
     if y == 42 {
-      return // expected-error {{return from initializer without initializing all stored properties}}
+      return // expected-error {{return from failable initializer before initializing all stored properties; did you mean to return 'nil'?}} {{13-13= nil}}
     }
     // many lines later
     self.b = y
@@ -1176,7 +1176,7 @@ struct S2_44078 {
   
   init?(x: Int, y: Int) {
     self.a = x
-    return // expected-error {{return from initializer without initializing all stored properties}}
+    return // expected-error {{return from failable initializer before initializing all stored properties; did you mean to return 'nil'?}} {{11-11= nil}}
   }
 }
 

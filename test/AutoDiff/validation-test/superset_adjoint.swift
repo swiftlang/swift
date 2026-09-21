@@ -1,5 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -solver-disable-binding-optimizations)
-// FIXME: See above regarding this flag.
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -36,15 +35,6 @@ SupersetVJPTests.testWithLeakChecking("SupersetNested") {
 }
 
 SupersetVJPTests.testWithLeakChecking("CrossModuleClosure") {
-  // FIXME: When type checking with binding optimizations enabled,
-  // we propagate types into the closure better, but this has
-  // the side effect that this expression now trips an
-  // inconsistency / bug with solver-perf. We favor
-  // AdditiveArithmetic.+ over Tracked<T>.+, and we don't
-  // attempt the concrete overload at all. The resulting
-  // solution is correct because Tracked conforms to
-  // AdditiveArithmetic, but AutoDiff doesn't like the
-  // resulting AST and complains that + is not differentiable.
   expectEqual(1, gradient(at: Tracked<Float>(1)) { x in x + 2 })
 }
 

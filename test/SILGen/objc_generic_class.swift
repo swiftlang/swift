@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 // REQUIRES: objc_interop

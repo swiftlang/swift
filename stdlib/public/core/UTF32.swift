@@ -37,7 +37,7 @@ extension Unicode.UTF32: Unicode.Encoding {
   }
 
   /// Returns whether the given code unit represents an ASCII scalar
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func isASCII(_ x: CodeUnit) -> Bool {
     return x <= 0x7F
   }

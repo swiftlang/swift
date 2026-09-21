@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s
 
 // High-level tests that silgen properly emits code for failable and throwing
@@ -260,13 +261,13 @@ struct ThrowStruct {
   // CHECK: bb6([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb7([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK: bb7:
   // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[NIL]] : $Optional<ThrowStruct>)
   //
   // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: br bb7([[ERR]] : $any Error)
+  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK-NEXT: br bb7
   // CHECK-NEXT: }
   init?(failable: ()) {
     try? self.init(throws: ())
@@ -354,13 +355,13 @@ struct ThrowStruct {
   // CHECK: bb9([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb10([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK: bb10:
   // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<ThrowStruct>>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<ThrowStruct>>)
   //
   // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: br bb10([[ERR]] : $any Error)
+  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK-NEXT: br bb10
   // CHECK-NEXT: }
   init?(failable4: ()) {
     try? self.init(failableAndThrows: ())
@@ -580,6 +581,8 @@ class FailableBaseClass {
   // CHECK-NEXT: assign [[RESULT]] to [[PB_BOX]]
   // CHECK-NEXT: [[RESULT_COPY:%[0-9]+]] = load [copy] [[PB_BOX]]
   // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt, [[RESULT_COPY]]
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<FailableBaseClass>)
@@ -625,6 +628,8 @@ class FailableDerivedClass : FailableBaseClass {
   // CHECK-NEXT: br bb1
   //
   // CHECK: bb1:
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
@@ -851,6 +856,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // ... and destroy the box in the error block.
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   end_borrow [[LIFETIME]]
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
@@ -888,6 +895,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // ... and destroy the box in the error block.
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   end_borrow [[LIFETIME]]
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
@@ -1048,6 +1057,9 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[SUCC_BB2]]([[NEW_SELF:%.*]] : @owned $ThrowDerivedClass):
   // CHECK-NEXT: assign [[NEW_SELF]] to [[PB_BOX]]
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
@@ -1059,6 +1071,9 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT: br [[THROWING_BB]]([[ERROR]]
   //
   // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $any Error):
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]
@@ -1088,6 +1103,9 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[SUCC_BB2]](
   // CHECK-NEXT: ignored_use
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
@@ -1099,6 +1117,9 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT: br [[THROWING_BB]]([[ERROR]]
   //
   // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $any Error):
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]

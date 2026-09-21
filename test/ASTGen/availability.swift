@@ -72,3 +72,18 @@ public class ClassWithMembers {
   @_spi_available(macOS 10.15, *)
   public func spiFunc() {}
 }
+
+@available(*, unavailable, renamed: "`class`") // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+func keyword_renamed() {}
+
+@available(*, unavailable, renamed: "`foo bar`") // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+func spaces_renamed() {}
+
+@available(*, unavailable, renamed: "foo(`3bar baz`:)") // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+func keywords_in_arguments(x: Int) {}
+
+func testEscapedRenamed() {
+  keyword_renamed() // expected-error {{'keyword_renamed()' has been renamed to '`class`'}}
+  spaces_renamed() // expected-error {{'spaces_renamed()' has been renamed to '`foo bar`'}}
+  keywords_in_arguments(x: 0) // expected-error {{'keywords_in_arguments(x:)' has been renamed to 'foo(`3bar baz`:)'}}
+}

@@ -165,6 +165,32 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
 }
 
 #if SWIFT_OBJC_INTEROP
+id swift::swift_getObjCMetatypeFromMetadata(const Metadata *theMetadata) {
+  if (!theMetadata)
+    return nil;
+  // Unwrap ObjC class wrappers.
+  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+    return (id)wrapper->Class;
+  }
+  // Get ObjC protocols.
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(theMetadata)) {
+    if (existential->isObjC() && existential->NumProtocols == 1) {
+      auto protocolObj = existential->getProtocols()[0].getObjCProtocol();
+      return objc_retain(protocolObj);
+    }
+  }
+  // Otherwise, the input should already be a Swift class object.
+  if (auto *theClass = dyn_cast<ClassMetadata>(theMetadata)) {
+    assert(theClass->isTypeMetadata());
+    return (id)theClass;
+  }
+  fatalError(/* flags = */ 0,
+             "Failed to get objc metatype from unexpected metadata kind %s\n",
+             getStringForMetadataKind(theMetadata->getKind()).data());
+}
+#endif
+
+#if SWIFT_OBJC_INTEROP
 static SwiftObject *_allocHelper(Class cls) {
   // XXX FIXME
   // When we have layout information, do precise alignment rounding

@@ -13,6 +13,7 @@
 #include "swift/Runtime/LibPrespecialized.h"
 #include "MetadataCache.h"
 #include "Private.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
@@ -168,9 +169,42 @@ struct LibPrespecializedState {
 
   const LibPrespecializedData<InProcess> *data;
   std::atomic<MapConfiguration> mapConfiguration = MapConfiguration::Unset;
+
+  /// Set when an image is loaded that overrides one in the shared cache. This
+  /// can invalidate prespecialized metadata, as it may contain pointers into
+  /// the overridden image. This may be set at launch, or later on by way of
+  /// dlopen.
+  ///
+  /// Some prespecialized metadata lookups are guarded by this flag. This is
+  /// done when prespecialized metadata might have a pointer into the original
+  /// image, but can be looked up using keys that don't require the original
+  /// image to be loaded. For example, tuple metadata does NOT need to be gated
+  /// by this, because the elements have to be provided by the caller in order
+  /// to look them up, and there's no (legal) way for a caller to get a pointer
+  /// to the overridden image in the first place. Nominal type metadata does
+  /// need to be gated, because you could have e.g. a class with a superclass
+  /// pointer to an overridden image, that can be looked up using the subclass's
+  /// nominal type descriptor and generic arguments that don't involve the
+  /// superclass's image.
+  ///
+  /// Because this flag can go from false -> true after launch, a lookup that's
+  /// guarded by this flag can go from returning a value to returning nothing.
+  /// That means that the return value must either be saved in a dynamic cache
+  /// by the caller (e.g. nominal type metadata) or it must be something where
+  /// pointer equality is not required (e.g. witness tables). Metadata where the
+  /// prespecialized table is used as a top-level cache must not be gated on
+  /// imageOverridden.
+  std::atomic<bool> imageOverridden = false;
+
   AddressRange sharedCacheRange{0, 0};
   AddressRange metadataAllocatorInitialPoolRange{0, 0};
   bool descriptorMapEnabled;
+
+  /// Whether the library may be used at all.
+  bool enabled() const {
+    return mapConfiguration.load(std::memory_order_relaxed) !=
+           MapConfiguration::Disabled;
+  }
 
   LibPrespecializedState() {
     prespecializedLoggingEnabled =
@@ -307,18 +341,6 @@ struct LibPrespecializedState {
     else if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_get_swift_prespecialized_data)) {
       dataPtr = SWIFT_RUNTIME_WEAK_USE(_dyld_get_swift_prespecialized_data());
       LOG("Got dataPtr %p from _dyld_get_swift_prespecialized_data", dataPtr);
-
-      // Disable the prespecialized metadata if anything in the shared cache is
-      // overridden. Eventually we want to be cleverer and only disable the
-      // prespecializations that have been invalidated, but we'll start with the
-      // simplest approach.
-      if (dyld_shared_cache_some_image_overridden()) {
-        mapConfiguration.store(MapConfiguration::Disabled,
-                               std::memory_order_release);
-        LOG("Disabling prespecialized metadata, "
-            "dyld_shared_cache_some_image_overridden = %d",
-            dyld_shared_cache_some_image_overridden());
-      }
     }
 #endif
 #endif
@@ -346,6 +368,13 @@ struct LibPrespecializedState {
     LOG("  disabledProcessTable=%p", data->getDisabledProcessesTable());
     LOG("  pointerKeyedMetadataMap=%p", data->getPointerKeyedMetadataMap());
     LOG("  descriptorMap=%p", data->getDescriptorMap());
+    LOG("  pointerKeyedWitnessTableMap=%p",
+        data->getPointerKeyedWitnessTableMap());
+    LOG("  functionMetadataMap=%p", data->getFunctionMetadataMap());
+    LOG("  tupleMetadataMap=%p", data->getTupleMetadataMap());
+    LOG("  foreignMetadataMap=%p", data->getForeignMetadataMap());
+    LOG("  objcClassWrapperMetadataMap=%p",
+        data->getObjCClassWrapperMetadataMap());
 
     return data;
   }
@@ -404,12 +433,12 @@ void
 swift::libPrespecializedImageLoaded() {
 #if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
   // A newly loaded image might have caused us to load images that are
-  // overriding images in the shared cache.  If we do that, turn off
-  // prespecialized metadata.
+  // overriding images in the shared cache.  If we do that, set imageOverridden
+  // to turn off certain prespecialized metadata that may be invalidated by an
+  // overridden image.
   if (dyld_shared_cache_some_image_overridden())
-    LibPrespecialized.get().mapConfiguration.store(
-        LibPrespecializedState::MapConfiguration::Disabled,
-        std::memory_order_release);
+    LibPrespecialized.get().imageOverridden.store(true,
+                                                  std::memory_order_relaxed);
 #endif
 }
 
@@ -470,7 +499,7 @@ getMetadataFromNameKeyedMap(const LibPrespecializedState &state,
 
   auto key = mangling.result();
   auto *metadataMap = state.data->getMetadataMap();
-  auto *element = metadataMap->find(key.data(), key.size());
+  auto *element = metadataMap->find(key);
   auto *result = element ? element->value : nullptr;
   LOG("found %p for key '%.*s'.", result, (int)key.size(), key.data());
   return result;
@@ -568,6 +597,16 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                     const void *const *arguments) {
   auto &state = LibPrespecialized.get();
 
+  // A prespecialized generic type may point into other images, so an overridden
+  // image can invalidate it, as those pointers don't get fixed up. The caller
+  // caches the values returned from this function, so it's safe to stop
+  // returning values when imageOverridden gets set.
+  if (state.imageOverridden.load(std::memory_order_relaxed))
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
   switch (state.mapConfiguration) {
   case LibPrespecializedState::MapConfiguration::Unset:
     assert(false &&
@@ -583,6 +622,181 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
     return getMetadataFromPointerKeyedMapDebugMode(state, description,
                                                    arguments);
   }
+}
+
+const WitnessTable *
+swift::getLibPrespecializedWitnessTable(
+    const ProtocolConformanceDescriptor *conformance, const Metadata *type) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  // A prespecialized witness table's contents point into images the lookup key
+  // does not cover: the protocol's, for default witnesses, and the base
+  // conformance's, for base-protocol slots resolved at build time.
+  if (state.imageOverridden.load(std::memory_order_relaxed))
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
+  auto *map = data->getPointerKeyedWitnessTableMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The dyld call takes the key as the first pointer in the key, then
+    // separately an array of the rest. Our keys are conformance, type.
+    const void *arguments[1] = {type};
+    auto result = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, conformance, /*argumentCount=*/1, arguments));
+    LOG("WT lookup (conformance=%p, type=%p) -> %p (dyld hash table).",
+        (const void *)conformance, (const void *)type, result);
+    return reinterpret_cast<const WitnessTable *>(
+        const_cast<void *>(result));
+  }
+#endif
+  return nullptr;
+}
+
+const PrespecializedMetadataCandidates *
+swift::getLibPrespecializedFunctionTypeMetadata(
+    const Metadata *result, const Metadata *const *parameters,
+    unsigned numParameters) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
+  auto *map = data->getFunctionMetadataMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The dyld call takes the first pointer of the key separately from the
+    // rest. Our keys are the result type followed by the parameter types.
+    auto value = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, result, numParameters,
+        const_cast<const void **>(
+            reinterpret_cast<const void *const *>(parameters))));
+    LOG("Function type lookup (result=%p, %u parameters) -> %p.",
+        (const void *)result, numParameters, value);
+    return reinterpret_cast<const PrespecializedMetadataCandidates *>(value);
+  }
+#endif
+  return nullptr;
+}
+
+const PrespecializedMetadataCandidates *
+swift::getLibPrespecializedTupleTypeMetadata(const Metadata *const *elements,
+                                             unsigned numElements) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
+  // The empty tuple has statically emitted metadata and never reaches here, so
+  // there is always at least one element to key on.
+  if (numElements == 0)
+    return nullptr;
+
+  auto *map = data->getTupleMetadataMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The dyld call takes the first pointer of the key separately from the
+    // rest. Our keys are the element types.
+    auto value = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, elements[0], numElements - 1,
+        const_cast<const void **>(
+            reinterpret_cast<const void *const *>(elements + 1))));
+    LOG("Tuple type lookup (%u elements, first=%p) -> %p.", numElements,
+        (const void *)elements[0], value);
+    return reinterpret_cast<const PrespecializedMetadataCandidates *>(value);
+  }
+#endif
+  return nullptr;
+}
+
+ForeignTypeMetadata *swift::getLibPrespecializedForeignTypeMetadata(
+    const TypeContextDescriptor *description) {
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
+  auto *map = data->getForeignMetadataMap();
+  if (!map)
+    return nullptr;
+
+  auto identity = ParsedTypeIdentity::parse(description).FullIdentity;
+
+  auto isMatch = [&](auto pointers) {
+    auto *metadata = reinterpret_cast<const Metadata *>(*pointers.first);
+    auto *candidateDescription = getForeignTypeDescription(metadata);
+    return ParsedTypeIdentity::parse(candidateDescription).FullIdentity ==
+           identity;
+  };
+  auto isNull = [](auto pointers) { return *pointers.first == nullptr; };
+
+  auto found = map->find(identity, isMatch, isNull);
+  if (!found.first || !*found.first) {
+    LOG("Did not find foreign metadata for '%.*s'.", (int)identity.size(),
+        identity.data());
+    return nullptr;
+  }
+
+  auto *result = const_cast<ForeignTypeMetadata *>(
+      reinterpret_cast<const ForeignTypeMetadata *>(*found.first));
+  LOG("Found foreign metadata %p for '%.*s'.", result, (int)identity.size(),
+      identity.data());
+  return result;
+}
+
+const Metadata *swift::getLibPrespecializedObjCClassWrapperMetadata(
+    const ClassMetadata *theClass) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
+  auto *map = data->getObjCClassWrapperMetadataMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The key is just the ObjC class, so we never pass anything for arguments.
+    auto value = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, theClass, /*argumentCount=*/0, /*arguments=*/nullptr));
+    LOG("ObjC class wrapper lookup (class=%p) -> %p.", (const void *)theClass,
+        value);
+    return reinterpret_cast<const Metadata *>(value);
+  }
+#endif
+  return nullptr;
 }
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
@@ -657,7 +871,7 @@ swift::getLibPrespecializedTypeDescriptor(Demangle::NodePointer node) {
 
   // Perform the lookup.
   auto isNull = [](auto pointers) { return *pointers.first == nullptr; };
-  auto found = descriptorMap->find(key.data(), key.size(), isMatch, isNull);
+  auto found = descriptorMap->find(key, isMatch, isNull);
 
   LOG("Hash table lookup checked %u loaded entries, %u total entries.",
       numDescriptorsLoaded, numDescriptorsChecked);
@@ -701,9 +915,8 @@ void _swift_validatePrespecializedMetadata() {
     return;
   }
 
-  LibPrespecialized.get().mapConfiguration.store(
-      LibPrespecializedState::MapConfiguration::Disabled,
-      std::memory_order_release);
+  LibPrespecialized.get().imageOverridden.store(true,
+                                                std::memory_order_relaxed);
 
   unsigned validated = 0;
   unsigned failed = 0;

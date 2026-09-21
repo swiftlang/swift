@@ -27,7 +27,7 @@ public struct ${type} {
   public var _storage: ${builtin}
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init(_ _builtin: ${builtin}) {
     self._storage = _builtin
@@ -47,7 +47,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// - Returns: The current value.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func load(ordering: AtomicLoadOrdering) -> Value {
     let result = switch ordering {
@@ -77,7 +77,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func store(
     _ desired: consuming Value,
@@ -112,7 +112,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// - Returns: The original value.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func exchange(
     _ desired: consuming Value,
@@ -165,7 +165,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///   the exchange was successful, and `original` is the original value.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func compareExchange(
     expected: consuming Value,
@@ -213,7 +213,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///   the exchange was successful, and `original` is the original value.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func compareExchange(
     expected: consuming Value,
@@ -285,7 +285,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///   the exchange was successful, and `original` is the original value.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func weakCompareExchange(
     expected: consuming Value,
@@ -343,7 +343,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///   the exchange was successful, and `original` is the original value.
   @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func weakCompareExchange(
     expected: consuming Value,

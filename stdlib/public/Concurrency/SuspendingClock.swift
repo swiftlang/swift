@@ -125,7 +125,7 @@ extension SuspendingClock: Clock {
 @_unavailableInEmbedded
 extension SuspendingClock {
   @available(SwiftStdlib 5.7, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var systemEpoch: Instant {
     unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
   }
@@ -189,4 +189,14 @@ extension SuspendingClock.Instant: InstantProtocol {
   ) -> Swift.Duration {
     rhs.duration(to: lhs)
   }
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: Identifiable
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_unavailableInEmbedded
+extension SuspendingClock: Identifiable {
+  /// The stable identity of the suspending system clock.
+  public var id: SystemClockID { .suspending }
 }

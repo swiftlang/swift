@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -validate-tbd-against-ir=none -disable-llvm-verify -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -validate-tbd-against-ir=none -disable-llvm-verify -Xcc -fignore-exceptions -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import Singleton
 
@@ -21,4 +21,11 @@ public func test() {
   var x = DeletedSpecialMembers.create()
   _ = x.test()
   mutateIt(x)
+}
+
+// CHECK-LABEL: define {{.*}}swiftcc {{.*}}@"$s4main18testConstRvalueRefyySo21DeletedSpecialMembersVF"
+// CHECK: call i32 @{{.*}}readItConstRvalueRef{{.*}}(ptr %0)
+
+public func testConstRvalueRef(_ x: DeletedSpecialMembers) {
+  _ = readItConstRvalueRef(consuming: x)
 }

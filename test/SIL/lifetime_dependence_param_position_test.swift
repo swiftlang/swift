@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-silgen \
 // RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 

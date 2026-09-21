@@ -15,6 +15,10 @@
 @property (readonly, nonnull) id accessorDeclaredFirstAsNullable;
 
 @property (readonly, nullable) id accessorInProto;
+
+@property (readonly, weak, nullable) RPFoo *weakRedeclared;
+@property (readonly, assign, nullable) RPFoo *assignRedeclared;
+@property (readonly, strong, nullable) RPFoo *strongRedeclared;
 @end
 
 @interface RPBase <RPProto>

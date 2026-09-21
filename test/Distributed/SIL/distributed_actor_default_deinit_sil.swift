@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -target %target-swift-5.7-abi-triple -enable-experimental-feature DistributedActorResignRemoteID -I %t | %FileCheck %s --enable-var-scope
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_DistributedActorResignRemoteID
 
 // FIXME(distributed): test fails on optimized build: OSS - Swift (Tools Opt+No Assert,  Stdlib Opt+DebInfo, Test Simulator) - macOS
 // REQUIRES: radar97074020
@@ -108,6 +109,14 @@ distributed actor MyDistActor {
 // ===== -----------------------------------------------------------------------
 // CHECK: // remoteActorDeinitBB
 // CHECK: [[REMOTE_ACTOR_DEINIT_BB]]:
+
+// The remote proxy invokes resignRemoteID before destroying its stored properties.
+// CHECK:  [[ID_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
+// CHECK:  [[SYS_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
+// CHECK:  [[ID_LOAD_R:%[0-9]+]] = load [[ID_REF_R]] : $*ActorAddress
+// CHECK:  [[SYS_LOAD_R:%[0-9]+]] = load [[SYS_REF_R]] : $*FakeActorSystem
+// CHECK:  [[FN_REF_R:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV14resignRemoteIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
+// CHECK:  {{.*}} = apply [[FN_REF_R]]([[ID_LOAD_R]], [[SYS_LOAD_R]]) : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
 
 // Even just the remote deinit branch must destroy the ID
 // CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
@@ -234,6 +243,14 @@ distributed actor MyDistActorIsolated {
 // ===== -----------------------------------------------------------------------
 // CHECK: // remoteActorDeinitBB
 // CHECK: [[REMOTE_ACTOR_DEINIT_BB]]:
+
+// The remote proxy invokes resignRemoteID before destroying its stored properties.
+// CHECK:  [[ID_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.id
+// CHECK:  [[SYS_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.actorSystem
+// CHECK:  [[ID_LOAD_R:%[0-9]+]] = load [[ID_REF_R]] : $*ActorAddress
+// CHECK:  [[SYS_LOAD_R:%[0-9]+]] = load [[SYS_REF_R]] : $*FakeActorSystem
+// CHECK:  [[FN_REF_R:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV14resignRemoteIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
+// CHECK:  {{.*}} = apply [[FN_REF_R]]([[ID_LOAD_R]], [[SYS_LOAD_R]]) : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
 
 // Even just the remote deinit branch must destroy the ID
 // CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.id

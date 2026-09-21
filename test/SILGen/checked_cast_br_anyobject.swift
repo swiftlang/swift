@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name checked_cast_br_anyobject -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s
 
 public struct BridgedSwiftObject {

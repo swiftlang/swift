@@ -17,35 +17,23 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenRequests.h"
-#include "swift/AST/SILOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include <cstdio>
 using namespace swift;
@@ -167,7 +155,8 @@ struct SILLLVMGenOptions {
 
   llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly =
       llvm::cl::opt<llvm::cl::boolOrDefault>(
-          "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
+          "enable-experimental-move-only",
+          llvm::cl::init(llvm::cl::boolOrDefault::BOU_UNSET),
           llvm::cl::desc("Enable experimental move-only semantics."));
 
   llvm::cl::list<std::string> ExperimentalFeatures =
@@ -209,11 +198,11 @@ struct SILLLVMGenOptions {
 
 static std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   switch (defaultable) {
-  case llvm::cl::BOU_TRUE:
+  case llvm::cl::boolOrDefault::BOU_TRUE:
     return true;
-  case llvm::cl::BOU_FALSE:
+  case llvm::cl::boolOrDefault::BOU_FALSE:
     return false;
-  case llvm::cl::BOU_UNSET:
+  case llvm::cl::boolOrDefault::BOU_UNSET:
     return std::nullopt;
   }
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
@@ -403,6 +392,11 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
   Invocation.computeCXXStdlibOptions();
+
+  // The implicit search paths depend on the language options - e.g. Embedded
+  // Swift picks up its runtime libraries from a different directory. Recompute
+  // them now that all language options are set.
+  Invocation.updateImplicitSearchPaths();
 
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();

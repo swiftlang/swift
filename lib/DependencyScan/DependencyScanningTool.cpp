@@ -260,6 +260,13 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
   hollowImportInfoSet->imports = nullptr;
   hollowMainModuleInfo->imports = hollowImportInfoSet;
 
+  // Empty Optional Import set
+  swiftscan_import_info_set_t *hollowOptionalImportInfoSet =
+      new swiftscan_import_info_set_t;
+  hollowOptionalImportInfoSet->count = 0;
+  hollowOptionalImportInfoSet->imports = nullptr;
+  hollowMainModuleInfo->optional_imports = hollowOptionalImportInfoSet;
+
   // Default library level
   hollowMainModuleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
 

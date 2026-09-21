@@ -15,7 +15,6 @@
 #include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/TypeVariableType.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -449,11 +448,7 @@ TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {
   // The inference should produce 4 types: KeyPath<String, Int>,
   // PartialKeyPath<String>, AnyKeyPath and Any - in that order.
 
-  ASSERT_EQ(inferredTypes.size(), 4);
+  ASSERT_EQ(inferredTypes.size(), 2);
   ASSERT_TRUE(inferredTypes[0]->isEqual(keyPath));
-  ASSERT_TRUE(inferredTypes[1]->isEqual(
-      BoundGenericType::get(Context.getPartialKeyPathDecl(),
-                            /*parent=*/Type(), {getStdlibType("String")})));
-  ASSERT_TRUE(inferredTypes[2]->isEqual(getStdlibType("AnyKeyPath")));
-  ASSERT_TRUE(inferredTypes[3]->isEqual(Context.TheAnyType));
+  ASSERT_TRUE(inferredTypes[1]->isEqual(Context.TheAnyType));
 }

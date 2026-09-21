@@ -52,7 +52,7 @@ struct BisectToolchains: AsyncParsableCommand {
     let d = DateFormatter()
     d.dateFormat = "yyyy-MM-dd"
     guard let result = d.date(from: oldDate) else {
-      log("Improperly formatted date: \(oldDate)! Expected format: yyyy_MM_dd.")
+      log("Improperly formatted date: \(oldDate)! Expected format: yyyy-MM-dd.")
       fatalError()
     }
     return result
@@ -70,7 +70,7 @@ struct BisectToolchains: AsyncParsableCommand {
     let d = DateFormatter()
     d.dateFormat = "yyyy-MM-dd"
     guard let result = d.date(from: newDate) else {
-      log("Improperly formatted date: \(newDate)! Expected format: yyyy_MM_dd.")
+      log("Improperly formatted date: \(newDate)! Expected format: yyyy-MM-dd.")
       fatalError()
     }
     return result
@@ -101,14 +101,14 @@ struct BisectToolchains: AsyncParsableCommand {
     // just say 50 toolchains ago. To get a few weeks worth. This is easier than
     // writing dates a lot.
     let oldDateAsDate = self.oldDateAsDate
-    guard let goodTagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= oldDateAsDate }) else {
+    guard let goodTagIndex = selectTagIndex(tags, onOrBefore: oldDateAsDate) else {
       log("Failed to find tag with date: \(oldDateAsDate)")
       fatalError()
     }
 
     let badTagIndex: Int
     if let newDateAsDate = self.newDateAsDate {
-      let b = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= newDateAsDate })
+      let b = selectTagIndex(tags, onOrBefore: newDateAsDate)
       guard let b else {
         log("Failed to find tag newer than date: \(newDateAsDate)")
         fatalError()

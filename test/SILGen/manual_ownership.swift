@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend %s -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -verify -sil-verify-all -enable-experimental-feature ManualOwnership -o %t.silgen
 // RUN: %target-swift-frontend %s -emit-silgen -verify -sil-verify-all \
 // RUN:   -enable-experimental-feature ManualOwnership -o %t.silgen
 
@@ -17,6 +18,7 @@ class TriangleClass {
 // CHECK-NEXT:    [[SHAPE:%.*]] = apply [[M]](%0)
 // CHECK-NEXT:    [[COPY:%.*]] = explicit_copy_value [[SHAPE]]
 // CHECK-NEXT:    destroy_value [[SHAPE]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-NEXT:  } // end sil function 'basic_access_of_loadable'
 @_silgen_name("basic_access_of_loadable")
@@ -51,6 +53,7 @@ func var_assign(_ t: TriangleClass, _ b: Bool) -> TriangleClass {
 // CHECK:       bb0(%0 : @guaranteed $TriangleClass):
 // CHECK-NEXT:     debug_value %0
 // CHECK-NEXT:     [[IMPL_COPY:%.*]] = copy_value %0
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:     return [[IMPL_COPY]]
 // CHECK-NEXT:  } // end sil function 'return_borrowed'
 @_silgen_name("return_borrowed")
@@ -67,6 +70,7 @@ func return_borrowed(_ t: borrowing TriangleClass) -> TriangleClass {
 // CHECK-NEXT:     [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
 // CHECK-NEXT:     [[IMPL_COPY:%.*]] = load [copy] [[ACCESS]]
 // CHECK-NEXT:     end_access [[ACCESS]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:     end_borrow
 // CHECK-NEXT:     destroy_value
 // CHECK-NEXT:     return [[IMPL_COPY]]
@@ -82,6 +86,7 @@ func return_consumingParam(_ t: consuming TriangleClass) -> TriangleClass {
 // CHECK-NEXT:     [[BORROW:%.*]] = begin_borrow %0
 // CHECK-NEXT:     [[IMPL_COPY:%.*]] = copy_value [[BORROW]]
 // CHECK-NEXT:     end_borrow [[BORROW]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:     destroy_value %0
 // CHECK-NEXT:     return [[IMPL_COPY]]
 // CHECK-NEXT:  } // end sil function 'return_owned'

@@ -53,9 +53,6 @@
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -64,8 +61,10 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include <functional>
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -77,6 +76,8 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //===----------------------------------------------------------------------===//
 
 void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
+  PrettyStackTraceSILFunction trace("deserializing", F);
+
   ASSERT(F->isExternalDeclaration());
 
   LLVM_DEBUG(llvm::dbgs() << "Imported function: "
@@ -109,7 +110,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // an existing function with a wrong linkage, e.g. using `@_cdecl`.
   if(!(callerSerializedKind == IsNotSerialized ||
             F->hasValidLinkageForFragileRef(callerSerializedKind) ||
-            hasSharedVisibility(linkage) || F->isExternForwardDeclaration())) {
+            hasSharedVisibility(linkage))) {
     StringRef name = "a serialized function";
     llvm::SmallVector<char> scratch;
 
@@ -430,33 +431,41 @@ void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
   }
 }
 
+/// Force-deserialize the witness tables for an existential's conformances.
+///
+/// A normal embedded conformance is shared and emitted lazily into the module
+/// that forms the existential, so without this the importer references a witness
+/// table no module defines, an undefined symbol at link. `init_existential_value`
+/// has no visitor: the linker runs after AddressLowering, which has already
+/// lowered it to `init_existential_addr`.
+///
+/// TODO: a two-step scheme (declare here, deserialize at the witness_method use)
+/// would be lazier, but risks visiting witness_method before this instruction.
+void SILLinkerVisitor::linkInExistentialConformances(
+    ArrayRef<ProtocolConformanceRef> conformances) {
+  for (ProtocolConformanceRef C : conformances) {
+    visitProtocolConformance(C, /*referencedFromInitExistential=*/true);
+  }
+}
+
 void SILLinkerVisitor::visitInitExistentialAddrInst(
     InitExistentialAddrInst *IEI) {
-  // Link in all protocol conformances that this touches.
-  //
-  // TODO: There might be a two step solution where the init_existential_inst
-  // causes the witness table to be brought in as a declaration and then the
-  // protocol method inst causes the actual deserialization. For now we are
-  // not going to be smart about this to enable avoiding any issues with
-  // visiting the open_existential_addr/witness_method before the
-  // init_existential_inst.
-  for (ProtocolConformanceRef C : IEI->getConformances()) {
-    visitProtocolConformance(C, true);
-  }
+  linkInExistentialConformances(IEI->getConformances());
 }
 
 void SILLinkerVisitor::visitInitExistentialRefInst(
     InitExistentialRefInst *IERI) {
-  // Link in all protocol conformances that this touches.
-  //
-  // TODO: There might be a two step solution where the init_existential_inst
-  // causes the witness table to be brought in as a declaration and then the
-  // protocol method inst causes the actual deserialization. For now we are
-  // not going to be smart about this to enable avoiding any issues with
-  // visiting the protocol_method before the init_existential_inst.
-  for (ProtocolConformanceRef C : IERI->getConformances()) {
-    visitProtocolConformance(C, true);
-  }
+  linkInExistentialConformances(IERI->getConformances());
+}
+
+void SILLinkerVisitor::visitAllocExistentialBoxInst(
+    AllocExistentialBoxInst *AEBI) {
+  linkInExistentialConformances(AEBI->getConformances());
+}
+
+void SILLinkerVisitor::visitInitExistentialMetatypeInst(
+    InitExistentialMetatypeInst *IEMI) {
+  linkInExistentialConformances(IEMI->getConformances());
 }
 
 void SILLinkerVisitor::visitBuiltinInst(BuiltinInst *bi) {

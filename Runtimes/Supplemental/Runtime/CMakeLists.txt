@@ -5,10 +5,6 @@ cmake_minimum_required(VERSION 3.29)
 # in `EmitSwiftInterface.cmake`
 # to ensure it keeps laying down nested swiftmodule folders
 
-if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
-  cmake_policy(SET CMP0157 OLD)
-endif()
-
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
@@ -86,9 +82,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependenceMutableAccessors>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-disable-upcoming-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
@@ -189,6 +183,8 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     SymbolLocator.swift
     Utils.swift
     Win32Unwinder.swift
+
+    SafeReadMemory.cpp
   )
 
   # Add the correct assembly language files

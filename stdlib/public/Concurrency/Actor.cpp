@@ -16,6 +16,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/DispatchShims.h"
 #include <atomic>
 #include <new>
 #if __has_feature(ptrauth_calls)
@@ -23,10 +24,16 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/ABI/Actor.h"
-#include "swift/ABI/Task.h"
+#if !SWIFT_CONCURRENCY_EMBEDDED
+// Private.h pulls in the demangler and other hosted C++ facilities, which are
+// unavailable when building for embedded (freestanding) targets.
+#include "../runtime/Private.h"
+#endif
+#include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Actor.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
 #include "swift/Concurrency/Actor.h"
@@ -38,6 +45,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -97,6 +105,25 @@ static bool shouldYieldThread() {
 /*****************************************************************************/
 /******************************* TASK TRACKING ******************************/
 /*****************************************************************************/
+
+/// The currently executing task. If this has thread-local storage (Windows,
+/// Linux) or is a plain global (embedded), give it a stable name and protected
+/// visibility, enabling debuggers to locate the symbol by name and ensuring it
+/// survives stripping the symbol table.
+/// Update swift_concurrency_current_task_storage_kind in
+/// swift/Runtime/ConcurrencyDebug.h if this changes.
+#ifdef SWIFT_THREAD_LOCAL
+extern "C" {
+// (windows) dllexport is not allowed on thread-local variables.
+#if defined(__ELF__)
+SWIFT_ATTRIBUTE_FOR_EXPORTS
+#endif
+#else
+namespace {
+#endif
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
+_swift_concurrency_currentTask;
+}
 
 namespace {
 
@@ -189,28 +216,55 @@ public:
 };
 
 class ActiveTask {
-  /// A thread-local variable pointing to the active tracking
-  /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
-                                 tls_key::concurrency_task) Value;
-
 public:
-  static void set(AsyncTask *task) { Value.set(task); }
-  static AsyncTask *get() { return Value.get(); }
+  static void set(AsyncTask *task) { _swift_concurrency_currentTask.set(task); }
+  static AsyncTask *get() { return _swift_concurrency_currentTask.get(); }
   static AsyncTask *swap(AsyncTask *newTask) {
-    return Value.swap(newTask);
+    return _swift_concurrency_currentTask.swap(newTask);
   }
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
-ActiveTask::Value;
-
 SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
+
+/// This function establishes the Task's context and attempts to invoke
+/// it. The invocation may fail and the Task may not be run if the
+/// passed in exclusion value is not what is in the ActiveTaskStatus
+/// during the cas loop to mark the Task as running. If Task
+/// priority escalation is not enabled, this will always succeed.
+SWIFT_ALWAYS_INLINE
+static inline void taskInvokeWithExclusionValue(
+    AsyncTask *task, SerialExecutorRef serialExecutor,
+    TaskExecutorRef taskExecutor,
+    AsyncTask::ExclusionValue allowedStealerExclusionValue,
+    AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlagsFromTask) {
+  // Update the task status to say that it's running on the current
+  // thread.  If the task suspends somewhere, it should update the
+  // task status appropriately; we don't need to update it afterwards.
+  [[maybe_unused]] auto [mayRun, dispatchOpaquePriority] =
+      task->tryStartRunning(allowedStealerExclusionValue, invokeFlags);
+  if (mayRun) {
+    // Update the active task in the current thread.
+    auto oldTask = ActiveTask::swap(task);
+
+    auto traceHandle =
+        concurrency::trace::job_run_begin(task, serialExecutor, taskExecutor);
+    task->runInFullyEstablishedContext();
+    concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self({dispatchOpaquePriority});
+#endif
+
+    assert(ActiveTask::get() == nullptr &&
+           "active task wasn't cleared before suspending?");
+    if (oldTask) ActiveTask::set(oldTask);
+  }
+}
 
 void swift::runJobInEstablishedExecutorContext(Job *job,
                                                SerialExecutorRef serialExecutor,
@@ -223,28 +277,9 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    // Update the active task in the current thread.
-    auto oldTask = ActiveTask::swap(task);
-
-    // Update the task status to say that it's running on the
-    // current thread.  If the task suspends somewhere, it should
-    // update the task status appropriately; we don't need to update
-    // it afterwards.
-    [[maybe_unused]]
-    uint32_t dispatchOpaquePriority = task->flagAsRunning();
-
-    auto traceHandle =
-        concurrency::trace::job_run_begin(job, serialExecutor, taskExecutor);
-    task->runInFullyEstablishedContext();
-    concurrency::trace::job_run_end(traceHandle);
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
-#endif
-
-    assert(ActiveTask::get() == nullptr &&
-           "active task wasn't cleared before suspending?");
-    if (oldTask) ActiveTask::set(oldTask);
+    taskInvokeWithExclusionValue(task, serialExecutor, taskExecutor,
+                                 task->_private().LocalStealerExclusionValue,
+                                 AsyncTask::InvokeFlagsFromTask);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -255,6 +290,25 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #if SWIFT_OBJC_INTEROP
   objc_autoreleasePoolPop(pool);
 #endif
+}
+
+/// Runs the Task embedded in the stealer using the stealer's exclusion value.
+/// The stealer holds a reference to the Task which is released here. Stealers
+/// are not reference counted so the object is directly destroyed here.
+inline void AsyncTaskStealer::process(Job *_job) {
+  auto *stealer = cast<AsyncTaskStealer>(_job);
+  SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
+
+  auto *trackingInfo = ExecutorTrackingInfo::current();
+
+  taskInvokeWithExclusionValue(stealer->Task, trackingInfo->getActiveExecutor(),
+                               trackingInfo->getTaskExecutor(),
+                               stealer->ExclusionValue,
+                               AsyncTask::InvokeFlagsFromStealer);
+
+  swift_release(stealer->Task);
+
+  swift_cxx_deleteObject(stealer);
 }
 
 void swift::adoptTaskVoucher(AsyncTask *task) {
@@ -431,6 +485,11 @@ __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
   // Potentially, override the platform detected mode, primarily used in tests.
 #if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  // The override downgrades the isolation check from fatal to a warning, so it
+  // is unavailable in processes don't allow disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return nullptr;
+
   return swift::runtime::environment::
       concurrencyIsCurrentExecutorLegacyModeOverride();
 #else
@@ -519,6 +578,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
       return true;
     }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
     // We cannot use 'complexEquality' as it requires two executor instances,
     // and we do not have a 'current' executor here.
 
@@ -558,6 +618,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     }
 
     assert(!options.contains(swift_task_is_current_executor_flag::Assert));
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
     return false;
   }
 
@@ -610,6 +671,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     }
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // Complex equality means that if two executors of the same type have some
   // special logic to check if they are "actually the same".
   //
@@ -706,6 +768,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
   // In the end, since 'checkIsolated' could not be used, so we must assume
   // that the executors are not the same context.
   assert(!options.contains(swift_task_is_current_executor_flag::Assert));
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
   return false;
 }
 
@@ -759,6 +822,12 @@ static unsigned unexpectedExecutorLogLevel =
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
+  // SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL can downgrade the executor check from a
+  // fatal error to a warning, so it is unavailable in processes don't allow
+  // disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return;
+
   const char *levelStr = getenv("SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL");
   if (!levelStr)
     return;
@@ -831,6 +900,7 @@ void swift::swift_task_reportUnexpectedExecutor(
       isFatalError ? "error" : "warning", functionIsolation,
       (int)fileLength, file, (int)line, whereExpected);
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (_swift_shouldReportFatalErrorsToDebugger()) {
     RuntimeErrorDetails details = {
         .version = RuntimeErrorDetails::currentVersion,
@@ -849,6 +919,7 @@ void swift::swift_task_reportUnexpectedExecutor(
         isFatalError ? RuntimeErrorFlagFatal : RuntimeErrorFlagNone, message,
         &details);
   }
+#endif
 
 #if defined(_WIN32)
 #define STDERR_FILENO 2
@@ -1508,6 +1579,9 @@ TaskExecutorRef TaskExecutorRef::fromTaskExecutorPreference(Job *job) {
   if (auto task = dyn_cast<AsyncTask>(job)) {
     return task->getPreferredTaskExecutor();
   }
+  if (auto stealer = dyn_cast<AsyncTaskStealer>(job)) {
+    return stealer->Task->getPreferredTaskExecutor();
+  }
   return TaskExecutorRef::undefined();
 }
 
@@ -1865,11 +1939,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         break;
       }
     } else {
-      auto taskExecutor = TaskExecutorRef::undefined();
-      if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-        taskExecutor = task->getPreferredTaskExecutor();
-        trackingInfo.setTaskExecutor(taskExecutor);
-      }
+      auto taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
+      trackingInfo.setTaskExecutor(taskExecutor);
 
       // This thread is now going to follow the task on this actor.
       // It may hop off the actor
@@ -2305,23 +2376,53 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
+enum class ActorClassKind {
+  /// A default actor, i.e. it uses the default actor executor
+  DefaultActor,
+  /// An actor which uses a custom executor
+  NonDefaultActor,
+};
+
+/// Returns what kind of actor (if any) the passed metadata represents.
+static std::optional<ActorClassKind>
+classifyActorClass(const Metadata *metadata) {
+  auto *classMetadata = dyn_cast_or_null<ClassMetadata>(metadata);
+
+  if (!classMetadata || !classMetadata->isTypeMetadata())
+    return std::nullopt;
+
+  bool isActor = false;
+  while (true) {
+    if (!classMetadata->isArtificialSubclass()) {
+      const auto *description = classMetadata->getDescription();
+
+      // Trust the class descriptor if it says it's a default actor
+      if (description->isDefaultActor())
+        return ActorClassKind::DefaultActor;
+
+      isActor |= description->isActor();
+    }
+
+    // Go to the superclass
+    classMetadata = classMetadata->Superclass;
+
+    // If we run out of Swift classes, it's not a default actor
+    if (!classMetadata || !classMetadata->isTypeMetadata())
+      return isActor ? std::optional(ActorClassKind::NonDefaultActor)
+                     : std::nullopt;
+  }
+}
+
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
   assert(metadata->isTypeMetadata());
-  while (true) {
-    // Trust the class descriptor if it says it's a default actor.
-    if (!metadata->isArtificialSubclass() &&
-        metadata->getDescription()->isDefaultActor()) {
-      return true;
-    }
-
-    // Go to the superclass.
-    metadata = metadata->Superclass;
-
-    // If we run out of Swift classes, it's not a default actor.
-    if (!metadata || !metadata->isTypeMetadata()) {
-      return false;
-    }
-  }
+  return classifyActorClass(metadata) == ActorClassKind::DefaultActor;
+}
+#else
+// Every Swift actor that survives to runtime metadata in Embedded Swift
+// is a default actor.
+static bool isDefaultActorClass(const ClassMetadata *metadata) {
+  (void)metadata;
+  return true;
 }
 #endif
 
@@ -2487,6 +2588,15 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
     asImpl(executor.getDefaultActor())->unlock(true);
 }
 
+#if SWIFT_TASK_DEBUG_LOG_ENABLED
+static inline const char *safeGetIdentityDebugName(SerialExecutorRef exec) {
+  if (exec.isGeneric())
+    return exec.isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)"
+                                        : " (GenericExecutor)";
+  return "";
+}
+#endif
+
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
@@ -2501,17 +2611,15 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
                                            : TaskExecutorRef::undefined());
   auto newTaskExecutor = task->getPreferredTaskExecutor();
-  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch executors: executor %p%s to "
-                       "new serial executor: %p%s; task executor: from %p%s to %p%s",
-                       task,
-                       currentExecutor.getIdentity(),
-                       currentExecutor.getIdentityDebugName(),
-                       newExecutor.getIdentity(),
-                       newExecutor.getIdentityDebugName(),
-                       currentTaskExecutor.getIdentity(),
-                       currentTaskExecutor.isDefined() ? "" : " (undefined)",
-                       newTaskExecutor.getIdentity(),
-                       newTaskExecutor.isDefined() ? "" : " (undefined)");
+  SWIFT_TASK_DEBUG_LOG(
+      "Task %p trying to switch executors: executor %p%s to "
+      "new serial executor: %p%s; task executor: from %p%s to %p%s",
+      task, currentExecutor.getIdentity(),
+      safeGetIdentityDebugName(currentExecutor), newExecutor.getIdentity(),
+      newExecutor.getIdentityDebugName(), currentTaskExecutor.getIdentity(),
+      currentTaskExecutor.isDefined() ? "" : " (undefined)",
+      newTaskExecutor.getIdentity(),
+      newTaskExecutor.isDefined() ? "" : " (undefined)");
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
@@ -2726,13 +2834,11 @@ extern "C" SWIFT_CC(swift) void _swift_task_makeAnyTaskExecutor(
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef) {
 #ifndef NDEBUG
-  auto _taskExecutorRef = TaskExecutorRef::undefined();
-  if (auto task = dyn_cast<AsyncTask>(job)) {
-    _taskExecutorRef = task->getPreferredTaskExecutor();
-  }
-  SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
-                       serialExecutorRef.getIdentity(),
-                       _taskExecutorRef.getIdentity());
+  [[maybe_unused]]
+  auto _taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
+  SWIFT_TASK_DEBUG_LOG(
+      "enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
+      serialExecutorRef.getIdentity(), _taskExecutorRef.getIdentity());
 #endif
 
   assert(job && "no job provided");
@@ -2742,22 +2848,19 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   _swift_tsan_release(job);
 
   if (serialExecutorRef.isGeneric()) {
-    if (auto task = dyn_cast<AsyncTask>(job)) {
-      auto taskExecutorRef = task->getPreferredTaskExecutor();
-      if (taskExecutorRef.isDefined()) {
+    auto taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
+    if (taskExecutorRef.isDefined()) {
 #if SWIFT_CONCURRENCY_EMBEDDED
-        swift_unreachable("task executors not supported in embedded Swift");
+      swift_unreachable("task executors not supported in embedded Swift");
 #else
-        auto taskExecutorIdentity = taskExecutorRef.getIdentity();
-        auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
-        auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
+      auto taskExecutorIdentity = taskExecutorRef.getIdentity();
+      auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
+      auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
 
-        return _swift_task_enqueueOnTaskExecutor(
-            job,
-            taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
+      return _swift_task_enqueueOnTaskExecutor(
+          job, taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
-      } // else, fall-through to the default global enqueue
-    }
+    } // else, fall-through to the default global enqueue
     return swift_task_enqueueGlobal(job);
   }
 
@@ -2793,13 +2896,43 @@ swift_actor_escalate(DefaultActorImpl *actor, AsyncTask *task, JobPriority newPr
 SWIFT_CC(swift)
 void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
   JobPriority newPriority) {
-  if (executor.isGeneric()) {
-    // TODO (rokhinip): We'd push a stealer job for the task on the executor.
-    return;
-  }
+  SWIFT_TASK_DEBUG_LOG("Escalating executor %p to %#x",
+                       (void *)executor.getIdentity(), newPriority);
 
   if (executor.isDefaultActor()) {
     return swift_actor_escalate(asImpl(executor.getDefaultActor()), task, newPriority);
+  }
+
+  // If the task is enqueued on any other executor, we can enqueue
+  // a task stealer job on that executor. For now, don't do this if it's
+  // a custom executor, just in case the custom executor has a
+  // problem with enqueuing non-task jobs.
+  if (executor.isGeneric() && !task->hasTaskExecutorPreferenceRecord()) {
+    SWIFT_TASK_DEBUG_LOG("Enqueuing stealer for %p on %p", (void *)task,
+                         (void *)executor.getIdentity());
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    // Even though we are in the "enqueue stealer" path, this could
+    // enqueue the original Task if another stealer had previously
+    // been enqueued and still is but the original Task did manage to
+    // run at some point (while rare, this wouldn't be unexpected)
+    //
+    // Because this is in the escalation path, this stealer is being added in
+    // order to escalate the Task while it is enqueued on an executor so it is
+    // only an optimization and not mandatory like the normal enqueue path is
+    //
+    // Unlike flagAsAndEnqueueOnExecutor, we do the enqueue while our caller
+    // is still holding the Task Status Lock. That is safe here because any
+    // caller of swift_executor_escalate must hold a refcount on the Task
+    // for the duration of the call, so the Task cannot be destroyed out from
+    // under us even if it runs to completion on the target executor before
+    // the lock is released. getSelfOrStealer may still return nullptr on the
+    // async-let escalation path, in which case there is nothing to enqueue.
+    Job *job = swift_task_getSelfOrStealerForEnqueue(task, EnqueueFlagsForEscalation);
+    if (job) {
+      swift_task_enqueue(job, executor);
+    }
+#endif
+    return;
   }
 
   // TODO (rokhinip): This is either the main actor or an actor with a custom
@@ -2819,6 +2952,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
 void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *_actor) {
   asImpl(_actor)->initialize();
 }
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 /// Compute the minimal allocation size for a 'remote' distributed actor reference.
 ///
@@ -2827,6 +2961,19 @@ void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedAct
 /// properties beyond those three are never initialized or accessed on a remote
 /// instance, so we can trim the allocation at the offset where the first
 /// user-defined field would begin.
+///
+/// Under embedded Swift this computation is not possible: the embedded
+/// `ClassMetadata` layout is intentionally minimal (just superclass + destroy
+/// + ivarDestroyer pointers; see `stdlib/public/core/EmbeddedRuntime.swift`)
+/// and does NOT carry a `TargetClassDescriptor` or field-offset vector. The
+/// non-embedded path reads `description->NumFields` and projects
+/// `metadata->getFieldOffsets()[3]`, neither of which exists in the embedded
+/// metadata. Embedded therefore does not use this function at all: IRGen
+/// computes the trim size and alignment mask at compile time from `ClassLayout`
+/// and passes them to the dedicated
+/// `swift_distributedActor_remote_initialize_embedded` entry point below. See
+/// `lib/IRGen/GenDistributed.cpp::emitDistributedActorInitializeRemote`
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static size_t
 getDistributedRemoteActorAllocSize(const ClassMetadata *metadata) {
   auto description = metadata->getDescription();
@@ -2839,12 +2986,11 @@ getDistributedRemoteActorAllocSize(const ClassMetadata *metadata) {
   if (numFields >= 4) {
     // The 4th field is the first user-defined stored property.
     // Its offset marks the end of the synthesized fields,
-    // so it is exactly  how much storage we need.
+    // so it is exactly how much storage we need.
     const auto *fieldOffsets = metadata->getFieldOffsets();
     return fieldOffsets[3];
   }
 
-  // Only the three required fields exist, remote-ref and local instances have the same size.
   return metadata->getInstanceSize();
 }
 
@@ -2871,24 +3017,74 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
     actor->initialize(/*remote*/true);
     assert(swift_distributed_actor_is_remote(alloc));
     return reinterpret_cast<OpaqueValue*>(actor);
-  } else {
-    auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
-    actor->initialize(/*remote*/true);
-    assert(swift_distributed_actor_is_remote(alloc));
-    return reinterpret_cast<OpaqueValue*>(actor);
   }
+
+  // Non-default-actor distributed actors are not supported in Embedded Swift.
+  auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(swift_distributed_actor_is_remote(alloc));
+  return reinterpret_cast<OpaqueValue*>(actor);
 }
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+/// Embedded-only variant: accepts the allocation size and alignment mask
+/// pre-computed by the compiler at IR generation time. The minimal embedded
+/// ClassMetadata layout carries no TargetClassDescriptor, field-offset vector,
+/// InstanceSize, or InstanceAlignMask, so the runtime cannot derive either
+/// value itself. IRGen emits the correct trim size (offset of the first
+/// user-defined stored property, or full instance size when there are none)
+/// and the class's alignment mask, and passes both here directly.
+OpaqueValue*
+swift::swift_distributedActor_remote_initialize_embedded(
+    const Metadata *actorType, size_t allocSize, size_t alignMask) {
+  // The only inline definition of Metadata::getClassObject() lives in
+  // ../runtime/Private.h, which the embedded build cannot include (it pulls in
+  // the demangler). Embedded metadata is always native Swift class metadata,
+  // which is its own class object, so cast directly
+  const ClassMetadata *metadata = cast<ClassMetadata>(actorType);
+
+  HeapObject *alloc = swift_allocObject(metadata, allocSize, alignMask);
+
+  // Zero the body so that the destructor can safely release fields without
+  // encountering uninitialized memory.
+  memset((void *)(alloc + 1), 0, allocSize - sizeof(HeapObject));
+
+  // All embedded distributed actors are default actors.
+  auto actor = asImpl(reinterpret_cast<DefaultActor *>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(swift_distributed_actor_is_remote(alloc));
+  return reinterpret_cast<OpaqueValue*>(actor);
+}
+#endif
+
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
-  if (isDefaultActorClass(metadata)) {
+  if (!_actor || isObjCTaggedPointer(_actor))
+    return false;
+
+  auto actorKind = classifyActorClass(swift_getObjectType(_actor));
+  if (!actorKind)
+    return false;
+
+  switch (*actorKind) {
+  case ActorClassKind::DefaultActor:
     return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
-  } else {
+  case ActorClassKind::NonDefaultActor:
     return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
 #else
+  // The embedded ClassMetadata carries no descriptor, so classifyActorClass
+  // cannot run here. Every actor that survives to runtime metadata in
+  // Embedded Swift is a default actor, and non-default-actor distributed
+  // actors are rejected in swift_distributedActor_remote_initialize
+  if (!_actor)
+    return false;
+
+  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
+  if (isDefaultActorClass(metadata))
+    return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
+
   return false;
 #endif
 }
@@ -2896,3 +3092,11 @@ bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 bool DefaultActorImpl::isDistributedRemote() {
   return this->isDistributedRemoteActor;
 }
+
+// ************************* PLEASE UPDATE DEBUG.H DOCS ************************
+// * When changing this version number you MUST document the change in         *
+// * `Concurrency/Debug.h`.                                                    *
+// *****************************************************************************
+[[gnu::used, gnu::retain]]
+uint32_t swift::_swift_concurrency_debug_internal_layout_version =
+    (static_cast<uint32_t>(SWIFT_THREAD_LOCAL_STORAGE_KIND) << 24) | 3;

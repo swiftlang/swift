@@ -1,7 +1,8 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -verify -sil-verify-all | %FileCheck %s --check-prefixes CHECK,REG
 // RUN: %target-swift-emit-silgen %s -verify -sil-verify-all -enable-sil-opaque-values | %FileCheck %s --check-prefixes CHECK,OV
 
-// CHECK-LABEL:   sil{{.*}} [ossa] @{{.*}}uninhabited_generic{{.*}}
+// CHECK-LABEL:   sil{{.*}} [ossa] {{(\[opaque\] )?}}@{{.*}}uninhabited_generic{{.*}}
 // CHECK:           [[NEVER:%[^,]+]] = apply {{.*}} -> Never
 // CHECK-NEXT:      ignored_use [[NEVER]]
 // CHECK-NEXT:      unreachable

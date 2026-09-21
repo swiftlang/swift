@@ -15,9 +15,6 @@
 
 #include "Visibility.h"
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nonnull _swift_stdlib_threadLocalStorageGet(void);
-
 #if !defined(__swift_embedded__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void * _Nullable _swift_getExclusivityTLSImpl(void);

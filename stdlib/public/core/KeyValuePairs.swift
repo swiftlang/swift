@@ -134,7 +134,7 @@ extension KeyValuePairs {
   ///
   /// - Complexity: O(1)
   @available(SwiftCompatibilitySpan 5.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
     get {

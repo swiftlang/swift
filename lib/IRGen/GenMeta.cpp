@@ -40,7 +40,6 @@
 #include "swift/Strings.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -67,7 +66,6 @@
 #include "GenStruct.h"
 #include "GenValueWitness.h"
 #include "GenericArguments.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -75,7 +73,6 @@
 #include "MetadataRequest.h"
 #include "MetatypeMetadataVisitor.h"
 #include "ProtocolInfo.h"
-#include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
@@ -925,6 +922,7 @@ namespace {
       NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
       NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
       asImpl().addAssociatedTypeNames();
+      asImpl().addCOMInterfaceID();
       asImpl().addRequirementSignature();
       asImpl().addRequirements();
       auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
@@ -939,6 +937,16 @@ namespace {
       auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
+    }
+
+    void addCOMInterfaceID() {
+      if (!Proto->isCOMInterface())
+        return;
+
+      const COMDeclInfo *info = Proto->getCOMDeclInfo();
+      ASSERT(info && info->isInterface());
+
+      B.add(IGM.getCOMIdentityConstant(info->getInterfaceID()));
     }
 
     void addRequirementSignature() {
@@ -1033,7 +1041,7 @@ namespace {
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
           flags = flags.withIsAsync(true);
-          declRef = declRef.asDistributed();
+          declRef = declRef.getDistributedThunkDeclRef();
         }
         addDiscriminator(flags, schema, declRef);
       }
@@ -1068,7 +1076,8 @@ namespace {
         auto address =
           B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
         int offset = WitnessTableFirstRequirementOffset;
-        auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
+        auto firstReqAdjustment =
+            llvm::ConstantInt::getSigned(IGM.Int32Ty, -offset);
         address = llvm::ConstantExpr::getGetElementPtr(
             IGM.ProtocolRequirementStructTy, address, firstReqAdjustment);
 
@@ -1471,6 +1480,17 @@ namespace {
       InvertibleProtocolSet result;
       auto nominal = dyn_cast<NominalTypeDecl>(Type);
       if (!nominal)
+        return result;
+
+      // GenericContextDescriptorFlags must be zero for descriptors that might
+      // be seen by a pre-5.8 runtime, so omit this on pre-5.8 targets unless
+      // we're building the runtime itself.
+      auto deploymentAvailability =
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (!IGM.Context.LangOpts.DisableAvailabilityChecking &&
+          !deploymentAvailability.isContainedIn(
+              IGM.Context.getSwift58Availability()) &&
+          !IGM.getSwiftModule()->isStdlibModule())
         return result;
 
       auto checkProtocol = [&](InvertibleProtocolKind kind) {
@@ -2860,8 +2880,7 @@ namespace {
               if (isUnavailability) {
                 // Invert the result of "at least" check by xor'ing resulting
                 // boolean with `-1`.
-                success =
-                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+                success = IGF.Builder.CreateXor(success, IGF.Builder.getTrue());
               }
 
               auto nextCondOrRet = queryIndex == queries.size() - 1
@@ -3602,7 +3621,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   // If we don't have a count, then we're the 'like:' variant and we need to
   // pass '-1' to the runtime call.
   if (!count) {
-    count = llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
+    count = llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
   }
 
   // Call swift_initRawStructMetadata().
@@ -3632,17 +3651,36 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   auto rawLayout = T.getRawLayout();
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
   auto structLayoutflags = StructLayoutFlags::Swift5Algorithm;
-  auto rawLayoutFlags = (RawLayoutFlags) 0;
+  llvm::Value *rawLayoutFlags = IGM.getSize(Size(0));
 
-  if (rawLayout->shouldMoveAsLikeType())
-    rawLayoutFlags |= RawLayoutFlags::MovesAsLike;
+  if (rawLayout->shouldMoveAsLikeType()) {
+    rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                      IGM.getSize(Size((uint8_t) RawLayoutFlags::MovesAsLike)));
+
+    // PODness comes directly from the like type if we 'movesAsLike'. A custom
+    // deinit on the raw layout type however automatically forces non-pod.
+    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+      rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                          IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
+    } else {
+      auto &likeTypeInfo = IGM.getTypeInfo(likeType);
+      auto isPOD = likeTypeInfo.getIsTriviallyDestroyable(IGF, likeType);
+      auto isNonPODFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
+      rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
+    }
+  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+    rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
+  }
 
   // If we don't have a count, then we're the 'like:' variant so just pass some
   // 0 to the runtime call.
   if (!count) {
     count = IGM.getSize(Size(0));
   } else {
-    rawLayoutFlags |= RawLayoutFlags::IsArray;
+    rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                          IGM.getSize(Size((uint8_t) RawLayoutFlags::IsArray)));
   }
 
   // Call swift_initRawStructMetadata2().
@@ -3651,7 +3689,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                           IGM.getSize(Size(uintptr_t(structLayoutflags))),
                           likeTypeLayout,
                           count,
-                          IGM.getSize(Size(uintptr_t(rawLayoutFlags)))});
+                          rawLayoutFlags});
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -7569,6 +7607,9 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
 
 /// Get the runtime identifier for a special protocol, if any.
 SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
+  if (P->isCOMInterface())
+    return SpecialProtocol::COM;
+
   auto known = P->getKnownProtocolKind();
   if (!known)
     return SpecialProtocol::None;
@@ -7578,7 +7619,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
-  case KnownProtocolKind::BorrowingSequence:
+  case KnownProtocolKind::Iterable:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::IteratorProtocol:
   case KnownProtocolKind::BorrowingIteratorProtocol:
@@ -7643,7 +7684,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
-  case KnownProtocolKind::CxxBorrowingSequence:
+  case KnownProtocolKind::CxxIterable:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
@@ -7657,6 +7698,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::TaskExecutor:
+  case KnownProtocolKind::Clock:
   case KnownProtocolKind::ExecutorFactory:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
@@ -7668,6 +7710,11 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::SendableMetatype:
   case KnownProtocolKind::ConvertibleToBytes:
   case KnownProtocolKind::ConvertibleFromBytes:
+  case KnownProtocolKind::IUnknown:
+  case KnownProtocolKind::ISwiftObject:
+  case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 
@@ -7964,9 +8011,23 @@ GenericArgumentMetadata irgen::addGenericRequirements(
                                            /*key argument*/false,
                                            isPackRequirement,
                                            isValueRequirement);
+      // Pass along the generic signature so that, if the runtime demangler is
+      // too old to understand this type's mangled name and we fall back to a
+      // dangling metadata-accessor function, the accessor can map the
+      // type-parameter-dependent type into a generic environment and bind it
+      // from the generic requirements buffer at runtime.
+      //
+      // Use the CanType overload rather than the Type overload: the latter
+      // reduces the type against the signature, which would collapse the RHS
+      // of a same-type requirement onto its equivalence-class representative
+      // (e.g. `T.A == T.B` would be recorded as `T.A == T.A`) and corrupt the
+      // requirement. We want the original RHS, just mangled with the signature
+      // available for the dangling-accessor fallback.
       auto typeName =
-          IGM.getTypeRef(requirement.getSecondType(), nullptr,
-                         MangledTypeRefRole::Metadata).first;
+          IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
+                         sig.getCanonicalSignature(),
+                         MangledTypeRefRole::Metadata)
+              .first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),
@@ -8181,6 +8242,27 @@ llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,
   builder.addInt64(typeId->getLimitedValue());
   return cast<llvm::GlobalValue>(
       IGM.defineCoroFunctionPointer(entity, builder.finishAndCreateFuture()));
+}
+
+// Same as above, but can be used for synthetic functions that
+// don't have a matching SIL function.
+llvm::Constant *irgen::emitLocalCoroFunctionPointer(IRGenModule &IGM,
+                                                    llvm::Function *function,
+                                                    llvm::StringRef name) {
+  ConstantInitBuilder initBuilder(IGM);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(IGM.CoroFunctionPointerTy));
+  builder.addCompactFunctionReference(function);
+  builder.addInt32(0);
+  auto *typeId = IGM.getMallocTypeId(function);
+  ASSERT(typeId->getIntegerType() == IGM.Int64Ty);
+  builder.addInt64(typeId->getLimitedValue());
+  // Internal linkage: each module that needs it gets its own copy, so there is
+  // no external symbol to resolve.
+  auto *var = builder.finishAndCreateGlobal(name, IGM.getPointerAlignment(),
+                                            /*constant*/ true,
+                                            llvm::GlobalValue::InternalLinkage);
+  return var;
 }
 
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,

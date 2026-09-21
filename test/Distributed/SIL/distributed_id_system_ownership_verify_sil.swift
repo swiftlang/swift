@@ -4,7 +4,6 @@
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
-// REQUIRES: swift_in_compiler
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib

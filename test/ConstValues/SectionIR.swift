@@ -61,7 +61,7 @@ struct W {
 // CHECK: @"$s9SectionIR11intLiteral8s6UInt16Vvp" = {{.*}}constant %Ts6UInt16V <{ i16 -1 }>, section "mysection"
 // CHECK: @"$s9SectionIR11intLiteral9s6UInt32Vvp" = {{.*}}constant %Ts6UInt32V <{ i32 -1 }>, section "mysection"
 // CHECK: @"$s9SectionIR12intLiteral10s6UInt64Vvp" = {{.*}}constant %Ts6UInt64V <{ i64 -1 }>, section "mysection"
-// CHECK: @"$s9SectionIR13floatLiteral1Sfvp" = {{.*}}constant %TSf <{ float 0x40091EB860000000 }>, section "mysection"
+// CHECK: @"$s9SectionIR13floatLiteral1Sfvp" = {{.*}}constant %TSf <{ float {{0x40091EB860000000|3\.140000e\+00}} }>, section "mysection"
 // CHECK: @"$s9SectionIR13floatLiteral2Sdvp" = {{.*}}constant %TSd <{ double 2.718000e+00 }>, section "mysection"
 // CHECK: @"$s9SectionIR12boolLiteral1Sbvp" = {{.*}}constant %TSb <{ i1 true }>, section "mysection"
 // CHECK: @"$s9SectionIR12boolLiteral2Sbvp" = {{.*}}constant %TSb zeroinitializer, section "mysection"
@@ -77,6 +77,6 @@ struct W {
 // CHECK: @"$s9SectionIR1WV8closure7yS2iXCvpZ" = {{.*}}constant ptr @"$s9SectionIR1WV8closure7yS2iXCvpZfiS2icfU_To{{(.ptrauth)?}}", section "mysection"
 
 // CHECK: @"$s9SectionIR6tuple1Si_S2iSdSbtvp" = {{.*}}constant <{ %TSi, %TSi, %TSi, {{.*}} }> <{ %TSi <{ {{i64|i32}} 1 }>, %TSi <{ {{i64|i32}} 2 }>, %TSi <{ {{i64|i32}} 3 }>, {{.*}} }>, section "mysection"
-// CHECK: @"$s9SectionIR6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {{i64|i32}} 42 }>, %TSf <{ float 0x40091EB860000000 }>, %TSb zeroinitializer }>, section "mysection"
+// CHECK: @"$s9SectionIR6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {{i64|i32}} 42 }>, %TSf <{ float {{0x40091EB860000000|3\.140000e\+00}} }>, %TSb zeroinitializer }>, section "mysection"
 // CHECK: @"$s9SectionIR6tuple3Siyc_SSSictvp" = {{.*}}constant <{ %swift.function, %swift.function }> <{ %swift.function { ptr @"$s9SectionIR3fooSiyF{{.*}}", ptr null }, %swift.function { ptr @"$s9SectionIR3bar1xSSSi_tF{{.*}}", ptr null } }>, section "mysection"
 // CHECK: @"$s9SectionIR11inlineArrays06InlineD0Vy$2_SiGvp" = {{.*}}constant %"Ts11InlineArrayVy$2_SiG" <{ [3 x %TSi] [%TSi <{ {{i64|i32}} 1 }>, %TSi <{ {{i64|i32}} 2 }>, %TSi <{ {{i64|i32}} 3 }>] }>, section "mysection"

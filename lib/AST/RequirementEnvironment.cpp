@@ -23,9 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 
 #define DEBUG_TYPE "Protocol conformance checking"
@@ -70,12 +68,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     return t;
   };
-  auto conformanceToWitnessThunkConformanceFn =
-      LookUpConformanceInModule();
 
   auto substConcreteType = concreteType.subst(
       conformanceToWitnessThunkTypeFn,
-      conformanceToWitnessThunkConformanceFn);
+      LookUpConformanceInModule());
 
   // Calculate the depth at which the requirement's generic parameters
   // appear in the witness thunk signature.
@@ -113,34 +109,26 @@ RequirementEnvironment::RequirementEnvironment(
       }
       return substGenericParam;
     },
-    [substConcreteType, conformance, conformanceDC, covariantSelf, &ctx](
+    [substConcreteType, conformance, &ctx](
         InFlightSubstitution &IFS, Type type, ProtocolDecl *proto)
           -> ProtocolConformanceRef {
-      // The protocol 'Self' conforms concretely to the conforming type.
-      if (type->isEqual(ctx.TheSelfType) && !covariantSelf && conformance) {
-        ProtocolConformance *specialized = conformance;
-
-        if (conformance->getGenericSignature()) {
-          auto concreteSubs =
-            substConcreteType->getContextSubstitutionMap(conformanceDC);
-          specialized =
-            ctx.getSpecializedConformance(substConcreteType,
-                                          cast<NormalProtocolConformance>(conformance),
-                                          concreteSubs);
-        }
-
-        // findWitnessedObjCRequirements() does a weird thing by passing in a
-        // DC that is not the conformance DC. Work around it here.
-        if (!specialized->getType()->isEqual(substConcreteType)) {
-          ASSERT(specialized->getType()->isExactSuperclassOf(substConcreteType));
-          specialized = ctx.getInheritedConformance(substConcreteType, specialized);
-        }
-
-        return ProtocolConformanceRef(specialized);
+      // There are two special cases where we must use the Self conformance
+      // given to us:
+      // 1) The hard-coded DistributedActor conformance to Actor.
+      // 2) A reparented protocol conformance representing the default witness table.
+      //
+      // In both cases, the conforming type is a type parameter, so we must
+      // use the supplied conformance.
+      //
+      // In every other situation, we do the lookup again, even for the Self
+      // conformance we already do have, to avoid having to re-create the right
+      // Inherited / SpecializedProtocolConformance sugar by hand.
+      if (type->isEqual(ctx.TheSelfType) &&
+          substConcreteType->isEqual(ctx.TheSelfType) &&
+          conformance) {
+        return ProtocolConformanceRef(conformance);
       }
 
-      // All other generic parameters come from the requirement itself
-      // and conform abstractly.
       return lookupConformance(type.subst(IFS), proto);
     });
 
@@ -188,7 +176,7 @@ RequirementEnvironment::RequirementEnvironment(
   if (conformanceSig) {
     for (auto &rawReq : conformanceSig.getRequirements()) {
       auto req = rawReq.subst(conformanceToWitnessThunkTypeFn,
-                              conformanceToWitnessThunkConformanceFn);
+                              LookUpConformanceInModule());
       requirements.push_back(req);
     }
   }

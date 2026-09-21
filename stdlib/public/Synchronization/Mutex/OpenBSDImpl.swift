@@ -32,7 +32,7 @@ public struct _MutexHandle: ~Copyable {
   let value: _Cell<pthread_mutex_t?>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     var mx = unsafe pthread_mutex_t(bitPattern: 0)
@@ -44,7 +44,7 @@ public struct _MutexHandle: ~Copyable {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     let r = unsafe pthread_mutex_lock(value._address)
@@ -54,14 +54,14 @@ public struct _MutexHandle: ~Copyable {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     unsafe pthread_mutex_trylock(value._address) == 0
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _unlock() {
     let r = unsafe pthread_mutex_unlock(value._address)
@@ -71,7 +71,7 @@ public struct _MutexHandle: ~Copyable {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   deinit {
     let r = unsafe pthread_mutex_destroy(value._address)

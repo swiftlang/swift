@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s -o %t.sil
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa -dead-object-elimination %s -o %t.sil
 // RUN: %FileCheck --check-prefix=CHECK-MEM2REG %s --input-file=%t.sil
 // RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IR %s
 // RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -c %t.sil -o %t.o
@@ -27,7 +27,7 @@ bb0(%0 : $Int64, %1 : $Int64, %2 : $@thin MyStruct.Type):
 sil_scope 2 { loc "sroa.swift":7:6 parent @foo : $@convention(thin) (Int64, Int64) -> Int64 }
 
 // foo(in_x:in_y:)
-sil hidden @foo : $@convention(thin) (Int64, Int64) -> Int64 {
+sil hidden [ossa] @foo : $@convention(thin) (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
   debug_value %0 : $Int64, let, name "in_x", argno 1, loc "sroa.swift":7:10, scope 2
   debug_value %1 : $Int64, let, name "in_y", argno 2, loc "sroa.swift":7:21, scope 2
@@ -51,13 +51,12 @@ bb0(%0 : $Int64, %1 : $Int64):
   // function_ref MyStruct.init(x:y:)
   %10 = function_ref @MyStructInit : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct, loc "sroa.swift":8:21, scope 2
   %11 = apply %10(%7, %9, %5) : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct, loc "sroa.swift":8:21, scope 2
-  store %11 to %4 : $*MyStruct, loc "sroa.swift":8:21, scope 2
+  store %11 to [trivial] %4 : $*MyStruct, loc "sroa.swift":8:21, scope 2
   %13 = struct_element_addr %4 : $*MyStruct, #MyStruct.x, loc "sroa.swift":9:17, scope 2
-  // CHECK-MEM2REG: %[[FIELD_X:[0-9]+]] = struct_extract %[[STRUCT:[0-9]+]] : $MyStruct, #MyStruct.x, loc "sroa.swift":8:21
-  store %0 to %13 : $*Int64, loc "sroa.swift":9:17, scope 2
+  // CHECK-MEM2REG: (%[[FIELD_X:[0-9]+]], %[[FIELD_Y:[0-9]+]]) = destructure_struct %[[STRUCT:[0-9]+]]
+  store %0 to [trivial] %13 : $*Int64, loc "sroa.swift":9:17, scope 2
   %15 = struct_element_addr %4 : $*MyStruct, #MyStruct.y, loc "sroa.swift":10:17, scope 2
-  // CHECK-MEM2REG: %[[FIELD_Y:[0-9]+]] = struct_extract %[[STRUCT]] : $MyStruct, #MyStruct.y, loc "sroa.swift":8:21
-  store %1 to %15 : $*Int64, loc "sroa.swift":10:17, scope 2
+  store %1 to [trivial] %15 : $*Int64, loc "sroa.swift":10:17, scope 2
   // Make sure the struct fields' SSA values are properly connected to the source variables via op_fragment
   // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9), type $MyStruct, expr op_fragment:#MyStruct.x
   // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9), type $MyStruct, expr op_fragment:#MyStruct.y

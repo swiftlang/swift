@@ -1043,7 +1043,7 @@ extension Collection {
   // runtime the generic implementation would call itself
   // in an infinite recursion because of the absence of a better option.
   @available(*, unavailable)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(bounds: Range<Index>) -> SubSequence { fatalError() }
 }
 
@@ -1188,8 +1188,7 @@ extension Collection {
   ///   value of the same or of a different type.
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<T, E>(
     _ transform: (Element) throws(E) -> T
   ) throws(E) -> [T] {

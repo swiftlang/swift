@@ -42,7 +42,7 @@ import _Concurrency
 /// This causes a number of other properties of the actor to be inferred:
 ///   - the ``SerializationRequirement`` that will be used at compile time to
 ///     verify `distributed` target declarations are well formed,
-///   - if the distributed actor is `Codable`, based on the ``ID`` being Codable or not,
+///   - if the distributed actor is `Codable`, based on the ``id`` being Codable or not,
 ///   - the type of the ``ActorSystem`` accepted in the synthesized default initializer.
 ///
 /// A distributed actor must declare what type of actor system it is ready to
@@ -151,8 +151,8 @@ import _Concurrency
 /// initialization, and cannot be set or mutated by the actor itself.
 ///
 /// ``id`` is the effective identity of the actor, and is used in equality checks,
-/// as well as the actor's synthesized ``Codable`` conformance if the ``ID`` type
-/// conforms to ``Codable``.
+/// as well as the actor's synthesized `Codable` conformance if the ``id`` type
+/// conforms to `Codable`.
 ///
 /// ## Automatic Conformances
 ///
@@ -172,35 +172,33 @@ import _Concurrency
 /// implementations.
 ///
 /// ### Implicit Codable conformance
-/// If created with an actor system whose ``DistributedActorSystem/ActorID`` is ``Codable``, the
+/// If created with an actor system whose ``DistributedActorSystem/ActorID`` is `Codable`, the
 /// compiler will synthesize code for the concrete distributed actor to conform
-/// to ``Codable`` as well.
+/// to `Codable` as well.
 ///
 /// This is necessary to support distributed calls where the `SerializationRequirement`
-/// is ``Codable`` and thus users may want to pass actors as arguments to remote calls.
+/// is `Codable` and thus users may want to pass actors as arguments to remote calls.
 ///
-/// The synthesized implementations use a single ``SingleValueEncodingContainer`` to
-/// encode/decode the ``id`` property of the actor. The ``Decoder`` required
-/// ``Decoder/init(from:)`` is implemented by retrieving an actor system from the
+/// The synthesized implementations use a single `SingleValueEncodingContainer` to
+/// encode/decode the ``id`` property of the actor. The `Decoder` required
+/// `Decoder.init(from:)` is implemented by retrieving an actor system from the
 /// decoders' `userInfo`, effectively like as follows:
 ///
 /// ```swift
 /// decoder.userInfo[.actorSystemKey] as? ActorSystem
-// ```
+/// ```
 ///
-/// The such obtained actor system is then used to ``resolve(id:using:)`` the decoded ``ID``.
+/// The such obtained actor system is then used to ``resolve(id:using:)`` the decoded ``id``.
 ///
-/// Use the ``CodingUserInfoKey/actorSystemKey`` to provide the necessary
+/// Use the `CodingUserInfoKey.actorSystemKey` to provide the necessary
 /// actor system for the decoding initializer when decoding a distributed actor.
 ///
 /// - SeeAlso: ``DistributedActorSystem``
-/// - SeeAlso: ``Actor``
-/// - SeeAlso: ``AnyActor``
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   where ID == ActorSystem.ActorID,
         SerializationRequirement == ActorSystem.SerializationRequirement {
-  
+
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
 
@@ -243,7 +241,7 @@ public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   nonisolated var actorSystem: ActorSystem { get }
 
   /// Retrieve the executor for this distributed actor as an optimized,
-  /// unowned reference. This API is equivalent to ``Actor/unownedExecutor``,
+  /// unowned reference. This API is equivalent to `Actor.unownedExecutor`,
   /// however, by default, it intentionally returns `nil` if this actor is a reference
   /// to a remote distributed actor, because the executor for remote references
   /// is effectively never going to execute any code "on" this actor's isolated state 
@@ -279,6 +277,21 @@ public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   /// - Parameter system: `system` which should be used to resolve the `identity`, and be associated with the returned actor
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
 
+  #if $Embedded
+  /// Receiver-side remote call target dispatch, synthesized by the compiler.
+  /// The static equivalent of the runtime accessible functions that
+  /// non-embedded Distributed uses to execute remote calls.
+  ///
+  /// Not intended to be called by user code; actor system implementations
+  /// should call ``DistributedActorSystem/executeDistributedTarget`` instead,
+  /// the same as a non-embedded implementation would.
+  @available(SwiftStdlib 6.5, *)
+  nonisolated(nonsending) func _executeDistributedTarget(
+    target: RemoteCallTarget,
+    invocationDecoder: inout Self.ActorSystem.InvocationDecoder,
+    resultHandler: Self.ActorSystem.ResultHandler
+  ) async throws
+  #endif // $Embedded
 }
 
 // ==== Hashable conformance ---------------------------------------------------
@@ -303,29 +316,32 @@ extension DistributedActor {
 
 // ==== Codable conformance ----------------------------------------------------
 
+#if !$Embedded
 extension CodingUserInfoKey {
 
   /// Key which is required to be set on a `Decoder`'s `userInfo` while attempting
   /// to `init(from:)` a `DistributedActor`. The stored value under this key must
-  /// conform to ``DistributedActorSystem``.
+  /// conform to `DistributedActorSystem`.
   ///
   /// Forgetting to set this key will result in that initializer throwing, because
-  /// an actor system is required in order to call ``DistributedActor/resolve(id:using:)`` using it.
+  /// an actor system is required in order to call `DistributedActor.resolve(id:using:)` using it.
   @available(SwiftStdlib 5.7, *)
   public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
 }
+#endif // !$Embedded
 
+#if !$Embedded
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable {
 
   /// Initializes an instance of this distributed actor by decoding its ``id``,
-  /// and passing it to the ``DistributedActorSystem`` obtained from `decoder.userInfo[actorSystemKey]`.
+  /// and passing it to the `DistributedActorSystem` obtained from `decoder.userInfo[actorSystemKey]`.
   ///
-  /// ## Requires: The decoder must have the ``CodingUserInfoKey/actorSystemKey`` set to
+  /// ## Requires: The decoder must have the `CodingUserInfoKey.actorSystemKey` set to
   /// the ``ActorSystem`` that this actor expects, as it will be used to call ``DistributedActor/resolve(id:using:)``
   /// on, in order to obtain the instance this initializer should return.
   ///
-  /// - Parameter decoder: used to decode the ``ID`` of this distributed actor.
+  /// - Parameter decoder: used to decode the ``id`` of this distributed actor.
   /// - Throws: If the actor system value in `decoder.userInfo` is missing or mistyped;
   ///           the `ID` fails to decode from the passed `decoder`;
   //            or if the ``DistributedActor/resolve(id:using:)`` method invoked by this initializer throws.
@@ -340,7 +356,9 @@ extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable 
     self = try Self.resolve(id: id, using: system)
   }
 }
+#endif // !$Embedded
 
+#if !$Embedded
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor /*: implicitly Encodable */ where Self.ID: Encodable {
 
@@ -350,6 +368,7 @@ extension DistributedActor /*: implicitly Encodable */ where Self.ID: Encodable 
     try container.encode(self.id)
   }
 }
+#endif // !$Embedded
 
 // ==== Local actor special handling -------------------------------------------
 
@@ -363,7 +382,7 @@ extension DistributedActor {
   /// state.
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   // we need to silgen_name here because the signature is the same as __abi_whenLocal,
   // and even though this is @AEIC, the symbol name would conflict.
   @_silgen_name("$s11Distributed0A5ActorPAAE20whenLocalTypedThrowsyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lF")
@@ -403,7 +422,7 @@ extension DistributedActor {
 /// distributed actor
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_implements(Actor, unownedExecutor)
   public nonisolated var __actorUnownedExecutor: UnownedSerialExecutor {
     if #available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *) {
@@ -436,25 +455,20 @@ extension DistributedActor {
 
 // ==== isRemote / isLocal -----------------------------------------------------
 
-/// Verifies if the passed ``DistributedActor`` conforming type is a remote reference.
-/// Passing a type not conforming to ``DistributedActor`` may result in undefined behavior.
+/// Checks if the passed ``DistributedActor`` instance is a remote reference.
+/// Passing an object that is not a distributed actor will always return `false`.
 ///
 /// Official API to perform this task is `whenLocal`.
 @_silgen_name("swift_distributed_actor_is_remote")
 public func __isRemoteActor(_ actor: AnyObject) -> Bool
 
-/// Verifies if the passed ``DistributedActor`` conforming type is a local reference.
-/// Passing a type not conforming to ``DistributedActor`` may result in undefined behavior.
+/// Checks if the passed ``DistributedActor`` conforming type is a local instance.
+/// Passing an object that is not a distributed actor will always return `false`.
 ///
 /// Official API to perform this task is `whenLocal`.
 public func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
-
-// ==== Proxy Actor lifecycle --------------------------------------------------
-
-@_silgen_name("swift_distributedActor_remote_initialize")
-func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
 
 // ==== Distributed Actor Stubs ------------------------------------------------
 

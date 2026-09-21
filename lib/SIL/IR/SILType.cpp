@@ -19,14 +19,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Sema/Concurrency.h"
-#include <tuple>
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -142,9 +140,20 @@ SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
+  // If the function uses ownership for trivial values, then no types are
+  // considered trivial in its context.
+  if (F.hasOwnershipForTrivialValues()) {
+    return false;
+  }
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   
   return F.getTypeProperties(contextType).isTrivial();
+}
+
+bool SILType::isNonTrivialOnlyBecauseNonEscapable(const SILFunction &F) const {
+  auto contextType =
+      hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
+  return F.getTypeProperties(contextType).isNonTrivialOnlyBecauseNonEscapable();
 }
 
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
@@ -195,6 +204,8 @@ bool SILType::isEmpty(const SILFunction &F) const {
                                 F.getResilienceExpansion())) {
       return false;
     }
+    if (structDecl->hasUnreferenceableStorage())
+      return false;
 
     TypeExpansionContext typeEx = F.getTypeExpansionContext();
     for (VarDecl *field : structDecl->getStoredProperties()) {
@@ -466,8 +477,7 @@ EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
-  SILModule &M = F.getModule();
-  return isLoadable(F) || !SILModuleConventions(M).useLoweredAddresses();
+  return isLoadable(F) || !F.hasLoweredAddresses();
 }
 
 bool SILType::isAddressOnly(const SILFunction &F) const {
@@ -575,6 +585,11 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
     }
   }
 
+  // A COM interface existential is already its foreign object-model projection.
+  // It is neither a Swift class reference nor an opaque existential constraint.
+  if (layout.getCOMInterface())
+    return ExistentialRepresentation::COM;
+
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
   if (layout.requiresClass())
@@ -589,6 +604,8 @@ bool
 SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
                                          Type containedType) const {
   switch (repr) {
+  case ExistentialRepresentation::COM:
+    return getASTType().isCOMExistentialType();
   case ExistentialRepresentation::None:
     return !isAnyExistentialType();
   case ExistentialRepresentation::Opaque:
@@ -666,8 +683,9 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   switch (getConvention()) {
   case ResultConvention::Indirect:
   case ResultConvention::Pack:
-    return SILModuleConventions(M).isSILIndirect(*this) ? OwnershipKind::None
-                                                        : OwnershipKind::Owned;
+    return SILAddressConventions::forFunction(F).isSILIndirect(*this)
+               ? OwnershipKind::None
+               : OwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
     return OwnershipKind::Owned;
@@ -682,7 +700,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
-    return isAddressResult(SILModuleConventions(M).loweredAddresses)
+    return SILAddressConventions::forFunction(F).isAddressResult(*this)
                ? OwnershipKind::None
                : OwnershipKind::Guaranteed;
   case ResultConvention::Inout:
@@ -694,31 +712,22 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
-SILModuleConventions::SILModuleConventions(SILModule &M)
-    : M(&M), loweredAddresses(M.useLoweredAddresses()) {}
-
-bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
-                                                     SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
+bool SILAddressConventions::isReturnedIndirectlyInSIL(SILType type,
+                                                     const SILFunction &F) {
+  if (F.hasLoweredAddresses()) {
+    return F.getModule()
+        .Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
   return false;
 }
 
-bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
-        .isAddressOnly();
-  }
-
-  return false;
-}
-
-bool SILModuleConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
+bool SILAddressConventions::isThrownIndirectlyInSIL(SILType type,
+                                                   const SILFunction &F) {
+  if (F.hasLoweredAddresses()) {
+    return F.getModule()
+        .Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -924,6 +933,12 @@ bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()
       ->getAutoDiffTangentSpace(LookUpConformanceInModule())
       .has_value();
+}
+
+bool SILType::isCalledOnce() const {
+  if (auto F = dyn_cast<SILFunctionType>(getASTType()))
+    return F->isCalledOnce();
+  return false;
 }
 
 Type
@@ -1151,8 +1166,8 @@ bool SILType::isMoveOnly(bool orWrapped) const {
     return fnTy->isTrivialNoEscape();
   }
    */
-  if (isa<SILFunctionType>(ty))
-    return false;
+  if (auto F = dyn_cast<SILFunctionType>(ty))
+    return F->isCalledOnce();
 
   // Treat all other SIL-specific types as Copyable.
   if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
@@ -1170,7 +1185,7 @@ bool SILType::isValueTypeWithDeinit() const {
   // Do not look inside an aggregate type that has a user-deinit, for which
   // memberwise-destruction is not equivalent to aggregate destruction.
   if (auto *nominal = getNominalOrBoundGenericNominal()) {
-    return nominal->getValueTypeDestructor() != nullptr;
+    return nominal->hasValueTypeDestructor();
   }
   return false;
 }

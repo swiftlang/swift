@@ -12,18 +12,14 @@
 
 #define DEBUG_TYPE "sil-dead-function-elimination"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -111,6 +107,12 @@ class DeadFunctionAndGlobalElimination {
     // through the witness table by the distributed accessor. Neither kind
     // is necessarily referenced from SIL, so both must be kept alive.
     if (F->isDistributed() || F->isThunk() == IsDistributedThunk)
+      return true;
+
+    // The recipient-side `$distributedProxyAdapter$<base>` thunk is
+    // referenced by name from the IRGen-only distributed-target accessor;
+    // it has no SIL caller. DFE must not remove it.
+    if (F->isThunk() == IsDistributedProxyAdapterThunk)
       return true;
 
     if (F->getDynamicallyReplacedFunction())

@@ -17,13 +17,10 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/Support/SaveAndRestore.h"
 

@@ -268,9 +268,9 @@ bb0(%0 : @guaranteed $Optional<any Actor>):
 // CHECK-NEXT: switch_enum %0 : $Optional<any Actor>, case #Optional.some!enumelt: bb1, default bb2
 
 // CHECK: bb1([[ACTOR:%.*]] : @guaranteed $any Actor):
-// CHECK-NEXT: [[OPENED:%.*]] = open_existential_ref [[ACTOR]] : $any Actor to $@opened("[[ID:.*]]", any Actor) Self
-// CHECK-NEXT: [[WITNESS:%.*]] = witness_method $@opened("[[ID]]", any Actor) Self, #Actor.unownedExecutor!getter : <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor
-// CHECK-NEXT: [[SERIAL_EXEC:%.*]] = apply [[WITNESS]]<@opened("[[ID]]", any Actor) Self>([[OPENED]])
+// CHECK-NEXT: [[OPENED:%.*]] = open_existential_ref [[ACTOR]] : $any Actor to $@opened([[ID:.*]], any Actor) Self
+// CHECK-NEXT: [[WITNESS:%.*]] = witness_method $@opened([[ID]], any Actor) Self, #Actor.unownedExecutor!getter : <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor
+// CHECK-NEXT: [[SERIAL_EXEC:%.*]] = apply [[WITNESS]]<@opened([[ID]], any Actor) Self>([[OPENED]])
 // CHECK-NEXT: [[EXECUTOR:%.*]] = struct_extract [[SERIAL_EXEC]] : $UnownedSerialExecutor, #UnownedSerialExecutor.executor
 // CHECK-NEXT: [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[EXECUTOR]] : $Builtin.Executor
 // CHECK-NEXT: br bb3([[SOME]] : $Optional<Builtin.Executor>)

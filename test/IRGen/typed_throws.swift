@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-availability-checking -runtime-compatibility-version none -target %module-target-future | %FileCheck %s --check-prefix=CHECK-MANGLE
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -runtime-compatibility-version none -target %module-target-future | %FileCheck %s --check-prefix=CHECK-MANGLE
 
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-availability-checking -runtime-compatibility-version 5.8 -disable-concrete-type-metadata-mangled-name-accessors | %FileCheck %s --check-prefix=CHECK-NOMANGLE
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -runtime-compatibility-version 5.8 -disable-concrete-type-metadata-mangled-name-accessors | %FileCheck %s --check-prefix=CHECK-NOMANGLE
 
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  | %FileCheck %s --check-prefix=CHECK
 
@@ -302,7 +302,7 @@ protocol AsyncGenProto<A> {
 }
 
 // CHECK: define internal swifttailcc void @"$s12typed_throws23callAsyncIndirectResult1p1xxAA0D8GenProto_px1ARts_XP_SitYaAA10SmallErrorVYKlFTY0_"(ptr swiftasync %0)
-// CHECK:   musttail call swifttailcc void {{%.*}}(ptr noalias {{%.*}}, ptr swiftasync {{%.*}}, i64 {{%.*}}, ptr noalias swiftself {{%.*}}, ptr %swifterror, ptr {{%.*}}, ptr {{%.*}})
+// CHECK:   musttail call swifttailcc void {{%.*}}(ptr noalias {{%.*}}, ptr swiftasync {{%.*}}, i64 {{%.*}}, ptr %swifterror, ptr noalias swiftself {{%.*}}, ptr {{%.*}}, ptr {{%.*}})
 // CHECK:   ret void
 // CHECK: }
 @inline(never)

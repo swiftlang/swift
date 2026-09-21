@@ -6,7 +6,6 @@
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_AddressableTypes
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -730,36 +729,36 @@ bb0:
 // CHECK-LABEL: Address escape information for test_index_addr:
 // CHECK:      pair 0 - 1
 // CHECK-NEXT:   %2 = ref_tail_addr %1 : $X, $Int
-// CHECK-NEXT:   %5 = index_addr %2 : $*Int, %0 : $Builtin.Word
+// CHECK-NEXT:   %5 = index_addr [projection] %2 : $*Int, %0 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 0 - 2
 // CHECK-NEXT:   %2 = ref_tail_addr %1 : $X, $Int
-// CHECK-NEXT:   %6 = index_addr %2 : $*Int, %3 : $Builtin.Word
+// CHECK-NEXT:   %6 = index_addr [projection] %2 : $*Int, %3 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 0 - 3
 // CHECK-NEXT:   %2 = ref_tail_addr %1 : $X, $Int
-// CHECK-NEXT:   %7 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:   %7 = index_addr [projection] %2 : $*Int, %4 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 0 - 4
 // CHECK-NEXT:   %2 = ref_tail_addr %1 : $X, $Int
-// CHECK-NEXT:   %8 = index_addr %7 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:   %8 = index_addr [projection] %7 : $*Int, %4 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 1 - 2
-// CHECK-NEXT:   %5 = index_addr %2 : $*Int, %0 : $Builtin.Word
-// CHECK-NEXT:   %6 = index_addr %2 : $*Int, %3 : $Builtin.Word
+// CHECK-NEXT:   %5 = index_addr [projection] %2 : $*Int, %0 : $Builtin.Word
+// CHECK-NEXT:   %6 = index_addr [projection] %2 : $*Int, %3 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 1 - 3
-// CHECK-NEXT:   %5 = index_addr %2 : $*Int, %0 : $Builtin.Word
-// CHECK-NEXT:   %7 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:   %5 = index_addr [projection] %2 : $*Int, %0 : $Builtin.Word
+// CHECK-NEXT:   %7 = index_addr [projection] %2 : $*Int, %4 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 1 - 4
-// CHECK-NEXT:   %5 = index_addr %2 : $*Int, %0 : $Builtin.Word
-// CHECK-NEXT:   %8 = index_addr %7 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:   %5 = index_addr [projection] %2 : $*Int, %0 : $Builtin.Word
+// CHECK-NEXT:   %8 = index_addr [projection] %7 : $*Int, %4 : $Builtin.Word
 // CHECK-NEXT: may alias
 // CHECK:      pair 2 - 4
-// CHECK-NEXT:   %6 = index_addr %2 : $*Int, %3 : $Builtin.Word
-// CHECK-NEXT:   %8 = index_addr %7 : $*Int, %4 : $Builtin.Word
-// CHECK-NEXT: may alias
+// CHECK-NEXT:   %6 = index_addr [projection] %2 : $*Int, %3 : $Builtin.Word
+// CHECK-NEXT:   %8 = index_addr [projection] %7 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT: no alias
 // CHECK:      End function test_index_addr
 sil @test_index_addr : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
@@ -768,10 +767,10 @@ bb0(%0 : $Builtin.Word):
   %2 = ref_tail_addr %1 : $X, $Int
   %3 = integer_literal $Builtin.Word, 2
   %4 = integer_literal $Builtin.Word, 1
-  %5 = index_addr %2 : $*Int, %0 : $Builtin.Word
-  %6 = index_addr %2 : $*Int, %3 : $Builtin.Word
-  %7 = index_addr %2 : $*Int, %4 : $Builtin.Word
-  %8 = index_addr %7 : $*Int, %4 : $Builtin.Word
+  %5 = index_addr [projection] %2 : $*Int, %0 : $Builtin.Word
+  %6 = index_addr [projection] %2 : $*Int, %3 : $Builtin.Word
+  %7 = index_addr [projection] %2 : $*Int, %4 : $Builtin.Word
+  %8 = index_addr [projection] %7 : $*Int, %4 : $Builtin.Word
   fix_lifetime %2 : $*Int
   fix_lifetime %5 : $*Int
   fix_lifetime %6 : $*Int
@@ -784,7 +783,7 @@ bb0(%0 : $Builtin.Word):
 // CHECK-LABEL: Address escape information for test_existentials:
 // CHECK:      pair 0 - 1
 // CHECK-NEXT:   %2 = init_existential_addr %1 : $*any P, $Int
-// CHECK-NEXT:   %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened("D2149896-0C4D-11EE-92B7-0EA13E3AABB3", any P) Self
+// CHECK-NEXT:   %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened(1, any P) Self
 // CHECK-NEXT: may alias
 // CHECK:      End function test_existentials
 sil @test_existentials : $@convention(thin) (Int) -> () {
@@ -793,9 +792,9 @@ bb0(%0 : $Int):
   %1 = alloc_stack $P
   %2 = init_existential_addr %1 : $*P, $Int
   store %0 to %2 : $*Int
-  %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened("D2149896-0C4D-11EE-92B7-0EA13E3AABB3", any P) Self
+  %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened(1, any P) Self
   fix_lifetime %2 : $*Int
-  fix_lifetime %4 : $*@opened("D2149896-0C4D-11EE-92B7-0EA13E3AABB3", any P) Self
+  fix_lifetime %4 : $*@opened(1, any P) Self
   dealloc_stack %1 : $*P
   %r = tuple ()
   return %r : $()

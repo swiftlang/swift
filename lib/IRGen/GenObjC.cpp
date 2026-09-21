@@ -22,14 +22,12 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/GlobalDecl.h"
-#include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
@@ -54,7 +52,6 @@
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
-#include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 
 #include "GenObjC.h"
@@ -199,6 +196,12 @@ namespace {
                      align) {
     }
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     /// AnyObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Unknown;
@@ -227,6 +230,12 @@ namespace {
                  SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(ReferenceCounting::Bridge, storageType, size, spareBits,
                      align) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     /// Builtin.BridgeObject uses its own specialized refcounting implementation.
     ReferenceCounting getReferenceCounting() const {
@@ -672,8 +681,9 @@ namespace {
       case SILDeclRef::Kind::Deallocator:
         Text = "dealloc";
         break;
-          
+
       case SILDeclRef::Kind::Func:
+      case SILDeclRef::Kind::DistributedThunk:
         Text = cast<FuncDecl>(ref.getDecl())->getObjCSelector()
                  .getString(Buffer);
         break;
@@ -990,7 +1000,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     formalIndirectResult = params.claimNext();
   } else {
     SILType appliedResultTy = origMethodType->getDirectFormalResultsType(
-        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+        /*loweredAddresses=*/true);
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     auto &nativeSchema = indirectedResultTI->nativeReturnValueSchema(IGM);
@@ -1082,7 +1093,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     cleanup();
     auto &callee = emission->getCallee();
     auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
-        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+        /*loweredAddresses=*/true);
     subIGF.emitScalarReturn(resultType, resultType, result,
                             /*isSwiftCCReturn=*/true,
                             /*isOutlined=*/false,
@@ -1738,14 +1750,10 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 }
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
-    ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
-  auto loader = fn->getASTContext().getClangModuleLoader();
-  if (loader->getOriginalForClonedMember(fn))
-    fn = loader->getCalledBaseCxxMethod(fn);
+    const clang::FunctionDecl *clangFn, llvm::Value *value,
+    bool needsNullCheck) {
+  assert(clangFn);
 
-  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
-
-  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
   auto llvmFn = cast<llvm::Function>(
       IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
 

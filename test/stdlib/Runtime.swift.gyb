@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: reflection
 // REQUIRES: swift_feature_Extern
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Swift
 import StdlibUnittest
@@ -18,6 +19,8 @@ import SwiftShims
   import Glibc
 #elseif os(WASI)
   import WASILibc
+#elseif os(Emscripten)
+  import EmscriptenLibc
 #elseif canImport(Android)
   import Android
 #elseif os(Windows)

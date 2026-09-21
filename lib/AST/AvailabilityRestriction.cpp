@@ -1,0 +1,561 @@
+//===--- AvailabilityRestriction.cpp - Swift Availability Restrictions ----===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/AST/AvailabilityRestriction.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
+
+using namespace swift;
+
+AvailabilityDomainAndRange
+AvailabilityRestriction::getDomainAndRange(const ASTContext &ctx) const {
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+  case Reason::UnavailableObsolete:
+    return getAttr().getObsoletedDomainAndRange(ctx).value();
+  case Reason::UnavailableUnintroduced:
+  case Reason::Unintroduced:
+    return getAttr().getIntroducedDomainAndRange(ctx).value();
+  case Reason::Deprecated:
+    return getAttr().getDeprecatedDomainAndRange(ctx).value();
+  }
+}
+
+AvailabilityDomainAndRange
+AvailabilityRestriction::getFixItDomainAndRange(const ASTContext &ctx) const {
+  auto attrDomain = getAttr().getDomain();
+  if (attrDomain.contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS))) {
+    switch (getReason()) {
+    case Reason::UnavailableUnconditionally:
+    case Reason::UnavailableObsolete:
+      return AvailabilityDomainAndRange(
+          attrDomain, AvailabilityRange(getAttr().getObsoleted().value()));
+    case Reason::UnavailableUnintroduced:
+    case Reason::Unintroduced:
+      return AvailabilityDomainAndRange(
+          attrDomain, AvailabilityRange(getAttr().getIntroduced().value()));
+    case Reason::Deprecated:
+      return AvailabilityDomainAndRange(
+          attrDomain, AvailabilityRange(getAttr().getDeprecated().value()));
+    }
+  }
+  return getDomainAndRange(ctx);
+}
+
+bool AvailabilityRestriction::isActiveForRuntimeQueries(
+    const ASTContext &ctx) const {
+  auto platform = getAttr().getPlatform();
+  if (!platform)
+    return true;
+
+  return swift::isPlatformActive(*platform, ctx.LangOpts,
+                                 /*forTargetVariant=*/false,
+                                 /*forRuntimeQuery=*/true);
+}
+
+bool AvailabilityRestriction::emitNoteForDecl(const Decl *decl) const {
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // declarations, have no location; refer to the declaration instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(decl, diag);
+  };
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diagnose({diag::availability_marked_unavailable, decl})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diagnose({diag::availability_introduced_in_version, decl,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableObsolete:
+    diagnose({diag::availability_obsoleted, decl, domainAndRange.getDomain(),
+              domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::emitNoteForConformance(
+    const ExtensionDecl *ext, const RootProtocolConformance *rootConf) const {
+  auto &ctx = ext->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // extensions, have no location; refer to the extension instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(ext, diag);
+  };
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diagnose({diag::conformance_availability_marked_unavailable, type, proto})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diagnose({diag::conformance_availability_introduced_in_version, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()});
+    break;
+  case Reason::UnavailableObsolete:
+    diagnose({diag::conformance_availability_obsoleted, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
+  switch (getDomain().getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::Platform:
+    return false;
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+    switch (getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+      return false;
+    case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
+      return true;
+    }
+  }
+}
+
+StringRef AvailabilityRestriction::getDiagnosticDescription(
+    llvm::SmallString<64> &scratch, const ASTContext &ctx,
+    bool includeMessage) const {
+  auto domainAndRange = getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  llvm::raw_svector_ostream os(scratch);
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+  case Reason::UnavailableObsolete:
+  case Reason::UnavailableUnintroduced: {
+    os << "is unavailable";
+
+    if (!shouldHideDomainNameInDiagnostics())
+      os << " in " << domain.getNameForDiagnostics();
+
+    // Include the message from the `@available` attribute, if there is one.
+    if (includeMessage) {
+      EncodedDiagnosticMessage encodedMessage(getAttr().getMessage());
+      if (!encodedMessage.Message.empty())
+        os << ": " << encodedMessage.Message;
+    }
+    break;
+  }
+  case Reason::Unintroduced: {
+    os << "is only available in " << domain.getNameForDiagnostics();
+    if (domainAndRange.getRange().hasMinimumVersion())
+      os << " " << domainAndRange.getRange().getVersionString() << " or newer";
+    break;
+  }
+  case Reason::Deprecated:
+    llvm_unreachable("deprecation requires a different diagnostic");
+  }
+  return scratch.str();
+}
+
+void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
+  os << "AvailabilityRestriction(";
+  getAttr().getDomain().print(os);
+  os << ", ";
+
+  std::optional<llvm::VersionTuple> version;
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    os << "unavailable";
+    break;
+  case Reason::UnavailableObsolete:
+    os << "obsoleted";
+    version = getAttr().getObsoleted();
+    break;
+  case Reason::UnavailableUnintroduced:
+  case Reason::Unintroduced:
+    os << "introduced";
+    version = getAttr().getIntroduced();
+    break;
+  case Reason::Deprecated:
+    os << "deprecated";
+    version = getAttr().getDeprecated();
+    break;
+  }
+
+  if (version)
+    os << ": " << *version;
+  os << ")";
+}
+
+std::optional<AvailabilityRestriction>
+DeclAvailabilityRestrictions::getPrimaryRestriction() const {
+  std::optional<AvailabilityRestriction> result;
+
+  auto isStrongerRestriction = [](const AvailabilityRestriction &lhs,
+                                  const AvailabilityRestriction &rhs) {
+    // Restriction reasons are defined in descending order of strength.
+    if (lhs.getReason() != rhs.getReason())
+      return lhs.getReason() < rhs.getReason();
+
+    if (lhs.getDomain() != rhs.getDomain()) {
+      // Restrictions in the universal domain are the strongest.
+      if (rhs.getDomain().isUniversal())
+        return true;
+
+      // Otherwise, pick the restriction from the broader domain.
+      if (lhs.getDomain() != rhs.getDomain())
+        return rhs.getDomain().contains(lhs.getDomain());
+    }
+
+    return false;
+  };
+
+  // Pick the strongest restriction.
+  for (auto const &restriction : restrictions) {
+    if (!result || isStrongerRestriction(restriction, *result))
+      result.emplace(restriction);
+  }
+
+  return result;
+}
+
+void DeclAvailabilityRestrictions::print(llvm::raw_ostream &os) const {
+  os << "{\n";
+  llvm::interleave(
+      restrictions,
+      [&os](const AvailabilityRestriction &restriction) {
+        os << "  " << restriction;
+      },
+      [&os] { os << ",\n"; });
+  os << "\n}";
+}
+
+static bool canIgnoreRestrictionInUnavailableContexts(
+    const Decl *decl, const AvailabilityRestriction &restriction,
+    const AvailabilityRestrictionFlags flags) {
+  auto domain = restriction.getDomain();
+
+  // Always reject uses of universally unavailable declarations, regardless
+  // of context, since there are no possible compilation configurations in
+  // which they are available. However, make an exception for types and
+  // conformances, which can sometimes be awkward to avoid references to.
+  if (!flags.contains(AvailabilityRestrictionFlag::
+                          AllowUniversallyUnavailableInCompatibleContexts)) {
+    if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
+      if (domain.isUniversal() || domain.isSwiftLanguageMode())
+        return false;
+    }
+  }
+
+  switch (restriction.getReason()) {
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    return true;
+
+  case AvailabilityRestriction::Reason::Unintroduced:
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+    return domain.isVersioned();
+
+  case AvailabilityRestriction::Reason::Deprecated:
+    // Filtering of deprecation restrictions is done by
+    // getDeprecationRestrictionForAttr().
+    return false;
+  }
+}
+
+/// Returns the domain for the target platform if \p restriction may be narrowed
+/// to apply to that domain when determining whether the restriction may be
+/// ignored in an unavailable context. Returns `std::nullopt` otherwise.
+static std::optional<AvailabilityDomain>
+getSubstituteDomainForRestriction(const AvailabilityRestriction &restriction,
+                                  const ASTContext &ctx) {
+  // Only narrow anyAppleOS availability restrictions.
+  if (!restriction.getDomain().contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS)))
+    return std::nullopt;
+
+  auto targetDomain = ctx.getTargetAvailabilityDomain();
+
+  // Don't narrow to an app extension domain. A module compiled with
+  // -application-extension cannot safely use declarations that are unavailable
+  // in the base platform domain.
+  if (auto platform = targetDomain.getPlatformKind()) {
+    if (auto basePlatform = basePlatformForExtensionPlatform(*platform))
+      targetDomain = AvailabilityDomain::forPlatform(*basePlatform);
+  }
+
+  if (restriction.getDomain().isSupersetOf(targetDomain))
+    return targetDomain;
+
+  return std::nullopt;
+}
+
+static std::optional<AvailabilityRestriction>
+getDeprecationRestrictionForAttr(const Decl *decl,
+                                 const SemanticAvailableAttr &attr,
+                                 const AvailabilityContext &context,
+                                 std::optional<AvailabilityRange> availableRange,
+                                 const AvailabilityRestrictionFlags flags) {
+  bool includeSoftDeprecation =
+      flags.contains(AvailabilityRestrictionFlag::IncludeSoftDeprecation);
+
+  if (context.isDeprecated())
+    return std::nullopt;
+
+  if (context.isUnavailable() && isa<TypeDecl>(decl))
+    return std::nullopt;
+
+  // Don't diagnose deprecation in contexts that are unreachable for the
+  // deprecated domain.
+  if (availableRange && availableRange->isKnownUnreachable())
+    return std::nullopt;
+
+  if (attr.isUnconditionallyDeprecated()) {
+    if (attr.getDomain().isUniversal() || availableRange)
+      return AvailabilityRestriction::deprecated(attr);
+  }
+
+  auto &ctx = decl->getASTContext();
+  if (auto deprecatedRange = attr.getDeprecatedRange(ctx)) {
+    // When IncludeSoftDeprecation is specified, decls deprecated in a future
+    // deployment target are diagnosed too.
+    if (includeSoftDeprecation)
+      return AvailabilityRestriction::deprecated(attr);
+
+    if (availableRange && availableRange->isContainedIn(*deprecatedRange))
+      return AvailabilityRestriction::deprecated(attr);
+  }
+
+  return std::nullopt;
+}
+
+/// Returns true if \p restriction should not be reported for a reference to
+/// \p decl from \p context.
+static bool shouldIgnoreRestriction(const Decl *decl,
+                                    const AvailabilityRestriction &restriction,
+                                    const AvailabilityContext &context,
+                                    const AvailabilityRestrictionFlags flags) {
+  auto &ctx = decl->getASTContext();
+
+  // The caller may have opted out of diagnosing potential unavailability for
+  // some of the domains that the restriction could belong to.
+  if (restriction.getReason() ==
+      AvailabilityRestriction::Reason::Unintroduced) {
+    if (flags.contains(
+            AvailabilityRestrictionFlag::AllowUnintroducedInPlatformDomains) &&
+        restriction.getDomain().isPlatform())
+      return true;
+
+    if (flags.contains(AvailabilityRestrictionFlag::
+                           AllowUnintroducedAtOrBelowDeploymentRange)) {
+      auto domainAndRange = restriction.getDomainAndRange(ctx);
+      if (auto deploymentRange =
+              domainAndRange.getDomain().getDeploymentRange(ctx)) {
+        if (deploymentRange->isContainedIn(domainAndRange.getRange()))
+          return true;
+      }
+    }
+  }
+
+  // The remaining reasons to ignore a restriction all require the context of
+  // the reference to be unavailable.
+  if (!context.isUnavailable())
+    return false;
+
+  if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
+    return false;
+
+  auto domain = restriction.getDomain();
+  if (auto substituteDomain =
+          getSubstituteDomainForRestriction(restriction, ctx))
+    domain = *substituteDomain;
+
+  return context.isUnavailableForDomain(domain);
+}
+
+std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
+    const SemanticAvailableAttr &attr, const Decl *decl,
+    const AvailabilityContext &context, AvailabilityRestrictionFlags flags) {
+  auto getRestriction = [&]() -> std::optional<AvailabilityRestriction> {
+    // Is the decl unconditionally unavailable?
+    if (attr.isUnconditionallyUnavailable())
+      return AvailabilityRestriction::unavailableUnconditionally(attr);
+
+    auto &ctx = decl->getASTContext();
+    auto domain = attr.getDomain();
+    bool domainSupportsRefinement = domain.supportsContextRefinement();
+
+    // Compute the available range in the given context. If there is no
+    // explicit range defined by the context, use the deployment range as
+    // fallback.
+    std::optional<AvailabilityRange> availableRange;
+    if (domainSupportsRefinement)
+      availableRange = context.getAvailabilityRange(domain, ctx);
+    if (!availableRange)
+      availableRange = domain.getDeploymentRange(ctx);
+
+    // Is the decl obsoleted in this context?
+    if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
+      if (availableRange && !availableRange->isKnownUnreachable() &&
+          availableRange->isContainedIn(*obsoletedRange))
+        return AvailabilityRestriction::unavailableObsolete(attr);
+    }
+
+    // Is the decl not yet introduced in this context?
+    if (auto introducedRange = attr.getIntroducedRange(ctx)) {
+      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+        return domainSupportsRefinement
+                   ? AvailabilityRestriction::unintroduced(attr)
+                   : AvailabilityRestriction::unavailableUnintroduced(attr);
+    }
+
+    // Is the decl deprecated in this context?
+    if (auto deprecation = getDeprecationRestrictionForAttr(
+            decl, attr, context, availableRange, flags))
+      return deprecation;
+
+    return std::nullopt;
+  };
+
+  auto restriction = getRestriction();
+  if (restriction &&
+      shouldIgnoreRestriction(decl, *restriction, context, flags))
+    return std::nullopt;
+
+  return restriction;
+}
+
+/// Returns true if unsatisfied `@available(..., unavailable)` restrictions for
+/// \p domain make code unreachable at runtime
+static bool
+domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
+                                               const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+    return true;
+
+  case AvailabilityDomain::Kind::Platform:
+    if (ctx.LangOpts.TargetVariant &&
+        domain.isActive(ctx, /*forTargetVariant=*/true))
+      return true;
+    return domain.isActive(ctx);
+
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return false;
+
+  case AvailabilityDomain::Kind::Embedded:
+    return ctx.LangOpts.hasFeature(Feature::Embedded);
+
+  case AvailabilityDomain::Kind::Custom:
+    switch (domain.getCustomDomain()->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return true;
+    case CustomAvailabilityDomain::Kind::Disabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return false;
+    }
+  }
+}
+
+/// Returns true if unsatisfied introduction restrictions for \p domain make
+/// code unreachable at runtime.
+static bool
+domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
+                                           const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Platform:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return false;
+
+  case AvailabilityDomain::Kind::Embedded:
+    return !ctx.LangOpts.hasFeature(Feature::Embedded);
+
+  case AvailabilityDomain::Kind::Custom:
+    switch (domain.getCustomDomain()->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return false;
+    case CustomAvailabilityDomain::Kind::Disabled:
+      return true;
+    }
+  }
+}
+
+static bool restrictionIndicatesRuntimeUnavailability(
+    const AvailabilityRestriction &restriction, const ASTContext &ctx) {
+  auto domain = restriction.getDomain();
+  switch (restriction.getReason()) {
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    return domainCanBeUnconditionallyUnavailableAtRuntime(domain, ctx);
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::Deprecated:
+    return false;
+  case AvailabilityRestriction::Reason::Unintroduced:
+    return domainIsUnavailableAtRuntimeIfUnintroduced(domain, ctx);
+  }
+}
+
+void swift::getRuntimeUnavailableDomains(
+    const DeclAvailabilityRestrictions &restrictions,
+    llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx) {
+  for (auto restriction : restrictions) {
+    if (restrictionIndicatesRuntimeUnavailability(restriction, ctx))
+      domains.push_back(restriction.getDomain());
+  }
+}

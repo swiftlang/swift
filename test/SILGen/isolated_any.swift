@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 6 -target %target-swift-5.1-abi-triple | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -38,6 +39,7 @@ func callAsync(fn: @isolated(any) @Sendable () async -> ()) async {
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sIeghH_IeAghH_TR : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @guaranteed @Sendable @async @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> ()
 func convertFromNonIsolated(fn: @escaping @Sendable () async -> ())
     -> @isolated(any) @Sendable () async -> () {
@@ -69,6 +71,7 @@ func convertFromNonIsolated(fn: @escaping @Sendable () async -> ())
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sIeghH_IeAghH_TR : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @guaranteed @Sendable @async @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> ()
 func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
     -> @isolated(any) @Sendable () async -> () {
@@ -88,6 +91,7 @@ func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeghHd_SiSgIeAghHd_TR : 
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> Optional<Int>
 func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () async -> Int)
     -> @isolated(any) @Sendable () async -> Int? {
@@ -106,6 +110,7 @@ func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () 
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[FN_COPY:%.*]] = copy_value %0 :
 // CHECK-NEXT:    [[FN_CONVERTED:%.*]] = convert_function [[FN_COPY]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> () to $@Sendable @async @callee_guaranteed () -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[FN_CONVERTED]] :
 func convertToNonIsolated(fn: @escaping @isolated(any) @Sendable () async -> ())
     -> @Sendable () async -> () {
@@ -121,6 +126,7 @@ func convertToNonIsolated(fn: @escaping @isolated(any) @Sendable () async -> ())
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeAghHd_SiSgIeghHd_TR : 
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@Sendable @async @callee_guaranteed () -> Optional<Int>
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIeAghHd_SiSgIeghHd_TR
@@ -537,7 +543,42 @@ func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
 // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[ISOLATION]] : $Optional<any Actor>
 // CHECK-NEXT: end_borrow [[FN_BORROW]] : $@isolated(any) @Sendable @callee_guaranteed () -> ()
 // CHECK-NEXT: destroy_value [[FN]] : $@isolated(any) @Sendable @callee_guaranteed () -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $Optional<any Actor>
 func extractIsolation(fn: @escaping @isolated(any) @Sendable () -> Void) -> (any Actor)? {
   fn.isolation
+}
+
+final class HasIsolatedAnyStorage {
+  var fn: @isolated(any) @Sendable () -> Void = {}
+  var optFn: (@isolated(any) @Sendable () -> Void)?
+}
+
+// The base of an isolation extraction expression has to be loaded first;
+// used to crash in SILGen on an @lvalue operand.
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test30extractIsolationFromMutableVar1cScA_pSgAA21HasIsolatedAnyStorageC_tF
+// CHECK:         [[ADDR:%.*]] = ref_element_addr %0 : $HasIsolatedAnyStorage, #HasIsolatedAnyStorage.fn
+// CHECK-NEXT:    [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]]
+// CHECK-NEXT:    [[FN:%.*]] = load [copy] [[ACCESS]]
+// CHECK-NEXT:    end_access [[ACCESS]]
+// CHECK-NEXT:    [[FN_BORROW:%.*]] = begin_borrow [[FN]]
+// CHECK-NEXT:    [[ISOLATION:%.*]] = function_extract_isolation [[FN_BORROW]]
+// CHECK-NEXT:    [[RESULT:%.*]] = copy_value [[ISOLATION]] : $Optional<any Actor>
+func extractIsolationFromMutableVar(c: HasIsolatedAnyStorage) -> (any Actor)? {
+  c.fn.isolation
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test36extractIsolationThroughOptionalChain1cScA_pSgAA21HasIsolatedAnyStorageC_tF
+// CHECK:         function_extract_isolation
+func extractIsolationThroughOptionalChain(c: HasIsolatedAnyStorage) -> (any Actor)? {
+  c.optFn?.isolation ?? nil
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test28extractIsolationFromLocalVarScA_pSgyF
+// CHECK:         function_extract_isolation
+func extractIsolationFromLocalVar() -> (any Actor)? {
+  var local: (@isolated(any) @Sendable () -> Void)? = nil
+  defer { local = nil }
+  return local?.isolation ?? nil
 }

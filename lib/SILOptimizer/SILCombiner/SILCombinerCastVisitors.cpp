@@ -14,22 +14,14 @@
 
 #include "SILCombiner.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -279,34 +271,6 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
     return Builder.createUpcast(urci->getLoc(), urci->getOperand(),
                                 urci->getType());
 
-  // %0 = init_existential_ref %x : $X -> Existential
-  // %1 = open_existential_ref %0 : $Existential -> @opened() Existential
-  // %2 = unchecked_ref_cast %1
-  //
-  // ->
-  //
-  // %0 = init_existential_ref %x : $X -> Existential
-  // %1 = open_existential_ref %0 : $Existential -> @opened() Existential
-  // %2 = unchecked_ref_cast %x
-  //
-  // NOTE: When we have an owned value, we only perform this optimization if we
-  // can remove both the open_existential_ref and the init_existential_ref.
-  if (auto *oer = dyn_cast<OpenExistentialRefInst>(urci->getOperand())) {
-    if (auto *ier = dyn_cast<InitExistentialRefInst>(oer->getOperand())) {
-      if (ier->getForwardingOwnershipKind() != OwnershipKind::Owned) {
-        return Builder.createUncheckedRefCast(urci->getLoc(), ier->getOperand(),
-                                              urci->getType());
-      }
-
-      SingleBlockOwnedForwardingInstFolder folder(*this, urci);
-      if (folder.add(oer) && folder.add(ier)) {
-        auto *newValue = Builder.createUncheckedRefCast(
-            urci->getLoc(), ier->getOperand(), urci->getType());
-        return std::move(folder).optimizeWithReplacement(newValue);
-      }
-    }
-  }
-
   return nullptr;
 }
 
@@ -320,6 +284,8 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
   if (!isa<UncheckedRefCastInst>(op) && !isa<UpcastInst>(op))
     return nullptr;
   if (!op->hasOneUse())
+    return nullptr;
+  if (op->getOwnershipKind() != OwnershipKind::Owned)
     return nullptr;
 
   SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);

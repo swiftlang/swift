@@ -31,8 +31,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 
@@ -299,11 +297,9 @@ static ValueDecl *deriveDifferentiable_method(
   auto &C = derived.Context;
   auto *parentDC = derived.getConformanceContext();
 
-  auto *param = new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentName,
-                                  SourceLoc(), parameterName, parentDC);
-  param->setSpecifier(ParamDecl::Specifier::Default);
-  param->setInterfaceType(parameterType);
-  param->setImplicit();
+  auto *param = ParamDecl::createImplicit(
+      C, argumentName, parameterName, parameterType, parentDC,
+      ParamDecl::Specifier::Default);
   ParameterList *params = ParameterList::create(C, {param});
 
   DeclName declName(C, methodName, params);
@@ -394,7 +390,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       new (C) StructDecl(synthesizedLoc, C.Id_TangentVector, synthesizedLoc,
                          /*Inherited*/ C.AllocateCopy(tvDesiredProtoInherited),
                          /*GenericParams*/ {}, parentDC);
-  structDecl->setBraces({synthesizedLoc, synthesizedLoc});
   structDecl->setImplicit();
   structDecl->setSynthesized();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);

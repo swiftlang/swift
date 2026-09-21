@@ -3,7 +3,6 @@
 
 // RUN: %target-swift-frontend %t/Main.swift -g -target %target-cpu-apple-macos14 -import-bridging-header %t/BridgingHeader.h -enable-experimental-feature Embedded -wmo -emit-ir -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib

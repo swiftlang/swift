@@ -1,0 +1,239 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// A dynamically self-resizing, heap allocated, noncopyable array of
+/// potentially noncopyable elements.
+///
+/// `UniqueArray` instances automatically resize their underlying storage as
+/// needed to accommodate newly inserted items, using a geometric growth curve.
+/// This lets code using `UniqueArray` avoid having to allocate enough
+/// capacity in advance; on the other hand, it makes it difficult to tell
+/// when and where such reallocations may happen.
+///
+/// For example, appending an element to a `UniqueArray` has highly variable
+/// complexity; often, it runs at a constant cost, but if the operation has to
+/// resize storage, then the cost of an individual append suddenly becomes
+/// proportional to the size of the whole array.
+///
+/// The geometric growth curve allows the cost of such latency spikes to
+/// get amortized across repeated invocations, bringing the average cost back
+/// to O(1); but the spikes make this construct less suitable for use cases that
+/// expect predictable, consistent performance on every operation.
+///
+/// For copyable elements, the copy-on-write `Array` type is still a more
+/// convenient and expressive choice.
+@available(SwiftStdlib 6.4, *)
+@frozen
+public struct UniqueArray<Element: ~Copyable>: ~Copyable {
+  @usableFromInline
+  internal var _storage: _RigidArray<Element>
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray: Sendable where Element: Sendable & ~Copyable {}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray where Element: ~Copyable {
+  /// The maximum number of elements this array can hold without having to
+  /// reallocate its storage.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_transparent
+  public var capacity: Int {
+    _assumeNonNegative(_storage.capacity)
+  }
+
+  /// The number of additional elements that can be added to this array without
+  /// reallocating its storage.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_transparent
+  public var freeCapacity: Int {
+    _assumeNonNegative(_storage.capacity &- _storage.count)
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray where Element: ~Copyable {
+  /// A span over the elements of this array, providing direct read-only access.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  public var span: Span<Element> {
+    @_lifetime(borrow self)
+    @_transparent
+    get {
+      _storage.span
+    }
+  }
+
+  /// A mutable span over the elements of this array, providing direct
+  /// mutating access.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  public var mutableSpan: MutableSpan<Element> {
+    @_lifetime(&self)
+    @_transparent
+    mutating get {
+      _storage.mutableSpan
+    }
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray where Element: ~Copyable {
+  /// Arbitrarily edit the storage underlying this array by invoking a
+  /// user-supplied closure with a mutable `OutputSpan` view over it.
+  /// This method calls its function argument at most once, allowing it to
+  /// arbitrarily modify the contents of the output span it is given.
+  /// The argument is free to add, remove or reorder any items; however,
+  /// it is not allowed to replace the span or change its capacity.
+  ///
+  /// When the function argument finishes (whether by returning or throwing an
+  /// error) the rigid array instance is updated to match the final contents of
+  /// the output span.
+  ///
+  /// - Parameter body: A function that edits the contents of this array through
+  ///    an `OutputSpan` argument. This method invokes this function
+  ///    at most once.
+  /// - Returns: This method returns the result of its function argument.
+  /// - Complexity: Adds O(1) overhead to the complexity of the function
+  ///    argument.
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_transparent
+  public mutating func edit<E: Error, R: ~Copyable>(
+    _ body: (inout OutputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    try _storage.edit(body)
+  }
+}
+
+@export(implementation)
+@_transparent
+internal func _growUniqueArrayCapacity(_ capacity: Int) -> Int {
+  // A growth factor of 1.5 seems like a reasonable compromise between
+  // over-allocating memory and wasting cycles on repeatedly resizing storage.
+  let c = (3 &* UInt(bitPattern: capacity) &+ 1) / 2
+  return Int(bitPattern: c)
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray where Element: ~Copyable {
+  /// Grow or shrink the capacity of a unique array instance without discarding
+  /// its contents.
+  ///
+  /// This operation replaces the array's storage buffer with a newly allocated
+  /// buffer of the specified capacity, moving all existing elements
+  /// to its new storage. The old storage is then deallocated.
+  ///
+  /// - Parameter capacity: The desired new capacity. `newCapacity` must be
+  ///    greater than or equal to the current count.
+  ///
+  /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  public mutating func setCapacity(_ newCapacity: Int) {
+    _storage.setCapacity(newCapacity)
+  }
+
+  /// Ensure that the array has capacity to store the specified number of
+  /// elements, by growing its storage buffer if necessary.
+  ///
+  /// If `capacity < n`, then this operation reallocates the unique array's
+  /// storage to grow it; on return, the array's capacity becomes `n`.
+  /// Otherwise the array is left as is.
+  ///
+  /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  public mutating func reserveCapacity(_ n: Int) {
+    _storage.reserveCapacity(n)
+  }
+
+  @export(implementation)
+  @_transparent
+  internal mutating func _ensureFreeCapacity(_ freeCapacity: Int) {
+    guard _storage.freeCapacity < freeCapacity else { return }
+    _ensureFreeCapacitySlow(freeCapacity)
+  }
+
+  @export(implementation)
+  @_transparent
+  internal func _grow(freeCapacity: Int) -> Int {
+    Swift.max(
+      count &+ freeCapacity,
+      _growUniqueArrayCapacity(capacity))
+  }
+
+  @export(implementation)
+  internal mutating func _ensureFreeCapacitySlow(_ freeCapacity: Int) {
+    let newCapacity = _grow(freeCapacity: freeCapacity)
+    setCapacity(newCapacity)
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray {
+  /// Copy the contents of this array into a newly allocated unique array
+  /// instance with just enough capacity to hold all its elements.
+  ///
+  /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  public func clone() -> Self {
+    UniqueArray(consuming: _storage.clone())
+  }
+  
+  /// Copy the contents of this array into a newly allocated unique array
+  /// instance with the specified capacity.
+  ///
+  /// - Parameter capacity: The desired capacity of the resulting unique array.
+  ///    `capacity` must be greater than or equal to `count`.
+  ///
+  /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  public func clone(capacity: Int) -> Self {
+    UniqueArray(consuming: _storage.clone(capacity: capacity))
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray: Iterable where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
+
+  @available(SwiftStdlib 6.4, *)
+  public typealias Failure = Never
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_transparent
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(borrow self)
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    Span.BorrowingIterator(self.span)
+  }
+}

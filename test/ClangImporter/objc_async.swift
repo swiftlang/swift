@@ -6,7 +6,6 @@
 
 import Foundation
 import ObjCConcurrency
-// expected-warning@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 @available(SwiftStdlib 5.5, *)
 @MainActor func onlyOnMainActor() { }
@@ -369,7 +368,6 @@ func testSender(
   sender.sendGeneric(sendableGeneric) // no warning
 
   sender.sendGeneric(nonSendableGeneric)
-  // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
 
   sender.sendPtr(ptr)
   sender.sendStringArray(stringArray)

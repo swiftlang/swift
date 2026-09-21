@@ -729,3 +729,20 @@ _ = {
     1
   }
 }
+
+func testTuplePattern(_ cond: Bool, x: Int, y: Int?) {
+  let _ = if cond { (x, x) } else { (y, y) }
+  let _ = if cond { (y, y) } else { (x, x) }
+  let (_, _) = if cond { (y, y) } else { (x, x) }
+  let (a, b) = if cond { (y, y) } else { (x, x) }
+
+  // FIXME: We ought to be able to join here, the fact that the contextual type
+  // isn't a top-level type variable means we allow the inferred type to propagate
+  // across branches. We either ought to be consistently substituting fresh
+  // type variables, or unifying the behavior when there is no contextual type
+  // at all.
+  let (_, _) = if cond { (x, x) } else { (y, y) }
+  // expected-error@-1 {{cannot convert value of type '(Int?, Int?)' to specified type '(Int, Int)'}}
+  let (c, d) = if cond { (x, x) } else { (y, y) }
+  // expected-error@-1 {{cannot convert value of type '(Int?, Int?)' to specified type '(Int, Int)'}}
+}

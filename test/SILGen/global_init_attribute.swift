@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-module -o %t %S/Inputs/def_global.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-full-demangle -parse-as-library -I %t %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library -I %t %s | %FileCheck %s
 //
 // Test that SILGen uses the "global_init" attribute for all global

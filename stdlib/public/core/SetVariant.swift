@@ -111,7 +111,7 @@ extension Set._Variant {
   }
 #endif
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var convertedToNative: _NativeSet<Element> {
 #if _runtime(_ObjC)
     guard isNative else {  return _NativeSet<Element>(asCocoa) }
@@ -380,7 +380,7 @@ extension Set._Variant {
 }
 
 extension Set._Variant {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> _NativeSet<Element> {
@@ -400,7 +400,7 @@ extension Set._Variant {
     return try asNative.filter(isIncluded)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func intersection(
     _ other: Set<Element>
   ) -> _NativeSet<Element> {

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 class Foo {
@@ -67,7 +68,9 @@ struct Box<T> {
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: dealloc_stack [[RESULT]] : $*Optional<T>
 // CHECK-NEXT: copy_addr [[SELF_ADDR]] to [init] %0 : $*Box<T>
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_addr %1 : $*T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[UNINIT_SELF_BOX_LIFETIME]]
 // CHECK-NEXT: destroy_value [[UNINIT_SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()

@@ -27,10 +27,10 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
-  AvailabilityConstraint.cpp
   AvailabilityContext.cpp
   AvailabilityDomain.cpp
   AvailabilityQuery.cpp
+  AvailabilityRestriction.cpp
   AvailabilityScope.cpp
   AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
@@ -69,6 +69,7 @@ add_swift_host_library(swiftAST STATIC
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
+  HiddenTypeLayout.cpp
   Identifier.cpp
   ImportCache.cpp
   IndexSubset.cpp
@@ -83,6 +84,7 @@ add_swift_host_library(swiftAST STATIC
   NameLookup.cpp
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
+  Ownership.cpp
   PackConformance.cpp
   PackExpansionMatcher.cpp
   ParameterPack.cpp
@@ -130,15 +132,16 @@ add_swift_host_library(swiftAST STATIC
   StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
+  SynthesizedDeclBuilder.cpp
   Type.cpp
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp
-  TypeJoinMeet.cpp
   TypeRepr.cpp
   TypeSubstitution.cpp
   TypeWalker.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
+  Yield.cpp
 
   LLVM_LINK_COMPONENTS
   ${SWIFTAST_LLVM_LINK_COMPONENTS}

@@ -20,28 +20,28 @@ public struct _MutexHandle: ~Copyable {
   let value: _Cell<os_unfair_lock>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     value = _Cell(os_unfair_lock())
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     unsafe os_unfair_lock_lock(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     unsafe os_unfair_lock_trylock(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _unlock() {
     unsafe os_unfair_lock_unlock(value._address)

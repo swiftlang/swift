@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen -checked-async-objc-bridging=off -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -checked-async-objc-bridging=off -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-OPAQUE --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-sil -o /dev/null -sil-verify-all -enable-sil-opaque-values -checked-async-objc-bridging=off -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen -checked-async-objc-bridging=off -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ADDR --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -108,10 +111,11 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   [[CONT_OPEN_EXT:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]]
 // CHECK:   [[CONT_CAST:%.*]] = unchecked_addr_cast [[CONT_OPEN_EXT]]
 // CHECK:   [[CONT:%.*]] = load [trivial] [[CONT_CAST]]
-// CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $Int
-// CHECK:   store %1 to [trivial] [[RESULT_BUF]]
+// CHECK-ADDR:   [[RESULT_BUF:%.*]] = alloc_stack $Int
+// CHECK-ADDR:   store %1 to [trivial] [[RESULT_BUF]]
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeUnsafeContinuation
-// CHECK:   apply [[RESUME]]<Int>([[CONT]], [[RESULT_BUF]])
+// CHECK-ADDR:   apply [[RESUME]]<Int>([[CONT]], [[RESULT_BUF]])
+// CHECK-OPAQUE: apply [[RESUME]]<Int>([[CONT]], %1)
 
 // CHECK: sil{{.*}}@[[STRING_COMPLETION_THROW_BLOCK]]
 // CHECK:   [[RESUME_IN:%.*]] = copy_value %1
@@ -123,13 +127,14 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   [[ERROR_IN_B:%.*]] = begin_borrow [[ERROR_IN]]
 // CHECK:   switch_enum [[ERROR_IN_B]] : {{.*}}, case #Optional.some!enumelt: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[RESUME_BB:bb[0-9]+]]
 // CHECK: [[RESUME_BB]]:
-// CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $String
+// CHECK-ADDR:   [[RESULT_BUF:%.*]] = alloc_stack $String
 // CHECK:   [[RESUME_CP:%.*]] = copy_value [[RESUME_IN]]
 // CHECK:   [[BRIDGE:%.*]] = function_ref @{{.*}}unconditionallyBridgeFromObjectiveC
 // CHECK:   [[BRIDGED_RESULT:%.*]] = apply [[BRIDGE]]([[RESUME_CP]]
-// CHECK:   store [[BRIDGED_RESULT]] to [init] [[RESULT_BUF]]
+// CHECK-ADDR:   store [[BRIDGED_RESULT]] to [init] [[RESULT_BUF]]
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeUnsafeThrowingContinuation
-// CHECK:   apply [[RESUME]]<String>([[CONT]], [[RESULT_BUF]])
+// CHECK-ADDR:   apply [[RESUME]]<String>([[CONT]], [[RESULT_BUF]])
+// CHECK-OPAQUE: apply [[RESUME]]<String>([[CONT]], [[BRIDGED_RESULT]])
 // CHECK:   br [[END_BB:bb[0-9]+]]
 // CHECK: [[END_BB]]:
 // CHECK:   return
@@ -145,7 +150,8 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   [[CONT_OPEN:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]]
 // CHECK:   [[CONT_CAST:%.*]] = unchecked_addr_cast [[CONT_OPEN]]
 // CHECK:   [[CONT:%.*]] = load [trivial] [[CONT_CAST]]
-// CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $()
+// CHECK-ADDR:   [[RESULT_BUF:%.*]] = alloc_stack $()
+// CHECK-OPAQUE: [[RESULT_BUF:%.*]] = tuple ()
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeUnsafeContinuation
 // CHECK:   apply [[RESUME]]<()>([[CONT]], [[RESULT_BUF]])
 
@@ -174,13 +180,14 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   function_ref{{.*}}42_resumeUnsafeThrowingContinuationWithError
 
 // CHECK: sil{{.*}}@[[NSSTRING_INT_THROW_COMPLETION_BLOCK]]
-// CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $(String, Int)
-// CHECK:   [[RESULT_0_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 0
+// CHECK-ADDR:   [[RESULT_BUF:%.*]] = alloc_stack $(String, Int)
+// CHECK-ADDR:   [[RESULT_0_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 0
 // CHECK:   [[BRIDGE:%.*]] = function_ref @{{.*}}unconditionallyBridgeFromObjectiveC
 // CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE]]
-// CHECK:   store [[BRIDGED]] to [init] [[RESULT_0_BUF]]
-// CHECK:   [[RESULT_1_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 1
-// CHECK:   store %2 to [trivial] [[RESULT_1_BUF]]
+// CHECK-ADDR:   store [[BRIDGED]] to [init] [[RESULT_0_BUF]]
+// CHECK-ADDR:   [[RESULT_1_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 1
+// CHECK-ADDR:   store %2 to [trivial] [[RESULT_1_BUF]]
+// CHECK-OPAQUE: {{%.*}} = tuple ([[BRIDGED]] : $String, %2 : $Int)
 
 // CHECK-LABEL: sil {{.*}}@${{.*}}22testSlowServerFromMain
 @MainActor
@@ -253,7 +260,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 }
 
 // rdar://91502776
-// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}21checkCostcoMembershipSbyYaF : $@convention(thin) @async () -> Bool {
+// CHECK-LABEL: sil hidden [ossa] {{.*}}@$s{{.*}}21checkCostcoMembershipSbyYaF : $@convention(thin) @async () -> Bool {
 // CHECK:    bb0:
 // CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[FINAL_BUF:%.*]] = alloc_stack $Bool
@@ -294,10 +301,11 @@ func checkCostcoMembership() async -> Bool {
 }
 
 extension OptionalMemberLookups {
-  // CHECK-LABEL: sil hidden [ossa] @$s10objc_async21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF
+  // CHECK-LABEL: sil hidden [ossa] {{.*}}@$s10objc_async21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF
   // CHECK:         [[SELF:%[0-9]+]] = copy_value {{.*}} : $Self
   // CHECK:         [[METH:%[0-9]+]] = objc_method {{.*}} : $Self, #OptionalMemberLookups.generateMaybe!foreign : <Self where Self : OptionalMemberLookups> (Self) -> () async -> (), $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
-  // CHECK:         [[CONT:%.*]] = struct $UnsafeContinuation<(), Never> (%10 : $Builtin.RawUnsafeContinuation)
+  // CHECK:         [[RAW_CONT:%.*]] = get_async_continuation_addr ()
+  // CHECK:         [[CONT:%.*]] = struct $UnsafeContinuation<(), Never> ([[RAW_CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
   // CHECK:         [[PROJECTED:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage
   // CHECK:         [[PROJECTED_ANY:%.*]] = init_existential_addr [[PROJECTED]]
@@ -315,16 +323,19 @@ extension OptionalMemberLookups {
 
 
 // CHECK-LABEL: sil {{.*}} @$s10objc_async12checkHotdogsySSSgx_So8NSObjectCtYaKSo16HotdogCompetitorRzlF : $@convention(thin) @async <τ_0_0 where τ_0_0 : HotdogCompetitor> (@guaranteed τ_0_0, @guaranteed NSObject) -> (@owned Optional<String>, @error any Error) {
+// CHECK: [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK: hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
+// CHECK: [[PILE_OF_HOT_DOGS_REF:%.*]] = objc_method %0 : $τ_0_0, #HotdogCompetitor.pileOfHotdogsToEat!foreign
 // CHECK: hop_to_executor {{.*}} : $MainActor
-// CHECK: [[AUTO_REL_STR:%.*]] = apply {{.*}}<τ_0_0>({{.*}}) : $@convention(objc_method)
+// CHECK: [[AUTO_REL_STR:%.*]] = apply [[PILE_OF_HOT_DOGS_REF]]<τ_0_0>({{.*}}) : $@convention(objc_method)
 // CHECK: [[UNMANAGED_OPTIONAL:%.*]] = load [trivial] {{.*}} : $*@sil_unmanaged Optional<NSError>
 // CHECK: [[MANAGED_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_OPTIONAL]] : $@sil_unmanaged Optional<NSError> to $Optional<NSError>
 // CHECK: [[RETAINED_OPTIONAL:%.*]] = copy_value [[MANAGED_OPTIONAL]] : $Optional<NSError>
 // CHECK: [[MARKED:%.*]] = mark_dependence [[RETAINED_OPTIONAL]] : $Optional<NSError> on {{.*}} : $*Optional<NSError>
 // CHECK: assign [[MARKED]] to {{.*}} : $*Optional<NSError>
-// CHECK: destroy_value {{.*}} : $MainActor
-// CHECK: dealloc_stack {{.*}} : $*AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+// CHECK-ADDR: dealloc_stack {{.*}} : $*AutoreleasingUnsafeMutablePointer<Optional<NSError>>
 // CHECK: dealloc_stack {{.*}} : $*@sil_unmanaged Optional<NSError>
+// CHECK: destroy_value {{.*}} : $MainActor
 // CHECK: hop_to_executor {{.*}} : $Optional<any Actor>
 // CHECK: switch_enum
 func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {
@@ -338,30 +349,32 @@ extension SlowServer: @retroactive FailableFloatLoader {
     return 0
   }
 }
-// CHECK-LABEL: sil [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF : $@convention(method) @async (@guaranteed SlowServer) -> (Float, @error any Error)
+// CHECK-LABEL: sil [ossa] {{.*}}@$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF : $@convention(method) @async (@guaranteed SlowServer) -> (Float, @error any Error)
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFTo : $@convention(objc_method) (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] {{.*}}@$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFTo : $@convention(objc_method) (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> () {
 // CHECK:         function_ref @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> ()
+// CHECK-LABEL: sil shared [thunk] [ossa] {{.*}}@$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> ()
 // CHECK:         [[BLOCK:%.*]] = copy_block
 // CHECK:         [[METHOD:%.*]] = function_ref @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF :
 // CHECK:         try_apply [[METHOD]]({{%.*}}) : {{.*}}, normal bb1, error bb2
 // CHECK:       bb1([[NORMAL_RESULT:%.*]] : $Float):
-// CHECK-NEXT:    [[BORROWED_BLOCK:%.*]] = begin_borrow [[BLOCK]] :
+// CHECK-ADDR-NEXT:    [[BORROWED_BLOCK:%.*]] = begin_borrow [[BLOCK]] :
 // CHECK-NEXT:    [[NIL_NSERROR:%.*]] = enum $Optional<NSError>, #Optional.none
-// CHECK-NEXT:    apply [[BORROWED_BLOCK]]([[NORMAL_RESULT]], [[NIL_NSERROR]])
+// CHECK-ADDR-NEXT:    apply [[BORROWED_BLOCK]]([[NORMAL_RESULT]], [[NIL_NSERROR]])
+// CHECK-OPAQUE-NEXT:  apply [[BLOCK]]([[NORMAL_RESULT]], [[NIL_NSERROR]])
 // CHECK:       bb2([[ERROR_RESULT:%.*]] : @owned $any Error):
-// CHECK-NEXT:    [[BORROWED_BLOCK:%.*]] = begin_borrow [[BLOCK]] :
+// CHECK-ADDR-NEXT:    [[BORROWED_BLOCK:%.*]] = begin_borrow [[BLOCK]] :
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[CONVERT_FN:%.*]] = function_ref
 // CHECK-NEXT:    [[NSERROR:%.*]] = apply [[CONVERT_FN]]([[ERROR_RESULT]])
 // CHECK-NEXT:    [[SOME_NSERROR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt, [[NSERROR]] : $NSError
 // CHECK-NEXT:    [[ZERO_FLOAT:%.*]] = builtin "zeroInitializer"() : $Float
-// CHECK-NEXT:    [[BORROWED_SOME_NSERROR:%.*]] = begin_borrow [[SOME_NSERROR]] :
-// CHECK-NEXT:    apply [[BORROWED_BLOCK]]([[ZERO_FLOAT]], [[BORROWED_SOME_NSERROR]])
+// CHECK-ADDR-NEXT:    [[BORROWED_SOME_NSERROR:%.*]] = begin_borrow [[SOME_NSERROR]] :
+// CHECK-ADDR-NEXT:    apply [[BORROWED_BLOCK]]([[ZERO_FLOAT]], [[BORROWED_SOME_NSERROR]])
+// CHECK-OPAQUE-NEXT:  apply [[BLOCK]]([[ZERO_FLOAT]], [[SOME_NSERROR]])
 
-// CHECK-LABEL: sil hidden [ossa] @$s10objc_async13testAnyObjectyySo10SlowServerCYaF : $@convention(thin) @async (@guaranteed SlowServer) -> () {
+// CHECK-LABEL: sil hidden [ossa] {{.*}}@$s10objc_async13testAnyObjectyySo10SlowServerCYaF : $@convention(thin) @async (@guaranteed SlowServer) -> () {
 // CHECK: bb0([[SLOWSERVER:%.*]] : @guaranteed $SlowServer):
 // CHECK: [[SLOWSERVER_C:%.*]] = copy_value [[SLOWSERVER]]
 // CHECK: [[SLOWSERVER_ANYOBJECT:%.*]] = init_existential_ref [[SLOWSERVER_C]]
@@ -370,7 +383,7 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B:%.*]] = begin_borrow [[SLOWSERVER_ANYOBJECT_M]]
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O:%.*]] = open_existential_ref [[SLOWSERVER_ANYOBJECT_M_B]]
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O_C:%.*]] = copy_value [[SLOWSERVER_ANYOBJECT_M_B_O]]
-// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) @Sendable () -> (), @opened("{{.*}}", AnyObject) Self) -> ()
+// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened({{.*}}, AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) @Sendable () -> (), @opened({{.*}}, AnyObject) Self) -> ()
 // CHECK: [[CONT:%.*]] = get_async_continuation_addr ()
 // CHECK: [[UNSAFE_CONT:%.*]] = struct $UnsafeContinuation<(), Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
 // CHECK: [[BLOCK:%.*]] = alloc_stack $@block_storage Any
@@ -380,7 +393,7 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK: merge_isolation_region [[BLOCK]] : $*@block_storage Any,
 // CHECK: [[CONT_HANDLER:%.*]] = function_ref @$sIeyBh_ytTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
 // CHECK: [[INIT_BLOCK_STORAGE_HEADER:%.*]] = init_block_storage_header [[BLOCK]] : $*@block_storage Any, invoke [[CONT_HANDLER]]
-// CHECK: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, [[BLOCK]]
+// CHECK: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened({{.*}}, AnyObject) Self, [[BLOCK]]
 // CHECK: apply [[METHOD]]({{%.*}}, [[INIT_BLOCK_STORAGE_HEADER]], [[SLOWSERVER_ANYOBJECT_M_B_O_C]])
 // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume bb1
 // CHECK: } // end sil function '$s10objc_async13testAnyObjectyySo10SlowServerCYaF'

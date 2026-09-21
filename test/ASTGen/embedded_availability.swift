@@ -1,25 +1,24 @@
 // **Copied from test/embedded/availability.swift**
 // RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature ParserASTGen
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_ParserASTGen
 
 @_unavailableInEmbedded
 public struct UnavailableInEmbedded {}
-// expected-note@-1 {{'UnavailableInEmbedded' has been explicitly marked unavailable here}}
+// expected-note@-2 {{'UnavailableInEmbedded' has been explicitly marked unavailable here}}
 
 @available(*, unavailable, message: "always unavailable")
 public struct UniverallyUnavailable {}
-// expected-note@-1 3 {{'UniverallyUnavailable' has been explicitly marked unavailable here}}
+// expected-note@-2 3 {{'UniverallyUnavailable' has been explicitly marked unavailable here}}
 
 @_unavailableInEmbedded
 public func unavailable_in_embedded() { }
-// expected-note@-1 {{'unavailable_in_embedded()' has been explicitly marked unavailable here}}
+// expected-note@-2 {{'unavailable_in_embedded()' has been explicitly marked unavailable here}}
 
 @available(*, unavailable, message: "always unavailable")
 public func universally_unavailable() { }
-// expected-note@-1 4 {{'universally_unavailable()' has been explicitly marked unavailable here}}
+// expected-note@-2 4 {{'universally_unavailable()' has been explicitly marked unavailable here}}
 
 @_unavailableInEmbedded
 public func unused() { } // no error
@@ -39,9 +38,9 @@ public func has_universally_unavailable_overload(_ s2: S2) { }
 
 public struct Available {}
 
-@_unavailableInEmbedded
+@_unavailableInEmbedded // expected-note {{'unavailable_in_embedded_method' has been explicitly marked unavailable here}}
 extension Available {
-  public func unavailable_in_embedded_method( // expected-note {{'unavailable_in_embedded_method' has been explicitly marked unavailable here}}
+  public func unavailable_in_embedded_method(
     _ uie: UnavailableInEmbedded,
     _ uu: UniverallyUnavailable, // expected-error {{'UniverallyUnavailable' is unavailable: always unavailable}}
     _ a: Available,

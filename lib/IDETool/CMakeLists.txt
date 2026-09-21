@@ -13,6 +13,7 @@ target_link_libraries(swiftIDETool PRIVATE
   swiftFrontend
   swiftFrontendTool
   clangAST
+  clangDriver
   clangFrontend)
 
 set_swift_llvm_is_available(swiftIDETool)

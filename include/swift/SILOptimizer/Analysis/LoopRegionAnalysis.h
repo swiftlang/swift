@@ -118,7 +118,6 @@
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/Basic/BlotSetVector.h"
-#include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"

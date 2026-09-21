@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -enable-callee-allocated-coro-abi -enable-library-evolution -enable-experimental-feature BuiltinModule -enable-experimental-feature CoroutineAccessors
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
 // RUN:     -enable-callee-allocated-coro-abi               \
@@ -15,6 +16,12 @@
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_BuiltinModule
+
+// This test is about the default-override forwarding thunks that bridge the
+// old and new coroutine-accessor ABIs across a resilience boundary for `open`
+// members; that bridge only exists where the old ABI is emitted at all, which
+// only happens on an ABI-stable platform.
+// REQUIRES: swift_stable_abi
 
 import Builtin
 
@@ -38,7 +45,7 @@ open class OpenBase<T> {
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[ORIGINAL:%[^,]+]] = class_method [[SELF]], #OpenBase.openField!read
-// CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
+// CHECK-SAME:        <T> (OpenBase<T>) -> @yield_once () yields (T) -> ()
 // CHECK-SAME:        $@yield_once @convention(method) <τ_0_0> (@guaranteed OpenBase<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:         ([[ADDR:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[ORIGINAL]]<τ_0_0>([[SELF]])
 // CHECK:         yield [[ADDR]]
@@ -69,7 +76,7 @@ open class OpenBase<T> {
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[ORIGINAL:%[^,]+]] = class_method [[SELF]], #OpenBase.openField!modify
-// CHECK:             <T> (OpenBase<T>) -> () -> ()
+// CHECK:             <T> (OpenBase<T>) -> @yield_once () yields (inout T) -> ()
 // CHECK:             $@yield_once @convention(method) <τ_0_0> (@guaranteed OpenBase<τ_0_0>) -> @yields @inout τ_0_0
 // CHECK:         ([[ADDR:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[ORIGINAL]]<τ_0_0>([[SELF]])
 // CHECK:         yield [[ADDR]]
@@ -107,7 +114,7 @@ open class OpenBase<T> {
 // CHECK-SAME:  ):
 // CHECK:         [[ORIGINAL:%[^,]+]] = class_method [[SELF]]
 // CHECK:             #OpenBase.subscript!read
-// CHECK:             <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
+// CHECK:             <T><U> (OpenBase<T>) -> @yield_once (U, Open.Type) yields (T) -> ()
 // CHECK:             $@yield_once @convention(method) <τ_0_0><τ_1_0> (@in_guaranteed τ_1_0, @thin Open.Type, @guaranteed OpenBase<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:         ([[ADDR:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[ORIGINAL]]<τ_0_0, τ_1_0>([[KEY]], [[OPEN_TY]], [[SELF]])
 // CHECK:         yield [[ADDR]]
@@ -143,7 +150,7 @@ open class OpenBase<T> {
 // CHECK-SAME:  ):
 // CHECK:         [[ORIGINAL:%[^,]+]] = class_method [[SELF]]
 // CHECK-SAME:        #OpenBase.subscript!modify
-// CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
+// CHECK-SAME:        <T><U> (OpenBase<T>) -> @yield_once (U, Open.Type) yields (inout T) -> ()
 // CHECK-SAME:        $@yield_once @convention(method) <τ_0_0><τ_1_0> (@in_guaranteed τ_1_0, @thin Open.Type, @guaranteed OpenBase<τ_0_0>) -> @yields @inout τ_0_0
 // CHECK:         ([[ADDR:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[ORIGINAL]]<τ_0_0, τ_1_0>([[KEY]], [[OPEN_TY]], [[SELF]])
 // CHECK:         yield [[ADDR]]
@@ -300,24 +307,24 @@ class InternalBase<T> {
 // CHECK-LABEL: sil_default_override_table OpenBase {
 // CHECK-NEXT:    #OpenBase.openField!yielding_borrow
 // CHECK-SAME:        #OpenBase.openField!read
-// CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
+// CHECK-SAME:        <T> (OpenBase<T>) -> @yield_once () yields (T) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseC9openFieldxvyTwd
 // CHECK-NEXT:    #OpenBase.openField!yielding_mutate
 // CHECK-SAME:        #OpenBase.openField!modify
-// CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
+// CHECK-SAME:        <T> (OpenBase<T>) -> @yield_once () yields (inout T) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseC9openFieldxvxTwd
 // CHECK-NEXT:    #OpenBase.subscript!yielding_borrow
 // CHECK-SAME:        #OpenBase.subscript!read
-// CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
+// CHECK-SAME:        <T><U> (OpenBase<T>) -> @yield_once (U, Open.Type) yields (T) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluiyTwd
 // CHECK-NEXT:    #OpenBase.subscript!yielding_mutate
 // CHECK-SAME:        #OpenBase.subscript!modify
-// CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
+// CHECK-SAME:        <T><U> (OpenBase<T>) -> @yield_once (U, Open.Type) yields (inout T) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd
 // CHECK-NOT:     #OpenBase.publicField!yielding_borrow
 // CHECK-NOT:     #OpenBase.publicField!yielding_mutate
-// CHECK-NOT:     #OpenBase.subscript!yielding_borrow: #OpenBase.subscript!read: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
-// CHECK-NOT:     #OpenBase.subscript!yielding_mutate: #OpenBase.subscript!modify: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
+// CHECK-NOT:     #OpenBase.subscript!yielding_borrow: #OpenBase.subscript!read: <T><U> (OpenBase<T>) -> @yield_once (U, Public.Type) yields (T) -> ()
+// CHECK-NOT:     #OpenBase.subscript!yielding_mutate: #OpenBase.subscript!modify: <T><U> (OpenBase<T>) -> @yield_once (U, Public.Type) yields (inout T) -> ()
 // CHECK-NEXT:  }
 
 // CHECK-NOT: sil_default_override_table PublicBase {

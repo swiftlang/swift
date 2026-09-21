@@ -19,6 +19,11 @@ extension ApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
     if context.tryOptimizeKeypath(apply: self) {
+      for arg in arguments {
+        if let keypath = arg.getRootKeypath() {
+          context.notifyInstructionChanged(keypath)
+        }
+      }
       context.erase(instruction: self)
       return
     }
@@ -332,6 +337,19 @@ private extension EnumDecl {
       return true
     default:
       return false
+    }
+  }
+}
+
+private extension Value {
+  func getRootKeypath() -> KeyPathInst? {
+    switch self {
+    case let keypath as KeyPathInst:
+      return keypath
+    case is UpcastInst, is BeginBorrowInst, is MoveValueInst, is CopyValueInst:
+      return (self as! UnaryInstruction).operand.value.getRootKeypath()
+    default:
+      return nil
     }
   }
 }

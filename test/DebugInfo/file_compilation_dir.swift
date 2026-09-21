@@ -7,12 +7,14 @@
 // RUN: cd %t
 // RUN: cp %s .
 // Output paths differ in the new driver, so force SWIFT_USE_OLD_DRIVER for now.
-// RUN: env SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -g \
+// The legacy driver does not recognize the `wasm32-unknown-emscripten` triple,
+// so skip the legacy-driver RUN lines on Emscripten.
+// RUN: %if !OS=emscripten %{ env SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -g \
 // RUN:   -c -file-compilation-dir /path/to \
-// RUN:   file_compilation_dir.swift -o - -emit-ir | %FileCheck --check-prefix=CHECK-REL %s
-// RUN: env SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -g \
+// RUN:   file_compilation_dir.swift -o - -emit-ir | %FileCheck --check-prefix=CHECK-REL %s %}
+// RUN: %if !OS=emscripten %{ env SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -g \
 // RUN:   -c -file-compilation-dir . \
-// RUN:   file_compilation_dir.swift -o - -emit-ir | %FileCheck --check-prefix=CHECK-REL-CWD %s
+// RUN:   file_compilation_dir.swift -o - -emit-ir | %FileCheck --check-prefix=CHECK-REL-CWD %s %}
 
 func foo() {}
 

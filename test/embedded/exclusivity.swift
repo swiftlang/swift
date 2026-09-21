@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-ir %s -enforce-exclusivity=checked -enable-experimental-feature Embedded | %FileCheck -check-prefix STATIC-ONLY %s
 // RUN: %target-swift-frontend -parse-as-library -emit-ir %s -enable-experimental-feature Embedded | %FileCheck -check-prefix STATIC-ONLY %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDynamicExclusivity
 

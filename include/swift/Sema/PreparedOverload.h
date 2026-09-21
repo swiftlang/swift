@@ -138,7 +138,7 @@ struct PreparedOverloadChange {
     /// For ChangeKind::Fix.
     struct {
       ConstraintFix *TheFix;
-      unsigned Impact;
+      FixImpact Impact;
     } Fix;
 
     /// For ChangeKind::RecordedNodeType.
@@ -263,7 +263,7 @@ struct PreparedOverloadBuilder {
     Changes.push_back(change);
   }
 
-  void addedFix(ConstraintFix *fix, unsigned impact) {
+  void addedFix(ConstraintFix *fix, FixImpact impact) {
     PreparedOverload::Change change;
     change.Kind = PreparedOverload::Change::AddedFix;
     change.Fix.TheFix = fix;

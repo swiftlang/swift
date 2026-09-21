@@ -24,9 +24,7 @@
 #include "SemanticARCOptVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
-#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
@@ -198,8 +196,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // block.
   {
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areWithinExtendedScope(lr.getAllConsumingInsts(),
-                                                     nullptr);
+          return !borrowScope.areWithinExtendedScope(lr.getAllConsumingInsts());
         })) {
       LLVM_DEBUG(llvm::dbgs() << "copy_value is extending borrow introducer "
                                  "lifetime, bailing out\n");
@@ -240,8 +237,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areWithinExtendedScope(
-                phiArgLR.getAllConsumingInsts(), nullptr);
+            return !borrowScope.areWithinExtendedScope(phiArgLR.getAllConsumingInsts());
           })) {
         return false;
       }
@@ -768,7 +764,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // parent owned value's lifetime.
   // Note: we cannot optimistically ignore DeadEndBlocks - unlike for ownership
   //       verification.
-  LinearLifetimeChecker checker(nullptr, /*instIndices=*/ nullptr);
+  LinearLifetimeChecker checker(nullptr);
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

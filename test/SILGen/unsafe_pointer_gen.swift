@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -parse-as-library %s | %FileCheck %s
 
 // Test the absence of a 'strict' flag.

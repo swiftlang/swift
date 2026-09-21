@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault %s | %FileCheck %s
 
 // REQUIRES: concurrency

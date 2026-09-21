@@ -1,16 +1,16 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=ImportAsMember -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK:      extension MyNS.NestedStruct {
-// CHECK-NEXT:   func method() -> Int32
-// CHECK-NEXT:   func methodConstRef() -> Int32
-// CHECK-NEXT:   func methodInline() -> Int32
-// CHECK-NEXT:   func nestedMethod() -> Int32
-// CHECK-NEXT:   func nestedMethodInline() -> Int32
+// CHECK-NEXT:   func method() -> CInt
+// CHECK-NEXT:   func methodConstRef() -> CInt
+// CHECK-NEXT:   func methodInline() -> CInt
+// CHECK-NEXT:   func nestedMethod() -> CInt
+// CHECK-NEXT:   func nestedMethodInline() -> CInt
 // CHECK-NEXT: }
 
 // CHECK:      extension MyNS.MyDeepNS.DeepNestedStruct {
-// CHECK-NEXT:   func method() -> Int32
-// CHECK-NEXT:   func methodConstRef() -> Int32
-// CHECK-NEXT:   func methodTypedef() -> Int32
-// CHECK-NEXT:   func methodTypedefQualName() -> Int32
+// CHECK-NEXT:   func method() -> CInt
+// CHECK-NEXT:   func methodConstRef() -> CInt
+// CHECK-NEXT:   func methodTypedef() -> CInt
+// CHECK-NEXT:   func methodTypedefQualName() -> CInt
 // CHECK-NEXT: }

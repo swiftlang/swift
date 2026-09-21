@@ -70,11 +70,17 @@ public enum _SwiftifyInfo {
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
+/// Parameter nullableAsEmptySpan: when `true`, a `_Nullable` pointer annotated with
+/// `countedBy`/`sizedBy` is exposed as a non-Optional `Span`/`UnsafeBufferPointer` in the
+/// wrapper, with a runtime assertion that a returned null pointer only occurs when the count is
+/// 0. When `false`, the wrapper instead exposes `Span?`/`UnsafeBufferPointer?`, preserving source
+/// stability for projects that adopted the original `SafeInteropWrappers` experimental feature.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
-                             typeMappings: [String: String] = [:]) =
+                             typeMappings: [String: String] = [:],
+                             nullableAsEmptySpan: Bool = false) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
@@ -109,7 +115,7 @@ public enum _SwiftifyProtocolMethodInfo {
 /// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(borrow source)
 public func _swiftifyOverrideLifetime<
@@ -129,7 +135,7 @@ public func _swiftifyOverrideLifetime<
 /// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(copy source)
 public func _swiftifyOverrideLifetime<

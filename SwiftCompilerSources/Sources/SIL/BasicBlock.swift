@@ -71,10 +71,34 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
   }
 
   public func insertPhiArgument(
-    atPosition: Int, type: Type, ownership: Ownership, _ context: some MutatingContext
+    atPosition: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil, _ context: some MutatingContext
   ) -> Argument {
     context.notifyInstructionsChanged()
-    return bridged.insertPhiArgument(atPosition, type.bridged, ownership._bridged).argument
+    return bridged.insertPhiArgument(atPosition, type.bridged, ownership._bridged,
+                                     (decl as Decl?).bridged).argument
+  }
+
+  /// Replaces the type of the phi argument at `index` with `type`, rewiring all of its uses
+  /// to the new argument. The argument must not be in the entry block.
+  public func replacePhiArgumentAndReplaceAllUses(
+    at index: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil,
+    _ context: some MutatingContext
+  ) -> Argument {
+    let oldArgument = arguments[index]
+    let uses = Array(oldArgument.uses)
+    // `eraseArgument` requires the argument to have no uses. Redirect them to a
+    // placeholder of the new type first, then retarget them to the new argument
+    // once it exists.
+    let undef = Undef.get(type: type, context)
+    for use in uses {
+      use.set(to: undef, context)
+    }
+    eraseArgument(at: index, context)
+    let newArgument = insertPhiArgument(atPosition: index, type: type, ownership: ownership, decl: decl, context)
+    for use in uses {
+      use.set(to: newArgument, context)
+    }
+    return newArgument
   }
 
   public func eraseArgument(at index: Int, _ context: some MutatingContext) {
@@ -115,6 +139,10 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     context.notifyInstructionsChanged()
     context.notifyBranchesChanged()
     bridged.moveAllInstructionsToEnd(otherBlock.bridged)
+  }
+
+  func recomputeInstructionIndices() {
+    bridged.recomputeInstructionIndices()
   }
 
   //===----------------------------------------------------------------------===//
@@ -435,6 +463,86 @@ private func deleteUser(of value: Value, at deleteIndex: Int, _ context: TestCon
       context.erase(instruction: use.instruction)
     } else {
       print("use: \(use)")
+    }
+  }
+}
+
+/// Tests instruction indices.
+///
+/// Like with the other tests, instruction modifications are triggered by `string_literal`
+/// instructions with known "commands".
+///
+let instructionIndexTest = Test("instruction_index") { function, arguments, context in
+  for block in function.blocks {
+    block.recomputeInstructionIndices()
+  }
+
+  for block in function.blocks {
+    for inst in block.instructions {
+      guard let sl = inst as? StringLiteralInst else {
+        continue
+      }
+      let action = sl.value
+      switch action {
+      case "delete":
+        context.erase(instruction: sl)
+      case "replace_terminator":
+        context.erase(instruction: block.terminator)
+        let builder = Builder.init(atEndOf: block, location: sl.location, context)
+        builder.createUnreachable()
+      case "move_before_previous":
+        sl.move(before: sl.previous!, context)
+      case "move_to_previous_block":
+        sl.move(before: block.previous!.instructions.first!, context)
+      case "merge_with_next":
+        let nextBlock = block.next!
+        context.erase(instruction: block.terminator)
+        nextBlock.moveAllInstructions(toEndOf: block, context)
+      case "merge_with_previous":
+        let prevBlock = block.previous!
+        context.erase(instruction: prevBlock.terminator)
+        prevBlock.moveAllInstructions(toBeginOf: block, context)
+      case "renumber":
+        block.recomputeInstructionIndices()
+      default:
+        if action.startsWith("insert ") {
+          let n = Int(action.string.dropFirst(7))!
+          let builder = Builder.init(before: sl, context)
+          let type = context.getBuiltinIntegerType(bitWidth: 64)
+          for i in 0..<n {
+            _ = builder.createIntegerLiteral(i, type: type)
+          }
+        } else if action.startsWith("insert_reverse ") {
+          let n = Int(action.string.dropFirst(15))!
+          let type = context.getBuiltinIntegerType(bitWidth: 64)
+          var insertionPoint = inst
+          for i in 0..<n {
+            let builder = Builder.init(before: insertionPoint, context)
+            insertionPoint = builder.createIntegerLiteral(i, type: type)
+          }
+        }
+      }
+    }
+  }
+
+  for block in function.blocks {
+    if block.instructions.isEmpty {
+      context.erase(block: block)
+    }
+  }
+
+  let numInstructions = function.getInstructionCount()
+
+  for (i, inst) in function.instructions.enumerated() {
+    // Avoid printing too much SIL
+    if i < 100 || i > numInstructions-100 {
+      if let idx = inst.rawIndexInBlock {
+        print("#\(idx): \(inst)")
+      } else {
+        print("-: \(inst)")
+      }
+    } else if (i == 100) {
+      print("...")
     }
   }
 }

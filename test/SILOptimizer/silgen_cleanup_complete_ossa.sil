@@ -89,8 +89,8 @@ bb5:
 // CHECK-LABEL: } // end sil function 'testExistentialLifetime'
 sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
 bb0(%0 : @owned $any P):
-  %1 = open_existential_ref %0 : $any P to $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self
-  %2 = init_existential_ref %1 : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self, $AnyObject
+  %1 = open_existential_ref %0 : $any P to $@opened(1, any P) Self
+  %2 = init_existential_ref %1 : $@opened(1, any P) Self : $@opened(1, any P) Self, $AnyObject
   return %2 : $AnyObject
 }
 

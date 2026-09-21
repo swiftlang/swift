@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name X %s | %FileCheck %s
 
 // Exercises a SILGen code path that would trigger an assertion when emitting

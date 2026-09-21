@@ -9,8 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
+// The emission of runtime metadata for inverted requirements needs a 5.8+
+// target, so build the test targeting 5.8 and only run it against a 5.8+
+// runtime.
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes -Xfrontend -enable-sil-opaque-values)
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_Lifetimes
 
 import StdlibUnittest
@@ -87,7 +92,7 @@ NoncopyableHashableTests.test("hashing noncopyables") {
   
 }
 
-NoncopyableHashableTests.test("hashing nonescapables") {  
+NoncopyableHashableTests.test("hashing nonescapables") {
   let nc1 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc2 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc3 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 2))

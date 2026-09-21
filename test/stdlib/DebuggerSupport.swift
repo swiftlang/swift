@@ -71,7 +71,7 @@ StringForPrintObjectTests.test("StructWithMembers") {
   expectEqual(printed, "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
 }
 
-StringForPrintObjectTests.test("StructWithMembersAndDescription") {
+StringForPrintObjectTests.test("StructWithMembersAndDescription").require(.stdlib_6_4).code {
   let printed = _stringForPrintObject(StructWithMembersAndDescription())
   expectEqual(printed, "Hello World\n")
 }

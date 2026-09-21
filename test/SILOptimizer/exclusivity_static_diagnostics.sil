@@ -1,4 +1,9 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -enforce-exclusivity=unchecked -diagnose-static-exclusivity -verify | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -enforce-exclusivity=unchecked \
+// RUN: -diagnose-static-exclusivity -verify \
+// RUN: -enable-experimental-feature Lifetimes \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage raw
 
@@ -1622,4 +1627,32 @@ bb0(%0 : $*Int):
   destroy_value %3 : $@callee_guaranteed () -> ()
   %10 = tuple ()
   return %10 : $()
+}
+
+// -----------------------------------------------------------------------------
+// rdar://181348593 (Exclusivity sub-object analysis is defeated by end_cow_mutation_addr)
+//
+// Check that the inserted end_cow_mutation_addr uses the access to the sub-object ('foo'),
+// not the access to the enclosing aggregate ('self'), so that the sub-object access does not
+// artificially overlap with an access to an unrelated sub-object ('bar').
+
+struct Agg {
+  @_hasStorage var foo: Int { get set }
+  @_hasStorage var bar: Int { get set }
+}
+
+sil hidden [ossa] @run : $@convention(method) (@inout Agg) -> () {
+bb0(%0 : $*Agg):
+  %5 = begin_access [modify] [unknown] %0 : $*Agg
+  %6 = struct_element_addr %5 : $*Agg, #Agg.foo
+
+  %12 = begin_access [read] [unknown] %0 : $*Agg
+  %13 = struct_element_addr %12, #Agg.bar
+  end_access %12
+
+  end_cow_mutation_addr %5
+  end_access %5
+
+  %37 = tuple ()
+  return %37
 }

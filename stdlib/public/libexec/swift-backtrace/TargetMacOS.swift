@@ -71,6 +71,8 @@ class Target {
 
   var task: task_t
   var images: ImageMap
+  
+  var concurrencyTaskRegistryAddr: UInt64?
 
   var threads: [TargetThread] = []
   var crashingThreadNdx: Int = -1
@@ -185,6 +187,7 @@ class Target {
     crashingThread = crashInfo.crashing_thread
     signal = crashInfo.signal
     faultAddress = crashInfo.fault_address
+    concurrencyTaskRegistryAddr = crashInfo.concurrency_task_registry_addr
 
     guard let mctx: MContext = try? reader.fetch(from: crashInfo.mctx,
                                                  as: MContext.self) else {

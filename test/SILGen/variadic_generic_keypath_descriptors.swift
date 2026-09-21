@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-library-evolution -target %target-swift-5.9-abi-triple %s
 // RUN: %target-swift-emit-silgen -enable-library-evolution -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 // rdar://problem/112474421

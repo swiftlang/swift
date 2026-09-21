@@ -32,6 +32,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
   list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
 endif()
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+
+  # We lazy link these libraries to avoid loading them unnecessarily, and upward
+  # link to indicate that this shouldn't be considered part of a dependency
+  # cycle.
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy-lswiftObjectiveC")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward-lswiftObjectiveC")
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -75,16 +89,6 @@ endif()
 
 add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
-if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
-  add_subdirectory(Cxx)
-else()
-  # SwiftCompilerSources rely on C++ interop, specifically on being able to
-  # import the C++ standard library into Swift. On Linux, this is only possible
-  # when using the modulemap that Swift provides for libstdc++. Make sure we
-  # include the libstdc++ modulemap into the build even when not building
-  # C++ interop modules.
-  add_subdirectory(Cxx/libstdcxx)
-endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
@@ -93,6 +97,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
   set(swiftDemanglingSources
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Ownership.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
@@ -101,9 +106,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
-  set(swiftDemanglingCRSources
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
-
   set(swift_demangling_cflags)
 
   if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
@@ -135,13 +137,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
       ${swift_demangling_cflags}
     C_COMPILE_FLAGS_LINUX -fno-lto
     INSTALL_IN_COMPONENT never_install)
-
-  add_swift_target_library(swiftDemanglingCR OBJECT_LIBRARY
-    ${swiftDemanglingCRSources}
-    C_COMPILE_FLAGS
-      -DswiftCore_EXPORTS
-      ${swift_demangling_cflags}
-    INSTALL_IN_COMPONENT never_install)
 endif()
 
 option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
@@ -155,6 +150,37 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
 option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
        "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
        FALSE)
+
+set(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    built using the platform abstraction layer (hooks in
+    swift/EmbeddedPlatform.h). This is the per-triple analogue of
+    SWIFT_USE_SWIFT_EMBEDDED_PLATFORM (which turns the abstraction layer on
+    for every embedded triple); the two are OR'd together, so a triple
+    uses the abstraction layer when either the global option is TRUE or the
+    regex matches.")
+
+set(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    built using the Interface code-generation model. Their libraries' object
+    files contain real code (rather than the empty/stub objects produced for
+    the default Inlinable model), and clients reference the library's strong
+    external symbols instead of re-emitting `linkonce_odr` copies. Because
+    those archives are what clients link against, they are installed into
+    lib/swift/embedded/<triple>/ alongside the swiftmodules.")
+
+set(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    compiled with LLVM LTO (-lto=<type>). This is orthogonal to
+    SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX — enabling LTO on
+    triples that still use the default (empty-object-file) code-generation
+    model is harmless but produces no meaningful bitcode; you almost always
+    want to select the same triple set for both.")
+
+set(SWIFT_EMBEDDED_LTO_TYPE "llvm-full" CACHE STRING
+    "LTO type for embedded Swift libraries selected by
+SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX. Either 'llvm-thin' or
+'llvm-full'.")
 
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
@@ -183,6 +209,7 @@ option(SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "emscripten") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
@@ -197,14 +224,28 @@ set(EMBEDDED_STDLIB_TARGET_TRIPLES)
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if(SWIFT_WASI_SYSROOT_PATH)
-    # Also include none-wasm triples, which don't require a sysroot.
-    # Skip non-Wasm targets.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "wasm32    wasm32-unknown-wasip1    wasm32-unknown-wasip1"
-      "wasm32    wasm32-unknown-none-wasm  wasm32-unknown-none-wasm"
-      "wasm64    wasm64-unknown-none-wasm  wasm64-unknown-none-wasm"
     )
-  else()
+  endif()
+
+  if(SWIFT_EMSCRIPTEN_SYSROOT_PATH)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-emscripten    wasm32-unknown-emscripten"
+    )
+  endif()
+
+  # Freestanding Wasm triples require no sysroot; they are always buildable
+  # whenever LLVM can target WebAssembly, regardless of which (if any)
+  # Wasm-hosted SDK sysroot is configured above.
+  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+    )
+  endif()
+
+  if(NOT SWIFT_WASI_SYSROOT_PATH AND NOT SWIFT_EMSCRIPTEN_SYSROOT_PATH)
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         # arch    module_name               target triple
@@ -230,6 +271,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         "armv4t   armv4t-none-none-eabi     armv4t-none-none-eabi"
+        "armv5te  armv5te-none-none-eabi    armv5te-none-none-eabi"
         "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
         "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
         "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
@@ -256,13 +298,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       )
     endif()
 
-    if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
-      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-        "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
-        "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
-      )
-    endif()
-
     if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         "avr  avr-none-none-elf    avr-none-none-elf"
@@ -271,7 +306,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   endif()
 endif()
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
+   AND NOT SWIFT_WASI_SYSROOT_PATH
+   AND NOT SWIFT_EMSCRIPTEN_SYSROOT_PATH)
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
@@ -285,6 +322,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
       "arm64    arm64-apple-macos         arm64-apple-macos14"
       "arm64e   arm64e-apple-macos        arm64e-apple-macos14"
     )
+    if(SWIFT_ENABLE_MACCATALYST)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "x86_64   x86_64-apple-ios-macabi  x86_64-apple-ios18-macabi"
+        "arm64    arm64-apple-ios-macabi   arm64-apple-ios18-macabi"
+        "arm64e   arm64e-apple-ios-macabi  arm64e-apple-ios18-macabi"
+      )
+    endif()
   elseif (SWIFT_HOST_VARIANT STREQUAL "windows")
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       # Without specifying the `windows` component LLVM refuses to
@@ -338,6 +382,8 @@ if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  get_threading_package(EMBEDDED "embedded" SWIFT_SDK_embedded_THREADING_PACKAGE)
+
   set(triples)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -347,6 +393,30 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
   message(STATUS "Building Embedded Swift standard libraries for targets: ${triples}")
   message(STATUS "")
+endif()
+
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  add_subdirectory(Cxx)
+else()
+  # SwiftCompilerSources rely on C++ interop, specifically on being able to
+  # import the C++ standard library into Swift. On Linux, this is only possible
+  # when using the modulemap that Swift provides for libstdc++. Make sure we
+  # include the libstdc++ modulemap into the build even when not building
+  # C++ interop modules.
+  add_subdirectory(Cxx/libstdcxx)
+endif()
+
+# Directory containing the freshly-built compiler plugins (SwiftMacros, etc.).
+# Stdlib modules that use a compiler-plugin macro -- e.g. `@DebugDescription`,
+# or `_SwiftifyImport` synthesized from Clang bounds-safety annotations in a
+# bridging header -- must pass this via `-plugin-path` so the compiler uses the
+# just-built plugin instead of falling back to a stale one from the host
+# toolchain. Computed once here and inherited by the stdlib subdirectories
+# below (core, EmbeddedPlatform, Synchronization, ...).
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_HOST_PLUGINS_DIR "${CMAKE_BINARY_DIR}/lib/swift/host/plugins")
+else()
+  set(SWIFT_HOST_PLUGINS_DIR "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/host/plugins")
 endif()
 
 if(SWIFT_BUILD_STDLIB)

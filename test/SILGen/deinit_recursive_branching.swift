@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // Non-linearly recursive structures should not get optimized
@@ -16,7 +17,7 @@ class Tree {
 // CHECK:   [[RIGHT:%.*]] = ref_element_addr [[SELF]] : $Tree, #Tree.right
 // CHECK:   [[RIGHT_ACCESS:%.*]] = begin_access [deinit] [static] [[RIGHT]] : $*Optional<Tree>
 // CHECK:   destroy_addr [[RIGHT_ACCESS]] : $*Optional<Tree>
-// CHECK:   end_access [[RIGHT_ACCESS]] : $*Optional<Tree>                // id: %9
+// CHECK:   end_access [[RIGHT_ACCESS]] : $*Optional<Tree>
 // CHECK:   [[SELF_NATIVE:%.*]] = unchecked_ref_cast [[SELF]] : $Tree to $Builtin.NativeObject
 // CHECK:   [[SELF_NATIVE_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_NATIVE_OWNED]] : $Builtin.NativeObject

@@ -3,8 +3,6 @@
 // Use this testfile to check if the `swift-frontend -sil-passpipeline-dumper` option works.
 // RUN: %swift_frontend_plain -sil-passpipeline-dumper -Onone | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
-
 // CHECK: ---
 // CHECK: name:            Non-Diagnostic Mandatory Optimizations
 // CHECK: passes:          [ "for-each-loop-unroll", "mandatory-arc-opts", "onone-prespecializer",
@@ -12,7 +10,8 @@
 // CHECK: ---
 // CHECK: name:            Serialization
 // CHECK: passes:          [ "serialize-sil", "sil-moved-async-var-dbginfo-propagator",
-// CHECK-NEXT:               "ownership-model-eliminator" ]
+// CHECK-NEXT:               "mandatory-temp-rvalue-elimination", "mandatory-temp-lvalue-elimination",
+// CHECK-NEXT:               "kill-invalid-debug-values", "ownership-model-eliminator" ]
 // CHECK: ---
 // CHECK: name:            Rest of Onone
 // CHECK: passes:          [ "use-prespecialized", "function-stack-protection", "late-onone-simplification",

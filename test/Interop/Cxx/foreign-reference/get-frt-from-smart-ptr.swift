@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %swift_src_root/lib/ClangImporter/SwiftBridging -I %S/Inputs -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -O) | %FileCheck %s
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -O) | %FileCheck %s
 
 // REQUIRES: executable_test
 

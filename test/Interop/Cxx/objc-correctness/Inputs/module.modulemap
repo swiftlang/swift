@@ -49,3 +49,9 @@ module CxxForeignRef {
   header "cxx-frt.h"
   requires cplusplus
 }
+
+module ObjCAsyncNonTrivialCxx {
+  header "objc-async-completion-handler-non-trivial.h"
+  requires objc
+  requires cplusplus
+}

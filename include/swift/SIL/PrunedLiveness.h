@@ -127,14 +127,12 @@
 #define SWIFT_SILOPTIMIZER_UTILS_PRUNEDLIVENESS_H
 
 #include "swift/AST/TypeExpansionContext.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -726,18 +724,16 @@ public:
   /// Pass \p deadEndBlocks when the defs' lifetime isn't known to be complete.
   /// When passed, the liveness boundary is understood to extend into dead-end
   /// regions.
-  bool isWithinBoundary(SILInstruction *inst,
-                        DeadEndBlocks *deadEndBlocks) const;
+  bool isWithinBoundary(SILInstruction *inst) const;
 
   /// Whether all \p insts are between this def and the liveness boundary;
   /// \p deadEndBlocks is optional.
   template <typename Instructions>
-  bool areWithinBoundary(Instructions insts,
-                         DeadEndBlocks *deadEndBlocks) const {
+  bool areWithinBoundary(Instructions insts) const {
     assert(asImpl().isInitialized());
 
     for (auto *inst : insts) {
-      if (!isWithinBoundary(inst, deadEndBlocks))
+      if (!isWithinBoundary(inst))
         return false;
     }
     return true;
@@ -745,14 +741,12 @@ public:
 
   /// Returns true when all \p uses are between this def and the liveness
   /// boundary \p deadEndBlocks is optional.
-  bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
-                             DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesWithinBoundary(ArrayRef<Operand *> uses) const;
 
   /// Returns true if any of the \p uses are before this def or after the
   /// liveness boundary
   /// \p deadEndBlocks is optional.
-  bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
-                              DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesOutsideBoundary(ArrayRef<Operand *> uses) const;
 
   /// Compute the boundary from the blocks discovered during liveness analysis.
   ///

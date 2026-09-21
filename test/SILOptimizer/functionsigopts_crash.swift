@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -module-name main -O -emit-sil -primary-file %s -enable-experimental-feature Lifetimes | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 protocol P {

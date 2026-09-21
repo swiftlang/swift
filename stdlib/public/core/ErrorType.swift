@@ -111,10 +111,10 @@ import SwiftShims
 ///     }
 ///     // Prints "Parsing error: mismatchedTag [19:5]"
 public protocol Error: Sendable {
-#if !$Embedded
   var _domain: String { get }
   var _code: Int { get }
 
+#if !$Embedded
   // Note: _userInfo is always an NSDictionary, but we cannot use that type here
   // because the standard library cannot depend on Foundation. However, the
   // underscore implies that we control all implementations of this requirement.
@@ -192,8 +192,7 @@ func _willThrowTypedImpl<E: Error>(_ error: E)
 ///
 /// On older platforms, the error will not be passed into the runtime, because
 /// doing so would require memory allocation (to create the 'any Error').
-@inlinable
-@_alwaysEmitIntoClient
+@export(implementation)
 @_silgen_name("swift_willThrowTyped")
 public func _willThrowTyped<E: Error>(_ error: E) {
   if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
@@ -228,8 +227,7 @@ public func _unexpectedError(
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedErrorTyped")
-@_alwaysEmitIntoClient
-@inlinable
+@export(implementation)
 public func _unexpectedErrorTyped<E: Error>(
   _ error: __owned E,
   filenameStart: Builtin.RawPointer,
@@ -258,7 +256,7 @@ public func _errorInMain(_ error: Error) {
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught, typed error.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
   #if !$Embedded
   fatalError("Error raised at top level: \(String(reflecting: error))")
@@ -272,16 +270,28 @@ public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
 @_silgen_name("_swift_stdlib_getDefaultErrorCode")
 public func _getDefaultErrorCode<T: Error>(_ error: T) -> Int
 
-#if !$Embedded
 extension Error {
   public var _code: Int {
+#if !$Embedded
     return _getDefaultErrorCode(self)
+#else
+    // _swift_stdlib_getDefaultErrorCode() looks up the enum tag of an error
+    // value (for enum types conforming to Error). If the type is not an enum,
+    // it returns 1. We don't have that type metadata under Embedded Swift, so
+    // we always return 1 here.
+    return 1
+#endif
   }
 
   public var _domain: String {
+#if !$Embedded
     return _typeName(type(of: self), qualified: true)
+#else
+    return "(unknown domain in Embedded Swift)"
+#endif
   }
 
+#if !$Embedded
   public var _userInfo: AnyObject? {
 #if _runtime(_ObjC)
     return _getErrorDefaultUserInfo(self)
@@ -289,8 +299,8 @@ extension Error {
     return nil
 #endif
   }
-}
 #endif
+}
 
 extension Error where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.

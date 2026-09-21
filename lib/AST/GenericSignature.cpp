@@ -24,9 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
-#include <functional>
 
 using namespace swift;
 
@@ -196,6 +194,23 @@ bool GenericSignatureImpl::hasParameterPack() const {
   return false;
 }
 
+bool GenericSignatureImpl::canBeEmittedInEmbeddedSwift() const {
+  for (auto param: getGenericParams()) {
+    // Ignore parameters that are mapped to concrete types.
+    if (isConcreteType(Type(param)))
+      continue;
+
+    // Class-constrained parameters are okay.
+    if (auto layout = getLayoutConstraint(Type(param)))
+      if (layout->isClass())
+        continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 ASTContext &GenericSignature::getASTContext(
                                     ArrayRef<GenericTypeParamType *> params,
                                     ArrayRef<swift::Requirement> requirements) {
@@ -270,6 +285,40 @@ CanGenericSignature::getCanonical(ArrayRef<GenericTypeParamType *> params,
                     /*isKnownCanonical=*/true);
 
   return CanGenericSignature(canSig);
+}
+
+bool GenericSignature::isABIMoreGenericThan(GenericSignature outerSig) const {
+  auto canInnerSig = getCanonicalSignature();
+  auto canOuterSig = outerSig.getCanonicalSignature();
+  if (canInnerSig == canOuterSig)
+    return false;
+
+  // The inner signature added generic parameters.
+  if (canOuterSig.getGenericParams().size() !=
+        canInnerSig.getGenericParams().size())
+    return true;
+
+  // Look at the requirements of the inner signature that aren't satisfied
+  // by the outer signature, to see if there are any requirements that aren't
+  // just marker protocols.
+  auto requirements = canInnerSig.requirementsNotSatisfiedBy(canOuterSig);
+  for (const auto &req : requirements) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      if (req.getProtocolDecl()->isMarkerProtocol())
+        continue;
+
+      return true;
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+    case RequirementKind::SameType:
+      return true;
+    }
+  }
+
+  return false;
 }
 
 CanGenericSignature GenericSignature::getCanonicalSignature() const {
@@ -1360,6 +1409,19 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses) const {
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ false);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesForPrinting(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ true);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesImpl(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses,
+    bool ForPrinting) const {
   auto &ctx = getASTContext();
 
   llvm::SmallSet<CanType, 12> seenDMTs;
@@ -1470,7 +1532,11 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
     // If the subject matches a primary associated type we identified earlier,
     // then we will infer a default for them, so drop this requirement.
-    if (seenDMTs.contains(subject->getCanonicalType()))
+    //
+    // To maintain with compatability between SE-503 and the deprecated
+    // SuppressedAssociatedTypes, we preserve these requirements when the
+    // purpose is for the ASTPrinter.
+    if (!ForPrinting && seenDMTs.contains(subject->getCanonicalType()))
       continue;
 
     // Otherwise, for a non-primary associated type, no default is inferred,

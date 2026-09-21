@@ -648,3 +648,29 @@ do {
   // SWIFT-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   foo(x)
 }
+
+do {
+  class C: Equatable {
+    static func ==(lhs: C, rhs: C) -> Bool {
+      return false
+    }
+  }
+
+  protocol P: C {}
+
+  class D: C, P {}
+
+  func f1(x: (any P)?, y: D) {
+    _ = x == y
+    _ = x != y
+    _ = x ?? nil == y
+    _ = x ?? nil != y
+  }
+
+  func f2(x: D?, y: any P) {
+    _ = x == y
+    _ = x != y
+    _ = x ?? nil == y
+    _ = x ?? nil != y
+  }
+}

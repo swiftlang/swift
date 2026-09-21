@@ -30,15 +30,29 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
-#include <functional>
 #include <memory>
+
+// std::string and std::function are not available in freestanding mode with
+// some standard library implementations (e.g. libstdc++). They're only used
+// by the demangler's hosted-only convenience API for producing/consuming
+// human-readable strings (e.g. for lldb, diagnostics), which is never needed
+// by the embedded runtime: Embedded Swift statically specializes generics and
+// has no use for a runtime name demangler.
+#if __STDC_HOSTED__
+#include <functional>
 #include <string>
+#endif
 
 namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
 enum class SymbolicReferenceKind : uint8_t;
+
+// genericParameterName and DemangleOptions are only used by the demangler's
+// hosted-only std::string-based convenience API; see the __STDC_HOSTED__
+// comment above the <string>/<functional> includes.
+#if __STDC_HOSTED__
 
 /// A simple default implementation that assigns letters to type parameters in
 /// alphabetic order.
@@ -99,6 +113,8 @@ struct DemangleOptions {
   };
 };
 
+#endif // __STDC_HOSTED__
+
 class Node;
 using NodePointer = Node *;
 class NodePrinter;
@@ -118,6 +134,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ConstantPropKeyPath = 9,
   ConstantPropStruct = 10,
   ClosurePropPreviousArg = 11,
+  EscapingClosureProp = 12,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -389,6 +406,14 @@ inline bool isMangledName(llvm::StringRef mangledName) {
   return getManglingPrefixLength(mangledName) != 0;
 }
 
+/// Returns true if \p mangledName names ASYNC_MAIN_ENTRY_POINT_NAME or one of
+/// its async funclets. Not covered by isMangledName(), which requires a prefix.
+bool isAsyncMainEntryPointSymbol(llvm::StringRef mangledName);
+
+/// Returns the length of the ASYNC_MAIN_ENTRY_POINT_NAME at the start of
+/// \p mangledName, including any Mach-O underscore, or 0 if there is none.
+int getAsyncMainEntryPointNameLength(llvm::StringRef mangledName);
+
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
 /// This includes the old (<= swift 3.x) mangling prefix "_T".
@@ -492,6 +517,10 @@ public:
   /// context or with a call of clear().
   NodePointer demangleTypeAsNode(llvm::StringRef MangledName);
 
+  // The std::string-based convenience methods below are only used by the
+  // hosted-only demangler API; see the __STDC_HOSTED__ comment above the
+  // <string>/<functional> includes.
+#if __STDC_HOSTED__
   /// Demangle the given symbol and return the readable name.
   ///
   /// \param MangledName The mangled symbol string, which start a mangling
@@ -521,6 +550,7 @@ public:
   std::string
   demangleTypeAsString(llvm::StringRef MangledName,
                        const DemangleOptions &Options = DemangleOptions());
+#endif
 
   /// Returns true if the mangledName refers to a thunk function.
   ///
@@ -528,6 +558,7 @@ public:
   /// or ObjC-as-swift thunks or allocating init functions.
   bool isThunkSymbol(llvm::StringRef MangledName);
 
+#if __STDC_HOSTED__
   /// Returns the mangled name of the target of a thunk.
   ///
   /// \returns Returns the remaining name after removing the thunk mangling
@@ -535,6 +566,7 @@ public:
   /// or the thunk target cannot be derived from the mangling, an empty string
   /// is returned.
   std::string getThunkTarget(llvm::StringRef MangledName);
+#endif
 
   /// Returns true if the \p mangledName refers to a function which conforms to
   /// the Swift calling convention.
@@ -543,6 +575,7 @@ public:
   /// function symbol.
   bool hasSwiftCallingConvention(llvm::StringRef MangledName);
 
+#if __STDC_HOSTED__
   /// Demangle the given symbol and return the module name of the symbol.
   ///
   /// \param mangledName The mangled symbol string, which start a mangling
@@ -550,6 +583,7 @@ public:
   ///
   /// \returns The module name.
   std::string getModuleName(llvm::StringRef mangledName);
+#endif
 
   /// Deallocates all nodes.
   ///
@@ -557,6 +591,11 @@ public:
   /// demangling operation.
   void clear();
 };
+
+// The standalone demangleSymbolAsString/demangleTypeAsString convenience
+// functions are only used by the hosted-only demangler API; see the
+// __STDC_HOSTED__ comment above the <string>/<functional> includes.
+#if __STDC_HOSTED__
 
 /// Standalone utility function to demangle the given symbol as string.
 ///
@@ -640,7 +679,8 @@ demangleTypeAsString(llvm::StringRef MangledName,
   return demangleTypeAsString(MangledName.data(),
                               MangledName.size(), Options);
 }
-  
+
+#endif // __STDC_HOSTED__
 
 enum class OperatorKind {
   NotOperator,
@@ -720,18 +760,30 @@ public:
 };
 
 /// Remangle a demangled parse tree.
+///
+/// This std::string-returning overload is only used by the hosted-only
+/// demangler API; see the __STDC_HOSTED__ comment above the
+/// <string>/<functional> includes.
+#if __STDC_HOSTED__
 ManglingErrorOr<std::string>
 mangleNode(NodePointer root,
            Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
+#endif
 
 using SymbolicResolver = llvm::function_ref<Demangle::NodePointer(
     SymbolicReferenceKind, const void *)>;
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
+///
+/// This std::string-returning overload is only used by the hosted-only
+/// demangler API; see the __STDC_HOSTED__ comment above the
+/// <string>/<functional> includes.
+#if __STDC_HOSTED__
 ManglingErrorOr<std::string>
 mangleNode(NodePointer root, SymbolicResolver resolver,
            Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
+#endif
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
@@ -745,7 +797,13 @@ mangleNode(NodePointer root, SymbolicResolver resolver, NodeFactory &Factory,
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
+///
+/// This std::string-returning overload is only used by the hosted-only
+/// demangler API; see the __STDC_HOSTED__ comment above the
+/// <string>/<functional> includes.
+#if __STDC_HOSTED__
 ManglingErrorOr<std::string> mangleNodeOld(NodePointer root);
+#endif
 
 /// Remangle in the old mangling scheme.
 ///
@@ -775,6 +833,11 @@ ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
 /// demangling.
 ///
 /// \returns A string representing the demangled name.
+///
+/// nodeToString and keyPathSourceString are only used by the hosted-only
+/// demangler API; see the __STDC_HOSTED__ comment above the
+/// <string>/<functional> includes.
+#if __STDC_HOSTED__
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
 
@@ -788,7 +851,13 @@ void nodeToString(NodePointer Root, NodePrinter &Printer);
 /// into the identfier/subscript that would be used to invoke it in swift code.
 std::string keyPathSourceString(const char *MangledName,
                                 size_t MangledNameLength);
+#endif
 
+// DemanglerPrinter is built entirely around std::string, which is not
+// available in freestanding mode with some standard library implementations
+// (e.g. libstdc++); it's only used by the non-embedded compiler's demangler
+// printers (NodePrinter.cpp, NodeDumper.cpp, OldDemangler.cpp).
+#if __STDC_HOSTED__
 /// A class for printing to a std::string.
 class DemanglerPrinter {
 public:
@@ -840,6 +909,7 @@ public:
 private:
   std::string Stream;
 };
+#endif
 
 /// Returns a the node kind \p k as string.
 const char *getNodeKindString(swift::Demangle::Node::Kind k);
@@ -847,7 +917,12 @@ const char *getNodeKindString(swift::Demangle::Node::Kind k);
 /// Prints the whole node tree \p Root in readable form into a std::string.
 ///
 /// Useful for debugging.
+///
+/// Only used by the hosted-only demangler API; see the __STDC_HOSTED__
+/// comment above the <string>/<functional> includes.
+#if __STDC_HOSTED__
 std::string getNodeTreeAsString(NodePointer Root);
+#endif
 
 bool nodeConsumesGenericArgs(Node *node);
 
@@ -869,6 +944,11 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 
 /// Produce the mangled name for the nominal type descriptor of a type
 /// referenced by its module and type name.
+///
+/// mangledNameForTypeMetadataAccessor and NodePrinter are only used by the
+/// hosted-only demangler API; see the __STDC_HOSTED__ comment above the
+/// <string>/<functional> includes.
+#if __STDC_HOSTED__
 std::string mangledNameForTypeMetadataAccessor(
     llvm::StringRef moduleName, llvm::StringRef typeName, Node::Kind typeKind,
     Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
@@ -1028,6 +1108,8 @@ protected:
   void printEntityType(NodePointer Entity, NodePointer type,
                        NodePointer genericFunctionTypeList, unsigned depth);
 };
+
+#endif // __STDC_HOSTED__
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

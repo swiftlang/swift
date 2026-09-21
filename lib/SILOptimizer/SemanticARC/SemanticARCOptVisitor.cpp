@@ -18,9 +18,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SemanticARCOptVisitor.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/SIL/DebugUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -97,7 +96,7 @@ bool SemanticARCOptVisitor::processWorklist() {
       if (isInstructionTriviallyDead(defInst)) {
         assert(!ctx.assumingAtFixedPoint &&
                "Assumed was at fixed point and recomputing state?!");
-        deleteAllDebugUses(defInst);
+        deleteAllDebugUses(defInst, getCallbacks());
         eraseInstruction(defInst);
         madeChange = true;
         ctx.verify();

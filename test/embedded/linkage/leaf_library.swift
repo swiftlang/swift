@@ -15,7 +15,6 @@
 
 // RUN: %target-swift-frontend %t/Application.swift -I %t/Modules -parse-as-library -entry-point-function-name Application_main -enable-experimental-feature Embedded -emit-ir -o - | %FileCheck -check-prefix APPLICATION-IR --dump-input-filter all %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 //--- Library.swift

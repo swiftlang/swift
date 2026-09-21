@@ -32,8 +32,8 @@
 // RUN:   -emit-symbol-graph -emit-symbol-graph-dir %t/symbol-graph2 \
 // RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=CACHE-HIT
 
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test.symbols.json': key 'llvmcas://{{.*}}'
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test@A.symbols.json': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test.symbols.json': id 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test@A.symbols.json': id 'llvmcas://{{.*}}'
 
 // RUN: diff -r -u %t/symbol-graph1 %t/symbol-graph2
 

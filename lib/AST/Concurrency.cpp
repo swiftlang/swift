@@ -16,17 +16,12 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/LangOptions.h"
 
 using namespace swift;
 
 ModuleDecl *swift::moduleImportForPreconcurrency(
     NominalTypeDecl *nominal, const DeclContext *fromDC) {
-  // If the declaration itself has the @preconcurrency attribute,
-  // respect it.
-  if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-    return nominal->getParentModule();
-  }
-
   // Determine whether this nominal type is visible via a @preconcurrency
   // import.
   auto import = nominal->findImport(fromDC);
@@ -46,16 +41,31 @@ swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
                                              const DeclContext *fromDC,
                                              bool ignoreExplicitConformance) {
   ModuleDecl *importedModule = moduleImportForPreconcurrency(nominal, fromDC);
-  if (!importedModule)
+
+  // No @preconcurrency import, and the decl itself isn't preconcurrency: no
+  // limit.
+  // DISCUSSION: Check this before the conformance lookup below, which has side
+  // effects for lazy attributes like @_nonSendable. When that has been cleaned
+  // up this paranoia is no longer warranted...
+  if (!importedModule && !nominal->preconcurrency())
     return std::nullopt;
 
-  // When the type is explicitly non-Sendable, @preconcurrency imports
-  // downgrade the diagnostic to a warning in Swift 6.
+  // An explicitly non-Sendable type downgrades to a warning, whether it's a
+  // preconcurrency decl or imported. Explicit Sendable conformance warns
+  // even below complete checking.
   if (!ignoreExplicitConformance && hasExplicitSendableConformance(nominal))
     return DiagnosticBehavior::Warning;
 
-  // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
-  // diagnostics until the imported module enables Swift 6.
+  // Otherwise the type is implicitly non-Sendable. A preconcurrency decl (no
+  // import) warns only under complete checking.
+  if (!importedModule)
+    return fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
+                   StrictConcurrency::Complete
+               ? DiagnosticBehavior::Warning
+               : DiagnosticBehavior::Ignore;
+
+  // An implicitly non-Sendable type behind a @preconcurrency import is
+  // suppressed until the imported module enables Swift 6.
   return importedModule->isConcurrencyChecked() ? DiagnosticBehavior::Warning
                                                 : DiagnosticBehavior::Ignore;
 }

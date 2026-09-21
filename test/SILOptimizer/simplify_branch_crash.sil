@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-opt-pass-count=1.1 -simplification -simplify-instruction=br | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin

@@ -25,9 +25,10 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -155,7 +156,8 @@ addImplicitCodingKeys(NominalTypeDecl *target,
     InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
   ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
-  auto *enumDecl = new (C) EnumDecl(SourceLoc(), codingKeysEnumIdentifier,
+  auto anchorLoc = target->getStartLoc();
+  auto *enumDecl = new (C) EnumDecl(anchorLoc, codingKeysEnumIdentifier,
                                     SourceLoc(), inherited, nullptr, target);
   enumDecl->setImplicit();
   enumDecl->setSynthesized();
@@ -574,11 +576,9 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
                                              C.AllocateCopy(boundType));
 
   // let container : Keyed*Container<KeyType>
-  auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, introducer,
-                                        SourceLoc(), identifier, DC);
-  containerDecl->setImplicit();
-  containerDecl->setSynthesized();
-  containerDecl->setInterfaceType(containerType);
+  VarDecl *containerDecl = VarDeclBuilder(DC, identifier)
+                               .introducer(introducer)
+                               .type(containerType);
   return containerDecl;
 }
 
@@ -1563,11 +1563,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
         /*throws*/ true);
 
     // generate: var allKeys = ArraySlice(container.allKeys);
-    auto *allKeysDecl =
-        new (C) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                        SourceLoc(), C.Id_allKeys, funcDC);
-    allKeysDecl->setImplicit();
-    allKeysDecl->setSynthesized();
+    VarDecl *allKeysDecl = VarDeclBuilder(funcDC, C.Id_allKeys)
+                               .introducer(VarDecl::Introducer::Var);
     {
       auto *arraySliceRef =
           new (C) DeclRefExpr(ConcreteDeclRef(C.getArraySliceDecl()),
@@ -1594,11 +1591,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
     //            one.")
     //    throw DecodingError.typeMismatch(Foo.self, context)
     //  }
-    auto *theKeyDecl =
-        new (C) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Let,
-                        SourceLoc(), C.getIdentifier("onlyKey"), funcDC);
-    theKeyDecl->setImplicit();
-    theKeyDecl->setSynthesized();
+    VarDecl *theKeyDecl = VarDeclBuilder(funcDC, C.getIdentifier("onlyKey"))
+                              .introducer(VarDecl::Introducer::Let);
 
     SmallVector<StmtConditionElement, 2> guardElements;
     {
@@ -1814,12 +1808,9 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
 
   // Params: (Decoder)
   auto decoderType = ExistentialType::get(C.getDecoderType());
-  auto *decoderParamDecl = new (C) ParamDecl(
-      SourceLoc(), SourceLoc(), C.Id_from,
-      SourceLoc(), C.Id_decoder, conformanceDC);
-  decoderParamDecl->setImplicit();
-  decoderParamDecl->setSpecifier(ParamSpecifier::Default);
-  decoderParamDecl->setInterfaceType(decoderType);
+  ParamDecl *decoderParamDecl =
+      ParamDecl::createImplicit(C, C.Id_from, C.Id_decoder, decoderType,
+                                conformanceDC, ParamSpecifier::Default);
 
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
 

@@ -3,7 +3,6 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: rdar114110966
 
 import Foundation
 
@@ -66,5 +65,22 @@ public class InClass {
 // CHECK:  return
   public func testOptionalShortCut2() {
     t?.other?.other = v?.other?.other
+  }
+}
+
+// Regression test for rdar://177840176
+class Baz {
+    @objc dynamic func bar(_ title: String?) {}
+}
+
+class Qux {
+  var baz: Baz!
+  func foo(strings: [String]?) {
+    guard strings?.isEmpty ?? false else { return }
+    let firstString = strings?[0]
+    baz.bar(firstString)
+    baz.bar(firstString)
+
+    guard strings?.isEmpty ?? false else { return }
   }
 }

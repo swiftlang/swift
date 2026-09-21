@@ -55,11 +55,24 @@ extension Function {
           verifiableInst.verify(context)
         }
       }
+      verifyInstructionIndices(in: block, context)
     }
 
     if hasOwnership, isDefinition {
       verifyNoUnreachableBlocks(context)
       verifyNoInfiniteLoops(context)
+    }
+  }
+
+  private func verifyInstructionIndices(in block: BasicBlock, _ context: VerifierContext) {
+    var prevIndex: Int? = nil
+    for inst in block.instructions {
+      if let idx = inst.rawIndexInBlock {
+        if let prev = prevIndex {
+          require(idx > prev, "inconsistent instruction indices", atInstruction: inst)
+        }
+        prevIndex = idx
+      }
     }
   }
 

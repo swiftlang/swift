@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Check that constant propagation of MemoryLayout is also done at -Onone to ensure that
 // no metadata is created at runtime - which would violate the performance annotation.

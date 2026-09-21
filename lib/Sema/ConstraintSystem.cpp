@@ -36,7 +36,6 @@
 #include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
@@ -348,8 +347,8 @@ getDynamicResultSignature(ValueDecl *decl) {
     // for methods, and ensures that we don't take a protocol's generic
     // signature into account for a subscript requirement.
     if (auto *genericFn = ty->getAs<GenericFunctionType>()) {
-      ty = FunctionType::get(genericFn->getParams(), genericFn->getResult(),
-                             genericFn->getExtInfo());
+      ty = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
     }
 
     // Handle properties and subscripts, anchored by the getter's selector.
@@ -941,11 +940,13 @@ ConstraintSystem::getPackExpansionEnvironment(PackExpansionExpr *expr) const {
 
 GenericEnvironment *ConstraintSystem::createPackExpansionEnvironment(
     PackExpansionExpr *expr, CanGenericTypeParamType shapeParam) {
+  auto &ctx = getASTContext();
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
-  auto elementSig = getASTContext().getOpenedElementSignature(
+  auto elementSig = ctx.getOpenedElementSignature(
       contextEnv->getGenericSignature().getCanonicalSignature(), shapeParam);
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  auto *env = GenericEnvironment::forOpenedElement(elementSig, UUID::fromTime(),
+  auto *env = GenericEnvironment::forOpenedElement(elementSig,
+                                                   ctx.getNextGenericEnvironmentID(),
                                                    shapeParam, contextSubs);
   recordPackExpansionEnvironment(expr, env);
   return env;
@@ -1440,6 +1441,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool isCalledOnce = false;
+
+  if (auto *called = expr->getAttrs().getAttribute<CalledAttr>()) {
+    isCalledOnce = called->isOnce();
+  }
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
@@ -1458,6 +1464,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
       .withSendable(sendable)
+      .withCalledOnce(isCalledOnce)
       .build();
   }
 
@@ -1472,6 +1479,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
       .withSendable(sendable)
+      .withCalledOnce(isCalledOnce)
       .build();
 }
 
@@ -1765,6 +1773,17 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     // Otherwise we've flattened the dependence, evaluate Sendable.
     return std::make_pair(Type(), isSendableCapture(ty));
   }
+
+  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+    ty = simplify(ty);
+
+    // If we still have type variables, we keep the dependence.
+    if (ty->hasTypeVariable())
+      return std::pair(ty, false);
+
+    // Otherwise we've flattened the dependence, evaluate @called(once).
+    return std::make_pair(Type(), ty->isNoncopyable());
+  }
 };
 
 } // end anonymous namespace
@@ -2042,6 +2061,13 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   return IUOReferenceKind::ReturnValue;
 }
 
+bool Solution::isValidSolution() const {
+  return (Fixes.empty() &&
+          FixedScore.Data[SK_Unavailable] == 0 &&
+          FixedScore.Data[SK_Hole] == 0 &&
+          FixedScore.Data[SK_Fix] == 0);
+}
+
 SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
@@ -2083,19 +2109,12 @@ SolutionResult ConstraintSystem::salvage() {
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
 
-      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
-        auto &solution = viable[0];
-        if (solution.Fixes.empty() &&
-            diagnosticTransaction == nullptr &&
-            !getASTContext().LangOpts.DisableAvailabilityChecking &&
-            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
-            solution.getFixedScore().Data[SK_Hole] == 0 &&
-            solution.getFixedScore().Data[SK_Fix] == 0) {
-          ABORT([&](auto &out) {
-            out << "Found valid solution in salvage()\n\n";
-            solution.dump(out, 0);
-          });
-        }
+      // We should not have found a valid solution in salvage().
+      if (getASTContext().TypeCheckerOpts.DiagnoseValidSalvage &&
+          diagnosticTransaction == nullptr &&
+          !getASTContext().LangOpts.DisableAvailabilityChecking &&
+          viable[0].isValidSolution()) {
+        return SolutionResult::forUndiagnosedError();
       }
 
       return SolutionResult::forSolved(std::move(viable[0]));
@@ -3694,7 +3713,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType:
-    case ConstraintLocator::FunctionSendability: {
+    case ConstraintLocator::FunctionSendability:
+    case ConstraintLocator::FunctionExecutionSemantics: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
@@ -3782,11 +3802,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::ResultBuilderBodyResult: {
-      path = path.slice(1);
-      break;
-    }
-
     case ConstraintLocator::UnresolvedMemberChainResult: {
       auto *resultExpr = castToExpr<UnresolvedMemberChainResultExpr>(anchor);
       anchor = resultExpr->getSubExpr();
@@ -3827,6 +3842,9 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::GenericArgument:
     case ConstraintLocator::FunctionArgument:
     case ConstraintLocator::SynthesizedArgument:
+      break;
+
+    case ConstraintLocator::FunctionYield:
       break;
 
     case ConstraintLocator::FunctionResult:
@@ -4005,14 +4023,15 @@ void ConstraintSystem::generateOverloadConstraints(
         getFix) {
   SmallVector<ValueDecl *, 1> requirements;
 
-  if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-    for (auto choice : choices) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->isOperator() &&
-            isa<ProtocolDecl>(decl->getDeclContext()) &&
-            !isDeclUnavailable(decl, locator)) {
-          requirements.push_back(decl);
-        }
+  // Skip protocol extension operators that are refinements of a protocol
+  // requirement operator, because they never participate in a valid
+  // solution.
+  for (auto choice : choices) {
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->isOperator() &&
+          isa<ProtocolDecl>(decl->getDeclContext()) &&
+          !isDeclUnavailable(decl, locator)) {
+        requirements.push_back(decl);
       }
     }
   }
@@ -4029,14 +4048,12 @@ void ConstraintSystem::generateOverloadConstraints(
     // Skip protocol extension operators that are refinements of a protocol
     // requirement operator, because they never participate in a valid
     // solution.
-    if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->getDeclContext()->getExtendedProtocolDecl()) {
-          if (llvm::any_of(requirements, [&](ValueDecl *req) {
-            return TypeChecker::isDeclRefinementOf(decl, req);
-          })) {
-            continue;
-          }
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+        if (llvm::any_of(requirements, [&](ValueDecl *req) {
+          return TypeChecker::isDeclRefinementOf(decl, req);
+        })) {
+          continue;
         }
       }
     }
@@ -4195,7 +4212,11 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argPath = path.drop_back(iter - path.rbegin());
   auto *argLocator = getConstraintLocator(anchor, argPath);
 
-  auto *argExpr = castToExpr(simplifyLocatorToAnchor(argLocator));
+  auto simplifiedAnchor = simplifyLocatorToAnchor(argLocator);
+  if (!simplifiedAnchor)
+    return std::nullopt;
+
+  auto *argExpr = getAsExpr(simplifiedAnchor);
 
   // If we were unable to simplify down to the argument expression, we don't
   // know what this is.
@@ -4454,6 +4475,23 @@ bool ConstraintSystem::isArgumentOfImportedDecl(
 
   auto *choice = overload->choice.getDecl();
   return choice->hasClangNode();
+}
+
+bool ConstraintSystem::isArgumentOfSubscript(
+    ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  if (path.empty())
+    return false;
+
+  auto *application = getCalleeLocator(getConstraintLocator(anchor, path));
+
+  auto overload = findSelectedOverloadFor(application);
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  return isa<SubscriptDecl>(overload->choice.getDecl());
 }
 
 ConversionEphemeralness
@@ -4760,7 +4798,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   // If constraint system is in invalid state always produce
   // a fallback diagnostic that asks to file a bug.
   if (inInvalidState()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+    produceFallbackDiagnostic(target.getLoc());
     return;
   }
 
@@ -4799,9 +4837,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   }
 
   // Emit a poor fallback message.
-  auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  if (auto *expr = target.getAsExpr())
-    diag.highlight(expr->getSourceRange());
+  produceFallbackDiagnostic(target.getLoc());
 }
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
@@ -4816,7 +4852,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityRestriction(D, DC, loc).has_value();
   const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
       std::make_pair(std::make_pair(D, locator), result));
   return result;
@@ -4836,6 +4872,15 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
   return isDeclUnavailable(ext, locator);
 }
 
+void ConstraintSystem::produceFallbackDiagnostic(SourceLoc loc) const {
+  auto &ctx = getASTContext();
+  if (ctx.TypeCheckerOpts.CrashFailDiagnostic) {
+    ABORT("Failed to produce a diagnostic, and "
+          "-solver-enable-crash-fail-diagnostic was enabled");
+  }
+  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
+}
+
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
 /// diagnostic.
 void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
@@ -4850,7 +4895,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
       (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
-  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
+  produceFallbackDiagnostic(loc);
 }
 
 SourceLoc constraints::getLoc(ASTNode anchor) {
@@ -5016,7 +5061,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    if (getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc))
+    if (getUnsatisfiedAvailabilityRestriction(setter, DC, referenceLoc))
       return true;
   }
 
@@ -5064,20 +5109,6 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
   }
 
   return false;
-}
-
-ProtocolConformanceRef
-ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
-  auto cacheKey = std::make_pair(type.getPointer(), protocol);
-
-  auto cachedConformance = Conformances.find(cacheKey);
-  if (cachedConformance != Conformances.end())
-    return cachedConformance->second;
-
-  auto conformance =
-      swift::lookupConformance(type, protocol, /*allowMissing=*/true);
-  Conformances[cacheKey] = conformance;
-  return conformance;
 }
 
 std::pair<bool, std::optional<KeyPathCapability>>
@@ -5183,7 +5214,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!overload) {
         // If overload cannot be found because member is missing,
         // that's a failure.
-        if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
+        if (hasFixFor(calleeLoc, FixKind::DefineMemberBasedOnUse))
           return fail();
 
         return delay();

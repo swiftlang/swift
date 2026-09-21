@@ -14,7 +14,7 @@
 ///
 /// - Parameters:
 ///   - x: An instance to preserve until this function returns.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func extendLifetime<T: ~Copyable & ~Escapable>(
   _ x: borrowing T
@@ -31,7 +31,7 @@ public func extendLifetime<T: ~Copyable & ~Escapable>(
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 public func withExtendedLifetime<
   T: ~Copyable & ~Escapable,
@@ -65,7 +65,7 @@ internal func __abi_withExtendedLifetime<T, Result>(
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 public func withExtendedLifetime<
   T: ~Copyable & ~Escapable,
@@ -119,7 +119,7 @@ public func _fixLifetime<T: ~Copyable & ~Escapable>(_ x: borrowing T) {
 ///     The pointer argument is valid only for the duration of the function's
 ///     execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 @safe
 public func withUnsafeMutablePointer<
@@ -145,7 +145,7 @@ internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
 ///
 /// This function is similar to `withUnsafeMutablePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 public func _withUnprotectedUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
@@ -181,7 +181,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 @safe
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
@@ -231,7 +231,7 @@ internal func __abi_withUnsafePointer<T, Result>(
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 @safe
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
@@ -259,7 +259,7 @@ internal func __abi_se0413_withUnsafePointer<T, Result>(
 ///
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
@@ -278,7 +278,7 @@ public func _withUnprotectedUnsafePointer<
 ///
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(always)
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
@@ -290,8 +290,7 @@ public func _withUnprotectedUnsafePointer<
 }
 
 @available(*, deprecated, message: "Use the copy operator")
-@_alwaysEmitIntoClient
-@inlinable
+@export(implementation)
 @_transparent
 @_semantics("lifetimemanagement.copy")
 public func _copy<T>(_ value: T) -> T {
@@ -303,7 +302,7 @@ public func _copy<T>(_ value: T) -> T {
 /// borrow scope of the `source` argument.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(borrow source)
 public func _overrideLifetime<
@@ -319,7 +318,7 @@ public func _overrideLifetime<
 /// the `source` argument.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(copy source)
 public func _overrideLifetime<
@@ -335,7 +334,7 @@ public func _overrideLifetime<
 /// on the caller's exclusive borrow scope of the `source` argument.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(&source)
 public func _overrideLifetime<
@@ -352,7 +351,7 @@ public func _overrideLifetime<
 /// on the caller's borrow scope of the `source` argument.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(dependent: borrow source)
 public func _overrideLifetime<

@@ -27,3 +27,9 @@ extension NonStrictClass {
 extension StrictStruct {
   @Sendable func f() { } // expected-warning{{instance method of non-Sendable type 'StrictStruct' cannot be marked as '@Sendable'}}
 }
+
+@preconcurrency protocol RefinesSendable: Sendable {}
+extension StrictClass: RefinesSendable {}
+// expected-warning@-1{{extension declares a conformance of imported type 'StrictClass' to imported protocol 'Sendable'; this will not behave correctly if the owners of 'StrictModule' introduce this conformance in the future}}
+// expected-note@-2{{add '@retroactive' to silence this warning}}
+// expected-warning@-3{{conformance to 'Sendable' must occur in the same source file as class 'StrictClass'; use '@unchecked Sendable' for retroactive conformance}}

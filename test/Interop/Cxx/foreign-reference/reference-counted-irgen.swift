@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fignore-exceptions -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import ReferenceCounted
 
@@ -48,20 +48,18 @@ public func getNullable(wantNullptr: Bool) -> GlobalCountNullableInit? {
     return result
 }
 
-// CHECK:      define {{.*}}swiftcc i{{.*}} @"$s4main11getNullable11wantNullptrSo011GlobalCountC4InitVSgSb_tF"(i1 %0)
+// CHECK:      define {{.*}}swiftcc ptr @"$s4main11getNullable11wantNullptrSo011GlobalCountC4InitVSgSb_tF"(i1 %0)
 // CHECK-NEXT: entry:
 // CHECK:        %1 = call ptr @{{_ZN23GlobalCountNullableInit6createEb|"\?create\@GlobalCountNullableInit\@\@SAPEAU1\@_N\@Z"}}
-// CHECK-NEXT:   %2 = ptrtoint ptr %1 to i{{.*}}
-// CHECK-NEXT:   %3 = inttoptr i{{.*}} %2 to ptr
-// CHECK-NEXT:   %4 = icmp ne ptr %3, null
-// CHECK-NEXT:   br i1 %4, label %lifetime.nonnull-value, label %lifetime.cont
+// CHECK-NEXT:   %2 = icmp ne ptr %1, null
+// CHECK-NEXT:   br i1 %2, label %lifetime.nonnull-value, label %lifetime.cont
 
 // CHECK:      lifetime.nonnull-value:
-// CHECK-NEXT:   call void @{{_Z20GCRetainNullableInitP23GlobalCountNullableInit|"\?GCRetainNullableInit\@\@YAXPEAUGlobalCountNullableInit\@\@\@Z"}}(ptr %3)
+// CHECK-NEXT:   call void @{{_Z20GCRetainNullableInitP23GlobalCountNullableInit|"\?GCRetainNullableInit\@\@YAXPEAUGlobalCountNullableInit\@\@\@Z"}}(ptr %1)
 // CHECK-NEXT:   br label %lifetime.cont
 
 // CHECK:      lifetime.cont:
-// CHECK:          ret i{{.*}} %2
+// CHECK:          ret ptr %1
 // CHECK-NEXT: }
 
 
@@ -74,6 +72,6 @@ public func getArrayOfLocalCount() -> [NS.LocalCount] {
 // CHECK-NEXT:   %0 = call swiftcc %swift.metadata_response @"$sSo2NSO10LocalCountVMa"(i{{.*}} 0)
 // CHECK-NEXT:   %1 = extractvalue %swift.metadata_response %0, 0
 // CHECK-NEXT:   %2 = call swiftcc { ptr, ptr } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{.*}} 1, ptr %1)
-// CHECK:        %6 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
-// CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %6)
+// CHECK:        [[C:%.*]] = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
+// CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr [[C]])
 // CHECK:      }

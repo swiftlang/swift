@@ -114,6 +114,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       c[#Func Attribute#]; name=c
 // KEYWORD2-NEXT:             Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
+// KEYWORD2-NEXT:             Keyword/None:                       implementation[#Func Attribute#]; name=implementation
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // KEYWORD2-NEXT:             Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
@@ -123,9 +124,14 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
+// KEYWORD2-NEXT:             Keyword/None:                       used[#Func Attribute#]; name=used
+// KEYWORD2-NEXT:             Keyword/None:                       section[#Func Attribute#]; name=section
+// KEYWORD2-NEXT:             Keyword/None:                       unsafe[#Func Attribute#]; name=unsafe
 // KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
-// KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       safe[#Func Attribute#]; name=safe
+// KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi
 // KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NEXT:             Keyword/None:                       specialized[#Func Attribute#]; name=specialized
 // KEYWORD2-NEXT:             Keyword/None:                       diagnose[#Func Attribute#]; name=diagnose
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -361,6 +367,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-DAG: Keyword/None:                       diagnose[#Declaration Attribute#]; name=diagnose
+// ON_MEMBER_LAST-DAG: Keyword/None:                       com[#Declaration Attribute#]; name=com
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -438,6 +445,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-DAG: Keyword/None:                       diagnose[#Declaration Attribute#]; name=diagnose
+// KEYWORD_LAST-DAG: Keyword/None:                       com[#Declaration Attribute#]; name=com
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper

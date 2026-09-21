@@ -42,7 +42,7 @@ extension AtomicLoadOrdering {
   /// This value corresponds to `std::memory_order_relaxed` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var relaxed: Self {
     Self(_rawValue: 0)
@@ -56,7 +56,7 @@ extension AtomicLoadOrdering {
   /// This value corresponds to `std::memory_order_acquire` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var acquiring: Self {
     Self(_rawValue: 2)
@@ -70,7 +70,7 @@ extension AtomicLoadOrdering {
   /// This value corresponds to `std::memory_order_seq_cst` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var sequentiallyConsistent: Self {
     Self(_rawValue: 5)
@@ -139,7 +139,7 @@ extension AtomicStoreOrdering {
   /// This value corresponds to `std::memory_order_relaxed` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var relaxed: Self {
     Self(_rawValue: 0)
@@ -153,7 +153,7 @@ extension AtomicStoreOrdering {
   /// This value corresponds to `std::memory_order_release` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var releasing: Self {
     Self(_rawValue: 3)
@@ -167,7 +167,7 @@ extension AtomicStoreOrdering {
   /// This value corresponds to `std::memory_order_seq_cst` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var sequentiallyConsistent: Self {
     Self(_rawValue: 5)
@@ -236,7 +236,7 @@ extension AtomicUpdateOrdering {
   /// This value corresponds to `std::memory_order_relaxed` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var relaxed: Self {
     Self(_rawValue: 0)
@@ -250,7 +250,7 @@ extension AtomicUpdateOrdering {
   /// This value corresponds to `std::memory_order_acquire` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var acquiring: Self {
     Self(_rawValue: 2)
@@ -264,7 +264,7 @@ extension AtomicUpdateOrdering {
   /// This value corresponds to `std::memory_order_release` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var releasing: Self {
     Self(_rawValue: 3)
@@ -276,7 +276,7 @@ extension AtomicUpdateOrdering {
   /// This value corresponds to `std::memory_order_acq_rel` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var acquiringAndReleasing: Self {
     Self(_rawValue: 4)
@@ -291,7 +291,7 @@ extension AtomicUpdateOrdering {
   /// This value corresponds to `std::memory_order_seq_cst` in C++.
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static var sequentiallyConsistent: Self {
     Self(_rawValue: 5)
@@ -337,7 +337,7 @@ extension AtomicLoadOrdering {
   @available(SwiftStdlib 6.0, *)
   @_semantics("constant_evaluable")
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   static func _failureOrdering(
     for ordering: AtomicUpdateOrdering
@@ -380,7 +380,7 @@ extension AtomicLoadOrdering {
 /// false-positive races for data protected by a fence.
 @available(SwiftStdlib 6.0, *)
 @_semantics("atomics.requires_constant_orderings")
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func atomicMemoryFence(
   ordering: AtomicUpdateOrdering

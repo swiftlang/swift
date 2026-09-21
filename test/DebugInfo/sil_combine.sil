@@ -74,13 +74,13 @@ struct MyStruct {
 
 // When a struct is removed and a debug_value with a reconstruction block
 // references it, salvageDebugInfo should prepend a struct reconstruction
-// into the debug BB using the first field + undefs for the rest.
+// into the debug BB, taking every field through an operand of its own.
 // CHECK-LABEL: sil @salvage_struct_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "field_x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
-// CHECK:     %[[S:[0-9]+]] = struct $MyStruct (%[[ARG]] : $Int64, undef : $Int64)
-// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $MyStruct, #MyStruct.x
-// CHECK:     return %[[E]] : $Int64
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = struct $MyStruct (%0 : $Int64, %1 : $Int64)
+// CHECK:     %3 = struct_extract %2 : $MyStruct, #MyStruct.x
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -100,7 +100,7 @@ public struct Empty {}
 // When an empty struct is removed, the debug_value should be fully salvaged
 // into a debug BB by cloning the struct construction.
 // CHECK-LABEL: sil @salvage_empty_struct
-// CHECK: debug_value undef : $Empty, let, name "e", transform {
+// CHECK: debug_value (), let, name "e", transform {
 // CHECK:   bb0:
 // CHECK:     %[[S:[0-9]+]] = struct $Empty ()
 // CHECK:     return %[[S]] : $Empty
@@ -115,13 +115,13 @@ bb0:
 
 // When a tuple is removed and a debug_value with a reconstruction block
 // references it, salvageDebugInfo should prepend a tuple reconstruction
-// into the debug BB using the first element + undefs for the rest.
+// into the debug BB, taking every element through an operand of its own.
 // CHECK-LABEL: sil @salvage_tuple_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
-// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
-// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
-// CHECK:     return %[[E]] : $Int64
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = tuple (%0 : $Int64, %1 : $Int64)
+// CHECK:     %3 = tuple_extract %2 : $(Int64, Int64), 0
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -139,7 +139,7 @@ bb0(%0 : $Int64, %1 : $Int64):
 // When an empty tuple is removed, the debug_value should be fully salvaged
 // into a debug BB by cloning the tuple construction.
 // CHECK-LABEL: sil @salvage_empty_tuple
-// CHECK: debug_value undef : $(), let, name "e", transform {
+// CHECK: debug_value (), let, name "e", transform {
 // CHECK:   bb0:
 // CHECK:     %[[T:[0-9]+]] = tuple ()
 // CHECK:     return %[[T]] : $()
@@ -150,6 +150,95 @@ bb0:
   debug_value %t : $(), let, name "e"
   %r = tuple ()
   return %r : $()
+}
+
+// Salvaging a move-only struct should not preserve `forwarding: @owned` in the
+// debug reconstruction block.
+
+struct NCPair: ~Copyable {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+// CHECK-LABEL: sil @salvage_noncopyable_struct_with_debug_bb
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK-NOT:   forwarding
+// CHECK:     %2 = struct $NCPair (%0 : $Int64, %1 : $Int64)
+// CHECK-NOT:   forwarding
+// CHECK:     %3 = struct_extract %2 : $NCPair, #NCPair.x
+// CHECK:     return %3 : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_noncopyable_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %s = struct $NCPair (%0 : $Int64, %1 : $Int64)
+  debug_value %s : $NCPair, let, name "field_x", type $Int64, transform {
+  bb0(%0 : $NCPair):
+    %1 = struct_extract %0 : $NCPair, #NCPair.x
+    return %1 : $Int64
+  }
+  %e = struct_extract %s : $NCPair, #NCPair.x
+  return %e : $Int64
+}
+
+// Salvaging a move-only tuple should not preserve `forwarding: @owned` in the
+// debug reconstruction block.
+
+// CHECK-LABEL: sil @salvage_noncopyable_tuple_with_debug_bb
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK-NOT:   forwarding
+// CHECK:     %2 = tuple (%0 : $Int64, %1 : $Int64)
+// CHECK-NOT:   forwarding
+// CHECK:     %3 = tuple_extract %2 : $(Int64, Int64), 0
+// CHECK:     return %3 : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_noncopyable_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %t = tuple (%0 : $Int64, %1 : $Int64)
+  debug_value %t : $(Int64, Int64), let, name "x", type $Int64, transform {
+  bb0(%0 : $(Int64, Int64)):
+    %1 = tuple_extract %0 : $(Int64, Int64), 0
+    return %1 : $Int64
+  }
+  %e = tuple_extract %t : $(Int64, Int64), 0
+  return %e : $Int64
+}
+
+class Klass {}
+
+struct KlassStruct {
+  @_hasStorage var k: Klass { get set }
+  @_hasStorage var x: Int64 { get set }
+  init(k: Klass, x: Int64)
+}
+
+// When SimplifyStruct removes an owned struct with begin_borrow/struct_extract
+// uses via erase(instructionIncludingAllUsers:), debug uses must be salvaged.
+// The struct is rebuilt in the reconstruction block from both of its fields.
+//
+// CHECK-LABEL: sil [ossa] @salvage_struct_erase_including_all_users
+// CHECK-NOT:     struct $KlassStruct
+// CHECK:         debug_value (%0 : $Klass, %1 : $Int64), let, name "s", transform {
+// CHECK:           bb0(%0 : $Klass, %1 : $Int64):
+// CHECK:             %2 = struct $KlassStruct (%0 : $Klass, %1 : $Int64)
+// CHECK:             return %2 : $KlassStruct
+// CHECK:         }
+// CHECK:         destroy_value %0 : $Klass
+// CHECK:         return %1 : $Int64
+// CHECK:       } // end sil function 'salvage_struct_erase_including_all_users'
+sil [ossa] @salvage_struct_erase_including_all_users : $@convention(thin) (@owned Klass, Int64) -> Int64 {
+bb0(%0 : @owned $Klass, %1 : $Int64):
+  %s = struct $KlassStruct (%0 : $Klass, %1 : $Int64)
+  debug_value %s : $KlassStruct, let, name "s"
+  %b = begin_borrow %s : $KlassStruct
+  %e = struct_extract %b : $KlassStruct, #KlassStruct.x
+  end_borrow %b : $KlassStruct
+  destroy_value %s : $KlassStruct
+  return %e : $Int64
 }
 
 // This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
@@ -168,4 +257,31 @@ bb0(%0 : $*T):
   debug_value %1, let, name "var"
   %2 = struct_extract %1, #T.x
   return %2
+}
+
+sil [readonly] @makeKlass : $@convention(thin) () -> @owned Klass
+
+// This test verifies that two derived uses of an apply don't cause a crash
+// while trying to be deleted twice.
+// TODO: This should leave undef debug_values behind (PR #91910).
+
+// CHECK-LABEL: sil [ossa] @multi_operand_apply
+// CHECK:       bb0:
+// CHECK-NEXT:    [[T:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[T]]
+// CHECK-NEXT:  } // end sil function 'multi_operand_apply'
+sil [ossa] @multi_operand_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @makeKlass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = copy_value %1 : $Klass
+  debug_value (%1, %2), let, name "pair", transform {
+  bb0(%0 : $Klass, %1 : $Klass):
+    %2 = tuple (%0, %1)
+    return %2
+  }
+  destroy_value %2 : $Klass
+  destroy_value %1 : $Klass
+  %r = tuple ()
+  return %r : $()
 }

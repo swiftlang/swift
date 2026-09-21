@@ -18,9 +18,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
@@ -299,11 +297,23 @@ static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
   } state = Start;
   const char *matchStart = nullptr;
 
-  // Find _T, $S, $s, _$S, _$s, @__swiftmacro_ followed by a valid mangled string
+  // Find _T, $S, $s, _$S, _$s, @__swiftmacro_ followed by a valid mangled
+  // string, or ASYNC_MAIN_ENTRY_POINT_NAME.
   while (ptr < end) {
     switch (state) {
     case Start:
       while (ptr < end) {
+        // No prefix to look for here: match the whole name plus any suffix.
+        if (int nameLen = swift::Demangle::getAsyncMainEntryPointNameLength(
+                llvm::StringRef(ptr, end - ptr))) {
+          matchStart = ptr;
+          ptr += nameLen;
+          while (ptr < end && isValidInMangling(*ptr))
+            ++ptr;
+          match = llvm::StringRef(matchStart, ptr - matchStart);
+          return true;
+        }
+
         char ch = *ptr++;
 
         if (ch == '_') {

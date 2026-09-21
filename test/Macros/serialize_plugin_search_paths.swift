@@ -4,7 +4,7 @@
 // RUN:   -emit-executable -emit-module \
 // RUN:   -Xfrontend -serialize-debugging-options \
 // RUN:   -module-name MyApp \
-// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -swift-version 5 \
 // RUN:   -plugin-path %t/plugins \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
@@ -12,7 +12,6 @@
 
 // RUN: %lldb-moduleimport-test -verbose -dump-module %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_feature_Macros
 // CHECK: - Plugin Search Options:
 // CHECK:     -plugin-path {{.*}}plugins
 // CHECK:     -external-plugin-path {{.*}}plugins#{{.*}}swift-plugin-server

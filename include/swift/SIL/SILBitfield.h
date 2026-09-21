@@ -74,7 +74,7 @@ public:
 
   unsigned get(T *entity) const {
     assert(entity->getFunction() == function);
-    if (bitfieldID > entity->lastInitializedBitfieldID) {
+    if (bitfieldID > entity->getLastInitializedBitfieldID()) {
       // The bitfield is not initialized yet in this block.
       return 0;
     }
@@ -86,7 +86,7 @@ public:
     assert(((value << startBit) & ~mask) == 0 &&
            "value too large for BasicBlockBitfield");
     unsigned clearMask = mask;
-    if (bitfieldID > entity->lastInitializedBitfieldID) {
+    if (bitfieldID > entity->getLastInitializedBitfieldID()) {
 
       // The bitfield is not initialized yet in this block.
       // Initialize the bitfield, and also initialize all parent bitfields,
@@ -101,11 +101,11 @@ public:
       // -> we have to initialize the fields: BB, C, DDD and EE
       //
       Impl *bf = parent;
-      while (bf && bf->bitfieldID > entity->lastInitializedBitfieldID) {
+      while (bf && bf->bitfieldID > entity->getLastInitializedBitfieldID()) {
         clearMask |= bf->mask;
         bf = bf->parent;
       }
-      entity->lastInitializedBitfieldID = bitfieldID;
+      entity->setLastInitializedBitfieldID(bitfieldID);
     }
     entity->setCustomBits((entity->getCustomBits() & ~clearMask) | (value << startBit));
   }

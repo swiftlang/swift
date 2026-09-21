@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -O -parse-stdlib -emit-ir -module-name ZeroInit -verify %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Swift
 

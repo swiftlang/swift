@@ -23,6 +23,8 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   AnyDifferentiable.swift
   ArrayDifferentiation.swift
   OptionalDifferentiation.swift
+  AdditiveArithmeticDifferentiation.swift
+  NumericDifferentiation.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
@@ -39,6 +41,7 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WASI WASILibc
+  SWIFT_MODULE_DEPENDS_EMSCRIPTEN EmscriptenLibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
   C_COMPILE_FLAGS

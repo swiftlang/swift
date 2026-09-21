@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -target %target-swift-5.1-abi-triple -verify -wmo %s %S/Inputs/opaque_result_type_captured_wmo_2.swift
 // RUN: %target-swift-emit-silgen -target %target-swift-5.1-abi-triple -verify -wmo %s %S/Inputs/opaque_result_type_captured_wmo_2.swift
 func foo(s: String?) {
   let x = PImpl()

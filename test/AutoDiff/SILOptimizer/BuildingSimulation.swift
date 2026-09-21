@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -verify -O %s | %FileCheck %s
-// REQUIRES: swift_in_compiler
 
 import _Differentiation
 

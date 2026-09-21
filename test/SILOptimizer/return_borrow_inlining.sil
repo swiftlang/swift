@@ -1,0 +1,179 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class Klass {
+  let id: Int
+  init()
+}
+
+public struct Container {
+  var _k: Klass
+  var _k2: Klass
+  init()
+}
+
+sil [transparent] [ossa] @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass {
+bb0(%0 : $*Container):
+  %1 = load_borrow %0 : $*Container
+  %2 = struct_extract %1 : $Container, #Container._k
+  return_borrow %2 from_scopes (%1)
+}
+
+// CHECK-LABEL: sil [ossa] @test_simple_borrow : $@convention(thin) (@in_guaranteed Container) -> Int {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_simple_borrow'
+sil [ossa] @test_simple_borrow : $@convention(thin) (@in_guaranteed Container) -> Int {
+bb0(%0 : $*Container):
+  %1 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %3 = ref_element_addr %2 : $Klass, #Klass.id
+  %4 = load [trivial] %3 : $*Int
+  return %4 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @test_phi_usage : $@convention(thin) (@in_guaranteed Container, Builtin.Int1) -> Int {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_phi_usage'
+sil [ossa] @test_phi_usage : $@convention(thin) (@in_guaranteed Container, Builtin.Int1) -> Int {
+bb0(%0 : $*Container, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %4 = apply %3(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  br bb3(%4 : $Klass)
+
+bb2:
+  %6 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %7 = apply %6(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  br bb3(%7 : $Klass)
+
+bb3(%9 : @guaranteed $Klass):
+  %10 = borrowed %9 : $Klass from ()
+  %11 = ref_element_addr %10 : $Klass, #Klass.id
+  %12 = load [trivial] %11 : $*Int
+  return %12 : $Int
+}
+
+sil [transparent] [ossa] @load_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass {
+bb0(%0 : $*Container):
+  %1 = struct_element_addr %0 : $*Container, #Container._k
+  %2 = load_borrow %1 : $*Klass
+  return_borrow %2 from_scopes (%2)
+}
+
+// CHECK-LABEL: sil [ossa] @test_load_borrow : $@convention(thin) (@in_guaranteed Container) -> Int {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_load_borrow'
+sil [ossa] @test_load_borrow : $@convention(thin) (@in_guaranteed Container) -> Int {
+bb0(%0 : $*Container):
+  %1 = function_ref @load_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %3 = ref_element_addr %2 : $Klass, #Klass.id
+  %4 = load [trivial] %3 : $*Int
+  return %4 : $Int
+}
+
+sil [transparent] [ossa] @conditional_borrow_accessor : $@convention(method) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass {
+bb0(%0 : $*Container, %1 : $Builtin.Int1):
+  %2 = load_borrow %0 : $*Container
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = struct_extract %2 : $Container, #Container._k
+  br bb3(%4 : $Klass)
+
+bb2:
+  %6 = struct_extract %2 : $Container, #Container._k2
+  br bb3(%6 : $Klass)
+
+bb3(%8 : @guaranteed $Klass):
+  %9 = borrowed %8 : $Klass from (%2 : $Container)
+  return_borrow %9 from_scopes (%2)
+}
+
+// CHECK-LABEL: sil [ossa] @test_conditional_paths : $@convention(thin) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_conditional_paths'
+sil [ossa] @test_conditional_paths : $@convention(thin) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass {
+bb0(%0 : $*Container, %1 : $Builtin.Int1):
+  %2 = function_ref @conditional_borrow_accessor : $@convention(method) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass
+  %3 = apply %2(%0, %1) : $@convention(method) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @test_split_use : $@convention(thin) (@in_guaranteed Container, Builtin.Int1) -> Int {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_split_use'
+sil [ossa] @test_split_use : $@convention(thin) (@in_guaranteed Container, Builtin.Int1) -> Int {
+bb0(%0 : $*Container, %1 : $Builtin.Int1):
+  %f = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %result = apply %f(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  cond_br %1, bbLeft, bbRight
+
+bbLeft:
+  %addr1 = ref_element_addr %result : $Klass, #Klass.id
+  %val1 = load [trivial] %addr1 : $*Int
+  br exitBB(%val1 : $Int)
+
+bbRight:
+  br mergeBlock(%result : $Klass)
+
+mergeBlock(%phi : @guaranteed $Klass):
+  %bphi = borrowed %phi : $Klass from ()
+  %addr2 = ref_element_addr %bphi : $Klass, #Klass.id
+  %val2 = load [trivial] %addr2 : $*Int
+  br exitBB(%val2 : $Int)
+
+exitBB(%ret : $Int):
+  return %ret : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @test_return_borrow_caller : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_return_borrow_caller'
+sil [ossa] @test_return_borrow_caller : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass {
+bb0(%0 : $*Container):
+  %1 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  return_borrow %2 from_scopes ()
+}
+
+// CHECK-LABEL: sil [ossa] @test_conditional_return_borrow : $@convention(method) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_conditional_return_borrow'
+sil [ossa] @test_conditional_return_borrow : $@convention(method) (@in_guaranteed Container, Builtin.Int1) -> @guaranteed Klass {
+bb0(%0 : $*Container, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %4 = apply %3(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  br bb3(%4 : $Klass)
+
+bb2:
+  %6 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %7 = apply %6(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  br bb3(%7 : $Klass)
+
+bb3(%9 : @guaranteed $Klass):
+  %10 = borrowed %9 : $Klass from ()
+  return_borrow %10 from_scopes ()
+}
+
+// CHECK-LABEL: sil [ossa] @test_return_owned_convention : $@convention(thin) (@in_guaranteed Container) -> @owned Klass {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_return_owned_convention'
+sil [ossa] @test_return_owned_convention : $@convention(thin) (@in_guaranteed Container) -> @owned Klass {
+bb0(%0 : $*Container):
+  %1 = function_ref @simple_borrow_accessor : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed Container) -> @guaranteed Klass
+  %3 = copy_value %2 : $Klass
+  return %3 : $Klass
+}
+

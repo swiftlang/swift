@@ -63,15 +63,13 @@ namespace clang {
   namespace driver {
     class Driver;
   }
-namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
   struct TranslationUnitDeps;
   enum class ModuleOutputKind;
   using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
-}
-}
+} // namespace clang
 
 namespace swift {
 enum class ResultConvention : uint8_t;
@@ -88,6 +86,7 @@ class DeclContext;
 class DiagnosticEngine;
 class EffectiveClangContext;
 class EnumDecl;
+class Evaluator;
 class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
@@ -119,6 +118,18 @@ enum OptionalTypeKind : unsigned {
   OTK_ImplicitlyUnwrappedOptional
 };
 enum { NumOptionalTypeKinds = 2 };
+
+/// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
+/// decide whether to apply libkern's ownership convention.
+///
+/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
+enum class LibkernSubclass {
+  None,
+  OSObject,
+  /// OSIterator derives from OSObject, so a type that derives from OSIterator
+  /// also derives from OSObject.
+  OSIterator,
+};
 
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
@@ -215,6 +226,7 @@ public:
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
          StringRef swiftPCHHash = "", std::string casidForPCH = "",
          DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false,
+         bool needCodeGenTargetOpts = true,
          std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
          std::shared_ptr<llvm::cas::ActionCache> Cache = nullptr);
 
@@ -236,19 +248,12 @@ public:
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ASTContext &ctx,
-                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                       bool ignoreClangTarget = false);
-
   std::vector<std::string>
   getClangDepScanningInvocationArguments(ASTContext &ctx);
 
-  static std::unique_ptr<clang::CompilerInvocation>
-  createClangInvocation(ClangImporter *importer,
-                        const ClangImporterOptions &importerOpts,
-                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        const std::vector<std::string> &CC1Args);
+  std::unique_ptr<clang::CompilerInvocation> createClangInvocation(
+      ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+      bool forCodeGen = false);
 
   /// Creates a Clang Driver based on the Swift compiler options.
   ///
@@ -297,7 +302,8 @@ public:
   /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
-                               bool isTestableImport = false) override;
+                               bool isTestableImport,
+                               bool isSourceCanImport) override;
 
   /// Import a module with the given module path.
   ///
@@ -534,7 +540,7 @@ public:
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
-      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      const clang::dependencies::TranslationUnitDeps &deps,
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
@@ -565,7 +571,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::CodeGenOptions &getCodeGenOpts() const;
 
-  std::string getClangModuleHash() const;
+  std::string computeClangContextHash() const;
 
   /// Get clang file mapping.
   const ClangInvocationFileMapping &getClangFileMapping() const {
@@ -600,6 +606,50 @@ public:
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
+  /// Per-module memory information for a single loaded Clang module.
+  struct ClangModuleMemoryInfo {
+    std::string moduleName;
+    /// In-memory size of the serialized module (.pcm) buffer. This is the
+    /// serialized bitstream, not the deserialized AST.
+    uint64_t inMemoryBufferBytes = 0;
+    /// Whether the buffer is mmap-backed (file-backed/demand-paged) rather than
+    /// malloc-backed (resident heap).
+    bool bufferIsMMapped = false;
+    /// Total entities serialized in the module on disk (upper bound).
+    uint64_t onDiskDecls = 0;
+    uint64_t onDiskTypes = 0;
+    uint64_t onDiskIdentifiers = 0;
+    uint64_t onDiskMacros = 0;
+    /// Decls actually deserialized (materialized) into the shared ASTContext.
+    /// Only populated when a stats reporter is active (see DeclRead listener).
+    uint64_t materializedDecls = 0;
+  };
+
+  /// Aggregate Clang memory statistics plus a per-module breakdown. All imported
+  /// modules share a single ASTContext, so the deserialized-AST byte figure is
+  /// aggregate; per-module data is buffer bytes + entity counts.
+  struct ClangMemoryStats {
+    /// Bytes held by the shared Clang ASTContext (bump allocator + side tables).
+    uint64_t astContextBytes = 0;
+    /// In-memory bytes of mmap-backed loaded-module buffers (informational).
+    uint64_t moduleBufferMMapBytes = 0;
+    /// In-memory bytes of malloc-backed loaded-module buffers (resident heap).
+    uint64_t moduleBufferMallocBytes = 0;
+    uint64_t numLoadedModules = 0;
+    uint64_t numMaterializedDecls = 0;
+    std::vector<ClangModuleMemoryInfo> perModule;
+  };
+
+  /// Collect Clang memory statistics for the importer's main instance.
+  ClangMemoryStats getClangMemoryStats() const;
+
+  /// Enable per-module materialized-decl tracking by the deserialization
+  /// listener. Should be called soon after importer creation; decls deserialized
+  /// before this call (e.g. while setting up a bridging header) are not counted,
+  /// but module-import deserialization (the bulk) is. Off by default to avoid
+  /// per-decl overhead in builds that don't request memory statistics.
+  void enableMemoryStatistics();
+
   /// Dump Swift lookup tables.
   void dumpSwiftLookupTables() const override;
 
@@ -608,9 +658,6 @@ public:
   void collectSubModuleNames(
       ImportPath::Module path,
       std::vector<std::string> &names) const;
-
-  /// Given a Clang module, decide whether this module is imported already.
-  static bool isModuleImported(const clang::Module *M);
 
   DeclName importName(
       const clang::NamedDecl *D,
@@ -661,6 +708,9 @@ public:
 
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
+  void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                 SourceLoc useLoc) override;
+
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
   bool needsClosureConstructor(
@@ -690,6 +740,9 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
+  void registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                                    const clang::Decl *anchorDecl) override;
+
   /// Returns a decl that was imported earlier or null if it was not found in
   /// the cache.
   virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) override;
@@ -698,8 +751,15 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
+
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
+
+  /// Classify \p decl against libkern's OSObject hierarchy.
+  LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
 
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
@@ -736,10 +796,6 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
-
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
 
@@ -772,12 +828,44 @@ bool isCxxStdModule(StringRef moduleName, bool IsSystem);
 std::optional<clang::QualType>
 getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 
-/// Returns true if the given type is a C++ `const` reference type.
-bool isCxxConstReferenceType(const clang::Type *type);
+/// How a C++ reference parameter is represented in Swift.
+enum class CxxReferenceParameterKind {
+  /// `const T&` / `const T&&`: `borrowing T`.
+  Borrowed,
+  /// `T&`: `inout T`. Where `inout` is not expressible (inside
+  /// `@convention(c)`) it stays an `UnsafeMutablePointer`.
+  Mutating,
+  /// `T&&`: `consuming T`.
+  Consuming,
+};
+
+struct CxxReferenceParameter {
+  clang::QualType pointeeType;
+  CxxReferenceParameterKind kind;
+};
+
+/// Classifies a C++ reference parameter type, or `None` if \p type is not a
+/// C++ reference type. Every kind but `Mutating` is lowered indirectly, so
+/// those must be imported as the pointee rather than as a pointer.
+std::optional<CxxReferenceParameter>
+classifyCxxReferenceParameter(clang::QualType type);
 
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Whether any declaration of \p decl carries one of the given swift_attrs.
+/// Within a translation unit a swift_attr propagates to later redeclarations
+/// only, and a chain assembled across modules is not merged at all, so an
+/// attribute is not necessarily visible on the declaration at hand.
+bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+                                  ArrayRef<StringRef> attrs);
+
+/// Whether the given Clang record is imported as a foreign reference type,
+/// including when it has no definition. Accounts for inherited reference-ness
+/// when a definition is available, and for an annotation on any declaration in
+/// the chain when it is not.
+bool isForeignReferenceRecord(const clang::RecordDecl *decl, Evaluator &eval);
 
 /// Determine whether the given Clang record declaration has the
 /// swift_attr("import_opaque_pointer") attribute, which causes any pointer
@@ -833,6 +921,9 @@ bool declIsCxxOnly(const Decl *decl);
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
 
+/// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
+bool isClangCxxRecord(const DeclContext *dc);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///
@@ -876,15 +967,13 @@ template <typename T>
 std::optional<T>
 matchSwiftAttr(const clang::Decl *decl,
                llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl || !decl->hasAttrs())
+  if (!decl)
     return std::nullopt;
 
-  for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      for (const auto &p : patterns) {
-        if (swiftAttr->getAttribute() == p.first)
-          return p.second;
-      }
+  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    for (const auto &p : patterns) {
+      if (swiftAttr->getAttribute() == p.first)
+        return p.second;
     }
   }
   return std::nullopt;
@@ -897,7 +986,23 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
+getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
+
+/// Determines the ownership convention of functions that return libkern's
+/// OSObject or one of its subclasses.
+///
+/// - Methods which start with "get" or "Get" and which are not returning
+///   a subclass of OSIterator are assumed to be getters.
+///   They return at "+0" and the caller is not responsible for releasing the
+///   returned object.
+///
+/// - All other methods are assumed to return at "+1", and the caller is
+///   responsible for releasing the returned object.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 enum class RefCountedPtrError {
   NotAnnotated,
@@ -1009,7 +1114,9 @@ public:
   /// was inherited with private inheritance.
   ///
   /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
-  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+  ///
+  /// Returns true if \param clonedDecl was marked unavailable.
+  bool setUnavailableIfNecessary(const ValueDecl *baseDecl,
                                  ValueDecl *clonedDecl) const;
 
   friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {

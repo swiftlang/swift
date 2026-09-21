@@ -21,9 +21,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
@@ -254,9 +252,7 @@ public:
   // NOTE: The load optimized in this method is a load [trivial].
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
-  SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
@@ -277,7 +273,6 @@ public:
   SILInstruction *visitAllocExistentialBoxInst(AllocExistentialBoxInst *S);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
-  SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
@@ -385,7 +380,7 @@ private:
 
   SILInstruction *createApplyWithConcreteType(
       FullApplySite Apply,
-      const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
+      llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
       SILBuilderContext &BuilderCtx);
 
   // Common utility function to replace the WitnessMethodInst using a

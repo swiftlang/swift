@@ -15,9 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/UUID.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 
 // WIN32 doesn't natively support <uuid/uuid.h>. Instead, we use Win32 APIs.
@@ -29,6 +27,11 @@
 #include <algorithm>
 #else
 #include <uuid/uuid.h>
+#endif
+
+#if defined(__EMSCRIPTEN__)
+static inline void uuid_generate_random(uuid_t out) { uuid_generate(out); }
+static inline void uuid_generate_time(uuid_t out) { uuid_generate(out); }
 #endif
 
 using namespace swift;
@@ -84,6 +87,25 @@ std::optional<swift::UUID> swift::UUID::fromString(const char *s) {
   if (uuid_parse(s, result.Value))
     return std::nullopt;
   return result;
+#endif
+}
+
+void swift::UUID::getCanonicalBytes(unsigned char (&bytes)[Size]) const {
+#if defined(_WIN32)
+  // Value is a Win32 ::UUID; Data1/Data2/Data3 are native-endian. Swap them
+  // back to string order. Data4 is a byte array.
+  bytes[0] = Value[3];
+  bytes[1] = Value[2];
+  bytes[2] = Value[1];
+  bytes[3] = Value[0];
+  bytes[4] = Value[5];
+  bytes[5] = Value[4];
+  bytes[6] = Value[7];
+  bytes[7] = Value[6];
+  for (unsigned i = 8; i < Size; ++i)
+    bytes[i] = Value[i];
+#else
+  memcpy(bytes, Value, Size);
 #endif
 }
 

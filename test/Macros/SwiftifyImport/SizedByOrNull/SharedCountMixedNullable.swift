@@ -13,45 +13,45 @@
 // `CountedByOrNull/SharedCountMixedNullable.swift` file for design notes.
 
 // Case 1: non-Optional sharer first.
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .sizedByOrNull(pointer: .param(2), size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .sizedByOrNull(pointer: .param(2), size: "size"), nullableAsEmptySpan: true)
 public func nonOptionalFirst(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ size: CInt) {
 }
 
 // Case 2: Optional sharer first.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .param(2), size: "size"))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .param(2), size: "size"), nullableAsEmptySpan: true)
 public func optionalFirst(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ size: CInt) {
 }
 
 // Case 3: all sharers Optional.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedByOrNull(pointer: .param(2), size: "size"))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedByOrNull(pointer: .param(2), size: "size"), nullableAsEmptySpan: true)
 public func allOptional(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ size: CInt) {
 }
 
 // Case 4: three sharers, mixed.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .param(2), size: "size"), .sizedByOrNull(pointer: .param(3), size: "size"))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .param(2), size: "size"), .sizedByOrNull(pointer: .param(3), size: "size"), nullableAsEmptySpan: true)
 public func threeMixed(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ p3: UnsafeRawPointer?, _ size: CInt) {
 }
 
 // Case 5: three sharers, all Optional.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedByOrNull(pointer: .param(2), size: "size"), .sizedByOrNull(pointer: .param(3), size: "size"))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedByOrNull(pointer: .param(2), size: "size"), .sizedByOrNull(pointer: .param(3), size: "size"), nullableAsEmptySpan: true)
 public func threeAllOptional(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ p3: UnsafeRawPointer?, _ size: CInt) {
 }
 
 // Case 6: parameter + return value sharing a size.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .return, size: "size"))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
 public func paramOptionalReturn(_ p1: UnsafeRawPointer?, _ size: CInt) -> UnsafeRawPointer? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeRawPointer?'}}
 }
 
 // Case 7: two parameters and a return sharing a size, mixed.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .param(2), size: "size"), .sizedByOrNull(pointer: .return, size: "size"))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .sizedBy(pointer: .param(2), size: "size"), .sizedByOrNull(pointer: .return, size: "size"), nullableAsEmptySpan: true)
 public func twoParamsAndReturn(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ size: CInt) -> UnsafeRawPointer? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeRawPointer?'}}
 }
 
 // Case 8: nonescaping (RawSpan) variants — verifies unsafe-prefix handling
 // for Span vs UnsafeRawBufferPointer.
-@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)), .sizedByOrNull(pointer: .param(2), size: "size"), .nonescaping(pointer: .param(2)))
+@_SwiftifyImport(.sizedByOrNull(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)), .sizedByOrNull(pointer: .param(2), size: "size"), .nonescaping(pointer: .param(2)), nullableAsEmptySpan: true)
 public func spansAllOptional(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _ size: CInt) {
 }
 

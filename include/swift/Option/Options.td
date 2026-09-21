@@ -280,6 +280,11 @@ def o : JoinedOrSeparate<["-"], "o">,
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
+def experimental_use_gnu_jobserver :
+  Flag<["-"], "experimental-use-gnu-jobserver">,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild, NewDriverOnlyOption]>,
+  HelpText<"Participate in the GNU make jobserver advertised in MAKEFLAGS, letting its token pool (not -j) bound concurrency across the build">;
+
 def sdk : Separate<["-"], "sdk">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
@@ -494,6 +499,10 @@ def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
 
+def remark_hidden_type_layout_serialization : Flag<["-"], "Rhidden-type-layout-serialization">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about hidden type layout serialization">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
@@ -513,6 +522,13 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_EQ
+    : Joined<["-"], "serialize-diagnostics=">,
+      Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput,
+             CacheInvariant]>,
+      HelpText<"Serialize diagnostics in a specific format: 'dia', a binary "
+               "format (the default), or 'sarif'">,
+      MetaVarName<"<format>">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
@@ -582,7 +598,7 @@ def require_explicit_sendable : Flag<["-"], "require-explicit-sendable">,
   HelpText<"Require explicit Sendable annotations on public declarations">;
 
 def define_availability : Separate<["-"], "define-availability">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
 
@@ -592,7 +608,7 @@ def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
 
 def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimization=">,
   MetaVarName<"<complete,none>">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the optimization mode for unavailable declarations. The "
            "value may be 'none' (no optimization) or 'complete' (code is not "
            "generated at all unavailable declarations)">;
@@ -621,7 +637,7 @@ def define_dynamic_availability_domain : Separate<["-"], "define-dynamic-availab
     MetaVarName<"<domain>">;
 
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Deprecated; has no effect">;
 
 def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-non-resilient-access">,
@@ -629,7 +645,7 @@ def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-no
   HelpText<"Deprecated; use -allow-non-resilient-access instead">;
 
 def allow_non_resilient_access : Flag<["-"], "allow-non-resilient-access">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Ensures all contents are generated besides exportable decls in the binary module, so non-resilient access can be allowed">;
 
 def library_level : Separate<["-"], "library-level">,
@@ -843,6 +859,11 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
 def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmodular-includes">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Augment emitted Objective-C header with textual imports for every included modular import">;
+
+def generated_header_underlying_module_include_base : Separate<["-"], "generated-header-underlying-module-include-base">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<path>">,
+  HelpText<"When emitting the generated Objective-C header for a mixed-source module, import the underlying Clang module's headers using quoted includes relative to <path>, instead of assuming a framework-style umbrella header named after the module">;
 
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
@@ -1228,11 +1249,11 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def ExperimentalPackageCMOAbortOnDeserializationFail : Flag<["-"], "experimental-package-cmo-abort-on-deserialization-fail">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Abort if a deserialization error is found while package optimization is enabled">;
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Deprecated; use -package-cmo instead">;
 
 def PackageCMO : Flag<["-"], "package-cmo">,
@@ -1449,6 +1470,8 @@ def emit_sil : Flag<["-"], "emit-sil">,
   HelpText<"Emit canonical SIL file(s)">, ModeOpt;
 def emit_silgen : Flag<["-"], "emit-silgen">,
   HelpText<"Emit raw SIL file(s)">, ModeOpt;
+def emit_silgen_ossa : Flag<["-"], "emit-silgen-ossa">,
+  HelpText<"Emit raw SIL file(s) at the earliest point it has reached complete OSSA after SILGen">, ModeOpt;
 def emit_lowered_sil : Flag<["-"], "emit-lowered-sil">,
   HelpText<"Emit lowered SIL file(s)">, ModeOpt;
 def emit_sib : Flag<["-"], "emit-sib">,
@@ -1886,6 +1909,14 @@ def enable_autolinking_runtime_compatibility_bytecode_layouts
       HelpText<"Enable autolinking for the bytecode layouts runtime "
                "compatibility library">;
 
+def weak_link_span_compatibility_lib
+    : Flag<[ "-" ], "weak-link-span-compatibility-lib">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Weakly link the symbols that are back deployed by the Span "
+               "compatibility library instead of strongly linking them, when "
+               "the deployment target predates the OS release that introduced "
+               "them">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
@@ -1939,12 +1970,12 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
 def allow_availability_platforms: Separate<["-"], "allow-availability-platforms">,
-  Flags<[SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption, HelpHidden]>,
   HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
 def block_availability_platforms: Separate<["-"], "block-availability-platforms">,
-  Flags<[SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption, HelpHidden]>,
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
@@ -2286,7 +2317,7 @@ def emit_module_dependencies_path:
 def use_frontend_parseable_output:
   Flag<["-"], "use-frontend-parseable-output">,
   Flags<[HelpHidden, NewDriverOnlyOption, CacheInvariant]>,
-  HelpText<"Emit parseable-output from swift-frontend jobs instead of from "
+  HelpText<"Deprecated: Emit parseable-output from swift-frontend jobs instead of from "
            "the driver">;
 
 def print_explicit_dependency_graph:
@@ -2393,6 +2424,14 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
+def scanner_cas_fs: Separate<["-"], "scanner-cas-fs">,
+  Flags<[NewDriverOnlyOption, CacheInvariant]>,
+  HelpText<"Configure the filesystem to read from the provided CAS tree during dep-scanning">;
+
+def cas_fs_escape: Separate<["-"], "cas-fs-escape">,
+  Flags<[NewDriverOnlyOption, CacheInvariant]>,
+  HelpText<"Path for using the underlying file system instead of CASFS">, MetaVarName<"<path>">;
+
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
@@ -2443,6 +2482,13 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
 def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
+
+def print_llvm_backend_diagnostics
+    : Flag<["-"], "print-llvm-backend-diagnostics">,
+      Flags<[FrontendOption, NoDriverOption]>,
+      HelpText<
+          "Print error-severity LLVM backend diagnostics (e.g. object-file "
+          "emission errors) instead of swallowing them">;
 
 def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
   Flags<[FrontendOption, NoDriverOption]>,

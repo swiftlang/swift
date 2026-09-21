@@ -3,12 +3,17 @@
 
 // RUN: %target-swift-frontend -num-threads 2 -O -c -emit-module -o %t/MyModule.o             %t/MyModule.swift                   -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -num-threads 2 -O -c              -o %t/MainA.o -o %t/MainB.o  %t/MainA.swift %t/MainB.swift -I %t -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/MainA.o %t/MainB.o %t/MyModule.o %target-embedded-posix-shim -o %t/a.out
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/MainA.o %t/MainB.o %t/MyModule.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
+
+// UNSUPPORTED: OS=emscripten
+// Dictionary literals trigger the embedded stdlib's hash-seed init, which calls
+// arc4random_buf, not provided by emscripten's musl-derived libc
+// (`wasm-ld: error: undefined symbol: arc4random_buf`). Same cause as
+// dependencies-random.swift.
 
 // BEGIN MyModule.swift
 

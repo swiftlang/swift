@@ -16,9 +16,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -757,8 +755,7 @@ public:
       : BridgeFun(nullptr), BridgeCall(nullptr), OptionalResult(nullptr),
         ReleaseAfterBridge(nullptr), ReleaseArgAfterCall(nullptr), Idx(0) {}
 
-  static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI,
-                               DeadEndBlocks *deBlocks);
+  static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI);
 
   operator bool() const { return BridgeFun != nullptr; }
   SILValue bridgedValue() { return BridgedValue; }
@@ -826,8 +823,7 @@ static SILInstruction *findReleaseOf(SILValue releasedValue,
   return nullptr;
 }
 
-BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
-                                       ApplyInst *AI, DeadEndBlocks *deBlocks) {
+BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI) {
   // Match
   // %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // %16 = apply %15(%14) : $@convention(method) (@guaranteed String) -> @owned NSString
@@ -916,7 +912,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 
   if (hasOwnership && !BridgedValueRelease) {
     SmallVector<Operand *> newUses{&AI->getOperandRef(ArgIdx)};
-    if (!areUsesWithinValueLifetime(BridgedValue, newUses, deBlocks)) {
+    if (!areUsesWithinValueLifetime(BridgedValue, newUses)) {
       return BridgedArgument();
     }
   }
@@ -1220,7 +1216,7 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
       continue;
 
     auto BridgedArg =
-        BridgedArgument::match(CurIdx, Param.get(), BridgedCall, deBlocks);
+        BridgedArgument::match(CurIdx, Param.get(), BridgedCall);
     if (!BridgedArg)
       continue;
 

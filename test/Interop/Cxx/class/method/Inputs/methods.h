@@ -47,4 +47,77 @@ struct ReferenceParams {
   }
 };
 
+struct HasInitMethods {
+  int field;
+  int init() const { return field; }
+  int init(int n) {
+    field = n;
+    return field;
+  }
+};
+
+struct HasInitWithBackticks {
+  int x;
+  int notInit() const __attribute__((swift_name("`init`()"))) { return x; }
+};
+
+struct HasRenamedInitMethods {
+  int field;
+  int start() const __attribute__((swift_name("init()"))) { return field; }
+  // expected-warning@-1 {{ignoring swift_name attribute 'init()'; 'start' cannot be imported as an initializer}} 
+  // expected-note@-2 {{use backticks (e.g. 'swift_name("`init`(...)")')}}
+  int startWith(int a) const __attribute__((swift_name("init(n:)"))) {
+    return field + a;
+  }
+  // expected-warning@-3 {{ignoring swift_name attribute 'init(n:)'; 'startWith' cannot be imported as an initializer}} 
+  // expected-note@-4 {{use backticks (e.g. 'swift_name("`init`(...)")')}}
+};
+
+struct HasStaticInitFactoryAndInitMethod {
+  // Should be renamed to `init`
+  int init() const { return value; }
+
+  // Should be imported as an initializer
+  static HasStaticInitFactoryAndInitMethod makeWithValue(int value)
+      __attribute__((swift_name("init(value:)"))) {
+    HasStaticInitFactoryAndInitMethod result;
+    result.value = value + 3;
+    return result;
+  }
+
+private:
+  int value = 0;
+};
+
+struct HasNonInitializerStaticInitMethod {
+  static int nonInitializer(int value) __attribute__((swift_name("init(n:)"))) {
+    return value;
+  }
+  // expected-warning@-3 {{ignoring swift_name attribute 'init(n:)'; 'nonInitializer' cannot be imported as an initializer}} 
+  // expected-note@-4 {{use backticks (e.g. 'swift_name("`init`(...)")')}}
+};
+
+struct ConstructorWithRenamedLabel {
+  int value;
+  __attribute__((swift_name("init(renamed:)")))
+  ConstructorWithRenamedLabel(int v) : value(v) {}
+};
+
+struct WithFactory {
+  int x;
+};
+
+inline WithFactory makeWithFactory(int n)
+    __attribute__((swift_name("WithFactory.init(n:)"))) {
+  return {n * 2};
+}
+// expected-note@-4 {{'makeWithFactory' declared here}}
+
+inline WithFactory makeWithWrongFactory(int n)
+    __attribute__((swift_name("WrongFactory.init(n:)"))) {
+  return {n * 3};
+}
+// expected-warning@-3 {{imported declaration 'makeWithWrongFactory' could not be mapped to 'WrongFactory.init(n:)'}}
+// expected-note@-4 {{please report this issue to the owners of 'Methods}}
+
 #endif // TEST_INTEROP_CXX_CLASS_METHOD_METHODS_H

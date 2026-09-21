@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -import-objc-header %S/Inputs/clang_records_addressable_for_dependencies.h -enable-experimental-feature Lifetimes %s
 // RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/clang_records_addressable_for_dependencies.h -enable-experimental-feature Lifetimes %s | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes

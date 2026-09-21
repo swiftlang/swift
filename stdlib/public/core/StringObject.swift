@@ -184,7 +184,7 @@ internal struct _StringObject {
   }
 
   // FIXME: This ought to be the setter for property `_countAndFlags`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _setCountAndFlags(to value: CountAndFlags) {
 #if _pointerBitWidth(_64)
     self._countAndFlagsBits = value._storage
@@ -571,7 +571,7 @@ extension _StringObject {
 
   // Whether this string is in one of our fastest representations:
   // small or tail-allocated (i.e. mortal/immortal native)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var isPreferredRepresentation: Bool {
     return _fastPath(isSmall || _countAndFlags.isTailAllocated)
@@ -781,7 +781,7 @@ extension _StringObject.CountAndFlags {
     return 0x1000_0000_0000_0000
   }
 
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal static var isForeignUTF8Mask: UInt64 {
     return 0x0800_0000_0000_0000
@@ -904,7 +904,7 @@ extension _StringObject.CountAndFlags {
   ///
   /// As of Swift 5.7, this bit is never set; however, future releases may
   /// introduce such forms.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always) // Swift 5.7
   internal var isForeignUTF8: Bool {
     (_storage & Self.isForeignUTF8Mask) != 0
@@ -945,7 +945,7 @@ extension _StringObject {
   }
 
   @inline(__always)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var largeAddress: UnsafeRawPointer {
     unsafe UnsafeRawPointer(bitPattern: largeAddressBits)
       ._unsafelyUnwrappedUnchecked
@@ -1112,8 +1112,7 @@ extension _StringObject {
 #endif
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   @inline(__always)
   internal var owner: _ConvertedObject? {
     guard self.isMortal else { return nil }
@@ -1158,7 +1157,7 @@ extension _StringObject {
   /// If this returns false, then the string is encoded in UTF-16.
   ///
   /// This always returns a value corresponding to the string's actual encoding.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always) // Swift 5.7
   internal var isUTF8: Bool {
     // This is subtle. It is designed to return the right value in all past &

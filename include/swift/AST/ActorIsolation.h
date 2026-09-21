@@ -382,6 +382,8 @@ struct IsolationSource {
   enum Kind : uint8_t {
     /// Isolation is written in an explicit attribute.
     Explicit,
+    /// Isolation comes from a file-level default.
+    FileDefault,
     /// Isolation is inferred from the enclosing lexical context.
     LexicalContext,
     /// Isolation is inferred from conformance to a protocol.
@@ -409,8 +411,15 @@ struct IsolationSource {
                   Kind kind = Kind::None)
       : inferenceSource(inferenceSource), kind(kind) {}
 
-  bool isInferred() const {
-    return (kind != None) && (kind != Explicit);
+  // Whether this isolation was not explicitly written as an attribute here.
+  // \c FileDefault is considered inferred.
+  bool isInferred() const { return (kind != None) && (kind != Explicit); }
+
+  /// Whether this isolation should behave as if written explicitly on the
+  /// declaration for the purpose of maintaining behavior like explicit
+  /// isolated.
+  bool effectivelyExplicit() const {
+    return (kind == Explicit) || (kind == FileDefault);
   }
 
   void printForDiagnostics(llvm::raw_ostream &os,
@@ -434,11 +443,22 @@ struct InferredActorIsolation {
 };
 
 /// Determine how the given value declaration is isolated.
+///
+/// Includes applicable file-default isolation.
 ActorIsolation getActorIsolation(ValueDecl *value);
+
+/// Determine how the given extension declaration is isolated.
+///
+/// Includes applicable file-default isolation.
+ActorIsolation getActorIsolation(ExtensionDecl *ext);
 
 /// Infer the actor isolation of the given declaration, including
 /// the source of isolation inference.
 InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
+
+/// Infer the actor isolation of the given extension, including the source of
+/// isolation inference.
+InferredActorIsolation getInferredActorIsolation(ExtensionDecl *ext);
 
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation

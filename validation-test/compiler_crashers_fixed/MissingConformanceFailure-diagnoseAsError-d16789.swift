@@ -1,0 +1,5 @@
+// {"kind":"typecheck","signature":"swift::constraints::MissingConformanceFailure::diagnoseAsError()","signatureAssert":"Assertion failed: (detail::isPresent(Val) && \"dyn_cast on a non-existent value\"), function dyn_cast","signatureNext":"MissingConformance::diagnose"}
+// RUN: not %target-swift-frontend -typecheck %s
+struct a: Identifiable {
+}
+\a.id

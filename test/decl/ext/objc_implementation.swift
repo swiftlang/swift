@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_ObjCImplementation
 
 protocol EmptySwiftProto {}
 
@@ -16,7 +15,8 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-note@-8 {{missing instance method 'method(fromHeader3:)'}} {{none}}
   // expected-note@-9 {{missing instance method 'extensionMethod(fromHeader2:)'}} {{none}}
   // expected-note@-10 {{missing property 'readonlyPropertyFromHeader7'}}
-  // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{77-77=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: Int32\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: Int32\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: Int32\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: Int32\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n}}
+  // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{77-77=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: CInt\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: CInt\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: CInt\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: CInt\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: CInt) {\n        <#code#>\n    \}\n}}
+  // expected-warning@-12 {{'@objc @implementation' extension does not implement initializer 'init(fromSuperclass2:)' inherited from its superclass; invoking it from Objective-C will trap at runtime}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
@@ -51,7 +51,7 @@ protocol EmptySwiftProto {}
   // expected-error@-1 {{property 'methodFromHeader5' does not match the instance method declared by the header}}
 
   func method(fromHeader6: Double) {
-    // expected-error@-1 {{instance method 'method(fromHeader6:)' of type '(Double) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+    // expected-error@-1 {{instance method 'method(fromHeader6:)' of type '(Double) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
   }
 
   var propertyFromHeader1: CInt
@@ -89,7 +89,7 @@ protocol EmptySwiftProto {}
   }
 
   var propertyFromHeader11: Float
-  // expected-error@-1 {{property 'propertyFromHeader11' of type 'Float' does not match type 'Int32' declared by the header}}
+  // expected-error@-1 {{property 'propertyFromHeader11' of type 'Float' does not match type 'CInt' (aka 'Int32') declared by the header}}
 
   var readonlyPropertyFromHeader1: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable
@@ -178,7 +178,7 @@ protocol EmptySwiftProto {}
   }
 
   class func classMethod3(_: Float) {
-    // expected-error@-1 {{class method 'classMethod3' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+    // expected-error@-1 {{class method 'classMethod3' of type '(Float) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
   }
 
   func instanceMethod1(_: CInt) {
@@ -242,7 +242,7 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-note@-3 {{missing instance method 'categoryMethod(fromHeader3:)'}} {{none}}
   // expected-note@-4 {{missing property 'categoryPropertyFromHeader5'}} {{none}}
   // expected-note@-5 {{missing property 'categoryReadonlyPropertyFromHeader1'}} {{none}}
-  // expected-note@-6 {{add stubs for missing '@implementation' requirements}} {{62-62=\n    @objc(categoryMethodFromHeader3:)\n    open func categoryMethod(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryMethodFromHeader4:)\n    open func categoryMethod(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryPropertyFromHeader5)\n    open var categoryPropertyFromHeader5: Int32 {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    @objc(categoryReadonlyPropertyFromHeader1)\n    open var categoryReadonlyPropertyFromHeader1: Int32 {\n        <#code#>\n    \}\n}}
+  // expected-note@-6 {{add stubs for missing '@implementation' requirements}} {{62-62=\n    @objc(categoryMethodFromHeader3:)\n    open func categoryMethod(fromHeader3 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(categoryMethodFromHeader4:)\n    open func categoryMethod(fromHeader4 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(categoryPropertyFromHeader5)\n    open var categoryPropertyFromHeader5: CInt {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    @objc(categoryReadonlyPropertyFromHeader1)\n    open var categoryReadonlyPropertyFromHeader1: CInt {\n        <#code#>\n    \}\n}}
 
   func method(fromHeader3: CInt) {
     // FIXME: should emit expected-DISABLED-error@-1 {{instance method 'method(fromHeader3:)' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
@@ -487,6 +487,49 @@ protocol EmptySwiftProto {}
   }
 }
 
+@objc @implementation extension UniversallyDeprecatedClass1 { }
+// expected-warning@-1 {{'UniversallyDeprecatedClass1' is deprecated: use SomethingElse instead}}
+
+@available(*, deprecated, message: "use SomethingElse instead")
+@objc @implementation extension UniversallyDeprecatedClass2 { }
+
+@objc @implementation extension UniversallyDeprecatedMembersClass {
+  func deprecatedMethod1() { }
+
+  @available(*, deprecated, message: "use something else")
+  func deprecatedMethod2() { }
+
+  var deprecatedProperty1: CInt
+
+  @available(*, deprecated, message: "use something else")
+  func notDeprecatedMethod1() { }
+}
+
+// A restriction in the Swift language mode domain only prevents references from
+// Swift source, so an implementation that is restricted this way is still
+// reachable through the declaration in the header.
+@objc @implementation extension SwiftAvailabilityMembersClass {
+  @available(swift, obsoleted: 1.0, renamed: "renamedMethod()")
+  func swiftObsoletedMethod1() { }
+  // expected-warning@-1 {{instance method 'swiftObsoletedMethod1()' does not match the declaration in the header because it is unavailable}} {{none}}
+  // expected-note@-3 {{'swiftObsoletedMethod1()' was obsoleted in Swift 1.0}} {{none}}
+
+  @available(swift, obsoleted: 99.0)
+  func swiftObsoletedMethod2() { }
+
+  @available(swift 99.0)
+  func swift99Method1() { }
+  // expected-warning@-1 {{instance method 'swift99Method1()' does not match the declaration in the header because it is unavailable in Swift}} {{none}}
+  // expected-note@-3 {{'swift99Method1()' was introduced in Swift 99.0}} {{none}}
+}
+
+@available(swift, obsoleted: 1.0)
+@objc(Category) @implementation extension SwiftObsoletedExtensionClass {
+  // expected-warning@-1 {{'@objc @implementation' extension cannot implement class 'SwiftObsoletedExtensionClass' because it is unavailable}} {{none}}
+  // expected-note@-3 {{extension of 'SwiftObsoletedExtensionClass' was obsoleted in Swift 1.0}} {{none}}
+  func swiftObsoletedCategoryMethod1() { }
+}
+
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
 @_objcImplementation(EmptyCategory) extension ObjCClass {
   // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-36=@implementation}} {{1-1=@objc(EmptyCategory) }}
@@ -572,12 +615,12 @@ func CImplFuncMissing(_: Int32) {
 
 @implementation @_cdecl("CImplFuncMismatch1")
 func CImplFuncMismatch1(_: Float) {
-  // expected-error@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @_cdecl("CImplFuncMismatch2")
 func CImplFuncMismatch2(_: Int32) -> Float {
-  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @_cdecl("CImplFuncMismatch3")
@@ -608,7 +651,7 @@ func CImplFuncMismatch3a(_: Int32) -> Any? {
 
 @implementation @_cdecl("CImplFuncMismatch4a")
 func CImplFuncMismatch4a(_: Int32) -> Any {
-  // expected-error@-1 {{global function 'CImplFuncMismatch4a' of type '(Int32) -> Any' does not match type '(Int32) -> Any?' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch4a' of type '(Int32) -> Any' does not match type '(CInt) -> Any?' (aka '(Int32) -> Optional<Any>') declared by the header}}
 }
 
 @implementation @_cdecl("CImplFuncMismatch5a")
@@ -631,6 +674,42 @@ func mismatchedName1(_: Int32) {
 func CImplFuncNameMismatch2(_: Int32) {
   // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
+}
+
+@implementation @_cdecl("CImplFuncUnavailable1")
+func CImplFuncUnavailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailable1' does not match the declaration in the header because it must be unavailable}}
+
+@available(*, unavailable)
+@implementation @_cdecl("CImplFuncUnavailable2")
+func CImplFuncUnavailable2(_: Int32) { }
+
+// FIXME: There is no way to satisfy this diagnostic, since 'unavailable' cannot
+// be used in an '@available' attribute for the 'swift' domain.
+@implementation @_cdecl("CImplFuncUnavailableInSwift1")
+func CImplFuncUnavailableInSwift1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailableInSwift1' does not match the declaration in the header because it must be unavailable in Swift}} {{none}}
+
+@implementation @_cdecl("CImplFuncDeprecated1")
+func CImplFuncDeprecated1(_: Int32) { }
+
+@available(*, unavailable)
+@implementation @_cdecl("CImplFuncAvailable1")
+func CImplFuncAvailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncAvailable1' does not match the declaration in the header because it is unavailable}}
+// expected-note@-4 {{'CImplFuncAvailable1' has been explicitly marked unavailable here}}
+
+@available(*, deprecated, message: "use something else")
+@implementation @_cdecl("CImplFuncAvailable2")
+func CImplFuncAvailable2(_: Int32) { }
+
+// When the '@objc' (not '@_cdecl') spelling is used, there is no C name to
+// mention, so the diagnostic should fall back to the Swift name rather than
+// printing an empty '' name.
+class SwiftSubclassWithImplMethod: ObjCClass {
+  @objc @implementation
+  func unimplementedMethod(_: CInt) {}
+  // expected-error@-2 {{could not find imported function 'unimplementedMethod' matching instance method 'unimplementedMethod'; make sure you import the module or header that declares it}}
 }
 
 //

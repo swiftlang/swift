@@ -20,7 +20,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 
 #include "BitPatternBuilder.h"
 #include "Field.h"
@@ -68,7 +67,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     builder.addHeapHeader();
   }
 
-  auto triviallyDestroyable = (decl && decl->getValueTypeDestructor())
+  auto triviallyDestroyable = (decl && decl->hasValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = (decl && !decl->canBeCopyable())
     ? IsNotCopyable : IsCopyable;

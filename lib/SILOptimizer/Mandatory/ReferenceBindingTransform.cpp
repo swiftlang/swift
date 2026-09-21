@@ -13,10 +13,6 @@
 #define DEBUG_TYPE "sil-reference-binding-transform"
 
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
-#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -111,7 +107,7 @@ struct ValidateAllUsesWithinLiveness : public AccessUseVisitor {
     if (isa<EndAccessInst>(user))
       return true;
 
-    if (liveness.isWithinBoundary(user, /*deadEndBlocks=*/nullptr)) {
+    if (liveness.isWithinBoundary(user)) {
       LLVM_DEBUG(llvm::dbgs() << "User in boundary: " << *user);
       diagnose(op->getUser(),
                diag::sil_referencebinding_src_used_within_inout_scope);

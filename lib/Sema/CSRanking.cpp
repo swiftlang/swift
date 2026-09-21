@@ -22,6 +22,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -174,9 +175,13 @@ bool ConstraintSystem::worseThanBestSolution() const {
     return false;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->getCurrentIndent())
-        << "(solution " << CurrentScore << " is worse than the best solution "
-        << solverState->BestScore <<")\n";
+    auto &log = llvm::errs();
+    log.indent(solverState->getCurrentIndent())
+        << "(solution";
+    CurrentScore.print(log);
+    log << " is worse than the best solution";
+    solverState->BestScore->print(log);
+    log <<")\n";
   }
 
   return true;
@@ -990,10 +995,17 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
           break;
         }
       }
+      auto yields = funcType->getYields();
+      SmallVector<AnyFunctionType::Yield, 1> newYields;
+      for (auto yield : yields) {
+        newYields.emplace_back(getStrippedType(yield.getType(), ctx),
+                               yield.getFlags());
+      }
       auto newExtInfo = funcType->getExtInfo().withRepresentation(
           AnyFunctionType::Representation::Swift);
       return FunctionType::get(
-          newParams, getStrippedType(funcType->getResult(), ctx), newExtInfo);
+        newParams, newYields,
+        getStrippedType(funcType->getResult(), ctx), newExtInfo);
     }
 
     return std::nullopt;
@@ -1350,9 +1362,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
-              if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
+              if (canConvertTo(cs.CC, resType1, resType2)) {
                 score1 += weight;
-              } else if (TypeChecker::isSubtypeOf(resType2, resType1, cs.DC)) {
+              } else if (canConvertTo(cs.CC, resType2, resType1)) {
                 score2 += weight;
               }
             }

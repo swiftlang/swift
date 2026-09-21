@@ -1,14 +1,32 @@
-// REQUIRES: rdar81115750
 // REQUIRES: CPU=arm64,OS=macosx
 
-// Doesn't autolink compatibility library because target OS doesn't need it
-// RUN: %target-swift-frontend -target arm64-apple-macosx10.14  -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s
+// The baseline arm64 macOS deployment target (Swift 5.3 / macOS 10.16) doesn't
+// need the pre-5.5 compatibility libraries, but the concurrency-era ones must
+// still be back-deployed.
+// RUN: %target-swift-frontend -target arm64-apple-macosx10.14  -emit-ir -parse-stdlib %s | %FileCheck %s
 
 public func foo() {}
 
-// NO-FORCE-LOAD-NOT: FORCE_LOAD
-// NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility50"}
-// NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility51"}
-// NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility52"}
-// NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility53"}
-// NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibilityDynamicReplacements"}
+// The pre-5.5 compatibility libraries are not force-loaded...
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility52"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility53"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
+// ...but the concurrency-era ones are.
+// CHECK-DAG: @"_swift_FORCE_LOAD_$_swiftCompatibilityConcurrency"
+// CHECK-DAG: @"_swift_FORCE_LOAD_$_swiftCompatibility56"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility52"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility53"
+// CHECK-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
+
+// Likewise for the autolink metadata.
+// CHECK-NOT: !{!"-lswiftCompatibility50"}
+// CHECK-NOT: !{!"-lswiftCompatibility51"}
+// CHECK-NOT: !{!"-lswiftCompatibility52"}
+// CHECK-NOT: !{!"-lswiftCompatibility53"}
+// CHECK-NOT: !{!"-lswiftCompatibilityDynamicReplacements"}
+// CHECK-DAG: !{!"-lswiftCompatibilityConcurrency"}
+// CHECK-DAG: !{!"-lswiftCompatibility56"}

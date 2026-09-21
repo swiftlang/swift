@@ -413,8 +413,8 @@ void CompilerInvocation::computeCXXStdlibOptions() {
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
         ClangImporterOpts, SearchPathOpts, clangDriver);
-    auto &clangToolchain =
-        clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+    auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(LangOpts.Target.normalize()));
     auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
     auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
 
@@ -443,9 +443,49 @@ void CompilerInvocation::computeCXXStdlibOptions() {
   }
 }
 
+void CompilerInvocation::setCommonEmbeddedSwiftOptions(
+    EmbeddedSwiftContext context, bool exclusivityEnforcementSpecified) {
+  LangOpts.enableFeature(Feature::Embedded);
+
+  LangOpts.UnavailableDeclOptimizationMode =
+      UnavailableDeclOptimization::Complete;
+  LangOpts.DisableImplicitStringProcessingModuleImport = true;
+  LangOpts.DisableImplicitConcurrencyModuleImport |=
+      !LangOpts.Target.isOSWASI();
+  IRGenOpts.DisableLegacyTypeInfo = true;
+  TypeCheckerOpts.SkipFunctionBodies = FunctionBodySkipping::None;
+  SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
+  SILOpts.UseAggressiveReg2MemForCodeSize = true;
+
+  if (!exclusivityEnforcementSpecified && !SILOpts.RemoveRuntimeAsserts) {
+    SILOpts.EnforceExclusivityStatic = true;
+    SILOpts.EnforceExclusivityDynamic = false;
+  }
+  if (context == EmbeddedSwiftContext::DebuggerExpression)
+    return;
+
+  // Settings that either don't matter or would be harmful for the debugger.
+  IRGenOpts.InternalizeAtLink = true;
+  IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
+  IRGenOpts.EnableReflectionNames = false;
+  FrontendOpts.DisableBuildingInterface = true;
+  SearchPathOpts.ModuleLoadMode = ModuleLoadingMode::OnlySerialized;
+  SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
+  SILOpts.EmbeddedSwift = true;
+  // -g is promoted to -gdwarf-types in embedded Swift
+  if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
+  }
+}
+
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path.str();
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+}
+
+void CompilerInvocation::updateImplicitSearchPaths() {
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
@@ -822,7 +862,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   using namespace options;
   Opts.EnableCaching |= Args.hasFlag(
       OPT_cache_compile_job, OPT_no_cache_compile_job, /*Default=*/false);
-  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
+  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks) ||
+                               ::getenv("SWIFT_ENABLE_COMPILE_CACHE_REMARK");
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   Opts.WriteOutputHashXAttr |= Args.hasArg(OPT_write_output_hash_xattr);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
@@ -853,6 +894,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
 
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
+
+  Opts.CASFSInputOverlay |= Args.hasArg(OPT_cas_fs_input_overlay);
+  if (Opts.CASFSInputOverlay && Opts.EnableCaching) {
+    // The content of the input files is read from disk, so it no longer
+    // contributes to the cache key.
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   "-cas-fs-input-overlay", "-cache-compile-job");
+    return true;
+  }
 
   return false;
 }
@@ -1167,6 +1217,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitStringProcessingModuleImport |=
     Args.hasArg(OPT_disable_implicit_string_processing_module_import);
 
+  Opts.DisableImplicitCOMModuleImport |=
+      Args.hasArg(OPT_disable_implicit_com_module_import);
+
   Opts.DisableImplicitCxxModuleImport |=
     Args.hasArg(OPT_disable_implicit_cxx_module_import);
 
@@ -1232,6 +1285,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.WeakLinkAtTarget |= Args.hasArg(OPT_weak_link_at_target);
+
+  Opts.WeakLinkSpanCompatibilityLib |=
+      Args.hasArg(OPT_weak_link_span_compatibility_lib);
 
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
 
@@ -1561,6 +1617,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableModuleRecoveryRemarks = Args.hasArg(OPT_remark_module_recovery);
   Opts.EnableModuleSerializationRemarks =
       Args.hasArg(OPT_remark_module_serialization);
+  Opts.EnableHiddenTypeLayoutSerializationRemarks =
+      Args.hasArg(OPT_remark_hidden_type_layout_serialization);
   Opts.EnableModuleApiImportRemarks = Args.hasArg(OPT_remark_module_api_import);
   Opts.EnableMacroLoadingRemarks = Args.hasArg(OPT_remark_macro_loading);
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
@@ -1677,6 +1735,32 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         " " + printFormalCxxInteropVersion(Opts);
 
   Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
+  // Preserve COM interop inherited by a textual-interface sub-invocation.
+  // This mirrors C++ interop above: parsing the interface's own flags may
+  // enable or refine the inherited model, but must not turn it back off.
+  Opts.EnableCOMInterop |= Args.hasArg(OPT_enable_com_interop);
+  // A COM interop model is in effect exactly when interop is enabled: default
+  // it from the target, then honor an explicit override.
+  if (Opts.EnableCOMInterop) {
+    if (!Opts.COMModel)
+      Opts.COMModel = Target.isOSDarwin()
+                          ? LangOptions::COMInteropModel::CoreFoundation
+                          : LangOptions::COMInteropModel::Microsoft;
+
+    if (const Arg *A = Args.getLastArg(OPT_com_interop_model)) {
+      std::optional<LangOptions::COMInteropModel> model =
+          llvm::StringSwitch<decltype(model)>(A->getValue())
+              .Case("microsoft", LangOptions::COMInteropModel::Microsoft)
+              .Case("corefoundation",
+                    LangOptions::COMInteropModel::CoreFoundation)
+              .Default(std::nullopt);
+      if (model)
+        Opts.COMModel = *model;
+      else
+        Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                       A->getOption().getPrefixedName(), A->getValue());
+    }
+  }
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
@@ -1883,6 +1967,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
+  setUnsignedIntegerArgument(OPT_max_associated_type_inference_iterations,
+                             Opts.AssociatedTypeInferenceIterations);
+
   for (auto &block: FrontendOpts.BlocklistConfigFilePaths)
     Opts.BlocklistConfigFilePaths.push_back(block);
   if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
@@ -1895,10 +1982,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   if (Opts.hasFeature(Feature::Embedded)) {
-    Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
-    Opts.DisableImplicitStringProcessingModuleImport = true;
-    Opts.DisableImplicitConcurrencyModuleImport |= !Opts.Target.isOSWASI();
-
     if (!swiftModulesInitialized()) {
       Diags.diagnose(SourceLoc(), diag::no_swift_sources_with_embedded);
       HadError = true;
@@ -1917,6 +2000,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     if (Opts.EnableObjCInterop) {
       Diags.diagnose(SourceLoc(), diag::objc_with_embedded);
+      HadError = true;
+    }
+
+    if (Opts.hasFeature(Feature::TypedAllocation) && !Target.isArch64Bit()) {
+      Diags.diagnose(SourceLoc(), diag::typed_allocation_requires_64_bit);
       HadError = true;
     }
   }
@@ -2117,20 +2205,20 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
-  Opts.CrashOnValidSalvage =
-      Args.hasFlag(OPT_solver_enable_crash_on_valid_salvage,
-                   OPT_solver_disable_crash_on_valid_salvage,
-                   Opts.CrashOnValidSalvage);
+  Opts.DiagnoseValidSalvage =
+      Args.hasFlag(OPT_solver_enable_diagnose_valid_salvage,
+                   OPT_solver_disable_diagnose_valid_salvage,
+                   Opts.DiagnoseValidSalvage);
+
+  Opts.CrashFailDiagnostic =
+      Args.hasFlag(OPT_solver_enable_crash_fail_diagnostic,
+                   OPT_solver_disable_crash_fail_diagnostic,
+                   Opts.CrashFailDiagnostic);
 
   Opts.SolverEnableTransitiveConformance =
       Args.hasFlag(OPT_solver_enable_transitive_conformance,
                    OPT_solver_disable_transitive_conformance,
                    Opts.SolverEnableTransitiveConformance);
-
-  Opts.SolverEnableBindingOptimizations =
-      Args.hasFlag(OPT_solver_enable_binding_optimizations,
-                   OPT_solver_disable_binding_optimizations,
-                   Opts.SolverEnableBindingOptimizations);
 
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,
@@ -2142,15 +2230,25 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_prune_disjunctions,
                    Opts.SolverPruneDisjunctions);
 
-  Opts.SolverOptimizeOperatorDefaults =
-      Args.hasFlag(OPT_solver_enable_optimize_operator_defaults,
-                   OPT_solver_disable_optimize_operator_defaults,
-                   Opts.SolverOptimizeOperatorDefaults);
-
   Opts.SolverEnablePerformanceHacks =
       Args.hasFlag(OPT_solver_enable_performance_hacks,
                    OPT_solver_disable_performance_hacks,
                    Opts.SolverEnablePerformanceHacks);
+
+  Opts.SolverEnableEnumerateSupertypes =
+      Args.hasFlag(OPT_solver_enable_enumerate_supertypes,
+                   OPT_solver_disable_enumerate_supertypes,
+                   Opts.SolverEnableEnumerateSupertypes);
+
+  Opts.SolverEnableTypeVariableJoins =
+      Args.hasFlag(OPT_solver_enable_type_var_joins,
+                   OPT_solver_disable_type_var_joins,
+                   Opts.SolverEnableTypeVariableJoins);
+
+  Opts.SolverEnablePromoteSupertypes =
+      Args.hasFlag(OPT_solver_enable_promote_supertypes,
+                   OPT_solver_disable_promote_supertypes,
+                   Opts.SolverEnablePromoteSupertypes);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
@@ -2297,6 +2395,20 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_clang_spi)) {
     Opts.EnableClangSPI = false;
   }
+
+  if (auto *A = Args.getLastArg(OPT_enable_objc_msgsend_selector_stubs,
+                                OPT_disable_objc_msgsend_selector_stubs))
+    Opts.ForceObjCMsgSendSelectorStubs =
+        A->getOption().matches(OPT_enable_objc_msgsend_selector_stubs);
+  else
+    Opts.ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+  if (auto *A = Args.getLastArg(OPT_enable_objc_msgsend_class_selector_stubs,
+                                OPT_disable_objc_msgsend_class_selector_stubs))
+    Opts.ForceObjCMsgSendClassSelectorStubs =
+        A->getOption().matches(OPT_enable_objc_msgsend_class_selector_stubs);
+  else
+    Opts.ForceObjCMsgSendClassSelectorStubs = std::nullopt;
 
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
@@ -2798,6 +2910,31 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *arg = Args.getLastArg(OPT_serialize_diagnostics_EQ)) {
+    auto format =
+        llvm::StringSwitch<std::optional<DiagnosticOptions::SerializedFormat>>(
+            arg->getValue())
+            .Case("dia", DiagnosticOptions::SerializedFormat::LLVMBitcode)
+            .Case("sarif", DiagnosticOptions::SerializedFormat::SARIF)
+            .Default(std::nullopt);
+    if (!format) {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     arg->getOption().getPrefixedName(), arg->getValue());
+      return true;
+    }
+
+#if !SWIFT_BUILD_SARIF
+    // Accepting the argument would silently write no log at all.
+    if (*format == DiagnosticOptions::SerializedFormat::SARIF) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_serialize_diagnostics_sarif_unsupported_build);
+      return true;
+    }
+#endif
+
+    Opts.SerializedDiagnosticsFormat = *format;
+  }
+
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
     bool negated = contents.starts_with("no-");
@@ -2827,6 +2964,13 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       !temporarilySuppressEmbeddedRestrictionDiagnostics(Args))
     Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
                                                DiagGroupID::EmbeddedRestrictions);
+
+  // If -no-allocations was specified, make the HeapAllocation warnings into
+  // errors.
+  if (isEmbedded(Args) && Args.hasArg(OPT_no_allocations)) {
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsError,
+                                               DiagGroupID::HeapAllocation);
+  }
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
@@ -3319,12 +3463,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
                    OPT_disable_lifetime_dependence_diagnostics,
                    Opts.EnableLifetimeDependenceDiagnostics);
+  Opts.EnableLifetimeResolution =
+      Args.hasFlag(OPT_enable_lifetime_resolution,
+                   OPT_disable_lifetime_resolution,
+                   Opts.EnableLifetimeResolution);
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.VerifyOwnershipAll |= Args.hasArg(OPT_sil_ownership_verify_all);
   Opts.AbortOnUnknownRegionIsolationPatternError |=
       Args.hasArg(OPT_sil_region_isolation_assert_on_unknown_pattern);
+  Opts.EmitIsolationHistory |=
+      Args.hasArg(OPT_sil_region_isolation_emit_isolation_history);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
@@ -3446,11 +3596,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::embedded_dynamic_exclusivity_staging);
       Opts.EnforceExclusivityDynamic = false;
     }
-  } else if (!Opts.RemoveRuntimeAsserts &&
-             LangOpts.hasFeature(Feature::Embedded)) {
-    // Embedded Swift defaults to -enforce-exclusivity=unchecked for now.
-    Opts.EnforceExclusivityStatic = true;
-    Opts.EnforceExclusivityDynamic = false;
   }
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
@@ -3922,6 +4067,22 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = true;
   }
 
+  // LLDB needs reflection metadata to inspect variables of non-embedded Swift
+  // programs. Embedded Swift promotes -g to -gdwarf-types and relies on the
+  // DWARF type information instead, so it is exempt from this warning.
+  if (Opts.ReflectionMetadata == ReflectionMetadataMode::None &&
+      Opts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes &&
+      !LangOpts.hasFeature(Feature::Embedded)) {
+    const Arg *DebugInfoArg = Args.getLastArg(OPT_g_Group);
+    const Arg *NoReflectionArg =
+        Args.getLastArg(OPT_disable_reflection_metadata);
+    if (DebugInfoArg && NoReflectionArg)
+      Diags.diagnose(SourceLoc(),
+                     diag::warning_reflection_metadata_disabled_with_debug_info,
+                     DebugInfoArg->getAsString(Args),
+                     NoReflectionArg->getAsString(Args));
+  }
+
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
     Opts.EnableAnonymousContextMangledNames = true;
 
@@ -3975,6 +4136,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_emit_singleton_metadata_pointer)) {
     Opts.EmitSingletonMetadataPointers = true;
+  }
+
+  if (Args.hasArg(OPT_disable_emit_singleton_metadata_pointer)) {
+    Opts.EmitSingletonMetadataPointers = false;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
@@ -4232,6 +4397,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+  Opts.PrintLLVMBackendDiagnostics |=
+      Args.hasArg(OPT_print_llvm_backend_diagnostics);
 
   if (CASOpts.WriteOutputHashXAttr && Opts.UseCASBackend) {
     Diags.diagnose(SourceLoc(), diag::error_option_incompatible,
@@ -4245,6 +4412,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+  // These are the conditions clang uses to emit call site info for optimized
+  // binaries.
+  if (Opts.shouldOptimize() &&
+      Opts.DebugInfoLevel >= IRGenDebugInfoLevel::ASTTypes &&
+      Triple.supportsDebugEntryValues())
+    Opts.DebugCallsiteInfo = true;
 
   if (Args.hasArg(OPT_mergeable_symbols))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
@@ -4457,21 +4630,9 @@ bool CompilerInvocation::parseArgs(
   computeAArch64TBIOptions();
 
   if (LangOpts.hasFeature(Feature::Embedded)) {
-    IRGenOpts.InternalizeAtLink = true;
-    IRGenOpts.DisableLegacyTypeInfo = true;
-    IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
-    IRGenOpts.EnableReflectionNames = false;
-    FrontendOpts.DisableBuildingInterface = true;
-    SearchPathOpts.ModuleLoadMode = ModuleLoadingMode::OnlySerialized;
-    TypeCheckerOpts.SkipFunctionBodies = FunctionBodySkipping::None;
-    SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
-    SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
-    SILOpts.EmbeddedSwift = true;
-    SILOpts.UseAggressiveReg2MemForCodeSize = true;
-    // -g is promoted to -gdwarf-types in embedded Swift
-    if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
-      IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
-    }
+    setCommonEmbeddedSwiftOptions(
+        EmbeddedSwiftContext::FullCompilation,
+        ParsedArgs.hasArg(OPT_enforce_exclusivity_EQ));
   } else {
     if (SILOpts.NoAllocations) {
       Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
@@ -4557,10 +4718,16 @@ CompilerInvocation::setUpInputForSILTool(
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {
-    const StringRef stem = !moduleNameArg.empty()
-                               ? moduleNameArg
-                               : llvm::sys::path::stem(inputFilename);
-    setModuleName(stem);
+    // Prefer the module name which is recorded in the module file itself over
+    // the file name: the file name is not necessarily the module name, e.g. for
+    // modules in a `<module-name>.swiftmodule` directory, where the file is
+    // named after the target.
+    StringRef moduleName = moduleNameArg;
+    if (moduleName.empty() && Lexer::isIdentifier(result.name))
+      moduleName = result.name;
+    if (moduleName.empty())
+      moduleName = llvm::sys::path::stem(inputFilename);
+    setModuleName(moduleName);
     getFrontendOptions().InputMode =
         FrontendOptions::ParseInputMode::SwiftLibrary;
   } else {

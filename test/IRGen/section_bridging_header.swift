@@ -2,7 +2,6 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -enforce-exclusivity=unchecked -parse-as-library -emit-sil -import-objc-header %t/bridge.h %t/file.swift -o /dev/null
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 
 // BEGIN bridge.h

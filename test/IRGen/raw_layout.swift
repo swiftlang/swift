@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: swift_feature_RawLayout
 
@@ -396,7 +396,8 @@ entry(%0 : $*Cell<T>):
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}19CellThatMovesAsLikeVMr"(ptr %"CellThatMovesAsLike<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: call void @swift_initRawStructMetadata2(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} 2)
+// CHECK: [[IS_POD:%.*]] = select i1 {{.*}}, {{i64|i32}} 2, {{i64|i32}} 10
+// CHECK: call void @swift_initRawStructMetadata2(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} [[IS_POD]])
 
 //===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> destroy
@@ -632,7 +633,9 @@ entry(%0 : $*Cell<T>):
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}17VectorMovesAsLikeVMr"(ptr %"VectorMovesAsLike<T, N>", ptr {{.*}}, ptr {{.*}})
 // CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
-// CHECK:         call void @swift_initRawStructMetadata2(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 3)
+// CHECK:         [[IS_POD:%.*]] = select i1 {{.*}}, {{i64|i32}} 2, {{i64|i32}} 10
+// CHECK-NEXT:    [[IS_ARRAY:%.*]] = or {{i64|i32}} [[IS_POD]], 1
+// CHECK:         call void @swift_initRawStructMetadata2(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} [[IS_ARRAY]])
 
 //===----------------------------------------------------------------------===//
 // VectorMovesAsLike destroy

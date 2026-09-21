@@ -159,7 +159,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU") OR
-     ("${SDK}" STREQUAL "WASI"))
+     ("${SDK}" STREQUAL "WASI") OR
+     ("${SDK}" STREQUAL "EMSCRIPTEN"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -385,6 +386,7 @@ foreach(SDK ${SWIFT_SDKS})
     foreach(BUILD_FLAVOR ${build_flavors})
       # Configure variables for this subdirectory.
       set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
+      set(SWIFT_STDLIB_DARWIN_ARCHS "${SWIFT_SDK_${SDK}_ARCHITECTURES}")
       get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
       get_swift_test_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${SDK}" "${ARCH}" "default")
       get_swift_test_versioned_target_triple(VARIANT_TRIPLE "${SDK}" "${ARCH}" "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}" "${BUILD_FLAVOR}")
@@ -405,10 +407,13 @@ foreach(SDK ${SWIFT_SDKS})
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
 
-      # Reset these values for WASI, as Embedded Swift for WASI requires separate lit configs.
+      # Wasm-hosted SDKs have their own embedded-stdlib lit config; disable
+      # the embedded features on the non-embedded lit config so the same
+      # embedded test is not matched and executed twice.
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB})
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING})
-      if("${SDK}" STREQUAL "WASI")
+      is_wasm_sdk("${SDK}" _is_wasm_sdk)
+      if(_is_wasm_sdk)
         set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB OFF)
         set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING OFF)
       endif()
@@ -435,7 +440,7 @@ foreach(SDK ${SWIFT_SDKS})
           "${test_bin_dir}/lit.swift-features.cfg"
           "${validation_test_bin_dir}/lit.swift-features.cfg")
 
-      # Restore old values in case they were reset for WASI tests lit configs.
+      # Restore old values in case they were reset above for Wasm-hosted SDKs.
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old})
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old})
 
@@ -566,7 +571,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${command_upload_swift_reflection_test}
               ${command_clean_test_results_dir}
               COMMAND
-                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT} --
                 $<TARGET_FILE:Python3::Interpreter> "${LIT}"
                 ${final_lit_args}
                 "--param" "swift_test_subset=${test_subset}"
@@ -586,7 +591,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${command_upload_swift_reflection_test}
               ${command_clean_test_results_dir}
               COMMAND
-                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT} --
                 $<TARGET_FILE:Python3::Interpreter> "${LIT}"
                 ${final_lit_args}
                 "--param" "swift_test_subset=${test_subset}"
@@ -603,11 +608,14 @@ foreach(SDK ${SWIFT_SDKS})
         endforeach()
       endforeach()
 
-      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING AND (${ARCH} STREQUAL "wasm32"))
+      is_wasm_sdk("${SDK}" _is_wasm_sdk)
+      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING AND _is_wasm_sdk)
+        string(TOLOWER "${SDK}" _sdk_lower)
+        set(VARIANT_SUFFIX "-embedded-${_sdk_lower}")
+        string(REGEX REPLACE "-threads$" "" VARIANT_TRIPLE
+               "${SWIFT_SDK_${SDK}_ARCH_wasm32_TRIPLE}")
         set(test_mode "optimize_none")
         set(test_subset "primary")
-        set(VARIANT_SUFFIX "-embedded-wasi")
-        set(VARIANT_TRIPLE "wasm32-unknown-wasip1")
         set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/embedded")
         set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
         set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
@@ -629,7 +637,7 @@ foreach(SDK ${SWIFT_SDKS})
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+              ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT} --
               $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${embedded_wasm_lit_args}
               "--param" "swift_test_subset=${test_subset}"
@@ -638,7 +646,7 @@ foreach(SDK ${SWIFT_SDKS})
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
             USES_TERMINAL)
-        endif()
+      endif()
     endforeach()
   endforeach()
 endforeach()

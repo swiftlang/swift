@@ -4,6 +4,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -o %t
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -I %t %s %S/testable-multifile.swift -module-name main
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t %s %S/testable-multifile.swift -module-name main | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t %S/testable-multifile.swift %s -module-name main | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t -primary-file %s %S/testable-multifile.swift -module-name main | %FileCheck %s

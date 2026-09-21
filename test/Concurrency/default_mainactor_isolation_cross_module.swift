@@ -14,14 +14,14 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Lib.swiftinterface) -module-name Lib
 
 // Build the client using module
-// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify -verify-ignore-unrelated -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
 
 // RUN: rm %t/Lib.swiftmodule
 
 // Re-build the client using interface
-// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify -verify-ignore-unrelated -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
 
 // REQUIRES: swift_swift_parser, executable_test, concurrency
 

@@ -67,11 +67,14 @@ bb4:
   %19 = begin_access [read] [dynamic] %18 : $*Int
   %20 = load %19 : $*Int
   end_access %19 : $*Int
-  cond_br undef, bb4, bb5
+  cond_br undef, bb6, bb5
 
 bb5:
   %z = tuple ()
   return %z : $()
+
+bb6:
+  br bb4
 }
 
 // Test that jump threading sinks a
@@ -102,7 +105,7 @@ bb5:
 // CHECK:   [[ELT:%.*]] = index_addr [[TAIL]] : $*Int32, %14 : $Builtin.Word
 // CHECK:   [[ADR:%.*]] = struct_element_addr [[ELT]] : $*Int32, #Int32._value
 // CHECK:   load [[ADR]] : $*Builtin.Int32
-// CHECK:   cond_br undef, bb4, bb5
+// CHECK:   cond_br undef, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testJumpThreadIndex'
 sil @testJumpThreadIndex : $@convention(thin) (__ContiguousArrayStorageBase, Builtin.Int64) -> Builtin.Int32 {
 bb0(%0 : $__ContiguousArrayStorageBase, %1 : $Builtin.Int64):
@@ -129,10 +132,13 @@ bb3(%arg : $C):
 
 bb4:
   %val = load %adr : $*Builtin.Int32
-  cond_br undef, bb4, bb5
+  cond_br undef, bb6, bb5
 
 bb5:
   return %val : $Builtin.Int32
+
+bb6:
+  br bb4
 }
 
 // Test that debug_value is not unnecessarily lost during address projection sinking.
@@ -153,7 +159,7 @@ sil @useAny : $@convention(thin) <V> (@in_guaranteed V) -> ()
 sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
 bb0(%0 : $*S, %1 : $CC<R>, %2 : $Bool):
   %bool = struct_extract %2 : $Bool, #Bool._value
-  cond_br %bool, bb1, bb2
+  cond_br %bool, bb1, bb5
 
 bb1:
   debug_value %0 : $*S, let, name "u", expr op_deref
@@ -164,7 +170,7 @@ bb1:
 bb2:
   %field = ref_element_addr %1 : $CC<R>, #CC.r
   debug_value %field : $*R, let, name "t", expr op_deref
-  cond_br %bool, bb3, bb4
+  cond_br %bool, bb3, bb6
 
 bb3:
   debug_value %field : $*R, let, name "u", expr op_deref
@@ -175,6 +181,12 @@ bb3:
 bb4:
   %z = tuple ()
   return %z : $()
+
+bb5:
+  br bb2
+
+bb6:
+  br bb4
 }
 
 // Test multiple uses and cloned allocation.

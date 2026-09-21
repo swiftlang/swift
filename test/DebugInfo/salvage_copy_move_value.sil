@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Box {
+  var value: String
+}
+
+// Real-world pattern: Box.init inlined into caller.
+// copy_value of guaranteed arg consumed by store; debug_value "v" on the copy.
+// After sil-combine, the copy is eliminated but "v" should survive pointing to %0.
+// CHECK-LABEL: sil [ossa] @copy_value_consumed_by_store
+// CHECK: debug_value %0, let, name "v"
+sil [ossa] @copy_value_consumed_by_store : $@convention(thin) (@guaranteed String) -> @owned Box {
+bb0(%0 : @guaranteed $String):
+  %2 = copy_value %0 : $String
+  %3 = alloc_ref $Box
+  debug_value %2 : $String, let, name "v"
+  %6 = end_init_let_ref %3 : $Box
+  %7 = begin_borrow %6 : $Box
+  %8 = ref_element_addr %7 : $Box, #Box.value
+  store %2 to [init] %8 : $*String
+  end_borrow %7 : $Box
+  return %6 : $Box
+}
+
+// copy+move chain from guaranteed arg. SimplifyMoveValue RAUWs the move to
+// the copy, then guaranteed canonicalization removes the destroy and deletes
+// the copy through deleteCopyAndMoveChain. salvageDebugInfo repoints to %0.
+// CHECK-LABEL: sil [ossa] @move_value_salvage
+// CHECK: debug_value %0, let, name "m"
+sil [ossa] @move_value_salvage : $@convention(thin) (@guaranteed Box) -> () {
+bb0(%0 : @guaranteed $Box):
+  %1 = copy_value %0 : $Box
+  %2 = move_value %1 : $Box
+  debug_value %2 : $Box, let, name "m"
+  destroy_value %2 : $Box
+  %r = tuple ()
+  return %r : $()
+}

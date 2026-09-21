@@ -17,13 +17,11 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "clang/AST/DeclObjC.h"
 #include "swift/AST/TypeCheckRequests.h"
-
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 
@@ -129,6 +127,7 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
+UNINTERESTING_FEATURE(SymbolLinkageMarkers)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -136,6 +135,7 @@ UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
 UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
+UNINTERESTING_FEATURE(NoncopyableCasting)
 UNINTERESTING_FEATURE(AccessLevelOnImport)
 UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
 UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
@@ -177,6 +177,19 @@ UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
 UNINTERESTING_FEATURE(TypedAllocation)
+UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
+UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
+UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
+
+static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
+  auto *SD = dyn_cast<SubscriptDecl>(decl);
+  if (!SD)
+    return false;
+
+  return llvm::any_of(*SD->getIndices(), [](const ParamDecl *index) {
+    return index->getSpecifier() != ParamSpecifier::Default;
+  });
+}
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
@@ -198,6 +211,7 @@ UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
 UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(SerializeAbstractTypeLayoutForHiddenTypes)
 UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
 static bool usesFeatureCAttribute(Decl *decl) {
@@ -208,6 +222,10 @@ static bool usesFeatureCAttribute(Decl *decl) {
   }
 
   return false;
+}
+
+static bool usesFeatureTargetAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TargetAttr>();
 }
 
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
@@ -410,7 +428,7 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   if (!fd) {
     return false;
   }
-  
+
   for (auto pd : *fd->getParameters()) {
     if (pd->isAddressable()) {
       return true;
@@ -423,7 +441,7 @@ static bool usesFeatureAddressableTypes(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -452,7 +470,7 @@ static bool usesFeatureABIAttributeSE0479(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-static bool usesFeatureIsolatedConformances(Decl *decl) { 
+static bool usesFeatureIsolatedConformances(Decl *decl) {
   // FIXME: Check conformances associated with this decl?
   return false;
 }
@@ -467,6 +485,9 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
 UNINTERESTING_FEATURE(ClosureBodyMacro)
 UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
 UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinTaskCancellationScope)
+UNINTERESTING_FEATURE(BuiltinTaskDeadline)
+UNINTERESTING_FEATURE(BuiltinCancellationHandlerWithReason)
 UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
@@ -474,11 +495,19 @@ UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
+UNINTERESTING_FEATURE(SafeInteropWrappersNullAsEmptySpan)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
+UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
+UNINTERESTING_FEATURE(LibkernOwnershipConventions)
+UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
+UNINTERESTING_FEATURE(ForeignReferenceTypeSubclassing)
+UNINTERESTING_FEATURE(CxxImplementation)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
+UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
+UNINTERESTING_FEATURE(EmbeddedDistributed)
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
@@ -490,6 +519,11 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
     return llvm::any_of(var->getAllAccessors(),
                         accessorDeclUsesFeatureCoroutineAccessors);
   }
+  case DeclKind::Subscript: {
+    auto *subscript = cast<SubscriptDecl>(decl);
+    return llvm::any_of(subscript->getAllAccessors(),
+                        accessorDeclUsesFeatureCoroutineAccessors);
+  }
   case DeclKind::Accessor: {
     auto *accessor = cast<AccessorDecl>(decl);
     return accessorDeclUsesFeatureCoroutineAccessors(accessor);
@@ -499,9 +533,17 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   }
 }
 
+static bool usesFeatureCoroutineFunctions(Decl *decl) {
+  if (auto *FD = dyn_cast<FuncDecl>(decl))
+    return FD->isCoroutine() && !isa<AccessorDecl>(FD);
+  
+  return false;
+}
+
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
 UNINTERESTING_FEATURE(BuiltinMarkDependence)
+UNINTERESTING_FEATURE(BuiltinGepProjection)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -574,7 +616,7 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
 }
 
 static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
-  return isa<UsingDecl>(D);
+  return isa<FileDefaultDecl>(D);
 }
 
 UNINTERESTING_FEATURE(BuiltinSelect)
@@ -608,6 +650,13 @@ static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
 static bool usesFeatureInlineAlways(Decl *decl) {
   if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
     return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
+static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
+  if (auto *unsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
+    return unsafeAttr->isAlways();
   }
   return false;
 }
@@ -671,7 +720,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 
   // Check if this decl itself is a reparentable protocol (of extension of).
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
+    if (auto *nominal = ext->getExtendedNominal())
+      decl = nominal;
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
@@ -685,7 +735,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
-UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
+
+UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
 
 static bool usesFeatureBorrowInout(Decl *decl) {
   auto &ctx = decl->getASTContext();
@@ -696,6 +747,49 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 
   return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
 }
+
+UNINTERESTING_FEATURE(BuiltinDereferenceable)
+
+static bool usesFeatureCalledAttribute(Decl *D) {
+  auto &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+    return false;
+
+  std::function<bool(Type)> hasCalled = [](Type T) {
+    if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
+      return F->isCalledOnce();
+    return false;
+  };
+
+  if (auto *TA = dyn_cast<TypeAliasDecl>(D)) {
+    if (auto type = TA->getUnderlyingType()) {
+      return type.findIf(hasCalled);
+    }
+    return false;
+  }
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, n = PBD->getNumPatternEntries(); i != n; ++i) {
+      auto P = PBD->getCheckedPattern(i);
+      if (!P)
+        continue;
+
+      bool usesCalled = false;
+      P->forEachVariable([&usesCalled](auto *V) {
+        usesCalled |= usesFeatureCalledAttribute(V);
+      });
+
+      if (usesCalled)
+        return true;
+    }
+
+    return false;
+  }
+
+  return usesTypeMatching(D, hasCalled);
+}
+
+UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

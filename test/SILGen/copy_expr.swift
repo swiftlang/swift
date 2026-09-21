@@ -1,3 +1,5 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature NoImplicitCopy %s
+
 // RUN: %target-swift-emit-silgen -enable-experimental-feature NoImplicitCopy %s | %FileCheck %s
 
 // REQUIRES: swift_feature_NoImplicitCopy

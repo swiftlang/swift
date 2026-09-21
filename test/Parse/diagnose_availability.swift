@@ -80,13 +80,13 @@ func interpolatedMessage() {}
 func multilineMessage() {}
 multilineMessage()
 // expected-error@-1{{'multilineMessage()' is unavailable: foobar message.}}
-// expected-note@-3{{'multilineMessage()' has been explicitly marked unavailable here}}
+// expected-note@-6{{'multilineMessage()' has been explicitly marked unavailable here}}
 
 @available(*, unavailable, message: " ")
 func emptyMessage() {}
 emptyMessage()
 // expected-error@-1{{'emptyMessage()' is unavailable:  }}
-// expected-note@-3{{'emptyMessage()' has been explicitly marked unavailable here}}
+// expected-note@-4{{'emptyMessage()' has been explicitly marked unavailable here}}
 
 // expected-error@+1{{'message' cannot be an extended escaping string literal}}
 @available(*, unavailable, message: #"""

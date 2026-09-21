@@ -50,6 +50,12 @@ public:
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowByPointer);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   static bool classof(const BorrowByPointerTypeInfo *) { return true; }
   // NB: this classof implementation assumes that it is already known that
   // the `TypeInfo` being cast is converted from a `Builtin.Borrow`. Other
@@ -119,6 +125,12 @@ public:
       ReferentTI(referentTI)
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowInline);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
   unsigned getExplosionSize() const override {
@@ -211,22 +223,32 @@ public:
                                        Address src,
                                        SILType T,
                                        bool isOutlined) const override {
-    return ReferentTI.getExtraInhabitantIndex(IGF, src, T, isOutlined);
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy =
+        SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    return ReferentTI.getExtraInhabitantIndex(IGF, src, referentTy, isOutlined);
   }
 
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,
                             bool isOutlined) const override {
-    return ReferentTI.storeExtraInhabitant(IGF, index, dest, T, isOutlined);
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy =
+        SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    return ReferentTI.storeExtraInhabitant(IGF, index, dest, referentTy,
+                                           isOutlined);
   }
 
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
     return ReferentTI.getFixedExtraInhabitantMask(IGM);
   }
-  
+
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {
-    return ReferentTI.buildTypeLayoutEntry(IGM, T, useStructLayouts);
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy =
+        SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    return ReferentTI.buildTypeLayoutEntry(IGM, referentTy, useStructLayouts);
   }
 
   static bool classof(const BorrowByPointerTypeInfo *) { return true; }
@@ -252,6 +274,12 @@ public:
                            IsABIAccessible)
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowNonFixed);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,

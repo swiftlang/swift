@@ -387,20 +387,12 @@ void CompletionLookup::addImportModuleNames() {
   }
 }
 
-void CompletionLookup::addUsingSpecifiers() {
-  for (unsigned i = 0,
-                n = static_cast<unsigned>(UsingSpecifier::LastSpecifier) + 1;
-       i != n; ++i) {
+void CompletionLookup::addFileDefaultSpecifiers() {
+  for (auto specifier :
+       {"@MainActor", "nonisolated", "@available", "@diagnose"}) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Keyword, SemanticContextKind::None);
-    switch (static_cast<UsingSpecifier>(i)) {
-    case UsingSpecifier::MainActor:
-      Builder.addTextChunk("@MainActor");
-      break;
-    case UsingSpecifier::Nonisolated:
-      Builder.addTextChunk("nonisolated");
-      break;
-    }
+    Builder.addTextChunk(specifier);
   }
 }
 
@@ -623,87 +615,87 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
   }
   assert(!T.isNull());
 
-  if (ExprType) {
-    Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
-    if (ContextTy) {
-      // Look through lvalue types and metatypes
-      Type MaybeNominalType = ExprType->getRValueType();
+  if (!ExprType)
+    return T;
 
-      if (auto Metatype = MaybeNominalType->getAs<MetatypeType>())
-        MaybeNominalType = Metatype->getInstanceType();
+  ASSERT(!ExprType->hasTypeParameter() && "Expected contextual base type");
 
-      if (auto SelfType = MaybeNominalType->getAs<DynamicSelfType>())
-        MaybeNominalType = SelfType->getSelfType();
+  Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
+  if (!ContextTy)
+    return T;
 
-      // For optional protocol requirements and dynamic dispatch,
-      // strip off optionality from the base type, but only if
-      // we're not actually completing a member of Optional.
-      if (!ContextTy->getOptionalObjectType() &&
-          MaybeNominalType->getOptionalObjectType())
-        MaybeNominalType = MaybeNominalType->getOptionalObjectType();
+  // Look through lvalue types and metatypes
+  Type MaybeNominalType = ExprType->getRValueType();
 
-      // For dynamic lookup don't substitute in the base type.
-      if (MaybeNominalType->isAnyObject())
-        return T;
+  if (auto Metatype = MaybeNominalType->getAs<MetatypeType>())
+    MaybeNominalType = Metatype->getInstanceType();
 
-      // FIXME: Sometimes ExprType is the type of the member here,
-      // and not the type of the base. That is inconsistent and
-      // should be cleaned up.
-      if (!MaybeNominalType->mayHaveMembers())
-        return T;
+  if (auto SelfType = MaybeNominalType->getAs<DynamicSelfType>())
+    MaybeNominalType = SelfType->getSelfType();
 
-      // We can't do anything if the base type has unbound generic parameters.
-      if (MaybeNominalType->hasUnboundGenericType())
-        return T;
+  // For optional protocol requirements and dynamic dispatch,
+  // strip off optionality from the base type, but only if
+  // we're not actually completing a member of Optional.
+  if (!ContextTy->getOptionalObjectType() &&
+      MaybeNominalType->getOptionalObjectType())
+    MaybeNominalType = MaybeNominalType->getOptionalObjectType();
 
-      // If we are doing implicit member lookup on a protocol and we have found
-      // a declaration in a constrained extension, use the extension's `Self`
-      // type for the generic substitution.
-      // Eg in the following, the `Self` type returned by `qux` is
-      // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
-      // ```
-      // protocol MyProto {}
-      // struct MyGeneric<T>: MyProto {}
-      // extension MyProto where Self == MyGeneric<Int> {
-      //   static func qux() -> Self { .init() }
-      // }
-      // func takeMyProto(_: any MyProto)  {}
-      // func test() {
-      //   takeMyProto(.#^COMPLETE^#)
-      // }
-      // ```
-      if (MaybeNominalType->isExistentialType()) {
-        Type SelfType;
-        if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-          if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
-            auto Sig = ED->getGenericSignature();
-            SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
-          }
-        }
-        if (SelfType) {
-          MaybeNominalType = SelfType;
-        } else {
-          return T;
-        }
-      }
+  // For dynamic lookup don't substitute in the base type.
+  if (MaybeNominalType->isAnyObject())
+    return T;
 
-      // For everything else, substitute in the base type.
-      auto Subs = MaybeNominalType->getMemberSubstitutionMap(VD);
+  // FIXME: Sometimes ExprType is the type of the member here,
+  // and not the type of the base. That is inconsistent and
+  // should be cleaned up.
+  if (!MaybeNominalType->mayHaveMembers())
+    return T;
 
-      // For a GenericFunctionType, we only want to substitute the
-      // param/result types, as otherwise we might end up with a bad generic
-      // signature if there are ErrorTypes present in the base type. Note
-      // we pass in DesugarMemberTypes so that we see the actual concrete type
-      // witnesses instead of type alias types.
-      if (auto *GFT = T->getAs<GenericFunctionType>()) {
-        T = GFT->substGenericArgs(Subs, SubstFlags::DesugarMemberTypes);
-      } else {
-        T = T.subst(Subs, SubstFlags::DesugarMemberTypes);
+  // We can't do anything if the base type has unbound generic parameters.
+  if (MaybeNominalType->hasUnboundGenericType())
+    return T;
+
+  // If we are doing implicit member lookup on a protocol and we have found
+  // a declaration in a constrained extension, use the extension's `Self`
+  // type for the generic substitution.
+  // Eg in the following, the `Self` type returned by `qux` is
+  // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
+  // ```
+  // protocol MyProto {}
+  // struct MyGeneric<T>: MyProto {}
+  // extension MyProto where Self == MyGeneric<Int> {
+  //   static func qux() -> Self { .init() }
+  // }
+  // func takeMyProto(_: any MyProto)  {}
+  // func test() {
+  //   takeMyProto(.#^COMPLETE^#)
+  // }
+  // ```
+  if (MaybeNominalType->isExistentialType()) {
+    Type SelfType;
+    if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+      if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
+        auto Sig = ED->getGenericSignature();
+        SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
       }
     }
+    if (!SelfType)
+      return T;
+
+    MaybeNominalType = SelfType;
   }
 
-  return T;
+  // For everything else, substitute in the base type.
+  auto Subs = MaybeNominalType->getMemberSubstitutionMap(VD);
+
+  // For a GenericFunctionType, we only want to substitute the
+  // param/result types, as otherwise we might end up with a bad generic
+  // signature if there are ErrorTypes present in the base type. Note
+  // we pass in DesugarMemberTypes so that we see the actual concrete type
+  // witnesses instead of type alias types.
+  if (auto *GFT = T->getAs<GenericFunctionType>())
+    return GFT->substGenericArgs(Subs, SubstFlags::DesugarMemberTypes);
+
+  return T.subst(Subs, SubstFlags::DesugarMemberTypes);
 }
 
 Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
@@ -793,6 +785,12 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   } else if (VD->hasInterfaceType()) {
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
   }
+
+  // Make sure to look through the storage reference type if present. These
+  // shouldn't be presented to the user, and cannot be used in the constraint
+  // system when e.g computing type relations.
+  if (VarType)
+    VarType = VarType->getReferenceStorageReferent();
 
   std::optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.
@@ -2013,7 +2011,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
 
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addNominalTypeRef(NTD, Reason, dynamicLookupInfo);
-      addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
+      addConstructorCallsForType(NTD->getDeclaredTypeInContext(),
                                  NTD->getName(), Reason, dynamicLookupInfo);
       return;
     }

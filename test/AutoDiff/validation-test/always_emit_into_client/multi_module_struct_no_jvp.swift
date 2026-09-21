@@ -1,4 +1,5 @@
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=emscripten
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift-dylib(%t/%target-library-name(MultiModuleStruct1)) %S/Inputs/MultiModuleStruct/file1.swift \

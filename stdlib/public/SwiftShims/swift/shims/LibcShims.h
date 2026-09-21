@@ -104,7 +104,7 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t malloc_size(const void *);
   return malloc_size(ptr);
 }
-#elif defined(__linux__) || defined(__CYGWIN__) || defined(__ANDROID__) \
+#elif defined(__linux__) || defined(__CYGWIN__) \
    || defined(__HAIKU__) || defined(__FreeBSD__) || defined(__wasi__)
 #define HAS_MALLOC_SIZE 1
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
@@ -172,20 +172,6 @@ long double _stdlib_squareRootl(long double _self) {
   return __builtin_sqrtl(_self);
 }
 #endif
-
-// Apple's math.h does not declare lgamma_r() etc by default, but they're
-// unconditionally exported by libsystem_m.dylib in all OS versions that
-// support Swift development; we simply need to provide declarations here.
-// In the macOS 15.0, iOS 18.0, et al SDKs, math.h unconditionally declares
-// lgamma_r() when building for Swift. Detect those SDKs by checking for a
-// header which was added in those versions. (Redeclaring the function
-// would cause an error where `lgamma_r` is ambiguous between the SDK
-// `_math.lgamma_r` and this `SwiftShims.lgamma_r`.)
-#if defined(__APPLE__) && !__has_include(<_modules/_math_h.h>)
-float lgammaf_r(float x, int *psigngam);
-double lgamma_r(double x, int *psigngam);
-long double lgammal_r(long double x, int *psigngam);
-#endif // defined(__APPLE__) && !__has_include(<_modules/_math_h.h>)
 
 #ifdef __cplusplus
 } // extern "C"

@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -solver-enable-optimize-operator-defaults | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s -solver-disable-optimize-operator-defaults | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
 infix operator +++
 

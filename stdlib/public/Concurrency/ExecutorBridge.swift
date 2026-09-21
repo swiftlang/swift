@@ -16,10 +16,22 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
+#if canImport(Builtin)
+import Builtin
+#endif
 
 @available(StdlibDeploymentTarget 6.3, *)
-@_extern(c, "_swift_exit")
-internal func _exit(result: CInt)
+@_extern(c) private func _swift_exit(_ result: CInt) /* -> Never */
+
+@available(StdlibDeploymentTarget 6.3, *)
+internal func _exit(result: CInt) -> Never {
+  _swift_exit(result)
+#if canImport(Builtin)
+  Builtin.unreachable()
+#else
+  fatalError("Unreachable")
+#endif
+}
 
 #if !$Embedded
 @available(StdlibDeploymentTarget 6.3, *)
@@ -91,7 +103,7 @@ internal func _jobGetExecutorPrivateData(
   _ job: Builtin.Job
 ) -> UnsafeMutableRawPointer
 
-#if os(WASI) || !$Embedded
+#if os(WASI) || os(Emscripten) || !$Embedded
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_getMainExecutor")
@@ -104,7 +116,7 @@ internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor {
 @_silgen_name("swift_getMainExecutor")
 internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor
 #endif // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-#endif // os(WASI) || !$Embedded
+#endif // os(WASI) || os(Emscripten) || !$Embedded
 
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_getDefaultExecutor")

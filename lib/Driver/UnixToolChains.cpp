@@ -10,37 +10,53 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <fstream>
 
 #include "ToolChains.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/TaskQueue.h"
-#include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
-#include "clang/Basic/Version.h"
-#include "clang/Driver/Util.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/Program.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 using namespace swift::driver::toolchains;
+
+static unsigned getDefaultDWARFVersionForUnixTriple(const llvm::Triple &triple) {
+  // Match Clang: DWARF v5 is the default everywhere except Android, which
+  // stays on v4 for compatibility with the NDK's bundled debugging tools.
+  if (triple.isAndroid())
+    return 4;
+  return 5;
+}
+
+void toolchains::GenericUnix::addCommonFrontendArgs(
+    const OutputInfo &OI, const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  ToolChain::addCommonFrontendArgs(OI, output, inputArgs, arguments);
+
+  std::string dwarfVersion;
+  {
+    llvm::raw_string_ostream os(dwarfVersion);
+    os << "-dwarf-version=";
+    if (OI.DWARFVersion)
+      os << std::to_string(*OI.DWARFVersion);
+    else
+      os << getDefaultDWARFVersionForUnixTriple(getTriple());
+  }
+  arguments.push_back(inputArgs.MakeArgString(dwarfVersion));
+}
 
 std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,

@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -module-name preconcurrency_conformances -enable-upcoming-feature DynamicActorIsolation %t/src/checks.swift -verify
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -module-name preconcurrency_conformances -enable-upcoming-feature DynamicActorIsolation %t/src/checks.swift -verify | %FileCheck %t/src/checks.swift
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 6 -target %target-swift-5.1-abi-triple -module-name preconcurrency_conformances -disable-dynamic-actor-isolation %t/src/checks_disabled.swift -verify | %FileCheck %t/src/checks_disabled.swift
 
@@ -26,6 +27,9 @@ actor MyActor {
 @globalActor
 struct GlobalActor {
   static var shared: MyActor = MyActor()
+  // expected-warning@-1{{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
+  // expected-note@-2{{declare it as 'static let' to guarantee a stable instance}}
+  // expected-note@-3{{if this property always returns the same instance, silence the warning with '@diagnose(UnstableGlobalActorShared, as: ignored)'}}
 }
 
 @MainActor

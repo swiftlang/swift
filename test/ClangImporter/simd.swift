@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -typecheck -verify -verify-ignore-unrelated %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import c_simd
 
 let char2_value: char2 = makes_char2()

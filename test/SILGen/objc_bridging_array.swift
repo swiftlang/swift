@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types %s | %FileCheck %s
 
@@ -25,8 +26,10 @@ func setChildren(p: Parent, c: Child) {
 // CHECK: [[BB:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[BUFFER:%.*]] = ref_tail_addr
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[BUFFER0:%.*]] = index_addr [projection] [[BUFFER]] : $*Child, [[IDX0]] : $Builtin.Word
 // CHECK: [[CHILD:%.*]] = copy_value %1 : $Child
-// CHECK: store [[CHILD]] to [init] [[BUFFER]] : $*Child
+// CHECK: store [[CHILD]] to [init] [[BUFFER0]] : $*Child
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Child>([[ARRAY]])
 // CHECK: [[FN:%.*]] = function_ref @$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray

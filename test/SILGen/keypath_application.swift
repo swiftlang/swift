@@ -1,3 +1,5 @@
+// RUN: %target-swift-emit-sil -sil-verify-all -o /dev/null -enable-sil-opaque-values %s
+
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
@@ -196,7 +198,7 @@ extension Int {
 func writebackNesting(x: inout Int,
                       y: WritableKeyPath<Int, Int>,
                       z: WritableKeyPath<Int, Int>,
-                      w: Int) -> Int {
+                      w: Int) {
   // -- get 'b'
   // CHECK: function_ref @$sSi19keypath_applicationE1bSivg
   // -- apply keypath y

@@ -37,6 +37,7 @@ target_link_libraries(swiftClangImporter PRIVATE
   swiftAST
   swiftParse
   clangOptions
+  clangDriver
   clangTooling)
 
 target_link_libraries(swiftClangImporter INTERFACE
@@ -50,7 +51,3 @@ add_dependencies(swiftClangImporter
   ${CLANG_TABLEGEN_TARGETS})
 
 set_swift_llvm_is_available(swiftClangImporter)
-
-if(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER)
-  add_subdirectory(SwiftBridging)
-endif()

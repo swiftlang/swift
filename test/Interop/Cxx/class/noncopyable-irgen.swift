@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST1- -D TEST1
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST2- -D TEST2
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST3- -D TEST3
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST4- -D TEST4 -Xcc -DTEST4 -Xcc -std=c++20
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST5- -D TEST5
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST1- -D TEST1
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST2- -D TEST2
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST3- -D TEST3
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST4- -D TEST4 -Xcc -DTEST4 -Xcc -std=c++20
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST5- -D TEST5
 
 //--- Inputs/module.modulemap
 module Test {

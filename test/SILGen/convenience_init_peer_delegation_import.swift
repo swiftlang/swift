@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/convenience_init_peer_delegation_import.h %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/convenience_init_peer_delegation_import.h %s | %FileCheck %s
 
 extension ImportedClass {

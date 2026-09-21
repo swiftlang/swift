@@ -5,7 +5,7 @@
 // CHECK:  }
 // CHECK-NEXT:  static var kA: ns.EnumInNS { get }
 // CHECK-NEXT:  static var kB: ns.EnumInNS { get }
-// CHECK-NEXT:  enum ScopedEnumInNS : Int32 {
+// CHECK-NEXT:  enum ScopedEnumInNS : CInt {
 // CHECK:    case scopeA
 // CHECK:    case scopeB
 // CHECK-NEXT:  }

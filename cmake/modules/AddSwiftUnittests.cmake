@@ -59,7 +59,7 @@ function(add_swift_unittest test_dirname)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
       target_compile_options(${test_dirname} PRIVATE
         -march=core2)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv5|armv6|armv7|i686")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "mipsel|armv5|armv6|armv7|i686")
       set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES
         "atomic")
     endif()
@@ -107,6 +107,12 @@ function(add_swift_unittest test_dirname)
       set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
         LINK_FLAGS " -fsanitize=thread")
     endif()
+  endif()
+
+  if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-framework,CoreFoundation")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-framework,Foundation")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-lswiftObjectiveC")
   endif()
 
   is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" HAS_DEBUG_INFO)

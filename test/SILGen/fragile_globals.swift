@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %S/Inputs/ModuleA.swift
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %S/Inputs/ModuleB.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -I%t %s -Xllvm -sil-disable-pass=initialize-static-globals -O
 // RUN: %target-swift-emit-sil -parse-as-library -I%t %s -Xllvm -sil-disable-pass=initialize-static-globals -O | %FileCheck %s
 
 import ModuleA

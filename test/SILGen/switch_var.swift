@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch_var %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
@@ -294,6 +295,7 @@ func test_var_4(p p: P) {
     c(x: z.1)
 
   // CHECK: [[DFLT_NO_CASE3]]:
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   end_borrow [[ZLIFETIME]]
   // CHECK-NEXT:   destroy_value [[ZADDR]]
   // CHECK-NOT: destroy_addr

@@ -47,6 +47,8 @@
 // RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Flat-*.swiftmodule
 // RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/FMWK-*.swiftmodule
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 
 import Normal
 import Flat

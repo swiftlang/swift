@@ -3,6 +3,7 @@
 // RUN: split-file %s %t
 
 // REQUIRES: OS=macosx || OS=maccatalyst
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
 // First, test that the swift interface with an invalid os version behaves fine.
 // RUN: %target-swift-typecheck-module-from-interface(%t/Modules/Simple.swiftmodule/arm64-apple-macos.swiftinterface) -module-name Simple 

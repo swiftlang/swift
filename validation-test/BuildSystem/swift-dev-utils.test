@@ -15,6 +15,9 @@
 # RUN: cp -R "%swift_src_root/utils/swift-dev-utils" "%t/src/swift/utils/swift-dev-utils"
 # RUN: rm -rf "%t/src/swift/utils/swift-dev-utils/.build"
 
+# 'Package.resolved' may lead to networking. See https://github.com/swiftlang/swift/pull/91938.
+# RUN: rm -f "%t/src/swift/utils/swift-dev-utils/Package.resolved"
+
 # Add symlinks for local dependencies
 # RUN: ln -s "%swift_src_root/../swift-"* "%t/src"
 # RUN: ln -s "%swift_src_root/../llbuild" "%t/src"

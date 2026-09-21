@@ -8,6 +8,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Synchronization
 

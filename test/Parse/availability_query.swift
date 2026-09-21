@@ -48,23 +48,23 @@ if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to mat
 if #available(iDishwasherOS 0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
 }
 
-if #available(iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+if #available(iDishwasherOS 51) { // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
 // expected-error@-1 {{condition required for target platform}}
 }
 
-if #available(iDishwasherOS 51, *) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+if #available(iDishwasherOS 51, *) { // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
 }
 
-if #available(macos 51, *) { // expected-warning {{unrecognized platform name 'macos'; did you mean 'macOS'?}} {{15-20=macOS}}
+if #available(macos 51, *) { // expected-warning {{cannot find availability domain 'macos'; did you mean 'macOS'?}} {{15-20=macOS}}
 }
 
-if #available(mscos 51, *) { // expected-warning {{unrecognized platform name 'mscos'; did you mean 'macOS'?}} {{15-20=macOS}}
+if #available(mscos 51, *) { // expected-warning {{cannot find availability domain 'mscos'; did you mean 'macOS'?}} {{15-20=macOS}}
 }
 
-if #available(macoss 51, *) { // expected-warning {{unrecognized platform name 'macoss'; did you mean 'macOS'?}} {{15-21=macOS}}
+if #available(macoss 51, *) { // expected-warning {{cannot find availability domain 'macoss'; did you mean 'macOS'?}} {{15-21=macOS}}
 }
 
-if #available(mac 51, *) { // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{15-18=macOS}}
+if #available(mac 51, *) { // expected-warning {{cannot find availability domain 'mac'; did you mean 'macOS'?}} {{15-18=macOS}}
 }
 
 if #available(OSX 51, OSX 52, *) {  // expected-error {{version for macOS already specified}}
@@ -103,11 +103,11 @@ if #available(OSX 51,) { // expected-error {{expected platform name}}
 if #available(OSX 51, iOS { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
-if #available(OSX 51, iOS 8.0, iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+if #available(OSX 51, iOS 8.0, iDishwasherOS 51) { // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
 // expected-error@-1 {{must handle potential future platforms with '*'}}
 }
 
-if #available(iDishwasherOS 51, OSX 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+if #available(iDishwasherOS 51, OSX 51) { // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
 // expected-error@-1 {{must handle potential future platforms with '*'}}
 }
 

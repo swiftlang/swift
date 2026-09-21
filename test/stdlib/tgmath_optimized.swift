@@ -10,6 +10,8 @@
   import Glibc
 #elseif os(WASI)
   import WASILibc
+#elseif os(Emscripten)
+  import EmscriptenLibc
 #elseif canImport(Android)
   import Android
 #elseif os(Windows)

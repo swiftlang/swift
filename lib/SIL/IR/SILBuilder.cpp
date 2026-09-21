@@ -57,7 +57,7 @@ SILType SILBuilder::getPartialApplyResultType(
     TypeExpansionContext context, SILType origTy, unsigned argCount,
     SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation,
-    PartialApplyInst::OnStackKind onStack) {
+    PartialApplyInst::OnStackKind onStack, bool isCalledOnce) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs, context);
@@ -79,6 +79,8 @@ SILType SILBuilder::getPartialApplyResultType(
               argCount));
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();
+  if (isCalledOnce)
+    extInfoBuilder = extInfoBuilder.withCalledOnce();
   auto extInfo = extInfoBuilder.build();
 
   // If the original method has an @unowned_inner_pointer return, the partial
@@ -640,7 +642,15 @@ void SILBuilder::emitDestructureValueOperation(
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
-                                             PoisonRefs_t poisonRefs,
+                                             UsesMoveableValueDebugInfo_t moved,
+                                             bool trace, bool overrideLoc) {
+  return createDebugValue(Loc, ArrayRef<SILValue> { src }, Var, moved, trace,
+                          overrideLoc);
+}
+
+DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc,
+                                             ArrayRef<SILValue> operands,
+                                             SILDebugVariable Var,
                                              UsesMoveableValueDebugInfo_t moved,
                                              bool trace, bool overrideLoc) {
   if (shouldDropVariable(Var, Loc))
@@ -657,9 +667,9 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
     DebugLoc = getSILDebugLocation(Loc, true);
   }
 
-  return insert(DebugValueInst::create(DebugLoc, src, getModule(),
+  return insert(DebugValueInst::create(DebugLoc, operands, getModule(),
                                        *substituteAnonymousArgs(Name, Var, Loc),
-                                       poisonRefs, moved, trace));
+                                       moved, trace));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

@@ -25,17 +25,17 @@
 #include "swift/AST/Stmt.h" // for PoundAvailableInfo
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 class BraceStmt;
+class CaseStmt;
 class Decl;
 class IfStmt;
 class GuardStmt;
 class SourceFile;
 class Stmt;
+class SwitchStmt;
 class Expr;
 class StmtConditionElement;
 
@@ -89,7 +89,15 @@ public:
     GuardStmtElseBranch,
 
     // The context was introduced for the body of a while statement.
-    WhileStmtBody
+    WhileStmtBody,
+
+    /// A placeholder context introduced for the entirety of a switch
+    /// statement. The contents are expanded lazily because the case label
+    /// items must be type-checked before per-case refinement can be computed.
+    SwitchStmt,
+
+    /// The context was introduced for the body of a switch statement case.
+    SwitchStmtCaseBody
   };
 
 private:
@@ -106,6 +114,8 @@ private:
       PoundAvailableInfo *PAI;
       GuardStmt *GS;
       WhileStmt *WS;
+      SwitchStmt *SS;
+      CaseStmt *CS;
     };
 
   public:
@@ -124,6 +134,10 @@ private:
           DC(DC), GS(GS) {}
     IntroNode(WhileStmt *WS, const DeclContext *DC)
         : IntroReason(Reason::WhileStmtBody), DC(DC), WS(WS) {}
+    IntroNode(SwitchStmt *SS, const DeclContext *DC)
+        : IntroReason(Reason::SwitchStmt), DC(DC), SS(SS) {}
+    IntroNode(CaseStmt *CS, const DeclContext *DC)
+        : IntroReason(Reason::SwitchStmtCaseBody), DC(DC), CS(CS) {}
 
     Reason getReason() const { return IntroReason; }
 
@@ -161,6 +175,16 @@ private:
       assert(IntroReason == Reason::WhileStmtBody);
       return WS;
     }
+
+    SwitchStmt *getAsSwitchStmt() const {
+      assert(IntroReason == Reason::SwitchStmt);
+      return SS;
+    }
+
+    CaseStmt *getAsCaseStmt() const {
+      assert(IntroReason == Reason::SwitchStmtCaseBody);
+      return CS;
+    }
   };
 
   /// The AST node that introduced this context.
@@ -180,6 +204,11 @@ private:
   } LazyInfo = {};
 
   void verify(const AvailabilityScope *parent, ASTContext &ctx) const;
+
+  AvailabilityScope *findMostRefinedSubContextImpl(
+      SourceLoc Loc, ASTContext &Ctx,
+      llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack,
+      ASTNode stopAtASTNode);
 
   AvailabilityScope(ASTContext &Ctx, IntroNode Node, AvailabilityScope *Parent,
                     SourceRange SrcRange, const AvailabilityContext Info);
@@ -242,6 +271,20 @@ public:
                          AvailabilityScope *Parent,
                          const AvailabilityContext Info);
 
+  /// Create a placeholder availability scope for a switch statement that
+  /// will be lazily expanded into per-case scopes once the case label items
+  /// have been type-checked.
+  static AvailabilityScope *createForSwitchStmt(ASTContext &Ctx, SwitchStmt *SS,
+                                                const DeclContext *DC,
+                                                AvailabilityScope *Parent,
+                                                const AvailabilityContext Info);
+
+  /// Create an availability scope for the body of a switch statement case.
+  static AvailabilityScope *
+  createForSwitchStmtCaseBody(ASTContext &Ctx, CaseStmt *CS,
+                              const DeclContext *DC, AvailabilityScope *Parent,
+                              const AvailabilityContext Info);
+
   Decl *getDeclOrNull() const {
     auto IntroReason = getReason();
     if (IntroReason == Reason::Decl || IntroReason == Reason::DeclImplicit)
@@ -251,6 +294,14 @@ public:
 
   /// Returns the reason this scope was introduced.
   Reason getReason() const;
+
+  /// Returns the AST node that introduced this scope, or a null `ASTNode` if
+  /// the node cannot be represented as one.
+  ASTNode getASTNode() const;
+
+  /// Returns true if this scope was introduced by a statement, as opposed to a
+  /// declaration or the root of a source file.
+  bool isIntroducedByStmt() const;
 
   /// Returns the AST node that introduced this availability scope. Note that
   /// this node may be different than the refined range. For example, an
@@ -296,8 +347,22 @@ public:
   void addChild(AvailabilityScope *Child, ASTContext &Ctx);
 
   /// Returns the innermost AvailabilityScope descendant of this scope
-  /// for the given source location.
-  AvailabilityScope *findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx);
+  /// for the given source location. If \p stopAtASTNode is non-null, scopes
+  /// that were introduced by that node are not descended into (or expanded), so
+  /// the result describes the availability of the position \p stopAtASTNode
+  /// appears in rather than the availability that it introduces.
+  AvailabilityScope *
+  findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx,
+                            ASTNode stopAtASTNode = ASTNode());
+
+  /// Like `findMostRefinedSubContext()`, but also populates \p ScopeStack with
+  /// the chain of scopes that contain \p Loc, ordered outermost first and
+  /// ending with the returned scope. This allows callers to inspect the
+  /// enclosing scopes of the result.
+  AvailabilityScope *findMostRefinedSubContext(
+      SourceLoc Loc, ASTContext &Ctx,
+      llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack,
+      ASTNode stopAtASTNode = ASTNode());
 
   bool getNeedsExpansion() const { return LazyInfo.needsExpansion; }
 

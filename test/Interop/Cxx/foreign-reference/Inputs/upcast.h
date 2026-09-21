@@ -18,7 +18,7 @@ struct FRT_IMMORTAL Base {
   }
 };
 
-struct FRT_IMMORTAL Derived : Base {
+struct Derived : Base {
   int derivedValue;
 
   Derived() : derivedValue(2) {}
@@ -32,7 +32,7 @@ struct FRT_IMMORTAL Derived : Base {
   }
 };
 
-struct FRT_IMMORTAL LeafDerived : Derived {
+struct LeafDerived : Derived {
   int leafValue;
 
   LeafDerived() : leafValue(3) {}
@@ -129,6 +129,23 @@ __attribute__((swift_attr("release:.releaseC")));
 // FIXME: this redeclares the lifetime operations, since ClangImporter currently
 // reports a conflict between annotations on base types otherwise
 
+// A derived FRT that re-annotates SWIFT_SHARED_REFERENCE with the same
+// retain/release ops as its base. Despite the matching ops, the explicit
+// annotation acts as an upcast barrier.
+struct ReannotatedRefCountedDerived : RefCountedBase {
+  int reannotatedField = 30;
+
+  ReannotatedRefCountedDerived() = default;
+  ReannotatedRefCountedDerived(const ReannotatedRefCountedDerived &) = delete;
+
+  static ReannotatedRefCountedDerived &create() {
+    static ReannotatedRefCountedDerived instance;
+    return instance;
+  }
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:.retain")))
+__attribute__((swift_attr("release:.release")));
+
 // Private inheritance: should NOT produce a Swift superclass relationship.
 struct FRT_IMMORTAL PrivateDerived : private Base {
   int privateDerivedValue;
@@ -161,7 +178,7 @@ struct FRT_IMMORTAL ProtectedDerived : protected Base {
 
 struct EmptyTag {};
 
-struct FRT_IMMORTAL DerivedFromEmptyAndBase : EmptyTag, Base {
+struct DerivedFromEmptyAndBase : EmptyTag, Base {
   int extraValue;
 
   DerivedFromEmptyAndBase() : extraValue(7) {}
@@ -184,7 +201,7 @@ struct FRT_IMMORTAL CRTPBase {
   Derived *derivedSelf() { return static_cast<Derived *>(this); }
 };
 
-struct FRT_IMMORTAL CRTPDerived : CRTPBase<CRTPDerived> {
+struct CRTPDerived : CRTPBase<CRTPDerived> {
   int crtpDerivedValue;
 
   CRTPDerived() : crtpDerivedValue(11) {}

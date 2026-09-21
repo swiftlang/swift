@@ -68,6 +68,11 @@ public class Instruction : CustomStringConvertible, Hashable {
       context.notifyCallsChanged()
     }
     context.notifyInstructionsChanged()
+
+    if let definingInst = value.definingInstruction {
+      assert(!definingInst.isDeleted, "tried to set operand of a deleted instruction")
+    }
+
     bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
   }
@@ -144,47 +149,53 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.mayHaveSideEffects()
   }
 
-  public final var mayAccessPointerOrGlobal: Bool {
-    guard mayReadOrWriteMemory else {
-      return false
-    }
+  /// True if arbitrary functions may be called by this instruction.
+  /// This can be either directly, e.g. by an `apply` instruction, or indirectly by destroying a value which
+  /// might have a deinitializer which can call functions.
+  public var mayCallFunction: Bool { false }
+
+  public final var isDeinitBarrier: Bool {
     switch self {
-    case is BuiltinInst:
-      // Consider all builtins that read/write memory to access pointers.
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst, is YieldInst:
       return true
+
+    case is LoadWeakInst, is LoadUnownedInst, is StrongCopyUnownedValueInst, is StrongCopyUnmanagedValueInst:
+      // Moving a destroy over a load-weak changes its behavior, because if the object is destroyed
+      // before the load-weak it yields nil.
+      return true
+
+    case is HopToExecutorInst:
+      // A synchronization point.
+      return true
+
+    case let endAccess as EndAccessInst where endAccess.beginAccess.enforcement == .dynamic:
+      // A deinitializer can read and write class properties, global variables or boxes - which are
+      // protected by dynamic access scopes: the deinit could modify the memory which the access
+      // scope is reading, or vice versa.
+      return true
+
+    case let builtin as BuiltinInst:
+      // A memory accessing builtin can be an implicit load weak, a synchronization point or a
+      // pointer access.
+      return builtin.mayReadOrWriteMemory
+
     case let endBorrow as EndBorrowInst:
+      // Accessing memory via an arbitrary pointer is a deinit barrier, because it may conflict
+      // with a pointer access in a de-initializer.
       switch endBorrow.borrow {
       case let loadBorrow as LoadBorrowInst:
         return FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(loadBorrow.address)
       default:
         return false
       }
+
     default:
-      return operands.contains { op in
-        FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(op.value)
-      }
-    }
-  }
-
-  /// True if arbitrary functions may be called by this instruction.
-  /// This can be either directly, e.g. by an `apply` instruction, or indirectly by destroying a value which
-  /// might have a deinitializer which can call functions.
-  public var mayCallFunction: Bool { false }
-
-  public final var mayLoadWeakOrUnowned: Bool {
-    return bridged.mayLoadWeakOrUnowned()
-  }
-
-  public final var maySynchronize: Bool {
-    return bridged.maySynchronize()
-  }
-
-  public final var isDeinitBarrier: Bool {
-    switch self {
-    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
-      return true
-    default:
-      return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
+      // Accessing memory via an arbitrary pointer or a global is a deinit barrier, because it may
+      // conflict with such an access in a de-initializer.
+      return mayReadOrWriteMemory &&
+             operands.contains { op in
+               FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(op.value)
+             }
     }
   }
 
@@ -218,6 +229,52 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
     return bridged.isIdenticalTo(otherInst.bridged)
+  }
+
+  /// The raw index of this instruction in its parent block, used for ordering.
+  /// Returns nil if the index has not been computed yet. Use
+  /// `dominatesInBlock` for ordering comparisons instead of comparing raw indices.
+  final var rawIndexInBlock: Int? {
+    let idx = bridged.getRawIndexInBlock()
+    return idx == 0 ? nil : idx
+  }
+
+  /// Returns true if this instruction comes before `other` in the same block.
+  ///
+  /// Complexity: O(1) in the common case.
+  ///
+  /// Each instruction carries a lazily-computed integer index.  Indices are assigned on demand
+  /// by `recomputeInstructionIndices` (spaced by a stride of 8) and persist across optimization
+  /// passes. When instructions are inserted or moved, the implementation tries to slot them into
+  /// the gap between their neighbors, so a single insertion is still O(1). If no gap is available,
+  /// the inserted instruction gets no index assigned; the next call to `dominatesInBlock` that
+  /// encounters such an unassigned index triggers a full re-computation of the block, which is O(n)
+  /// in the number of instructions.
+  ///
+  /// **Pathological case:** repeatedly inserting more than 8 instructions between the same two
+  /// neighbors (exhausting the stride gap) and then calling `dominatesInBlock` on the inserted
+  /// instructions will trigger O(n) re-computations each time.
+  ///
+  public final func strictlyDominatesInBlock(_ other: Instruction) -> Bool {
+    let (idx, otherIdx) = Instruction.getListIndices(lhs: self, rhs: other)
+    return idx < otherIdx
+  }
+
+  /// Like `strictlyDominatesInBlock`, but also returns true if this instruction is the asme as `other`.
+  public final func dominatesInBlock(_ other: Instruction) -> Bool {
+    let (idx, otherIdx) = Instruction.getListIndices(lhs: self, rhs: other)
+    return idx <= otherIdx
+  }
+
+  private static func getListIndices(lhs: Instruction, rhs: Instruction) -> (Int, Int) {
+    precondition(lhs.parentBlock == rhs.parentBlock)
+    precondition(!lhs.isDeleted)
+    precondition(!rhs.isDeleted)
+    if let lhsIdx = lhs.rawIndexInBlock, let rhsIdx = rhs.rawIndexInBlock {
+      return (lhsIdx, rhsIdx)
+    }
+    lhs.parentBlock.recomputeInstructionIndices()
+    return (lhs.rawIndexInBlock!, rhs.rawIndexInBlock!)
   }
 
   public func hash(into hasher: inout Hasher) {
@@ -270,6 +327,17 @@ extension OptionalBridgedInstruction {
 }
 
 extension Optional where Wrapped == Instruction {
+  public var bridged: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(self?.bridged.obj)
+  }
+}
+
+extension Optional where Wrapped == ApplySite {
+  /// Bridges an optional ApplySite to OptionalBridgedInstruction. Used by
+  /// the Builder.createApply / createTryApply / createBeginApply /
+  /// createPartialApply factories so they can take an optional source-apply
+  /// hint for per-argument SILLocations without forcing every caller to
+  /// materialize the bridged value themselves.
   public var bridged: OptionalBridgedInstruction {
     OptionalBridgedInstruction(self?.bridged.obj)
   }
@@ -642,7 +710,7 @@ public protocol DebugVariableInstruction : VarDeclInstruction {
 @_semantics("fast_cast")
 public protocol MetaInstruction: Instruction {}
 
-final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction, MetaInstruction {
+final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaInstruction {
   public var varDecl: VarDecl? {
     bridged.DebugValue_getDecl().getAs(VarDecl.self)
   }
@@ -659,10 +727,10 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
     bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
   }
 
-  public func stripDeref() { bridged.DebugValue_stripDeref() }
-  public func prependDeref() { bridged.DebugValue_prependDeref() }
-  public func killOperand(withType type: Type? = nil) {
-    bridged.DebugValue_killOperand(type?.bridged ?? BridgedType())
+  public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
+  public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
+  public func killOperand(index: Int, withType type: Type? = nil) {
+    bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
   }
 }
 
@@ -950,12 +1018,29 @@ public protocol IndexingInstruction: SingleValueInstruction {
 extension IndexingInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
+
+  public var constantIndex: Int? {
+    if let literal = index as? IntegerLiteralInst,
+       let indexValue = literal.value
+    {
+      return indexValue
+    }
+    return nil
+  }
 }
 
 final public
 class IndexAddrInst : SingleValueInstruction, IndexingInstruction {
   public var needsStackProtection: Bool {
     bridged.IndexAddrInst_needsStackProtection()
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining `index_addr` instructions); without this flag such chaining
+  /// is permitted.
+  public var isProjection: Bool {
+    bridged.IndexAddrInst_isProjection()
   }
 }
 
@@ -968,6 +1053,7 @@ class TailAddrInst : SingleValueInstruction, IndexingInstruction {}
 @_semantics("fast_cast")
 public protocol InitExistentialInstruction: Instruction {
   var conformances: ConformanceArray { get }
+  var formalConcreteType: CanonicalType { get }
 }
 
 final public
@@ -986,12 +1072,30 @@ class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction, InitExi
 final public
 class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var existential: Value { operand.value }
+
+  /// The generic environment that this instruction's opened archetype lives in.
+  public var definedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenExistentialRefInst_getDefinedGenericEnvironment())
+  }
+}
+
+final public
+class OpenCOMExistentialInst : SingleValueInstruction, UnaryInstruction {
+  public var existential: Value { operand.value }
+
+  public var definedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenCOMExistentialInst_getDefinedGenericEnvironment())
+  }
 }
 
 final public
 class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialValueInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialValueInst_getFormalConcreteType())
   }
 }
 
@@ -1032,6 +1136,10 @@ class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction, In
 
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialMetatypeInst_getFormalConcreteType())
   }
 }
 
@@ -1277,6 +1385,23 @@ final public class KeyPathInst : SingleValueInstruction {
     bridged.KeyPathInst_hasPattern()
   }
 
+  public var supportedInEmbeddedSwift: Bool {
+    // The `EmbeddedSwiftDiagnostics` pass uses this predicate to decide
+    // whether to reject a `keypath` inst with `err_embedded_swift_keypath`.
+    // A pattern is supported iff IRGen can turn it into a static immortal
+    // instance, so gate this on the same predicate IRGen consults.
+    return staticInstanceClassType != nil
+  }
+
+  /// If this key path will be statically instantiated in Embedded Swift,
+  /// returns the concrete key path class type (`KeyPath<Root, Value>` /
+  /// `WritableKeyPath<Root, Value>` / `ReferenceWritableKeyPath<Root,
+  /// Value>`) that IRGen will use as the object's isa.  Nil if the key path
+  /// isn't statically instantiable.
+  public var staticInstanceClassType: Type? {
+    return bridged.KeyPathInst_getStaticInstanceClassType().typeOrNil
+  }
+
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
     var results = BridgedInstruction.KeyPathFunctionResults()
     for componentIdx in 0..<bridged.KeyPathInst_getNumComponents() {
@@ -1477,9 +1602,18 @@ final public class StrongCopyWeakValueInst : SingleValueInstruction, UnaryInstru
 final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
   public var doKeepUnique: Bool { bridged.EndCOWMutationInst_doKeepUnique() }
+
+  public func set(keepUnique: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.EndCOWMutationInst_setKeepUnique(keepUnique)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class EndCOWMutationAddrInst : Instruction, UnaryInstruction {
+  public var address: Value { operand.value }
+}
+final public class EndFormalScopeInst : Instruction, UnaryInstruction {
   public var address: Value { operand.value }
 }
 
@@ -1488,6 +1622,9 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
+
+  /// True is this is a partial application of a `@called(once)` function value.
+  public var isCalledOnce: Bool { bridged.PartialApplyInst_isCalledOnce() }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
   /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
@@ -1548,6 +1685,8 @@ final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {
 final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class COMMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -1762,6 +1901,18 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {
+  public var existentialType: Type {
+    results[0].type
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.AllocExistentialBoxInst_getFormalConcreteType())
+  }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.AllocExistentialBoxInst_getConformances())
+  }
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -2184,6 +2335,10 @@ final public class BranchInst : TermInst {
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
+
+  public func getPhi(for operand: Operand) -> Phi {
+    return Phi(getArgument(for: operand))!
+  }
 }
 
 final public class CondBranchInst : TermInst {
@@ -2191,75 +2346,92 @@ final public class CondBranchInst : TermInst {
   public var falseBlock: BasicBlock { successors[1] }
 
   public var condition: Value { operands[0].value }
-
-  public var trueOperands: OperandArray { operands[1..<(bridged.CondBranchInst_getNumTrueArgs() &+ 1)] }
-  public var falseOperands: OperandArray {
-    let ops = operands
-    return ops[(bridged.CondBranchInst_getNumTrueArgs() &+ 1)..<ops.count]
-  }
-
-  /// Returns the true or false block argument for the cond_br `operand`.
-  ///
-  /// Return nil if `operand` is the condition itself.
-  public func getArgument(for operand: Operand) -> Argument? {
-    let opIdx = operand.index
-    if opIdx == 0 {
-      return nil
-    }
-    let argIdx = opIdx - 1
-    let numTrueArgs = bridged.CondBranchInst_getNumTrueArgs()
-    if (0..<numTrueArgs).contains(argIdx) {
-      return trueBlock.arguments[argIdx]
-    } else {
-      return falseBlock.arguments[argIdx - numTrueArgs]
-    }
-  }
 }
 
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst, UnaryInstruction {
+public class SwitchEnumInstBase : TermInst, UnaryInstruction {
 
-  public var enumOp: Value { operand.value }
+  final public var enumOp: Value { operand.value }
 
   public struct CaseIndexArray : RandomAccessCollection {
-    fileprivate let switchEnum: SwitchEnumInst
+    fileprivate let switchEnum: SwitchEnumInstBase
 
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { switchEnum.bridged.SwitchEnumInst_getNumCases() }
+    public var endIndex: Int { switchEnum.numCases }
 
-    public subscript(_ index: Int) -> Int {
-      switchEnum.bridged.SwitchEnumInst_getCaseIndex(index)
-    }
+    public subscript(_ index: Int) -> Int { switchEnum.getCaseIndex(index) }
   }
 
-  var caseIndices: CaseIndexArray { CaseIndexArray(switchEnum: self) }
+  final public var caseIndices: CaseIndexArray { CaseIndexArray(switchEnum: self) }
 
-  var cases: Zip2Sequence<CaseIndexArray, SuccessorArray> {
+  final public var cases: Zip2Sequence<CaseIndexArray, SuccessorArray> {
     zip(caseIndices, successors)
   }
 
-  public var numCases: Int { caseIndices.count }
+  public var numCases: Int { fatalError("numCases must be implemented by derived class") }
 
-  // This does not handle the special case where the default covers exactly
-  // the "missing" case.
-  public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
-    cases.first(where: { $0.0 == forCaseIndex })?.1
+  func getCaseIndex(_ index: Int) -> Int {
+    fatalError("getCaseIndex must be implemented by derived class")
+  }
+
+  public func getUniqueCaseForDefault() -> Int? {
+    fatalError("getUniqueCaseForDefault must be implemented by derived class")
   }
 
   public func getSuccessorForDefault() -> BasicBlock? {
-    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
+    fatalError("getSuccessorForDefault must be implemented by derived class")
   }
 
   // This does not handle the special case where the default covers exactly
   // the "missing" case.
-  public func getUniqueCase(forSuccessor: BasicBlock) -> Int? {
+  final public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
+    cases.first(where: { $0.0 == forCaseIndex })?.1
+  }
+
+  final public func getSuccessor(forCaseIndex: Int) -> BasicBlock {
+    for (idx, succ) in cases {
+      if idx == forCaseIndex {
+        return succ
+      }
+    }
+    return getSuccessorForDefault()!
+  }
+
+  // This does not handle the special case where the default covers exactly
+  // the "missing" case.
+  final public func getUniqueCase(forSuccessor: BasicBlock) -> Int? {
     cases.first(where: { $0.1 == forSuccessor })?.0
   }
 }
 
-final public class SwitchEnumAddrInst : TermInst {
+final public class SwitchEnumInst : SwitchEnumInstBase {
+  public override var numCases: Int { bridged.SwitchEnumInst_getNumCases() }
+  override func getCaseIndex(_ index: Int) -> Int { bridged.SwitchEnumInst_getCaseIndex(index) }
+
+  public override func getUniqueCaseForDefault() -> Int? {
+    let uniqueCaseIdx = bridged.SwitchEnumInst_getUniqueCaseForDefault()
+    return uniqueCaseIdx >= 0 ? uniqueCaseIdx : nil
+  }
+
+  public override func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
+  }
+}
+
+final public class SwitchEnumAddrInst : SwitchEnumInstBase {
+  public override var numCases: Int { bridged.SwitchEnumAddrInst_getNumCases() }
+  override func getCaseIndex(_ index: Int) -> Int { bridged.SwitchEnumAddrInst_getCaseIndex(index) }
+
+  public override func getUniqueCaseForDefault() -> Int? {
+    let uniqueCaseIdx = bridged.SwitchEnumAddrInst_getUniqueCaseForDefault()
+    return uniqueCaseIdx >= 0 ? uniqueCaseIdx : nil
+  }
+
+  public override func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumAddrInst_getSuccessorForDefault().block
+  }
 }
 
 final public class SelectEnumAddrInst : SingleValueInstruction {
@@ -2292,6 +2464,10 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var source: Value { operand.value }
   public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
+
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastBranch_getTargetFormalType())
+  }
 
   public func updateSourceFormalTypeFromOperandLoweredType() {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()

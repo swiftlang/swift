@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-WEAK-LET
 // RUN: %target-swift-emit-silgen -enable-upcoming-feature ImmutableWeakCaptures %s | %FileCheck %s --check-prefixes=CHECK,CHECK-HAS-WEAK-LET
 

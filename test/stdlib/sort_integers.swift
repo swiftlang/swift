@@ -69,13 +69,13 @@ let sort_verifier: ([Int]) -> Void = {
     var y = $0.sorted()
     for i in 0..<y.count - 1 {
     if (y[i] > y[i+1]) {
-        print("Error: \(y)")
+        print("Error! \(y)")
         return
       }
     }
 }
 
-//CHECK-NOT: Error!
+//CHECK-NOT: Error
 permute(2, sort_verifier)
 permute(6, sort_verifier)
 permute(7, sort_verifier)
@@ -111,7 +111,7 @@ let partition_verifier: ([Int]) -> Void = {
 permute(2, partition_verifier)
 permute(6, partition_verifier)
 permute(7, partition_verifier)
-//CHECK-NOT: Error!
+//CHECK-NOT: Error
 //CHECK: Test2 - Done
 print("Test2 - Done")
 
@@ -119,7 +119,7 @@ print("Test2 - Done")
 randomize(70, sort_verifier)
 randomize(700, sort_verifier)
 randomize(1900, sort_verifier)
-//CHECK-NOT: Error!
+//CHECK-NOT: Error
 //CHECK: Test3 - Done
 print("Test3 - Done")
 

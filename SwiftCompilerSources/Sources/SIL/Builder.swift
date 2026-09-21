@@ -31,7 +31,7 @@ public struct Builder {
 
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   public init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     self.init(insertAt: .before(insPnt), location: location, context.notifyInstructionChanged, context._bridged)
   }
 
@@ -42,7 +42,7 @@ public struct Builder {
   /// For replacing an existing meta instruction with another, use
   /// ``Builder.init(replacing:_:)``.
   public init(before insPnt: Instruction, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     self.init(insertAt: .before(insPnt), location: insPnt.location,
               context.notifyInstructionChanged, context._bridged)
   }
@@ -51,7 +51,7 @@ public struct Builder {
   /// for the purpose of replacing that meta instruction with an equivalent instruction.
   /// This function does not delete `insPnt`.
   public init(replacing insPnt: MetaInstruction, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     self.init(insertAt: .before(insPnt), location: insPnt.location, context.notifyInstructionChanged, context._bridged)
   }
 
@@ -60,7 +60,7 @@ public struct Builder {
   /// TODO: this is usually incorrect for terminator instructions. Instead use
   /// `Builder.insert(after:location:_:insertFunc)` from OptUtils.swift. Rename this to afterNonTerminator.
   public init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     guard let nextInst = insPnt.next else {
       fatalError("cannot insert an instruction after a block terminator.")
     }
@@ -74,6 +74,16 @@ public struct Builder {
   /// from OptUtils.swift. Rename this to afterNonTerminator.
   public init(after insPnt: Instruction, _ context: some MutatingContext) {
     self.init(after: insPnt, location: insPnt.location, context)
+  }
+
+  public init(afterDefinitionOf value: Value, _ context: some MutatingContext) {
+    if let definingInstruction = value.definingInstruction {
+      self.init(after: definingInstruction, context)
+    } else if let arg = value as? Argument {
+      self.init(atBeginOf: arg.parentBlock, context)
+    } else {
+      fatalError("wrong value kind for Builder.(afterDefinitionOf:)")
+    }
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
@@ -296,9 +306,15 @@ public struct Builder {
     return notifyNew(dr.getAs(PointerToAddressInst.self))
   }
 
-  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool) -> IndexAddrInst {
-    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection)
+  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool,
+                              isProjection: Bool) -> IndexAddrInst {
+    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection, isProjection)
     return notifyNew(dr.getAs(IndexAddrInst.self))
+  }
+
+  public func createIndexRawPointer(base: Value, index: Value) -> IndexRawPointerInst {
+    let dr = bridged.createIndexRawPointer(base.bridged, index.bridged)
+    return notifyNew(dr.getAs(IndexRawPointerInst.self))
   }
 
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
@@ -314,6 +330,11 @@ public struct Builder {
   public func createUncheckedValueCast(from value: Value, to type: Type) -> UncheckedValueCastInst {
     let cast = bridged.createUncheckedValueCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedValueCastInst.self))
+  }
+
+  public func createUncheckedTrivialBitCast(from value: Value, to type: Type) -> UncheckedTrivialBitCastInst {
+    let cast = bridged.createUncheckedTrivialBitCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedTrivialBitCastInst.self))
   }
 
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {
@@ -497,15 +518,17 @@ public struct Builder {
     arguments: [Value],
     isNonThrowing: Bool = false,
     isNonAsync: Bool = false,
-    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo(),
+    argumentLocationsFrom: ApplySite? = nil
   ) -> ApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createApply(function.bridged, substitutionMap.bridged, valuesRef,
-                          isNonThrowing, isNonAsync, specializationInfo)
+                          isNonThrowing, isNonAsync, specializationInfo,
+                          argumentLocationsFrom.bridged)
     }
     return notifyNew(apply.getAs(ApplyInst.self))
   }
-  
+
   @discardableResult
   public func createTryApply(
     function: Value,
@@ -514,26 +537,30 @@ public struct Builder {
     normalBlock: BasicBlock,
     errorBlock: BasicBlock,
     isNonAsync: Bool = false,
-    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo(),
+    argumentLocationsFrom: ApplySite? = nil
   ) -> TryApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createTryApply(function.bridged, substitutionMap.bridged, valuesRef,
                              normalBlock.bridged, errorBlock.bridged,
-                             isNonAsync, specializationInfo)
+                             isNonAsync, specializationInfo,
+                             argumentLocationsFrom.bridged)
     }
     return notifyNew(apply.getAs(TryApplyInst.self))
   }
-  
+
   public func createBeginApply(function: Value,
                                _ substitutionMap: SubstitutionMap,
                                arguments: [Value],
                                isNonThrowing: Bool = false,
                                isNonAsync: Bool = false,
-                               specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+                               specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo(),
+                               argumentLocationsFrom: ApplySite? = nil
   ) -> BeginApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createBeginApply(function.bridged, substitutionMap.bridged, valuesRef,
-                               isNonThrowing, isNonAsync, specializationInfo)
+                               isNonThrowing, isNonAsync, specializationInfo,
+                               argumentLocationsFrom.bridged)
     }
     return notifyNew(apply.getAs(BeginApplyInst.self))
   }
@@ -610,17 +637,20 @@ public struct Builder {
 
   public func createPartialApply(
     function: Value,
-    substitutionMap: SubstitutionMap, 
-    capturedArguments: [Value], 
-    calleeConvention: ArgumentConvention, 
-    hasUnknownResultIsolation: Bool, 
+    substitutionMap: SubstitutionMap,
+    capturedArguments: [Value],
+    calleeConvention: ArgumentConvention,
+    hasUnknownResultIsolation: Bool,
     isOnStack: Bool,
     /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
-    isNested: Bool
+    isNested: Bool,
+    isCalledOnce: Bool,
+    argumentLocationsFrom: ApplySite? = nil
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
       let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
-                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested)
+                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested,
+                                           isCalledOnce, argumentLocationsFrom.bridged)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
@@ -815,6 +845,13 @@ public struct Builder {
 
   public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceInst {
     let markDependence = bridged.createMarkDependence(value.bridged, base.bridged,
+                                                      BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
+    return notifyNew(markDependence.getAs(MarkDependenceInst.self))
+  }
+
+  public func createMarkDependence(value: Value, base: Value, ownership: Ownership,
+                                   kind: MarkDependenceKind) -> MarkDependenceInst {
+    let markDependence = bridged.createMarkDependence(value.bridged, base.bridged, ownership._bridged,
                                                       BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }

@@ -113,6 +113,9 @@ extension LifetimeDependentApply {
     if let beginApply = applySite as? BeginApplyInst {
       return getYieldDependenceSources(beginApply: beginApply)
     }
+    // applySite.captureDependence is ignored here because captures are always an inherited dependence relative to the
+    // apply site's callee operand (whenever the callee is copied the closure context is copied). We don't insert any
+    // mark_dependence for inherited dependencies.
     for operand in applySite.parameterOperands {
       guard let dep = applySite.resultDependence(on: operand) else {
         continue

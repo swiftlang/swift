@@ -154,8 +154,19 @@ public func _getTypeByMangledNameInContext(
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
 
+/// A variant of `_getTypeByMangledNameInContext` that never logs lookup
+/// failures, for probing callers that treat a `nil` result as an expected
+/// outcome rather than an error.
+@_silgen_name("swift_getTypeByMangledNameInContextQuiet")
+internal func _getTypeByMangledNameInContextQuiet(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericContext: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> Any.Type?
+
 /// Prevents performance diagnostics in the passed closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("no_performance_analysis")
 @unsafe
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
@@ -165,16 +176,19 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 // Helper function that exploits a bug in rethrows checking to
 // allow us to call rethrows functions from generic typed-throws functions
 // and vice-versa.
-@usableFromInline
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
 }
 
+// July 2026:  The compiler no longer emits references to this
+// symbol (the compiler instead synthesizes an equivalent symbol that
+// also works with Embedded Swift).
+// It is retained purely to preserve compatibility with binaries that
+// used the experimental version of CoroutineAccessors.
 @available(SwiftStdlib 9999, *)
 @usableFromInline internal var swift_deletedCalleeAllocatedCoroutineMethodError: () {
-  // TODO: CoroutineAccessors: Change to read from _read.
   @_silgen_name("swift_deletedCalleeAllocatedCoroutineMethodError")
   _read {
     fatalError("Fatal error: Call of deleted method")

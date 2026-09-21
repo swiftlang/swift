@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -target x86_64-apple-macosx10.50 -target-variant x86_64-apple-ios48.0-macabi -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -target x86_64-apple-macosx10.50 -target-variant x86_64-apple-ios48.0-macabi -O -emit-ir | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -primary-file %s -target %target-cpu-apple-macosx10.50 -target-variant %target-cpu-apple-ios48.0-macabi -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -target %target-cpu-apple-macosx10.50 -target-variant %target-cpu-apple-ios48.0-macabi -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx || OS=maccatalyst

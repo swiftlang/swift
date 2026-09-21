@@ -29,7 +29,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "clang/AST/Type.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 
@@ -119,6 +118,10 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
       out << "extension of " << extendedTy;
       hasPrintedName = true;
     }
+  } else if (auto *ID = dyn_cast<ImportDecl>(D)) {
+    out << "import of ";
+    ID->getImportPath().print(out);
+    hasPrintedName = true;
   }
 
   if (!hasPrintedName)

@@ -38,10 +38,11 @@ public:
 };
 
 // CHECK: struct Struct {
-// CHECK-NEXT:   init(x: Int32, y: Int32)
+// CHECK-NEXT:   init(x: CInt, y: CInt)
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   var x: Int32
-// CHECK-NEXT:   var y: Int32
+// CHECK-NEXT:   var x: CInt
+// CHECK-NEXT:   var y: CInt
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnsClassInTypesModules() -> Never
 // CHECK-NEXT: }
 

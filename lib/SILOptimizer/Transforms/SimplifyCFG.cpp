@@ -32,7 +32,6 @@
 
 #include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -45,7 +44,6 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -203,11 +201,9 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
 
     ThreadedSuccessorBlock =
         clonedSrc->getSuccessors()[ti.ThreadedSuccessorIdx].getBB();
-    auto Args = ti.ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
-                                             : CondTerm->getFalseArgs();
-
+    // A cond_br passes no branch arguments (SIL has no critical edges).
     SILBuilderWithScope(CondTerm).createBranch(CondTerm->getLoc(),
-                                               ThreadedSuccessorBlock, Args);
+                                               ThreadedSuccessorBlock);
 
     CondTerm->eraseFromParent();
   } else {
@@ -509,21 +505,27 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
         if (!LiveBlock->args_empty()) {
           auto *LiveBlockArg = LiveBlock->getArgument(0);
+
+          auto builder = SILBuilderWithScope(SEI);
+
           // The default block receives the whole enum value, not the extracted
           // payload. Only use the payload for explicitly matched case blocks.
+          //
+          // Use unchecked_enum_data to extract the payload instead of using the
+          // enum instruction's operand, to avoid over-consuming the operand if
+          // the enum has other users.
           bool isDefaultBlock = SEI->hasDefault() && LiveBlock == SEI->getDefaultBB();
           SILValue NewValue = (!isDefaultBlock && EI->hasOperand())
-                                  ? EI->getOperand()
+                                  ? builder.createUncheckedEnumData(
+                                        SEI->getLoc(), EI, EI->getElement())
                                   : SILValue(EI);
           LiveBlockArg->replaceAllUsesWith(NewValue);
           LiveBlock->eraseArgument(0);
-          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+          builder.createBranch(SEI->getLoc(), LiveBlock);
         } else {
           SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
         }
         SEI->eraseFromParent();
-        if (EI->use_empty())
-          EI->eraseFromParent();
         HaveChangedCFG = true;
       }
       continue;
@@ -534,13 +536,11 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         LLVM_DEBUG(llvm::dbgs() << "simplify threaded " << *CondBr);
         SILBasicBlock *TrueSide = CondBr->getTrueBB();
         SILBasicBlock *FalseSide = CondBr->getFalseBB();
-        auto TrueArgs = CondBr->getTrueArgs();
-        auto FalseArgs = CondBr->getFalseArgs();
         bool isFalse = !IL->getValue();
-        auto LiveArgs = isFalse ? FalseArgs : TrueArgs;
         auto *LiveBlock = isFalse ? FalseSide : TrueSide;
+        // A cond_br passes no branch arguments (SIL has no critical edges).
         SILBuilderWithScope(CondBr)
-            .createBranch(CondBr->getLoc(), LiveBlock, LiveArgs);
+            .createBranch(CondBr->getLoc(), LiveBlock);
         CondBr->eraseFromParent();
         if (IL->use_empty())
           IL->eraseFromParent();
@@ -560,13 +560,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   if (!EnableOSSADominatorBasedSimplify && Fn.hasOwnership())
     return false;
 
-  // Split all critical edges such that we can move code onto edges. This is
-  // also required for SSA construction in dominatorBasedSimplifications' jump
-  // threading. It only splits new critical edges it creates by jump threading.
   bool Changed = false;
-  if (!Fn.hasOwnership() && EnableJumpThread) {
-    Changed = splitAllCriticalEdges(Fn, DT, nullptr);
-  }
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
   SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
 
@@ -1468,8 +1462,9 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   auto *ThisBB = BI->getParent();
   SILBasicBlock *TrueSide = BI->getTrueBB();
   SILBasicBlock *FalseSide = BI->getFalseBB();
-  auto TrueArgs = BI->getTrueArgs();
-  auto FalseArgs = BI->getFalseArgs();
+  // A cond_br passes no branch arguments (SIL has no critical edges).
+  ArrayRef<SILValue> TrueArgs;
+  ArrayRef<SILValue> FalseArgs;
 
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
@@ -1507,7 +1502,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
           Builder.createCondBranch(
               BI->getLoc(),
               invertExpectAndApplyTo(Builder, BI->getCondition(), Cond),
-              FalseSide, FalseArgs, TrueSide, TrueArgs, BI->getFalseBBCount(),
+              FalseSide, TrueSide, BI->getFalseBBCount(),
               BI->getTrueBBCount());
           BI->eraseFromParent();
           addToWorklist(ThisBB);
@@ -1552,12 +1547,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << "true-trampoline from bb" << ThisBB->getDebugID() << " to bb"
                << trueTrampolineDest.destBB->getDebugID() << '\n');
 
-    SmallVector<SILValue, 4> falseArgsCopy(FalseArgs.begin(), FalseArgs.end());
     eraseTrampolineDestArgs(trueTrampolineDest);
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), trueTrampolineDest.destBB,
-        {}, FalseSide, falseArgsCopy,
-        BI->getTrueBBCount(), BI->getFalseBBCount());
+        FalseSide, BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
 
     substitutedBlockPreds(TrueSide, ThisBB);
@@ -1575,11 +1568,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << "false-trampoline from bb" << ThisBB->getDebugID() << " to bb"
                << falseTrampolineDest.destBB->getDebugID() << '\n');
 
-    SmallVector<SILValue, 4> trueArgsCopy(TrueArgs.begin(), TrueArgs.end());
     eraseTrampolineDestArgs(falseTrampolineDest);
     SILBuilderWithScope(BI).createCondBranch(
-        BI->getLoc(), BI->getCondition(), TrueSide, trueArgsCopy,
-        falseTrampolineDest.destBB, {}, BI->getTrueBBCount(),
+        BI->getLoc(), BI->getCondition(), TrueSide,
+        falseTrampolineDest.destBB, BI->getTrueBBCount(),
         BI->getFalseBBCount());
     BI->eraseFromParent();
 
@@ -1600,7 +1592,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     ++NumConstantFolded;
   };
   if (trueTrampolineDest.destBB == FalseSide
-      && trueTrampolineDest.newSourceBranchArgs == FalseArgs) {
+      && trueTrampolineDest.newSourceBranchArgs.empty()) {
     condBrToBr(trueTrampolineDest.newSourceBranchArgs, FalseSide);
     removeIfDead(TrueSide);
     return true;
@@ -2534,7 +2526,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   LLVM_DEBUG(llvm::dbgs() << "simplify try_apply block\n");
 
   auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
-  SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(*TAI->getFunction());
+  SILFunctionConventions calleeConv(CalleeFnTy, silConv);
   auto ResultTy = calleeConv.getSILResultType(
       TAI->getFunction()->getTypeExpansionContext());
   auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
@@ -2547,7 +2541,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         TAI->getModule(), TAI->getSubstitutionMap(),
         Builder.getTypeExpansionContext());
   }
-  SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
+  SILFunctionConventions targetConv(TargetFnTy, silConv);
 
   auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
   if (OrigFnTy->isPolymorphic()) {
@@ -2555,7 +2549,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         OrigFnTy->substGenericArgs(TAI->getModule(), TAI->getSubstitutionMap(),
                                    Builder.getTypeExpansionContext());
   }
-  SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
+  SILFunctionConventions origConv(OrigFnTy, silConv);
   auto context = TAI->getFunction()->getTypeExpansionContext();
   SmallVector<SILValue, 8> Args;
   unsigned numArgs = TAI->getNumArguments();
@@ -3048,8 +3042,6 @@ private:
   bool createNewArguments();
   void replaceIncomingArgs(SILBuilder &B, BranchInst *BI,
                            llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
-  void replaceIncomingArgs(SILBuilder &B, CondBranchInst *CBI,
-                           llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
 };
 } // end anonymous namespace
 
@@ -3066,46 +3058,6 @@ void ArgumentSplitter::replaceIncomingArgs(
   }
   std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
   B.createBranch(BI->getLoc(), BI->getDestBB(), NewIncomingValues);
-}
-
-void ArgumentSplitter::replaceIncomingArgs(
-    SILBuilder &B, CondBranchInst *CBI,
-    llvm::SmallVectorImpl<SILValue> &NewIncomingValues) {
-  llvm::SmallVector<SILValue, 4> OldIncomingValues;
-  ArrayRef<SILValue> NewTrueValues, NewFalseValues;
-
-  unsigned ArgIndex = Arg->getIndex();
-  if (Arg->getParent() == CBI->getTrueBB()) {
-    ArrayRef<Operand> TrueArgs = CBI->getTrueOperands();
-    for (unsigned i : llvm::reverse(indices(TrueArgs))) {
-      // Skip this argument.
-      if (i == ArgIndex)
-        continue;
-      NewIncomingValues.push_back(TrueArgs[i].get());
-    }
-    std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
-    for (SILValue V : CBI->getFalseArgs())
-      OldIncomingValues.push_back(V);
-    NewTrueValues = NewIncomingValues;
-    NewFalseValues = OldIncomingValues;
-  } else {
-    ArrayRef<Operand> FalseArgs = CBI->getFalseOperands();
-    for (unsigned i : llvm::reverse(indices(FalseArgs))) {
-      // Skip this argument.
-      if (i == ArgIndex)
-        continue;
-      NewIncomingValues.push_back(FalseArgs[i].get());
-    }
-    std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
-    for (SILValue V : CBI->getTrueArgs())
-      OldIncomingValues.push_back(V);
-    NewTrueValues = OldIncomingValues;
-    NewFalseValues = NewIncomingValues;
-  }
-
-  B.createCondBranch(CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(),
-                     NewTrueValues, CBI->getFalseBB(), NewFalseValues,
-                     CBI->getTrueBBCount(), CBI->getFalseBBCount());
 }
 
 bool ArgumentSplitter::createNewArguments() {
@@ -3183,10 +3135,12 @@ bool ArgumentSplitter::createNewArguments() {
   // and have them point directly at the argument.
   simplifyUsers(Agg);
 
-  // If we only had such users of Agg and Agg is dead now (ignoring debug
-  // instructions), remove it.
-  if (onlyHaveDebugUses(Agg))
+  // If we only had such users of Agg and Agg is dead now, rewrite debug values
+  // and remove it.
+  if (onlyHaveDebugUses(Agg)) {
+    salvageDebugInfo(Agg);
     eraseFromParentWithDebugInsts(Agg);
+  }
 
   return true;
 }
@@ -3224,12 +3178,10 @@ bool ArgumentSplitter::split() {
       NewIncomingValues.push_back(ProjInst);
     }
 
-    if (auto *Br = dyn_cast<BranchInst>(OldTerm)) {
-      replaceIncomingArgs(B, Br, NewIncomingValues);
-    } else {
-      auto *CondBr = cast<CondBranchInst>(OldTerm);
-      replaceIncomingArgs(B, CondBr, NewIncomingValues);
-    }
+    // Only a BranchInst can carry phi arguments: SIL has no critical edges, so
+    // a phi block is only ever reached through unconditional branches.
+    auto *Br = cast<BranchInst>(OldTerm);
+    replaceIncomingArgs(B, Br, NewIncomingValues);
 
     OldTerm->eraseFromParent();
     NewIncomingValues.clear();
@@ -3314,12 +3266,6 @@ static bool splitBBArguments(SILFunction &Fn) {
 }
 
 bool SimplifyCFG::run() {
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
-  // This pass results in verification failures when Swift sources are not
-  // enabled.
-  LLVM_DEBUG(llvm::dbgs() << "SimplifyCFG disabled in C++-only Swift compiler\n");
-  return false;
-#endif //!SWIFT_ENABLE_SWIFT_IN_SWIFT
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
 
   // Disable some expensive optimizations if the function is huge.
@@ -3404,24 +3350,6 @@ static bool hasMandatoryArgument(TermInst *term) {
   return (!isa<BranchInst>(term) && !isa<CondBranchInst>(term));
 }
 
-
-// Get the element of Aggregate corresponding to the one extracted by
-// Extract.
-static SILValue getInsertedValue(SILInstruction *Aggregate,
-                                 SILInstruction *Extract) {
-  if (auto *Struct = dyn_cast<StructInst>(Aggregate)) {
-    auto *SEI = cast<StructExtractInst>(Extract);
-    return Struct->getFieldValue(SEI->getField());
-  }
-  if (auto *Enum = dyn_cast<EnumInst>(Aggregate)) {
-    assert(Enum->getElement() ==
-           cast<UncheckedEnumDataInst>(Extract)->getElement());
-    return Enum->getOperand();
-  }
-  auto *Tuple = cast<TupleInst>(Aggregate);
-  auto *TEI = cast<TupleExtractInst>(Extract);
-  return Tuple->getElement(TEI->getFieldIndex());
-}
 
 /// Find a parent SwitchEnumInst of the block \p BB. The block \p BB is a
 /// predecessor of the merge-block \p PostBB which should post-dominate the
@@ -3704,10 +3632,10 @@ static FunctionTest SimplifyCFGSimplifyBlockArgs(
     });
 } // end namespace swift::test
 
-// Attempt to simplify the ith argument of BB.  We simplify cases
-// where there is a single use of the argument that is an extract from
-// a struct, tuple or enum and where the predecessors all build the struct,
-// tuple or enum and pass it directly.
+// Attempt to simplify the ith argument of BB.
+//
+// Note: "unwrapping" of a struct, tuple or enum argument is implemented in
+// Swift - see `Phi.unwrapAggregate` in SimplifyPhiArgument.swift.
 bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *A = BB->getArgument(i);
 
@@ -3717,84 +3645,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   if (!DT && A->getType().is<BuiltinIntegerType>())
     return simplifySwitchEnumToSelectEnum(BB, i, A);
 
-  // For now, just focus on cases where there is a single use.
-  SILValue argVal = lookThroughBorrowedFromUser(A);
-  if (!argVal->hasOneUse())
-    return false;
-
-  auto *Use = *argVal->use_begin();
-  auto *User = Use->getUser();
-
-  auto disableInOSSA = [](SingleValueInstruction *inst) {
-    assert(isa<StructInst>(inst) || isa<TupleInst>(inst) ||
-           isa<EnumInst>(inst));
-    if (!inst->getFunction()->hasOwnership()) {
-      return false;
-    }
-    if (inst->getOwnershipKind() == OwnershipKind::Owned)
-      return !inst->getSingleUse();
-    return false;
-  };
-
-  // Handle projections.
-  if (!isa<StructExtractInst>(User) &&
-      !isa<TupleExtractInst>(User) &&
-      !isa<UncheckedEnumDataInst>(User))
-    return false;
-  auto proj = cast<SingleValueInstruction>(User);
-
-  // For now, just handle the case where all predecessors are
-  // unconditional branches.
-  for (auto *Pred : BB->getPredecessorBlocks()) {
-    if (!isa<BranchInst>(Pred->getTerminator()))
-      return false;
-    auto *Branch = cast<BranchInst>(Pred->getTerminator());
-    SILValue BranchArg = Branch->getArg(i);
-    if (!isa<StructInst>(BranchArg) && !isa<TupleInst>(BranchArg) &&
-        !isa<EnumInst>(BranchArg)) {
-      return false;
-    }
-    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
-      if (EI->getElement() != cast<UncheckedEnumDataInst>(proj)->getElement())
-        return false;
-    }
-    if (disableInOSSA(cast<SingleValueInstruction>(BranchArg))) {
-      return false;
-    }
-  }
-
-  // Okay, we'll replace the BB arg with one with the right type, replace
-  // the uses in this block, and then rewrite the branch operands.
-  LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  if (auto *bfi = getBorrowedFromUser(A)) {
-    bfi->replaceAllUsesWith(A);
-    bfi->eraseFromParent();
-  }
-  A->replaceAllUsesWith(SILUndef::get(A));
-  auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
-                                        BB->getArgument(i)->getOwnershipKind());
-  proj->replaceAllUsesWith(NewArg);
-
-  // Rewrite the branch operand for each incoming branch.
-  for (auto *Pred : BB->getPredecessorBlocks()) {
-    if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
-      auto *BranchOpValue = cast<SingleValueInstruction>(Branch->getOperand(i));
-      auto V = getInsertedValue(cast<SingleValueInstruction>(Branch->getArg(i)),
-                                proj);
-      Branch->setOperand(i, V);
-      if (isInstructionTriviallyDead(BranchOpValue)) {
-        BranchOpValue->replaceAllUsesWithUndef();
-        BranchOpValue->eraseFromParent();
-      }
-      addToWorklist(Pred);
-    }
-  }
-
-  proj->eraseFromParent();
-
-  updateGuaranteedPhis(PM, { NewArg });
-
-  return true;
+  return false;
 }
 
 namespace swift::test {
@@ -4012,30 +3863,6 @@ SILTransform *swift::createJumpThreadSimplifyCFG() {
 
 namespace {
 
-// Used to test critical edge splitting with sil-opt.
-class SplitCriticalEdges : public SILFunctionTransform {
-  bool OnlyNonCondBrEdges;
-
-public:
-  SplitCriticalEdges(bool SplitOnlyNonCondBrEdges)
-      : OnlyNonCondBrEdges(SplitOnlyNonCondBrEdges) {}
-
-  void run() override {
-    auto &Fn = *getFunction();
-
-    if (OnlyNonCondBrEdges && Fn.getModule().getOptions().VerifyAll)
-      Fn.verifyCriticalEdges();
-
-    // Split all critical edges from all or non only cond_br terminators.
-    bool Changed = splitAllCriticalEdges(Fn, nullptr, nullptr);
-
-    if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    }
-  }
-
-};
-
 // Used to test SimplifyCFG::simplifyArgs with sil-opt.
 class SimplifyBBArgs : public SILFunctionTransform {
 public:
@@ -4080,16 +3907,6 @@ public:
 };
 
 } // end anonymous namespace
-
-/// Splits all critical edges in a function.
-SILTransform *swift::createSplitAllCriticalEdges() {
-  return new SplitCriticalEdges(false);
-}
-
-/// Splits all critical edges from non cond_br terminators in a function.
-SILTransform *swift::createSplitNonCondBrCriticalEdges() {
-  return new SplitCriticalEdges(true);
-}
 
 // Simplifies basic block arguments.
 SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }

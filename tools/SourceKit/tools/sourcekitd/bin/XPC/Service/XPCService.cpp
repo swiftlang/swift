@@ -15,7 +15,6 @@
 #include "sourcekitd/Service.h"
 
 #include "SourceKit/Core/LLVM.h"
-#include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/Support/Logging.h"
 
@@ -64,7 +63,7 @@ namespace {
 class SKUIDToUIDMap {
   typedef llvm::DenseMap<void *, UIdent> MapTy;
   MapTy Map;
-  WorkQueue Queue{ WorkQueue::Dequeuing::Concurrent, "UIDMap" };
+  std::mutex MapMtx;
 
 public:
   UIdent get(sourcekitd_uid_t SKDUID);
@@ -440,18 +439,11 @@ int main(int argc, const char *argv[]) {
 }
 
 UIdent SKUIDToUIDMap::get(sourcekitd_uid_t SKDUID) {
-  UIdent UID;
-  Queue.dispatchSync([&]{
-    MapTy::iterator It = Map.find(SKDUID);
-    if (It != Map.end())
-      UID = It->second;
-  });
-
-  return UID;
+  std::lock_guard<std::mutex> lock(MapMtx);
+  return Map.lookup(SKDUID);
 }
 
 void SKUIDToUIDMap::set(sourcekitd_uid_t SKDUID, UIdent UID) {
-  Queue.dispatchBarrier([=]{
-    this->Map[SKDUID] = UID;
-  });
+  std::lock_guard<std::mutex> lock(MapMtx);
+  Map[SKDUID] = UID;
 }

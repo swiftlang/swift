@@ -65,27 +65,35 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool 
 
 
 template <>
-HeapObject *RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits oldbits,
-                                                   uint32_t n) {
+HeapObject *
+RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits oldbits,
+                                             uint32_t n, uint32_t *count) {
   if (oldbits.isImmortal(false)) {
+    // Immortal objects are never deallocated, so reading the (saturated)
+    // count is safe here.
+    if (count) *count = getCount();
     return getHeapObject();
   }
   else if (oldbits.hasSideTable()) {
     // Out-of-line slow path.
     auto side = oldbits.getSideTable();
-    side->incrementStrong(n);
+    side->incrementStrong(n, count);
   }
   else {
     // Overflow into a new side table.
     auto side = allocateSideTable(false);
-    side->incrementStrong(n);
+    side->incrementStrong(n, count);
   }
   return getHeapObject();
 }
 template <>
-HeapObject *RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits,
-                                                uint32_t n) {
+HeapObject *
+RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits,
+                                                uint32_t n, uint32_t *count) {
   if (oldbits.isImmortal(false)) {
+    // Immortal objects are never deallocated, so reading the (saturated)
+    // count is safe here.
+    if (count) *count = getCount();
     return getHeapObject();
   }
   else {
@@ -104,11 +112,11 @@ void RefCounts<InlineRefCountBits>::incrementNonAtomicSlow(InlineRefCountBits ol
   else if (oldbits.hasSideTable()) {
     // Out-of-line slow path.
     auto side = oldbits.getSideTable();
-    side->incrementStrong(n);  // FIXME: can there be a nonatomic impl?
+    side->incrementStrong(n, nullptr);  // FIXME: can there be a nonatomic impl?
   } else {
     // Overflow into a new side table.
     auto side = allocateSideTable(false);
-    side->incrementStrong(n);  // FIXME: can there be a nonatomic impl?
+    side->incrementStrong(n, nullptr);  // FIXME: can there be a nonatomic impl?
   }
 }
 template <>

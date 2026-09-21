@@ -74,22 +74,6 @@ public protocol Actor: AnyObject, Sendable {
   nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 }
 
-/// Called to initialize the default actor instance in an actor.
-/// The implementation will call this within the actor's initializer.
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_defaultActor_initialize")
-public func _defaultActorInitialize(_ actor: AnyObject)
-
-@available(SwiftStdlib 5.9, *)
-@_silgen_name("swift_nonDefaultDistributedActor_initialize")
-public func _nonDefaultDistributedActorInitialize(_ actor: AnyObject)
-
-/// Called to destroy the default actor instance in an actor.
-/// The implementation will call this within the actor's deinit.
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_defaultActor_destroy")
-public func _defaultActorDestroy(_ actor: AnyObject)
-
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
@@ -109,7 +93,7 @@ public macro isolation<T>() -> T = Builtin.IsolationMacro
 #endif
 
 #if $IsolatedAny
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "Use `.isolation` on @isolated(any) closure values instead.")
 public func extractIsolation<each Arg, Result>(

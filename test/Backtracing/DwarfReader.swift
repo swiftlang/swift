@@ -1,10 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/Inlining.swift -Xfrontend -disable-availability-checking -parse-as-library -g -o %t/Inlining
 // RUN: %target-build-swift %s -parse-as-library -g -o %t/DwarfReader
-// RUN: %target-run %t/DwarfReader %t/Inlining | %FileCheck %s
+// RUN: %target-run %t/DwarfReader %S/Inputs/Inlining | %FileCheck %s
 
-// REQUIRES: OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
+// REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 @_spi(DwarfTest) import Runtime
 #if canImport(Darwin)
@@ -27,6 +29,7 @@ struct DwarfReader {
 
     // CHECK: {{.*}}/Inlining is a {{32|64}}-bit ELF image
     // CHECK: Units:
+    // CHECK: Functions:
     // CHECK: Call Sites:
 
     if !testDwarfReaderFor(path: CommandLine.arguments[1]) {

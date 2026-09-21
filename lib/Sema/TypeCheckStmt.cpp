@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
@@ -47,9 +46,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -423,6 +419,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   }
 
   ASTNode node;
+  ArgumentList *args = nullptr;
   ParameterList *params = nullptr;
   ParamDecl *selfParam = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
@@ -473,12 +470,17 @@ unsigned LocalDiscriminatorsRequest::evaluate(
       node = initInfo.getInitFromProjectedValue();
       break;
     }
+  } else if (auto customAttrInit = dyn_cast<CustomAttributeInitializer>(dc)) {
+    args = customAttrInit->getAttribute()->getArgs();
+    // Custom attribute initializer contexts are omitted when mangling, so
+    // number their closures in the enclosing context.
+    dc = customAttrInit->getParent();
   } else {
     params = getParameterList(dc);
   }
 
   auto startDiscriminator = ctx.getNextDiscriminator(dc);
-  if (!node && !params && !selfParam)
+  if (!node && !args && !params && !selfParam)
     return startDiscriminator;
 
   SetLocalDiscriminators visitor(startDiscriminator);
@@ -496,6 +498,9 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 
   if (node)
     node.walk(visitor);
+
+  if (args)
+    args->walk(visitor);
 
   unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
   ctx.setMaxAssignedDiscriminator(dc, nextDiscriminator);
@@ -783,6 +788,17 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   if (auto CE = dyn_cast<CoerceExpr>(E))
     return getDeclRefProvidingExpressionForHasSymbol(CE->getSubExpr());
 
+  // Strip implicit function conversions, which may be inserted to adjust the
+  // type or isolation of the reference:
+  //
+  //   if #_hasSymbol(foo as () throws -> ()) { ... }
+  //
+  if (isa<FunctionConversionExpr>(E) ||
+      isa<CovariantFunctionConversionExpr>(E) ||
+      isa<ActorIsolationErasureExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(
+        cast<ImplicitConversionExpr>(E)->getSubExpr());
+
   // Unwrap curry thunks which are injected into the AST to wrap some forms of
   // unapplied method references, e.g.
   //
@@ -799,6 +815,14 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   //
   if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(E))
     return getDeclRefProvidingExpressionForHasSymbol(DSCE->getFn());
+
+  // Drill into the right hand side of a DotSyntaxBaseIgnoredExpr, which wraps
+  // an uncurried reference to an instance member, e.g.
+  //
+  //   if #_hasSymbol(SomeStruct.foo) { ... }
+  //
+  if (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(DSBIE->getRHS());
 
   return E;
 }
@@ -977,20 +1001,16 @@ static bool typeCheckAvailableStmtConditionElement(StmtConditionElement &elt,
     return false;
   }
 
-  auto &diags = dc->getASTContext().Diags;
+  // Determine whether this element's `#available`/`#unavailable` query has a
+  // statically known result, but don't diagnose here — the per-element
+  // useless-availability warning is emitted by a second pass in
+  // `typeCheckConditionForStatement` so it can attach a fix-it that depends
+  // on the rest of the condition.
   bool isConditionAlwaysTrue = false;
-
   if (auto query = info->getAvailabilityQuery()) {
     auto domain = query->getDomain();
-    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled()) {
+    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled())
       isConditionAlwaysTrue = *query->getConstantResult();
-
-      diags
-        .diagnose(elt.getStartLoc(),
-                  diag::availability_query_useless_always_true, domain,
-                  isConditionAlwaysTrue)
-        .highlight(elt.getSourceRange());
-    }
   }
 
   if (!isConditionAlwaysTrue)
@@ -1091,6 +1111,80 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   }
 }
 
+/// If \p elt is a `#available` or `#unavailable` condition element whose
+/// query result is statically known because the queried domain is
+/// permanently always-enabled, emit the standard useless-check warning. When
+/// the element evaluates to a constant true, additionally attach a fix-it
+/// that removes just this element from the surrounding condition list,
+/// provided removing it preserves semantics: the surrounding statement must
+/// not itself be diagnosed as always-true (the whole-stmt fix-it would
+/// otherwise subsume the per-element one), and the condition must contain
+/// more than one element so removal leaves a non-empty list.
+static void diagnoseUselessAvailabilityCondition(StmtCondition cond,
+                                                 unsigned eltIndex,
+                                                 bool stmtAlwaysTrue,
+                                                 ASTContext &ctx) {
+  auto elt = cond[eltIndex];
+  auto *info = elt.getAvailability();
+  if (info->isInvalid())
+    return;
+  auto query = info->getAvailabilityQuery();
+  if (!query || !query->isConstant())
+    return;
+  auto domain = query->getDomain();
+  if (!domain.isPermanentlyAlwaysEnabled())
+    return;
+
+  bool isAlwaysTrue = *query->getConstantResult();
+  auto inflight = ctx.Diags.diagnose(
+      elt.getStartLoc(), diag::availability_query_useless_always_true, domain,
+      isAlwaysTrue);
+  inflight.highlight(elt.getSourceRange());
+
+  if (!isAlwaysTrue || stmtAlwaysTrue || cond.size() < 2)
+    return;
+
+  auto &SM = ctx.SourceMgr;
+  SourceLoc removeStart, removeEnd;
+  if (eltIndex + 1 < cond.size()) {
+    // Not the last element: remove from the start of this element up to
+    // the start of the next element, taking the trailing comma and
+    // whitespace with it.
+    removeStart = elt.getStartLoc();
+    removeEnd = cond[eltIndex + 1].getStartLoc();
+  } else {
+    // Last element: remove from one past the end of the previous element
+    // up to one past the end of this element, taking the leading comma and
+    // whitespace with it.
+    removeStart =
+        Lexer::getLocForEndOfToken(SM, cond[eltIndex - 1].getEndLoc());
+    removeEnd = Lexer::getLocForEndOfToken(SM, elt.getEndLoc());
+  }
+  if (removeStart.isInvalid() || removeEnd.isInvalid())
+    return;
+
+  inflight.fixItRemoveChars(removeStart, removeEnd);
+}
+
+/// Emits diagnostics for irrefutable condition elements.
+static void diagnoseIrrefutableConditionElement(StmtCondition cond,
+                                                unsigned eltIndex,
+                                                bool stmtAlwaysTrue,
+                                                ASTContext &ctx) {
+  switch (cond[eltIndex].getKind()) {
+  case StmtConditionElement::CK_Availability:
+    diagnoseUselessAvailabilityCondition(cond, eltIndex, stmtAlwaysTrue, ctx);
+    return;
+
+  case StmtConditionElement::CK_PatternBinding:
+  case StmtConditionElement::CK_Boolean:
+  case StmtConditionElement::CK_HasSymbol:
+    // FIXME: Diagnose other irrefutable conditions here (e.g.
+    //   `if case _ = x { ... }`).
+    return;
+  }
+}
+
 /// Type check the given 'if', 'while', or 'guard' statement condition.
 ///
 /// \param stmt The conditional statement to type-check, which will be modified
@@ -1105,16 +1199,27 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   bool hadError = false;
   bool hadAnyFalsable = false;
   auto cond = stmt->getCond();
+
+  // Type-check each element, keeping track of the statement's refutability.
   for (auto &elt : cond) {
     hadError |=
         TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
+  auto &ctx = dc->getASTContext();
+  auto &diags = ctx.Diags;
+
+  bool diagnoseStmtAsAlwaysTrue =
+      !stmt->isImplicit() && !hadAnyFalsable && !hadError;
+
+  // Visit each element again to diagnose irrefutable elements.
+  for (auto i : indices(cond)) {
+    diagnoseIrrefutableConditionElement(cond, i, diagnoseStmtAsAlwaysTrue, ctx);
+  }
+
   // If none of the statement's conditions can be false, diagnose.
   // FIXME: Also diagnose if none of the statements conditions can be true.
-  if (!stmt->isImplicit() && !hadAnyFalsable && !hadError) {
-    auto &ctx = dc->getASTContext();
-    auto &diags = ctx.Diags;
+  if (diagnoseStmtAsAlwaysTrue) {
     Diag<> msg = diag::invalid_diagnostic;
     switch (stmt->getKind()) {
     case StmtKind::If:
@@ -1322,8 +1427,14 @@ public:
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
-    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
+    // Checking yields requires proper interface type. If decl is invalid, then
+    // we already emitted diagnostics elsewhere.
+    if (auto *AFD = TheFunc->getAbstractFunctionDecl()) {
+      if (AFD->isInvalid())
+        return YS;
+    }
 
+    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
     auto yieldExprs = YS->getMutableYields();
     if (yieldExprs.size() != yieldResults.size()) {
       getASTContext().Diags.diagnose(YS->getYieldLoc(), diag::bad_yield_count,
@@ -1440,6 +1551,7 @@ public:
     bool diagnosed = false;
 
     auto *outerDC = climbContextForDiscardStmt(DC);
+    auto *nominalDecl = outerDC->getParent()->getSelfNominalTypeDecl();
     AbstractFunctionDecl *fn = nullptr; // the type member we reside in.
     if (outerDC->getParent()->isTypeContext()) {
       fn = dyn_cast<AbstractFunctionDecl>(outerDC);
@@ -1474,8 +1586,7 @@ public:
     }
 
     // check the kind of type this discard statement appears within.
-    if (!diagnosed) {
-      auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
+    if (!diagnosed && nominalDecl) {
       Type nominalType =
           fn->mapTypeIntoEnvironment(nominalDecl->getDeclaredInterfaceType());
 
@@ -1486,7 +1597,7 @@ public:
         diagnosed = true;
 
       // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->getValueTypeDestructor()) {
+      } else if (!nominalDecl->hasValueTypeDestructor()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -1494,9 +1605,16 @@ public:
         diagnosed = true;
       // if the type is public and not frozen, then the method must not be
       // inlinable.
+      //
+      // `discard self` has to know the type's stored properties in order
+      // to destroy them individually, so a body emitted
+      // into a client must not bake in a layout the defining library could
+      // change.
       } else if (auto fragileKind = fn->getFragileFunctionKind();
                  !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
-                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}
+                 && fn->getResilienceExpansion() ==
+                        ResilienceExpansion::Minimal) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            // Code in ABI stable SDKs has already used the `@inlinable`
                            // attribute on functions using `discard self`.
@@ -2289,12 +2407,12 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // Diagnose unused constructor calls.
     if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
-               callee->getDeclContext()->getDeclaredInterfaceType())
-        .highlight(call->getArgs()->getSourceRange());
+                  callee->getDeclContext()->getDeclaredInterfaceType())
+          .highlight(call->getSourceRange());
       return;
     }
-    
-    SourceRange SR1 = call->getArgs()->getSourceRange(), SR2;
+
+    SourceRange SR1 = call->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
       SR1 = BO->getLHS()->getSourceRange();
       SR2 = BO->getRHS()->getSourceRange();
@@ -2485,6 +2603,14 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
+    // A Swift subclass of a C++ FRT calls the base's imported constructor.
+    // There is no designated initializer to chain to.
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      auto &ctx = fromCtor->getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          classDecl->isForeignReferenceType())
+        return false;
+    }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
       if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
@@ -2507,7 +2633,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     superclassDecl->synthesizeSemanticMembersIfNeeded(
         DeclBaseName::createConstructor());
 
-    NLOptions subOptions = NL_QualifiedDefault;
+    NLOptions subOptions = NLFlags::QualifiedDefault;
 
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
@@ -3162,6 +3288,7 @@ static bool requiresDefinition(Decl *decl) {
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       break;
     }
   }
@@ -3619,30 +3746,26 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
-bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
+bool swift::shouldUseIterable(ASTContext &ctx, Type seqTy,
                                        bool isAsync, SourceLoc loc,
                                        DeclContext *dc) {
-  if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
-    return false;
-  }
-
   if (isAsync || seqTy->isExistentialType()) {
     return false;
   }
 
   auto *borrowingSeqProto =
-      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+      ctx.getProtocol(KnownProtocolKind::Iterable);
   if (!borrowingSeqProto) {
     return false;
   }
 
-  // Always prefer conformance to Sequence over BorrowingSequence when
+  // Always prefer conformance to Sequence over Iterable when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
   }
 
-  // Fall back to Sequence if no conformance to BorrowingSequence is found.
+  // Fall back to Sequence if no conformance to Iterable is found.
   // This ensures that we maintain Sequence as the minimal required
   // conformance.
   auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
@@ -3685,21 +3808,32 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+    isBorrowing = shouldUseIterable(ctx, seqType, isAsync,
                                              sequence->getStartLoc(), dc);
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
                 : (isBorrowing
-                       ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
+                       ? ctx.getProtocol(KnownProtocolKind::Iterable)
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
-    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
-            dc, stmt->getForLoc())) {
-      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
-      return nullptr;
+    if (!ctx.LangOpts.DisableAvailabilityChecking) {
+      auto availability =
+          AvailabilityContext::forLocation(stmt->getForLoc(), dc);
+      bool hadError = false;
+      availability.enumerateUnsatisfiedRestrictionsForConformance(
+          seqConformanceRef,
+          [&](const Decl *decl, const ProtocolDecl *proto,
+              AvailabilityRestriction restriction) {
+            hadError =
+                emitDiagnosticForUnavailableConformance(seqType, proto,
+                                                        restriction);
+            return true;
+          });
+      if (hadError)
+        return nullptr;
     }
 
     buildMakeIteratorVar();
@@ -3719,26 +3853,36 @@ public:
   }
 
 private:
-  void
-  emitDiagnosticsForUnavailableConformance(Type seqType,
-                                           AvailabilityConstraint constraint) {
+  bool emitDiagnosticForUnavailableConformance(
+      Type seqType, const ProtocolDecl *unavailableProto,
+      AvailabilityRestriction restriction) {
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = constraint.getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
-    auto range = domainAndRange.getRange();
-    if (domain.isVersioned() && range.hasMinimumVersion()) {
-      ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                         seqType, protoDecl,
-                         domain.getNameForAttributePrinting(),
-                         range.getVersionString());
-      fixAvailability(loc, dc, constraint.getFixItDomainAndRange(ctx), ctx);
-    } else {
-      ctx.Diags.diagnose(
-          loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
-          seqType, protoDecl);
-    }
+    llvm::SmallString<64> scratch;
+    auto diag =
+        ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                           seqType, protoDecl,
+                           restriction.getDiagnosticDescription(scratch, ctx));
+
+    // An unavailable conformance to 'Sendable' must be downgraded to a warning
+    // since previously there may have been code silently working with this violation,
+    // and we don't want to source-break those sites.
+    bool isSendableConformance =
+        unavailableProto &&
+        unavailableProto->isSpecificProtocol(KnownProtocolKind::Sendable);
+
+    if (isSendableConformance)
+      diag.warnUntilLanguageMode(LanguageMode::v6);
+
+    // A restriction that is unavailable cannot be satisfied with a runtime
+    // availability query, so only offer a fix-it for the other restrictions.
+    if (!restriction.isUnavailable())
+      fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
+
+    // Only return true if we truly emitted an error diagnostic.
+    return !isSendableConformance ||
+           ctx.LangOpts.isLanguageModeAtLeast(LanguageMode::v6);
   }
 
   void buildMakeIteratorVar() {
@@ -3767,7 +3911,7 @@ private:
   }
 
   Expr *buildNextSpanCall(DeclRefExpr *makeIteratorVarRef) {
-    // For borrowing: call nextSpan(maximumCount: Int.max)
+    // For borrowing: call nextSpan(maxCount: Int.max)
     auto *nextSpanFn = ctx.getBorrowingIteratorNextSpan();
     auto associatedType =
         sequenceProto->getAssociatedType(ctx.Id_BorrowingIterator);
@@ -3784,9 +3928,9 @@ private:
     auto *intRef = TypeExpr::createImplicit(ctx.getIntType(), ctx);
     auto *maxRef = UnresolvedDotExpr::createImplicit(ctx, intRef, ctx.Id_max);
 
-    // Create argument: maximumCount: Int.max
+    // Create argument: maxCount: Int.max
     auto *args =
-        ArgumentList::forImplicitSingle(ctx, ctx.Id_maximumCount, maxRef);
+        ArgumentList::forImplicitSingle(ctx, ctx.Id_maxCount, maxRef);
 
     return CallExpr::createImplicit(ctx, nextSpanRef, args);
   }
@@ -3865,7 +4009,7 @@ private:
     // that in a special variable which is going to be used by SILGen.
     FuncDecl *makeIterator =
         isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                : (isBorrowing ? ctx.getBorrowingSequenceMakeBorrowingIterator()
+                : (isBorrowing ? ctx.getIterableMakeBorrowingIterator()
                                : ctx.getSequenceMakeIterator());
 
     ConcreteDeclRef witness;

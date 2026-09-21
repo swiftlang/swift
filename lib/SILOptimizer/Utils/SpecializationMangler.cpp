@@ -13,10 +13,8 @@
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/MD5Stream.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -149,6 +147,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::MoveValueInst:
     mangleConstantProp(cast<SingleValueInstruction>(constInst->getOperand(0)));
     break;
@@ -242,18 +241,21 @@ FunctionSignatureSpecializationMangler::appendStringAsIdentifier(StringRef str) 
 
 void
 FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) {
-  ArgOpBuffer << 'c';
-
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Inst)) {
+    ArgOpBuffer << 'c';
     auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
     appendIdentifier(FRI->getReferencedFunction()->getName());
     return;
   }
   auto *PAI = cast<PartialApplyInst>(Inst);
+  // Use 'c' for on-stack (non-escaping) and 'E' for escaping partial_applys.
+  // This prevents name collisions when both kinds specialize the same callee
+  // with the same captured-argument types but different ownership conventions.
+  ArgOpBuffer << (PAI->isOnStack() ? 'c' : 'E');
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
   appendIdentifier(FRI->getReferencedFunction()->getName());
 

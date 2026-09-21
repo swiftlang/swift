@@ -15,14 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/IR/DerivedTypes.h"
 
 #include "Explosion.h"
 #include "GenHeap.h"
@@ -30,8 +24,6 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "IndirectTypeInfo.h"
-#include "NonFixedTypeInfo.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -98,6 +90,12 @@ public:
                              IsTriviallyDestroyable_t isTriviallyDestroyable, IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
               isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const DifferentiableFuncFieldInfo &field) const {
@@ -277,6 +275,12 @@ public:
                      IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
               isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const LinearFuncFieldInfo &field) const {

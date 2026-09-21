@@ -3,7 +3,7 @@ import re
 import shlex
 import subprocess
 import sys
-from typing import List, Any, Optional, Dict, Set, Tuple
+from typing import List, Any, Iterator, Optional, Dict, Set, Tuple
 
 from .runner_arguments import RunnerArguments
 
@@ -124,6 +124,23 @@ class Git:
     def _quote_command(command: List[Any]) -> str:
         return " ".join(Git._quote(arg) for arg in command)
 
+    @staticmethod
+    def is_shallow(*, repo_path: Path) -> bool:
+        """
+        Returns whether a repository is shallow.
+
+        Args:
+            repo_path (Path): The path to the repository.
+
+        Returns:
+            bool: A Boolean value indicating whether the repository is shallow.
+        """
+
+        is_shallow_output, _, _ = Git.run(
+            repo_path, ["rev-parse", "--is-shallow-repository"],
+        )
+        return is_shallow_output.strip() == "true"
+
 
 def is_git_repository(path: Path) -> bool:
     """Returns whether a Path object is a Git repository.
@@ -139,6 +156,21 @@ def is_git_repository(path: Path) -> bool:
         return False
     git_dir_path = path.joinpath(".git")
     return git_dir_path.exists() and git_dir_path.is_dir()
+
+
+def iter_git_repositories(source_root: Path) -> Iterator[Path]:
+    """Yields the path of each Git repository in a source root directory.
+
+    Args:
+        source_root (Path): The directory to scan for Git repositories.
+
+    Yields:
+        Path: The path to each immediate subdirectory that is a Git repository.
+    """
+
+    for path in source_root.iterdir():
+        if is_git_repository(path):
+            yield path
 
 
 def is_any_repository_locked(pool_args: List[RunnerArguments]) -> Set[str]:

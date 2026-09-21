@@ -32,12 +32,18 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/DeclTemplate.h"
+#include "clang/AST/DeclarationName.h"
+#include "clang/AST/Expr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
+#include "clang/Sema/Overload.h"
+#include "llvm-c/Types.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Casting.h"
 #include <optional>
 
 using namespace swift;
@@ -88,6 +94,202 @@ static bool isStdSpanType(clang::QualType clangType) {
   return decl && decl->isInStdNamespace() && decl->getName() == "span";
 }
 
+// Walks a clang `Expr` tree that appears as a `__counted_by` /
+// `__sized_by` count expression and emits an equivalent Swift expression.
+// `Visit(expr)` returns true on success and the result can be retrieved via
+// `str()`.
+struct SwiftCountExprEmitter
+    : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
+  const clang::ASTContext &ctx;
+  llvm::SmallString<128> result;
+  llvm::raw_svector_ostream out;
+
+  explicit SwiftCountExprEmitter(const clang::ASTContext &ctx)
+      : ctx(ctx), out(result) {}
+
+  StringRef str() const { return result; }
+
+  bool VisitDeclRefExpr(const clang::DeclRefExpr *e) {
+    const clang::DeclarationName name = e->getDecl()->getDeclName();
+    if (name.getNameKind() != clang::DeclarationName::Identifier ||
+        name.isEmpty()) {
+      DLOG("Unsupported decl name in count expr\n");
+      return false;
+    }
+    out << e->getDecl()->getName();
+    return true;
+  }
+
+  bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
+    const auto *bt = IL->getType()->getAs<clang::BuiltinType>();
+    if (!bt)
+      return false;
+    bool isSigned = IL->getType()->isSignedIntegerType();
+    llvm::SmallString<20> valueStr;
+    IL->getValue().toString(valueStr, /*Radix=*/10, isSigned);
+    std::optional<StringRef> swiftName = getBuiltinTypeSwiftName(bt);
+    if (!swiftName) {
+      DLOG("Unsupported integer literal type\n");
+      return false;
+    }
+    out << *swiftName << '(' << valueStr << ')';
+    return true;
+  }
+
+  bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
+    return visitCastImpl(c);
+  }
+
+  bool VisitCStyleCastExpr(const clang::CStyleCastExpr *c) {
+    return visitCastImpl(c);
+  }
+
+  bool VisitParenExpr(const clang::ParenExpr *p) {
+    out << '(';
+    if (!Visit(p->getSubExpr()))
+      return false;
+    out << ')';
+    return true;
+  }
+
+  bool VisitUnaryOperator(const clang::UnaryOperator *unop) {
+    char op;
+    switch (unop->getOpcode()) {
+#define UNOP(variant, c)                                                       \
+  case clang::variant:                                                         \
+    op = c;                                                                    \
+    break
+      UNOP(UO_Plus, '+');
+      UNOP(UO_Minus, '-');
+      UNOP(UO_Not, '~');
+#undef UNOP
+    default:
+      DLOG("Unsupported unary operator\n");
+      return false;
+    }
+    out << op;
+    return Visit(unop->getSubExpr());
+  }
+
+  bool VisitBinaryOperator(const clang::BinaryOperator *binop) {
+    StringRef op;
+    switch (binop->getOpcode()) {
+#define BINOP(variant, string)                                                 \
+  case clang::variant:                                                         \
+    op = " " string " ";                                                       \
+    break
+      BINOP(BO_Add, "+");
+      BINOP(BO_Sub, "-");
+      BINOP(BO_Mul, "*");
+      BINOP(BO_Div, "/");
+      BINOP(BO_Rem, "%");
+      BINOP(BO_Shl, "<<");
+      BINOP(BO_Shr, ">>");
+      BINOP(BO_And, "&");
+      BINOP(BO_Or, "|");
+      BINOP(BO_Xor, "^");
+#undef BINOP
+    default:
+      DLOG("Unsupported binary operator\n");
+      return false;
+    }
+    // Always parenthesize binary operations: Swift and C disagree on the
+    // relative precedence of `<<`/`>>` vs `+`/`-` and `&` vs `+`/`-`, so
+    // unparenthesized output could change meaning across languages.
+    out << '(';
+    if (!Visit(binop->getLHS()))
+      return false;
+    out << op;
+    if (!Visit(binop->getRHS()))
+      return false;
+    out << ')';
+    return true;
+  }
+
+  bool VisitStmt(const clang::Stmt *) {
+    DLOG("Ignoring count parameter with unsupported expression\n");
+    return false;
+  }
+
+private:
+  bool visitCastImpl(const clang::CastExpr *c) {
+    ASSERT(isa<clang::CStyleCastExpr>(c) || isa<clang::ImplicitCastExpr>(c));
+    using CK = clang::CastKind;
+    switch (c->getCastKind()) {
+    case CK::CK_LValueToRValue:
+    case CK::CK_NoOp:
+    case CK::CK_ArrayToPointerDecay:
+    case CK::CK_FunctionToPointerDecay:
+      return Visit(c->getSubExpr());
+    case CK::CK_IntegralCast:
+    case CK::CK_BooleanToSignedIntegral:
+    case CK::CK_IntegralToBoolean:
+    case CK::CK_IntegralToFloating:
+    case CK::CK_FloatingToIntegral:
+    case CK::CK_FloatingCast: {
+      std::optional<StringRef> swiftName =
+          getBuiltinTypeSwiftName(c->getType());
+      if (!swiftName) {
+        DLOG("Unsupported cast destination type\n");
+        return false;
+      }
+      bool isExplicitCast = isa<clang::CStyleCastExpr>(c);
+      out << *swiftName << '(';
+      // Implicit casts get plain T(x) casts: trap instead of truncate
+      // Explicit casts mirror C's truncation on narrowing integer conversions
+      if (isExplicitCast && c->getCastKind() == CK::CK_IntegralCast)
+        out << "truncatingIfNeeded: ";
+      if (!Visit(c->getSubExpr()))
+        return false;
+      out << ')';
+      return true;
+    }
+    default:
+      DLOG("Unsupported cast kind\n");
+      return false;
+    }
+  }
+};
+
+static Type ConcretePointeeType(Type swiftType) {
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  PointerTypeKind PTK;
+  Type PointeeTy = nonnullType->getAnyPointerElementType(PTK);
+  if (PointeeTy &&
+      (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
+    return PointeeTy;
+  return Type();
+}
+
+// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
+// to handle.
+static bool
+SwiftifiableSizedByPointerType(const clang::ASTContext &ctx, Type swiftType,
+                               const clang::CountAttributedType *CAT) {
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  if (nonnullType->isOpaquePointer())
+    return true;
+  PointerTypeKind PTK;
+  if (!nonnullType->getAnyPointerElementType(PTK)) {
+    DLOG("Ignoring sized_by on non-pointer type\n");
+    return false;
+  }
+  if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
+    return true;
+  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
+    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
+    CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
+    return false;
+  }
+  // We have a pointer to a type with a size. Verify that it is char-sized.
+  auto PtrT = CAT->getAs<clang::PointerType>();
+  auto PointeeT = PtrT->getPointeeType();
+  bool isByteSized = ctx.getTypeSizeInChars(PointeeT).isOne();
+  if (!isByteSized)
+    DLOG("Ignoring sized_by on non-byte-sized pointer\n");
+  return isByteSized;
+}
+
 struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
@@ -97,14 +299,19 @@ struct SwiftifyInfoPrinter {
   MacroDecl &SwiftifyImportDecl;
   bool firstParam = true;
   llvm::StringMap<std::string> &typeMapping;
+  bool &DiagnosedMissingNullableAsEmptySpanParam;
+  bool hasNullableCountedBy = false;
 
 protected:
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
                       llvm::raw_svector_ostream &out,
                       MacroDecl &SwiftifyImportDecl,
-                      llvm::StringMap<std::string> &typeMapping)
+                      llvm::StringMap<std::string> &typeMapping,
+                      bool &DiagnosedMissingNullableAsEmptySpanParam)
       : ctx(ctx), SwiftContext(SwiftContext), out(out),
-        SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping) {}
+        SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping),
+        DiagnosedMissingNullableAsEmptySpanParam(
+            DiagnosedMissingNullableAsEmptySpanParam) {}
 
 public:
   void printTypeMapping() {
@@ -135,14 +342,17 @@ public:
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : availabilityAttrs) {
+      auto platform = attr.getPlatform();
+      if (!platform) continue;
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+      out << prettyPlatformString(*platform) << " " << introducedOpt.value();
     }
     out << "\"";
   }
-private:
+
+protected:
   bool hasMacroParameter(StringRef ParamName) const {
     for (auto *Param : *SwiftifyImportDecl.parameterList)
       if (Param->getArgumentName().str() == ParamName)
@@ -150,7 +360,6 @@ private:
     return false;
   }
 
-protected:
   void printSeparator() {
     if (!firstParam) {
       out << ", ";
@@ -162,16 +371,27 @@ protected:
 
 struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
-                      llvm::raw_svector_ostream &out,
-                      MacroDecl &SwiftifyImportDecl,
-                      llvm::StringMap<std::string> &typeMapping)
-      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping) {}
+                              llvm::raw_svector_ostream &out,
+                              MacroDecl &SwiftifyImportDecl,
+                              llvm::StringMap<std::string> &typeMapping,
+                              bool &DiagnosedMissingNullableAsEmptySpanParam)
+      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl,
+                            typeMapping,
+                            DiagnosedMissingNullableAsEmptySpanParam) {}
 
-  void printCountedBy(const clang::CountAttributedType *CAT,
-                      ssize_t pointerIndex) {
-    printSeparator();
-    clang::Expr *countExpr = CAT->getCountExpr();
+  bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
+                      ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
+    // Step 1: check if we support this attribute
     bool isSizedBy = CAT->isCountInBytes();
+    if (isSizedBy ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+                  : ConcretePointeeType(swiftType).isNull())
+      return false;
+    SwiftCountExprEmitter emitter(ctx);
+    if (!emitter.Visit(CAT->getCountExpr()))
+      return false;
+
+    // Step 2: print - any early exit must occur before this point
+    printSeparator();
     out << ".";
     if (isSizedBy)
       out << "sizedBy";
@@ -182,14 +402,11 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     out << "(pointer: ";
     printParamOrReturn(pointerIndex);
     out << ", ";
-    if (isSizedBy)
-      out << "size";
-    else
-      out << "count";
-    out << ": \"";
-    countExpr->printPretty(
-        out, {}, {ctx.getLangOpts()}); // TODO: map clang::Expr to Swift Expr
-    out << "\")";
+    out << (isSizedBy ? "size" : "count");
+    out << ": \"" << emitter.str() << "\")";
+    if (!CAT->isOrNull() && swiftType->isOptional() && !isImplicitlyUnwrapped)
+      hasNullableCountedBy = true;
+    return true;
   }
 
   void printNonEscaping(int idx) {
@@ -215,6 +432,21 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
       return true;
     }
     return false;
+  }
+
+  void printNullableAsEmptySpan() {
+    if (!hasMacroParameter("nullableAsEmptySpan")) {
+      if (DiagnosedMissingNullableAsEmptySpanParam ||
+          // Don't warn when it has no impact on the result.
+          !hasNullableCountedBy)
+        return;
+      DiagnosedMissingNullableAsEmptySpanParam = true;
+      SwiftContext.Diags.diagnose(
+          SourceLoc(), diag::swiftify_nullable_as_empty_span_param_missing);
+      return;
+    }
+    printSeparator();
+    out << "nullableAsEmptySpan: true";
   }
 
 private:
@@ -248,115 +480,6 @@ private:
   }
 };
 
-struct CountedByExpressionValidator
-    : clang::ConstStmtVisitor<CountedByExpressionValidator, bool> {
-  bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
-
-  bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
-    switch (IL->getType()->castAs<clang::BuiltinType>()->getKind()) {
-    case clang::BuiltinType::Char_S:
-    case clang::BuiltinType::Char_U:
-    case clang::BuiltinType::UChar:
-    case clang::BuiltinType::SChar:
-    case clang::BuiltinType::Short:
-    case clang::BuiltinType::UShort:
-    case clang::BuiltinType::UInt:
-    case clang::BuiltinType::Long:
-    case clang::BuiltinType::ULong:
-    case clang::BuiltinType::LongLong:
-    case clang::BuiltinType::ULongLong:
-      DLOG("Ignoring count parameter with non-portable integer literal\n");
-      return false;
-    default:
-      return true;
-    }
-  }
-
-  bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
-    return this->Visit(c->getSubExpr());
-  }
-  bool VisitParenExpr(const clang::ParenExpr *p) {
-    return this->Visit(p->getSubExpr());
-  }
-
-#define SUPPORTED_UNOP(UNOP) \
-  bool VisitUnary ## UNOP(const clang::UnaryOperator *unop) { \
-    return this->Visit(unop->getSubExpr()); \
-  }
-  SUPPORTED_UNOP(Plus)
-  SUPPORTED_UNOP(Minus)
-  SUPPORTED_UNOP(Not)
-#undef SUPPORTED_UNOP
-
-#define SUPPORTED_BINOP(BINOP) \
-  bool VisitBin ## BINOP(const clang::BinaryOperator *binop) { \
-    return this->Visit(binop->getLHS()) && this->Visit(binop->getRHS()); \
-  }
-  SUPPORTED_BINOP(Add)
-  SUPPORTED_BINOP(Sub)
-  SUPPORTED_BINOP(Div)
-  SUPPORTED_BINOP(Mul)
-  SUPPORTED_BINOP(Rem)
-  SUPPORTED_BINOP(Shl)
-  SUPPORTED_BINOP(Shr)
-  SUPPORTED_BINOP(And)
-  SUPPORTED_BINOP(Xor)
-  SUPPORTED_BINOP(Or)
-#undef SUPPORTED_BINOP
-
-  bool VisitStmt(const clang::Stmt *) {
-    DLOG("Ignoring count parameter with unsupported expression\n");
-    return false;
-  }
-};
-
-
-static Type ConcretePointeeType(Type swiftType) {
-  Type nonnullType = swiftType->lookThroughSingleOptionalType();
-  PointerTypeKind PTK;
-  Type PointeeTy = nonnullType->getAnyPointerElementType(PTK);
-  if (PointeeTy && (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
-    return PointeeTy;
-  return Type();
-}
-
-// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
-// to handle.
-static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
-                                           Type swiftType,
-                                           const clang::CountAttributedType *CAT) {
-  Type nonnullType = swiftType->lookThroughSingleOptionalType();
-  if (nonnullType->isOpaquePointer())
-    return true;
-  PointerTypeKind PTK;
-  if (!nonnullType->getAnyPointerElementType(PTK)) {
-    DLOG("Ignoring sized_by on non-pointer type\n");
-    return false;
-  }
-  if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
-    return true;
-  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
-    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
-    CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
-    return false;
-  }
-  // We have a pointer to a type with a size. Verify that it is char-sized.
-  auto PtrT = CAT->getAs<clang::PointerType>();
-  auto PointeeT = PtrT->getPointeeType();
-  bool isByteSized = ctx.getTypeSizeInChars(PointeeT).isOne();
-  if (!isByteSized)
-    DLOG("Ignoring sized_by on non-byte-sized pointer\n");
-  return isByteSized;
-}
-static bool SwiftifiableCAT(const clang::ASTContext &ctx,
-                            const clang::CountAttributedType *CAT,
-                            Type swiftType) {
-  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr()) &&
-    (CAT->isCountInBytes() ?
-       SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-     : !ConcretePointeeType(swiftType).isNull());
-}
-
 // Searches for template instantiations that are not behind type aliases.
 // FIXME: make sure the generated code compiles for template
 // instantiations that are not behind type aliases.
@@ -373,15 +496,47 @@ struct UnaliasedInstantiationVisitor
     return false;
   }
 
+  bool VisitRecordType(const clang::RecordType *RT) {
+    if (isa_and_nonnull<clang::ClassTemplateSpecializationDecl>(
+            RT->getDecl())) {
+      hasUnaliasedInstantiation = true;
+      DLOG("Signature contains raw template, skipping\n");
+      return false;
+    }
+    return true;
+  }
+
   static bool checkTemplates(clang::QualType clangType, bool hasLifetime,
                              bool isStdSpan) {
     if (hasLifetime && isStdSpan) {
       // std::span is transformed to Swift Span, so the std::span template
       // instantiation won't show up in the macro expansion's signature. The
       // element type still needs to be checked.
-      const auto *TST = clangType->getAs<clang::TemplateSpecializationType>();
-      ASSERT(TST && "std::span is not specialized?");
-      clangType = TST->template_arguments()[0].getAsType();
+      auto getTemplateArg = [](clang::QualType Ty) {
+        const auto *STTPT = Ty->getAs<clang::SubstTemplateTypeParmType>();
+        if (!STTPT)
+          return clang::QualType();
+        const auto *RT =
+            dyn_cast<clang::RecordType>(STTPT->getReplacementType());
+        if (!RT)
+          return clang::QualType();
+        const auto *CD =
+            dyn_cast<clang::ClassTemplateSpecializationDecl>(RT->getDecl());
+        if (!CD)
+          return clang::QualType();
+        auto Args = CD->getTemplateArgs().asArray();
+        return Args[0].getAsType();
+      };
+      if (const auto *TST =
+              clangType->getAs<clang::TemplateSpecializationType>())
+        clangType = TST->template_arguments()[0].getAsType();
+      else if (clang::QualType ArgTy = getTemplateArg(clangType);
+               !ArgTy.isNull()) {
+        clangType = ArgTy;
+      } else {
+        assert(0 && "unknown std::span representation");
+        return true;
+      }
     }
     UnaliasedInstantiationVisitor checker;
     checker.TraverseType(clangType);
@@ -511,12 +666,8 @@ static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
 }
 
-static size_t getNumParams(const clang::FunctionDecl* D) {
-    return D->getNumParams();
-}
-
 static bool shouldSkipModule(ModuleDecl *M) {
-  if (M->getName().str() == CLANG_HEADER_MODULE_NAME) {
+  if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
     return false;
   }
@@ -556,10 +707,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     return false;
   }
 
-  clang::ASTContext &clangASTContext = Self.getClangASTContext();
-
   const clang::Module *OwningModule = getOwningModule(ClangDecl);
-  bool IsInBridgingHeader = MappedDecl->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME;
+  bool IsInBridgingHeader = MappedDecl->getModuleContext()->isClangBridgingHeaderImportModule();
   ASSERT(OwningModule || IsInBridgingHeader);
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
 
@@ -629,7 +778,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       ASSERT(MappedDecl->isImportAsInstanceMember());
       swiftNumParams += 1;
     }
-    if (getNumParams(ClangDecl) != swiftNumParams) {
+    if (ClangDecl->param_size() != swiftNumParams) {
       DLOG("mismatching parameter lists");
       assert(
           ClangDecl->isVariadic() ||
@@ -642,7 +791,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
-                                : getNumParams(ClangDecl);
+                                : ClangDecl->param_size();
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
       DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
@@ -672,8 +821,9 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                "free function mapped to instance method without swift_name??");
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
-      } else if (SwiftifiableCAT(clangASTContext, CAT, swiftParamTy)) {
-        printer.printCountedBy(CAT, mappedIndex);
+      } else if (CAT && printer.printCountedBy(
+                            CAT, swiftParamTy, mappedIndex,
+                            swiftParam->isImplicitlyUnwrappedOptional())) {
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
@@ -737,11 +887,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       attachMacro = true;
     }
 
-    if (!attachMacro && CAT == nullptr)
-      // The return type is not imported eagerly (unlike parameter types). Exit
-      // early to avoid unnecessarily importing types we might not need.
-      return false;
-
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
       swiftReturnTy = funcDecl->getResultInterfaceType();
@@ -754,9 +899,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     (void)printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
-    if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
-      printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
-      DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
+    if (CAT && printer.printCountedBy(
+                   CAT, swiftReturnTy, SwiftifyInfoPrinter::RETURN_VALUE_INDEX,
+                   MappedDecl->isImplicitlyUnwrappedOptional())) {
+      DLOG("Found bounds info '" << clang::QualType(CAT, 0)
+                                 << "' on return value\n");
       attachMacro = true;
     }
   }
@@ -789,8 +936,24 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
-  auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
-  if (!ClangDecl)
+  const clang::Decl *ClangDecl = MappedDecl->getClangDecl();
+
+  if (ClangDecl && ClangDecl->isImplicit()) {
+    if (auto *F = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (const FuncDecl *Orig = getOriginalForVirtualThunk(F)) {
+        DLOG("Remapping virtual thunk to original clang decl\n");
+        ClangDecl = Orig->getClangDecl();
+      }
+    }
+  }
+
+  auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
+  auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
+  if (!ClangFuncDecl && !ClangObjCMethodDecl)
+    return;
+  ASSERT(!ClangFuncDecl || !ClangObjCMethodDecl);
+
+  if (isa<ProtocolDecl>(MappedDecl->getParent()))
     return;
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
@@ -799,20 +962,72 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     return;
   }
 
+  // A method that overrides a virtual method needs no wrapper of its own if it
+  // inherits one: the base class wrapper calls the virtual method, so it already
+  // dispatches to this override, and a second wrapper here would only add an
+  // overload that cannot be resolved against the inherited one.
+  //
+  // The wrapper is only inherited when the C++ base class is imported as the
+  // Swift superclass. Reached any other way - through a value type base, or a
+  // base that is not the primary one - the base class wrapper is cloned rather
+  // than inherited and cannot be called, so this override does need its own. Ask
+  // for the primary superclass in Clang terms rather than looking at the Swift
+  // superclass, which is not necessarily set up yet while importing a member.
+  if (auto *CxxMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
+    auto primarySuperclassOf = [&](const clang::CXXRecordDecl *Record) {
+      return evaluateOrDefault(SwiftContext.evaluator,
+                               ForeignReferenceTypeInfoRequest({Record}), {})
+          .getPrimarySuperclass();
+    };
+    if (CxxMethod->size_overridden_methods() > 0) {
+      llvm::SmallPtrSet<const clang::CXXRecordDecl *, 16> SuperClasses;
+      for (auto *Super = primarySuperclassOf(CxxMethod->getParent()); Super;
+           Super = primarySuperclassOf(Super)) {
+        SuperClasses.insert(Super->getCanonicalDecl());
+      }
+      if (SuperClasses.size() > 0) {
+        for (auto *Overridden : CxxMethod->overridden_methods()) {
+          if (SuperClasses.count(Overridden->getParent()->getCanonicalDecl())) {
+            // FIXME: We should still generate a safe wrapper if the superclass
+            // is missing one, or if this one would produce a different
+            // signature.
+            DLOG("Inherits the wrapper of an overridden virtual method, which "
+                 "dispatches here\n");
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  // For projects adopting SafeInteropWrappers we preserve the original
+  // Optional-propagating signature unless they opt-in to the new one.
+  const bool LegacyOptionalRequested =
+      SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) &&
+      !SwiftContext.LangOpts.hasFeature(
+          Feature::SafeInteropWrappersNullAsEmptySpan);
+
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
     out << "@_SwiftifyImport(";
 
     llvm::StringMap<std::string> typeMapping;
-    SwiftifyInfoFunctionPrinter printer(getClangASTContext(), SwiftContext, out,
-                                        *SwiftifyImportDecl, typeMapping);
-    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
+    SwiftifyInfoFunctionPrinter printer(
+        getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
+        typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
+    bool foundInfo = ClangFuncDecl ?
+      swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
+      swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
+    if (!foundInfo) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
     printer.printAvailability();
     printer.printTypeMapping();
+    if (!LegacyOptionalRequested) {
+      printer.printNullableAsEmptySpan();
+    }
     out << ")";
   }
 

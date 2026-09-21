@@ -16,8 +16,6 @@
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
-#include "SILGenTopLevel.h"
-#include "Scope.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -44,7 +42,6 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
@@ -145,7 +142,10 @@ static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
     SILDeclRef c(fd);
     auto funcTy =
         SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
-    SILFunctionConventions fnConv(funcTy, SGM.M);
+    // No function body in scope; this only validates the bridging function's
+    // ABI shape, so use the build-mode default conventions.
+    SILFunctionConventions fnConv(
+        funcTy, SILAddressConventions::forRawSIL(SGM.M));
 
     auto toSILType = [&SGM](Type ty) {
       return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
@@ -529,11 +529,11 @@ Type SILGenModule::getConfiguredExecutorFactory() {
     mainType->lookupQualified(mainType,
                               DeclNameRef(identifier),
                               SourceLoc(),
-                              NL_RemoveNonVisible |
-                              NL_RemoveOverridden |
-                              NL_OnlyTypes |
-                              NL_RemoveAssociatedTypes |
-                              NL_ProtocolMembers,
+                              {NLFlags::RemoveNonVisible,
+                               NLFlags::RemoveOverridden,
+                               NLFlags::OnlyTypes,
+                               NLFlags::RemoveAssociatedTypes,
+                               NLFlags::ProtocolMembers},
                               decls);
     for (auto decl : decls) {
       auto *genericDecl = cast<GenericTypeDecl>(decl);
@@ -629,6 +629,22 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto fn = M.lookUpFunction(functionName);
   if (fn) return fn;
 
+  // In embedded Swift the projection entry points are provided by
+  // `_read`/`_modify` accessors on `KeyPath`/`WritableKeyPath`/
+  // `ReferenceWritableKeyPath` (see KeyPath.swift).  Those accessors are
+  // class methods, so we must (a) emit our external declaration with
+  // `@convention(method)` so the SIL deserializer accepts the accessor as the
+  // body, and (b) pass `Root` as `@in_guaranteed` even for the writable
+  // modify variant since Swift subscripts cannot take `inout` parameters.
+  //
+  // In non-embedded Swift the entry points are thin coroutines implemented in
+  // the C++ runtime (see stdlib/public/runtime/KeyPaths.cpp) whose ABI is
+  // fixed, so we keep `@convention(thin)` and the original base convention.
+  bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  if (isEmbedded && typeKind == KPTK_WritableKeyPath && !isReadAccess) {
+    isBaseInout = false;
+  }
+
   auto sig = keyPathDecl->getGenericSignature().getCanonicalSignature();
   auto rootType = sig.getGenericParams()[0]->getCanonicalType();
   auto valueType = sig.getGenericParams()[1]->getCanonicalType();
@@ -652,7 +668,11 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo = SILFunctionType::ExtInfo::getThin();
+  auto extInfo =
+      isEmbedded
+          ? SILFunctionType::ExtInfo::getThin().withRepresentation(
+                SILFunctionTypeRepresentation::Method)
+          : SILFunctionType::ExtInfo::getThin();
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -998,7 +1018,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   }
 
   switch (constant.kind) {
-  case SILDeclRef::Kind::Func: {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk: {
     if (auto *ce = constant.getAbstractClosureExpr()) {
       preEmitFunction(constant, f, ce);
       PrettyStackTraceSILFunction X("silgen closureexpr", f);
@@ -1463,6 +1484,9 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto origSilFnType = originalFunction->getLoweredFunctionType();
   auto *silParamIndices =
       autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
 
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
   // parameters corresponding to captured variables. These parameters do not
@@ -1497,7 +1521,8 @@ void SILGenModule::emitDifferentiabilityWitness(
         M, linkage, originalFunction, diffKind, silConfig.parameterIndices,
         silConfig.resultIndices, config.derivativeGenericSignature,
         /*jvp*/ nullptr, /*vjp*/ nullptr,
-        /*isSerialized*/ hasPublicVisibility(linkage), attr);
+        /*isSerialized*/ hasPublicVisibility(linkage), isDefaultDerivative,
+        attr);
   }
 
   // Set derivative function in differentiability witness.
@@ -1550,6 +1575,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   emitDistributedThunkForDecl(AFD);
 
+  // If \p AFD has an `any P` / `some P` `@Resolvable protocol` parameter
+  // or result, also emit the recipient-side thunk that adapts between the
+  // wire-level proxy stub `$P` and the user-facing `any P` / `some P`
+  // for the call into \p AFD itself.
+  emitDistributedResolvableProxyAdapterThunkForDecl(AFD);
+
   if (AFD->isBackDeployed()) {
     // Emit the fallback function that will be used when the original function
     // is unavailable at runtime.
@@ -1584,21 +1615,22 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         vjp = f;
         break;
       }
-      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
-      auto origDeclRef =
-          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
-      auto *origFn = getFunction(origDeclRef, NotForDefinition);
-      auto witnessGenSig =
-          autodiff::getDifferentiabilityWitnessGenericSignature(
-              origAFD->getGenericSignature(), AFD->getGenericSignature());
-      auto *resultIndices =
-        autodiff::getFunctionSemanticResultIndices(origAFD,
-                                                   derivAttr->getParameterIndices());
-      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
-                            witnessGenSig);
-      emitDifferentiabilityWitness(origAFD, origFn,
-                                   DifferentiabilityKind::Reverse, config, jvp,
-                                   vjp, derivAttr);
+
+      for (auto *origAFD : derivAttr->getOriginalFunctions(getASTContext())) {
+        auto origDeclRef =
+            SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+        auto *origFn = getFunction(origDeclRef, NotForDefinition);
+        auto witnessGenSig =
+            autodiff::getDifferentiabilityWitnessGenericSignature(
+                origAFD->getGenericSignature(), AFD->getGenericSignature());
+        auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+            origAFD, derivAttr->getParameterIndices());
+        AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                              witnessGenSig);
+        emitDifferentiabilityWitness(origAFD, origFn,
+                                     DifferentiabilityKind::Reverse, config,
+                                     jvp, vjp, derivAttr);
+      }
     }
 }
 
@@ -2171,10 +2203,6 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  // TODO: Key path code emission doesn't handle opaque values properly yet.
-  if (!SILModuleConventions(M).useLoweredAddresses())
-    return;
-  
   auto descriptorContext = decl->getPropertyDescriptorGenericSignature();
   if (!descriptorContext)
     return;
@@ -2236,40 +2264,11 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     emitEntryPoint(sf);
   }
 
-  for (auto *D : sf->getTopLevelDecls()) {
-    // Emit auxiliary decls.
-    D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      visit(auxiliaryDecl);
-    });
-
-    visit(D);
-  }
-
-  // FIXME: Visit macro-generated extensions separately.
-  //
-  // The code below that visits auxiliary decls of the top-level
-  // decls in the source file does not work for nested types with
-  // attached conformance macros:
-  // ```
-  // struct Outer {
-  //   @AddConformance struct Inner {}
-  // }
-  // ```
-  // Because the attached-to decl is not at the top-level. To fix this,
-  // visit the macro-generated conformances that are recorded in the
-  // synthesized file unit to cover all macro-generated extension decls.
-  if (auto *synthesizedFile = sf->getSynthesizedFile()) {
-    for (auto *D : synthesizedFile->getTopLevelDecls()) {
-      if (!isa<ExtensionDecl>(D))
-        continue;
-
-      auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
-      if (sf->getFulfilledMacroRole() != MacroRole::Conformance &&
-          sf->getFulfilledMacroRole() != MacroRole::Extension)
-        continue;
-
+  {
+    SmallVector<Decl *, 64> decls;
+    sf->getTopLevelDeclsWithAuxiliaryDecls(decls);
+    for (auto *D : decls)
       visit(D);
-    }
   }
 
   for (Decl *D : sf->getHoistedDecls()) {

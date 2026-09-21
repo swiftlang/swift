@@ -23,6 +23,13 @@ class CMakeProduct(product.Product):
     def is_verbose(self):
         return self.args.verbose_build
 
+    @staticmethod
+    def write_cmake_file_api_query(build_dir):
+        query_dir = os.path.join(build_dir, ".cmake", "api", "v1", "query")
+        os.makedirs(query_dir, exist_ok=True)
+        open(os.path.join(query_dir, "codemodel-v2"), "a").close()
+        open(os.path.join(query_dir, "cache-v2"), "a").close()
+
     def build_with_cmake(self, build_targets, build_type, build_args,
                          prefer_native_toolchain=False, 
                          ignore_extra_cmake_options=False, build_llvm=True):
@@ -52,11 +59,7 @@ class CMakeProduct(product.Product):
                 os.makedirs(self.build_dir)
 
             # Use `cmake-file-api` in case it is available.
-            query_dir = os.path.join(self.build_dir, ".cmake", "api", "v1", "query")
-            if not os.path.exists(query_dir):
-                os.makedirs(query_dir)
-            open(os.path.join(query_dir, "codemodel-v2"), 'a').close()
-            open(os.path.join(query_dir, "cache-v2"), 'a').close()
+            self.write_cmake_file_api_query(self.build_dir)
 
             env = None
             if self.toolchain.distcc:
@@ -405,6 +408,18 @@ class CMakeProduct(product.Product):
             self.args.lit_args, self.args.lit_jobs))
         swift_cmake_options.define('LLVM_LIT_ARGS', '{} -j {}'.format(
             self.args.lit_args, self.args.lit_jobs))
+
+        # Forward LLVM_ENABLE_INDEX_STORE to both the LLVM and Swift host
+        # configures. HandleLLVMOptions.cmake (used by both) gates the
+        # actual -index-store-path append on a check_{c,cxx}_compiler_flag
+        # probe, so this is a no-op when the host compiler does not
+        # understand the flag.
+        llvm_cmake_options.define(
+            'LLVM_ENABLE_INDEX_STORE:BOOL',
+            cmake.CMakeOptions.true_false(self.args.llvm_enable_index_store))
+        swift_cmake_options.define(
+            'LLVM_ENABLE_INDEX_STORE:BOOL',
+            cmake.CMakeOptions.true_false(self.args.llvm_enable_index_store))
 
         if self.args.clang_profile_instr_use:
             llvm_cmake_options.define('LLVM_PROFDATA_FILE',

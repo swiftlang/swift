@@ -17,8 +17,8 @@ module CustomSequence {
   export *
 }
 
-module CustomBorrowingSequence {
-  header "custom-borrowing-sequence.h"
+module CustomIterable {
+  header "custom-iterable.h"
   requires cplusplus
   export *
 }

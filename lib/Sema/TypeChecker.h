@@ -18,26 +18,26 @@
 #define TYPECHECKING_H
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -152,54 +152,22 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
   return TypeCheckExprOptions(flag1) | flag2;
 }
 
-/// Flags that can be used to control name lookup.
-enum class NameLookupFlags {
-  /// Whether to ignore access control for this lookup, allowing inaccessible
-  /// results to be returned.
-  IgnoreAccessControl = 1 << 0,
-  /// Whether to include results from outside the innermost scope that has a
-  /// result.
-  IncludeOuterResults = 1 << 1,
-  // Whether to include results that are marked @inlinable or @usableFromInline.
-  IncludeUsableFromInline = 1 << 2,
-  /// This lookup should exclude any names introduced by macro expansions.
-  ExcludeMacroExpansions = 1 << 3,
-  /// Whether to include members that would otherwise be filtered out because
-  /// they come from a module that has not been imported.
-  IgnoreMissingImports = 1 << 4,
-  /// If @abi attributes are present, return the decls representing the ABI,
-  /// not the API.
-  ABIProviding = 1 << 5,
-
-  // Reminder: If you add a flag, make sure you update simple_display() below
-};
-
-/// A set of options that control name lookup.
-using NameLookupOptions = OptionSet<NameLookupFlags>;
-
-void simple_display(llvm::raw_ostream &out, NameLookupOptions opts);
-
-inline NameLookupOptions operator|(NameLookupFlags flag1,
-                                   NameLookupFlags flag2) {
-  return NameLookupOptions(flag1) | flag2;
-}
-
 /// Default options for member name lookup.
-const NameLookupOptions defaultMemberLookupOptions;
+const NLOptions defaultMemberLookupOptions;
 
 /// Default options for member name lookup in the constraint solver.
 /// Overloads which come from modules that have not been imported should be
 /// deprioritized by ranking and diagnosed by MiscDiagnostics, so we allow
 /// them to be found in constraint solver lookups to improve diagnostics
 /// overall.
-const NameLookupOptions defaultConstraintSolverMemberLookupOptions(
-    NameLookupFlags::IgnoreMissingImports);
+const NLOptions defaultConstraintSolverMemberLookupOptions(
+    NLFlags::IgnoreMissingImports);
 
 /// Default options for member type lookup.
-const NameLookupOptions defaultMemberTypeLookupOptions;
+const NLOptions defaultMemberTypeLookupOptions;
 
 /// Default options for unqualified name lookup.
-const NameLookupOptions defaultUnqualifiedLookupOptions;
+const NLOptions defaultUnqualifiedLookupOptions;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
@@ -452,12 +420,8 @@ bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
 ///
 /// \param dc The context of the conversion.
 ///
-/// \param unwrappedIUO If non-null, will be set to indicate whether the
-/// conversion force-unwrapped an implicitly-unwrapped optional.
-///
 /// \returns true if \c t1 can be implicitly converted to \c t2.
-bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
-                     bool *unwrappedIUO = nullptr);
+bool isConvertibleTo(Type t1, Type t2, DeclContext *dc);
 
 /// Determine whether one type is explicitly convertible to another,
 /// i.e. using an 'as' expression.
@@ -479,12 +443,8 @@ bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
 ///
 /// \param dc The context of the conversion.
 ///
-/// \param unwrappedIUO If non-null, will be set to indicate whether the
-/// conversion force-unwrapped an implicitly-unwrapped optional.
-///
 /// \returns true if \c t1 can be explicitly converted to \c t2.
-bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
-                     bool *unwrappedIUO = nullptr);
+bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc);
 
 /// Return true if performing a checked cast from one type to another
 /// with the "as!" operator could possibly succeed.
@@ -512,13 +472,9 @@ bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
 ///
 /// \param dc The context of the conversion.
 ///
-/// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
-/// or bridge operation force-unwraps an implicitly-unwrapped optional.
-///
 /// \returns true if \c t1 and \c t2 satisfy the constraint.
 bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
-                            constraints::ConstraintKind kind, DeclContext *dc,
-                            bool *unwrappedIUO = nullptr);
+                            constraints::ConstraintKind kind, DeclContext *dc);
 
 /// If the inputs to an apply expression use a consistent "sugar" type
 /// (that is, a typealias or shorthand syntax) equivalent to the result type
@@ -566,6 +522,7 @@ void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
+void checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 
@@ -625,6 +582,27 @@ CheckGenericArgumentsResult
 checkGenericArgumentsForDiagnostics(GenericSignature signature,
                                     TypeSubstitutionFn substitutions);
 
+/// Check \p requirements (from \p signature, substituted via
+/// \p substitutions) specifically for isolated conformances that conflict
+/// with a `Sendable`/`SendableMetatype` requirement on the corresponding
+/// generic parameter, and report on any failures in detail for diagnostic
+/// needs.
+CheckGenericArgumentsResult
+checkIsolatedConformancesForDiagnostics(GenericSignature signature,
+                                        ArrayRef<Requirement> requirements,
+                                        TypeSubstitutionFn substitutions);
+
+/// Search \p type for bound generic types whose generic arguments were
+/// substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it, and diagnose each violation at \p loc.
+void checkIsolatedConformancesInType(Type type, SourceLoc loc);
+
+/// Search \p D's interface type for bound generic types whose generic arguments
+/// were substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it.
+void checkIsolatedConfromancesInDecl(Decl *D);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
@@ -939,7 +917,7 @@ TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 /// \param options Options that control name lookup.
 LookupResult lookupUnqualified(
     DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NameLookupOptions options = defaultUnqualifiedLookupOptions);
+    NLOptions options = defaultUnqualifiedLookupOptions);
 
 /// Perform unqualified type lookup at the given source location
 /// within a particular declaration context.
@@ -950,7 +928,7 @@ LookupResult lookupUnqualified(
 /// \param options Options that control name lookup.
 LookupResult lookupUnqualifiedType(
     DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NameLookupOptions options = defaultUnqualifiedLookupOptions);
+    NLOptions options = defaultUnqualifiedLookupOptions);
 
 /// Lookup a member in the given type.
 ///
@@ -963,7 +941,7 @@ LookupResult lookupUnqualifiedType(
 LookupResult
 lookupMember(DeclContext *dc, Type type, DeclNameRef name,
              SourceLoc loc = SourceLoc(),
-             NameLookupOptions options = defaultMemberLookupOptions);
+             NLOptions options = defaultMemberLookupOptions);
 
 /// Look up a member type within the given type.
 ///
@@ -979,7 +957,7 @@ lookupMember(DeclContext *dc, Type type, DeclNameRef name,
 LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
                  SourceLoc loc = SourceLoc(),
-                 NameLookupOptions options = defaultMemberTypeLookupOptions);
+                 NLOptions options = defaultMemberTypeLookupOptions);
 
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
@@ -1224,7 +1202,7 @@ enum : unsigned {
 /// Check for a typo correction.
 void performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                            Type baseTypeOrNull,
-                           NameLookupOptions lookupOptions,
+                           NLOptions lookupOptions,
                            TypoCorrectionResults &corrections,
                            GenericSignature genericSig = GenericSignature(),
                            unsigned maxResults = 4);
@@ -1536,11 +1514,16 @@ bool maybeDiagnoseMissingImportForMember(
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
 
-// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// Guide ForEachStmt type-checking by indicating whether the Iterable
 // protocol should be used, thus enabling Borrowing iteration for a given
 // sequence type.
-bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+bool shouldUseIterable(ASTContext &ctx, Type seqTy, bool isAsync,
                                 SourceLoc loc, DeclContext *dc);
+
+/// Returns true if \p fromModule may define \p symbol. The Swift runtime
+/// reserves a set of symbol names (swift_retain etc.) that only the standard
+/// library and runtime-adjacent modules may implement.
+bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule);
 
 } // end namespace swift
 

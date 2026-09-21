@@ -183,7 +183,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
     #endif
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_unavailableInEmbedded
   public mutating func appendInterpolation(_ value: Any.Type) {
 	  _typeName(value, qualified: false).write(to: &self)
@@ -216,7 +216,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?,
     default: @autoclosure () -> some StringProtocol
@@ -246,7 +246,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?,
     default: @autoclosure () -> some StringProtocol
@@ -276,7 +276,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?, 
     default: @autoclosure () -> some StringProtocol
@@ -306,7 +306,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?, 
     default: @autoclosure () -> some StringProtocol

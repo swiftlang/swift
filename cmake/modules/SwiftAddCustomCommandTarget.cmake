@@ -112,7 +112,7 @@ function(add_custom_command_target dependency_out_var_name)
   # forwarded verbatim.
   set(options ALL VERBATIM APPEND IDEMPOTENT EXCLUDE_FROM_ALL)
   set(single_value_args
-      MAIN_DEPENDENCY WORKING_DIRECTORY COMMENT CUSTOM_TARGET_NAME)
+      MAIN_DEPENDENCY WORKING_DIRECTORY COMMENT CUSTOM_TARGET_NAME JOB_POOL)
   set(multi_value_args OUTPUT DEPENDS IMPLICIT_DEPENDS SOURCES)
   cmake_parse_arguments(
       ACCT # prefix
@@ -140,7 +140,7 @@ function(add_custom_command_target dependency_out_var_name)
 
     _make_acct_argument_list(
       OUTPUT MAIN_DEPENDENCY DEPENDS
-      IMPLICIT_DEPENDS WORKING_DIRECTORY COMMENT VERBATIM APPEND)
+      IMPLICIT_DEPENDS WORKING_DIRECTORY COMMENT VERBATIM APPEND JOB_POOL)
     add_custom_command(${ACCT_COMMANDS} ${args})
 
     _make_acct_argument_list(ALL WORKING_DIRECTORY SOURCES)

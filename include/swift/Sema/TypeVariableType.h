@@ -228,6 +228,10 @@ public:
   /// operator.
   bool isTernary() const;
 
+  /// Determine whether this type variable represents a type of a synthesized
+  /// argument of a call/subscript.
+  bool isSynthesizedArgument() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -331,9 +335,7 @@ public:
   /// Assign a fixed type to this equivalence class.
   void assignFixedType(Type type,
                        constraints::SolverTrail *trail) {
-    assert((!getFixedType(nullptr) ||
-            getFixedType(nullptr)->isEqual(type)) &&
-           "Already has a fixed type!");
+    DEBUG_ASSERT(!getFixedType(nullptr) && "Already has a fixed type!");
     auto rep = getRepresentative(trail);
     if (trail)
       rep->getImpl().recordBinding(*trail);

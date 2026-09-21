@@ -573,6 +573,10 @@ func rdar35541153() {
 
 func rdar35890334(_ arr: inout [Int]) {
   _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
+
+  // https://github.com/swiftlang/swift/issues/49146
+  var args = [3]
+  args.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
 }
 
 // rdar://problem/39616039

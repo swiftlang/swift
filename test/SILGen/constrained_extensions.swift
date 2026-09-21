@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name constrained_extensions -primary-file %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name constrained_extensions -O -primary-file %s > /dev/null

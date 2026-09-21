@@ -21,11 +21,8 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeDeclFinder.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -161,7 +158,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                            problematicImport->accessLevel,
                            problematicImport->module.importedModule,
                            problematicImport->module.importedModule
-                             ->isClangHeaderImportModule());
+                             ->isClangBridgingHeaderImportModule());
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
@@ -247,7 +244,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                        limitImport->accessLevel,
                        limitImport->module.importedModule,
                        limitImport->module.importedModule
-                         ->isClangHeaderImportModule());
+                         ->isClangBridgingHeaderImportModule());
   }
 
   return true;
@@ -454,7 +451,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        import->accessLevel,
                        import->module.importedModule,
                        import->module.importedModule
-                         ->isClangHeaderImportModule());
+                         ->isClangBridgingHeaderImportModule());
   }
 
   return true;
@@ -546,7 +543,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                        limitImport->accessLevel,
                        limitImport->module.importedModule,
                        limitImport->module.importedModule
-                         ->isClangHeaderImportModule());
+                         ->isClangBridgingHeaderImportModule());
   }
 
   return true;

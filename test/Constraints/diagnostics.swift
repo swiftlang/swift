@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-disable-enumerate-supertypes
 
 protocol P {
   associatedtype SomeType
@@ -147,8 +147,8 @@ infix operator ***~ : Starry
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
-@available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+@available(*, unavailable, message: "call the 'map()' method on the sequence") // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>(
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -607,8 +607,8 @@ func r22470302(_ c: r22470302Class) {
 
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
-  @available(*, unavailable, message: "calling this is unwise")
-  func unavail<T : Sequence> // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  @available(*, unavailable, message: "calling this is unwise") // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : Sequence>
     (_ a : T) -> String where T.Iterator.Element == String {}
 }
 extension Array {
@@ -617,7 +617,7 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+    return "foo".unavail([0])  // expected-error {{conflicting arguments to generic parameter 'Element' ('String' vs. 'Int')}}
   }
 }
 
@@ -1572,6 +1572,15 @@ func testNilCoalescingOperatorRemoveFix() {
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
+func testInvalidMethodWithInvalidArg(_ x: Int) {
+  x.undefinedMethod(undefined)
+  // expected-error@-1 {{value of type 'Int' has no member 'undefinedMethod'}}
+  // expected-error@-2 {{cannot find 'undefined' in scope}}
+}
+
+// FIXME: https://github.com/swiftlang/swift/issues/89918
+let _ = type(of: Int.foo) // expected-error {{failed to produce diagnostic}}
+
 // https://github.com/apple/swift/issues/74617
 struct Foo_74617 {
   public var bar: Float { 123 }
@@ -1588,4 +1597,24 @@ do {
   _ = {
     let x: String = 0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
   }. // expected-error {{expected member name following '.'}}
+}
+
+// rdar://169736579
+do {
+  class C {}
+
+  class D: C {
+   var bar: Int = 0
+  }
+
+  func foo<T>(_ x: T, _ fn: (T) -> Void) {}
+
+  func bar(_ x: D) {
+    foo(x) { y in
+      let x = y.bar
+      bar(0, 0)
+      // expected-error@-1 {{extra argument in call}}
+      // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'D'}}
+    }
+  }
 }

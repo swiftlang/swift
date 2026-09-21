@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-as-library -module-name Swift -parse-stdlib %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 // This test checks specific codegen related to normal arguments being passed at

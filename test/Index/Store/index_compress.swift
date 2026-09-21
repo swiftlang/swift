@@ -9,4 +9,4 @@
 // RUN: head -1 %t/idx/**/records/**/*index_compress.swift* | grep '^CIDXR'
 
 func foo() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | s:4main3fooyyF | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | s:4main3fooyyF | Def | rel: 0

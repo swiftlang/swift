@@ -19,8 +19,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -28,14 +26,12 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/Strings.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
@@ -276,7 +272,7 @@ namespace {
 
     llvm::DenseMap<PointerUnion<const SILDebugScope *, SILFunction *>, DeclID>
         DebugScopeMap;
-    llvm::DenseMap<const void *, unsigned> SourceLocMap;  
+    llvm::DenseMap<const void *, unsigned> SourceLocMap;
 
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
@@ -299,6 +295,11 @@ namespace {
     llvm::SmallVector<const SILFunction *, 16> functionWorklist;
 
     llvm::SmallVector<const SILGlobalVariable *, 16> globalWorklist;
+
+    /// DebugValueInsts with reconstruction blocks found during serialization.
+    /// After all regular blocks are written, these are used to emit the
+    /// trailing SIL_DEBUG_RECONSTRUCTION_BLOCK records.
+    std::vector<DebugValueInst *> DebugBBWorklist;
 
     /// String storage for temporarily created strings which are referenced from
     /// the tables.
@@ -332,6 +333,8 @@ namespace {
 
     void writeSILFunction(const SILFunction &F, bool DeclOnly = false);
     void writeSILBasicBlock(const SILBasicBlock &BB);
+    void writeBlockArgs(const SILBasicBlock &BB, SmallVectorImpl<DeclID> &Args);
+    void writeDebugReconstructionBlock(const SILBasicBlock &DebugBB);
     void writeSILInstruction(const SILInstruction &SI);
     void writeSILVTable(const SILVTable &vt);
     void writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit);
@@ -357,6 +360,7 @@ namespace {
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
     void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
+    void writeApplyArgLocs(ApplySite AS, const SourceManager &SM);
 
     void writeNoOperandLayout(const SILInstruction *I) {
       unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
@@ -654,6 +658,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::TargetFeatures,
+                             F.targetFeatures());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportModule,
                              F.wasmImportModuleName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportName,
@@ -738,10 +744,17 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     SerializedBBNum++;
   }
   assert(BasicID == SerializedBBNum && "Wrong number of BBs was serialized");
+
+  // Write debug reconstruction blocks after all regular blocks.
+  for (auto *DVI : DebugBBWorklist) {
+    auto *DebugBB = DVI->getDebugReconstructionBlock();
+    writeDebugReconstructionBlock(*DebugBB);
+  }
+  DebugBBWorklist.clear();
 }
 
-void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
-  SmallVector<DeclID, 4> Args;
+void SILSerializer::writeBlockArgs(const SILBasicBlock &BB,
+                                   SmallVectorImpl<DeclID> &Args) {
   for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I) {
     SILArgument *SA = *I;
     DeclID tId = S.addTypeRef(SA->getType().getRawASTType());
@@ -783,6 +796,11 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
 
     Args.push_back(vId);
   }
+}
+
+void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
+  SmallVector<DeclID, 4> Args;
+  writeBlockArgs(BB, Args);
 
   unsigned abbrCode = SILAbbrCodes[SILBasicBlockLayout::Code];
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
@@ -800,6 +818,42 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
       writeSourceLoc(SI.getLoc(), SM);
     }
 
+    writeSILInstruction(SI);
+  }
+}
+
+void SILSerializer::writeDebugReconstructionBlock(const SILBasicBlock &DebugBB) {
+  // Set up fresh ValueIDs for the debug BB's local values.
+  ValueIDs.clear();
+  InstID = 0;
+  unsigned ValueID = 2; // 0 and 1 reserved for SILUndef.
+
+  // Assign IDs to block arguments.
+  for (auto *Arg : DebugBB.getArguments())
+    ValueIDs.insert({static_cast<const ValueBase *>(Arg), ValueID++});
+
+  // Assign IDs to instruction results.
+  for (const SILInstruction &SI : DebugBB)
+    for (auto result : SI.getResults())
+      ValueIDs[result] = ValueID++;
+
+  // Emit the debug reconstruction block header with block args.
+  SmallVector<DeclID, 4> Args;
+  writeBlockArgs(DebugBB, Args);
+
+  unsigned abbrCode = SILAbbrCodes[SILDebugReconstructionBlockLayout::Code];
+  SILDebugReconstructionBlockLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                Args);
+
+  // Emit each instruction in the debug BB, with source locations.
+  auto &SM = DebugBB.getParent()->getModule().getSourceManager();
+  for (const SILInstruction &SI : DebugBB) {
+    // Although source locations within a debug reconstruction block are not
+    // useful, the deserializer will use the last valid SourceLoc for
+    // instructions. If not serialized, the last valid SourceLoc is usually
+    // the return statement, which has a ReturnKind location incompatible
+    // with regular instructions.
+    writeSourceLoc(SI.getLoc(), SM);
     writeSILInstruction(SI);
   }
 }
@@ -944,7 +998,7 @@ void
 SILSerializer::writeKeyPathPatternComponent(
                    const KeyPathPatternComponent &component,
                    SmallVectorImpl<uint64_t> &ListOfValues) {
-  
+
   auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
     ListOfValues.push_back((unsigned)kind);
     ListOfValues.push_back(S.addTypeRef(component.getComponentType()));
@@ -1072,12 +1126,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (!Options.SerializeDebugInfoSIL)
      return;
     auto DVI = cast<DebugValueInst>(&SI);
-    unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
+    unsigned attrs = 0;
+    bool hasReconstructionBlock = DVI->getDebugReconstructionBlock() != nullptr;
+    attrs |= unsigned(hasReconstructionBlock);
     attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
     attrs |= unsigned(DVI->hasTrace()) << 2;
 
-    auto Operand = DVI->getOperand();
-    auto Type = Operand->getType();
+    if (hasReconstructionBlock)
+      DebugBBWorklist.push_back(const_cast<DebugValueInst *>(DVI));
+
+    auto operands = DVI->getAllOperands();
 
     unsigned DebugVarTypeCategory = 0;
     auto DebugVar = DVI->getVarInfo();
@@ -1086,8 +1144,20 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto &SM = SI.getFunction()->getModule().getSourceManager();
 
     SmallVector<uint64_t, 8> ListOfValues;
-    ListOfValues.push_back(addValueRef(Operand));
-    ListOfValues.push_back(S.addTypeRef(Type.getRawASTType()));
+
+    // Encode operand count only when there's a reconstruction block
+    // (otherwise it's implicitly 1).
+    if (hasReconstructionBlock)
+      ListOfValues.push_back(operands.size());
+    else
+      ASSERT(operands.size() == 1);
+
+    // Encode each operand as (ValueRef, TypeRef, TypeCategory).
+    for (auto &op : operands) {
+      ListOfValues.push_back(addValueRef(op.get()));
+      ListOfValues.push_back(S.addTypeRef(op.get()->getType().getRawASTType()));
+      ListOfValues.push_back((unsigned)op.get()->getType().getCategory());
+    }
 
     if (DebugVar) {
       // Is a DebugVariable being serialized.
@@ -1157,7 +1227,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILDebugValueLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
-        (unsigned)Type.getCategory(), DebugVarTypeCategory, attrs,
+        DebugVarTypeCategory, attrs,
     ListOfValues);
 
     if (ScopeToWrite) {
@@ -1368,13 +1438,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::ProjectBoxInst: {
     auto PBI = cast<ProjectBoxInst>(&SI);
-    
+
     // Use SILOneTypeOneOperandLayout with the field index crammed in the TypeID
     auto boxOperand = PBI->getOperand();
     auto boxRef = addValueRef(boxOperand);
     auto boxType = boxOperand->getType();
     auto boxTypeRef = S.addTypeRef(boxType.getRawASTType());
-    
+
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
           SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
           unsigned(PBI->getKind()), 0,
@@ -1405,7 +1475,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_BUILTIN,
-        0, S.addSubstitutionMapRef(BI->getSubstitutions()),
+        0, /*HasArgumentLocs=*/0,
+        S.addSubstitutionMapRef(BI->getSubstitutions()),
         S.addTypeRef(BI->getType().getRawASTType()),
         (unsigned)BI->getType().getCategory(),
         S.addDeclBaseNameRef(BI->getName()),
@@ -1435,10 +1506,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_APPLY,
         unsigned(AI->getApplyOptions().toRaw()),
+        unsigned(AI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
         unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+    writeApplyArgLocs(ApplySite(const_cast<ApplyInst *>(AI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -1463,10 +1537,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_BEGIN_APPLY, unsigned(AI->getApplyOptions().toRaw()),
+        unsigned(AI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
         unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+    writeApplyArgLocs(ApplySite(const_cast<BeginApplyInst *>(AI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -1494,10 +1571,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_TRY_APPLY, unsigned(AI->getApplyOptions().toRaw()),
+        unsigned(AI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
         unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+    writeApplyArgLocs(ApplySite(const_cast<TryApplyInst *>(AI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1512,13 +1592,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                         : IsNestedEncoding::IsNotNested) << 0;
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
-        SIL_PARTIAL_APPLY, 0,
+        SIL_PARTIAL_APPLY, 0, unsigned(PAI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
-        addValueRef(PAI->getCallee()),
-        flags,
+        addValueRef(PAI->getCallee()), flags,
         unsigned(swift::ActorIsolation::Unspecified), Args);
+    writeApplyArgLocs(ApplySite(const_cast<PartialApplyInst *>(PAI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
@@ -1583,27 +1664,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::CondBranchInst: {
-    // Format: condition, true basic block ID, a list of arguments, false basic
-    // block ID, a list of arguments. Use SILOneTypeValuesLayout: the type is
-    // for condition, the list has value for condition, true basic block ID,
-    // false basic block ID, number of true arguments, and a list of true|false
-    // arguments.
+    // Format: condition, true basic block ID, false basic block ID, and a
+    // (now always zero) count of true arguments. A cond_br never passes branch
+    // arguments because SIL does not contain critical edges.
     const CondBranchInst *CBI = cast<CondBranchInst>(&SI);
     SmallVector<ValueID, 4> ListOfValues;
     ListOfValues.push_back(addValueRef(CBI->getCondition()));
     ListOfValues.push_back(BasicBlockMap[CBI->getTrueBB()]);
     ListOfValues.push_back(BasicBlockMap[CBI->getFalseBB()]);
-    ListOfValues.push_back(CBI->getTrueArgs().size());
-    for (auto Elt : CBI->getTrueArgs()) {
-      ListOfValues.push_back(S.addTypeRef(Elt->getType().getRawASTType()));
-      ListOfValues.push_back((unsigned)Elt->getType().getCategory());
-      ListOfValues.push_back(addValueRef(Elt));
-    }
-    for (auto Elt : CBI->getFalseArgs()) {
-      ListOfValues.push_back(S.addTypeRef(Elt->getType().getRawASTType()));
-      ListOfValues.push_back((unsigned)Elt->getType().getCategory());
-      ListOfValues.push_back(addValueRef(Elt));
-    }
+    ListOfValues.push_back(0);
 
     SILOneTypeValuesLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
@@ -1618,7 +1687,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     // Format: continuation, resume block ID, error block ID if given
     SmallVector<ValueID, 3> ListOfValues;
-    
+
     ListOfValues.push_back(addValueRef(AACI->getOperand()));
     ListOfValues.push_back(BasicBlockMap[AACI->getResumeBB()]);
     if (auto errorBB = AACI->getErrorBB()) {
@@ -1793,6 +1862,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
@@ -1823,7 +1893,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
       Attr = HTE->isMandatory();
     } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
-      Attr = unsigned(DVI->poisonRefs()) | (unsigned(DVI->isDeadEnd()) << 1);
+      Attr = unsigned(DVI->isDeadEnd());
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
@@ -1984,7 +2054,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
       operand2 = IAI->getIndex();
-      Attr = (IAI->needsStackProtection() ? 1 : 0);
+      Attr = (IAI->needsStackProtection() ? 1 : 0) | (IAI->isProjection() ? 2 : 0);
     }
     SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILTwoOperandsLayout::Code],
@@ -2254,6 +2324,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialValueInst:
@@ -2288,6 +2359,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         attrs |= 0x01;
     } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
       attrs = encodeValueOwnership(refCast->getOwnershipKind());
+    } else if (auto *opening = dyn_cast<OpenCOMExistentialInst>(&SI)) {
+      attrs = encodeValueOwnership(opening->getForwardingOwnershipKind());
     } else if (auto *atp = dyn_cast<AddressToPointerInst>(&SI)) {
       attrs = atp->needsStackProtection() ? 1 : 0;
     }
@@ -2877,6 +2950,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
+  case SILInstructionKind::COMMethodInst: {
+    const COMMethodInst *CMI = cast<COMMethodInst>(&SI);
+    SILType Ty = CMI->getType();
+    SmallVector<uint64_t, 8> ListOfValues;
+    handleMethodInst(CMI, CMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        static_cast<unsigned>(SI.getKind()), S.addTypeRef(Ty.getRawASTType()),
+        static_cast<unsigned>(Ty.getCategory()), ListOfValues);
+    break;
+  }
   case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
@@ -2966,7 +3051,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
          S.addTypeRef(IBSHI->getBlockStorage()->getType().getRawASTType()));
     // Always an address, don't need to save category
-    
+
     ListOfValues.push_back(addValueRef(IBSHI->getInvokeFunction()));
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getRawASTType()));
@@ -3007,7 +3092,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto &component : pattern->getComponents()) {
       writeKeyPathPatternComponent(component, ListOfValues);
     }
-    
+
     for (auto &operand : KPI->getPatternOperands()) {
       auto value = operand.get();
       ListOfValues.push_back(addValueRef(value));
@@ -3238,7 +3323,7 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESS_TABLE_OFFSETS,
                 WitnessTableOffset);
   }
-  
+
   if (!DefaultWitnessTableList.empty()) {
     writeIndexTable(S, List, sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES,
                     DefaultWitnessTableList);
@@ -3407,6 +3492,9 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
       !impl->hasValidLinkageForFragileRef(IsSerialized))
     return;
 
+  if (deinit.isSpecialized())
+    return;
+
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
   Mangle::ASTMangler mangler(deinit.getNominalDecl()->getASTContext());
@@ -3430,15 +3518,15 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
 
 void SILSerializer::writeSILProperty(const SILProperty &prop) {
   PropertyOffset.push_back(Out.GetCurrentBitNo());
-  
+
   SmallVector<uint64_t, 4> componentValues;
-  
+
   if (auto component = prop.getComponent()) {
     writeKeyPathPatternComponent(*component, componentValues);
   } else {
     componentValues.push_back((unsigned)KeyPathComponentKindEncoding::Trivial);
   }
-  
+
   PropertyLayout::emitRecord(
     Out, ScratchRecord,
     SILAbbrCodes[PropertyLayout::Code],
@@ -3490,6 +3578,31 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
                               FNameID, LocationKind, (unsigned)Loc.isImplicit());
+}
+
+void SILSerializer::writeApplyArgLocs(ApplySite AS, const SourceManager &SM) {
+  if (!Options.SerializeDebugInfoSIL)
+    return;
+
+  // Per the in-memory invariant, an apply either has trailing per-argument
+  // location storage (every slot a valid SILLocation) or none at all. The
+  // SILInstApplyLayout HasArgumentLocs bit captures which case applies; we
+  // only emit the trailing records when storage is present.
+  auto argLocs = AS.getArgumentLocs();
+  if (!argLocs)
+    return;
+
+  assert(argLocs->size() == AS.getNumArguments() &&
+         "argLocs storage must be parallel to args when present");
+
+  // Emit one SIL_SOURCE_LOC / SIL_SOURCE_LOC_REF record per argument, in
+  // argument order. The SILInstApplyLayout HasArgumentLocs bit on the
+  // preceding apply record signals the deserializer to consume exactly
+  // NumCallArguments such records inline. Reuses writeSourceLoc so per-
+  // argument locations share the same encoding (and OpaquePtr-based
+  // cache) as instruction debug-loc overrides.
+  for (auto loc : *argLocs)
+    writeSourceLoc(loc, SM);
 }
 
 void SILSerializer::writeExtraStringIfNonEmpty(
@@ -3775,7 +3888,7 @@ void SILSerializer::writeSILDifferentiabilityWitness(
   DifferentiabilityWitnessLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
       addSILFunctionRef(original), toStableSILLinkage(dw.getLinkage()),
-      dw.isDeclaration(), dw.isSerialized(),
+      dw.isDeclaration(), dw.isSerialized(), dw.isDefault(),
       toStableDifferentiabilityKind(dw.getKind()),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()), jvpID,
       vjpID, dw.getParameterIndices()->getNumIndices(),
@@ -3874,6 +3987,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SourceLocLayout>();
   registerSILAbbr<SourceLocRefLayout>();
   registerSILAbbr<DebugValueDelimiterLayout>();
+  registerSILAbbr<SILDebugReconstructionBlockLayout>();
   registerSILAbbr<SILExtraStringLayout>();
 
   // Write out VTables first because it may require serializations of

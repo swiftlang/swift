@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckEmbedded.h"
@@ -33,7 +34,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -43,11 +43,11 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -55,11 +55,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Parse/Lexer.h"
@@ -68,12 +66,9 @@
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
@@ -297,6 +292,28 @@ static void checkInheritanceClause(
     if (isa<GenericTypeParamDecl>(decl) ||
         isa<AssociatedTypeDecl>(decl))
       continue;
+
+    // The COM identity protocols describe compiler-managed metatype
+    // conformances. Protocols cannot refine them in source, including through
+    // protocol compositions.
+    if (ctx.LangOpts.EnableCOMInterop && isa<ProtocolDecl>(decl) &&
+        inheritedTy->isConstraintType()) {
+      auto layout = inheritedTy->getExistentialLayout();
+      bool hasIdentity = false;
+      for (auto *protocol : layout.getProtocols()) {
+        if (!protocol->isCOMIdentity())
+          continue;
+        diags.diagnose(inherited.getLoc(),
+                       diag::com_identity_explicit_conformance,
+                       protocol->getName());
+        hasIdentity = true;
+      }
+      if (hasIdentity) {
+        if (auto *repr = inherited.getTypeRepr())
+          repr->setInvalid();
+        continue;
+      }
+    }
 
     if (inherited.isReparented())
       checkReparentedExtensionEntry(ext, inherited, inheritedTy);
@@ -1606,7 +1623,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     classDecl->getLoc(),
-                                    NameLookupFlags::IgnoreAccessControl);
+                                    NLFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();
@@ -1735,6 +1752,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::SyntheticMacro:
       break;
     }
   }
@@ -1847,7 +1865,7 @@ static void diagnoseRetroactiveConformances(
   ModuleDecl *extTypeModule = extendedNominalDecl->getParentModule();
 
   // If the type comes from the __ObjC clang header module, don't warn.
-  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME))
+  if (extTypeModule->isClangBridgingHeaderImportModule())
     return;
 
   // At this point, we know we're extending a type declared outside this module.
@@ -2232,6 +2250,14 @@ static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
 }
 
 namespace {
+
+/// A metatype extension is a COM construct when it extends a declaration
+/// canonically classified as a COM interface.
+static bool isCOMMetatypeExtension(const ExtensionDecl *ED) {
+  auto *proto = dyn_cast_or_null<ProtocolDecl>(ED->getExtendedNominal());
+  return proto && proto->isCOMInterface();
+}
+
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
@@ -2255,9 +2281,9 @@ public:
     // We don't do this for members of classes because it happens as part of
     // visiting their ABI members.
     if (!isa<ClassDecl>(decl->getDeclContext())) {
-      decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-        this->visit(auxiliaryDecl);
-      }, /*visitFreestandingExpanded=*/false);
+      decl->visitAuxiliaryDecls(
+          [&](Decl *auxiliaryDecl) { this->visit(auxiliaryDecl); },
+          /*visitFreestandingExpanded=*/false, /*visitExtensions*/ true);
     }
 
     if (auto *Stats = Ctx.Stats)
@@ -2405,8 +2431,11 @@ public:
         !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
         ID->getAccessLevel() == AccessLevel::Public) {
       auto importer = ID->getModuleContext();
-      Ctx.Diags.diagnose(ID, diag::error_import_of_ipi_module,
-                         target->getName(), importer->getName());
+      unsigned importerLevel =
+          Ctx.LangOpts.LibraryLevel == LibraryLevel::API ? 0 : 1;
+      Ctx.Diags.diagnose(ID, diag::warn_import_of_ipi_module,
+                         target->getName(), importer->getName(),
+                         importerLevel);
     }
 
     // Preconcurrency imports aren't strictly memory-safe when we have strict
@@ -2419,8 +2448,11 @@ public:
     }
   }
 
-  void visitUsingDecl(UsingDecl *UD) {
-    // Nothing to validate yet.
+  void visitFileDefaultDecl(FileDefaultDecl *FDD) {
+    if (!FDD->getDeclContext()->isModuleScopeContext()) {
+      // 'default' is only valid at file scope.
+      FDD->diagnose(diag::decl_inner_scope);
+    }
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -2428,14 +2460,14 @@ public:
     checkRedeclaration(OD);
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD))
       (void)IOD->getPrecedenceGroup();
-    checkAccessControl(OD);
+    checkDeclCommon(OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
     checkRedeclaration(PGD);
-    checkAccessControl(PGD);
+    checkDeclCommon(PGD);
   }
 
   void visitMissingDecl(MissingDecl *missing) {  }
@@ -2457,7 +2489,7 @@ public:
 
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
-    checkAccessControl(MD);
+    checkDeclCommon(MD);
 
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
@@ -2539,6 +2571,10 @@ public:
     MED->forEachExpandedNode([&](ASTNode node) {
       TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
     });
+  }
+
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations are not type checked");
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -2781,6 +2817,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             var->diagnose(diag::opaque_type_var_no_init);
             break;
           }
@@ -2806,6 +2843,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 
@@ -2828,6 +2866,7 @@ public:
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 
@@ -2850,8 +2889,7 @@ public:
 
     TypeChecker::checkDeclAttributes(PBD);
 
-    checkAccessControl(PBD);
-
+    checkDeclCommon(PBD);
     checkExplicitAvailability(PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
@@ -2951,7 +2989,7 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    checkAccessControl(SD);
+    checkDeclCommon(SD);
 
     checkExplicitAvailability(SD);
 
@@ -3023,6 +3061,26 @@ public:
       }
     }
 
+    // A `consuming` index is consumed by whichever accessor runs, so it is only
+    // legal when a single accessor performs a whole access.
+    if (SD->getImplInfo().getReadWriteImpl() ==
+        ReadWriteImplKind::MaterializeToTemporary) {
+      for (auto *index : *SD->getIndices()) {
+        if (index->getValueOwnership() != ValueOwnership::Owned)
+          continue;
+
+        auto spelling = ParamDecl::getSpecifierSpelling(index->getSpecifier());
+        SD->diagnose(diag::subscript_consuming_parameter_separate_accessors,
+                     spelling);
+        if (auto *set = SD->getAccessor(AccessorKind::Set))
+          set->diagnose(diag::subscript_consuming_parameter_use_coroutine,
+                        "_modify");
+        index->setInvalid();
+        SD->setInvalid();
+        break;
+      }
+    }
+
     // Now check all the accessors.
     SD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
@@ -3037,10 +3095,8 @@ public:
     // Force requests that can emit diagnostics.
     (void) TAD->getUnderlyingType();
 
-    // Make sure to check the underlying type.
-    
     TypeChecker::checkDeclAttributes(TAD);
-    checkAccessControl(TAD);
+    checkDeclCommon(TAD);
     checkGenericParams(TAD);
   }
   
@@ -3063,10 +3119,10 @@ public:
       AT->diagnose(diag::associated_type_objc, AT->getName(), proto->getName());
     }
 
-    checkAccessControl(AT);
+    checkDeclCommon(AT);
 
     // Trigger the checking for overridden declarations.
-    (void) AT->getOverriddenDecls();
+    (void)AT->getOverriddenDecls();
 
     auto defaultType = AT->getDefaultDefinitionType();
     if (defaultType && !defaultType->hasError()) {
@@ -3193,7 +3249,7 @@ public:
 
     checkInheritanceClause(ED);
     diagnoseMissingExplicitSendable(ED);
-    checkAccessControl(ED);
+    checkDeclCommon(ED);
 
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
@@ -3273,8 +3329,7 @@ public:
     checkInheritanceClause(SD);
     diagnoseMissingExplicitSendable(SD);
 
-    checkAccessControl(SD);
-
+    checkDeclCommon(SD);
     checkExplicitAvailability(SD);
 
     TypeChecker::checkDeclCircularity(SD);
@@ -3457,8 +3512,14 @@ public:
     if (CD->isActor())
       TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);
 
-    for (Decl *Member : CD->getABIMembers())
+    for (Decl *Member : CD->getABIMembers()) {
+      // Since `visit(Decl *)` skips visiting auxiliary decls for classes, we
+      // need to manually handle extension macros here.
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(Member)) {
+        NTD->visitAuxiliaryExtensions([&](Decl *ext) { visit(ext); });
+      }
       visit(Member);
+    }
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3566,13 +3627,29 @@ public:
           CD->diagnose(diag::superclass_of_open_not_open, superclassTy);
           Super->diagnose(diag::superclass_here);
         }
+
+        // A Swift class that subclasses a C++ foreign reference type has no
+        // Swift type metadata, and therefore no vtable: its members cannot be
+        // dynamically dispatched. Require the class to be 'final', which also
+        // means the foreign reference type is always the immediate superclass.
+        if (!isInvalidSuperclass &&
+            Ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+            !CD->isSemanticallyFinal() &&
+            CD->getForeignReferenceSuperclassOrSelf()) {
+          CD->diagnose(diag::foreign_reference_subclass_must_be_final, CD)
+              .fixItInsert(CD->getAttributeInsertionLoc(/*forModifier=*/true),
+                           "final ");
+        }
       }
     }
 
     checkInheritanceClause(CD);
+    if (Ctx.LangOpts.EnableCOMInterop)
+      com::validateImplementation(CD);
     diagnoseMissingExplicitSendable(CD);
 
-    checkAccessControl(CD);
+
+    checkDeclCommon(CD);
 
     checkExplicitAvailability(CD);
 
@@ -3596,6 +3673,13 @@ public:
 
     checkInheritanceClause(PD);
 
+    // Validate COM inheritance only after ordinary inherited types have been
+    // resolved. Keep this out of the early declaration-classification query
+    // used by name lookup and identity synthesis.
+    if (Ctx.LangOpts.EnableCOMInterop && !PD->hasCircularInheritedProtocols())
+      (void)evaluateOrDefault(Ctx.evaluator, COMInterfaceHierarchyRequest{PD},
+                              nullptr);
+
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member references another declaration whose generic signature
@@ -3606,7 +3690,10 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    checkAccessControl(PD);
+    if (Ctx.LangOpts.EnableCOMInterop)
+      com::validateProtocol(PD);
+
+    checkDeclCommon(PD);
 
     checkProtocolRefinementRequirements(PD);
 
@@ -3678,9 +3765,10 @@ public:
       }
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
+      TypeChecker::checkYieldList(FD->getYields(), FD);
     }
 
-    checkAccessControl(FD);
+    checkDeclCommon(FD);
 
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
@@ -3775,10 +3863,15 @@ public:
       }
     }
 
-    // If the function is exported to C, it must be representable in (Obj-)C.
-    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+    // If the function is exported to a foreign language, its signature must be
+    // representable in that language.
+    DeclAttribute *foreignLangAttr =
+        FD->getAttrs().getAttribute<swift::CDeclAttr>();
+    if (!foreignLangAttr)
+      foreignLangAttr = FD->getAttrs().getAttribute<swift::CxxDeclAttr>();
+    if (foreignLangAttr) {
       evaluateOrDefault(Ctx.evaluator,
-                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
+                        TypeCheckForeignFunctionRequest{FD, foreignLangAttr},
                         {});
     }
 
@@ -3799,7 +3892,6 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TypeChecker::checkParameterList(PL, EED);
-
       checkDefaultArguments(PL);
       checkVariadicParameters(PL, EED);
     }
@@ -3822,7 +3914,7 @@ public:
       EED->setInvalid();
     }
 
-    checkAccessControl(EED);
+    checkDeclCommon(EED);
   }
 
   /// The extended type must be '(repeat each Element)' or a generic
@@ -3850,7 +3942,12 @@ public:
   static void diagnoseExtensionOfMarkerProtocol(ExtensionDecl *ED) {
     auto *nominal = ED->getExtendedNominal();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(nominal)) {
-      if (proto->getKnownProtocolKind() && proto->isMarkerProtocol()) {
+      bool isExternalCOMInterfaceExtension =
+          ED->getASTContext().LangOpts.EnableCOMInterop &&
+          proto->isSpecificProtocol(KnownProtocolKind::COMInterface) &&
+          ED->getModuleContext() != proto->getModuleContext();
+      if ((proto->getKnownProtocolKind() && proto->isMarkerProtocol()) ||
+          isExternalCOMInterfaceExtension) {
         ED->diagnose(diag::cannot_extend_nominal, nominal);
       }
     }
@@ -3920,51 +4017,83 @@ public:
     }
   }
 
+  void diagnoseInvalidExtension(ExtensionDecl *ED, Type extType) {
+    const bool wasAlreadyInvalid = ED->isInvalid();
+    ED->setInvalid();
+
+    // Diagnose unsupported cases.
+    if (!extType->hasError() && extType->getAnyNominal()) {
+      auto canExtType = extType->getCanonicalType();
+      if (auto existential = canExtType->getAs<ExistentialType>()) {
+        ED->diagnose(diag::unsupported_existential_extension, extType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_extension_rewrite,
+                     existential->getConstraintType())
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          existential->getConstraintType()->getString());
+        return;
+      }
+
+      // If we've got here, then we have some kind of extension of a prima
+      // facie non-nominal type.  This can come up when we're projecting
+      // typealiases out of bound generic types.
+      //
+      // struct Array<T> { typealias Indices = Range<Int> }
+      // extension Array.Indices.Bound {}
+      //
+      // Offer to rewrite it to the underlying nominal type.
+      if (canExtType.getPointer() != extType.getPointer()) {
+        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_extension_rewrite, canExtType)
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          canExtType->getString());
+        return;
+      }
+    }
+
+    if (wasAlreadyInvalid)
+      return;
+
+    // If nothing else applies, fall back to a generic diagnostic.
+    ED->diagnose(diag::non_nominal_extension, extType);
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
     auto *nominal = ED->getExtendedNominal();
 
+    // If we couldn't resolve the extended decl, diagnose.
+    // FIXME: We shouldn't be diagnosing here, we should be diagnosing directly
+    // in the request such that the extension's "is invalid" bit is accurate.
     if (nominal == nullptr) {
-      const bool wasAlreadyInvalid = ED->isInvalid();
-      ED->setInvalid();
-      if (!extType->hasError() && extType->getAnyNominal()) {
-        auto canExtType = extType->getCanonicalType();
-        if (auto existential = canExtType->getAs<ExistentialType>()) {
-          ED->diagnose(diag::unsupported_existential_extension, extType)
-              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_extension_rewrite,
-                       existential->getConstraintType())
-              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                            existential->getConstraintType()->getString());
-          return;
-        }
+      diagnoseInvalidExtension(ED, extType);
 
-        // If we've got here, then we have some kind of extension of a prima
-        // facie non-nominal type.  This can come up when we're projecting
-        // typealiases out of bound generic types.
-        //
-        // struct Array<T> { typealias Indices = Range<Int> }
-        // extension Array.Indices.Bound {}
-        //
-        // Offer to rewrite it to the underlying nominal type.
-        if (canExtType.getPointer() != extType.getPointer()) {
-          ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
-              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_extension_rewrite, canExtType)
-              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                            canExtType->getString());
-          return;
-        }
-      }
-
-      if (!wasAlreadyInvalid) {
-        // If nothing else applies, fall back to a generic diagnostic.
-        ED->diagnose(diag::non_nominal_extension, extType);
-      }
+      // Make sure to still recurse into the extension members though, otherwise
+      // they will be left un-type-checked, which violates the assumption that
+      // all AST is type-checked after Sema runs.
+      for (Decl *Member : ED->getMembers())
+        visit(Member);
 
       return;
+    }
+
+    // Validate metatype extension constraints.  Skip when the extended type
+    // did not resolve — e.g. `S.Protocol` on a non-protocol `S`, which has
+    // already been diagnosed as an invalid `.Protocol` spelling.
+    if (ED->isMetatypeExtension() && !extType->hasError()) {
+      if (!isCOMMetatypeExtension(ED)) {
+        ED->diagnose(diag::metatype_extension_com_only);
+        ED->setInvalid();
+        return;
+      }
+      if (!isa<ProtocolDecl>(nominal)) {
+        ED->diagnose(diag::metatype_extension_non_protocol, extType);
+        ED->setInvalid();
+        return;
+      }
     }
 
     if (!extType->hasError()) {
@@ -4040,7 +4169,7 @@ public:
 
     TypeChecker::checkConformancesInContext(ED);
 
-    checkAccessControl(ED);
+    checkDeclCommon(ED);
 
     checkExplicitAvailability(ED);
 
@@ -4075,6 +4204,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+
     checkEmbeddedRestrictionsInSignature(CD);
 
     if (CD->getAsyncLoc().isValid())
@@ -4193,7 +4323,7 @@ public:
       }
     }
 
-    checkAccessControl(CD);
+    checkDeclCommon(CD);
 
     checkExplicitAvailability(CD);
 
@@ -4241,6 +4371,11 @@ public:
 
   void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {
     llvm_unreachable("BuiltinTupleDecl should not show up here");
+  }
+
+  void checkDeclCommon(Decl *D) {
+    checkAccessControl(D);
+    TypeChecker::checkIsolatedConfromancesInDecl(D);
   }
 };
 } // end anonymous namespace
@@ -4381,6 +4516,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // Check for duplicate parameter names.
     diagnoseDuplicateDecls(*params);
   }
+}
+
+void TypeChecker::checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD) {
+  // TODO: Reject yields on non-coroutines
 }
 
 std::optional<unsigned>

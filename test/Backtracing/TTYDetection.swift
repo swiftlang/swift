@@ -2,9 +2,9 @@
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/TTYDetection
 // RUN: %target-codesign %t/TTYDetection
 
-// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/TTYDetection 2> %t/default-output && cat %t/default-output | %FileCheck %s
-// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no,output-to=stderr %target-run %t/TTYDetection 2> %t/stderr-output && cat %t/stderr-output | %FileCheck %s --check-prefix STDERR
-// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no,output-to=stdout %target-run %t/TTYDetection > %t/stdout-output && cat %t/stdout-output | %FileCheck %s --check-prefix STDOUT
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/TTYDetection %t/TTYDetection.dSYM 2> %t/default-output && cat %t/default-output | %FileCheck %s
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=yes,cache=no,output-to=stderr %target-run %t/TTYDetection %t/TTYDetection.dSYM 2> %t/stderr-output && cat %t/stderr-output | %FileCheck %s --check-prefix STDERR
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=yes,cache=no,output-to=stdout %target-run %t/TTYDetection %t/TTYDetection.dSYM > %t/stdout-output && cat %t/stdout-output | %FileCheck %s --check-prefix STDOUT
 
 
 // UNSUPPORTED: use_os_stdlib

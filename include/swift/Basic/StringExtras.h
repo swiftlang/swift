@@ -21,14 +21,13 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <optional>
-#include <string>
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
   /// Determine whether the given string can be an argument label.
@@ -38,6 +37,19 @@ namespace swift {
 
   /// Determine whether the given string can be the name of a member.
   bool canBeMemberName(StringRef identifier);
+
+  /// Split a string at the first occurrence of a separator character, but do
+  /// not split within backticks (e.g. `A.B`).
+  std::pair<StringRef, StringRef> backtickAwareSplit(StringRef text,
+                                                     char separator);
+
+  /// Split a string at the last occurrence of a separator character, but do not
+  /// split within backticks.
+  std::pair<StringRef, StringRef> backtickAwareRSplit(StringRef text,
+                                                      char separator);
+
+  /// Strip surrounding backticks from a string if present.
+  StringRef stripBackticks(StringRef name);
 
   /// Returns true if the given word is one of Swift's known prepositions.
   ///

@@ -1,5 +1,8 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s --enable-var-scope
-// RUN: %target-swift-emit-sil -sil-verify-all %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -solver-enable-promote-supertypes %s
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values %s -o /dev/null -solver-enable-promote-supertypes
+
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -solver-enable-promote-supertypes | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -sil-verify-all %s -solver-enable-promote-supertypes
 
 enum MyError: Error {
   case fail
@@ -52,6 +55,7 @@ func throwsClassError() throws(ClassError) {
 // CHECK: apply [[FN]]<E>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
 // CHECK: copy_addr [take] [[ERROR_ALLOC]] to [init] %0 : $*E
 // CHECK: dealloc_stack [[ERROR_ALLOC]] : $*E
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: throw_addr
 func throwsIndirectError<E: Error>(_ error: E) throws(E) {
   throw error
@@ -294,6 +298,14 @@ func formerReabstractionCrash() {
   // CHECK-NEXT: // function_ref thunk
   // CHECK-NEXT: function_ref @$sSSIgo_SSs5Error_pIegrzr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> (@out String, @error_indirect any Error)
   // CHECK-NEXT: partial_apply
+  let _: MyResult<String, Error>? = { () -> MyResult<String, Error> in
+    return MyResult{"hello"}
+  }()
+
+  // Note: the same code without the result type annotation produces a different
+  // solution in the type checker now, where the closure returns an optional.
+
+  // CHECK-LABEL: sil private [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGSgyXEfU0_ : $@convention(thin) () -> @owned Optional<MyResult<String, any Error>> {
   let _: MyResult<String, Error>? = {
     return MyResult{"hello"}
   }()

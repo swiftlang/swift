@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-ns- -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-ns- -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -14,9 +14,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-  static var shared: Custom {
-    return Custom()
-  }
+  static let shared = Custom()
 }
 
 class NonSendable {} // expected-note 3{{}}

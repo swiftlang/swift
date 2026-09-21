@@ -37,20 +37,27 @@ import SIL
 let mandatoryDestroyHoisting = FunctionPass(name: "mandatory-destroy-hoisting") {
   (function: Function, context: FunctionPassContext) in
 
-  var endAccesses = Stack<EndAccessInst>(context)
-  defer { endAccesses.deinitialize() }
-  endAccesses.append(contentsOf: function.instructions.compactMap{ $0 as? EndAccessInst })
+  // Swift modules are serialized after the mandatory pipeline. At this point lifetimes
+  // (lexical or not) are fixed. When de-serializing a function in the mandatory pipeline, it means
+  // that for such functions lifetimes are fixed and MandatoryDestroyHoisting must not run.
+  if function.linkage.isExternal {
+    return
+  }
+
+  var accessScopeEnds = Stack<Instruction>(context)
+  defer { accessScopeEnds.deinitialize() }
+  accessScopeEnds.append(contentsOf: function.instructions.filter { $0.accessScopeBegin != nil })
 
   for block in function.blocks {
     for arg in block.arguments {
-      hoistDestroys(of: arg, endAccesses: endAccesses, context)
+      hoistDestroys(of: arg, accessScopeEnds: accessScopeEnds, context)
       if !context.continueWithNextSubpassRun() {
         return
       }
     }
     for inst in block.instructions {
       for result in inst.results {
-        hoistDestroys(of: result, endAccesses: endAccesses, context)
+        hoistDestroys(of: result, accessScopeEnds: accessScopeEnds, context)
         if !context.continueWithNextSubpassRun(for: inst) {
           return
         }
@@ -59,7 +66,7 @@ let mandatoryDestroyHoisting = FunctionPass(name: "mandatory-destroy-hoisting") 
   }
 }
 
-private func hoistDestroys(of value: Value, endAccesses: Stack<EndAccessInst>, _ context: FunctionPassContext) {
+private func hoistDestroys(of value: Value, accessScopeEnds: Stack<Instruction>, _ context: FunctionPassContext) {
   guard value.ownership == .owned,
 
         // We must not violate side-effect dependencies of non-copyable deinits.
@@ -86,7 +93,7 @@ private func hoistDestroys(of value: Value, endAccesses: Stack<EndAccessInst>, _
 
   // We must not move a destroy into an access scope, because the deinit can have an access scope as well.
   // And that would cause a false exclusivite error at runtime.
-  liverange.extendWithAccessScopes(of: endAccesses)
+  liverange.extendWithAccessScopes(of: accessScopeEnds)
 
   var aliveDestroys = insertNewDestroys(of: value, in: liverange)
   defer { aliveDestroys.deinitialize() }
@@ -227,7 +234,7 @@ private struct Liverange {
     fullLiverange.inclusiveRangeContains(instruction) && !prunedLiverange.inclusiveRangeContains(instruction)
   }
 
-  mutating func extendWithAccessScopes(of endAccesses: Stack<EndAccessInst>) {
+  mutating func extendWithAccessScopes(of accessScopeEnds: Stack<Instruction>) {
     var changed: Bool
     // We need to do this repeatedly because if access scopes are not nested properly, an overlapping scope
     // can make a non-overlapping scope also overlapping, e.g.
@@ -241,10 +248,10 @@ private struct Liverange {
     // ```
     repeat {
       changed = false
-      for endAccess in endAccesses {
-        if isOnlyInExtendedLiverange(endAccess), !isOnlyInExtendedLiverange(endAccess.beginAccess) {
-          prunedLiverange.insert(endAccess)
-          nonDestroyingUsers.append(endAccess)
+      for scopeEnd in accessScopeEnds {
+        if isOnlyInExtendedLiverange(scopeEnd), !isOnlyInExtendedLiverange(scopeEnd.accessScopeBegin!) {
+          prunedLiverange.insert(scopeEnd)
+          nonDestroyingUsers.append(scopeEnd)
           changed = true
         }
       }
@@ -258,6 +265,28 @@ private struct Liverange {
   }
 }
 
+private extension Instruction {
+  /// If this instruction ends an access scope which is relevant for exclusivity checking, the instruction
+  /// which begins that scope. Otherwise nil.
+  ///
+  /// Beside `begin_access`/`end_access` this also covers yield-once coroutines: a coroutine callee - e.g. a
+  /// `modify` accessor of a class property - can begin a formal access before the yield and end it after the
+  /// resume. Such an access is not visible as `begin_access`/`end_access` in the caller, but bounded by
+  /// `begin_apply` and `end_apply`/`abort_apply`.
+  var accessScopeBegin: Instruction? {
+    switch self {
+    case let endAccess as EndAccessInst:
+      return endAccess.beginAccess
+    case let endApply as EndApplyInst:
+      return endApply.beginApply
+    case let abortApply as AbortApplyInst:
+      return abortApply.beginApply
+    default:
+      return nil
+    }
+  }
+}
+
 private extension Stack where Element == Instruction {
   init?(usersOf value: Value, _ context: FunctionPassContext) {
     var users = Stack<Instruction>(context)
@@ -266,6 +295,9 @@ private extension Stack where Element == Instruction {
       if $0.instruction is DestroyValueInst,
          $0.value == value
       {
+        return .continueWalk
+      }
+      if $0.instruction is DebugValueInst {
         return .continueWalk
       }
       users.append($0.instruction)

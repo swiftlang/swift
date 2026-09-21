@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
@@ -56,7 +56,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   return result
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func _parseInteger<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
@@ -80,7 +80,7 @@ internal func _parseInteger<Result: FixedWidthInteger>(
   return unsafe _parseIntegerDigits(ascii: codeUnits, radix: radix, isNegative: false)
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(never)
 internal func _parseInteger<S: StringProtocol, Result: FixedWidthInteger>(
   ascii text: S, radix: Int

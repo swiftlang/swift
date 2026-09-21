@@ -58,7 +58,7 @@ extension ${intType}: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: borrowing ${intType}
@@ -77,7 +77,7 @@ extension ${intType}: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -108,7 +108,7 @@ extension Atomic where Value == ${intType} {
   @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func ${lowerFirst(name)}(
     _ operand: ${intType},
@@ -175,7 +175,7 @@ extension Atomic where Value == ${intType} {
   @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func add(
     _ operand: ${intType},
@@ -219,7 +219,7 @@ extension Atomic where Value == ${intType} {
   @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func subtract(
     _ operand: ${intType},

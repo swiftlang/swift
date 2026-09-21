@@ -18,7 +18,7 @@
 import Swift
 
 #if os(anyAppleOS)
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
 #if os(anyAppleOS)
@@ -30,7 +30,7 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.Runtime
+@_implementationOnly import BacktracingImpl.Runtime
 
 @available(BacktracingDT 6.2, *)
 struct SimpleImageRef: SymbolLoader.Image {
@@ -680,12 +680,16 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     var n = 0
     for frame in frames {
       lines.append("\(n)\t\(frame.description)")
+      let frameCount: Int
       switch frame.captured {
         case let .omittedFrames(count):
-          n += count
+          frameCount = count
         default:
-          n += 1
+          frameCount = 1
       }
+
+      let (wrapped, overflow) = n.addingReportingOverflow(frameCount)
+      n = overflow ? Int.max : wrapped
     }
 
     lines.append("")

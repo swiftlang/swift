@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-interop -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 
@@ -126,6 +127,7 @@ func opaque_existential_to_opaque_archetype
   // CHECK-NEXT: copy_addr [[ARG]] to [init] [[TEMP]]
   // CHECK-NEXT: unconditional_checked_cast_addr any NotClassBound in [[TEMP]] : $*any NotClassBound to T in [[RET]] : $*T
   // CHECK-NEXT: dealloc_stack [[TEMP]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: [[T0:%.*]] = tuple ()
   // CHECK-NEXT: return [[T0]]
 }

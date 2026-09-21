@@ -23,8 +23,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
-#include "clang/Lex/HeaderSearchOptions.h"
-#include "llvm/Config/config.h"
 #include "llvm/Support/Path.h"
 using namespace swift;
 
@@ -538,8 +536,8 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
 SwiftDependencyScanningService::SwiftDependencyScanningService()
     : Alloc(), Saver(Alloc) {
   ClangScanningService.emplace(
-      clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::Full,
+      clang::dependencies::ScanningMode::DependencyDirectivesScan,
+      clang::dependencies::ScanningOutputFormat::Full,
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
@@ -548,7 +546,7 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
       // the build system to handle the optimization safely.
       // Swift can handle the working directory optimizaiton
       // already so it is safe to turn on all optimizations.
-      clang::tooling::dependencies::ScanningOptimizations::All);
+      clang::dependencies::ScanningOptimizations::All);
 }
 
 bool
@@ -677,14 +675,14 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CASOpts.PluginOptions = CASConfig->PluginOptions;
 
   ClangScanningService.emplace(
-      clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
+      clang::dependencies::ScanningMode::DependencyDirectivesScan,
+      clang::dependencies::ScanningOutputFormat::FullIncludeTree,
       CASOpts, Instance.getSharedCASInstance(),
       Instance.getSharedCacheInstance(),
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
       // consistent with the non-CAS case.
-      clang::tooling::dependencies::ScanningOptimizations::All);
+      clang::dependencies::ScanningOptimizations::All);
 
   return false;
 }
@@ -800,7 +798,7 @@ void ModuleDependenciesCache::recordDependency(
 }
 
 void ModuleDependenciesCache::recordClangDependencies(
-    const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
+    const clang::dependencies::ModuleDepsGraph &dependencies,
     DiagnosticEngine &diags,
     BridgeClangDependencyCallback bridgeClangModule) {
   for (const auto &dep : dependencies)
@@ -808,7 +806,7 @@ void ModuleDependenciesCache::recordClangDependencies(
 }
 
 void ModuleDependenciesCache::recordClangDependency(
-    const clang::tooling::dependencies::ModuleDeps &dependency,
+    const clang::dependencies::ModuleDeps &dependency,
     DiagnosticEngine &diags, BridgeClangDependencyCallback bridgeClangModule) {
   if (!hasClangDependency(dependency.ID.ModuleName)) {
     recordDependency(dependency.ID.ModuleName, bridgeClangModule(dependency));

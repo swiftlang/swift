@@ -11,34 +11,25 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
-#include "CodeCompletionDiagnostics.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Comment.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/AfterPoundExprCompletion.h"
 #include "swift/IDE/ArgumentCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
-#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
 #include "swift/IDE/ExprCompletion.h"
@@ -49,21 +40,14 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Comment.h"
-#include "clang/AST/CommentVisitor.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/raw_ostream.h"
-#include <algorithm>
 #include <string>
 
 using namespace swift;
@@ -231,7 +215,7 @@ public:
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl(ImportPath::Builder &Path) override;
-  void completeUsingDecl() override;
+  void completeFileDefaultDecl() override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeCallArg(CodeCompletionExpr *E) override;
@@ -494,8 +478,8 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
   Path.pop_back();
 }
 
-void CodeCompletionCallbacksImpl::completeUsingDecl() {
-  Kind = CompletionKind::Using;
+void CodeCompletionCallbacksImpl::completeFileDefaultDecl() {
+  Kind = CompletionKind::FileDefault;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -939,7 +923,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AttributeBegin:
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
-  case CompletionKind::Using:
+  case CompletionKind::FileDefault:
   case CompletionKind::UnresolvedMember:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
@@ -1827,8 +1811,8 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
       Lookup.addImportModuleNames();
     break;
   }
-  case CompletionKind::Using: {
-    Lookup.addUsingSpecifiers();
+  case CompletionKind::FileDefault: {
+    Lookup.addFileDefaultSpecifiers();
     break;
   }
   case CompletionKind::AfterPoundDirective: {

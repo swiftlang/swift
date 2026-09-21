@@ -38,7 +38,7 @@ SWIFT_NONSENDABLE_ASSUMED
 func testSendable<T: Sendable>(_: T) {}
 
 public func test(p: Parent, v: SendableValue, ns: NonSendableValue) {
-  testSendable(p) // expected-error {{type 'Parent' does not conform to the 'Sendable' protocol}}
+  testSendable(p) // expected-warning {{type 'Parent' does not conform to the 'Sendable' protocol}}
   testSendable(v) // Ok (no diagnostics unable unavailable conformance associated with `Parent`).
   testSendable(ns) // expected-error {{conformance of 'NonSendableValue' to 'Sendable' is unavailable}}
 }

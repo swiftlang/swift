@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name unowned %s | %FileCheck %s
 
@@ -125,6 +126,7 @@ func test_unowned_let_capture(_ aC : C) {
 // CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   destroy_value [[UNOWNED_ARG]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[RESULT]] : $Int
 
 

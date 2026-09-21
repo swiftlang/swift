@@ -1,3 +1,9 @@
+
+if(WIN32)
+  option(SWIFT_ASSEMBLY_VERSION "Assembly Version" "${PROJECT_VERSION}")
+  option(SWIFT_PUBLIC_KEY_TOKEN "Code Signing Identity" "0000000000000000")
+endif()
+
 function(generate_plist project_name project_version target)
   set(PLIST_INFO_PLIST "Info.plist")
   set(PLIST_INFO_NAME "${project_name}")
@@ -62,7 +68,7 @@ function(embed_version_info target)
   get_target_property(_EVI_NAME ${target} NAME)
 
   # Pad the project version to a four-part `MAJOR.MINOR.PATCH.TWEAK`
-  string(REGEX MATCHALL "[0-9]+" version_parts "${PROJECT_VERSION}")
+  string(REGEX MATCHALL "[0-9]+" version_parts "${SWIFT_ASSEMBLY_VERSION}")
   list(LENGTH version_parts version_part_count)
   while(version_part_count LESS 4)
     list(APPEND version_parts "0")
@@ -77,6 +83,8 @@ function(embed_version_info target)
   file(CONFIGURE
     OUTPUT ${_EVI_BINARY_DIR}/${_EVI_NAME}.rc.in
     CONTENT [[
+#include <winuser.h>
+
 1 VERSIONINFO
 FILEVERSION    @_EVI_VERSION_MAJOR@,@_EVI_VERSION_MINOR@,@_EVI_VERSION_PATCH@,@_EVI_VERSION_TWEAK@
 PRODUCTVERSION @_EVI_VERSION_MAJOR@,@_EVI_VERSION_MINOR@,@_EVI_VERSION_PATCH@,@_EVI_VERSION_TWEAK@
@@ -143,7 +151,7 @@ function(embed_manifest target)
   get_target_property(_EM_NAME ${target} NAME)
 
   # Pad the project version to a four-part `MAJOR.MINOR.PATCH.TWEAK`
-  string(REGEX MATCHALL "[0-9]+" version_parts "${PROJECT_VERSION}")
+  string(REGEX MATCHALL "[0-9]+" version_parts "${SWIFT_ASSEMBLY_VERSION}")
   list(LENGTH version_parts version_part_count)
   while(version_part_count LESS 4)
     list(APPEND version_parts "0")
@@ -155,6 +163,8 @@ function(embed_manifest target)
   list(GET version_parts 3 _EM_VERSION_TWEAK)
   set(_EM_VERSION_STRING "${_EM_VERSION_MAJOR}.${_EM_VERSION_MINOR}.${_EM_VERSION_PATCH}.${_EM_VERSION_TWEAK}")
 
+  string(TOLOWER "${SWIFT_PUBLIC_KEY_TOKEN}" _EM_PUBLIC_KEY_TOKEN)
+
   # Evaluate variables
   file(CONFIGURE
     OUTPUT ${_EM_BINARY_DIR}/${_EM_NAME}-${_EM_VERSION_STRING}.1.manifest.in
@@ -163,6 +173,7 @@ function(embed_manifest target)
   <assemblyIdentity
     name="$<TARGET_NAME:@target@>"
     processorArchitecture="@CMAKE_SYSTEM_PROCESSOR@"
+    publicKeyToken="@_EM_PUBLIC_KEY_TOKEN@"
     type="win32"
     version="@_EM_VERSION_STRING@" />
   <file name="$<TARGET_FILE_NAME:@target@>" />
@@ -175,6 +186,8 @@ function(embed_manifest target)
   file(CONFIGURE
     OUTPUT ${_EM_BINARY_DIR}/${_EM_NAME}.rc.in
     CONTENT [[
+#include <winuser.h>
+
 1 VERSIONINFO
 FILEVERSION    @_EM_VERSION_MAJOR@,@_EM_VERSION_MINOR@,@_EM_VERSION_PATCH@,@_EM_VERSION_TWEAK@
 PRODUCTVERSION @_EM_VERSION_MAJOR@,@_EM_VERSION_MINOR@,@_EM_VERSION_PATCH@,@_EM_VERSION_TWEAK@

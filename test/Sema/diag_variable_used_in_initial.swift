@@ -53,6 +53,9 @@ func localContext() {
         func foo1() {}
         func foo2() {
           var foo1 = foo1()
+          // expected-warning@-1 {{initialization of variable 'foo1' was never used; consider replacing with assignment to '_' or removing it}}
+          // expected-warning@-2 {{variable 'foo1' inferred to have type '()', which may be unexpected}}
+          // expected-note@-3 {{add an explicit type annotation to silence this warning}}
         }
       }
     }

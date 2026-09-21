@@ -14,29 +14,23 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ImporterImpl.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
-#include "swift/Basic/Assertions.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/CASOptions.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendOptions.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/StringSaver.h"
 
 using namespace swift;
 
 using namespace clang::tooling;
-using namespace clang::tooling::dependencies;
+using namespace clang::dependencies;
 
 static void addScannerPrefixMapperInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
@@ -83,7 +77,7 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
 
 void ClangImporter::getBridgingHeaderOptions(
     const ASTContext &ctx,
-    const clang::tooling::dependencies::TranslationUnitDeps &deps,
+    const clang::dependencies::TranslationUnitDeps &deps,
     std::vector<std::string> &swiftArgs) {
   auto addClangArg = [&](Twine arg) {
     swiftArgs.push_back("-Xcc");
@@ -99,6 +93,44 @@ void ClangImporter::getBridgingHeaderOptions(
   // Ensure that the resulting PCM build invocation uses Clang frontend
   // directly
   swiftArgs.push_back("-direct-clang-cc1-module-build");
+
+  // `ClangImporter::create` overwrites the
+  // `clang::CodeGenOptions::OptimizationLevel` setting based on
+  // `swift::IRGenOptions::OptMode`. Respect the swift optimisation mode here
+  // so that the bridging header PCH, which is emitted using these options, is
+  // emitted and later consumed using the same clang optimisation level.
+  // Otherwise, the mismatch will be caught and reported as an error when
+  // reading the PCH.
+  switch (ctx.SILOpts.OptMode) {
+  case OptimizationMode::NotSet:
+    break;
+  case OptimizationMode::NoOptimization:
+    swiftArgs.push_back("-Onone");
+    break;
+  case OptimizationMode::ForSpeed:
+    swiftArgs.push_back("-O");
+    break;
+  case OptimizationMode::ForSize:
+    swiftArgs.push_back("-Osize");
+    break;
+  }
+
+  // If the main compilation specifies '-clang-target', forward it so the
+  // bridging header PCH is emitted through the same `ClangImporter::create`
+  // configuration path (and therefore the same `clang::CodeGenOptions`) as the
+  // compilations that later consume the PCH.
+  if (ctx.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-target");
+    swiftArgs.push_back(ctx.LangOpts.Target.str());
+    swiftArgs.push_back("-clang-target");
+    swiftArgs.push_back(ctx.LangOpts.ClangTarget->str());
+  }
+
+  // Inherit Embedded Swift.
+  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    swiftArgs.push_back("-enable-experimental-feature");
+    swiftArgs.push_back("Embedded");
+  }
 
   // Add args reported by the scanner.
 

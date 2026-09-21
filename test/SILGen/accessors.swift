@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name accessors -Xllvm -sil-full-demangle %s | %FileCheck %s
 
@@ -53,6 +54,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[T1]])
 // CHECK-NEXT: end_apply [[T2]]
 // CHECK-NEXT: destroy_value [[OWNED_SELF]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
@@ -94,6 +96,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$s9accessors11MutatingSubVyS2icis : $@convention(method) (Int, Int, @inout MutatingSub) -> ()
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[T1]])
 // CHECK-NEXT: end_apply [[TOKEN]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 

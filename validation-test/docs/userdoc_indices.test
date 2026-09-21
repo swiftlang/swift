@@ -5,8 +5,11 @@
 
 # RUN: %empty-directory(%t)
 
-# Check that the generated doc indices match those in the repo. Run
-# `./utils/generate-doc-index.swift <swift-source-directory>` to regenerate.
+# Check that the generated doc indices match those in the repo.
+#
+# To regenerate after adding/renaming a diagnostic doc:
+#   - In a CMake/ninja build:   ninja update-doc-index
+#   - Or manually:              swift utils/generate-doc-index.swift <swift-source-dir> userdocs/diagnostics
 
 # RUN: %host-build-swift -swift-version 5 -enable-upcoming-feature BareSlashRegexLiterals %swift_src_root/utils/generate-doc-index.swift -o %t/generate-doc-index
 # RUN: %t/generate-doc-index %swift_src_root %t

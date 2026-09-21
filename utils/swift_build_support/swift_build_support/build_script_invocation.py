@@ -13,6 +13,7 @@
 import os
 import platform
 import shlex
+import subprocess
 
 from build_swift.build_swift import argparse
 from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
@@ -61,6 +62,26 @@ class BuildScriptInvocation(object):
     @property
     def install_all(self):
         return self.args.install_all or self.args.infer_dependencies
+
+    @staticmethod
+    def _env_supports_end_of_options():
+        """Probe whether env(1) recognizes '--' as an end-of-options marker.
+
+        macOS 26's env(1) is stricter about option scanning past the program
+        token, so callers must terminate option parsing with '--' before
+        flag-like program arguments (e.g. cmake's '-G Ninja') to keep env from
+        consuming them. Older env(1)s that don't recognize '--' would try to
+        exec a program literally named '--' and fail; treat a non-zero exit
+        (or a missing env binary) as no support.
+        """
+        try:
+            return subprocess.call(
+                ['env', 'A=1', '--', '/bin/sh', '-c', 'exit 0'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            ) == 0
+        except OSError:
+            return False
 
     def convert_to_impl_arguments(self):
         """convert_to_impl_arguments() -> (env, args)
@@ -135,6 +156,9 @@ class BuildScriptInvocation(object):
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
             "--swift-source-dirname", products.Swift.product_source_name(),
         ]
+
+        if self._env_supports_end_of_options():
+            impl_args += ["--env-supports-end-of-options"]
 
         # Compute any product specific cmake arguments.
         #
@@ -260,6 +284,18 @@ class BuildScriptInvocation(object):
                 args.extra_cmake_options.append(
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
+        if args.build_sarif:
+            sarif_src = os.path.join(self.workspace.source_root,
+                                     "swift-toolchain-sarif")
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_SARIF_SOURCE:PATH={}'.format(sarif_src))
+            collections_src = os.path.join(self.workspace.source_root,
+                                           "swift-collections")
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE:PATH={}'.format(
+                    collections_src))
+            args.extra_cmake_options.append('-DSWIFT_BUILD_SARIF:BOOL=TRUE')
+
         if args.build_early_swift_driver:
             configuration = 'release' if str(args.build_variant) in [
                 'Release',
@@ -364,7 +400,8 @@ class BuildScriptInvocation(object):
             # For additional isolation, disable pkg-config. Homebrew's pkg-config
             # prioritizes CommandLineTools paths, resulting in compile errors.
             args.extra_cmake_options += [
-                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib',
+                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib;'
+                '/opt/homebrew/lib',
                 '-DPKG_CONFIG_EXECUTABLE=/usr/bin/false',
             ]
 
@@ -413,6 +450,10 @@ class BuildScriptInvocation(object):
                 "--extra-cmake-options=%s" % ' '.join(
                     shlex.quote(opt) for opt in args.extra_cmake_options)
             ]
+
+        impl_args += [
+            "--llvm-enable-index-store=%s" % (1 if args.llvm_enable_index_store else 0)
+        ]
 
         if args.lto_type is not None:
             impl_args += [
@@ -696,6 +737,21 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.WASISwiftSDK,
                             is_enabled=self.args.build_wasistdlib)
+
+        builder.add_product(products.EmscriptenSysroot,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenLLVMRuntimeLibs,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenStdlib,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenSwiftSDK,
+                            is_enabled=self.args.build_emscriptenstdlib)
+
+        builder.add_product(products.EmscriptenHostLLVM,
+                            is_enabled=self.args.build_emscripten_host_llvm)
+        builder.add_product(products.EmscriptenHostSwift,
+                            is_enabled=self.args.build_emscripten_host_swift)
+
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,

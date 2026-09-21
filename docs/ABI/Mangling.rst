@@ -13,12 +13,21 @@ Mangling
   mangled-name ::= '_T0' global // Swift 4.0
   mangled-name ::= '$S' global  // Swift 4.2
   mangled-name ::= '$e' global  // Embedded Swift (unstable)
+  mangled-name ::= async-main-entry-point
 
 All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
 compiler has used variations of the mangling described in this document, though
 pre-stable versions may not exactly conform to this description. By using
 distinct prefixes, tools can attempt to accommodate bugs and version variations
 in pre-stable versions of Swift.
+
+The one exception is the async entry point that runs a program's top-level
+code, which carries no prefix at all::
+
+  async-main-entry-point ::= 'async_Main'
+
+It is still a Swift async function, so its funclets take the usual mangled
+suffixes (``async_MainTY1_``, ``async_MainTQ0_``, ``async_MainTu``, ...).
 
 The basic mangling scheme is a list of 'operators' where the operators are
 structured in a post-fix order. For example the mangling may start with an
@@ -755,6 +764,7 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  FUNCTION-KIND ::= 'O'                      // `@called(once)` function type
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
@@ -862,7 +872,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? CALLED-ONCE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -873,6 +883,10 @@ mangled in to disambiguate.
   ISOLATION ::= 'A'                          // @isolated(any)
 #if SWIFT_RUNTIME_VERSION >= 6.4
   ISOLATION ::= 'N'                          // nonisolated(nonsending)
+#endif
+
+#if SWIFT_RUNTIME_VERSION >= 6.5
+  CALLED-ONCE ::= 'O'                        // @called(once)
 #endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
@@ -892,6 +906,7 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'M'                // Swift method
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure
+  FUNC-REPRESENTATION ::= 'V'                // COM method
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
@@ -1384,6 +1399,7 @@ Some kinds need arguments, which precede ``Tf``.
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order
                                              // and one 'identifier' argument which is the closure symbol name
+  ARG-SPEC-KIND ::= 'E'                      // like 'c', but for escaping closures
   ARG-SPEC-KIND ::= 'C' NATURAL-ZERO         // the same closure as a previous argument <n>
   ARG-SPEC-KIND ::= 'p' CONST-PROP           // Constant propagated argument
   ARG-SPEC-KIND ::= 'e' 'D'? 'G'? 'X'?       // Generic argument, with optional dead, owned=>guaranteed or exploded-specifier

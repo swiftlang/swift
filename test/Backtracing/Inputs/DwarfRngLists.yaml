@@ -1,0 +1,176 @@
+## A hand-crafted ELF object holding a single DWARF v5 compile unit that
+## exercises every DW_RLE_* range list encoding in .debug_rnglists, via
+## DW_FORM_rnglistx. This is what a real DWARF 5 compiler emits for
+## discontiguous PC ranges (e.g. an inlined subroutine split across two
+## blocks by the optimizer) -- see DwarfReaderRngLists.swift.
+##
+## Layout:
+##   DIE @ 0x1d: DW_TAG_subprogram, linkage_name "callee"
+##               (the abstract-origin target for every inlined_subroutine
+##               DIE below)
+##   DIE @ 0x25: DW_TAG_subprogram, DW_AT_ranges -> rangelist 0
+##               (no low_pc/high_pc: exercises buildFunctionInfo's
+##               DW_AT_ranges fallback)
+##     DIE: DW_TAG_inlined_subroutine, call_line 10, ranges -> rangelist 1
+##          (DW_RLE_base_addressx + two DW_RLE_offset_pair: discontiguous,
+##          indexed base address -- the original bug scenario)
+##     DIE: DW_TAG_inlined_subroutine, call_line 20, ranges -> rangelist 2
+##          (DW_RLE_startx_endx)
+##     DIE: DW_TAG_inlined_subroutine, call_line 30, ranges -> rangelist 3
+##          (DW_RLE_startx_length)
+##     DIE: DW_TAG_inlined_subroutine, call_line 40, ranges -> rangelist 4
+##          (DW_RLE_base_address + DW_RLE_offset_pair)
+##     DIE: DW_TAG_inlined_subroutine, call_line 50, ranges -> rangelist 5
+##          (DW_RLE_start_end + DW_RLE_start_length: discontiguous)
+##
+## Expected resolved ranges (verified against this exact file with
+## llvm-dwarfdump and a standalone DwarfReader probe):
+##   rangelist 0: [0x1010, 0x1020) [0x1030, 0x1040)
+##   rangelist 1: [0x2004, 0x2008) [0x2010, 0x2018)   (.debug_addr[0] = 0x2000)
+##   rangelist 2: [0x3000, 0x3010)                    (.debug_addr[1..2])
+##   rangelist 3: [0x2000, 0x2008)                    (.debug_addr[0] = 0x2000)
+##   rangelist 4: [0x9001, 0x9002)
+##   rangelist 5: [0xa000, 0xa010) [0xb000, 0xb010)
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_addr_base
+              Form:      DW_FORM_sec_offset
+            - Attribute: DW_AT_rnglists_base
+              Form:      DW_FORM_sec_offset
+        - Code:     0x02
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+        - Code:     0x03
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_ranges
+              Form:      DW_FORM_rnglistx
+        - Code:     0x04
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_ranges
+              Form:      DW_FORM_rnglistx
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x0000          # DW_AT_low_pc
+            - Value: 0x08            # DW_AT_addr_base
+            - Value: 0x0c            # DW_AT_rnglists_base
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "callee"          # DW_AT_linkage_name
+        - AbbrCode: 0x03
+          Values:
+            - Value: 0x00            # DW_AT_ranges (rangelist 0)
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x1d            # DW_AT_abstract_origin -> "callee" DIE
+            - Value: 0x01            # DW_AT_ranges (rangelist 1)
+            - Value: 0x01            # DW_AT_call_file
+            - Value: 0x0A            # DW_AT_call_line = 10
+            - Value: 0x01            # DW_AT_call_column
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x1d
+            - Value: 0x02            # rangelist 2
+            - Value: 0x01
+            - Value: 0x14            # 20
+            - Value: 0x01
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x1d
+            - Value: 0x03            # rangelist 3
+            - Value: 0x01
+            - Value: 0x1E            # 30
+            - Value: 0x01
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x1d
+            - Value: 0x04            # rangelist 4
+            - Value: 0x01
+            - Value: 0x28            # 40
+            - Value: 0x01
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x1d
+            - Value: 0x05            # rangelist 5
+            - Value: 0x01
+            - Value: 0x32            # 50
+            - Value: 0x01
+        - AbbrCode: 0x00              # end of subprogram's children
+        - AbbrCode: 0x00              # end of compile unit's children
+  debug_addr:
+    - Version: 5
+      Entries:
+        - Address: 0x2000
+        - Address: 0x3000
+        - Address: 0x3010
+  debug_rnglists:
+    - Lists:
+        - Entries:                    # rangelist 0
+            - Operator: DW_RLE_base_address
+              Values:   [ 0x1000 ]
+            - Operator: DW_RLE_offset_pair
+              Values:   [ 0x10, 0x20 ]
+            - Operator: DW_RLE_offset_pair
+              Values:   [ 0x30, 0x40 ]
+            - Operator: DW_RLE_end_of_list
+        - Entries:                    # rangelist 1
+            - Operator: DW_RLE_base_addressx
+              Values:   [ 0x00 ]
+            - Operator: DW_RLE_offset_pair
+              Values:   [ 0x04, 0x08 ]
+            - Operator: DW_RLE_offset_pair
+              Values:   [ 0x10, 0x18 ]
+            - Operator: DW_RLE_end_of_list
+        - Entries:                    # rangelist 2
+            - Operator: DW_RLE_startx_endx
+              Values:   [ 0x01, 0x02 ]
+            - Operator: DW_RLE_end_of_list
+        - Entries:                    # rangelist 3
+            - Operator: DW_RLE_startx_length
+              Values:   [ 0x00, 0x08 ]
+            - Operator: DW_RLE_end_of_list
+        - Entries:                    # rangelist 4
+            - Operator: DW_RLE_base_address
+              Values:   [ 0x9000 ]
+            - Operator: DW_RLE_offset_pair
+              Values:   [ 0x01, 0x02 ]
+            - Operator: DW_RLE_end_of_list
+        - Entries:                    # rangelist 5
+            - Operator: DW_RLE_start_end
+              Values:   [ 0xA000, 0xA010 ]
+            - Operator: DW_RLE_start_length
+              Values:   [ 0xB000, 0x10 ]
+            - Operator: DW_RLE_end_of_list

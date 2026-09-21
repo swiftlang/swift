@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name generic_tuples -parse-as-library %s | %FileCheck %s
 
@@ -8,6 +9,7 @@ func dup<T>(_ x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: debug_value [[XVAR]] : $*T, let, name "x", {{.*}} expr op_deref
 // CHECK-NEXT: copy_addr [[XVAR]] to [init] [[RESULT_0]]
 // CHECK-NEXT: copy_addr [[XVAR]] to [init] [[RESULT_1]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]]
 

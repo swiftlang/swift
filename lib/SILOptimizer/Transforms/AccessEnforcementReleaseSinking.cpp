@@ -25,7 +25,6 @@
 
 #define DEBUG_TYPE "access-enforcement-release"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -118,6 +117,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::IsBitwiseTakable:
     case BuiltinValueKind::IsSameMetatype:
     case BuiltinValueKind::Alignof:
+    case BuiltinValueKind::TypedAllocationID:
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:
@@ -163,6 +163,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::AssumeAlignment:
+    case BuiltinValueKind::Dereferenceable:
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
     case BuiltinValueKind::ExtractFunctionIsolation:
@@ -175,6 +176,10 @@ static bool isBarrier(SILInstruction *inst) {
     // or deinit side effects conservatively.
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::Ifdef:
     case BuiltinValueKind::AtomicLoad:
@@ -215,6 +220,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
     case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
     case BuiltinValueKind::TaskRemoveCancellationHandler:
     case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
@@ -224,6 +230,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::RemoveTaskLocalValue:
     case BuiltinValueKind::TaskCancellationShieldPush:
     case BuiltinValueKind::TaskCancellationShieldPop:
+    case BuiltinValueKind::TaskCancellationScopePush:
+    case BuiltinValueKind::TaskCancellationScopePop:
+    case BuiltinValueKind::TaskPushDeadline:
+    case BuiltinValueKind::TaskPopDeadline:
       return true;
     }
   }

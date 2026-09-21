@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift(-parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: swift_in_compiler
 
 // https://github.com/apple/swift/issues/73321
 // UNSUPPORTED: OS=windows-msvc

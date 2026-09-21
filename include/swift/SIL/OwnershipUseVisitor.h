@@ -23,10 +23,8 @@
 #ifndef SWIFT_SIL_OWNERSHIPUSEVISITOR_H
 #define SWIFT_SIL_OWNERSHIPUSEVISITOR_H
 
-#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ScopedAddressUtils.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -381,6 +379,7 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::BitwiseEscape:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
 
@@ -416,6 +415,7 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::BitwiseEscape:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
   case OperandOwnership::EndBorrow:

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch_default %s | %FileCheck %s
 
 class Klass {}
@@ -43,6 +44,7 @@ enum Enum {
 // CHECK:    br [[EXIT_BB]]
 //
 // CHECK: [[EXIT_BB]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // } // end sil function '$s14switch_default33testAddressOnlySubjectDefaultCaseyyAA4EnumOSgF'

@@ -66,7 +66,7 @@ extension Clock {
   ///          await someWork()
   ///       }
   @available(StdlibDeploymentTarget 5.7, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) func measure(
     _ work: nonisolated(nonsending) () async throws -> Void
   ) async rethrows -> Instant.Duration {
@@ -77,7 +77,7 @@ extension Clock {
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public func measure(
     isolation: isolated (any Actor)? = #isolation,
@@ -116,7 +116,7 @@ extension Clock {
   /// Prefer to use the `sleep(until:tolerance:)` method on `Clock` if you have
   /// access to an absolute instant.
   @available(StdlibDeploymentTarget 5.7, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func sleep(
     for duration: Instant.Duration,
     tolerance: Instant.Duration? = nil
@@ -130,6 +130,14 @@ enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2
   case walltime = 3
+}
+
+/// Identifier for the standard library clocks.
+@nonexhaustive
+@available(StdlibDeploymentTarget 6.5, *)
+public enum SystemClockID: UInt8, Sendable, Hashable {
+  case continuous = 1
+  case suspending = 2
 }
 
 @available(StdlibDeploymentTarget 5.7, *)

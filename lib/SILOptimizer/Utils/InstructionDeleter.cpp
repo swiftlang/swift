@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -232,13 +231,31 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
   // Cannot fix operand lifetimes in non-ownership SIL.
   assert(!fixLifetimes || inst->getFunction()->hasOwnership());
 
+  // First, salvage debug info...
+  SmallVector<SILInstruction *, 4> toSalvage;
+  toSalvage.push_back(inst);
+  for (unsigned idx = 0; idx < toSalvage.size(); ++idx) {
+    for (SILValue result : toSalvage[idx]->getResults()) {
+      for (Operand *use : result->getUses()) {
+        SILInstruction *user = use->getUser();
+        toSalvage.push_back(user);
+      }
+    }
+  }
+  for (auto inst : llvm::reverse(toSalvage)) {
+    swift::salvageDebugInfo(inst);
+  }
+
+  // ... then collect the instructions to delete.
+  // We need to do that separately, because `salvageDebugInfo` can insert new
+  // `debug_value` uses, which need to be deleted as well.
+
   // Recursively visit all uses while growing toDeleteInsts in def-use order and
   // dropping dead operands.
   SmallVector<SILInstruction *, 4> toDeleteInsts;
   SmallVector<Operand *, 4> toDropUses;
 
   toDeleteInsts.push_back(inst);
-  swift::salvageDebugInfo(inst);
   for (unsigned idx = 0; idx < toDeleteInsts.size(); ++idx) {
     for (SILValue result : toDeleteInsts[idx]->getResults()) {
       // Temporary use vector to avoid iterator invalidation.
@@ -251,7 +268,6 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
 
         toDeleteInsts.push_back(user);
         toDropUses.push_back(use);
-        swift::salvageDebugInfo(user);
       }
     }
   }
@@ -424,18 +440,24 @@ void swift::eliminateDeadInstruction(SILInstruction *inst,
 void swift::recursivelyDeleteTriviallyDeadInstructions(
     ArrayRef<SILInstruction *> ia, bool force, InstModCallbacks callbacks) {
   // Delete these instruction and others that become dead after it's deleted.
-  llvm::SmallPtrSet<SILInstruction *, 8> deadInsts;
-  for (auto *inst : ia) {
+  llvm::SmallSetVector<SILInstruction *, 8> deadInsts;
+  // Salvage debug info needs deletion to be in reverse order.
+  for (auto *inst : llvm::reverse(ia)) {
     // If the instruction is not dead and force is false, do nothing.
     if (force || isInstructionTriviallyDead(inst))
       deadInsts.insert(inst);
   }
-  llvm::SmallPtrSet<SILInstruction *, 8> nextInsts;
+  llvm::SmallSetVector<SILInstruction *, 8> nextInsts;
   while (!deadInsts.empty()) {
     for (auto inst : deadInsts) {
+      // Salvaging debug info may delete and rewrite queued instructions.
+      if (inst->isDeleted())
+        continue;
+
       // Call the callback before we mutate the to be deleted instruction in any
-      // way.
+      // way, and salvage debug info while it's meaningful.
       callbacks.notifyWillBeDeleted(inst);
+      salvageDebugInfo(inst);
 
       // Check if any of the operands will become dead as well.
       MutableArrayRef<Operand> operands = inst->getAllOperands();
@@ -463,6 +485,8 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
     }
 
     for (auto inst : deadInsts) {
+      if (inst->isDeleted())
+        continue;
       // This will remove this instruction and all its uses.
       eraseFromParentWithDebugInsts(inst, callbacks);
     }

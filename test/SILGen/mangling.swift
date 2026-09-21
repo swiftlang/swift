@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values
 // RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop

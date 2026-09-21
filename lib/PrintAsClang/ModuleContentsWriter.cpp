@@ -31,7 +31,6 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Strings.h"
@@ -40,6 +39,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <utility>
@@ -55,6 +55,27 @@ static bool isOSObjectType(const clang::Decl *decl) {
   if (!named)
     return false;
   return !DeclAndTypePrinter::maybeGetOSObjectBaseName(named).empty();
+}
+
+/// Whether \p ty is printed as an ObjC runtime type in a C header (AnyClass ->
+/// 'Class'), which requires <objc/objc.h>.
+static bool cReferencesObjCRuntimeType(Type ty) {
+  ty = ty->lookThroughAllOptionalTypes();
+  if (auto metatype = ty->getAs<ExistentialMetatypeType>())
+    return metatype->getInstanceType()->isAnyObject();
+  return false;
+}
+
+/// Whether \p FD's C signature uses such a type.
+static bool cDeclUsesObjCRuntimeType(const AbstractFunctionDecl *FD) {
+  if (auto *fd = dyn_cast<FuncDecl>(FD))
+    if (cReferencesObjCRuntimeType(fd->getResultInterfaceType()))
+      return true;
+  if (auto *params = FD->getParameters())
+    for (auto *param : *params)
+      if (cReferencesObjCRuntimeType(param->getInterfaceType()))
+        return true;
+  return false;
 }
 
 namespace {
@@ -393,6 +414,7 @@ class ModuleWriter {
   DeclAndTypePrinter printer;
   OutputLanguageMode outputLangMode;
   bool dependsOnStdlib = false;
+  bool requiresObjCRuntimeHeader = false;
 
 public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
@@ -413,6 +435,10 @@ public:
   bool isStdlibRequired() const {
     return dependsOnStdlib;
   }
+
+  /// Returns true if an emitted `@c` declaration uses a type whose C
+  /// representation needs <objc/objc.h> (AnyClass -> 'Class').
+  bool isObjCRuntimeHeaderRequired() const { return requiresObjCRuntimeHeader; }
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -450,7 +476,7 @@ public:
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
       // Do not expose compiler private '_ObjC' module.
-      if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
+      if (otherModule->isClangBridgingHeaderImportModule())
         return true;
       // Add C++ module imports in C++ mode explicitly, to ensure that their
       // import is always emitted in the header.
@@ -678,10 +704,10 @@ public:
           // Don't emit nested types that are just implicitly @objc.
           // You should have to opt into this, since they are even less
           // namespaced than usual.
-          if (std::any_of(VD->getAttrs().begin(), VD->getAttrs().end(),
-                          [](const DeclAttribute *attr) {
-                            return isa<ObjCAttr>(attr) && !attr->isImplicit();
-                          })) {
+          if (llvm::any_of(VD->getAttrs().getAttributes<ObjCAttr>(),
+                           [](const ObjCAttr *attr) {
+                             return !attr->isImplicit();
+                           })) {
             nestedTypes.push_back(VD);
           }
         }
@@ -802,6 +828,12 @@ public:
     if (addImport(FD))
       return true;
 
+    // A @c function in the C section using an ObjC runtime type (AnyClass ->
+    // 'Class') needs <objc/objc.h>.
+    if (outputLangMode == OutputLanguageMode::C &&
+        cDeclUsesObjCRuntimeType(FD))
+      requiresObjCRuntimeHeader = true;
+
     PrettyStackTraceDecl entry(
         "printing forward declarations needed by function", FD);
     ReferencedTypeFinder::walk(
@@ -916,11 +948,10 @@ public:
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
     if (outputLangMode == OutputLanguageMode::ObjC
         && ED->lookupConformance(errorTypeProto, conformances)) {
-      bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
-                                       ED->getAllElements().end(),
-                                       [](const EnumElementDecl *elem) {
-        return elem->getBaseIdentifier().str() == "Domain";
-      });
+      bool hasDomainCase =
+          llvm::any_of(ED->getAllElements(), [](const EnumElementDecl *elem) {
+            return elem->getBaseIdentifier().str() == "Domain";
+          });
       if (!hasDomainCase) {
         os << "static NSString * _Nonnull const " << getNameForObjC(ED)
            << "Domain = @\"" << getErrorDomainStringForObjC(ED) << "\";\n";
@@ -935,27 +966,26 @@ public:
     M.getTopLevelDeclsWithAuxiliaryDecls(decls);
     llvm::SmallSetVector<const ValueDecl *, 4> removedValueDecls;
 
-    auto newEnd =
-        std::remove_if(decls.begin(), decls.end(),
-                       [this, &removedValueDecls](const Decl *D) -> bool {
-                         if (auto VD = dyn_cast<ValueDecl>(D)) {
-                           auto shouldRemove = !printer.shouldInclude(VD);
-                           if (shouldRemove)
-                             removedValueDecls.insert(VD);
-                           return shouldRemove;
-                         }
+    llvm::erase_if(decls, [this, &removedValueDecls](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
+        auto shouldRemove = !printer.shouldInclude(VD);
+        if (shouldRemove)
+          removedValueDecls.insert(VD);
+        return shouldRemove;
+      }
 
-                         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-                           if (outputLangMode == OutputLanguageMode::Cxx)
-                             return false;
-                           auto baseClass = ED->getSelfClassDecl();
-                           return !baseClass ||
-                                  !printer.shouldInclude(baseClass) ||
-                                  baseClass->isForeign();
-                         }
-                         return true;
-                       });
-    decls.erase(newEnd, decls.end());
+      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        // Immediately filter out invalid extensions.
+        if (ED->isInvalid())
+          return true;
+        if (outputLangMode == OutputLanguageMode::Cxx)
+          return false;
+        auto baseClass = ED->getSelfClassDecl();
+        return !baseClass || !printer.shouldInclude(baseClass) ||
+               baseClass->isForeign();
+      }
+      return true;
+    });
 
     if (M.isStdlibModule()) {
       llvm::SmallVector<Decl *, 2> nestedAdds;
@@ -1205,17 +1235,18 @@ void swift::printModuleContentsAsObjC(
       .write();
 }
 
-void swift::printModuleContentsAsC(
+bool swift::printModuleContentsAsC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     std::optional<AccessLevel> minAccess) {
   llvm::raw_null_ostream prologueOS;
   llvm::StringSet<> exposedModules;
-  ModuleWriter(os, prologueOS, imports, M, interopContext,
-               getRequiredAccess(M, minAccess),
-               /*requiresExposedAttribute=*/false, exposedModules,
-               OutputLanguageMode::C)
-      .write();
+  ModuleWriter writer(os, prologueOS, imports, M, interopContext,
+                      getRequiredAccess(M, minAccess),
+                      /*requiresExposedAttribute=*/false, exposedModules,
+                      OutputLanguageMode::C);
+  writer.write();
+  return writer.isObjCRuntimeHeaderRequired();
 }
 
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(

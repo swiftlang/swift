@@ -15,14 +15,6 @@ class TestStatusCommand(unittest.TestCase):
 
     def init_repo(self, path: Path, with_changes: bool):
         self.call(args=["git", "init"], cwd=path)
-        self.call(
-            args=["git", "config", "--local", "user.name", "swift_test"], cwd=path
-        )
-        self.call(
-            args=["git", "config", "--local", "user.email", "no-reply@swift.org"],
-            cwd=path,
-        )
-        self.call(args=["git", "config", "commit.gpgsign", "false"], cwd=path)
 
         (path / "file.txt").write_text("initial\n")
         self.call(args=["git", "add", "file.txt"], cwd=path)

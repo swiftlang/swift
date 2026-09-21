@@ -17,7 +17,7 @@
 
 import Swift
 
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
@@ -25,7 +25,7 @@ internal func _precondition(
 	fatalError()
 }
 
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _internalInvariantFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
@@ -35,9 +35,9 @@ internal func _internalInvariantFailure(
 
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -48,9 +48,9 @@ internal func _overrideLifetime<
 
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -61,9 +61,9 @@ internal func _overrideLifetime<
 
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
-@lifetime(&source)
+@_lifetime(&source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -75,14 +75,14 @@ internal func _overrideLifetime<
 
 extension Range {
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.init(uncheckedBounds: bounds)
   }
 }
 
 extension Optional {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     get {
       if let x = self {

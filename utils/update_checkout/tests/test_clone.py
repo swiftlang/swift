@@ -39,7 +39,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
@@ -79,7 +79,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             output,
         )
 
-        repo = self.get_all_repos()[0]
+        repo = self.repo_names[0]
         repo_path = os.path.join(self.source_root, repo)
         shutil.rmtree(repo_path)
         output = self.call(
@@ -113,7 +113,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             output = subprocess.check_output(
                 ["git", "-C", repo_path, "config", "--get", "core.symlinks"], text=True
@@ -127,7 +127,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
     def test_clone_with_incorrect_git_config(self, mock_exit, mock_obtain):
-        repo = self.get_all_repos()[0]
+        repo = self.repo_names[0]
 
         def side_effect(*args, **kwargs):
             result = obtain_all_additional_swift_sources(*args, **kwargs)
@@ -161,7 +161,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
     def test_clone_with_missing_git_config_entry(self, mock_exit, mock_obtain):
-        repo = self.get_all_repos()[0]
+        repo = self.repo_names[0]
 
         def side_effect(*args, **kwargs):
             result = obtain_all_additional_swift_sources(*args, **kwargs)
@@ -305,7 +305,7 @@ class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
             ] + additional_flags
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
@@ -315,19 +315,77 @@ class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(current_commit, self.commit_hash)
 
 
+class SchemeWithURLOverrideTestCase(scheme_mock.SchemeMockTestCase):
+    """
+    Test the per-repository clone URL overrides. 'repo1' is given overrides
+    pointing at its own mock remote, plus unusable overrides that must not be
+    selected; 'repo2' is always skipped, since it can only be cloned through
+    the (unusable) ssh clone pattern of the mock config.
+    """
+
+    UNUSABLE_URL = "file:///unusable/repo1"
+
+    def setUp(self):
+        super().setUp()
+        # The https clone pattern of the mock config points at the mock
+        # remotes, so this is a URL that can actually be cloned from.
+        self.usable_url = self.config["https-clone-pattern"] % "repo1"
+
+    def _clone_repo1_with_overrides(self, overrides, additional_flags=[]):
+        import json
+
+        self.config["repos"]["repo1"]["remote"].update(overrides)
+        with open(self.config_path, "w") as f:
+            json.dump(self.config, f)
+
+        self.call(
+            self.base_args
+            + [
+                "--clone",
+                "--skip-repository",
+                "repo2",
+                "--max-retries",
+                "0",
+            ]
+            + additional_flags
+        )
+        self.assertTrue(os.path.isdir(os.path.join(self.source_root, "repo1")))
+
+    def test_clone_with_url_override(self):
+        # A protocol-agnostic override is used for both protocols.
+        self._clone_repo1_with_overrides({"url": self.usable_url})
+
+    def test_clone_with_url_override_and_ssh(self):
+        self._clone_repo1_with_overrides({"url": self.usable_url}, ["--clone-with-ssh"])
+
+    def test_clone_with_https_url_override(self):
+        self._clone_repo1_with_overrides(
+            {"https-url": self.usable_url, "ssh-url": self.UNUSABLE_URL}
+        )
+
+    def test_clone_with_ssh_url_override(self):
+        self._clone_repo1_with_overrides(
+            {"ssh-url": self.usable_url, "https-url": self.UNUSABLE_URL},
+            ["--clone-with-ssh"],
+        )
+
+    def test_clone_with_ssh_url_override_wins_over_url(self):
+        self._clone_repo1_with_overrides(
+            {"ssh-url": self.usable_url, "url": self.UNUSABLE_URL},
+            ["--clone-with-ssh"],
+        )
+
+    def test_clone_with_https_url_override_wins_over_url(self):
+        self._clone_repo1_with_overrides(
+            {"https-url": self.usable_url, "url": self.UNUSABLE_URL}
+        )
+
+
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.base_args = [
-            self.update_checkout_path,
-            "--config",
-            self.config_path,
-            "--source-root",
-            self.source_root,
-        ]
-
-        repos = self.get_all_repos()
+        repos = self.repo_names
         repos.pop()
 
         self.scheme_name = "missing-repo"
@@ -342,7 +400,7 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def test_clone(self):
         self.call(self.base_args + ["--scheme", self.scheme_name, "--clone"])
 
-        missing_repo_path = os.path.join(self.source_root, self.get_all_repos().pop())
+        missing_repo_path = os.path.join(self.source_root, self.repo_names.pop())
         self.assertFalse(os.path.isdir(missing_repo_path))
 
     # Test that we do not update a repository that is not listed in the given

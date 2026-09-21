@@ -24,7 +24,7 @@ func takesVariadic(_ fns: () -> Int...) {
 }
 
 func takesNoEscapeClosure(_ fn : () -> Int) {
-  // expected-note@-1 5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-1 7{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
@@ -36,9 +36,15 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 
-  _ = [fn] // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  _ = [fn] // expected-error {{type '() -> Int' cannot conform to 'Escapable'}}
+  // expected-note@-1 {{required by generic struct 'Array' where 'Element' = '() -> Int'}}
+  // expected-note@-2 {{a function type can be marked '@escaping' to conform to 'Escapable'}}
+  // expected-error@-3 {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
   _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
-  _ = [1 : fn] // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  _ = [1 : fn] // expected-error {{type '() -> Int' cannot conform to 'Escapable'}}
+  // expected-note@-1 {{required by generic struct 'Dictionary' where 'Value' = '() -> Int'}}
+  // expected-note@-2 {{a function type can be marked '@escaping' to conform to 'Escapable'}}
+  // expected-error@-3 {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
   _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
   _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
   _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}

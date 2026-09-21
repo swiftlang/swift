@@ -45,7 +45,12 @@
 // REQUIRES: executable_test
 
 // This test verifies the backwards compatibility of binaries built against old
-// SDKs running on newer OSes (where CoroutineAccessors has been enabled).
+// SDKs running on newer OSes (where CoroutineAccessors has been enabled).  That
+// scenario only arises on platforms with a stable ABI: class B's old-ABI
+// accessors (referenced directly by the pre-built Executable.o, since `B.i`
+// and `B[_:]` are `@_borrowed` on a non-final open class) are only emitted at
+// all when there's a prebuilt binary to stay compatible with.
+// REQUIRES: swift_stable_abi
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

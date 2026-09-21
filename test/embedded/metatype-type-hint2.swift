@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -o %t/Main.o -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded

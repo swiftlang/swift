@@ -49,6 +49,25 @@ BridgedOStream Bridged_dbgs() {
   return BridgedOStream(&llvm::dbgs());
 }
 
+bool Bridged_isDebugFlagEnabled() {
+#ifndef NDEBUG
+  return llvm::DebugFlag;
+#else
+  return false;
+#endif
+}
+
+bool Bridged_isCurrentDebugType(BridgedStringRef type) {
+#ifndef NDEBUG
+  if (!llvm::DebugFlag)
+    return false;
+  std::string typeStr(type.unbridged().data(), type.unbridged().size());
+  return llvm::isCurrentDebugType(typeStr.c_str());
+#else
+  return false;
+#endif
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedStringRef
 //===----------------------------------------------------------------------===//

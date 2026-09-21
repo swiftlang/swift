@@ -8,7 +8,7 @@
 // XFAIL: OS=freebsd
 
 // CHECK: enum FakeNamespace {
-// CHECK:   static func foo(_ x: Int32)
+// CHECK:   static func foo(_ x: CInt)
 // CHECK: }
 // CHECK: enum std {
 // CHECK:   typealias size_t = Int

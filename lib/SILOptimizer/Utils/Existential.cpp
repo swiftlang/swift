@@ -14,11 +14,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -88,10 +84,9 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
 
     // Ignore instructions which don't write to the stack location.
     // Also ignore ASIUser (only kicks in if ASIUser is the original apply).
-    if (isa<DeallocStackInst>(User) ||
-        DebugValueInst::hasAddrVal(User) ||
+    if (isa<DeallocStackInst>(User) || isa<DebugValueInst>(User) ||
         isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
-        isa<DeinitExistentialAddrInst>(User) ||
+        isa<COMMethodInst>(User) || isa<DeinitExistentialAddrInst>(User) ||
         OpenExistentialAddrInst::isRead(User) || User == ASIUser) {
       continue;
     }

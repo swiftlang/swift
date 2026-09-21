@@ -18,7 +18,16 @@
 
 import os
 import sys
+import platform
+
+def extended(path):
+    if platform.system() == 'Windows':
+        path = os.path.abspath(path)
+        if path.startswith('\\\\'):
+            return "\\\\?\\UNC\\{0}".format(path[2:])
+        return "\\\\?\\{0}".format(path)
+    return path
 
 OLD = 1390550700  # 2014-01-24T08:05:00+00:00
 for f in sys.argv[1:]:
-    os.utime(f, (OLD, OLD))
+    os.utime(extended(f), (OLD, OLD))

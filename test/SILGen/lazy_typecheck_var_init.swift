@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -enable-library-evolution -module-name Test %s
+
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -enable-library-evolution -module-name Test | %FileCheck %s --check-prefixes=CHECK,CHECK-NON-LAZY
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -enable-library-evolution -module-name Test -experimental-lazy-typecheck | %FileCheck %s --check-prefixes=CHECK,CHECK-LAZY
 

@@ -1,0 +1,58 @@
+// RUN: %scale-test --invert --begin 1 --end 5 --step 1 --select NumConstraintScopes %s
+// REQUIRES: asserts,no_asan
+
+struct MultipleMembers: Animatable {
+  typealias AnimatableData = Double
+
+  var animatableData: Double = 0
+
+  var a: Angle
+
+  func foo() {
+    _ = AnimatableValues(
+%for i in range(0, N):
+       self[_animatableValue: \.a],
+%end
+    )
+  }
+}
+
+struct AnimatableValues<each Value>: VectorArithmetic where repeat each Value: VectorArithmetic {
+  init(_: repeat each Value) {}
+  init(_: repeat (each Value).Type) {}
+}
+
+struct Angle: Animatable {
+  typealias AnimatableData = Double
+}
+
+protocol Animatable {
+  associatedtype AnimatableData: VectorArithmetic
+}
+
+protocol VectorArithmetic {}
+
+extension Double : VectorArithmetic {}
+
+struct EmptyAnimatableData {}
+
+extension Animatable {
+  subscript<T>(_animatableValue k: WritableKeyPath<Self, T>) -> T where T: VectorArithmetic {
+    fatalError()
+  }
+  @_disfavoredOverload subscript<T>(_animatableValue k: WritableKeyPath<Self, T>) -> T.AnimatableData
+      where T: Animatable {
+    fatalError()
+  }
+  @_disfavoredOverload subscript<T>(_animatableValue k: WritableKeyPath<Self, T>) -> EmptyAnimatableData {
+    fatalError()
+  }
+  subscript<T>(_animatableValue k: ReferenceWritableKeyPath<Self, T>) -> T
+      where T: VectorArithmetic {
+    fatalError()
+  }
+  @_disfavoredOverload subscript<T>(_animatableValue k: ReferenceWritableKeyPath<Self, T>) -> T.AnimatableData
+      where T : Animatable {
+    fatalError()
+  }
+}

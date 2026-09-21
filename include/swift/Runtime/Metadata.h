@@ -566,6 +566,9 @@ SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromMetadata(const Metadata *theClass);
 
+SWIFT_RUNTIME_EXPORT
+id swift_getObjCMetatypeFromMetadata(const Metadata *metadata);
+
 // Get the ObjC class object from class type metadata,
 // or nullptr if the type isn't an ObjC class.
 const ClassMetadata *
@@ -596,6 +599,17 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getBorrowTypeMetadata(MetadataRequest request,
                             const Metadata *referent);
+
+/// The standard sets of function witnesses a tuple's value witness table is
+/// built from, chosen by the tuple's POD-ness and inline-ness.
+///
+/// Exported for the prespecializations library builder to use for its tuple
+/// metadata.
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_inline;
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_nonpod_inline;
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_noninline;
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable
+    swift_tupleWitnesses_nonpod_noninline;
 
 /// Fetch a uniqued metadata for a tuple type.
 ///
@@ -988,8 +1002,14 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 }
 
 /// Return the type name for a given type metadata.
+///
+/// This returns std::string, so it's only usable (and only implemented, in
+/// Casting.cpp) in hosted builds; the embedded Concurrency runtime never
+/// calls it.
+#if __STDC_HOSTED__
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
+#endif
 
 /// Register a block of protocol records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT

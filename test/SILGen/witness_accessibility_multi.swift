@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/witness_accessibility_other.swiftmodule %S/Inputs/witness_accessibility_other.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t  %s
 // RUN: %target-swift-emit-silgen -I %t  %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -I %t %s
 

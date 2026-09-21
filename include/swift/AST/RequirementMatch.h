@@ -12,7 +12,7 @@
 #ifndef SWIFT_AST_REQUIREMENTMATCH_H
 #define SWIFT_AST_REQUIREMENTMATCH_H
 
-#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -55,6 +55,10 @@ enum class MatchKind : uint8_t {
 
   /// The types conflict.
   TypeConflict,
+
+  /// The types would match, but one of them is an implicitly unwrapped
+  /// optional and the other is a regular optional.
+  ImplicitlyUnwrappedOptionalConflict,
 
   /// The witness would match if an additional requirement were met.
   MissingRequirement,
@@ -261,7 +265,7 @@ class RequirementCheck {
 
     /// Storage for `CheckKind::Availability`.
     struct {
-      AvailabilityConstraint constraint;
+      AvailabilityRestriction restriction;
       AvailabilityContext requiredContext;
     } Availability;
   };
@@ -276,10 +280,10 @@ public:
   RequirementCheck(AccessScope requiredAccessScope, bool forSetter)
       : Kind(CheckKind::Access), Access{requiredAccessScope, forSetter} {}
 
-  RequirementCheck(AvailabilityConstraint constraint,
+  RequirementCheck(AvailabilityRestriction restriction,
                    AvailabilityContext requiredContext)
       : Kind(CheckKind::Availability),
-        Availability{constraint, requiredContext} {}
+        Availability{restriction, requiredContext} {}
 
   CheckKind getKind() const { return Kind; }
 
@@ -292,7 +296,7 @@ public:
   /// True if the witness is less available than the requirement.
   bool isLessAvailable() const {
     return (Kind == CheckKind::Availability)
-               ? !Availability.constraint.isUnavailable()
+               ? !Availability.restriction.isUnavailable()
                : false;
   }
 
@@ -303,11 +307,11 @@ public:
     return Access.requiredScope;
   }
 
-  /// The availability constraint that would fail if the witness were accessed
+  /// The availability restriction that would fail if the witness were accessed
   /// from contexts in which the requirement is available.
-  AvailabilityConstraint getAvailabilityConstraint() const {
+  AvailabilityRestriction getAvailabilityRestriction() const {
     ASSERT(Kind == CheckKind::Availability);
-    return Availability.constraint;
+    return Availability.restriction;
   }
 
   /// The required availability range for checks that failed due to the witness
@@ -371,6 +375,11 @@ struct RequirementMatch {
   /// Requirement not met.
   std::optional<Requirement> MissingRequirement;
 
+  /// For \c MatchKind::ImplicitlyUnwrappedOptionalConflict, the index of the
+  /// parameter whose implicit unwrapping differs. If this is \c std::nullopt,
+  /// the difference is in the value type or the result type instead.
+  std::optional<unsigned> IUOConflictParamIndex;
+
   /// Unmet attribute from the requirement.
   const DeclAttribute *UnmetAttribute = nullptr;
 
@@ -402,6 +411,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
+    case MatchKind::ImplicitlyUnwrappedOptionalConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::CompileTimeLiteralConflict:
@@ -441,6 +451,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
+    case MatchKind::ImplicitlyUnwrappedOptionalConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::CompileTimeLiteralConflict:
@@ -473,6 +484,7 @@ struct RequirementMatch {
     case MatchKind::RequiresNonSendable:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
+    case MatchKind::ImplicitlyUnwrappedOptionalConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::OptionalityConflict:
       return true;

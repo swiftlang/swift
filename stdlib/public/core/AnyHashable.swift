@@ -290,7 +290,7 @@ extension AnyHashable: _HasCustomAnyHashableRepresentation {
 
 @_unavailableInEmbedded
 extension AnyHashable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return self
   }

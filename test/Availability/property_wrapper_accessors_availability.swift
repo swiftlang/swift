@@ -169,10 +169,10 @@ func butt(x: inout Butt) { // expected-note * {{}}
     }
 }
 
-@available(macOS, unavailable)
+@available(macOS, unavailable) // expected-note {{has been explicitly marked unavailable here}}
 extension Butt {
   @available(iOS, unavailable)
-  struct Nested { // expected-note {{has been explicitly marked unavailable here}}
+  struct Nested {
     @SetterMoreAvailable
     var wrapped_setter_more_available: Int // expected-note 2 {{has been explicitly marked unavailable here}}
 
@@ -192,8 +192,8 @@ func testButtNested(x: inout Butt.Nested) { // expected-error {{'Nested' is unav
 @_spi_available(macOS, introduced: 51)
 extension Butt {
   struct NestedInSPIAvailableExtension {
-    @available(macOS, unavailable)
-    public var unavailable: Int {// expected-note {{'unavailable' has been explicitly marked unavailable here}}
+    @available(macOS, unavailable) // expected-note {{'unavailable' has been explicitly marked unavailable here}}
+    public var unavailable: Int {
       get { 0 }
       set {}
     }
@@ -305,5 +305,16 @@ class Subclass: Base<Item> {
   // availability from the static subscript in this case.
   override var item: Item? {
     didSet {}
+  }
+}
+
+struct HasDeprecatedWrappedProperty {
+  @available(*, deprecated)
+  @UnrestrictedProjection var value: Int
+
+  func use() {
+    _ = value  // expected-warning {{'value' is deprecated}}
+    _ = $value // expected-warning {{'$value' is deprecated}}
+    _ = _value // expected-warning {{'_value' is deprecated}}
   }
 }

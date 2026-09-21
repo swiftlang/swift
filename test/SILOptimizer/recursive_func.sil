@@ -44,7 +44,7 @@ bb0(%0 : $Int, %1 : $REC):
   %9 = apply %6(%8, %7) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %10
   %10 = apply %5(%0, %9) : $@convention(thin) (Int, Int) -> Bool // user: %11
   %11 = apply %4(%10) : $@convention(method) (Bool) -> Builtin.Int1 // user: %12
-  cond_br %11, bb1, bb2                           // id: %12
+  cond_br %11, bb1, bb3                           // id: %12
 
 bb1:                                              // Preds: bb0
   strong_retain %1 : $REC                         // id: %13
@@ -71,10 +71,13 @@ bb1:                                              // Preds: bb0
   %30 = apply %23(%29, %1) : $@convention(method) (Int, @guaranteed REC) -> ()
   br bb2                                          // id: %31
 
-bb2:                                              // Preds: bb0 bb1
+bb2:                                              // Preds: bb1
   strong_release %1 : $REC                        // id: %32
   %33 = tuple ()                                  // user: %34
   return %33 : $()                                // id: %34
+
+bb3:                                              // Preds: bb0
+  br bb2                                          // id: %35
 }
 
 // Swift.Bool._getBuiltinLogicValue (Swift.Bool)() -> Builtin.Int1

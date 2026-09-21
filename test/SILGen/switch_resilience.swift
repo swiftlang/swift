@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -I %t %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t %s | %FileCheck %s
 
 import resilient_struct
@@ -22,6 +23,7 @@ import resilient_struct
 // CHECK-NEXT: br bb4
 //
 // CHECK: bb3:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_addr [[STACK_SLOT_COPY]]
 // CHECK-NEXT: dealloc_stack [[STACK_SLOT_COPY]]
 // CHECK-NEXT: [[REPROJECT:%.*]] = tuple_element_addr [[VALUE]]

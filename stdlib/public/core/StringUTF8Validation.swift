@@ -77,32 +77,32 @@ internal struct _UTF8EncodingErrorKind: Error, Sendable, Hashable
   }
 
   /// A continuation byte (`10xxxxxx`) outside of a multi-byte sequence
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static var unexpectedContinuationByte: Self {
     .init(rawValue: 0)
   }
 
   /// A byte in a surrogate code point (`U+D800..U+DFFF`) sequence
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static var surrogateCodePointByte: Self {
     .init(rawValue: 1)
   }
 
   /// A byte in an invalid, non-surrogate code point (`>U+10FFFF`) sequence
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static var invalidNonSurrogateCodePointByte: Self {
     .init(rawValue: 2)
   }
 
   /// A byte in an overlong encoding sequence
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static var overlongEncodingByte: Self {
     .init(rawValue: 3)
   }
 
   /// A multi-byte sequence that is the start of a valid multi-byte scalar
   /// but is cut off before ending correctly
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static var truncatedScalar: Self {
     .init(rawValue: 4)
   }

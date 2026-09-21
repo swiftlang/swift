@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -module-name infer -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
+import Swift
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Declarations
@@ -12,6 +13,7 @@ class Klass {
 class ContainsKlass {
   var computedKlass: Klass { get }
   final var klass: Klass
+  func getOtherKlass() -> Klass
 
   init()
 }
@@ -19,6 +21,16 @@ class ContainsKlass {
 struct KlassPair {
   var lhs: Klass
   var rhs: Klass
+}
+
+struct Inner {
+  var a: Klass
+  var b: Klass
+}
+
+struct Outer {
+  var inner: Inner
+  var other: Klass
 }
 
 class KlassWithKlassPair {
@@ -30,6 +42,9 @@ class MyError {}
 class C {}
 
 sil @getKlass : $@convention(thin) () -> @owned Klass
+sil @getPair : $@convention(thin) () -> @owned KlassPair
+sil @getOuter : $@convention(thin) () -> @owned Outer
+sil @getTuple : $@convention(thin) () -> @owned (Klass, Klass)
 sil @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
 sil @useIndirect : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil @sideEffect : $@convention(thin) () -> ()
@@ -37,6 +52,7 @@ sil @getKlassThrows : $@convention(thin) () -> (@owned Klass, @error MyError)
 sil @getKlassCoro : $@yield_once @convention(thin) () -> @yields @owned Klass
 sil @C_throwingMethod : $@convention(method) (@guaranteed C) -> (@owned Klass, @error MyError)
 sil @C_method : $@convention(method) (@owned C) -> @owned Klass
+sil @globalVar_addressor : $@convention(thin) () -> Builtin.RawPointer
 sil @freeFunc : $@convention(thin) (@owned C) -> @owned Klass
 
 enum FakeOptional<T> {
@@ -53,6 +69,11 @@ enum FirstSecondThirdEnum<T> {
 case first
 case second(T)
 case third(FakeOptional<T>)
+}
+
+enum Choice {
+case first
+case second(Klass)
 }
 
 //===----------------------------------------------------------------------===//
@@ -783,6 +804,48 @@ bb0(%0 : $*Klass):
   return %9999 : $()
 }
 
+// Trace starts at the init_existential_addr result ($*Klass) rather than the
+// alloc_stack; the inferrer looks backward through init_existential_addr to
+// the named alloc_stack.
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_trace_at_result: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %2 = init_existential_addr %1 : $*Any, $Klass
+// CHECK: Name: 'myStorage'
+// CHECK: Root:   %1 = alloc_stack $Any, var, name "myStorage"
+// CHECK: end running test 1 of 1 on init_existential_addr_trace_at_result: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_addr_trace_at_result : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  %2 = alloc_stack $Any, var, name "myStorage"
+  %3 = init_existential_addr %2 : $*Any, $Klass
+  debug_value [trace] %3 : $*Klass
+  store %0 to [init] %3 : $*Klass
+  destroy_addr %2 : $*Any
+  dealloc_stack %2 : $*Any
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Same but via copy_addr into the init_existential_addr slot.
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_trace_at_result_copy_addr: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %2 = init_existential_addr %1 : $*Any, $Klass
+// CHECK: Name: 'myStorage'
+// CHECK: Root:   %1 = alloc_stack $Any, var, name "myStorage"
+// CHECK: end running test 1 of 1 on init_existential_addr_trace_at_result_copy_addr: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_addr_trace_at_result_copy_addr : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  specify_test "variable_name_inference @trace[0]"
+  %2 = alloc_stack $Any, var, name "myStorage"
+  %3 = init_existential_addr %2 : $*Any, $Klass
+  debug_value [trace] %3 : $*Klass
+  copy_addr [take] %0 to [init] %3 : $*Klass
+  destroy_addr %2 : $*Any
+  dealloc_stack %2 : $*Any
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: begin running test 1 of 1 on move_value_var_decl: variable_name_inference with: @trace[0]
 // CHECK: Input Value:   %2 = move_value [var_decl] %1 : $Klass
 // CHECK: Name: 'MyName'
@@ -1088,3 +1151,433 @@ bb0(%0 : @guaranteed $C):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: init_existential_ref look-through
+//
+// When a named class value is wrapped in `any Protocol` via init_existential_ref
+// the name inferrer must look through it to reach the concrete value, otherwise
+// region-isolation diagnostics fall back to the catch-all unknown-pattern error.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_named_variable: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+// CHECK: Name: 'myKlass'
+// CHECK: Root: %0 = argument of bb0 : $Klass
+// CHECK: end running test 1 of 1 on init_existential_ref_named_variable: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_ref_named_variable : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  debug_value %0 : $Klass, var, name "myKlass"
+  %2 = copy_value %0 : $Klass
+  %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+  debug_value [trace] %3 : $AnyObject
+  destroy_value %3 : $AnyObject
+  destroy_value %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Swift.Optional wrapping: init_existential_ref followed by Optional.some.
+// The `.some` path component is suppressed for Swift.Optional so the name
+// comes out clean as 'myKlass', not 'myKlass.some'.
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_optional_some_suppressed: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %4 = enum $Optional<AnyObject>, #Optional.some!enumelt, %3 : $AnyObject
+// CHECK: Name: 'myKlass'
+// CHECK: Root: %0 = argument of bb0 : $Klass
+// CHECK: end running test 1 of 1 on init_existential_ref_optional_some_suppressed: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_ref_optional_some_suppressed : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  debug_value %0 : $Klass, var, name "myKlass"
+  %2 = copy_value %0 : $Klass
+  %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+  %4 = enum $Optional<AnyObject>, #Optional.some!enumelt, %3 : $AnyObject
+  debug_value [trace] %4 : $Optional<AnyObject>
+  destroy_value %4 : $Optional<AnyObject>
+  destroy_value %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// FakeOptional wrapping: the `.some` path component IS included because
+// FakeOptional is not Swift.Optional (getOptionalObjectType() returns null).
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_fakeoptional_some_kept: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %4 = enum $FakeOptional<AnyObject>, #FakeOptional.some!enumelt, %3 : $AnyObject
+// CHECK: Name: 'myKlass.some'
+// CHECK: Root: %0 = argument of bb0 : $Klass
+// CHECK: end running test 1 of 1 on init_existential_ref_fakeoptional_some_kept: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_ref_fakeoptional_some_kept : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  debug_value %0 : $Klass, var, name "myKlass"
+  %2 = copy_value %0 : $Klass
+  %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+  %4 = enum $FakeOptional<AnyObject>, #FakeOptional.some!enumelt, %3 : $AnyObject
+  debug_value [trace] %4 : $FakeOptional<AnyObject>
+  destroy_value %4 : $FakeOptional<AnyObject>
+  destroy_value %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Global addressor (lazy-init global variable via pointer_to_address)
+//===----------------------------------------------------------------------===//
+
+// Basic: load from a lazy global through its addressor.
+// The addressor is a free function (no self) that returns a RawPointer.
+//
+// CHECK-LABEL: begin running test 1 of 1 on global_addressor_basic: variable_name_inference with: @trace[0]
+// CHECK: Name: 'globalVar_addressor'
+// CHECK: end running test 1 of 1 on global_addressor_basic: variable_name_inference with: @trace[0]
+sil [ossa] @global_addressor_basic : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference @trace[0]"
+  %0 = function_ref @globalVar_addressor : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Klass
+  %3 = begin_access [read] [dynamic] %2 : $*Klass
+  %4 = load [copy] %3 : $*Klass
+  end_access %3 : $*Klass
+  debug_value [trace] %4 : $Klass
+  destroy_value %4 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Composition: load a field from a struct accessed through a lazy global.
+// Chain: addressor -> ptr_to_addr -> load(ContainsKlass) -> ref_element_addr(.klass) -> load
+//
+// CHECK-LABEL: begin running test 1 of 1 on global_addressor_field: variable_name_inference with: @trace[0]
+// CHECK: Name: 'globalContainsKlass_addressor.klass'
+// CHECK: end running test 1 of 1 on global_addressor_field: variable_name_inference with: @trace[0]
+sil @globalContainsKlass_addressor : $@convention(thin) () -> Builtin.RawPointer
+sil [ossa] @global_addressor_field : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference @trace[0]"
+  %0 = function_ref @globalContainsKlass_addressor : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*ContainsKlass
+  %3 = begin_access [read] [dynamic] %2 : $*ContainsKlass
+  %4 = load [copy] %3 : $*ContainsKlass
+  end_access %3 : $*ContainsKlass
+  %4b = begin_borrow %4 : $ContainsKlass
+  %5 = ref_element_addr %4b : $ContainsKlass, #ContainsKlass.klass
+  %6 = load [copy] %5 : $*Klass
+  debug_value [trace] %6 : $Klass
+  destroy_value %6 : $Klass
+  end_borrow %4b : $ContainsKlass
+  destroy_value %4 : $ContainsKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//===----------------------------------------------------------------------===//
+//                  MARK: Tests for inferNameAndLeafDecl
+//===----------------------------------------------------------------------===//
+
+// A struct_extract of a stored property pushes the field's VarDecl through
+// the path component. The leaf-most decl on the joined name path is the
+// projected field.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_struct_extract_field: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = struct_extract %{{[0-9]+}} : $KlassPair, #KlassPair.lhs
+// CHECK: Name: 'kp.lhs'
+// CHECK: Leaf decl: 'lhs'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_struct_extract_field: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_struct_extract_field : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getPair : $@convention(thin) () -> @owned KlassPair
+  %1 = apply %0() : $@convention(thin) () -> @owned KlassPair
+  debug_value %1 : $KlassPair, let, name "kp"
+  %borrow = begin_borrow %1 : $KlassPair
+  %2 = struct_extract %borrow : $KlassPair, #KlassPair.lhs
+  debug_value [trace] %2 : $Klass
+  end_borrow %borrow : $KlassPair
+  destroy_value %1 : $KlassPair
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// The address-domain projection (struct_element_addr) pushes the same
+// VarDecl, so the leaf decl matches.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_struct_element_addr_field: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = struct_element_addr %{{[0-9]+}} : $*KlassPair, #KlassPair.rhs
+// CHECK: Name: 'kp.rhs'
+// CHECK: Leaf decl: 'rhs'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_struct_element_addr_field: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_struct_element_addr_field : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = alloc_stack $KlassPair, var, name "kp"
+  %1 = function_ref @getPair : $@convention(thin) () -> @owned KlassPair
+  %2 = apply %1() : $@convention(thin) () -> @owned KlassPair
+  store %2 to [init] %0 : $*KlassPair
+  %3 = struct_element_addr %0 : $*KlassPair, #KlassPair.rhs
+  debug_value [trace] %3 : $*Klass
+  destroy_addr %0 : $*KlassPair
+  dealloc_stack %0 : $*KlassPair
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// An unchecked_enum_data on a non-Optional enum pushes the case's
+// EnumElementDecl. The leaf decl is that case.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_unchecked_enum_data_case: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = unchecked_enum_data %{{[0-9]+}} : $Choice, #Choice.second!enumelt
+// CHECK: Name: 'choice.second'
+// CHECK: Leaf decl: 'second'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_unchecked_enum_data_case: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_unchecked_enum_data_case : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = enum $Choice, #Choice.second!enumelt, %1 : $Klass
+  debug_value %2 : $Choice, let, name "choice"
+  %3 = unchecked_enum_data %2 : $Choice, #Choice.second!enumelt
+  debug_value [trace] %3 : $Klass
+  destroy_value %3 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// A value whose only naming source is a debug_value `name` attribute
+// carries a StringRef leaf, not a decl. inferNameAndLeafDecl returns a
+// name but no leaf decl.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_debug_value_name_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = apply %{{[0-9]+}}() : $@convention(thin) () -> @owned Klass
+// CHECK: Name: 'MyName'
+// CHECK: Leaf decl: <none>
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_debug_value_name_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_debug_value_name_no_leaf_decl : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  debug_value [trace] %1 : $Klass
+  debug_value %1 : $Klass, let, name "MyName"
+  destroy_value %1 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Apply of a class method: CallResultNamer pushes the method's FuncDecl
+// through the path component. The leaf decl is that FuncDecl.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_apply_result_method: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = apply %{{[0-9]+}}(%{{[0-9]+}}) : $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+// CHECK: Name: 'obj.getOtherKlass'
+// CHECK: Leaf decl: 'getOtherKlass'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_apply_result_method: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_apply_result_method : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned ContainsKlass
+  debug_value %1 : $ContainsKlass, let, name "obj"
+  %borrow = begin_borrow %1 : $ContainsKlass
+  %method = class_method %borrow : $ContainsKlass, #ContainsKlass.getOtherKlass : (ContainsKlass) -> () -> Klass, $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  %result = apply %method(%borrow) : $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  debug_value [trace] %result : $Klass
+  end_borrow %borrow : $ContainsKlass
+  destroy_value %result : $Klass
+  destroy_value %1 : $ContainsKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Apply of a computed-property getter: CallResultNamer pushes the
+// AccessorDecl. The leaf decl is that AccessorDecl; the rendered name
+// (via getNameFromDecl) is the storage's user-facing identifier.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_apply_result_computed_property_getter: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = apply %{{[0-9]+}}(%{{[0-9]+}}) : $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+// CHECK: Name: 'obj.computedKlass'
+// CHECK: Leaf decl: 'computedKlass' kind: 'getter' 
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_apply_result_computed_property_getter: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_apply_result_computed_property_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned ContainsKlass
+  debug_value %1 : $ContainsKlass, let, name "obj"
+  %borrow = begin_borrow %1 : $ContainsKlass
+  %getter = class_method %borrow : $ContainsKlass, #ContainsKlass.computedKlass!getter : (ContainsKlass) -> () -> Klass, $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  %result = apply %getter(%borrow) : $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  debug_value [trace] %result : $Klass
+  end_borrow %borrow : $ContainsKlass
+  destroy_value %result : $Klass
+  destroy_value %1 : $ContainsKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// A chain of struct_extracts reports the *deepest* projection as the leaf
+// decl, not the outermost one: the leaf-most component is the first pushed
+// during the use->def walk. Here the walk sees `.a` before `.inner`, so the
+// leaf decl is 'a' even though the joined name is 'o.inner.a'.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_nested_struct_extract: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = struct_extract %{{[0-9]+}} : $Inner, #Inner.a
+// CHECK: Name: 'o.inner.a'
+// CHECK: Leaf decl: 'a' kind: 'property'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_nested_struct_extract: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_nested_struct_extract : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getOuter : $@convention(thin) () -> @owned Outer
+  %1 = apply %0() : $@convention(thin) () -> @owned Outer
+  debug_value %1 : $Outer, let, name "o"
+  %borrow = begin_borrow %1 : $Outer
+  %2 = struct_extract %borrow : $Outer, #Outer.inner
+  %3 = struct_extract %2 : $Inner, #Inner.a
+  debug_value [trace] %3 : $Klass
+  end_borrow %borrow : $Outer
+  destroy_value %1 : $Outer
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// destructure_struct pushes the projected field's VarDecl, matching
+// struct_extract. The leaf decl is that stored property.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_destructure_struct_field: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Name: 'kp.lhs'
+// CHECK: Leaf decl: 'lhs' kind: 'property'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_destructure_struct_field: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_destructure_struct_field : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getPair : $@convention(thin) () -> @owned KlassPair
+  %1 = apply %0() : $@convention(thin) () -> @owned KlassPair
+  debug_value %1 : $KlassPair, let, name "kp"
+  (%lhs, %rhs) = destructure_struct %1 : $KlassPair
+  debug_value [trace] %lhs : $Klass
+  destroy_value %lhs : $Klass
+  destroy_value %rhs : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// unchecked_take_enum_data_addr (the address-domain enum projection) pushes
+// the case's EnumElementDecl, matching the unchecked_enum_data value form.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_unchecked_take_enum_data_addr_case: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = unchecked_take_enum_data_addr %{{[0-9]+}} : $*Choice, #Choice.second!enumelt
+// CHECK: Name: 'choice.second'
+// CHECK: Leaf decl: 'second' kind: 'enum case'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_unchecked_take_enum_data_addr_case: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_unchecked_take_enum_data_addr_case : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = alloc_stack $Choice, var, name "choice"
+  %1 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %2 = apply %1() : $@convention(thin) () -> @owned Klass
+  %3 = enum $Choice, #Choice.second!enumelt, %2 : $Klass
+  store %3 to [init] %0 : $*Choice
+  %4 = unchecked_take_enum_data_addr %0 : $*Choice, #Choice.second!enumelt
+  debug_value [trace] %4 : $*Klass
+  destroy_addr %4 : $*Klass
+  dealloc_stack %0 : $*Choice
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// A tuple projection names the component by positional index, which is a
+// bare StringRef (not a decl). inferNameAndLeafDecl returns the name but no
+// leaf decl.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_tuple_extract_index_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = tuple_extract %{{[0-9]+}} : $(Klass, Klass), 1
+// CHECK: Name: 'pair.1'
+// CHECK: Leaf decl: <none>
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_tuple_extract_index_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_tuple_extract_index_no_leaf_decl : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getTuple : $@convention(thin) () -> @owned (Klass, Klass)
+  %1 = apply %0() : $@convention(thin) () -> @owned (Klass, Klass)
+  debug_value %1 : $(Klass, Klass), let, name "pair"
+  %borrow = begin_borrow %1 : $(Klass, Klass)
+  %2 = tuple_extract %borrow : $(Klass, Klass), 1
+  debug_value [trace] %2 : $Klass
+  end_borrow %borrow : $(Klass, Klass)
+  destroy_value %1 : $(Klass, Klass)
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// ref_element_addr (a class stored-property projection) pushes the field's
+// VarDecl, matching struct_extract/struct_element_addr on a struct stored
+// property. The joined name is unchanged; the leaf decl is that property.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_ref_element_addr_field: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = ref_element_addr %{{[0-9]+}} : $ContainsKlass, #ContainsKlass.klass
+// CHECK: Name: 'obj.klass'
+// CHECK: Leaf decl: 'klass' kind: 'property'
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_ref_element_addr_field: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_ref_element_addr_field : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned ContainsKlass
+  debug_value %1 : $ContainsKlass, let, name "obj"
+  %borrow = begin_borrow %1 : $ContainsKlass
+  %2 = ref_element_addr %borrow : $ContainsKlass, #ContainsKlass.klass
+  debug_value [trace] %2 : $*Klass
+  end_borrow %borrow : $ContainsKlass
+  destroy_value %1 : $ContainsKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// A value named only by an alloc_stack's var decl carries a StringRef leaf,
+// so there is a name but no leaf decl.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_alloc_stack_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Name: 'localVar'
+// CHECK: Leaf decl: <none>
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_alloc_stack_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_alloc_stack_no_leaf_decl : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = alloc_stack $Klass, var, name "localVar"
+  %1 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %2 = apply %1() : $@convention(thin) () -> @owned Klass
+  store %2 to [init] %0 : $*Klass
+  debug_value [trace] %0 : $*Klass
+  destroy_addr %0 : $*Klass
+  dealloc_stack %0 : $*Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// An apply of a direct free-function callee names the result after the
+// callee. Here the callee `getKlass` is a SIL-only declaration with no AST
+// decl, so getCalleeNameAndDecl yields a SIL function name but a null decl:
+// the name is 'getKlass' and there is no leaf decl.
+//
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_sil_only_callee_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+// CHECK: Input Value:   %{{[0-9]+}} = apply %{{[0-9]+}}() : $@convention(thin) () -> @owned Klass
+// CHECK: Name: 'getKlass'
+// CHECK: Leaf decl: <none>
+// CHECK: end running test {{[0-9]+}} of {{[0-9]+}} on test_sil_only_callee_no_leaf_decl: variable_name_inference_leaf_decl with: @trace[0]
+sil [ossa] @test_sil_only_callee_no_leaf_decl : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference_leaf_decl @trace[0]"
+  %0 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  debug_value [trace] %1 : $Klass
+  destroy_value %1 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

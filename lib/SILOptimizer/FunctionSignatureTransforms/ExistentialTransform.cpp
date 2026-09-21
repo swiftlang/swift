@@ -17,10 +17,7 @@
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -28,7 +25,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -245,6 +241,13 @@ void ExistentialSpecializerCloner::cloneArguments(
                                             StoreOwnershipQualifier::Init);
         InitRef = alloc;
         AllocStackInsts.push_back(alloc);
+        // When the argument is not consumed (@in_guaranteed), the
+        // load [copy] created a +1 that was stored into the stack. The
+        // original function body borrows but doesn't consume it, so we
+        // must destroy_addr before dealloc_stack.
+        if (NewFBuilder.hasOwnership() && !origConsumed) {
+          CleanupValues.push_back(alloc);
+        }
       }
 
       entryArgs.push_back(InitRef);
@@ -424,6 +427,10 @@ void ExistentialTransform::populateThunkBody() {
   struct Temp {
     SILValue DeallocStackEntry;
     SILValue DestroyValue;
+    // If set, we moved the (non-copyable) value out of an existential box and
+    // so we need to clean up the empty box with deinit_existential_addr instead
+    // of destroy_addr.
+    bool DestroyEmptyBox = false;
   };
   SmallVector<Temp, 8> Temps;
   SmallDenseMap<GenericTypeParamType *, Type> GenericToOpenedTypeMap;
@@ -450,12 +457,16 @@ void ExistentialTransform::populateThunkBody() {
         if (OriginallyConsumed) {
           // open_existential_addr projects a borrowed address into the
           // existential box. Since the callee consumes the generic value, we
-          // must pass in a copy.
+          // must pass in a copy -- unless the value is move-only, in which
+          // case we use a take instead: the callee already consumes the whole
+          // existential, so nothing else can observe OrigOperand's payload afterward.
+          bool isMoveOnly = OpenedSILType.isMoveOnly();
           auto *ASI =
             Builder.createAllocStack(Loc, OpenedSILType);
-          Builder.createCopyAddr(Loc, archetypeValue, ASI, IsNotTake,
+          Builder.createCopyAddr(Loc, archetypeValue, ASI,
+                                 isMoveOnly ? IsTake : IsNotTake,
                                  IsInitialization_t::IsInitialization);
-          Temps.push_back({ASI, OrigOperand});
+          Temps.push_back({ASI, OrigOperand, isMoveOnly});
           calleeArg = ASI;
         }
         ApplyArgs.push_back(calleeArg);
@@ -487,7 +498,15 @@ void ExistentialTransform::populateThunkBody() {
           SILValue ASI = Builder.createAllocStack(Loc, OpenedSILType);
           Builder.emitStoreValueOperation(Loc, archetypeValue, ASI,
                                           StoreOwnershipQualifier::Init);
-          Temps.push_back({ASI, SILValue()});
+          // When the argument is not consumed (@in_guaranteed), the load [copy]
+          // created a +1 that was forwarded through open_existential_ref and
+          // stored into the stack. The callee borrows but doesn't consume it,
+          // so we must destroy_addr before dealloc_stack.
+          if (Builder.hasOwnership() && !OriginallyConsumed) {
+            Temps.push_back({ASI, ASI});
+          } else {
+            Temps.push_back({ASI, SILValue()});
+          }
           archetypeValue = ASI;
         } else {
           // Otherwise in ossa, we need to add open_existential_ref as something
@@ -544,7 +563,9 @@ void ExistentialTransform::populateThunkBody() {
   /// Obtain the Result Type.
   SILValue ReturnValue;
   auto FunctionTy = NewF->getLoweredFunctionType();
-  SILFunctionConventions Conv(SubstCalleeType, M);
+  SILFunctionConventions Conv(
+      SubstCalleeType,
+      SILAddressConventions::forFunction(Builder.getFunction()));
   SILType ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
 
   /// If the original function has error results,  we need to generate a
@@ -585,8 +606,17 @@ void ExistentialTransform::populateThunkBody() {
     //     dealloc_stack %temp : $*T
     //
     // Otherwise, if we had an object, we just emit a destroy_value.
-    if (Temp.DestroyValue)
-      Builder.emitDestroyOperation(cleanupLoc, Temp.DestroyValue);
+    //
+    // If the payload is move-only, the copy_addr above was actually a take,
+    // so %consumedExistential's payload is already gone; only the (now
+    // empty) existential container itself still needs to be torn down, via
+    // deinit_existential_addr rather than destroy_addr.
+    if (Temp.DestroyValue) {
+      if (Temp.DestroyEmptyBox)
+        Builder.createDeinitExistentialAddr(cleanupLoc, Temp.DestroyValue);
+      else
+        Builder.emitDestroyOperation(cleanupLoc, Temp.DestroyValue);
+    }
     if (Temp.DeallocStackEntry)
       Builder.createDeallocStack(cleanupLoc, Temp.DeallocStackEntry);
   }

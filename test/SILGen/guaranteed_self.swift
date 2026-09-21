@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name guaranteed_self -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name guaranteed_self -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 protocol Fooable {
@@ -358,6 +359,7 @@ class D: C {
   // CHECK-NOT:     [[SELF2]]
   // CHECK-NOT:     [[SUPER2]]
   // CHECK:         [[SELF_FINAL:%.*]] = load [copy] [[PB]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:    end_borrow [[LIFETIME]]
   // CHECK-NEXT:    destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT:    return [[SELF_FINAL]]
@@ -463,6 +465,7 @@ class LetFieldClass {
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[REBORROWED_KRAKEN]])
   // CHECK-NEXT: end_borrow [[REBORROWED_KRAKEN]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_value [[MOVED_KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[KRAKEN_LIFETIME:%.+]] = begin_borrow [lexical] [var_decl] [[KRAKEN_BOX]]
@@ -476,8 +479,10 @@ class LetFieldClass {
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
   // CHECK: } // end sil function
@@ -523,9 +528,12 @@ class LetFieldClass {
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_value [[MOVED_KRAKEN]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
   func varkMethod() {

@@ -1,0 +1,645 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// Utilities to handle type information passed as arguments to macros         //
+// deriving conformances.                                                     //
+//===----------------------------------------------------------------------===//
+
+import SwiftSyntax
+import SwiftSyntaxBuilder
+
+/// Represents information on a type for which a macro derives a conformance
+/// to a protocol.
+public struct NominalTypeInfo {
+  var name: String
+  var kind: NominalTypeKind
+  var isUnsafe: Bool
+
+  /// Whether the type is noncopyable, in which case a parameter of this type
+  /// has to state its ownership explicitly.
+  var isNoncopyable: Bool
+}
+
+/// Represents the kind of nominal type this is, for the moment only structs
+/// and enums are supported.
+public enum NominalTypeKind {
+  case enumLike(EnumTypeInfo)
+  case structLike(StructTypeInfo)
+}
+
+public struct EnumTypeInfo {
+  /// Does this enum have the `@objc` attribute ?
+  var isObjC: Bool
+
+  /// Information on all its cases
+  var cases: [EnumCaseInfo]
+}
+
+/// Represents information on a single case of an enumeration.
+public struct EnumCaseInfo {
+  /// The case's name, escaped as it must appear in Swift source
+  var name: String
+
+  /// For each associated value, we have the label's name (escaped as it must
+  /// appear in Swift source) and `nil` if there isn't one
+  var associatedValueLabels: [String?]
+
+  /// Whether a value of this case can exist at runtime. False only when the
+  /// case is unavailable in every execution context the code may run in, so a
+  /// switch over `self` may treat it as unreachable.
+  var isReachable: Bool
+
+  /// Whether a reference constructing this case may be synthesized, guarded by
+  /// `runtimeAvailabilityQueries`. False when some restriction on the case
+  /// cannot be expressed as a runtime query, in which case the case must be
+  /// left out of any synthesized initializer entirely. This is stricter than
+  /// `isReachable`: a case unavailable on one of several targets is still
+  /// reachable, but cannot be constructed.
+  var isConstructible: Bool
+
+  /// The queries that must all succeed for this case to be available at
+  /// runtime. Only meaningful when `isConstructible` is true.
+  var runtimeAvailabilityQueries: [AvailabilityQuery]
+}
+
+public struct AvailabilityQuery {
+  var domain: String
+  var primaryRange: String?
+  var variantRange: String?
+
+  /// Whether this is an `#unavailable` query rather than an `#available` one.
+  var isUnavailability: Bool
+  var constantResult: Bool?
+}
+
+public struct StructTypeInfo {
+  /// Information on all the struct's properties
+  var properties: [StoredProperty]
+}
+
+public struct StoredProperty {
+  /// name of the stored property, escaped as it must appear in Swift source
+  var name: String
+
+  /// Textual representation of the property's type.
+  var typeName: String
+
+  /// Whether the property was introduced with `var`
+  var isVar: Bool
+
+  /// Whether the property is static
+  var isStatic: Bool
+
+  /// Whether the property is user-accessible
+  var isUserAccessible: Bool
+}
+
+/// Error type thrown by the various parsing functions in case of ill-formed
+/// input
+public enum TypeInfoParseError: Error {
+  /// Inside a function call, we expected a specific label if `expected` is a
+  /// string or no label if it is `nil` but we got the `got` syntax node
+  /// instead.
+  case badArgName(expected: String?, got: LabeledExprSyntax)
+
+  /// Inside a function call, we expected `expected` arguments but got the ones
+  /// in the `args` syntax node.
+  case argCountMismatch(expected: Int, args: LabeledExprListSyntax)
+
+  /// We were expecting to parse a string literal but found the `got` syntax
+  /// node instead.
+  case expectedStringLiteral(got: ExprSyntax)
+
+  /// We were expecting to parse a boolean literal but found the `got` syntax
+  /// node instead.
+  case expectedBoolLiteral(got: ExprSyntax)
+
+  /// We were expecting to parse an array literal but found the `got` syntax
+  /// node instead.
+  case expectedArrayLiteral(got: ExprSyntax)
+
+  /// We were expecting to parse a function call expression but found the `got`
+  /// syntax node instead.
+  case expectedFunctionCall(got: ExprSyntax)
+
+  /// We expected a function call which caller's name was in `names` but found
+  /// the `got` syntax node instead.
+  case expectedFunctionCallNames(names: [String], got: ExprSyntax)
+
+  /// We expected a string literal carrying Swift syntax as payload but found
+  /// the `got` syntax node instead.
+  case expectedStrLitAsInput(got: ExprSyntax)
+}
+
+private struct Parser {
+
+  /// Parses a string literal and returns its contents. Throws in case of error.
+  static func parseString(node: ExprSyntax) throws -> String {
+    guard
+      let res = node.as(StringLiteralExprSyntax.self)?.representedLiteralValue
+    else {
+      throw TypeInfoParseError.expectedStringLiteral(got: node)
+    }
+    return res
+  }
+
+  /// Parses a bool literal and returns its contents. Throws in case of error.
+  static func parseBool(node: ExprSyntax) throws -> Bool {
+    guard let lit = node.as(BooleanLiteralExprSyntax.self) else {
+      throw TypeInfoParseError.expectedBoolLiteral(got: node)
+    }
+    return lit.trimmedDescription == "true"
+  }
+
+  /// Parses either `nil` or an expression with the `parser` parsing function.
+  /// Throws if `parser` throws
+  static func parseOptional<T>(
+    node: ExprSyntax,
+    parser: (ExprSyntax) throws -> T
+  ) throws
+    -> T?
+  {
+    // Eagerly checks if it is nil. This means that T?? can never be some(nil)
+    // parsed this way as we just expect either nil or a value.
+    if node.is(NilLiteralExprSyntax.self) {
+      return nil
+    }
+    return try parser(node)
+  }
+
+  /// Parses an array literal containing elements parsed with the `parse` function
+  /// and returns them all. Will throw if it is not an array literal or if one
+  /// of the elements throws during parsing.
+  static func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T)
+    throws
+    -> [T]
+  {
+    guard let arr = node.as(ArrayExprSyntax.self) else {
+      throw TypeInfoParseError.expectedArrayLiteral(got: node)
+    }
+    return try arr.elements.map({ try parser($0.expression) })
+  }
+}
+
+/// Helper struct to represent an function call argument to be parsed.
+struct ArgParser<T> {
+  /// The label of the argument, `nil` if there is none.
+  var name: String?
+
+  /// The parsing function
+  var parser: (ExprSyntax) throws -> T
+
+  /// Returns a string argument with the `name` label.
+  static func stringArg(_ name: String?) -> ArgParser<String> {
+    .init(name: name, parser: Parser.parseString)
+  }
+
+  /// Returns a boolean argument with the `name` label.
+  static func boolArg(_ name: String?) -> ArgParser<Bool> {
+    .init(name: name, parser: Parser.parseBool)
+  }
+
+  /// Returns an argument with the `name` label of type `U?` where `U`
+  /// expressions can be parsed using the `parser` function.
+  static func optionalArg<U>(
+    _ name: String?,
+    parser: @escaping (ExprSyntax) throws -> U
+  ) -> ArgParser<U?> {
+    .init(
+      name: name,
+      parser: { node in try Parser.parseOptional(node: node, parser: parser) }
+    )
+  }
+
+  /// Returns an argument with the `name` label of type `[U]` where `U`
+  /// expressions can be parsed using the `parser` function.
+  static func arrayArg<U>(
+    _ name: String?,
+    parser: @escaping (ExprSyntax) throws -> U
+  ) -> ArgParser<
+    [U]
+  > {
+    .init(
+      name: name,
+      parser: { node in try Parser.parseArray(node: node, parser: parser) }
+    )
+  }
+
+  /// Returns a new argument with the same name but expecting an array of the
+  /// elements expected by `self`. This is meant to be used like a builder.
+  func toArray() -> ArgParser<[T]> {
+    .arrayArg(name, parser: parser)
+  }
+
+  /// Returns a new argument with the same name but expecting an optional of the
+  /// elements expected by `self`. This is meant to be used like a builder.
+  func toOptional() -> ArgParser<T?> {
+    .optionalArg(name, parser: parser)
+  }
+
+  /// Returns the parsed argument from `arg` and throws if the name is
+  /// mismatched or if the parsing function fails.
+  func expect(arg: LabeledExprSyntax) throws -> T {
+    let lbl = arg.label?.text
+    if lbl != name {
+      throw TypeInfoParseError.badArgName(expected: name, got: arg)
+    }
+    return try parser(arg.expression)
+  }
+}
+
+extension LabeledExprListSyntax {
+
+  /// Parses zero labelled arguments from the argument list
+  func expect() throws {
+    guard count == 0 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 0, args: self)
+    }
+  }
+
+  /// Parses one labelled argument from the argument list.
+  func expect<A>(_ a: ArgParser<A>) throws -> A {
+    guard count == 1 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 1, args: self)
+    }
+    let lst = Array(self)
+    return try a.expect(arg: lst[0])
+  }
+
+  /// Parses two labelled arguments from the argument list.
+  func expect<A, B>(_ a: ArgParser<A>, _ b: ArgParser<B>) throws -> (A, B) {
+    guard count == 2 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 2, args: self)
+    }
+    let lst = Array(self)
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1])
+    )
+  }
+
+  /// Parses three labelled arguments from the argument list.
+  func expect<A, B, C>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>
+  ) throws -> (A, B, C) {
+    guard count == 3 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 3, args: self)
+    }
+    let lst = Array(self)
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2])
+    )
+  }
+
+  /// Parses four labelled arguments from the argument list.
+  func expect<A, B, C, D>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>
+  ) throws -> (A, B, C, D) {
+    guard count == 4 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 4, args: self)
+    }
+    let lst = Array(self)
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2]),
+      try d.expect(arg: lst[3])
+    )
+  }
+
+  /// Parses five labelled arguments from the argument list.
+  func expect<A, B, C, D, E>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>, _ e: ArgParser<E>
+  ) throws -> (A, B, C, D, E) {
+    guard count == 5 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 5, args: self)
+    }
+    let lst = Array(self)
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2]),
+      try d.expect(arg: lst[3]),
+      try e.expect(arg: lst[4])
+    )
+  }
+}
+
+/// Protocol for `NominalTypeInfo` and associated types to conform to.
+public protocol TypeInfoProtocol: Equatable {
+  /// Parses `node` into `Self` and throws if an error occured
+  static func fromSyntax(node: ExprSyntax) throws -> Self
+
+  /// Builds a syntax node that can be parsed again to the same value as `self`.
+  var syntax: ExprSyntax { get }
+}
+
+extension NominalTypeInfo: TypeInfoProtocol {
+
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   NominalTypeInfo(
+    //       name: <String>,
+    //       kind: <NominalTypeKind>,
+    //       isUnsafe: <Bool>,
+    //       isNoncopyable: <Bool>)
+
+    let (name, kind, isUnsafe, isNoncopyable) = try getNamedFuncallArgs(
+      node: node,
+      name: "NominalTypeInfo"
+    )
+    .expect(
+      .stringArg("name"),
+      .init(name: "kind", parser: NominalTypeKind.fromSyntax),
+      .boolArg("isUnsafe"),
+      .boolArg("isNoncopyable")
+    )
+
+    return Self(
+      name: name, kind: kind, isUnsafe: isUnsafe, isNoncopyable: isNoncopyable)
+  }
+
+  public var syntax: ExprSyntax {
+    """
+    NominalTypeInfo(name: \(stringlit(name)),
+                    kind: \(kind.syntax),
+                    isUnsafe: \(boollit(isUnsafe)),
+                    isNoncopyable: \(boollit(isNoncopyable)))
+    """
+  }
+}
+
+extension NominalTypeKind: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   NominalTypeKind(structLike(<StructTypeInfo>))
+    // or
+    //   NominalTypeKind(enumLike(<EnumTypeInfo>))
+
+    guard let fcall = node.as(FunctionCallExprSyntax.self) else {
+      throw TypeInfoParseError.expectedFunctionCall(got: node)
+    }
+    switch fcall.calledExpression.trimmedDescription {
+    case "structLike":
+      return try .structLike(
+        fcall.arguments.expect(
+          ArgParser(name: nil, parser: StructTypeInfo.fromSyntax)
+        )
+      )
+    case "enumLike":
+      return try .enumLike(
+        fcall.arguments.expect(
+          ArgParser(name: nil, parser: EnumTypeInfo.fromSyntax)
+        )
+      )
+    default:
+      throw TypeInfoParseError.expectedFunctionCallNames(
+        names: ["structLike", "enumLike"],
+        got: fcall.calledExpression
+      )
+    }
+  }
+
+  public var syntax: ExprSyntax {
+    switch self {
+    case .enumLike(let e):
+      """
+      enumLike(\(e.syntax))
+      """
+    case .structLike(let s):
+      """
+      structLike(\(s.syntax))
+      """
+    }
+  }
+}
+
+private func getNamedFuncallArgs(node: ExprSyntax, name: String) throws
+  -> LabeledExprListSyntax
+{
+  guard let fcall = node.as(FunctionCallExprSyntax.self) else {
+    throw TypeInfoParseError.expectedFunctionCall(got: node)
+  }
+  guard fcall.calledExpression.trimmedDescription == name else {
+    throw TypeInfoParseError.expectedFunctionCallNames(
+      names: [name],
+      got: fcall.calledExpression
+    )
+  }
+  return fcall.arguments
+}
+
+extension StructTypeInfo: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   StructTypeInfo(properties: <[StoredProperty]>)
+
+    return Self(
+      properties: try getNamedFuncallArgs(node: node, name: "StructTypeInfo")
+        .expect(
+          .arrayArg("properties", parser: StoredProperty.fromSyntax)
+        )
+    )
+  }
+
+  public var syntax: ExprSyntax {
+    """
+    StructTypeInfo(properties: \(arraySyntax(properties)))
+    """
+  }
+}
+
+extension EnumTypeInfo: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>)
+    let (isObjC, cases) = try getNamedFuncallArgs(
+      node: node,
+      name: "EnumTypeInfo"
+    )
+    .expect(
+      .boolArg("isObjC"),
+      .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
+    )
+
+    // Enum cases can be overloaded, letting several cases can share a name. Name lookup
+    // resolves such a reference to the last one in decl order, so drop every earlier
+    // case with a name we have already seen.
+    var seen: Set<String> = Set()
+    let uniqueCases = cases.reversed().filter { seen.insert($0.name).inserted }.reversed()
+    return Self(isObjC: isObjC, cases: Array(uniqueCases))
+  }
+
+  public var syntax: ExprSyntax {
+    """
+    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arraySyntax(cases)))
+    """
+  }
+}
+
+extension StoredProperty: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   StoredProperty(
+    //       name: <String>,
+    //       typeName: <String>,
+    //       isVar: <Bool>,
+    //       isStatic: <Bool>,
+    //       isUserAccessible: <Bool>)
+
+    let (name, typeName, isVar, isStatic, isUserAccessible) = try getNamedFuncallArgs(
+      node: node,
+      name: "StoredProperty"
+    ).expect(
+      .stringArg("name"),
+      .stringArg("typeName"),
+      .boolArg("isVar"),
+      .boolArg("isStatic"),
+      .boolArg("isUserAccessible")
+    )
+
+    return Self(
+      name: name,
+      typeName: typeName,
+      isVar: isVar,
+      isStatic: isStatic,
+      isUserAccessible: isUserAccessible
+    )
+  }
+
+  public var syntax: ExprSyntax {
+    """
+    StoredProperty(name: \(stringlit(name)), typeName: \(stringlit(typeName)), isVar: \(boollit(isVar)), isStatic: \(boollit(isStatic)), isUserAccessible: \(boollit(isUserAccessible)))
+    """
+  }
+}
+
+extension EnumCaseInfo: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   EnumCaseInfo(name: <String>,
+    //                associatedValueLabels: <[String?]>,
+    //                isReachable: <Bool>,
+    //                isConstructible: <Bool>,
+    //                runtimeAvailabilityQueries: <[AvailabilityQuery]>)
+
+    let (name, associatedValueLabels, isReachable, isConstructible,
+         runtimeAvailabilityQueries) =
+      try getNamedFuncallArgs(
+        node: node,
+        name: "EnumCaseInfo"
+      ).expect(
+        .stringArg("name"),
+        .stringArg("associatedValueLabels").toOptional().toArray(),
+        .boolArg("isReachable"),
+        .boolArg("isConstructible"),
+        .arrayArg("runtimeAvailabilityQueries", parser: AvailabilityQuery.fromSyntax)
+      )
+
+    return Self(
+      name: name,
+      associatedValueLabels: associatedValueLabels,
+      isReachable: isReachable,
+      isConstructible: isConstructible,
+      runtimeAvailabilityQueries: runtimeAvailabilityQueries)
+  }
+
+  public var syntax: ExprSyntax {
+    """
+    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), isConstructible: \(boollit(isConstructible)), runtimeAvailabilityQueries: \(arraySyntax(runtimeAvailabilityQueries, \.syntax)))
+    """
+  }
+}
+
+extension AvailabilityQuery: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    let (domain, primaryRange, variantRange, isUnavailability, constantResult) =
+      try getNamedFuncallArgs(
+        node: node, name: "AvailabilityQuery"
+      ).expect(
+        .stringArg("domain"),
+        .stringArg("primaryRange").toOptional(),
+        .stringArg("variantRange").toOptional(),
+        .boolArg("isUnavailability"),
+        .boolArg("constantResult").toOptional()
+      )
+    return Self(
+      domain: domain, primaryRange: primaryRange, variantRange: variantRange,
+      isUnavailability: isUnavailability, constantResult: constantResult)
+  }
+
+  public var syntax: ExprSyntax {
+    return
+      """
+      AvailabilityQuery(
+        domain: \(stringlit(domain)),
+        primaryRange: \(optionalSyntax(primaryRange, stringlit)),
+        variantRange: \(optionalSyntax(variantRange, stringlit)),
+        isUnavailability: \(boollit(isUnavailability)),
+        constantResult: \(optionalSyntax(constantResult, boollit)))
+      """
+  }
+}
+
+extension TypeInfoProtocol {
+
+  /// Returns the parsed `Self` from a payloaded string literal containing
+  /// Swift syntax.
+  public static func fromStringLit(expr: ExprSyntax) throws -> Self {
+    guard
+      let underlying = expr.as(StringLiteralExprSyntax.self)?
+        .representedLiteralValue
+    else {
+      throw TypeInfoParseError.expectedStrLitAsInput(got: expr)
+    }
+    return try fromSyntax(node: "\(raw: underlying)")
+  }
+}
+
+/// Creates a string literal syntax node with `str` contents.
+private func stringlit(_ str: String) -> ExprSyntax {
+  ExprSyntax(StringLiteralExprSyntax(content: str))
+}
+
+/// Creates a bool literal syntax node with the value `b`.
+private func boollit(_ b: Bool) -> ExprSyntax {
+  ExprSyntax(BooleanLiteralExprSyntax(booleanLiteral: b))
+}
+
+/// Creates an array syntax node, with the element values from which we can
+/// derive syntax.
+private func arraySyntax<T: TypeInfoProtocol>(_ values: [T]) -> ExprSyntax {
+  arraySyntax(values, \.syntax)
+}
+
+/// Creates an array syntax node, with the element values from the mapping of
+/// `values` by the `toSyntax` function.
+private func arraySyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+  ExprSyntax(ArrayExprSyntax(expressions: values.map(toSyntax)))
+}
+
+/// Creates a `nil` syntax node if `value` is `nil` and the derived syntax of
+/// `value` otherwise.
+private func optionalSyntax<T: TypeInfoProtocol>(_ value: T?) -> ExprSyntax {
+  optionalSyntax(value, \.syntax)
+}
+
+/// Creates a `nil` syntax node if `value` is `nil` and the syntax node
+/// produced by calling `toSyntax` on `value` otherwise.
+private func optionalSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+  if let value = value {
+    toSyntax(value)
+  } else {
+    "nil"
+  }
+}

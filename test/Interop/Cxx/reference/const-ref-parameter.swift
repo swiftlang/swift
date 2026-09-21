@@ -23,15 +23,15 @@ func testFunction() {
 // COM: FIXME: should it be consumer(options:)?
 // CHECK-IDE-TEST: class func consumer(withOptions options: OptionsStruct) -> Self
 // COM: FIXME: should it be doThing(options:)?
-// CHECK-IDE-TEST: class func doThing(withOptions options: OptionsStruct) -> Int32
+// CHECK-IDE-TEST: class func doThing(withOptions options: OptionsStruct) -> CInt
 // COM: FIXME: should it be doOtherThing(options:)?
-// CHECK-IDE-TEST: func doOtherThing(withOptions options: OptionsStruct) -> Float
+// CHECK-IDE-TEST: func doOtherThing(withOptions options: OptionsStruct) -> CFloat
 
 // CHECK-IDE-TEST: struct OptionsConsumerCxx
 // CHECK-IDE-TEST: init(_ options: OptionsStruct)
 // CHECK-IDE-TEST: static func build(_ options: OptionsStruct) -> OptionsConsumerCxx
-// CHECK-IDE-TEST: static func doThing(_ options: OptionsStruct) -> Int32
-// CHECK-IDE-TEST: mutating func doOtherThing(_ options: OptionsStruct) -> Float
+// CHECK-IDE-TEST: static func doThing(_ options: OptionsStruct) -> CInt
+// CHECK-IDE-TEST: mutating func doOtherThing(_ options: OptionsStruct) -> CFloat
 
 
 // RUN: %target-swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -Xllvm -sil-print-types -emit-silgen -o - | %FileCheck %s

@@ -136,8 +136,7 @@ extension _Pointer /*: Equatable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
   ///            otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func == <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -150,8 +149,7 @@ extension _Pointer /*: Equatable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference different memory addresses;
   ///            otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func != <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ne_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -181,8 +179,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            earlier than `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func < <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -195,8 +192,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            earlier than or the same as `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func <= <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ule_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -209,8 +205,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            later than `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func > <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ugt_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -223,8 +218,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            later than or the same as `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func >= <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_uge_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -299,6 +293,47 @@ extension _Pointer /*: Strideable*/ {
   public func advanced(by n: Int) -> Self {
     return Self(Builtin.gep_Word(
       self._rawValue, n._builtinWordValue, Pointee.self))
+  }
+
+  /// Returns a pointer to the element at the given index, marking the result
+  /// as a projection of this pointer's pointee array.
+  ///
+  /// Unlike `advanced(by:)`, the returned pointer carries the `[projection]`
+  /// flag in SIL, indicating that it accesses exactly one element and cannot
+  /// be used for general pointer arithmetic by chaining index operations.
+  ///
+  /// - Parameter i: The index of the element to project.
+  /// - Returns: A pointer to the element at position `i`.
+  @_transparent
+  @export(implementation)
+  internal func project(_ i: Int) -> Self {
+#if $BuiltinGepProjection
+    return Self(Builtin.gepProjection_Word(
+      self._rawValue, i._builtinWordValue, Pointee.self))
+#else
+    return Self(Builtin.gep_Word(
+      self._rawValue, i._builtinWordValue, Pointee.self))
+#endif
+  }
+
+  /// Returns a pointer to the element at the given index, marking the result
+  /// as a projection of this pointer's pointee array, without triggering the
+  /// insertion of a stack-protection guard for the containing function.
+  ///
+  /// Only call this when `i` is in bounds, e.g. an index drawn from
+  /// `0 ..< count`.
+  ///
+  /// - Parameter i: The index of the element to project.
+  /// - Returns: A pointer to the element at position `i`.
+  @_transparent
+  @export(implementation)
+  internal func unprotectedProject(_ i: Int) -> Self {
+#if $BuiltinUnprotectedGepProjection
+    return Self(Builtin.unprotectedGepProjection_Word(
+      self._rawValue, i._builtinWordValue, Pointee.self))
+#else
+    return project(i)
+#endif
   }
 }
 

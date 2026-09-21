@@ -116,11 +116,24 @@ func testMultipleAsyncLet() async {
   // CHECK: }
 }
 
+func testNamedTask() async {
+  reflectionLog(str: "testNamedTask")
+  // CHECK: testNamedTask
+
+  await Task(name: "hello-task") {
+    await dodgeRaceCondition()
+    reflect(asyncTask: _getCurrentTaskShim())
+    // CHECK: Async task {{0x[0-9a-fA-F]*}}
+    // CHECK: name "hello-task"
+  }.value
+}
+
 @main struct Main {
   static func main() async {
     await testNestedCallsTask()
     await testOneAsyncLet()
     await testMultipleAsyncLet()
+    await testNamedTask()
 
     doneReflecting()
   }

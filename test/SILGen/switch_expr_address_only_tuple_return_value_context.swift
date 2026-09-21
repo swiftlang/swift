@@ -1,3 +1,6 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -verify %s
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -verify %s -o /dev/null
+
 // RUN: %target-swift-emit-silgen -verify %s
 
 // rdar://112213253

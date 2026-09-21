@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -parse-as-library -emit-ir %s -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Fails without optimized stdlib (rdar://119899895)
 // REQUIRES: optimized_stdlib

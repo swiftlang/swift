@@ -36,7 +36,8 @@ An isolated conformance cannot be used together with a `Sendable` requirement, b
 ```swift
 func acceptSendableP<T: P & Sendable>(_ value: T) { }
 
-@MainActor func useIsolatedConformanceOnMainActor(myType: MyType) {
+@MainActor
+func useIsolatedConformanceOnMainActor(myType: MyType) {
   acceptSendableP(myType) // error: main-actor-isolated conformance of 'MyType' to 'P' cannot satisfy conformance requirement for 'Sendable' type parameter 'T'
 }
 ```

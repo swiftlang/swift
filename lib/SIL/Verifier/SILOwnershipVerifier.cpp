@@ -16,40 +16,27 @@
 #include "LinearLifetimeCheckerPrivate.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/Projection.h"
-#include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
 
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#include <algorithm>
 
 using namespace swift;
 
@@ -186,8 +173,7 @@ bool SILValueOwnershipChecker::check() {
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
   llvm::copy(extendLifetimeUses, std::back_inserter(allRegularUsers));
 
-  LinearLifetimeChecker checker(deadEndBlocks,
-                                guaranteedPhiVerifier.instIndices);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto linearLifetimeResult = checker.checkValue(value, allLifetimeEndingUsers,
                                                  allRegularUsers, errorBuilder);
   result = !linearLifetimeResult.getFoundError();
@@ -237,7 +223,8 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (op->getOperandOwnership() == OperandOwnership::NonUse)
+    if (op->getOperandOwnership() == OperandOwnership::NonUse ||
+        op->getOperandOwnership() == OperandOwnership::DebugUse)
       continue;
 
     // First check if this recursive use is compatible with our values ownership
@@ -351,9 +338,10 @@ bool SILValueOwnershipChecker::gatherUsers(
       return false;
     }
 
-    // If this op is a type dependent operand, skip it. It is not interesting
+    // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (user->isTypeDependentOperand(*op))
+    if (op->getOperandOwnership() == OperandOwnership::NonUse ||
+        op->getOperandOwnership() == OperandOwnership::DebugUse)
       continue;
 
     // First check if this recursive use is compatible with our values
@@ -452,9 +440,23 @@ bool SILValueOwnershipChecker::gatherUsers(
                          << "Address User: " << *op->getUser();
           });
         };
+        SmallVector<Operand *, 8> interiorPointerUses;
         foundError |= (interiorPointerOperand.findTransitiveUses(
-                           &nonLifetimeEndingUsers, &onError)
+                           &interiorPointerUses, &onError)
                        == AddressUseKind::Unknown);
+        // A debug use does not require its operand to be alive, so it must not
+        // become an implicit regular user of the borrow scope. Filter such uses
+        // out here just like we do for the direct uses gathered above: the
+        // transitive address walk reports both debug uses of the projected
+        // address and, via findInnerTransitiveGuaranteedUses, debug uses of the
+        // values loaded from it.
+        for (auto *interiorPointerUse : interiorPointerUses) {
+          auto ownership = interiorPointerUse->getOperandOwnership();
+          if (ownership == OperandOwnership::NonUse ||
+              ownership == OperandOwnership::DebugUse)
+            continue;
+          nonLifetimeEndingUsers.push_back(interiorPointerUse);
+        }
       }
 
       // Finally add the op to the non lifetime ending user list.
@@ -549,7 +551,7 @@ bool SILValueOwnershipChecker::checkDeadEnds(
   }
   auto allWithinBoundary = true;
   for (auto *use : regularUses) {
-    if (!liveness.isWithinBoundary(use->getUser(), /*deadEndBlocks=*/nullptr)) {
+    if (!liveness.isWithinBoundary(use->getUser())) {
       allWithinBoundary |= errorBuilder.handleMalformedSIL([&] {
         llvm::errs()
             << "Owned value without lifetime ending uses whose regular use "
@@ -560,6 +562,25 @@ bool SILValueOwnershipChecker::checkDeadEnds(
     }
   }
   return allWithinBoundary;
+}
+
+/// Returns true if \p f's entire body has been reduced to a single
+/// `unreachable` instruction, e.g. by DiagnosticDeadFunctionElimination
+/// stubbing out a dead function. Such a stub can never execute, so missing
+/// lifetime ending uses for its `@owned` parameters can't leak anything.
+static bool isStubbedDeadFunctionBody(const SILFunction *F) {
+  if (!F->hasSemanticsAttr(semantics::DELETE_IF_UNUSED))
+    return false;
+
+  if (std::next(F->begin()) != F->end())
+    return false;
+
+  auto &BB = *F->begin();
+  if (BB.empty())
+    return false;
+
+  return &BB.front() == BB.getTerminator() &&
+         isa<UnreachableInst>(BB.getTerminator());
 }
 
 bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
@@ -573,6 +594,13 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   case OwnershipKind::None:
     return true;
   case OwnershipKind::Owned:
+    // `@called(once)` closures, in contrast to regular closures, can have
+    // `@owned` parameters. DiagnosticDeadFunctionElimination pass replaces
+    // whole body with an `unreachable` instruction which needs to be handled
+    // specifically here because it removes lifetime ending uses for such
+    // parameters.
+    if (isStubbedDeadFunctionBody(arg->getFunction()))
+      return true;
     break;
   }
 
@@ -620,8 +648,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     coroutineEndUses.push_back(use);
   }
 
-  LinearLifetimeChecker checker(deadEndBlocks,
-                                guaranteedPhiVerifier.instIndices);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto linearLifetimeResult =
       checker.checkValue(yield, coroutineEndUses, regularUses, errorBuilder);
   if (linearLifetimeResult.getFoundError()) {
@@ -862,7 +889,7 @@ bool disableOwnershipVerification(const SILModule &mod) {
 //===----------------------------------------------------------------------===//
 
 void SILInstruction::verifyOperandOwnership(
-    SILModuleConventions *silConv) const {
+    SILAddressConventions *silConv) const {
   if (isStaticInitializerInst())
     return;
 
@@ -964,8 +991,7 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
       .check();
 }
 
-void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks,
-                               InstructionIndices *instIndices) const {
+void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   // Do not validate SILUndef values.
   if (isa<SILUndef>(*this))
     return;
@@ -996,7 +1022,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks,
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
       *f, BehaviorKind::PrintMessageAndAssert);
-  GuaranteedPhiVerifier guaranteedPhiVerifier(f, deadEndBlocks, instIndices,
+  GuaranteedPhiVerifier guaranteedPhiVerifier(f, deadEndBlocks,
                                               errorBuilder);
   verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks,
                        guaranteedPhiVerifier);
@@ -1007,29 +1033,16 @@ void SILModule::verifyOwnership() const {
     return;
 
   for (const SILFunction &function : *this) {
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
     function.verifyOwnership();
-#else
-    DeadEndBlocks deBlocks(const_cast<SILFunction *>(&function));
-    function.verifyOwnership(&deBlocks);
-#endif
   }
 }
 
 void SILFunction::verifyOwnership() const {
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   verifyOwnership(nullptr);
-#else
-  auto deBlocks =
-      std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(this));
-  verifyOwnership(deBlocks.get());
-#endif
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   deadEndBlocks = nullptr;
-#endif
 
   if (!getModule().getOptions().VerifySILOwnership)
     return;
@@ -1052,10 +1065,8 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
   }
 
-  InstructionIndices instIndices(const_cast<SILFunction *>(this));
-
   GuaranteedPhiVerifier guaranteedPhiVerifier(this, deadEndBlocks,
-                                              &instIndices, *errorBuilder);
+                                              *errorBuilder);
   for (auto &block : *this) {
     for (auto *arg : block.getArguments()) {
       LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;

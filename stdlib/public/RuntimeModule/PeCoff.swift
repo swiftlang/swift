@@ -26,8 +26,8 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.ImageFormats.PeCoff
-internal import BacktracingImpl.ImageFormats.CodeView
+@_implementationOnly import BacktracingImpl.ImageFormats.PeCoff
+@_implementationOnly import BacktracingImpl.ImageFormats.CodeView
 
 // .. Typealiases ..............................................................
 
@@ -293,6 +293,8 @@ enum PeCoffImageError: Error {
   case badPESignature
   case missingOptionalHeader
   case badOptionalHeader
+  case badDebugDirectory
+  case badVirtualAddress
 }
 
 enum PeImageDirectoryEntry: Int {
@@ -506,7 +508,7 @@ final class PeCoffImage {
         )
       )
       let stringTableEnd = stringTableOffset + Address(stringTableSize)
-      let stringSource = source[stringTableOffset..<stringTableEnd]
+      let stringSource = try source[stringTableOffset..<stringTableEnd]
       stringTable = PeCoffStringTable(source: stringSource)
 
       var theFunctions: [PeFunction] = []
@@ -528,8 +530,9 @@ final class PeCoffImage {
           continue
         }
 
-        // And, at that, only those that have a section number
-        if symbol.SectionNumber <= 0 {
+        // And, at that, only those that have a valid section number
+        guard symbol.SectionNumber > 0
+              && symbol.SectionNumber <= sections.count else {
           continue
         }
 
@@ -639,9 +642,18 @@ final class PeCoffImage {
       if debugInfo.VirtualAddress != 0 && debugInfo.Size != 0 {
         var pos: Address
         if source.isMappedImage {
-          pos = Address(debugInfo.VirtualAddress) + self.imageBase
+          let (thePos, ov) = self.imageBase.addingReportingOverflow(
+            Address(debugInfo.VirtualAddress)
+          )
+          guard !ov else {
+            throw PeCoffImageError.badVirtualAddress
+          }
+          pos = thePos
         } else {
-          pos = Address(filePointer(from: debugInfo.VirtualAddress)!)
+          guard let fp = filePointer(from: debugInfo.VirtualAddress) else {
+            throw PeCoffImageError.badDebugDirectory
+          }
+          pos = Address(fp)
         }
 
         let end = pos + Address(debugInfo.Size)
@@ -652,13 +664,19 @@ final class PeCoffImage {
 
           let dataPos: Address
           if source.isMappedImage {
-            dataPos = Address(entry.AddressOfRawData) + self.imageBase
+            let (thePos, ov) = self.imageBase.addingReportingOverflow(
+              Address(entry.AddressOfRawData)
+            )
+            guard !ov else {
+              throw PeCoffImageError.badVirtualAddress
+            }
+            dataPos = thePos
           } else {
             dataPos = Address(entry.PointerToRawData)
           }
 
           let dataEnd = dataPos + Address(entry.SizeOfData)
-          let entrySource = source[dataPos..<dataEnd]
+          let entrySource = try source[dataPos..<dataEnd]
           switch entry.Type {
             case .PE_DEBUG_TYPE_CODEVIEW:
               let magic = maybeSwap(try entrySource.fetch(from:0, as: UInt32.self))
@@ -671,14 +689,17 @@ final class PeCoffImage {
                                                as: UInt8.self)
               let age = maybeSwap(try entrySource.fetch(from: 20,
                                                         as: UInt32.self))
-              let pdbFile = try entrySource.fetchString(from: 24)!
+              let (pdbFile, _) = try entrySource.fetchString(from: 24)
+              guard let pdbFile else {
+                break
+              }
 
               self.codeview = PeCodeview(uuid: uuid, age: age, pdbPath: pdbFile)
 
             case .PE_DEBUG_TYPE_REPRO:
               if entry.SizeOfData > 4 {
                 let len = maybeSwap(try entrySource.fetch(from: 0, as: UInt32.self))
-
+                guard len <= entry.SizeOfData - 4 else { break }
                 reproHash = try entrySource.fetch(from: 4,
                                                   count: Int(len),
                                                   as: UInt8.self)
@@ -698,7 +719,10 @@ final class PeCoffImage {
       if virtualAddress >= section.virtualAddress {
         let offset = virtualAddress - section.virtualAddress
         if offset < section.virtualSize && offset < section.sizeOfRawData {
-          return section.pointerToRawData + offset
+          let (result, overflowed)
+            = section.pointerToRawData.addingReportingOverflow(offset)
+          guard !overflowed else { return nil }
+          return result
         }
       }
     }
@@ -712,7 +736,10 @@ final class PeCoffImage {
       if filePointer >= section.pointerToRawData {
         let offset = filePointer - section.pointerToRawData
         if offset < section.sizeOfRawData {
-          return section.virtualAddress + offset
+          let (result, overflowed)
+            = section.virtualAddress.addingReportingOverflow(offset)
+          guard !overflowed else { return nil }
+          return result
         }
       }
     }
@@ -731,11 +758,11 @@ final class PeCoffImage {
     if source.isMappedImage {
       let base = Address(section.virtualAddress)
       let end = base + Address(section.virtualSize)
-      return source[base..<end]
+      return try? source[base..<end]
     } else {
       let base = Address(section.pointerToRawData)
       let end = base + Address(min(section.virtualSize, section.sizeOfRawData))
-      return source[base..<end]
+      return try? source[base..<end]
     }
   }
 
@@ -751,12 +778,12 @@ final class PeCoffImage {
 
 extension PeCoffImage: SymbolSource {
   func lookupSymbol(address: SymbolSource.Address) -> SymbolSource.Symbol? {
-    let address = address + Address(imageBase)
+    let address = address &+ Address(imageBase)
 
     if let function = dwarfReader?.lookupFunction(at: address) {
       let offset = address - function.lowPC
       return SymbolSource.Symbol(name: function.rawName,
-                                 offset: Int(offset),
+                                 offset: Int(clamping: offset),
                                  size: nil)
     } else if let functions {
       // If we don't have a DWARF reader, but we do have a function list,
@@ -775,7 +802,7 @@ extension PeCoffImage: SymbolSource {
           if mid + 1 == functions.count || address < functions[mid + 1].address {
             let offset = address - functions[mid].address
             return SymbolSource.Symbol(name: functions[mid].name,
-                                       offset: Int(offset),
+                                       offset: Int(clamping: offset),
                                        size: nil)
           }
           min = mid + 1
@@ -789,7 +816,7 @@ extension PeCoffImage: SymbolSource {
   func sourceLocation(
     for relativeAddress: SymbolSource.Address
   ) -> SymbolSource.SourceLocation? {
-    let address = relativeAddress + Address(imageBase)
+    let address = relativeAddress &+ Address(imageBase)
 
     guard let dwarfReader else {
       return nil
@@ -802,7 +829,7 @@ extension PeCoffImage: SymbolSource {
   func inlineCallSites(
     at relativeAddress: SymbolSource.Address
   ) -> Array<SymbolSource.CallSiteInfo> {
-    let address = relativeAddress + Address(imageBase)
+    let address = relativeAddress &+ Address(imageBase)
 
     guard let dwarfReader else {
       return []

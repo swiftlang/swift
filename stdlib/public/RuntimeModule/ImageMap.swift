@@ -19,12 +19,12 @@ import Swift
 
 #if os(anyAppleOS)
 internal import Darwin
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
 #if os(Windows)
 internal import WinSDK
-internal import BacktracingImpl.OS.Windows
+@_implementationOnly import BacktracingImpl.OS.Windows
 #endif
 
 /// Holds a map of the process's address space.
@@ -155,6 +155,10 @@ public struct ImageMap: Collection, Sendable, Hashable {
     return capture(for: mach_task_self())
     #elseif os(Windows)
     return capture(for: UInt(bitPattern: GetCurrentProcess()))
+    #elseif os(Linux)
+    // Use UncachedLocalMemoryReader on Linux to avoid crashes because other
+    // threads are modifying the memory map
+    return capture(using: UncachedLocalMemoryReader())
     #else
     return capture(using: UnsafeLocalMemoryReader())
     #endif
@@ -243,7 +247,13 @@ extension ImageMap: Codable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.singleValueContainer()
     let base64 = try container.decode(String.self)
-    self.init(compactImageMapData: Base64Decoder(source: base64.utf8))!
+    let compactImageMapData = Base64Decoder(source: base64.utf8)
+    var decoder = CompactImageMapFormat.Decoder(compactImageMapData)
+    guard let (platform, images, wordSize) = decoder.decode() else {
+      throw DecodingError.dataCorruptedError(in: container,
+        debugDescription: "Bad Compact ImageMap Format data")
+    }
+    self.init(platform: platform, images: images, wordSize: wordSize)
   }
 
 }

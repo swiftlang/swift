@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen  -parse-as-library %s | %FileCheck %s
 
 // Check that we don't crash if a local function references another local

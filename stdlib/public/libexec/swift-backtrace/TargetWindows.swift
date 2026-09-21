@@ -187,6 +187,7 @@ class Target {
   var exceptionCode: DWORD
   var faultAddress: Address
   var exceptionInfo: Address
+  var concurrencyTaskRegistryAddr: UInt64?
 
   var images: ImageMap
 
@@ -230,11 +231,9 @@ class Target {
     self.pid = pid
 
     guard let hProcess = OpenProcess(
-            DWORD(
-              PROCESS_VM_READ
+            PROCESS_VM_READ
               | PROCESS_QUERY_LIMITED_INFORMATION
-              | PROCESS_SUSPEND_RESUME
-            ),
+              | PROCESS_SUSPEND_RESUME,
             false,
             pid
           ) else {
@@ -309,6 +308,7 @@ class Target {
     exceptionCode = DWORD(crashInfo.signal)
     faultAddress = Address(truncatingIfNeeded: crashInfo.fault_address)
     exceptionInfo = Address(truncatingIfNeeded: crashInfo.exception_info)
+    concurrencyTaskRegistryAddr = crashInfo.concurrency_task_registry_addr
 
     images = ImageMap.capture(for: UInt(bitPattern: hProcess))
 
@@ -524,4 +524,3 @@ class Target {
 }
 
 #endif // os(Windows)
-

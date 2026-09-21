@@ -62,7 +62,7 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal static func split(_ element: Int) -> (word: Int, bit: Int) {
-    return unsafe (word(for: element), bit(for: element))
+    return (word(for: element), bit(for: element))
   }
 
   @inlinable
@@ -77,7 +77,7 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal static func wordCount(forCapacity capacity: Int) -> Int {
-    return unsafe word(for: capacity &+ Word.capacity &- 1)
+    return word(for: capacity &+ Word.capacity &- 1)
   }
 
   @inlinable
@@ -98,7 +98,7 @@ extension _UnsafeBitset {
   @inline(__always)
   internal func uncheckedContains(_ element: Int) -> Bool {
     unsafe _internalInvariant(isValid(element))
-    let (word, bit) = unsafe _UnsafeBitset.split(element)
+    let (word, bit) = _UnsafeBitset.split(element)
     return unsafe words[word].uncheckedContains(bit)
   }
 
@@ -107,7 +107,7 @@ extension _UnsafeBitset {
   @discardableResult
   internal func uncheckedInsert(_ element: Int) -> Bool {
     unsafe _internalInvariant(isValid(element))
-    let (word, bit) = unsafe _UnsafeBitset.split(element)
+    let (word, bit) = _UnsafeBitset.split(element)
     return unsafe words[word].uncheckedInsert(bit)
   }
 
@@ -116,7 +116,7 @@ extension _UnsafeBitset {
   @discardableResult
   internal func uncheckedRemove(_ element: Int) -> Bool {
     unsafe _internalInvariant(isValid(element))
-    let (word, bit) = unsafe _UnsafeBitset.split(element)
+    let (word, bit) = _UnsafeBitset.split(element)
     return unsafe words[word].uncheckedRemove(bit)
   }
 
@@ -352,8 +352,13 @@ extension _UnsafeBitset.Word: @unsafe Sequence, @unsafe IteratorProtocol {
 }
 
 extension _UnsafeBitset {
-  @_alwaysEmitIntoClient
+  @export(implementation)
+#if os(Windows)
+  // Workaround for a mis-compile: https://github.com/swiftlang/swift/issues/92465
+  @inline(never)
+#else
   @inline(__always)
+#endif
   internal static func _withTemporaryUninitializedBitset<R, E: Error>(
     wordCount: Int,
     body: (_UnsafeBitset) throws(E) -> R
@@ -367,13 +372,13 @@ extension _UnsafeBitset {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal static func withTemporaryBitset<R, E: Error>(
     capacity: Int,
     body: (_UnsafeBitset) throws(E) -> R
   ) throws(E) -> R {
-    let wordCount = unsafe Swift.max(1, Self.wordCount(forCapacity: capacity))
+    let wordCount = Swift.max(1, Self.wordCount(forCapacity: capacity))
     return try unsafe _withTemporaryUninitializedBitset(
       wordCount: wordCount
     ) { (bitset: _UnsafeBitset) throws(E) -> R in
@@ -384,7 +389,7 @@ extension _UnsafeBitset {
 }
 
 extension _UnsafeBitset {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal static func withTemporaryCopy<R, E: Error>(
     of original: _UnsafeBitset,

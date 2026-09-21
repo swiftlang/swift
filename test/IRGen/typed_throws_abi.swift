@@ -3691,7 +3691,7 @@ protocol PAsync {
     // CHECK: }
     func f4(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2f5ySi_S4itSbYaAA5EmptyVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2f5ySi_S4itSbYaAA5EmptyVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3, ptr noalias swiftself %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3772,7 +3772,7 @@ protocol PAsync {
     // CHECK: }
     func g4(_ b: Bool) async throws(OneWord) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2g5ySi_S4itSbYaAA7OneWordVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2g5ySi_S4itSbYaAA7OneWordVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3, ptr noalias swiftself %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3853,7 +3853,7 @@ protocol PAsync {
     // CHECK: }
     func h4(_ b: Bool) async throws(TwoWords) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2h5ySi_S4itSbYaAA8TwoWordsVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2h5ySi_S4itSbYaAA8TwoWordsVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3, ptr noalias swiftself %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3934,7 +3934,7 @@ protocol PAsync {
     // CHECK: }
     func i4(_ b: Bool) async throws(ThreeWords) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2i5ySi_S4itSbYaAA10ThreeWordsVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2i5ySi_S4itSbYaAA10ThreeWordsVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3, ptr noalias swiftself %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror

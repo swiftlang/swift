@@ -21,7 +21,7 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/ParameterList.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -91,8 +91,8 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
     // constructed.  Apply the sugar onto it.
     if (auto FT = E->getType()->getAs<FunctionType>())
       if (FT->getResult()->isEqual(resultSugar) && !resultSugar->isCanonical()){
-        auto NFT = FunctionType::get(FT->getParams(), resultSugar,
-                                     FT->getExtInfo());
+        auto NFT = FunctionType::get(FT->getParams(), FT->getYields(),
+                                     resultSugar, FT->getExtInfo());
         E->setType(NFT);
         return E;
       }
@@ -534,7 +534,7 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   auto lookup = TypeChecker::lookupUnqualified(
       dc->getModuleScopeContext(),
       nameRef, SourceLoc(),
-      defaultUnqualifiedLookupOptions | NameLookupFlags::ExcludeMacroExpansions
+      defaultUnqualifiedLookupOptions | NLFlags::ExcludeMacroExpansions
   );
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
@@ -758,36 +758,10 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
   auto *initExpr = synthesizeCallerSideDefault(param, defaultExpr, dc);
   assert(dc && "Expected a DeclContext before type-checking caller-side arg");
 
-  auto &ctx = param->getASTContext();
-  DiagnosticTransaction transaction(ctx.Diags);
   if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
                                               param->isAutoClosure(),
                                               /*atCallerSide=*/true)) {
-    auto isSimpleLiteral = [&]() -> bool {
-      switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING) \
-      case DefaultArgumentKind::NAME: return true;
-#include "swift/AST/MagicIdentifierKinds.def"
-      case DefaultArgumentKind::NilLiteral:
-      case DefaultArgumentKind::EmptyArray:
-      case DefaultArgumentKind::EmptyDictionary:
-        return true;
-      default:
-        return false;
-      }
-    };
-    if (param->hasDefaultExpr() && isSimpleLiteral()) {
-      // HACK: If we were unable to type-check the default argument in context,
-      // then retry by type-checking it within the parameter decl, which should
-      // also fail. This will present the user with a better error message and
-      // allow us to avoid diagnosing on each call site.
-      // Note we can't do this for expression macros since name lookup may
-      // differ at the call side vs the declaration. We can however do it for
-      // simple literals.
-      transaction.abort();
-      (void)param->getTypeCheckedDefaultExpr();
-      ASSERT(ctx.Diags.hadAnyError());
-    }
+    auto &ctx = param->getASTContext();
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro) {

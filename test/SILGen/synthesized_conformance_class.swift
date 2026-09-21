@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -swift-version 4 | %FileCheck %s
 
 final class Final<T> {
@@ -89,6 +90,7 @@ final class FinalHashableClass : Hashable {
 // CHECK: bb0(%0 : @guaranteed $FinalHashableClass):
 // CHECK:   [[FN:%.*]] = function_ref @$s29synthesized_conformance_class18FinalHashableClassC9hashValueSivg : $@convention(method) (@guaranteed FinalHashableClass) -> Int
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]](%0) : $@convention(method) (@guaranteed FinalHashableClass) -> Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $Int
 
 func doIt(_ c: FinalHashableClass) -> Int {

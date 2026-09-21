@@ -140,13 +140,23 @@ public struct Stack<Element> : CollectionLikeSequence {
   public mutating func deinitialize() { removeAll() }
 }
 
+extension BridgedContext.Slab {
+  public static func ==(lhs: BridgedContext.Slab, rhs: BridgedContext.Slab) -> Bool { 
+    lhs.data == rhs.data
+  }
+}
+
 public extension Stack {
   /// Mark a stack location for future iteration.
   ///
   /// TODO: Marker should be ~Escapable.
-  struct Marker {
+  struct Marker: Equatable {
     let slab: BridgedContext.Slab
     let index: Int
+
+    public static func ==(lhs: Marker, rhs: Marker) -> Bool { 
+      lhs.slab == rhs.slab && lhs.index == rhs.index
+    }
   }
 
   var top: Marker { Marker(slab: lastSlab, index: endIndex) }
@@ -177,6 +187,10 @@ public extension Stack {
       return Iterator(slab: low.slab, index: low.index,
                       lastSlab: high.slab, endIndex: high.index)
     }
+  }
+
+  func segment(low: Marker, high: Marker) -> Segment {
+    Segment(in: self, low: low, high: high)
   }
 
   /// Assert that `marker` is valid based on the current `top`.

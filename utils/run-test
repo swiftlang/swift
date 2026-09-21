@@ -231,16 +231,16 @@ def main():
         sys.stdout.flush()
 
     elif args.build != 'skip':
-        dependency_targets = ["all", "SwiftUnitTests"]
+        dependency_targets = ["all"]
         upload_stdlib_targets = []
         need_validation = any('/validation-test-' in path for path in paths)
         for target in targets:
             if args.mode != 'only_non_executable':
                 upload_stdlib_targets += ["upload-stdlib-%s" % target]
             if need_validation:
-                dependency_targets += ["swift-stdlib-%s" % target]
+                dependency_targets += ["swift-validation-%s-test-depends" % target]
             else:
-                dependency_targets += ["swift-test-stdlib-%s" % target]
+                dependency_targets += ["swift-%s-test-depends" % target]
 
         cmake_build = ['cmake', '--build', build_dir, '--']
         if args.build == 'verbose':

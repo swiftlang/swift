@@ -95,7 +95,7 @@ extension Actor {
   /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
   /// retaining the actor for the duration of the operation. This is to ensure the lifetime
   /// of the executor while performing the operation.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(SwiftStdlib 5.1, *)
   public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T {
     try operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
@@ -106,7 +106,7 @@ extension Actor {
   /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
   /// retaining the actor for the duration of the operation. This is to ensure the lifetime
   /// of the executor while performing the operation.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(SwiftStdlib 5.1, *)
   public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
     try await operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
@@ -147,7 +147,7 @@ extension Executor where Self: Equatable {
 
 extension Executor {
 
-  #if os(WASI) || !$Embedded
+  #if os(WASI) || os(Emscripten) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
   #if !os(Windows)
@@ -155,13 +155,13 @@ extension Executor {
   #endif
   @available(StdlibDeploymentTarget 6.3, *)
   internal var isMainExecutor: Bool {
-    #if os(WASI) || !$Embedded
+    #if !$Embedded
     return self is any MainExecutor
     #else
     return false
     #endif
   }
-  #endif // os(WASI) || !$Embedded
+  #endif // os(WASI) || os(Emscripten) || !$Embedded
 
 }
 
@@ -213,7 +213,7 @@ extension SchedulingExecutor {
 /// shared pool, as blocking it may prevent other actors from being responsive.
 ///
 /// You can implement a custom executor, by conforming a type to the
-/// ``SerialExecutor`` protocol, and implementing the ``enqueue(_:)`` method.
+/// ``SerialExecutor`` protocol, and implementing the ``enqueue(_:)-7sypu`` method.
 ///
 /// Once implemented, you can configure an actor to use such executor by
 /// implementing the actor's ``Actor/unownedExecutor`` computed property.
@@ -321,9 +321,10 @@ public protocol SerialExecutor: Executor {
   ///
   /// This check is not used when performing executor switching.
   ///
-  /// This check is used when performing ``Actor/assertIsolated()``,
-  /// ``Actor/preconditionIsolated()``, ``Actor/assumeIsolated()`` and similar
-  /// APIs which assert about the same "exclusive serial execution context".
+  /// This check is used when performing ``Actor/assertIsolated(_:file:line:)``,
+  /// ``Actor/preconditionIsolated(_:file:line:)``,
+  /// ``Actor/assumeIsolated(_:file:line:)`` and similar APIs which assert about
+  /// the same "exclusive serial execution context".
   ///
   /// - Parameter other: the executor to compare with.
   /// - Returns: `true`, if `self` and the `other` executor actually are
@@ -333,8 +334,9 @@ public protocol SerialExecutor: Executor {
   func isSameExclusiveExecutionContext(other: Self) -> Bool
 
   /// Last resort "fallback" isolation check, called when the concurrency runtime
-  /// is comparing executors e.g. during ``assumeIsolated()`` and is unable to prove
-  /// serial equivalence between the expected (this object), and the current executor.
+  /// is comparing executors e.g. during ``Actor/assumeIsolated(_:file:line:)``
+  /// and is unable to prove serial equivalence between the expected
+  /// (this object), and the current executor.
   ///
   /// During executor comparison, the Swift concurrency runtime attempts to compare
   /// current and expected executors in a few ways (including "complex" equality
@@ -380,10 +382,10 @@ public protocol SerialExecutor: Executor {
 @available(StdlibDeploymentTarget 6.0, *)
 extension SerialExecutor {
 
-  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  #if os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   @available(StdlibDeploymentTarget 6.3, *)
   public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
-  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  #endif // os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
   @available(StdlibDeploymentTarget 6.0, *)
   public func checkIsolated() {
@@ -441,9 +443,10 @@ extension SerialExecutor {
 /// requirements.
 ///
 /// By setting a task executor preference, either with a
-/// ``withTaskExecutorPreference(_:operation:)``, creating a task with a preference
-/// (`Task(executorPreference:)`, or `group.addTask(executorPreference:)`), the task and all of its child
-/// tasks (unless a new preference is set) will be preferring to execute on
+/// ``withTaskExecutorPreference(_:isolation:operation:)`` or creating a task
+/// with a preference -- using `Task(executorPreference:)` or
+/// `group.addTask(executorPreference:)` -- the task and all of its child tasks
+/// (unless a new preference is set) will be preferring to execute on
 /// the provided task executor.
 ///
 /// Unstructured tasks do not inherit the task executor.
@@ -498,11 +501,13 @@ extension Executor {
   }
 
   @inlinable
+  @diagnose(DeprecatedDeclaration, as: ignored)
   public func enqueue(_ job: consuming ExecutorJob) {
     self.enqueue(Job(job))
   }
 
   @inlinable
+  @diagnose(DeprecatedDeclaration, as: ignored)
   public func enqueue(_ job: consuming Job) {
     self.enqueue(UnownedJob(job))
   }
@@ -598,11 +603,11 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 @_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol ExecutorFactory {
-  #if os(WASI) || !$Embedded
+  #if os(WASI) || os(Emscripten) || !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
   static var mainExecutor: any MainExecutor { get }
-  #endif // os(WASI) || !$Embedded
+  #endif // os(WASI) || os(Emscripten) || !$Embedded
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
@@ -616,9 +621,9 @@ typealias DefaultExecutorFactory = PlatformExecutorFactory
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
-  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  #if os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   MainActor._executor = factory.mainExecutor
-  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  #endif // os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   Task._defaultExecutor = factory.defaultExecutor
 }
 
@@ -630,7 +635,7 @@ func _createDefaultExecutors() {
   }
 }
 
-#if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+#if os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 extension MainActor {
   @available(StdlibDeploymentTarget 6.3, *)
   static var _executor: (any MainExecutor)? = nil
@@ -655,7 +660,7 @@ extension MainActor {
     return unsafe UnownedSerialExecutor(ordinary: _executor!)
   }
 }
-#endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+#endif // os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
 extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.3, *)
@@ -678,7 +683,7 @@ extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.3, *)
   static var unownedDefaultExecutor: UnownedTaskExecutor {
     _createDefaultExecutorsOnce()
-    return unsafe UnownedTaskExecutor(_defaultExecutor!)
+    return unsafe UnownedTaskExecutor(Builtin.buildOrdinaryTaskExecutorRef(_defaultExecutor!))
   }
 }
 
@@ -879,7 +884,7 @@ extension UnownedTaskExecutor {
   /// This function is available independently from the `Hashable` conformance,
   /// allowing back-deployment to older runtimes when implementing `Hashable`
   /// in user code
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func hash(into hasher: inout Hasher) {
     let (ident, impl) = unsafe unsafeBitCast(self.executor, to: (Int, Int).self)
     hasher.combine(ident)

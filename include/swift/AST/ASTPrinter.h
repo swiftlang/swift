@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Decl.h"
 #include "clang/AST/Decl.h"
@@ -105,6 +104,9 @@ enum class PrintStructureKind {
   FunctionParameterList,
   /// '@attribute ParamTy...' in parameter declarations.
   FunctionParameterType,
+  CoroutineYield,
+  /// 'yields Tys...`
+  CoroutineYieldsTypes,
 };
 
 /// ---------------------------------
@@ -238,10 +240,6 @@ public:
   ASTPrinter &operator<<(QuotedString s);
 
   ASTPrinter &operator<<(unsigned long long N);
-
-  static void getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out);
-
-  ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(Identifier name);
   ASTPrinter &operator<<(DeclBaseName name);
@@ -457,6 +455,18 @@ void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
 /// context, by wrapping it in backticks.
 bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
                                bool isSpecializedCxxType = false);
+
+/// Escape a raw identifier (keyword or containing spaces/special characters)
+/// using backticks if needed, and write it to the output stream.
+void printIdentifierEscapingIfNeeded(
+    StringRef identifier, llvm::raw_ostream &os,
+    PrintNameContext context = PrintNameContext::Normal);
+
+/// Escape a raw identifier (keyword or containing spaces/special characters)
+/// using backticks if needed, and return it as a string.
+std::string
+identifierEscapingIfNeeded(StringRef identifier,
+                           PrintNameContext context = PrintNameContext::Normal);
 
 } // namespace swift
 

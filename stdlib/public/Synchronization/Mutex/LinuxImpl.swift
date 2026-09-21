@@ -70,7 +70,7 @@ public struct _MutexHandle: ~Copyable {
   let slowPathDepth: Atomic<UInt32>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     storage = Atomic(0)
@@ -93,7 +93,7 @@ private var maxActiveSpinners: UInt32 { 4 }
 @available(SwiftStdlib 6.0, *)
 extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     let (exchanged, _) = storage.compareExchange(
@@ -229,7 +229,7 @@ extension _MutexHandle {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     // Do a user space cmpxchg to see if we can easily acquire the lock.
@@ -242,7 +242,7 @@ extension _MutexHandle {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _unlock() {
     // Release the lock atomically in userspace. Previous value tells us whether anyone is parked.

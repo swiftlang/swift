@@ -26,6 +26,7 @@
 #include "GenMeta.h"
 #include "GenPack.h"
 #include "GenPointerAuth.h"
+#include "GenCast.h"
 #include "GenProto.h"
 #include "GenTuple.h"
 #include "GenType.h"
@@ -38,7 +39,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -53,9 +53,7 @@
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ModRef.h"
-#include <algorithm>
 
 using namespace swift;
 using namespace irgen;
@@ -3577,6 +3575,7 @@ public:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Closure:
@@ -3593,7 +3592,7 @@ public:
       //
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({}, C.TheEmptyTupleType, info);
+      return CanFunctionType::get({}, {}, C.TheEmptyTupleType, info);
     }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
@@ -3762,6 +3761,7 @@ namespace {
       case SILFunctionType::Representation::Method:
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::COMMethod:
       case SILFunctionType::Representation::CXXMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
@@ -3777,7 +3777,7 @@ namespace {
         // FIXME: Verify ExtInfo state is correct, not working by accident.
         CanFunctionType::ExtInfo info;
         return emitFromValueWitnessTable(
-            CanFunctionType::get({}, C.TheEmptyTupleType, info));
+            CanFunctionType::get({}, {}, C.TheEmptyTupleType, info));
       }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.
@@ -3987,6 +3987,23 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   return call;
 }
 
+llvm::Value *irgen::emitObjCMetatypeForMetatype(IRGenFunction &IGF,
+                                                llvm::Value *metatype,
+                                                CanType type) {
+  // If the type is known to have Swift metadata, this is trivial.
+  if (hasKnownSwiftMetadata(IGF.IGM, type))
+    return metatype;
+
+  assert(IGF.IGM.Context.LangOpts.EnableObjCInterop);
+  metatype = IGF.Builder.CreateBitCast(metatype, IGF.IGM.TypeMetadataPtrTy);
+
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetObjCMetatypeFromMetadataFunctionPointer(), metatype);
+  call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
+  return call;
+}
+
 /// Produce the heap metadata pointer for the given class type.  For
 /// Swift-defined types, this is equivalent to the metatype for the
 /// class, but for Objective-C-defined types, this is the class
@@ -4033,6 +4050,60 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
   return result;
 }
 
+/// This is like emitClassHeapMetadataRef but additionally supports
+/// ObjC protocols.
+llvm::Value *irgen::emitObjCMetatypeRef(IRGenFunction &IGF, CanType type,
+                                        DynamicMetadataRequest request,
+                                        bool allowUninitialized) {
+  assert(request.canResponseStatusBeIgnored() &&
+         "emitClassConstrainedMetadataRef only supports satisfied requests");
+  assert(type->satisfiesClassConstraint());
+
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // Look up the Swift metadata from context.
+    auto archetypeMeta = IGF.emitTypeMetadataRef(type, request).getMetadata();
+    auto deploymentAvailability =
+        AvailabilityRange::forDeploymentTarget(IGF.IGM.Context);
+    auto getObjCMetatypeFromMetadataAvail =
+        IGF.IGM.Context.getGetObjCMetatypeFromMetadataAvailability();
+    // Use getObjCMetatypeFromMetadata if available. Otherwise, use old
+    // getObjCClassFromMetadata.
+    llvm::Value *metatypePtr = nullptr;
+    if (deploymentAvailability.isContainedIn(getObjCMetatypeFromMetadataAvail)) {
+      metatypePtr = emitObjCMetatypeForMetatype(IGF, archetypeMeta, archetype);
+    } else {
+      metatypePtr = emitClassHeapMetadataRefForMetatype(IGF, archetypeMeta,
+                                                        archetype);
+    }
+    return metatypePtr;
+  }
+
+  if (type.isObjCExistentialType()) {
+    auto layout = type.getExistentialLayout();
+    auto protocols = layout.getProtocols();
+    assert(protocols.size() == 1 && "ObjC existential should have one protocol");
+    llvm::Value *result = emitReferenceToObjCProtocol(IGF, protocols[0]);
+    result = IGF.emitObjCRetainCall(result);
+    return result;
+  }
+
+  if (ClassDecl *theClass = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
+    if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
+      llvm::Value *result =
+          emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);
+      return result;
+    }
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    llvm::Constant *result = IGF.IGM.getAddrOfTypeMetadata(type);
+    return result;
+  }
+
+  llvm::Value *result = IGF.emitTypeMetadataRef(type, request).getMetadata();
+  return result;
+}
+
 /// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
@@ -4046,9 +4117,8 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
     break;
 
   case MetatypeRepresentation::ObjC:
-    explosion.add(emitClassHeapMetadataRef(IGF, type.getInstanceType(),
-                                           MetadataValueType::ObjCClass,
-                                           MetadataState::Complete));
+    explosion.add(emitObjCMetatypeRef(IGF, type.getInstanceType(),
+                                      MetadataState::Complete));
     break;
   }
 }

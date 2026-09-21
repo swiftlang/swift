@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module %S/Inputs/opaque_result_type_fragile_other.swift -emit-module-path %t/opaque_result_type_fragile_other.swiftmodule
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -I%t %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen -I%t %s | %FileCheck %s
 
 import opaque_result_type_fragile_other

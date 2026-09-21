@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-stdlib -primary-file %s
 // RUN: %target-swift-emit-silgen -parse-stdlib -primary-file %s | %FileCheck %s -check-prefix=RAW
 // RUN: %target-swift-emit-sil -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
 // RUN: %target-swift-emit-sil -O -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s

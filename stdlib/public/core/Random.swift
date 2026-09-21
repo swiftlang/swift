@@ -71,7 +71,7 @@ extension RandomNumberGenerator {
   // unsigned integer will be used, recursing infinitely and probably blowing
   // the stack.
   @available(*, unavailable)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func next() -> UInt64 { fatalError() }
   
   /// Returns a value from a uniform, independent distribution of binary data.
@@ -146,6 +146,11 @@ extension RandomNumberGenerator {
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
 /// - Windows uses `BCryptGenRandom`.
+///
+/// Embedded Swift supplies its own implementation rather than using the one
+/// above. On Linux it calls `arc4random_buf(3)` where the C library has it and
+/// `getrandom(2)` where it doesn't, and under the Embedded Swift platform
+/// abstraction layer it calls the platform's `_swift_generateRandom`.
 @frozen
 public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   /// Creates a new instance of the system's default random number generator.

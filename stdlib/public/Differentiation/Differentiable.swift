@@ -39,8 +39,7 @@ public protocol Differentiable {
 }
 
 public extension Differentiable where TangentVector == Self {
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   mutating func move(by offset: TangentVector) {
     self += offset
   }

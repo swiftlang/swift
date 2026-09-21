@@ -33,6 +33,12 @@ module InheritFRT {
   requires cplusplus
 }
 
+module InheritFRTSubclassing {
+  header "inherit-frt-subclassing.h"
+  requires cplusplus
+  export *
+}
+
 module WitnessTable {
   header "witness-table.h"
   requires cplusplus
@@ -124,7 +130,37 @@ module SuperStaticDispatch {
   export *
 }
 
+module SuperVirtualDispatch {
+  header "super-virtual-dispatch.h"
+  requires cplusplus
+  export *
+}
+
 module ImmortalFRTHashable {
   header "immortal-frt-hashable.h"
   requires cplusplus
+}
+
+module FrtSequence {
+  header "frt-sequence.h"
+  requires cplusplus
+}
+
+module VirtualMethodAttrs {
+  header "virtual-methods-attrs.h"
+  requires cplusplus
+}
+
+module InheritedGenericArgument {
+  header "inherited-generic-argument.h"
+  requires cplusplus
+}
+
+module LibkernOwnership {
+  header "libkern-ownership.hpp"
+  requires cplusplus
+}
+
+module CDeclFRT {
+  header "cdecl.h"
 }

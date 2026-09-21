@@ -1,12 +1,12 @@
 import Foundation
 import CoreFoundation
 import Dispatch
-var MY_MACRO: Int32 { get }
-var MACRO_DUP: Int32 { get }
-func doSomethingInHead(_ arg: Int32)
+var MY_MACRO: CInt { get }
+var MACRO_DUP: CInt { get }
+func doSomethingInHead(_ arg: CInt)
 class BaseInHead {
-  class func doIt(_ arg: Int32)
-  func doIt(_ arg: Int32)
+  class func doIt(_ arg: CInt)
+  func doIt(_ arg: CInt)
 }
 /// Awesome name.
 class SameName {

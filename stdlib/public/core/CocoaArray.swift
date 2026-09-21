@@ -153,7 +153,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {

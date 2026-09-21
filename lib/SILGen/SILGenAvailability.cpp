@@ -11,10 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenFunction.h"
-#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Platform.h"
 #include "swift/SIL/SILDeclRef.h"
 
 using namespace swift;
@@ -182,7 +181,8 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   auto fnType = SGF.SGM.Types.getConstantOverrideType(TEC, function);
   auto silFnType =
       SILType::getPrimitiveObjectType(fnType).castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(silFnType, SGF.SGM.M);
+  SILFunctionConventions fnConv(
+      silFnType, SILAddressConventions::forFunction(SGF.F));
 
   SILValue functionRef = SGF.emitGlobalFunctionRef(loc, function);
 
@@ -246,10 +246,18 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit error block.
     SGF.B.emitBlock(errorBB);
-    ManagedValue error =
-        SGF.B.createPhi(SGF.F.mapTypeIntoEnvironment(fnConv.getSILErrorType(TEC)),
-                        OwnershipKind::Owned);
-    SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
+    if (fnConv.hasIndirectSILErrorResults()) {
+      // For an indirect error result (e.g. an address-only typed throw), the
+      // callee has already written the error into the indirect error result
+      // address that we forwarded to it, which is this thunk's own error
+      // result. The error block therefore takes no argument; just rethrow.
+      SGF.B.createBranch(loc, SGF.ThrowDest.getBlock());
+    } else {
+      ManagedValue error = SGF.B.createPhi(
+          SGF.F.mapTypeIntoEnvironment(fnConv.getSILErrorType(TEC)),
+          OwnershipKind::Owned);
+      SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
+    }
 
     // Emit normal block.
     SGF.B.emitBlock(normalBB);
@@ -276,6 +284,17 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
                                      PoundAvailableInfo *availability) {
   auto &ctx = getASTContext();
   SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+
+  if (!availability->getAvailabilityQuery() &&
+      !ctx.LangOpts.DisableAvailabilityChecking) {
+    // Sema computes the query as a side effect of building the availability
+    // scopes that enclose it, and some of those scopes are only expanded on
+    // demand.
+    // FIXME: [availability] Request-ify availability query resolution.
+    (void)AvailabilityContext::forLocation(availability->getStartLoc(),
+                                           FunctionDC);
+  }
+
   auto query = availability->getAvailabilityQuery();
 
   // The query may not have been computed by Sema under the following
@@ -293,6 +312,11 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
     return B.createIntegerLiteral(loc, i1, !availability->isUnavailability());
 
   return emitAvailabilityCheck(*this, loc, *query);
+}
+
+SILValue SILGenFunction::emitAvailabilityQuery(SILLocation loc,
+                                               const AvailabilityQuery &query) {
+  return emitAvailabilityCheck(*this, loc, query);
 }
 
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,

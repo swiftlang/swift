@@ -97,7 +97,7 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 do {
   class SubTestNoActor : Test {
     @objc override func withMainActorId(_: @escaping (Any) -> Void) {}
-    // expected-error@-1 {{declaration 'withMainActorId' has a type with different global actor isolation from any potential overrides}}
+    // expected-warning@-1 {{declaration 'withMainActorId' has a type with different global actor isolation from any potential overrides}}
   }
 
   class SubTestWithActor : Test {

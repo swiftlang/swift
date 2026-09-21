@@ -17,6 +17,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Threading/Mutex.h"
 
+#include "swift/Basic/MathUtils.h"
 #include "swift/shims/Visibility.h"
 
 #include "llvm/ADT/Hashing.h"
@@ -26,6 +27,9 @@
 #include <condition_variable>
 #include <optional>
 #include <tuple>
+#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+#include <malloc/malloc.h>
+#endif
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -79,6 +83,25 @@ public:
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
+
+#ifdef MALLOC_ZONE_MALLOC_DEFAULT_ALIGN
+    // ObjC classes (and thus Swift classes) need to be allocated with the
+    // canonical tag, because the ObjC runtime uses the high bits of the isa
+    // field for other purposes. For now, force all Swift metadata to be
+    // allocated with the canonical tag. In the future, we should be able to
+    // refine this so that only classes use the canonical tag, and maybe only
+    // NSObject subclasses.
+    //
+    // Match the value of MALLOC_ZONE_MALLOC_OPTION_CANONICAL_TAG without
+    // referencing it, so we can build against SDKs that don't have it.
+    auto canonicalTag = (malloc_zone_malloc_options_t)(1u << 1);
+    size = roundUpToAlignment(size, alignment);
+    if (__builtin_available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0,
+                            visionOS 26.0, *))
+      return malloc_zone_malloc_with_options(NULL, alignment, size,
+                                             canonicalTag);
+#endif
+
     void *ptr = nullptr;
     if (SWIFT_UNLIKELY(posix_memalign(&ptr, alignment, size) != 0 || !ptr)) {
       swift::crash("Could not allocate memory for type metadata.");

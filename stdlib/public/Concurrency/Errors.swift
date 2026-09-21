@@ -15,5 +15,5 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_deletedAsyncMethodError")
 @usableFromInline internal func swift_deletedAsyncMethodError() async {
-    fatalError("Fatal error: Call of deleted method")
+    fatalError("Call of deleted method")
 }

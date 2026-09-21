@@ -22,7 +22,6 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/PluginLoader.h"
@@ -43,12 +42,12 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -60,7 +59,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
@@ -161,7 +159,7 @@ std::string CompilerInvocation::getConstValuesFilePathForPrimary(
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.SerializedDiagnosticsPath;
+      .SupplementaryOutputs.LLVMBitcodeDiagnosticsPath;
 }
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
@@ -235,7 +233,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
   serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
 
-  if (!getIRGenOptions().ForceLoadSymbolName.empty())
+  if (!getIRGenOptions().ForceLoadSymbolName.empty() &&
+      !getIRGenOptions().DisableForceLoadSymbols)
     serializationOpts.AutolinkForceLoad = true;
 
   // Options contain information about the developer's computer,
@@ -244,6 +243,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SerializeOptionsForDebugging =
       opts.SerializeOptionsForDebugging.value_or(
           !module->isExternallyConsumed());
+
+  serializationOpts.PrefixMapSourceInfo = opts.PrefixMapSourceInfo;
+  if (opts.PrefixMapSourceInfo) {
+    serializationOpts.SourceInfoPrefixMap = getIRGenOptions().FilePrefixMap;
+  }
 
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&
@@ -292,9 +296,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   // This is important to get diagnostics for errors which are located in imported modules.
   // Such errors can sometimes only be detected when building the client module, because
   // the error can be in a generic function which is specialized in the client module.
-  if (serializationOpts.EmbeddedSwiftModule &&
-      // Except for the stdlib core. We don't want to get error locations inside stdlib internals.
-      !getParseStdlib()) {
+  if (serializationOpts.EmbeddedSwiftModule) {
     serializationOpts.SerializeDebugInfoSIL = true;
   }
 
@@ -309,6 +311,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.EnableSerializationRemarks =
       getLangOptions().EnableModuleSerializationRemarks;
+  serializationOpts.IRGenOpts = &getIRGenOptions();
+  serializationOpts.EnableHiddenTypeLayoutSerializationRemarks =
+      getLangOptions().EnableHiddenTypeLayoutSerializationRemarks;
 
   return serializationOpts;
 }
@@ -317,9 +322,7 @@ Lowering::TypeConverter &CompilerInstance::getSILTypes() {
   if (auto *tc = TheSILTypes.get())
     return *tc;
 
-  auto *tc = new Lowering::TypeConverter(
-      *getMainModule(),
-      /*loweredAddresses=*/!Context->SILOpts.EnableSILOpaqueValues);
+  auto *tc = new Lowering::TypeConverter(*getMainModule());
   TheSILTypes.reset(tc);
   return *tc;
 }
@@ -413,8 +416,9 @@ void CompilerInstance::setupStatsReporter() {
   };
 
   auto getClangSourceManager = [](ASTContext &Ctx) -> clang::SourceManager * {
-    if (auto *clangImporter = static_cast<ClangImporter *>(
-            Ctx.getClangModuleLoader())) {
+    if (auto *clangImporter =
+            static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+        clangImporter && clangImporter->getClangInstance().hasASTContext()) {
       return &clangImporter->getClangASTContext().getSourceManager();
     }
     return nullptr;
@@ -612,6 +616,11 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
+  if (setupDiagnosticVerifierIfNeeded()) {
+    Error = "Setting up diagnostics verifier failed";
+    return true;
+  }
+
   if (setUpASTContextIfNeeded()) {
     Error = "Setting up ASTContext failed";
     return true;
@@ -619,11 +628,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
   if (hasASTContext()) {
     setupStatsReporter();
-  }
-
-  if (setupDiagnosticVerifierIfNeeded()) {
-    Error = "Setting up diagnostics verifier failed";
-    return true;
   }
 
   // Setup caching diagnostics processor. It should be setup after all other
@@ -742,6 +746,30 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
+
+    if (CASOpts.CASFSInputOverlay) {
+      // Overlay the input files that exist on disk on top of the CAS file
+      // system, so that editing them takes effect while every other file the
+      // compilation sees still comes from the CAS.
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> InputFS =
+          new llvm::vfs::InMemoryFileSystem();
+      for (const auto &Input :
+           Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
+        StringRef InputPath = Input.getFileName();
+        // An input that is not on disk is provided by the CAS file system.
+        if (InputPath == "-" || !llvm::sys::fs::exists(InputPath))
+          continue;
+        auto Buffer = llvm::MemoryBuffer::getFile(InputPath);
+        if (!Buffer) {
+          Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                               InputPath, Buffer.getError().message());
+          return true;
+        }
+        InputFS->addFile(InputPath, 0, std::move(*Buffer));
+      }
+      OverlayVFS->pushOverlay(std::move(InputFS));
+    }
+
     SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
@@ -881,17 +909,27 @@ bool CompilerInstance::setUpModuleLoaders() {
           IgnoreSourceInfoFile);
   }
 
+  bool needTargetCodeGenOpts =
+      FrontendOptions::doesActionGenerateSIL(FEOpts.RequestedAction);
+
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
   std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
       *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
       CASIDForPCH, getDependencyTracker(), /*ignoreFileMapping=*/false,
-      getSharedCASInstance(), getSharedCacheInstance());
+      /*needCodeGenTargetOpts=*/needTargetCodeGenOpts, getSharedCASInstance(),
+      getSharedCacheInstance());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
   }
+
+  // If memory statistics were requested, start tracking per-module materialized
+  // decl counts now, before any significant deserialization occurs.
+  if (FEOpts.CompilerDebuggingOpts.PrintClangStats ||
+      !FEOpts.StatsOutputDir.empty())
+    clangImporter->enableMemoryStatistics();
 
   // Configure ModuleInterfaceChecker for the ASTContext.
   auto const &Clang = clangImporter->getClangInstance();
@@ -938,6 +976,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
         Context->LangOpts, Context->ClangImporterOpts, Context->CASOpts,
+        Context->SILOpts,
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
@@ -1214,6 +1253,15 @@ bool CompilerInvocation::shouldImportCxx() const {
   return true;
 }
 
+bool CompilerInvocation::shouldImportCOM() const {
+  const auto &LangOpts = getLangOptions();
+  const auto &FEOpts = getFrontendOptions();
+
+  return LangOpts.EnableCOMInterop &&
+      !LangOpts.DisableImplicitCOMModuleImport &&
+      FEOpts.InputMode != FrontendOptions::ParseInputMode::SwiftModuleInterface;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -1301,6 +1349,12 @@ bool CompilerInstance::canImportCxxShim() const {
               .DependencyScanningSubInvocation;
 }
 
+bool CompilerInstance::canImportCOM() const {
+  const auto &ASTContext = getASTContext();
+  ImportPath::Module::Builder mod(ASTContext.getIdentifier(COM_MODULE_NAME));
+  return ASTContext.testImportModule(mod.get());
+}
+
 bool CompilerInstance::supportCaching() const {
   if (!Invocation.getCASOptions().EnableCaching)
     return false;
@@ -1311,6 +1365,13 @@ bool CompilerInstance::supportCaching() const {
 
 bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
   auto &FrontendOpts = Invocation.getFrontendOptions();
+  // An explicit '-downgrade-typecheck-interface-error' or
+  // '-no-downgrade-typecheck-interface-error' takes precedence over the
+  // blocklists, so that the interface of a blocklisted module can still be
+  // verified.
+  if (FrontendOpts.DowngradeInterfaceVerificationError.has_value())
+    return *FrontendOpts.DowngradeInterfaceVerificationError;
+
   if (Context->blockListConfig.hasBlockListAction(FrontendOpts.ModuleName,
                                              BlockListKeyKind::ModuleName,
                         BlockListAction::DowngradeInterfaceVerificationFailure)) {
@@ -1318,7 +1379,7 @@ bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
                             FrontendOpts.ModuleName);
     return true;
   }
-  return FrontendOpts.DowngradeInterfaceVerificationError;
+  return false;
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
@@ -1383,6 +1444,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     if (canImportCxxShim())
       pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
+
+  if (Invocation.getLangOptions().EnableCOMInterop)
+    if (Invocation.shouldImportCOM() && canImportCOM())
+      pushImport(COM_MODULE_NAME);
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   if (frontendOpts.ModuleHasBridgingHeader) {
@@ -1854,9 +1919,10 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
                              "SIL-mandatory-passes");
+  auto Action = Invocation.getFrontendOptions().RequestedAction;
+
   // Don't run diagnostic passes at all when merging modules.
-  if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::MergeModules) {
+  if (Action == FrontendOptions::ActionType::MergeModules) {
     return false;
   }
   if (Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
@@ -1864,7 +1930,18 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
     // to run the ownership evaluator.
     return runSILOwnershipEliminatorPass(*SM);
   }
-  return runSILDiagnosticPasses(*SM);
+
+  const bool RequestedSILGenOSSA =
+    (Action == FrontendOptions::ActionType::EmitSILGenOSSA);
+
+  // Run the passes SILGen relies on to reach verified OSSA SIL.
+  runSILGenPasses(*SM, /*VerifySILGen=*/RequestedSILGenOSSA);
+
+  // Stop here if the OSSA after SILGen is all that was requested.
+  if (RequestedSILGenOSSA)
+    return true;
+
+  return runSILDiagnosticPasses(*SM, /*RunSILGenPasses=*/false);
 }
 
 /// Perform SIL optimization passes if optimizations haven't been disabled.

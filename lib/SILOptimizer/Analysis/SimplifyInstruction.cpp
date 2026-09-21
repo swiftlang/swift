@@ -22,7 +22,6 @@
 #define DEBUG_TYPE "sil-simplify"
 
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
@@ -44,7 +43,6 @@ namespace {
     SILValue visitSILInstruction(SILInstruction *I) { return SILValue(); }
 
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
-    SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
@@ -142,27 +140,11 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
 }
 
 SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *tei) {
-  auto op = lookThroughOwnershipInsts(tei->getOperand());
-
-  // tuple_extract(tuple(x, y), 0) -> x
-  if (auto *tupleInst = dyn_cast<TupleInst>(op))
-    return tupleInst->getElement(tei->getFieldIndex());
-
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
   if (tei->getFieldIndex() == 0)
     if (auto *bi = dyn_cast<BuiltinInst>(tei->getOperand()))
       return simplifyOverflowBuiltin(bi);
-
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
-  auto op = lookThroughOwnershipInsts(sei->getOperand());
-
-  // struct_extract(struct(x, y), x) -> x
-  if (auto *si = dyn_cast<StructInst>(op))
-    return si->getFieldValue(sei->getField());
 
   return SILValue();
 }
@@ -740,13 +722,6 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
 
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
-
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
-  // If we weren't passed a dead end blocks, we can't optimize without ownership
-  // enabled.
-  if (!deadEndBlocks)
-    return next;
-#endif
 
   OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
   OwnershipRAUWHelper helper(ctx, svi, result, /*respectLexicalFlags=*/ true);

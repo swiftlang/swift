@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -verify %s -sdk %S/Inputs -enable-objc-interop

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-performance-optimizations -enable-experimental-feature Lifetimes | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical

@@ -19,9 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
 
@@ -525,23 +523,6 @@ swift::extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc) {
 }
 
 //----------------------------------------------------------------------------//
-// CustomRefCountingOperation computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           CustomRefCountingOperationDescriptor desc) {
-  out << "Finding custom (foreign reference) reference counting operation '"
-      << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
-                                                              : "release")
-      << "' for '" << desc.decl->getNameStr() << "'.\n";
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
-  return SourceLoc();
-}
-
-//----------------------------------------------------------------------------//
 // Macro-related adjustments to name lookup requests.
 //----------------------------------------------------------------------------//
 //
@@ -599,12 +580,12 @@ static DirectLookupDescriptor contextualizeOptions(
 static NLOptions
 contextualizeOptions(const DeclContext *dc, SourceLoc loc,
                      NLOptions options) {
-  if (!(options & NL_ExcludeMacroExpansions)
+  if (!options.contains(NLFlags::ExcludeMacroExpansions)
       && namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
-    options |= NL_ExcludeMacroExpansions;
-  if (!(options & NL_ABIProviding)
+    options |= NLFlags::ExcludeMacroExpansions;
+  if (!options.contains(NLFlags::ABIProviding)
       && namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
-    options |= NL_ABIProviding;
+    options |= NLFlags::ABIProviding;
 
   return options;
 }

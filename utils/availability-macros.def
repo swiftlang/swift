@@ -11,6 +11,9 @@
 #
 #     @available(SwiftStdlib 5.2, *)
 #
+# These macros are also made available for use in tests. They are converted into
+# %target-swift-X.Y-abi-triple substitutions and stdlib_X_Y_runtime features.
+#
 # Comments in this file start with `#`. Comments and empty lines are ignored.
 # Each of the remaining lines must define an availability macro in the same
 # format used by the `-define-availability` frontend command line option.
@@ -26,7 +29,7 @@
 # 9999 is the generic unknown future Swift release. It always needs to resolve
 # to the special placeholder version numbers 9999.
 
-SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999
 
 # The last entry in this list corresponds to the Swift version currently under
 # development. This usually resolves to placeholder version numbers (9999) until
@@ -47,7 +50,7 @@ SwiftStdlib 6.0:macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0
 SwiftStdlib 6.1:macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4
 SwiftStdlib 6.2:anyAppleOS 26.0
 SwiftStdlib 6.3:anyAppleOS 26.4
-SwiftStdlib 6.4:anyAppleOS 9999
+SwiftStdlib 6.4:anyAppleOS 27.0
 SwiftStdlib 6.5:anyAppleOS 9999
 # TODO: When you add a new version, remember to tell the compiler about it
 # by also adding it to include/swift/AST/RuntimeVersions.def.

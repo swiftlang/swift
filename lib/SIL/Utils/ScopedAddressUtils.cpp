@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -18,8 +17,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Test.h"
-#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 
@@ -186,8 +183,7 @@ void ScopedAddressValue::endScopeAtLivenessBoundary(
 }
 
 bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
-                                           SSAPrunedLiveness *liveness,
-                                           DeadEndBlocks *deadEndBlocks) {
+                                           SSAPrunedLiveness *liveness) {
   SmallVector<StoreBorrowInst *, 4> otherStoreBorrows;
   // Collect all other store_borrows to the destination of \p storeBorrow
   for (auto *destUse : storeBorrow->getDest()->getUses()) {
@@ -201,8 +197,7 @@ bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
 
   for (auto *otherStoreBorrow : otherStoreBorrows) {
     // Return true, if otherStoreBorrow was in \p storeBorrow's scope
-    if (liveness->isWithinBoundary(otherStoreBorrow,
-                                   /*deadEndBlocks=*/nullptr)) {
+    if (liveness->isWithinBoundary(otherStoreBorrow)) {
       return true;
     }
   }

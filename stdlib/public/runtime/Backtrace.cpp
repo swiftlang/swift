@@ -23,13 +23,10 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Paths.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Runtime/Win32.h"
 
 #include "swift/Demangling/Demangler.h"
-
-#ifdef __linux__
-#include <sys/auxv.h>
-#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -44,17 +41,6 @@
 #endif
 
 #if TARGET_OS_OSX || TARGET_OS_MACCATALYST
-#if __has_include(<sys/codesign.h>)
-#include <sys/codesign.h>
-#else
-// SPI
-#define CS_OPS_STATUS 0
-#define CS_GET_TASK_ALLOW  0x00000004
-#define CS_RUNTIME         0x00010000
-#define CS_PLATFORM_BINARY 0x04000000
-#define CS_PLATFORM_PATH   0x08000000
-extern "C" int csops(int, unsigned int, void *, size_t);
-#endif
 #include <spawn.h>
 #endif
 #include <unistd.h>
@@ -64,6 +50,8 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 #include <cstring>
 #include <cerrno>
 
+SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
+
 #ifdef _WIN32
 // We'll probably want dbghelp.h here
 #else
@@ -72,7 +60,7 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 
 #include "BacktracePrivate.h"
 
-#define DEBUG_BACKTRACING_SETTINGS 0
+#define DEBUG_BACKTRACING 0
 
 #ifndef lengthof
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
@@ -263,7 +251,7 @@ bool isStdinATty()
 void _swift_processBacktracingSetting(llvm::StringRef key, llvm::StringRef value);
 void _swift_parseBacktracingSettings(const char *);
 
-#if DEBUG_BACKTRACING_SETTINGS
+#if DEBUG_BACKTRACING
 const char *algorithmToString(UnwindAlgorithm algorithm) {
   switch (algorithm) {
   case UnwindAlgorithm::Auto: return "Auto";
@@ -290,39 +278,8 @@ const char *presetToString(Preset preset) {
   case Preset::Auto: return "Auto";
   case Preset::Friendly: return "Friendly";
   case Preset::Medium: return "Medium";
-  case Preset::Full: return Full;
+  case Preset::Full: return "Full";
   }
-}
-#endif
-
-#ifdef __linux__
-bool isPrivileged() {
-  return getauxval(AT_SECURE);
-}
-#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST
-bool isPrivileged() {
-  if (issetugid())
-    return true;
-
-  uint32_t flags = 0;
-  if (csops(getpid(),
-            CS_OPS_STATUS,
-            &flags,
-            sizeof(flags)) != 0)
-    return true;
-
-  if (flags & (CS_PLATFORM_BINARY | CS_PLATFORM_PATH | CS_RUNTIME))
-    return true;
-
-  return !(flags & CS_GET_TASK_ALLOW);
-}
-#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-bool isPrivileged() {
-  return issetugid();
-}
-#elif _WIN32
-bool isPrivileged() {
-  return false;
 }
 #endif
 
@@ -344,8 +301,8 @@ bool writeProtectMemory(void *ptr, size_t size) {
 BacktraceInitializer::BacktraceInitializer() {
   const char *backtracing = swift::runtime::environment::SWIFT_BACKTRACE();
 
-  // Force off for setuid processes.
-  if (isPrivileged()) {
+  // Force off for privileged processes.
+  if (swift::runtime::_swift_isRestrictedProcessForExec()) {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
 
@@ -394,7 +351,8 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 #else
 
-  if (isPrivileged() && _swift_backtraceSettings.enabled != OnOffTty::Off) {
+  if (swift::runtime::_swift_isRestrictedProcessForExec()
+      && _swift_backtraceSettings.enabled != OnOffTty::Off) {
     // You'll only see this warning if you do e.g.
     //
     //    SWIFT_BACKTRACE=enable=on /path/to/some/setuid/binary
@@ -574,7 +532,8 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 #endif
 
-#if DEBUG_BACKTRACING_SETTINGS
+#if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+#if DEBUG_BACKTRACING
   printf("\nBACKTRACING SETTINGS\n"
          "\n"
          "algorithm: %s\n"
@@ -592,7 +551,7 @@ BacktraceInitializer::BacktraceInitializer() {
          onOffTtyToString(_swift_backtraceSettings.color),
          _swift_backtraceSettings.timeout,
          presetToString(_swift_backtraceSettings.preset),
-         swiftBacktracePath);
+         _swift_backtraceSettings.swiftBacktracePath);
 
   printf("\nBACKTRACING ENV\n");
 
@@ -603,6 +562,7 @@ BacktraceInitializer::BacktraceInitializer() {
     ptr += len + 1;
   }
   printf("\n");
+#endif
 #endif
 }
 
@@ -1145,7 +1105,7 @@ _swift_backtrace_demangle(const char *mangledName,
 
     *outputBufferSize = strlen(result) + 1;
 
-    return outputBuffer;
+    return result;
 #endif
   }
 
@@ -1341,9 +1301,25 @@ _swift_spawnBacktracer(CrashInfo *crashInfo, int memserver_fd)
 _swift_spawnBacktracer(CrashInfo *crashInfo)
 #endif
 {
+  #if defined(_WIN32)
+  HANDLE hOutput =
+    GetStdHandle(_swift_backtraceSettings.outputTo == OutputTo::Stderr
+                    ? STD_ERROR_HANDLE
+                    : STD_OUTPUT_HANDLE);
+  #endif
+
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+  #if DEBUG_BACKTRACING
+    const char *message = "**backtracer disabled** ";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+  #endif
   return false;
 #else
+  #if DEBUG_BACKTRACING
+    const char *message = "preparing to launch backtracer... ";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+  #endif
+
   // Set-up the backtracer's command line arguments
   switch (_swift_backtraceSettings.algorithm) {
   case UnwindAlgorithm::Fast:
@@ -1471,6 +1447,9 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
   _swift_formatAddress(crashInfo, addr_buf);
+  
+  crashInfo->concurrency_task_registry_addr = _swift_concurrency_task_registry_addr;
+  
   #ifdef _WIN32
   _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
   #endif
@@ -1516,11 +1495,6 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   return false;
 
   #elif defined(_WIN32)
-  HANDLE hOutput;
-  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-    hOutput = GetStdHandle(STD_ERROR_HANDLE);
-  else
-    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
   // Windows actually uses a flat command line string with some rather
   // odd parsing rules.
@@ -1561,6 +1535,21 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
                              &startupInfo,
                              &processInfo);
   if (!bRet) {
+    #if DEBUG_BACKTRACING
+      char message[256];
+      int len = snprintf_s(message, sizeof(message),
+                          "swift runtime: %lu return code for CreateProcessW (%ls) ",
+                          (unsigned long)bRet,
+                          swiftBacktracePath);
+      if (len > 0) {
+        DWORD written;
+        WriteFile(hOutput, message, (DWORD)len, &written, NULL);
+      } else {
+        const char *message = "snprintf failed... ";
+        WriteFile(hOutput, message, strlen(message), NULL, NULL);
+      }
+    #endif
+
     return false;
   }
 
@@ -1571,6 +1560,12 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   if (dwRet != WAIT_OBJECT_0) {
     CloseHandle(processInfo.hProcess);
+
+    #if DEBUG_BACKTRACING
+      const char *message = "WaitForSingleObject failed... ";
+      WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    #endif 
+
     return false;
   }
 
@@ -1578,8 +1573,32 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   DWORD dwExitCode;
   if (!GetExitCodeProcess(processInfo.hProcess, &dwExitCode)) {
     CloseHandle(processInfo.hProcess);
+
+    #if DEBUG_BACKTRACING
+      const char *message = "GetExitCodeProcess failed... ";
+      WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    #endif
+
     return false;
   }
+
+#if DEBUG_BACKTRACING
+  if (dwExitCode != 0) {
+    char message[256];
+    int len = snprintf(message, sizeof(message),
+                        "swift runtime: %ls exited with status 0x%08lX (%lu)\n",
+                        swiftBacktracePath,
+                        (unsigned long)dwExitCode,
+                        (unsigned long)dwExitCode);
+    if (len > 0) {
+      DWORD written;
+      WriteFile(hOutput, message, (DWORD)len, &written, NULL);
+    } else {
+      const char *message = "snprintf failed... ";
+      WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    }
+  }
+#endif  
 
   CloseHandle(processInfo.hProcess);
   return dwExitCode == 0;

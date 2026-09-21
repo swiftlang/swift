@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,11 +28,12 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConformanceCache.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -911,8 +912,7 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
     IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
 }
 
-Type swift::tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2,
-                                                DeclContext *dc) {
+Type swift::tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2) {
   // Easy case, equivalent so just pick one.
   if (ty1->isEqual(ty2))
     return ty1;
@@ -940,11 +940,19 @@ Type swift::tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2,
       return Type();
   }
 
-  // In general we want to prefer a subtype over a supertype.
-  if (isSubtypeOf(ty1, ty2, dc))
+  constraints::ConformanceCache cache;
+  auto lt = canConvertTo(cache, ty1, ty2);
+  auto gt = canConvertTo(cache, ty2, ty1);
+
+  if (lt && gt) {
+    // The two types convert to each other, but they're distinct. Give up.
+    return Type();
+  } else if (lt) {
+    // Otherwise, prefer a subtype over a supertype.
     return ty1;
-  if (isSubtypeOf(ty2, ty1, dc))
+  } else if (gt) {
     return ty2;
+  }
 
   // Incomparable, return null.
   return Type();
@@ -955,12 +963,6 @@ bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
   return evaluateOrDefault(DC.getASTContext().evaluator,
     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
       TypeRelation::ConvertTo, openArchetypes)), false);
-}
-
-bool swift::isSubtypeOf(Type T1, Type T2, DeclContext *DC) {
-  return evaluateOrDefault(DC->getASTContext().evaluator,
-    TypeRelationCheckRequest(TypeRelationCheckInput(DC, T1, T2,
-      TypeRelation::SubtypeOf, /*openArchetypes*/ false)), false);
 }
 
 Type swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *SD) {

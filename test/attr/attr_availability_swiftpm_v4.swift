@@ -6,20 +6,20 @@ func shortThree() {}
 @available(_PackageDescription, introduced: 3.0)
 func threePointOh() {}
 
-@available(_PackageDescription, introduced: 3.0, obsoleted: 4.0)
-func threePointOhOnly() {} // expected-note {{was obsoleted in PackageDescription 4.0}}
+@available(_PackageDescription, introduced: 3.0, obsoleted: 4.0) // expected-note {{was obsoleted in PackageDescription 4.0}}
+func threePointOhOnly() {}
 
 @available(_PackageDescription, deprecated: 3.0)
 func deprecatedThreePointOh() {}
 
-@available(_PackageDescription, obsoleted: 3.0)
-func obsoletedThreePointOh() {} // expected-note {{was obsoleted in PackageDescription 3.0}}
+@available(_PackageDescription, obsoleted: 3.0) // expected-note {{was obsoleted in PackageDescription 3.0}}
+func obsoletedThreePointOh() {}
 
-@available(_PackageDescription, introduced: 3.0, obsoleted: 4.0)
-class ThreePointOhOnly {} // expected-note {{was obsoleted in PackageDescription 4.0}}
+@available(_PackageDescription, introduced: 3.0, obsoleted: 4.0) // expected-note {{was obsoleted in PackageDescription 4.0}}
+class ThreePointOhOnly {}
 
-@available(_PackageDescription, introduced: 3, obsoleted: 4, message: "use abc")
-class ThreeOnlyWithMessage {} // expected-note {{was obsoleted in PackageDescription 4}}
+@available(_PackageDescription, introduced: 3, obsoleted: 4, message: "use abc") // expected-note {{was obsoleted in PackageDescription 4}}
+class ThreeOnlyWithMessage {}
 
 
 @available(_PackageDescription 4)
@@ -37,8 +37,8 @@ func fourPointOh() {}
 @available(_PackageDescription 4)
 class ShortFour {}
 
-@available(_PackageDescription 99)
-func ninetyNine() {} // expected-note {{'ninetyNine()' was introduced in PackageDescription 99}}
+@available(_PackageDescription 99) // expected-note {{'ninetyNine()' was introduced in PackageDescription 99}}
+func ninetyNine() {}
 
 shortThree()
 threePointOh()
@@ -68,15 +68,15 @@ func shouldBeAlone() {}
 @available(_PackageDescription 4.0, swift 2.0, *) // expected-error {{PackageDescription version availability must be specified alone}} // expected-error {{Swift version availability must be specified alone}}
 func shouldBeAlone2() {}
 
-@available(*, unavailable, renamed: "shortFour")
+@available(*, unavailable, renamed: "shortFour") // expected-note {{'unconditionallyRenamed()' has been explicitly marked unavailable here}}
 @available(_PackageDescription 3)
-func unconditionallyRenamed() {} // expected-note {{'unconditionallyRenamed()' has been explicitly marked unavailable here}}
+func unconditionallyRenamed() {}
 
 unconditionallyRenamed() // expected-error {{'unconditionallyRenamed()' has been renamed to 'shortFour'}}
 
-@available(*, unavailable, renamed: "shortFour")
+@available(*, unavailable, renamed: "shortFour") // expected-note {{'unconditionallyRenamedAndIntroducedLater()' has been explicitly marked unavailable here}}
 @available(_PackageDescription 5)
-func unconditionallyRenamedAndIntroducedLater() {} // expected-note {{'unconditionallyRenamedAndIntroducedLater()' has been explicitly marked unavailable here}}
+func unconditionallyRenamedAndIntroducedLater() {}
 
 unconditionallyRenamedAndIntroducedLater() // expected-error {{'unconditionallyRenamedAndIntroducedLater()' has been renamed to 'shortFour'}}
 

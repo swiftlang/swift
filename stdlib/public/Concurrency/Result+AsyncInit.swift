@@ -19,7 +19,7 @@ extension Result where Success: ~Copyable {
   /// returned value as a success, or any thrown error as a failure.
   ///
   /// - Parameter body: A potentially throwing async closure to evaluate.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) init(
     catching body: nonisolated(nonsending) () async throws(Failure) -> Success
   ) async {

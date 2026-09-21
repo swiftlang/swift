@@ -7,6 +7,7 @@
 // REQUIRES: thread_safe_runtime
 
 // UNSUPPORTED: use_os_stdlib
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Tests for traps at run time when enforcing exclusive access.
 

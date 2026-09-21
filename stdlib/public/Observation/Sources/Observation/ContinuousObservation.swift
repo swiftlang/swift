@@ -161,16 +161,11 @@ extension ContinuousObservation.State {
   }
 
   @diagnose(
-    DeprecatedDeclaration,
-    as: ignored,
-    reason: "https://github.com/swiftlang/swift/issues/89045"
-  )
-  @diagnose(
     ConversionFromIsolatedAnyToSynchronous,
     as: ignored,
     reason: "https://github.com/swiftlang/swift/issues/89361"
   )
-  fileprivate static func track(
+  fileprivate nonisolated(nonsending) static func track(
     _ state: _ManagedCriticalState<ContinuousObservation.State>,
     options: ObservationTracking.Options,
     apply:
@@ -180,7 +175,7 @@ extension ContinuousObservation.State {
   ) async -> Bool {
     return await withTaskCancellationHandler(
       operation: {
-        return await withUnsafeContinuation(isolation: apply.isolation) {
+        return await withUnsafeContinuation {
           continuation in
           guard
             ContinuousObservation.State.populate(state, continuation: continuation)
@@ -188,9 +183,13 @@ extension ContinuousObservation.State {
             return
           }
           withObservationTracking(options: options) {
-            // This is safe since we have already been isolated to the tracking isolation.
-            // It can be asserted to be isolated by
+            // This is safe since we have already been isolated to the tracking
+            // isolation, which `assertIsolated` checks below. That assertion is
+            // only a debug aid and is unavailable in Embedded Swift, so it is
+            // skipped there.
+            #if !$Embedded
             apply.isolation?.assertIsolated()
+            #endif
             let fn = apply as @Sendable (borrowing ObservationTracking.Event) -> Void
             // This ends up also being how the `didSet` is called because this will occur
             // on the next iteration of the while loop from `trackingLoop` after the
@@ -213,8 +212,7 @@ extension ContinuousObservation.State {
       },
       onCancel: {
         ContinuousObservation.State.cancel(state)
-      },
-      isolation: apply.isolation
+      }
     )
   }
 }

@@ -20,13 +20,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-func-extractor"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SIL/SILBuilder.h"
@@ -34,7 +32,6 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
@@ -42,7 +39,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
@@ -258,12 +254,12 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
-  if (options.EnableObjCInterop == llvm::cl::BOU_UNSET) {
+  if (options.EnableObjCInterop == llvm::cl::boolOrDefault::BOU_UNSET) {
     Invocation.getLangOptions().EnableObjCInterop =
         Invocation.getLangOptions().Target.isOSDarwin();
   } else {
     Invocation.getLangOptions().EnableObjCInterop =
-    options.EnableObjCInterop == llvm::cl::BOU_TRUE;
+        options.EnableObjCInterop == llvm::cl::boolOrDefault::BOU_TRUE;
   }
 
   SILOptions &Opts = Invocation.getSILOptions();

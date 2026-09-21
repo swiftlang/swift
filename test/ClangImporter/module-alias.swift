@@ -9,3 +9,12 @@ import UncommonName
 
 _ = MyStruct()
 _ = UncommonName.MyStruct()
+
+// A -module-alias'd Clang module must be importable via canImport under both
+// its alias and its real name.
+#if !canImport(UncommonName)
+#error("canImport(UncommonName) should succeed for a -module-alias'd Clang module")
+#endif
+#if !canImport(CommonName)
+#error("canImport(CommonName) should still succeed")
+#endif

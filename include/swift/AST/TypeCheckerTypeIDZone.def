@@ -83,7 +83,7 @@ SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DerivativeAttrOriginalDeclRequest,
-              AbstractFunctionDecl *(DerivativeAttr *),
+              llvm::TinyPtrVector<AbstractFunctionDecl *>(DerivativeAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
               bool(TypeEraserAttr *, ProtocolDecl *),
@@ -113,6 +113,12 @@ SWIFT_REQUEST(TypeChecker, ResultBuilderTypeRequest, Type(ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, COMDeclInfoRequest,
+              const COMDeclInfo *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, COMInterfaceHierarchyRequest,
+              const COMInterfaceHierarchy *(ProtocolDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
               bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
               Cached, NoLocationInfo)
@@ -151,6 +157,9 @@ SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationResultHandlerOnReturnFu
 SWIFT_REQUEST(TypeChecker, GetDistributedThunkRequest,
               FuncDecl *(llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedRecipientResolvableProxyAdapterThunkRequest,
+              FuncDecl *(llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
@@ -177,7 +186,8 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
                   llvm::PointerUnion<Decl *, ClosureExpr *>),
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
-              ActorIsolationState(ValueDecl *),
+              ActorIsolationState(
+                  llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
               bool(ValueDecl *),
@@ -392,6 +402,8 @@ SWIFT_REQUEST(TypeChecker, ExplicitCaughtTypeRequest,
               Type(ASTContext *, CatchNode), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, YieldsTypeRequest,
+              Type(FuncDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
@@ -454,6 +466,10 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeCOMInterfaceIDRequest,
+              VarDecl *(ProtocolDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeCOMCLSIDRequest,
+              VarDecl *(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckPrimaryFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceAccessScopeRequest,
@@ -501,6 +517,9 @@ SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DeclRuntimeAvailabilityRequest,
               DeclRuntimeAvailability(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeLocalAvailableAttrsRequest,
+              evaluator::SideEffect(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
@@ -577,8 +596,8 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckCDeclFunctionRequest,
-              evaluator::SideEffect(FunctionDecl *, CDeclAttr *),
+SWIFT_REQUEST(TypeChecker, TypeCheckForeignFunctionRequest,
+              evaluator::SideEffect(FunctionDecl *, DeclAttribute *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckCDeclEnumRequest,
               evaluator::SideEffect(EnumDecl *, CDeclAttr *),
@@ -604,6 +623,11 @@ SWIFT_REQUEST(TypeChecker, IsCCompatibleDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SectionForDeclRequest,
+              std::optional<StringRef>(
+                  llvm::PointerUnion<const Decl *,
+                                     const AbstractClosureExpr *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               std::optional<SubstitutionMap>(const Decl *),
@@ -663,8 +687,12 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
-              std::optional<DefaultIsolation>(const SourceFile *),
+SWIFT_REQUEST(TypeChecker, FileDefaultsRequest,
+              FileDefaults(const SourceFile *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ApplyFileDefaultsRequest,
+              evaluator::SideEffect(Decl *),
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,

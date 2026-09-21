@@ -421,3 +421,13 @@ do {
     return row
   }
 }
+
+do {
+  struct S {}
+
+  func test(of: [String]) {} // expected-note {{candidate expects value of type '[String]' for parameter #1 (got '[S.Type]')}}
+  func test(of: [Int]) {} // expected-note {{candidate expects value of type '[Int]' for parameter #1 (got '[S.Type]')}}
+
+  test(of: [S.self]) // expected-error {{no exact matches in call to local function 'test'}}
+}
+

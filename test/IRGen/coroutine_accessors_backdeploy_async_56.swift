@@ -12,6 +12,8 @@
 // REQUIRES: concurrency_runtime
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+
 // CHECK-LABEL: %swift.back_deploy.task.pre_57 = type {
 //                  object header
 // CHECK-SAME:      %swift.refcounted
@@ -126,7 +128,7 @@ public var i: Int {
 
 // CHECK-LABEL: define{{.*}} void @increment_i_async(
 //                  ptr swiftasync %0
-// CHECK-SAME:      ptr swiftself captures(none) dereferenceable({{8|4}}) %1
+// CHECK-SAME:      ptr noalias swiftself captures(none) dereferenceable({{8|4}}) %1
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 //      :         [[SIZE_32:%[^,]+]] = load i32

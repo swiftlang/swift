@@ -28,8 +28,7 @@ func assertShortSig(
   _ expected: String, crash: String,
   sourceLocation: SourceLocation = #_sourceLocation
 ) {
-  guard let crashLog = CrashLog(from: crash),
-  let short = crashLog.signature.short else {
+  guard let short = CrashLog(from: crash).signature.short else {
     Issue.record("failed to parse crash", sourceLocation: sourceLocation)
     return
   }

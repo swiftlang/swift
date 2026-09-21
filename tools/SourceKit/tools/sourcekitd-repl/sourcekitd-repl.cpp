@@ -13,9 +13,7 @@
 #include "sourcekitd/sourcekitd.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Process.h"

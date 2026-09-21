@@ -17,35 +17,27 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/Parse/ParseVersion.h"
-#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/YAMLTraits.h"
 #include <cstdio>
 using namespace swift;
 
@@ -63,11 +55,11 @@ enum class OptGroup {
 
 std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   switch (defaultable) {
-  case llvm::cl::BOU_TRUE:
+  case llvm::cl::boolOrDefault::BOU_TRUE:
     return true;
-  case llvm::cl::BOU_FALSE:
+  case llvm::cl::boolOrDefault::BOU_FALSE:
     return false;
-  case llvm::cl::BOU_UNSET:
+  case llvm::cl::boolOrDefault::BOU_UNSET:
     return std::nullopt;
   }
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
@@ -268,12 +260,13 @@ struct SILOptOptions {
 
   llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes =
       llvm::cl::opt<llvm::cl::boolOrDefault>(
-          "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
+          "enable-lexical-lifetimes",
+          llvm::cl::init(llvm::cl::boolOrDefault::BOU_UNSET),
           llvm::cl::desc("Enable lexical lifetimes."));
 
   llvm::cl::opt<llvm::cl::boolOrDefault>
   EnableExperimentalMoveOnly = llvm::cl::opt<llvm::cl::boolOrDefault>(
-      "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
+      "enable-experimental-move-only", llvm::cl::init(llvm::cl::boolOrDefault::BOU_UNSET),
       llvm::cl::desc("Enable experimental move-only semantics."));
 
   llvm::cl::opt<bool> EnablePackMetadataStackPromotion = llvm::cl::opt<bool>(
@@ -413,6 +406,12 @@ struct SILOptOptions {
                      llvm::cl::init(true),
                      llvm::cl::desc("Run sil verifications after every pass."));
 
+  llvm::cl::opt<bool> EmitIsolationHistory = llvm::cl::opt<bool>(
+      "sil-region-isolation-emit-isolation-history",
+      llvm::cl::desc("Emit notes explaining why a disconnected value ended up "
+                     "in an isolated region. Mirrors the frontend flag of the "
+                     "same name; controls SILOptions::EmitIsolationHistory."));
+
   llvm::cl::opt<bool>
   SILVerifyAll = llvm::cl::opt<bool>("sil-verify-all",
                llvm::cl::Hidden,
@@ -535,6 +534,10 @@ struct SILOptOptions {
       EnableCxxInterop = llvm::cl::opt<bool>("enable-experimental-cxx-interop",
                        llvm::cl::desc("Enable C++ interop."),
                        llvm::cl::init(false));
+
+  llvm::cl::opt<bool> EnableCOMInterop{"enable-experimental-com-interop",
+                                       llvm::cl::desc("Enable COM interop."),
+                                       llvm::cl::init(false)};
 
   llvm::cl::opt<bool>
       IgnoreAlwaysInline = llvm::cl::opt<bool>("ignore-always-inline",
@@ -805,6 +808,14 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
   Invocation.computeCXXStdlibOptions();
 
+  if (options.EnableCOMInterop) {
+    auto &LangOpts = Invocation.getLangOptions();
+    LangOpts.EnableCOMInterop = true;
+    LangOpts.COMModel = LangOpts.Target.isOSDarwin()
+                            ? LangOptions::COMInteropModel::CoreFoundation
+                            : LangOptions::COMInteropModel::Microsoft;
+  }
+
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
 
@@ -829,6 +840,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
+
+  // The implicit search paths depend on the language options - e.g. Embedded
+  // Swift picks up its runtime libraries from a different directory. Recompute
+  // them now that all language options are set.
+  Invocation.updateImplicitSearchPaths();
 
   Invocation.getDiagnosticOptions().VerifyMode =
       options.VerifyMode ? DiagnosticOptions::Verify
@@ -856,6 +872,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.OptRecordPasses = options.RemarksPasses;
   SILOpts.EnableStackProtection = true;
   SILOpts.EnableMoveInoutStackProtection = options.EnableMoveInoutStackProtection;
+  SILOpts.EmitIsolationHistory = options.EmitIsolationHistory;
 
   SILOpts.VerifyExclusivity = options.VerifyExclusivity;
   if (options.EnforceExclusivity.getNumOccurrences() != 0) {

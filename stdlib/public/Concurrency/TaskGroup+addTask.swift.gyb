@@ -247,7 +247,7 @@ extension ${TYPE} {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   % end
-  @_alwaysEmitIntoClient
+  @export(implementation)
   ${"\n  ".join(ALL_AVAILABILITY)}
   public mutating func ${METHOD_NAME}( // ${TYPE}/${METHOD_NAME}
     ${",\n    ".join(adjust_params_for_group_kind(PARAMS))}

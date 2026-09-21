@@ -1,7 +1,11 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Xllvm -sil-print-types  -enable-builtin-module -Onone %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-sil -sil-verify-all -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
-// REQUIRES: swift_in_compiler
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop -o %t/builtins.silgen
+// RUN: %FileCheck -input-file %t/builtins.silgen %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types  -enable-builtin-module -Onone %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop -o %t/builtins.sil
+// RUN: %FileCheck -input-file %t/builtins.sil -check-prefix=CANONICAL %s
+
 
 import Builtin
 
@@ -200,6 +204,7 @@ class D {}
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $C to $Builtin.NativeObject
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[OBJ]]
 func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
@@ -221,6 +226,7 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG_COPY]] : $any ClassProto
 // CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}, any ClassProto) Self to $Builtin.NativeObject
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   return Builtin.unsafeCastToNativeObject(t as ClassProto)
@@ -283,8 +289,7 @@ func obj_to_raw_pointer(_ c: Builtin.NativeObject) -> Builtin.RawPointer {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins22class_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func class_from_raw_pointer(_ p: Builtin.RawPointer) -> C {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $C
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
+  // CHECK: return [[C]]
   return Builtin.bridgeFromRawPointer(p)
 }
 
@@ -295,16 +300,14 @@ func class_archetype_from_raw_pointer<T : C>(_ p: Builtin.RawPointer) -> T {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20obj_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.NativeObject
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
+  // CHECK: return [[C]]
   return Builtin.bridgeFromRawPointer(p)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins28existential_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func existential_from_raw_pointer(_ p: Builtin.RawPointer) -> AnyObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $AnyObject
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
+  // CHECK: return [[C]]
   return Builtin.bridgeFromRawPointer(p)
 }
 
@@ -575,6 +578,8 @@ func unreachable() {
 // CHECK-NEXT:    [[ARG2_FROM_WORD:%.*]] = unchecked_bitwise_cast [[ARG2]] : $Builtin.Word to $C
 // CHECK-NEXT:    [[ARG2_FROM_WORD_COPY:%.*]] = copy_value [[ARG2_FROM_WORD]]
 // CHECK-NEXT:    destroy_value [[ARG1_COPY1]]
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG1_D]] : $D, [[ARG1_OPT]] : $Optional<C>, [[ARG2_FROM_WORD_COPY:%.*]] : $C)
 // CHECK:         return [[RESULT]]
 func reinterpretCast(_ c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
@@ -609,6 +614,91 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
   // CHECK: load [trivial] [[RES]]
           Builtin.reinterpretCast(b) as Int)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20reinterpretCastTuple_2xs2ysBw_Bwt_AA1DC_AFtAA1CCSg_AItAH_AHts5Int16VtAH_AHt_Bw_Bwts4Int8V_AMttF : $@convention(thin) (@guaranteed C, @guaranteed C, Builtin.Word, Builtin.Word, Int8, Int8) -> (Builtin.Word, Builtin.Word, @owned D, @owned D, @owned Optional<C>, @owned Optional<C>, @owned C, @owned C, Int16)
+// CHECK:       bb0([[ARG1:%.*]] : @guaranteed $C, [[ARG2:%.*]] : @guaranteed $C, [[ARG3:%.*]] : $Builtin.Word, [[ARG4:%.*]] : $Builtin.Word, [[ARG5:%.*]] : $Int8, [[ARG6:%.*]] : $Int8):
+// CHECK-NEXT:    [[ARG12:%.*]] = tuple ([[ARG1]] : $C, [[ARG2]] : $C)
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    [[ARG34:%.*]] = tuple ([[ARG3]] : $Builtin.Word, [[ARG4]] : $Builtin.Word)
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    [[ARG56:%.*]] = tuple ([[ARG5]] : $Int8, [[ARG6]] : $Int8)
+// CHECK-NEXT:    debug_value
+
+// CHECK-NEXT:    [[ARG12_COPY1:%.*]] = copy_value [[ARG12]]
+// CHECK-NEXT:    ([[ARG1_COPY1:%.*]], [[ARG2_COPY1:%.*]]) = destructure_tuple [[ARG12_COPY1]]
+// CHECK-NEXT:    [[ARG12_COPY1A:%.*]] = tuple ([[ARG1_COPY1]] : $C, [[ARG2_COPY1]] : $C)
+// CHECK-NEXT:    [[ARG12_TRIVIAL:%.*]] = unchecked_trivial_bit_cast [[ARG12_COPY1A]] : $(C, C) to $(Builtin.Word, Builtin.Word)
+// CHECK-NEXT:    ([[ARG1_TRIVIAL:%.*]], [[ARG2_TRIVIAL:%.*]]) = destructure_tuple [[ARG12_TRIVIAL]]
+
+// CHECK-NEXT:    [[ARG12_COPY2:%.*]] = copy_value [[ARG12]]
+// CHECK-NEXT:    ([[ARG1_COPY2:%.*]], [[ARG2_COPY2:%.*]]) = destructure_tuple [[ARG12_COPY2]]
+// CHECK-NEXT:    [[ARG12_COPY2A:%.*]] = tuple ([[ARG1_COPY2]] : $C, [[ARG2_COPY2]] : $C)
+// CHECK-NEXT:    [[ARG12_D:%.*]] = unchecked_bitwise_cast [[ARG12_COPY2A]] : $(C, C) to $(D, D)
+// CHECK-NEXT:    [[ARG12_D_COPY:%.*]] = copy_value [[ARG12_D]]
+// CHECK-NEXT:    ([[ARG1_D:%.*]], [[ARG2_D:%.*]]) = destructure_tuple [[ARG12_D_COPY]]
+
+// CHECK-NEXT:    [[ARG12_COPY3:%.*]] = copy_value [[ARG12]]
+// CHECK-NEXT:    ([[ARG1_COPY3:%.*]], [[ARG2_COPY3:%.*]]) = destructure_tuple [[ARG12_COPY3]]
+// CHECK-NEXT:    [[ARG12_COPY3A:%.*]] = tuple ([[ARG1_COPY3]] : $C, [[ARG2_COPY3]] : $C)
+// CHECK-NEXT:    [[ARG12_OPT:%.*]] = unchecked_bitwise_cast [[ARG12_COPY3A]] : $(C, C) to $(Optional<C>, Optional<C>)
+// CHECK-NEXT:    [[ARG12_OPT_COPY:%.*]] = copy_value [[ARG12_OPT]]
+// CHECK-NEXT:    ([[ARG1_OPT:%.*]], [[ARG2_OPT:%.*]]) = destructure_tuple [[ARG12_OPT_COPY]]
+
+// CHECK-NEXT:    ([[ARG3_COPY:%.*]], [[ARG4_COPY:%.*]]) = destructure_tuple [[ARG34]]
+// CHECK-NEXT:    [[ARG34_COPY:%.*]] = tuple ([[ARG3_COPY]] : $Builtin.Word, [[ARG4_COPY]] : $Builtin.Word)
+// CHECK-NEXT:    [[ARG34_FROM_WORD:%.*]] = unchecked_bitwise_cast [[ARG34_COPY]] : $(Builtin.Word, Builtin.Word) to $(C, C)
+// CHECK-NEXT:    [[ARG34_FROM_WORD_COPY:%.*]] = copy_value [[ARG34_FROM_WORD]]
+// CHECK-NEXT:    ([[ARG3_FROM_WORD_COPY:%.*]], [[ARG4_FROM_WORD_COPY:%.*]]) = destructure_tuple [[ARG34_FROM_WORD_COPY]]
+
+// CHECK-NEXT:    ([[ARG5_COPY:%.*]], [[ARG6_COPY:%.*]]) = destructure_tuple [[ARG56]]
+// CHECK-NEXT:    [[ARG56_COPY:%.*]] = tuple ([[ARG5_COPY]] : $Int8, [[ARG6_COPY]] : $Int8)
+// CHECK-NEXT:    [[ARG56_FUSED:%.*]] = unchecked_trivial_bit_cast [[ARG56_COPY]] : $(Int8, Int8) to $Int16
+
+// CHECK-NEXT:    destroy_value [[ARG12_COPY3A]]
+// CHECK-NEXT:    destroy_value [[ARG12_COPY2A]]
+// CHECK-NEXT:    destroy_value [[ARG12_COPY1A]]
+
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG2_TRIVIAL]] : $Builtin.Word, [[ARG1_D]] : $D, [[ARG2_D]] : $D, [[ARG1_OPT]] : $Optional<C>, [[ARG2_OPT]] : $Optional<C>, [[ARG3_FROM_WORD_COPY]] : $C, [[ARG4_FROM_WORD_COPY]] : $C, [[ARG56_FUSED]] : $Int16)
+// CHECK:         return [[RESULT]]
+func reinterpretCastTuple(_ cs: (C, C), xs: (Builtin.Word, Builtin.Word), ys: (Int8, Int8)) -> ((Builtin.Word, Builtin.Word), (D, D), (C?, C?), (C, C), Int16) {
+  return (Builtin.reinterpretCast(cs) as (Builtin.Word, Builtin.Word),
+          Builtin.reinterpretCast(cs) as (D, D),
+          Builtin.reinterpretCast(cs) as (C?, C?),
+          Builtin.reinterpretCast(xs) as (C, C),
+          Builtin.reinterpretCast(ys) as Int16)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins24reinterpretAddrOnlyTuple{{[_0-9a-zA-Z]*}}F
+func reinterpretAddrOnlyTuple<T, U>(_ ts: (T, T)) -> (U, U) {
+  // CHECK: unchecked_addr_cast {{%.*}} : $*(T, T) to $*(U, U)
+  return Builtin.reinterpretCast(ts)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins33reinterpretAddrOnlyTupleToTrivial{{[_0-9a-zA-Z]*}}F
+func reinterpretAddrOnlyTupleToTrivial<T>(_ ts: (T, T)) -> (Int, Int) {
+  // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*(T, T) to $*(Int, Int)
+  // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
+  // CHECK: destroy_addr [[INPUT]]
+  return Builtin.reinterpretCast(ts)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins32reinterpretAddrOnlyLoadableTuple{{[_0-9a-zA-Z]*}}F
+func reinterpretAddrOnlyLoadableTuple<T>(_ as: (Int, Int), _ bs: (T, T)) -> ((T, T), (Int, Int)) {
+  // CHECK: [[BUF:%.*]] = alloc_stack $(Int, Int)
+  // CHECK: [[BUF_0:%.*]] = tuple_element_addr [[BUF]] : $*(Int, Int), 0
+  // CHECK: [[BUF_1:%.*]] = tuple_element_addr [[BUF]] : $*(Int, Int), 1
+  // CHECK: store {{%.*}} to [trivial] [[BUF_0]]
+  // CHECK: store {{%.*}} to [trivial] [[BUF_1]]
+  // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]] : $*(Int, Int) to $*(T, T)
+  // CHECK: copy_addr [[RES1]] to [init]
+  return (Builtin.reinterpretCast(`as`) as (T, T),
+  // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*(T, T) to $*(Int, Int)
+  // CHECK: load [trivial] [[RES]]
+          Builtin.reinterpretCast(bs) as (Int, Int))
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins18castToBridgeObject{{[_0-9a-zA-Z]*}}F
@@ -854,8 +944,7 @@ func once(control: Builtin.RawPointer) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins19valueToBridgeObjectyBbSuF : $@convention(thin) (UInt) -> @owned Builtin.BridgeObject {
 // CHECK: bb0([[UINT:%.*]] : $UInt):
 // CHECK:   [[BI:%.*]] = struct_extract [[UINT]] : $UInt, #UInt._value
-// CHECK:   [[CAST:%.*]] = value_to_bridge_object [[BI]]
-// CHECK:   [[RET:%.*]] = copy_value [[CAST]] : $Builtin.BridgeObject
+// CHECK:   [[RET:%.*]] = value_to_bridge_object [[BI]]
 // CHECK:   return [[RET]] : $Builtin.BridgeObject
 // CHECK: } // end sil function '$s8builtins19valueToBridgeObjectyBbSuF'
 func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
@@ -1040,3 +1129,11 @@ func markDependenceGuaranteed(_ p: AnyObject, _ o: AnyObject) -> AnyObject {
   return Builtin.markDependence(p, o)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20test_dereferenceableyBpBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+// CHECK: bb0([[PTR:%.*]] : $Builtin.RawPointer, [[SIZE:%.*]] : $Builtin.Word):
+// CHECK:   [[RESULT:%.*]] = builtin "dereferenceable"([[PTR]] : $Builtin.RawPointer, [[SIZE]] : $Builtin.Word) : $Builtin.RawPointer
+// CHECK:   return [[RESULT]] : $Builtin.RawPointer
+// CHECK: } // end sil function '$s8builtins20test_dereferenceableyBpBp_BwtF'
+func test_dereferenceable(_ ptr: Builtin.RawPointer, _ size: Builtin.Word) -> Builtin.RawPointer {
+  return Builtin.dereferenceable(ptr, size)
+}

@@ -95,22 +95,25 @@ public:
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr);
+      const GenericSpecializationInformation *SpecializationInfo = nullptr,
+      bool IsCalledOnce = false);
 
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                      SILFunctionTypeIsolation::forUnknown());
+                                      SILFunctionTypeIsolation::forUnknown(),
+                                  bool isCalledOnce = false);
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                      SILFunctionTypeIsolation::forUnknown()) {
+                                      SILFunctionTypeIsolation::forUnknown(),
+                                  bool isCalledOnce = false) {
     return createPartialApply(loc, fn.getValue(), subs, args,
-                              calleeConvention, resultIsolation);
+                              calleeConvention, resultIsolation, isCalledOnce);
   }
 
   using SILBuilder::createStructExtract;
@@ -371,6 +374,10 @@ public:
 
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
+                                        SILType openedType);
+
+  using SILBuilder::createOpenCOMExistential;
+  ManagedValue createOpenCOMExistential(SILLocation loc, ManagedValue arg,
                                         SILType openedType);
 
   using SILBuilder::createOpenExistentialValue;

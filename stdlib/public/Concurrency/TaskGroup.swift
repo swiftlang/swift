@@ -300,7 +300,7 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// Rather, the child tasks need to cooperatively react to the cancellation,
 /// and return early if that's possible.
 ///
-/// To create unstructured concurrency tasks, you can use ``Task.init``, ``Task.detached`` or ``Task.immediate``.
+/// To create unstructured concurrency tasks, you can use `Task.init`, `Task.detached` or `Task.immediate`.
 ///
 /// Task Group Cancellation
 /// =======================
@@ -344,8 +344,8 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 ///
 /// A canceled task group can still keep adding tasks, however they will start
 /// being immediately canceled, and might respond accordingly. To avoid adding
-/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
-/// rather than the plain ``addTask(name:priority:body:)`` which adds tasks unconditionally.
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(name:priority:operation:)``
+/// rather than the plain ``addTask(name:priority:operation:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `TaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -450,13 +450,13 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 
   /// Wait for all of the group's remaining tasks to complete.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func waitForAll() async {
     await awaitAllRemainingTasks(isolation: #isolation)
   }
 
   /// Wait for all of the group's remaining tasks to complete.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async {
     await awaitAllRemainingTasks(isolation: isolation)
@@ -494,6 +494,22 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording a specific
+  /// `CancellationError.Reason`.
+  ///
+  /// Semantically identical to ``cancelAll()``, but the passed `reason` is
+  /// propagated as the cancellation reason for each child task (readable via
+  /// `Task.cancellationReason` from inside those tasks). First-cancel-wins
+  /// on the reason for each child task individually.
+  ///
+  /// - SeeAlso: `cancelAll()`
+  /// - SeeAlso: `CancellationError.Reason`
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason._rawValue))
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `TaskGroup.cancelAll()` method.
@@ -505,10 +521,10 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// ### Interaction with task cancellation shields
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
   /// to return `false` even though the task has been cancelled externally.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -564,8 +580,8 @@ extension TaskGroup: Sendable { }
 ///
 /// A canceled task group can still keep adding tasks, however they will start
 /// being immediately canceled, and may act accordingly to this. To avoid adding
-/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
-/// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:operation:)``
+/// rather than the plain ``addTask(priority:operation:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `ThrowingTaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -647,7 +663,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - Throws: The *first* error that was thrown by a child task during draining all the tasks.
   ///           This first error is stored until all other tasks have completed, and is re-thrown afterwards.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func waitForAll() async throws {
     var firstError: Error? = nil
 
@@ -668,7 +684,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async throws {
     var firstError: Error? = nil
@@ -808,12 +824,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   containing the error that the child task threw.
   ///
   /// - SeeAlso: `next()`
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func nextResult() async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
@@ -852,6 +868,16 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording a specific
+  /// `CancellationError.Reason`.
+  ///
+  /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason._rawValue))
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `ThrowingTaskGroup.cancelAll()` method.
@@ -863,10 +889,10 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// ### Interaction with task cancellation shields
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
   /// to return `false` even though the task has been cancelled externally.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -1118,6 +1144,11 @@ func _taskGroupAddPendingTask(
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
 
+@usableFromInline
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_taskGroup_cancelAllWithFlags")
+func _taskGroupCancelAllWithFlags(group: Builtin.RawPointer, flags: UInt)
+
 /// Checks ONLY if the group was specifically canceled.
 /// The task itself being canceled must be checked separately.
 @available(SwiftStdlib 5.1, *)
@@ -1183,7 +1214,7 @@ struct TaskGroupFlags {
 
 /// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.8, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 func taskGroupCreateFlags(
         discardResults: Bool) -> Int {
   var bits = 0

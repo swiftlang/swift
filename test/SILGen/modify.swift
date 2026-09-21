@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name modify %s | %FileCheck %s
 
@@ -182,6 +183,7 @@ class HasDidSet : Base {
 // CHECK-NEXT:   yield [[VAL]] : $*Int, resume bb1, unwind bb2
 // CHECK:        [[DIDSET:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivW
 // CHECK-NEXT:   apply [[DIDSET]]([[SELF]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:   return [[TUPLE]]
 // CHECK: }
@@ -547,10 +549,10 @@ extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubs
 // CHECK-LABEL: sil_vtable DerivedForOverride {
 // CHECK:   #BaseForOverride.valueStored!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC11valueStoredSivg
 // CHECK:   #BaseForOverride.valueStored!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivs
-// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC11valueStoredSivM
+// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> @yield_once () yields (inout Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivM
 // CHECK:   #BaseForOverride.valueComputed!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC13valueComputedSivg
 // CHECK:   #BaseForOverride.valueComputed!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivs
-// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC13valueComputedSivM
+// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> @yield_once () yields (inout Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivM
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module modify {

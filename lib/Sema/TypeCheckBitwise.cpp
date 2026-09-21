@@ -25,7 +25,6 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 
 using namespace swift;
@@ -349,6 +348,7 @@ bool DeriveImplicitBitwiseCopyableConformance::allowedForFile() {
     case SourceFileKind::DefaultArgument:
     case SourceFileKind::Main:
     case SourceFileKind::SIL:
+    case SourceFileKind::SyntheticMacro:
       return true;
     }
     llvm_unreachable("covered switch");

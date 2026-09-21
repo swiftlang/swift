@@ -224,18 +224,13 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Consumption.h"
@@ -245,6 +240,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -254,7 +250,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -263,8 +258,6 @@
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -325,7 +318,7 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   SILBuilderWithScope debugInfoBuilder(insertPt);
   debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
   debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand(), *varInfo,
-                                    DontPoisonRefs, UsesMoveableValueDebugInfo);
+                                    UsesMoveableValueDebugInfo);
 }
 
 static void convertMemoryReinitToInitForm(SILInstruction *memInst,
@@ -357,19 +350,44 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
 
 /// Is this a reinit instruction that we know how to convert into its init form.
 static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
+  SILValue dest;
   switch (memInst->getKind()) {
   default:
     return false;
 
   case SILInstructionKind::CopyAddrInst: {
     auto *cai = cast<CopyAddrInst>(memInst);
-    return !cai->isInitializationOfDest();
+    if (cai->isInitializationOfDest())
+      return false;
+    dest = cai->getDest();
+    break;
   }
   case SILInstructionKind::StoreInst: {
     auto *si = cast<StoreInst>(memInst);
-    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
+    if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign)
+      return false;
+    dest = si->getDest();
+    break;
   }
   }
+
+  // If the store's destination is a begin_access, the reinit can only be
+  // converted into an init if the access exists solely to host this reinit.
+  // When the store is converted to an init, then the begin_access is
+  // considered the beginning of that reinitialization. A destroy_addres can
+  // then be inserted before the access to compensate for the reinit
+  // conversion. If, however, the access includes other reads, then we cannot
+  // hoist the destroy_addr out of the access scope.
+  if (auto *bai = dyn_cast<BeginAccessInst>(dest)) {
+    for (auto *use : bai->getUses()) {
+      auto *user = use->getUser();
+      if (user == memInst || isa<EndAccessInst>(user))
+        continue;
+      return false;
+    }
+  }
+
+  return true;
 }
 
 using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
@@ -496,8 +514,14 @@ static bool visitScopeEndsRequiringInit(
 static bool isCopyableValue(SILValue value) {
   if (value->getType().isMoveOnly())
     return false;
-  if (isa<MoveOnlyWrapperToCopyableAddrInst>(value))
+  if (auto *unwrap = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(value)) {
+    // If the operand is an address projection (e.g. struct_element_addr),
+    // the copy reads only a subfield rather than the entire @noImplicitCopy
+    // storage — treat as a regular copyable read.
+    if (Projection::isAddressProjection(unwrap->getOperand()))
+      return true;
     return false;
+  }
   return true;
 }
 
@@ -1054,6 +1078,11 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     }
   }
 
+  // A stored borrow is always initialized.
+  if (isa<StoreBorrowInst>(operand)) {
+    return true;
+  }
+
   // A read or write access always begins on an initialized value.
   if (auto access = dyn_cast<BeginAccessInst>(operand)) {
     switch (access->getAccessKind()) {
@@ -1147,11 +1176,46 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Assume a strict check of a temporary or formal access is initialized
   // before the check.
-  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand));
-      asi && address->isStrict()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked alloc_stack as init!\n");
-    return true;
+  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand))) {
+    if (address->isStrict()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding strict-marked alloc_stack as init!\n");
+      return true;
+    }
+    // An alloc_stack initialized by a nearby `copy_addr [init]` writing
+    // into it:
+    //   %asi = alloc_stack $T
+    //   ...      (only read-only / no-effect instructions)
+    //   copy_addr _ to [init] $asi
+    //   ...      (only read-only / no-effect instructions)
+    //   %mark = mark_unresolved_noncopyable_value_inst %asi
+    // The initialization cannot be reached transitively via the use-chain
+    // since it is not applied to the mark itself. We allow benign
+    // intervening instructions but reject anything that may write to
+    // memory other than the recognized init.
+    if (asi->getParent() == address->getParent()) {
+      bool seenInit = false;
+      for (auto it = std::next(asi->getIterator()); &*it != address; ++it) {
+        SILInstruction *inst = &*it;
+        if (auto *cai = dyn_cast<CopyAddrInst>(inst);
+            cai && cai->getDest() == asi && cai->isInitializationOfDest()) {
+          seenInit = true;
+          continue;
+        }
+        // Conservative approach here given that we do not check whether this
+        // instruction applies to the address we are interested in. This would
+        // require alias analysis.
+        if (inst->mayWriteToMemory()) {
+          seenInit = false;
+          break;
+        }
+      }
+      if (seenInit) {
+        LLVM_DEBUG(llvm::dbgs() << "Adding alloc_stack initialized by "
+                                   "copy_addr [init] (no intervening "
+                                   "writes) as init!\n");
+        return true;
+      }
+    }
   }
 
   // SILGen sometimes emits two stacked `mark_unresolved_non_copyable_value`s
@@ -1175,8 +1239,13 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
                  << "Adding stacked mark over init-permitting parent as "
                     "init!\n");
       return true;
-    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
     case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
+      // A read-only parent doesn't itself perform init, so the inner mark is
+      // initialized iff the parent is. This shape arises under opaque values
+      // when address lowering elides a `store_borrow` between two stacked
+      // `[no_consume_or_assign]` marks.
+      return addressBeginsInitialized(parentMark);
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
     case MarkUnresolvedNonCopyableValueInst::CheckKind::
         AssignableButNotConsumable:
       break;
@@ -1324,7 +1393,7 @@ void UseState::initializeLiveness(
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
   }
-  
+
   auto updateForLivenessAccess = [&](BeginAccessInst *beginAccess,
                                      const SmallBitVector &livenessMask) {
     for (auto *endAccess : beginAccess->getEndAccesses()) {
@@ -1740,6 +1809,7 @@ struct CopiedLoadBorrowEliminationVisitor
       auto *nextUse = useWorklist.pop_back_val();
       switch (nextUse->getOperandOwnership()) {
       case OperandOwnership::NonUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
         continue;
@@ -1913,15 +1983,16 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   // Allowing full object consumption in a deinit is still not allowed.
   if (iterType == targetType && !isa<DropDeinitInst>(user)) {
     // Don't allow whole-value consumption of `self` from a `deinit`.
-    if (!fn->getModule().getASTContext().LangOpts
-            .hasFeature(Feature::ConsumeSelfInDeinit)
+    auto &Ctx = fn->getModule().getASTContext();
+    if (!Ctx.LangOpts.hasFeature(Feature::ConsumeSelfInDeinit)
+        && !Ctx.LangOpts.hasFeature(Feature::MutateAndConsumeInDeinit)
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
         && !targetType.getEnumOrBoundGenericEnum()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
-      
+
       return {PartialMutationError::consumeDuringDeinit(iterType)};
     }
 
@@ -1961,7 +2032,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
            useState.address->getType().getNominalOrBoundGenericNominal());
-      if (nom->getValueTypeDestructor() && !isAllowedPartialConsume) {
+      if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
@@ -2123,7 +2194,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
   SILValue getRootAddress() const { return markedValue; }
-  
+
   ASTContext &getASTContext() {
     return markedValue->getFunction()->getASTContext();
   }
@@ -2155,9 +2226,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     liveness->initializeDef(bai);
     liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness->isWithinBoundary(
-              consumingUse->getUser(),
-              moveChecker.deba->get(consumingUse->getFunction()))) {
+      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;
@@ -2165,7 +2234,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     }
     return emittedError;
   }
-  
+
   void onError(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "    Found use unrecognized by the walker!\n";
                  op->getUser()->print(llvm::dbgs()));
@@ -2261,7 +2330,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-  
+
   // Ignore end_cow_mutation_addr.
   if (isa<EndCOWMutationAddrInst>(user)) {
     return true;
@@ -2303,7 +2372,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // immutable, so it is fine if we see debug_values or other uses that aren't
     // directly related to the current marked use; they will have to behave
     // compatibly anyway.
-    if (di->getOperand() == getRootAddress()) {
+    if (di->getSingleOperand() == getRootAddress()) {
       useState.debugValue = di;
     }
     return true;
@@ -2485,7 +2554,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         auto operand = stripAccessAndIdentityCasts(markedValue->getOperand());
         auto *fArg = dyn_cast<SILFunctionArgument>(operand);
         auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand);
-            
+
         // If we have a closure captured that we specialized, we should have a
         // no consume or assign and should emit a normal guaranteed diagnostic.
         if (fArg && fArg->isClosureCapture() &&
@@ -2627,6 +2696,34 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       }
     }
     return true;
+  }
+
+  // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
+  // leaves Src in place. Model this by recording the take at the entry of the
+  // success block rather than at the branch itself, so liveness treats Src as
+  // consumed starting there while still live from the branch to the failure
+  // edge. CopyOnSuccess never consumes Src, so it is only a liveness use.
+  // Both casts write to Dest, which must not be mistaken for a write to Src.
+  if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
+    auto consumption = ccabi->getConsumptionKind();
+    if (ccabi->getSrc() == op->get() &&
+        (consumption == CastConsumptionKind::TakeOnSuccess ||
+         consumption == CastConsumptionKind::CopyOnSuccess)) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: " << *user);
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      for (auto leafRange : leafRanges) {
+        if (consumption == CastConsumptionKind::TakeOnSuccess)
+          useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
   }
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our
@@ -2821,7 +2918,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
     return true;
   }
-  
+
   if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
     switch (access->getAccessKind()) {
     // Treat an opaque read access as a borrow liveness use for the duration
@@ -2935,6 +3032,19 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
 
   for (auto takeInstAndValue : instsToTest) {
     LLVM_DEBUG(llvm::dbgs() << "    Checking: " << *takeInstAndValue.first);
+
+    // The value is consumed and used at the same instruction (e.g. passed both
+    // @in and @in_guaranteed to one apply).
+    if (addressUseState.isLivenessUse(takeInstAndValue.first,
+                                      takeInstAndValue.second)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        Consumed and used at the same instruction!\n");
+      hadAnyErrorUsers = true;
+      diagnosticEmitter.emitAddressInstConsumesAndUsesValue(
+          addressUseState.address, takeInstAndValue.first);
+      emittedDiagnostic = true;
+      continue;
+    }
 
     // Check if we are in the boundary...
 
@@ -3684,7 +3794,23 @@ void ExtendUnconsumedLiveness::run() {
     }
     for (auto pair : addressUseState.reinitInsts) {
       if (pair.second.test(element)) {
-        destroys[pair.first] = DestroyKind::Reinit;
+        SILInstruction *reinit = pair.first;
+        // If the reinit stores through a begin_access and will be converted
+        // into an init, record the begin_access as the destroy point rather
+        // than the reinit itself. This keeps the old value's destroy from
+        // being sunk into the access scope (immediately before the reinit);
+        // instead liveness is extended only up to the begin_access.
+        SILInstruction *destroy = reinit;
+        if (isReinitToInitConvertibleInst(reinit)) {
+          SILValue dest;
+          if (auto *si = dyn_cast<StoreInst>(reinit))
+            dest = si->getDest();
+          else if (auto *cai = dyn_cast<CopyAddrInst>(reinit))
+            dest = cai->getDest();
+          if (auto *bai = dyn_cast_or_null<BeginAccessInst>(dest))
+            destroy = bai;
+        }
+        destroys[destroy] = DestroyKind::Reinit;
       }
     }
 

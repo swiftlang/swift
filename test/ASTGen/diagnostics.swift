@@ -77,11 +77,12 @@ func misisngPatternTest(arr: [Int]) {
          // expected-note@-1 {{insert pattern, 'in', and expression}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
 }
 
-using @MainActor // expected-note {{default isolation was previously declared here}}
-using nonisolated // expected-error {{invalid redeclaration of file-level default actor isolation}}
+default @MainActor // expected-note {{file-level default isolation previously declared here}}
+default nonisolated // expected-error {{invalid redeclaration of file-level default isolation}}
 
-using @Test
-// expected-error@-1 {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
+default @Test
+// expected-error@-1 {{cannot find type 'Test' in scope}}
+// expected-note@-2 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
-using test
-// expected-error@-1 {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
+default test
+// expected-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}

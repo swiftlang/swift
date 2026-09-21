@@ -23,16 +23,15 @@
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/NoDiscard.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
+class AvailabilityQuery;
 class ParameterList;
 class ProfileCounterRef;
 
@@ -317,6 +316,15 @@ enum class StorageReferenceOperationKind {
   Consume
 };
 
+/// The kind of resignID to call.
+enum class DistributedResignIDKind {
+  // `resignID(_:)`
+  ResignID,
+  // `resignRemoteID(_:)`
+  // Available since: Swift 6.5
+  ResignRemoteID,
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -328,8 +336,8 @@ public:
   /// The SILFunction being constructed.
   SILFunction &F;
 
-  /// The SILModuleConventions for this SIL module.
-  SILModuleConventions silConv;
+  /// F's lowered-addresses state, for conventions queries.
+  SILAddressConventions silConv;
 
   bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }
 
@@ -1064,9 +1072,12 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param field The stored property that has to be initialized.
   /// \param substitutions The substitutions to apply to initializer and setter.
-  void emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
-                             PatternBindingDecl *field,
-                             SubstitutionMap substitutions);
+  /// \param initAccessorSubsumedStorage Stored properties set up through an init
+  /// accessor on another property; their own initializer is skipped.
+  void emitMemberInitializer(
+      DeclContext *dc, VarDecl *selfDecl, PatternBindingDecl *field,
+      SubstitutionMap substitutions,
+      const llvm::SmallPtrSetImpl<VarDecl *> &initAccessorSubsumedStorage);
 
   void emitMemberInitializationViaInitAccessor(DeclContext *dc,
                                                VarDecl *selfDecl,
@@ -1333,6 +1344,7 @@ public:
 
   void finalizeEmission();
   void finalizeAddTaskLocalValue(BuiltinInst *builtin);
+  void finalizeTaskPushDeadline(BuiltinInst *builtin);
 
   /// Add a callback that will run when emission is complete for the
   /// current function. The callback is expected to have signature:
@@ -1575,8 +1587,14 @@ public:
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   ///
-  /// This is intended to only be used for destructors.
-  SILValue emitSelfDeclForDestructor(VarDecl *selfDecl);
+  /// This is intended to only be used for class `deinit`s.
+  SILValue emitSelfDeclForClassDeinit(VarDecl *selfDecl);
+
+  /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
+  /// up debug info, etc.  This returns the 'self' value.
+  ///
+  /// This is intended to only be used for struct or enum `deinit`s.
+  SILValue emitSelfDeclForMoveOnlyDeinit(VarDecl *selfDecl);
 
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
@@ -1758,6 +1776,12 @@ public:
   ManagedValue emitProtocolMetatypeToObject(SILLocation loc,
                                             CanType inputTy,
                                             SILType resultTy);
+
+  ManagedValue emitDoubleToCGFloat(SILLocation loc,
+                                   SILValue doubleValue, SGFContext C);
+
+  ManagedValue emitCGFloatToDouble(SILLocation loc,
+                                   SILValue cgfloatValue, SGFContext C);
 
   ManagedValue manageOpaqueValue(ManagedValue value,
                                  SILLocation loc,
@@ -2792,6 +2816,11 @@ public:
   /// Emit an `if #available` query, returning the resulting boolean test value.
   SILValue emitIfAvailableQuery(SILLocation loc, PoundAvailableInfo *info);
 
+  /// Emit an availability query for the given `AvailabilityQuery`, returning
+  /// the resulting boolean test value
+  SILValue emitAvailabilityQuery(SILLocation loc,
+                                 const AvailabilityQuery &query);
+
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//
@@ -2865,7 +2894,7 @@ public:
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.actorSystem.resignID(self.id)
+  ///   self.actorSystem.resign(Remote)ID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
@@ -2873,7 +2902,8 @@ public:
   /// \param actorDecl the declaration corresponding to the actor
   /// \param actorSelf the SIL value representing the distributed actor instance
   void emitDistributedActorSystemResignIDCall(SILLocation loc,
-                              ClassDecl *actorDecl, ManagedValue actorSelf);
+                              ClassDecl *actorDecl, ManagedValue actorSelf,
+                              DistributedResignIDKind kind);
 
   /// Emits check for remote actor and a branch that implements deallocating
   /// deinit for remote proxy. Calls \p emitLocalDeinit to generate branch for
@@ -3378,6 +3408,23 @@ public:
   /// If context is init accessor, find a mapping between the given type
   /// property and argument declaration synthesized for it.
   ParamDecl *isMappedToInitAccessorArgument(VarDecl *property);
+  
+  /// Arrange for an end-of-formal-scope marker for the given variable
+  /// binding value to be emitted when the current scope is exited.
+  /// 
+  /// This instruction by itself does not have any effects, but serves as a
+  /// marker for lifetime resolution so that it can reason about the formal
+  /// scopes of variables.
+  void enterFormalScopeCleanup(SILLocation loc, SILValue value);
+  
+  /// Arrange for an end-of-formal-scope marker for the given variable
+  /// binding value (which may not yet be determined, but must be bound before
+  /// the cleanup runs) to be emitted when the current scope is exited.
+  /// 
+  /// This instruction by itself does not have any effects, but serves as a
+  /// marker for lifetime resolution so that it can reason about the formal
+  /// scopes of variables.
+  void enterLetBindingFormalScopeCleanup(VarDecl *vd);
 };
 
 

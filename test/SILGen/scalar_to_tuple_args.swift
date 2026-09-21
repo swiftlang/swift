@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name scalar_to_tuple_args %s | %FileCheck %s
 
@@ -58,8 +59,10 @@ tupleWithDefaults(x: (x,x))
 // CHECK: [[BB:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[ADDR:%.*]] = ref_tail_addr
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[ADDR0:%.*]] = index_addr [projection] [[ADDR]] : $*Int, [[IDX0]] : $Builtin.Word
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
-// CHECK: copy_addr [[READ]] to [init] [[ADDR]]
+// CHECK: copy_addr [[READ]] to [init] [[ADDR0]]
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Int>([[ARRAY]])
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @$s20scalar_to_tuple_args13variadicFirstyySid_tF

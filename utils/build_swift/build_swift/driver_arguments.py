@@ -342,6 +342,10 @@ def create_argument_parser():
     option('--dump-config', toggle_true,
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
+    option('--dump-options', store_true,
+           help='instead of building, write a JSON description of every '
+                'recognized option (both build-script and build-script-impl) '
+                'to stdout and exit')
 
     option(['--reconfigure'], store_true,
            help="Reconfigure all projects as we build")
@@ -814,6 +818,9 @@ def create_argument_parser():
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
+    option(['--sarif'], toggle_true('build_sarif'),
+           help='build SARIF diagnostic serialization support into the compiler')
+
     option(['--skip-early-swiftsyntax'],
            toggle_false('build_early_swiftsyntax'),
            help='skip building early SwiftSyntax')
@@ -895,6 +902,29 @@ def create_argument_parser():
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
            help='install SourceKitLSP')
+
+    # Emscripten options
+
+    option(['--build-emscripten-stdlib'],
+           toggle_true('build_emscriptenstdlib'),
+           help='build the stdlib for Emscripten target into a '
+                'separate build directory')
+    option(['--build-emscripten-host-llvm'],
+           toggle_true('build_emscripten_host_llvm'),
+           help='cross-build LLVM static libraries to run hosted on a '
+                'WebAssembly (Emscripten) runtime')
+    option(['--build-emscripten-host-swift'],
+           toggle_true('build_emscripten_host_swift'),
+           help='cross-build swift-frontend to run hosted on a WebAssembly '
+                '(Emscripten) runtime. Requires the cross-LLVM and the '
+                'emscripten target stdlib/sysroot to exist already: build '
+                'them in this or a prior invocation with '
+                '--build-emscripten-host-llvm and --build-emscripten-stdlib')
+    option(['--emscripten-path'], store_path,
+           help='path to the Emscripten checkout')
+    option(['--skip-test-emscripten-stdlib'],
+           toggle_false('test_emscriptenstdlib'),
+           help='skip testing stdlib for Emscripten')
 
     # Swift Testing options
 
@@ -1372,8 +1402,12 @@ def create_argument_parser():
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
-    option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
-           help='skip building Swift Benchmark Suite')
+    option('--build-benchmarks', toggle_true('build_benchmarks'), default=False,
+           help='build Swift Benchmark Suite')
+
+    option('--skip-build-benchmarks', toggle_true('skip_build_benchmarks'),
+           help='[no-op] building the Swift Benchmark Suite is skipped by '
+                'default; pass --build-benchmarks to opt in')
 
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
@@ -1500,6 +1534,16 @@ def create_argument_parser():
     option('--llvm-enable-modules', toggle_true('llvm_enable_modules'),
            help='enable building llvm using modules')
 
+    option('--llvm-enable-index-store', toggle_true('llvm_enable_index_store'),
+           default=False,
+           help='emit -index-store-path while building LLVM/Clang and Swift '
+                'host tools (gated on the host compiler accepting the flag, '
+                'so it is a no-op for older compilers). Defaults to OFF. It '
+                'is also forced OFF when --sccache or an explicit '
+                '--cmake-c-launcher/--cmake-cxx-launcher is in use (compiler '
+                'caches cannot cache the index-store side outputs and would '
+                'otherwise miss on every translation unit).')
+
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
            help='LLVM target generators to build')
@@ -1602,10 +1646,6 @@ def create_argument_parser():
     option('--enable-experimental-cxx-interop', toggle_true,
            default=True,
            help='Enable experimental C++ interop.')
-
-    option('--enable-cxx-interop-swift-bridging-header', toggle_true,
-           default=True,
-           help='Ship the <swift/bridging> header for C++ interop')
 
     option('--enable-experimental-distributed', toggle_true,
            default=True,

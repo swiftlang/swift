@@ -24,7 +24,7 @@ extension Unicode.ASCII: Unicode.Encoding {
   }
 
   /// Returns whether the given code unit represents an ASCII scalar
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func isASCII(_ x: CodeUnit) -> Bool { return UTF8.isASCII(x) }
 
   @inline(__always)

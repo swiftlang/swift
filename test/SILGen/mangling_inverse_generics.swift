@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -module-name test -parse-as-library -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence -enable-experimental-feature PreInverseGenericsExcept
 // RUN: %target-swift-emit-silgen %s -module-name test \
 // RUN:   -parse-as-library \
 // RUN:   -enable-experimental-feature Lifetimes \

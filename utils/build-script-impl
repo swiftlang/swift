@@ -77,6 +77,7 @@ KNOWN_SETTINGS=(
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
     dsymutil-jobs                                 "1"               "number of parallel invocations of dsymutil"
     extra-dsymutil-args                           ""                "additional arguments to pass to dsymutil"
+    env-supports-end-of-options                   ""                "set if env(1) recognizes '--' as an end-of-options marker; build-script probes for this and forwards the flag"
 
     ## Build Tools
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -105,7 +106,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-ios                 "16.0"            "minimum deployment target version for iOS"
     darwin-deployment-version-osx                 "13.0"            "minimum deployment target version for OS X"
     darwin-deployment-version-tvos                "16.0"            "minimum deployment target version for tvOS"
-    darwin-deployment-version-watchos             "6.0"             "minimum deployment target version for watchOS"
+    darwin-deployment-version-watchos             "9.0"             "minimum deployment target version for watchOS"
     darwin-deployment-version-xros                "1.0"             "minimum deployment target version for xrOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
     darwin-install-extract-symbols-use-just-built-dsymutil ""       "whether we should extract symbols using the just built dsymutil"
@@ -191,7 +192,6 @@ KNOWN_SETTINGS=(
     lldb-assertions                               "1"               "build lldb with assertions enabled"
     lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
     lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
-    lldb-test-swift-compatibility                 ""                "specify additional Swift compilers to test lldb with"
     lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
     lldb-use-system-debugserver                   ""                "don't try to codesign debugserver, and use the system's debugserver instead"
     lldb-configure-tests                          "1"               "if set, will make sure we configure LLDB's test target without running the tests"
@@ -199,6 +199,7 @@ KNOWN_SETTINGS=(
     ## LLVM Options
     llvm-enable-lto                               ""                "Must be set to one of 'thin' or 'full'"
     llvm-enable-modules                           "0"               "enable building llvm using modules"
+    llvm-enable-index-store                       "1"               "enable '-index-store-path' when compiling LLVM/Clang and Swift host tools (gated on the host compiler accepting the flag)"
     llvm-install-components                       ""                "a semicolon-separated list of LLVM components to install"
     llvm-lit-args                                 ""                "If set, override the lit args passed to LLVM"
     enable-llvm-assertions                        "1"               "set to enable llvm assertions"
@@ -809,6 +810,16 @@ function set_build_options_for_host() {
             ;;
     esac
 
+    # Forward -DLLVM_ENABLE_INDEX_STORE to both the LLVM and Swift host
+    # configures. HandleLLVMOptions.cmake (used by both) gates the actual
+    # -index-store-path append on a check_{c,cxx}_compiler_flag probe, so
+    # this is a no-op when the host compiler does not understand the flag.
+    llvm_cmake_options+=(
+        -DLLVM_ENABLE_INDEX_STORE:BOOL="$(true_false ${LLVM_ENABLE_INDEX_STORE})"
+    )
+    swift_cmake_options+=(
+        -DLLVM_ENABLE_INDEX_STORE:BOOL="$(true_false ${LLVM_ENABLE_INDEX_STORE})"
+    )
 
     # If we are asked to not generate test targets for LLVM and or Swift,
     # disable as many LLVM tools as we can. This improves compile time when
@@ -858,8 +869,17 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
+
+    # The LLDB test suite is driven through the check-lldb targets, so its lit
+    # arguments have to be baked in here rather than passed at test time.
+    local lldb_lit_args="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
+    lldb_lit_args+=" --xunit-xml-output=$(lldb_test_results_directory ${host})/results.xml"
+    if test "${ENABLE_ASAN}" -o "$(echo ${LLDB_EXTRA_CMAKE_ARGS}|grep Address)"; then
+        # Limit the number of parallel tests
+        lldb_lit_args+=" -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
+    fi
     lldb_cmake_options+=(
-        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
+        -DLLVM_LIT_ARGS="${lldb_lit_args}"
     )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
@@ -971,12 +991,52 @@ usage() {
     echo "  create an installable package operates on install-destdir as normal."
 }
 
+# Emit a JSON list describing every entry in KNOWN_SETTINGS.
+# Used by `build-script --dump-options` to expose the bash layer's flags
+# alongside the Python layer's flags.
+dump_options_json() {
+    local s
+    json_escape() {
+        s="$1"
+        s="${s//\\/\\\\}"
+        s="${s//\"/\\\"}"
+        s="${s//$'\n'/\\n}"
+        s="${s//$'\r'/\\r}"
+        s="${s//$'\t'/\\t}"
+        printf '%s' "$s"
+    }
+
+    printf '['
+    local first=1
+    for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
+        if (( first )); then
+            first=0
+        else
+            printf ','
+        fi
+        local name="${KNOWN_SETTINGS[i]}"
+        local default_value="${KNOWN_SETTINGS[$((i+1))]}"
+        local desc="${KNOWN_SETTINGS[$((i+2))]}"
+        printf '{"name":"%s","option":"--%s","default":"%s","help":"%s"}' \
+            "$(json_escape "${name}")" \
+            "$(json_escape "${name}")" \
+            "$(json_escape "${default_value}")" \
+            "$(json_escape "${desc}")"
+    done
+    printf ']\n'
+}
+
 # Scan all command-line arguments
 while [[ "$1" ]] ; do
     case "$1" in
         -h | --help )
             usage
             exit
+            ;;
+
+        --dump-options )
+            dump_options_json
+            exit 0
             ;;
 
         --* )
@@ -1028,6 +1088,17 @@ fi
 
 if [[ "${SKIP_RECONFIGURE}" ]]; then
     RECONFIGURE=""
+fi
+
+# `env(1)` end-of-options terminator. macOS 26's env(1) is stricter about
+# option scanning past the program token, so callers must explicitly end
+# option scanning with `--` before the program. build-script probes whether
+# the local env(1) recognizes `--` and forwards
+# --env-supports-end-of-options when it does; otherwise this expands to
+# nothing so we don't break older env(1)s that would try to exec `--`.
+ENV_OPT_TERMINATOR=()
+if [[ "${ENV_SUPPORTS_END_OF_OPTIONS}" ]]; then
+    ENV_OPT_TERMINATOR=(--)
 fi
 
 # WORKSPACE, BUILD_DIR, and INSTALLABLE_PACKAGE must be absolute paths
@@ -1305,6 +1376,11 @@ function build_directory_bin() {
     product=$2
     root="$(build_directory ${host} ${product})"
     echo "${root}/bin"
+}
+
+function lldb_test_results_directory() {
+    host=$1
+    echo "$(build_directory ${host} lldb)/test-results"
 }
 
 function is_cmake_release_build_type() {
@@ -2034,9 +2110,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
 
                     case $package in
-                        "" | pthreads | darwin | linux | win32 | c11 | none) ;;
+                        "" | pthreads | darwin | linux | win32 | c11 | none | embedded) ;;
                         *)
-                        echo "build-script: unknown threading package $package for sdk $sdk; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', or empty for sdk default"
+                        echo "build-script: unknown threading package $package for sdk $sdk; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', 'embedded', or empty for sdk default"
                         exit 1
                         ;;
                     esac
@@ -2593,7 +2669,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
             fi
             with_pushd "${build_dir}" \
-                call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
+                call env "${EXTRA_DISTCC_OPTIONS[@]}" "${ENV_OPT_TERMINATOR[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
         fi
 
         # Build.
@@ -2685,46 +2761,22 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--- Can't execute tests for ${host}, skipping... ---"
                     continue
                 fi
-                llvm_build_dir=$(build_directory ${host} llvm)
                 lldb_build_dir=$(build_directory ${host} lldb)
-                results_dir="${lldb_build_dir}/test-results"
 
-                call mkdir -p "${results_dir}"
-                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
+                # The check-lldb targets write their JUnit report here; lit does
+                # not create the directory itself.
+                call mkdir -p "$(lldb_test_results_directory ${host})"
 
-                if test "${ENABLE_ASAN}" -o "$(echo ${LLDB_EXTRA_CMAKE_ARGS}|grep Address)"; then
-                    # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
-                fi
-
-                FILTER_SWIFT_OPTION="--filter=[sS]wift"
-                LLVM_LIT_FILTER_ARG=""
+                # check-lldb-swift is check-lldb restricted to --filter=[sS]wift.
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
+                    lldb_check_target="check-lldb-swift"
+                else
+                    lldb_check_target="check-lldb"
                 fi
 
-                echo "--- Running LLDB unit tests ---"
-                with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
                 echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
-
-                if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
-                    echo "Running LLDB swift compatibility tests against" \
-                         "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                    DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
-                    with_pushd ${results_dir} \
-                       call "${llvm_build_dir}/bin/llvm-lit" \
-                            "${lldb_build_dir}/test" \
-                            ${LLVM_LIT_ARGS} \
-                            --param dotest-args="${DOTEST_ARGS}" \
-                            --filter=compat
-                fi
+                    call ${NINJA_BIN} -j ${BUILD_JOBS} ${lldb_check_target}
                 continue
                 ;;
             llbuild)
@@ -2786,7 +2838,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                   echo "--- Running tests for ${product} ---"
                   with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                      call env VERBOSE=1 make check
+                      call env VERBOSE=1 "${ENV_OPT_TERMINATOR[@]}" make check
                   echo "--- Finished tests for ${product} ---"
                   continue
                 ;;
@@ -3010,7 +3062,7 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})
 
-        call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
+        call env DESTDIR="${host_install_destdir}" "${ENV_OPT_TERMINATOR[@]}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
     done
 done
 

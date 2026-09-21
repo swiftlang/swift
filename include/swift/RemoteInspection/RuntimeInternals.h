@@ -125,6 +125,8 @@ struct AsyncTaskPrivateStorage {
   uint32_t Id;
   typename Runtime::StoredSize BasePriority;
   typename Runtime::StoredPointer DependencyRecord;
+  typename Runtime::StoredPointer RegistryNext;
+  typename Runtime::StoredPointer RegistryPrev;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>
@@ -203,6 +205,15 @@ struct ChildFragment {
 template <typename Runtime>
 struct GroupChildFragment {
   typename Runtime::StoredPointer Group;
+};
+
+/// Mirror of `AsyncTask::NameFragment` in include/swift/ABI/Task.h.
+/// Tail-allocated immediately after `AsyncTask` iff
+/// `JobFlags::task_hasInitialTaskName()` is set.
+template <typename Runtime>
+struct NameFragment {
+  typename Runtime::StoredPointer Name;
+  typename Runtime::StoredSize NameLength;
 };
 
 template <typename Runtime>

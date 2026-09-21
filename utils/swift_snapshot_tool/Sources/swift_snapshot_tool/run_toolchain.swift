@@ -49,7 +49,7 @@ struct RunToolchains: AsyncParsableCommand {
     let d = DateFormatter()
     d.dateFormat = "yyyy-MM-dd"
     guard let result = d.date(from: date) else {
-      log("Improperly formatted date: \(date)! Expected format: yyyy_MM_dd.")
+      log("Improperly formatted date: \(date)! Expected format: yyyy-MM-dd.")
       fatalError()
     }
     return result
@@ -83,7 +83,7 @@ struct RunToolchains: AsyncParsableCommand {
     let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
     let date = self.dateAsDate
-    guard var tagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= date }) else {
+    guard var tagIndex = selectTagIndex(tags, onOrBefore: date) else {
       log("Failed to find tag with date: \(date)")
       fatalError()
     }

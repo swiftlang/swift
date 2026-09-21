@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s
 // RUN: %target-swift-emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s -check-prefix=IR
 

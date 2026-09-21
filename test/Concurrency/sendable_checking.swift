@@ -13,7 +13,7 @@ struct NS1 { }
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
 extension NS1: Sendable { }
-// expected-note@-1 4{{conformance of 'NS1' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2 4{{conformance of 'NS1' to 'Sendable' has been explicitly marked unavailable here}}
 
 @available(SwiftStdlib 5.1, *)
 struct NS2 { // expected-note {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
@@ -104,8 +104,8 @@ public actor MyActor: MyProto {
 // Make sure the generic signature doesn't minimize away Sendable requirements.
 class NSClass { }
 
-@available(*, unavailable)
-extension NSClass: @unchecked Sendable {} // expected-note {{conformance of 'NSClass' to 'Sendable' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{conformance of 'NSClass' to 'Sendable' has been explicitly marked unavailable here}}
+extension NSClass: @unchecked Sendable {}
 
 struct WrapClass<T: NSClass> {
   var t: T
@@ -480,7 +480,7 @@ struct DowngradeForPreconcurrency {
   func createStream() -> AsyncStream<NonSendable> {
     AsyncStream<NonSendable> {
       self.x // expected-tns-warning {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
-      // expected-tns-note @-1 {{'self.x.some' is exposed to main actor-isolated code}}
+      // expected-tns-note @-1 {{'self.x' is exposed to main actor-isolated code}}
       // expected-warning @-2 {{main actor-isolated property 'x' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
       // expected-warning @-3 {{non-Sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
     }
@@ -511,7 +511,7 @@ struct UnavailableSendable {}
 
 @available(*, unavailable)
 extension UnavailableSendable: Sendable {}
-// expected-note@-1 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
 
 @available(SwiftStdlib 5.1, *)
 func checkOpaqueType() -> some Sendable {

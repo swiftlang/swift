@@ -34,9 +34,8 @@
 
 // CHECK: // protocol witness for Loggable.verbosity.getter in conformance MyLib
 // CHECK: sil shared [transparent] [thunk] @$s7FileLib02MyB0V12AppleLogging8LoggableAadEP9verbositySivgTW : $@convention(witness_method: Loggable) (@in_guaranteed MyLib) -> Int {
-// CHECK: // %0                                             // user: %1
 // CHECK: bb0(%0 : $*MyLib):
-// CHECK:   %1 = load %0 : $*MyLib                          // user: %3
+// CHECK:   %1 = struct $MyLib
 // CHECK:   // function_ref MyLib.verbosity.getter
 // CHECK:   %2 = function_ref @$s7FileLib02MyB0V9verbositySivg : $@convention(method) (MyLib) -> Int // user: %3
 // CHECK:   %3 = apply %2(%1) : $@convention(method) (MyLib) -> Int // user: %4

@@ -1,8 +1,9 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s > %t/output.silgen
+// RUN: %FileCheck < %t/output.silgen %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
-
-// FIXME: "HECK" lines all need to be updated for OSSA.
 
 class C {}
 
@@ -21,16 +22,15 @@ func source<T>(_ t: T.Type) -> T
 
 // Test array initialization - we are still (somewhat) using addresses
 // ---
-// CHECK-LABEL: sil [ossa] @$s20opaque_values_silgen10callVarArgyyF : $@convention(thin) () -> () {
-// HECK: %[[APY:.*]] = apply %{{.*}}<Any>(%{{.*}}) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// HECK: %[[BRW:.*]] = begin_borrow %[[APY]]
-// HECK: %[[TPL:.*]] = tuple_extract %[[BRW]] : $(Array<Any>, Builtin.RawPointer), 1
-// HECK: end_borrow %[[BRW]] : $(Array<Any>, Builtin.RawPointer)
-// HECK: destroy_value %[[APY]]
-// HECK: %[[PTR:.*]] = pointer_to_address %[[TPL]] : $Builtin.RawPointer to [strict] $*Any
-// HECK: [[IOPAQUE:%.*]] = init_existential_value %{{.*}} : $Int, $Int, $Any
-// HECK: store [[IOPAQUE]] to [init] %[[PTR]] : $*Any
-// HECK: return %{{.*}} : $()
+// CHECK-LABEL: sil [ossa] [opaque] @$s20opaque_values_silgen10callVarArgyyF : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%[^,]+]] = apply %{{.*}}<Any>(%{{.*}}) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: ([[ARRAY:%[^,]+]], {{%[^)]+}}) = destructure_tuple [[ALLOC]] : $(Array<Any>, Builtin.RawPointer)
+// CHECK: [[BORROW:%[^,]+]] = begin_borrow [[ARRAY]] : $Array<Any>
+// CHECK: [[ELT_ADDR:%[^,]+]] = index_addr [projection] {{%[^,]+}} : $*Any, {{%[^,]+}}
+// CHECK: [[IOPAQUE:%[^,]+]] = init_existential_value {{%[^,]+}} : $Int, $Int, $Any
+// CHECK: store [[IOPAQUE]] to [init] [[ELT_ADDR]] : $*Any
+// CHECK: end_borrow [[BORROW]] : $Array<Any>
+// CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10callVarArgyyF'
 public func callVarArg() {
   hasVarArg(3)
@@ -38,29 +38,25 @@ public func callVarArg() {
 
 // Tests For-each statements
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen11forEachStmtyyF : $@convention(thin) () -> () {
-// HECK: bb0:
-// HECK:   [[PROJ_BOX_ARG:%.*]] = project_box %{{.*}} : ${ var IndexingIterator<Range<Int>> }
-// HECK:   [[APPLY_ARG1:%.*]] = apply
-// HECK-NOT: alloc_stack $Int
-// HECK-NOT: store [[APPLY_ARG1]] to [trivial]
-// HECK-NOT: alloc_stack $Range<Int>
-// HECK-NOT: dealloc_stack
-// HECK:   [[APPLY_ARG2:%.*]] = apply %{{.*}}<Range<Int>>
-// HECK:   store [[APPLY_ARG2]] to [trivial] [[PROJ_BOX_ARG]]
-// HECK:   br bb1
-// HECK: bb1:
-// CHECK-NOT: alloc_stack $Optional<Int>
-// HECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<Range<Int>>
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen11forEachStmtyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[PROJ_BOX_ARG:%.*]] = project_box %{{.*}} : ${ var IndexingIterator<Range<Int>> }
+// CHECK-NOT: alloc_stack $Int
+// CHECK-NOT: alloc_stack $Range<Int>
 // CHECK-NOT: dealloc_stack
-// HECK:   switch_enum [[APPLY_ARG3]]
-// HECK: bb2:
-// HECK:   br bb3
-// HECK: bb3:
-// HECK:   return %{{.*}} : $()
-// HECK: bb4([[ENUM_ARG:%.*]] : $Int):
+// CHECK:   [[ITER:%.*]] = apply %{{.*}}<Range<Int>>({{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in τ_0_0) -> @out IndexingIterator<τ_0_0>
+// CHECK:   store [[ITER]] to [trivial] [[PROJ_BOX_ARG]]
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack $Optional<Int>
+// CHECK:   [[NEXT:%.*]] = apply %{{.*}}<Range<Int>>
+// CHECK-NOT: dealloc_stack
+// CHECK:   switch_enum [[NEXT]] : $Optional<Int>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
+// CHECK: bb2([[ENUM_ARG:%.*]] : $Int):
 // CHECK-NOT:   unchecked_enum_data
-// HECK:   br bb1
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen11forEachStmtyyF'
 func forEachStmt() {
   for _ in 1..<42 {
@@ -69,7 +65,7 @@ func forEachStmt() {
 
 // Tests that existential boxes can contain opaque types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
 // CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened({{.*}}, any Error) Self
 // CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
@@ -86,15 +82,15 @@ func openExistBox(_ x: Error) -> String {
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen11condFromAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> () {
-// HECK: bb0([[ARG:%.*]] : $Any):
-// HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// HECK:   checked_cast_br Any in [[COPY_ARG]] : $Any to $@callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int), bb2, bb1
-// HECK: bb2([[THUNK_PARAM:%.*]] : $@callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
-// HECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
-// HECK:   partial_apply [callee_guaranteed] [[THUNK_REF]]([[THUNK_PARAM]])
-// HECK: bb6:
-// HECK:   return %{{.*}} : $()
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen11condFromAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Any):
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
+// CHECK:   checked_cast_br Any in [[COPY_ARG]] : $Any to (Int, (Int, (Int, Int)), Int) -> (Int, (Int, (Int, Int)), Int), [[SUCCESS:bb[0-9]+]], {{bb[0-9]+}}
+// CHECK: [[SUCCESS]]([[CAST:%.*]] : @owned $@callee_guaranteed @substituted <{{.*}}> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> @out τ_0_3 for <{{.*}}>):
+// CHECK:   [[CONVERTED:%.*]] = convert_function [[CAST]] {{.*}} to $@callee_guaranteed (@in_guaranteed Int, @in_guaranteed (Int, (Int, Int)), @in_guaranteed Int) -> @out (Int, (Int, (Int, Int)), Int)
+// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed (Int, (Int, Int)), @in_guaranteed Int) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
+// CHECK:   partial_apply [callee_guaranteed] [[THUNK_REF]]([[CONVERTED]])
+// CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen11condFromAnyyyypF'
 func condFromAny(_ x: Any) {
   if let f = x as? (Int, (Int, (Int, Int)), Int) -> (Int, (Int, (Int, Int)), Int) {
@@ -108,26 +104,28 @@ protocol EmptyP {}
 
 struct AddressOnlyStruct : EmptyP {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF : $@convention(thin) (Bool) -> @out any EmptyP {
-// HECK: bb0([[ARG:%.*]] : $Bool):
-// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any EmptyP }, var
-// HECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
-// HECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
-// HECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $any EmptyP
-// HECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*any EmptyP
-// HECK:   [[APPLY_FOR_BRANCH:%.*]] = apply %{{.*}}([[ARG]]) : $@convention(method) (Bool) -> Builtin.Int1
-// HECK:   cond_br [[APPLY_FOR_BRANCH]], bb2, bb1
-// HECK: bb1:
-// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*EmptyP
-// HECK:   [[RETVAL1:%.*]] = load [copy] [[READ]] : $*EmptyP
-// HECK:   br bb3([[RETVAL1]] : $EmptyP)
-// HECK: bb2:
-// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*EmptyP
-// HECK:   [[RETVAL2:%.*]] = load [copy] [[READ]] : $*EmptyP
-// HECK:   br bb3([[RETVAL2]] : $EmptyP)
-// HECK: bb3([[RETVAL:%.*]] : $EmptyP):
-// HECK:   destroy_value [[ALLOC_OF_BOX]]
-// HECK:   return [[RETVAL]] : $EmptyP
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF : $@convention(thin) (Bool) -> @out any EmptyP {
+// CHECK: bb0([[ARG:%.*]] : $Bool):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any EmptyP }, var
+// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[ALLOC_OF_BOX]]
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX_LIFETIME]]
+// CHECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $any EmptyP
+// CHECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*any EmptyP
+// CHECK:   [[COND:%.*]] = struct_extract [[ARG]] : $Bool, #Bool._value
+// CHECK:   cond_br [[COND]], bb1, bb2
+// CHECK: bb1:
+// CHECK:   [[READ1:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*any EmptyP
+// CHECK:   [[RETVAL1:%.*]] = load [copy] [[READ1]] : $*any EmptyP
+// CHECK:   br bb3([[RETVAL1]] : $any EmptyP)
+// CHECK: bb2:
+// CHECK:   [[READ2:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*any EmptyP
+// CHECK:   [[RETVAL2:%.*]] = load [copy] [[READ2]] : $*any EmptyP
+// CHECK:   br bb3([[RETVAL2]] : $any EmptyP)
+// CHECK: bb3([[RETVAL:%.*]] : @owned $any EmptyP):
+// CHECK:   end_borrow [[BOX_LIFETIME]]
+// CHECK:   destroy_value [[ALLOC_OF_BOX]]
+// CHECK:   return [[RETVAL]] : $any EmptyP
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF'
 func addrOnlyIf(x: Bool) -> EmptyP {
   var a : EmptyP = AddressOnlyStruct()
@@ -137,20 +135,22 @@ func addrOnlyIf(x: Bool) -> EmptyP {
 
 // Tests LValue of error types / existential boxes
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12propOfLValueySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
-// HECK: bb0([[ARG:%.*]] : $any Error):
-// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any Error }
-// HECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
-// HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// HECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
-// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*any Error
-// HECK:   [[LOAD_BOX:%.*]] = load [copy] [[READ]]
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $any Error to $*@opened({{.*}}, any Error) Self
-// HECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
-// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
-// HECK:   store [[LOAD_OPAQUE]] to [init] [[ALLOC_OPEN]]
-// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}, any Error) Self>([[ALLOC_OPEN]])
-// HECK:   return [[RET_VAL]] : $String
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen12propOfLValueySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any Error }
+// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[ALLOC_OF_BOX]]
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX_LIFETIME]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
+// CHECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*any Error
+// CHECK:   [[LOAD_BOX:%.*]] = load [copy] [[READ]]
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [[LOAD_BOX]] : $any Error
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROW_BOX]] : $any Error to $*@opened({{.*}}, any Error) Self
+// CHECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
+// CHECK:   store {{%[^,]+}} to [init] [[ALLOC_OPEN]]
+// CHECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}, any Error) Self>([[ALLOC_OPEN]])
+// CHECK:   return [[RET_VAL]] : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12propOfLValueySSs5Error_pF'
 func propOfLValue(_ x: Error) -> String {
   var x = x
@@ -160,9 +160,9 @@ func propOfLValue(_ x: Error) -> String {
 
 // Test SILGenBuilder.loadCopy().
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen7lastValyxxd_tlF : $@convention(thin) <T> (@guaranteed Array<T>) -> @out T {
-// HECK: [[LOAD:%.*]] = load [copy] %{{.*}} : $*T
-// HECK: return [[LOAD]] : $T
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen7lastValyxxd_tlF : $@convention(thin) <T> (@guaranteed Array<T>) -> @out T {
+// CHECK: [[LOAD:%.*]] = load [copy] %{{.*}} : $*T
+// CHECK: return [[LOAD]] : $T
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen7lastValyxxd_tlF'
 func lastVal<T>(_ rest: T...) -> T {
   var minValue: T
@@ -174,9 +174,9 @@ func lastVal<T>(_ rest: T...) -> T {
 
 // Test SILGenFunction::emitPointerToPointer.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen3foo1pSRyxGSPyxG_tlF : $@convention(thin) <Element> (UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
-// HECK: [[F:%.*]] = function_ref @$sconvertPointerToB8Argumentyq_xB0RzsABR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in_guaranteed τ_0_0) -> @out τ_0_1
-// HECK: apply [[F]]<UnsafePointer<Element>, UnsafePointer<Element>>(%0) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in_guaranteed τ_0_0) -> @out τ_0_1
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen3foo1pSRyxGSPyxG_tlF : $@convention(thin) <Element> (UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
+// CHECK: [[F:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in_guaranteed τ_0_0) -> @out τ_0_1
+// CHECK: apply [[F]]<UnsafePointer<Element>, UnsafePointer<Element>>(%0) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in_guaranteed τ_0_0) -> @out τ_0_1
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen3foo1pSRyxGSPyxG_tlF'
 func foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
   return UnsafeBufferPointer(start: p, count: 1)
@@ -188,22 +188,25 @@ protocol FooP {
   func foo()
 }
 
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10loadBorrowyyF4FooPL_V3foo3pos7ElementQzSg5IndexQz_tF : $@convention(method) <Elements where Elements : Collection> (@in_guaranteed Elements.Index, @inout FooP<Elements>) -> @out Optional<Elements.Element> {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen10loadBorrowyyF4FooPL_V3foo3pos7ElementQzSg5IndexQz_tF : $@convention(method) <Elements where Elements : Collection> (@in_guaranteed Elements.Index, @inout FooP<Elements>) -> @out Optional<Elements.Element> {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Elements.Index, [[ARG1:%.*]] : $*FooP<Elements>):
-// HECK: [[READ:%.*]] = begin_access [read] [unknown] [[ARG1]] : $*FooP<Elements>
-// HECK: [[LOAD:%.*]] = load [copy] [[READ]] : $*FooP<Elements>
-// HECK: end_access [[READ]] : $*FooP<Elements>
-// HECK: [[BORROW_LOAD:%.*]] = begin_borrow [[LOAD]]
-// HECK: [[EXTRACT:%.*]] = struct_extract [[BORROW_LOAD]] : $FooP<Elements>, #<abstract function>FooP._elements
-// HECK: [[COPYELT:%.*]] = copy_value [[EXTRACT]] : $Elements
-// HECK: [[COPYIDX:%.*]] = copy_value [[ARG0]] : $Elements.Index
-// HECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!getter : <Self where Self : Collection> (Self) -> (Self.Index) -> Self.Element : $@convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
-// HECK: [[RESULT:%.*]] = apply [[WT]]<Elements>([[COPYIDX]], [[COPYELT]]) : $@convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
-// HECK: destroy_value [[COPYELT]] : $Elements
-// HECK: [[ENUM_RESULT:%.*]] = enum $Optional<Elements.Element>, #Optional.some!enumelt, [[RESULT]] : $Elements.Element
-// HECK: destroy_value [[LOAD]]
+// CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[ARG1]] : $*FooP<Elements>
+// CHECK: [[LOAD:%.*]] = load [copy] [[READ]] : $*FooP<Elements>
+// CHECK: end_access [[READ]] : $*FooP<Elements>
+// CHECK: [[BORROW_LOAD:%.*]] = begin_borrow [[LOAD]]
+// CHECK: [[EXTRACT:%.*]] = struct_extract [[BORROW_LOAD]] : $FooP<Elements>, #<abstract function>FooP._elements
+// CHECK: [[COPYELT:%.*]] = copy_value [[EXTRACT]] : $Elements
+// CHECK: [[COPYIDX:%.*]] = copy_value [[ARG0]] : $Elements.Index
+// CHECK: [[BORROWELT:%.*]] = begin_borrow [[COPYELT]] : $Elements
+// CHECK: [[BORROWIDX:%.*]] = begin_borrow [[COPYIDX]] : $Elements.Index
+// CHECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!read : <Self where Self : Collection> (Self) -> @yield_once (Self.Index) yields (Self.Element) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK: ([[YIELD:%.*]], [[TOKEN:%.*]]) = begin_apply [[WT]]<Elements>([[BORROWIDX]], [[BORROWELT]]) : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK: [[RESULT:%.*]] = copy_value [[YIELD]] : $Elements.Element
+// CHECK: end_apply [[TOKEN]]
+// CHECK: destroy_value [[COPYELT]] : $Elements
+// CHECK: [[ENUM_RESULT:%.*]] = enum $Optional<Elements.Element>, #Optional.some!enumelt, [[RESULT]] : $Elements.Element
 // CHECK-NOT: destroy_value [[ARG0]] : $Elements.Index
-// HECK: return [[ENUM_RESULT]] : $Optional<Elements.Element>
+// CHECK: return [[ENUM_RESULT]] : $Optional<Elements.Element>
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10loadBorrowyyF4FooPL_V3foo3pos7ElementQzSg5IndexQz_tF'
 func loadBorrow() {
   struct FooP<Elements : Collection> {
@@ -218,32 +221,50 @@ func loadBorrow() {
 }
 
 
-// Tests LogicalPathComponent's writeback for opaque value types
+// Tests LogicalPathComponent's writeback for opaque value types.
+//
+// The subscript getter/setter are now trivial (the writeback orchestration that
+// materializeForSet used to perform lives in the caller, inoutAccessOfSubscript
+// below). They serve here to confirm opaque values flow through the subscript
+// accessors directly rather than via addresses.
 // ---
 // Dictionary.subscript.getter
-// CHECK-LABEL: sil [heuristic_always_inline] [ossa] @$sSD20opaque_values_silgenEyq_Sgq_cig : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @guaranteed Dictionary<Key, Value>) -> @out Optional<Value> {
-// HECK: bb0([[ARG0:%.*]] : $Value, [[ARG1:%.*]] : $*Dictionary<Key, Value>):
-// HECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*Dictionary<Key, Value>
-// HECK:   [[OPTIONAL_ALLOC:%.*]] = alloc_stack $Optional<Value>
-// HECK:   switch_enum_addr [[OPTIONAL_ALLOC]] : $*Optional<Value>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
-// HECK: bb2:
-// HECK:   [[OPTIONAL_LOAD:%.*]] = load [take] [[OPTIONAL_ALLOC]] : $*Optional<Value>
-// HECK:   apply {{.*}}<Key, Value>([[OPTIONAL_LOAD]], {{.*}}, [[WRITE]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// HECK:   return %{{.*}} : $()
+// CHECK-LABEL: sil [heuristic_always_inline] [ossa] [opaque] @$sSD20opaque_values_silgenEyq_Sgq_cig : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @guaranteed Dictionary<Key, Value>) -> @out Optional<Value> {
+// CHECK: bb0([[KEY:%.*]] : @guaranteed $Value, {{%.*}} : @guaranteed $Dictionary<Key, Value>):
+// CHECK:   [[COPY:%.*]] = copy_value [[KEY]] : $Value
+// CHECK:   [[SOME:%.*]] = enum $Optional<Value>, #Optional.some!enumelt, [[COPY]] : $Value
+// CHECK:   return [[SOME]] : $Optional<Value>
 // CHECK-LABEL: } // end sil function '$sSD20opaque_values_silgenEyq_Sgq_cig'
 
-// Tests materializeForSet's createSetterCallback for opaque values
-// ---
 // Dictionary.subscript.setter
-// CHECK-LABEL: sil [ossa] @$sSD20opaque_values_silgenEyq_Sgq_cis : $@convention(method) <Key, Value where Key : Hashable> (@in Optional<Value>, @in Value, @inout Dictionary<Key, Value>) -> () {
-// HECK: bb0([[ARG0:%.*]] : $Builtin.RawPointer, [[ARG1:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : $*Dictionary<Key, Value>, [[ARG3:%.*]] : $@thick Dictionary<Key, Value>.Type):
-// HECK:   [[PROJ_VAL1:%.*]] = project_value_buffer $Value in [[ARG1]] : $*Builtin.UnsafeValueBuffer
-// HECK:   [[LOAD_VAL1:%.*]] = load [take] [[PROJ_VAL1]] : $*Value
-// HECK:   [[ADDR_VAL0:%.*]] = pointer_to_address [[ARG0]] : $Builtin.RawPointer to [strict] $*Optional<Value>
-// HECK:   [[LOAD_VAL0:%.*]] = load [take] [[ADDR_VAL0]] : $*Optional<Value>
-// HECK:   apply {{.*}}<Key, Value>([[LOAD_VAL0]], [[LOAD_VAL1]], [[ARG2]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// HECK:   return %{{.*}} : $()
+// CHECK-LABEL: sil [ossa] [opaque] @$sSD20opaque_values_silgenEyq_Sgq_cis : $@convention(method) <Key, Value where Key : Hashable> (@in Optional<Value>, @in Value, @inout Dictionary<Key, Value>) -> () {
+// CHECK: bb0([[NEWVALUE:%.*]] : @owned $Optional<Value>, [[KEY:%.*]] : @owned $Value, {{%.*}} : $*Dictionary<Key, Value>):
+// CHECK:   destroy_value [[KEY]] : $Value
+// CHECK:   destroy_value [[NEWVALUE]] : $Optional<Value>
+// CHECK:   return
 // CHECK-LABEL: } // end sil function '$sSD20opaque_values_silgenEyq_Sgq_cis'
+
+// The actual writeback: read through the getter into a temporary, mutate the
+// in-place payload, then store it back through the setter. The optionals are
+// opaque values stored to/loaded from the temporary; no value is materialized
+// to an address except for the temporary itself.
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$sSD20opaque_values_silgenE22inoutAccessOfSubscript3keyyq__tF : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @inout Dictionary<Key, Value>) -> () {
+// CHECK:       bb0({{%.*}} : @guaranteed $Value, [[SELF:%.*]] : $*Dictionary<Key, Value>):
+// CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[SELF]] : $*Dictionary<Key, Value>
+// CHECK:         [[OPTIONAL_ALLOC:%.*]] = alloc_stack $Optional<Value>
+// CHECK:         [[GETTER:%.*]] = function_ref @$sSD20opaque_values_silgenEyq_Sgq_cig
+// CHECK:         [[OPTIONAL:%.*]] = apply [[GETTER]]<Key, Value>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_1, @guaranteed Dictionary<τ_0_0, τ_0_1>) -> @out Optional<τ_0_1>
+// CHECK:         store [[OPTIONAL]] to [init] [[OPTIONAL_ALLOC]] : $*Optional<Value>
+// CHECK:         switch_enum_addr [[OPTIONAL_ALLOC]] : $*Optional<Value>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: {{bb[0-9]+}}
+// CHECK:       [[SOME_BB]]:
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr [[OPTIONAL_ALLOC]] : $*Optional<Value>, #Optional.some!enumelt
+// CHECK:         [[INCREMENT:%.*]] = function_ref @{{.*}}increment
+// CHECK:         apply [[INCREMENT]]<Key, Value>([[PAYLOAD]])
+// CHECK:         [[WRITTEN:%.*]] = load [take] [[OPTIONAL_ALLOC]] : $*Optional<Value>
+// CHECK:         [[SETTER:%.*]] = function_ref @$sSD20opaque_values_silgenEyq_Sgq_cis
+// CHECK:         apply [[SETTER]]<Key, Value>([[WRITTEN]], {{.*}}, [[WRITE]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:         end_access [[WRITE]] : $*Dictionary<Key, Value>
+// CHECK-LABEL: } // end sil function '$sSD20opaque_values_silgenE22inoutAccessOfSubscript3keyyq__tF'
 extension Dictionary {
   public subscript(key: Value) -> Value? {
     @inline(__always)
@@ -264,12 +285,12 @@ extension Dictionary {
 // Test ownership of multi-case Enum values in the context of to @in thunks.
 // ---
 // protocol witness for static Swift.Equatable.== infix(A, A) -> Swift.Bool in conformance Swift.FloatingPointSign : Swift.Equatable
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s20opaque_values_silgen17FloatingPointSignOSQAASQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
-// HECK: bb0(%0 : $FloatingPointSign, %1 : $FloatingPointSign, %2 : $@thick FloatingPointSign.Type):
-// HECK:   %3 = metatype $@thin FloatingPointSign.Type // user: %5
-// HECK:   %4 = function_ref @$ss17FloatingPointSignO21__derived_enum_equalsySbAB_ABtFZ : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool // user: %5
-// HECK:   %5 = apply %4(%0, %1, %3) : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool // user: %6
-// HECK:   return %5 : $Bool
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] [opaque] @$s20opaque_values_silgen17FloatingPointSignOSQAASQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK: bb0(%0 : $FloatingPointSign, %1 : $FloatingPointSign, %2 : $@thick FloatingPointSign.Type):
+// CHECK:   [[META:%[^,]+]] = metatype $@thin FloatingPointSign.Type
+// CHECK:   [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen17FloatingPointSignO21__derived_enum_equalsySbAC_ACtFZ : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool
+// CHECK:   [[RESULT:%[^,]+]] = apply [[FN]](%0, %1, [[META]]) : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool
+// CHECK:   return [[RESULT]] : $Bool
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen17FloatingPointSignOSQAASQ2eeoiySbx_xtFZTW'
 public enum FloatingPointSign {
   /// The sign for a positive value.
@@ -284,14 +305,14 @@ public enum FloatingPointSign {
 //
 // TODO: Subsequent OSSA optimization should optimize away one of both of these copies.
 // ---
-// CHECK-OSX-LABEL: sil [ossa] @$s20opaque_values_silgen25unsafeDowncastToAnyObject04fromG0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
+// CHECK-OSX-LABEL: sil [ossa] [opaque] @$s20opaque_values_silgen25unsafeDowncastToAnyObject04fromG0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
 // CHECK-OSX: bb0(%0 : @guaranteed $Any):
 // CHECK-OSX:   [[COPY:%.*]] = copy_value %0 : $Any
 // CHECK-OSX:   [[BORROW2:%.*]] = begin_borrow [[COPY]] : $Any
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   end_borrow [[BORROW2]] : $Any
-// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}", Any) Self>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened({{.*}}, Any) Self>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any
@@ -305,7 +326,7 @@ public func unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 #if os(macOS)
 // Test open_existential_box_value in a conversion context.
 // ---
-// CHECK-OSX-LABEL: sil [ossa] @$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
+// CHECK-OSX-LABEL: sil [ossa] [opaque] @$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
 // CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] %{{.*}} : $any Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $any Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
@@ -342,17 +363,17 @@ public struct EnumIter<Base : IP> : IP, Seq {
   public typealias Iterator = EnumIter<Base>
 }
 
-// CHECK-LABEL: sil [ossa] @$s20opaque_values_silgen7EnumSeqV12makeIteratorAA0D4IterVy0G0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
-// HECK: bb0(%0 : @guaranteed $EnumSeq<Base>):
-// HECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
-// HECK:  [[FIELD:%.*]] = struct_extract %0 : $EnumSeq<Base>, #EnumSeq._base
-// HECK:  [[COPY:%.*]] = copy_value [[FIELD]] : $Base
-// HECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// HECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[COPY]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// HECK:  destroy_value [[COPY]] : $Base
-// HECK: [[FN:%.*]] = function_ref @$ss8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
-// HECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
-// HECK:  return [[RET]] : $EnumIter<Base.Iterator>
+// CHECK-LABEL: sil [ossa] [opaque] @$s20opaque_values_silgen7EnumSeqV12makeIteratorAA0D4IterVy0G0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
+// CHECK: bb0([[SELF:%.*]] : @guaranteed $EnumSeq<Base>):
+// CHECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
+// CHECK:  [[FIELD:%.*]] = struct_extract [[SELF]] : $EnumSeq<Base>, #EnumSeq._base
+// CHECK:  [[COPY:%.*]] = copy_value [[FIELD]] : $Base
+// CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
+// CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[COPY]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
+// CHECK:  destroy_value [[COPY]] : $Base
+// CHECK: [[FN:%.*]] = function_ref @$s20opaque_values_silgen8EnumIterV5_baseACyxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
+// CHECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
+// CHECK:  return [[RET]] : $EnumIter<Base.Iterator>
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen7EnumSeqV12makeIteratorAA0D4IterVy0G0QzGyF'
 public struct EnumSeq<Base : Seq> : Seq {
   public typealias Iterator = EnumIter<Base.Iterator>
@@ -379,7 +400,7 @@ extension Collection {
 }
 
 extension Array where Element == Int {
-  // CHECK-LABEL: sil private [ossa] @$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_ : {{.*}} {
+  // CHECK-LABEL: sil private [ossa] [opaque] @$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_ : {{.*}} {
   // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $Int):
   // CHECK-LABEL: } // end sil function '$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_'
   func incrementEachElement() -> [Int] {
@@ -389,7 +410,7 @@ extension Array where Element == Int {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int {
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_'
 func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
@@ -397,7 +418,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 }
 
 
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
 // CHECK-NOT: bb1 
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_'
 func testEmptyReturnClosure() {
@@ -409,7 +430,7 @@ func testEmptyReturnClosure() {
 // class-to-AnyObject cast as a guaranteed scalar cast
 // (doesCastPreserveOwnershipForTypes returns true).
 //
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastClassToAnyObjectyyXlAA1CCF : $@convention(thin) (@guaranteed C) -> @owned AnyObject {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen24testCastClassToAnyObjectyyXlAA1CCF : $@convention(thin) (@guaranteed C) -> @owned AnyObject {
 // CHECK: bb0(%0 : @guaranteed $C):
 // CHECK:   checked_cast_br C in %0 : $C to AnyObject, bb2, bb1
 // CHECK: bb1(%{{.*}} : @guaranteed $C):
@@ -423,7 +444,7 @@ func testCastClassToAnyObject(_ c: C) -> AnyObject {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF : $@convention(thin) (@guaranteed AnyObject) -> @owned C {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF : $@convention(thin) (@guaranteed AnyObject) -> @owned C {
 // CHECK: bb0(%0 : @guaranteed $AnyObject):
 // CHECK:   [[CP:%.*]] = copy_value %0 : $AnyObject
 // CHECK:   checked_cast_br AnyObject in [[CP]] : $AnyObject to C, bb1, bb2
@@ -438,7 +459,7 @@ func testCastAnyObjectToClass(_ o: AnyObject) -> C {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned C {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned C {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK:   [[CP:%.*]] = copy_value %0 : $T
 // CHECK:   checked_cast_br T in [[CP]] : $T to C, bb1, bb2
@@ -461,7 +482,7 @@ class TestGeneric<T> {
   var borrowedGeneric: T
 }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s20opaque_values_silgen11TestGenericC08borrowedE0xvr :
+// CHECK-LABEL: sil hidden [transparent] [ossa] [opaque] @$s20opaque_values_silgen11TestGenericC08borrowedE0xvr :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK:   [[REF:%.*]] = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[REF]] : $*T
@@ -478,7 +499,7 @@ class TestGeneric<T> {
 // CHECK:   unwind
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen11TestGenericC08borrowedE0xvr'
 
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen8TestEnumO5_codeSivg :
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen8TestEnumO5_codeSivg :
 // CHECK: bb0(%0 : @guaranteed $TestEnum<T>):
 // CHECK:   [[COPY:%.*]] = copy_value %0 : $TestEnum<T>
 // CHECK:   switch_enum [[COPY]] : $TestEnum<T>, case #TestEnum.invalidValue!enumelt: bb1
@@ -500,7 +521,7 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
   case yes(T)
   case and(T)
 
-// CHECK-LABEL: sil [ossa] @EnumWithTwoSameAddressOnlyPayloads_getPayload : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @EnumWithTwoSameAddressOnlyPayloads_getPayload : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // CHECK:         [[RESULT_STORAGE:%[^,]+]] = alloc_stack $T
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
@@ -533,7 +554,7 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
 
 // Verify exit block arguments are ordered correctly.
 // 
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
 // CHECK:         br [[EPILOG:bb[0-9]+]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:         br [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:       [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : @owned $Value, {{%[^,]+}} : @owned $Value):
@@ -553,7 +574,7 @@ func duplicate_with_int4<Value>(condition: Bool, value: Value) -> (Int, Int, Int
 }
 
 // Verify tuple rebuilding.
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:         return [[RETVAL]] : $(Value, Value)
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_'
@@ -563,7 +584,7 @@ func duplicate1<Value>(value: Value) -> (Value, Value) {
       (value, value)
   }
 }
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple $(one: Value, two: Value) ({{%[^,]+}}, {{%[^,]+}})   
 // CHECK:         return [[RETVAL]] : $(one: Value, two: Value)           
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_'
@@ -573,7 +594,7 @@ func duplicate2<Value>(value: Value) -> (one: Value, two: Value) {
       (one: value, two: value)
   }
 }
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_ : {{.*}} {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value, {{%[^,]+}} : $Int)
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_'
@@ -584,7 +605,7 @@ func duplicate_with_int1<Value>(value: Value) -> (Value, Value, Int) {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
 // CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)           
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ([[INNER]] : $(Value, Value), {{%[^,]+}} : $Int)    
 // CHECK:         return [[RETVAL]]
@@ -595,7 +616,7 @@ func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
     ((value, value), 42)
   }
 }
-// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
 // CHECK:         [[INNERMOST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Int)           
 // CHECK:         [[INNERMIDDLE:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMOST]] : $(Value, Int), {{%[^,]+}} : $Value) 
 // CHECK:         [[INNERLEAST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMIDDLE]] : $(Value, (Value, Int), Value)) 
@@ -612,7 +633,7 @@ func duplicate_with_int3<Value>(value: Value) -> (Int, (Value, (Value, (Value, I
 // Keypaths
 
 indirect enum IndirectEnumWithAReadableIntProperty {
-// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[opaque] @$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // TODO: Eliminate this copy.
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
@@ -634,7 +655,7 @@ func giveReadableIntKeyPathInt() {
 }
 
 indirect enum StructWithAReadableStringProperty {
-// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[opaque] @$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
@@ -655,7 +676,7 @@ func giveKeyPathString() {
 }
 
 #if os(macOS)
-// CHECK-OSX-LABEL: sil {{.*}}@$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb : {{.*}} <T> {{.*}} {
+// CHECK-OSX-LABEL: sil {{.*}}[opaque] @$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb : {{.*}} <T> {{.*}} {
 // Ensure that there aren't any "normal" (in the sense of try_apply) blocks that
 // take unbound generic parameters (τ_0_0).
 // CHECK-OSX-NOT: {{bb[0-9]+}}({{%[^,]+}} : @owned $τ_0_0):
@@ -665,7 +686,7 @@ func giveKeyPathString() {
 public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }
 #endif
 
-// CHECK-LABEL: sil {{.*}}[ossa] @SetIntoContainerAtKeyPath : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @SetIntoContainerAtKeyPath : {{.*}} {
 // CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] : {{.*}}, [[KP:%[^,]+]] : {{.*}}, [[VALUE:%[^,]+]] :
 // CHECK:         [[KP_COPY:%[^,]+]] = copy_value [[KP]] : $WritableKeyPath<Container, Field>
 // CHECK:         [[VALUE_COPY:%[^,]+]] = copy_value [[VALUE]] : $Field
@@ -680,7 +701,7 @@ func set<Container, Field>(into container: inout Container, at keyPath: Writable
   container[keyPath: keyPath] = value
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk : {{.*}} {
 // CHECK:       bb0([[VALUE:%[^,]+]] :
 // CHECK-SAME:      [[CONTAINER:%[^,]+]] :
 // CHECK:         [[CONTAINER_COPY:%[^,]+]] = copy_value [[CONTAINER]]
@@ -696,15 +717,15 @@ func FormClassKeyPath() {
   _ = \Q.q
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @UseGetterOnInout : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @UseGetterOnInout : {{.*}} {
 // CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] :
-// CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[CONTAINER_ADDR]]
-// CHECK:         [[CONTAINER:%[^,]+]] = load [trivial] [[CONTAINER_ACCESS]]
-// CHECK:         end_access [[CONTAINER_ACCESS]]
 // CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int)
+// CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[CONTAINER_ADDR]]
 // CHECK:         [[KEYPATH_UP:%[^,]+]] = upcast [[KEYPATH]]
+// CHECK:         [[CONTAINER:%[^,]+]] = load [trivial] [[CONTAINER_ACCESS]]
 // CHECK:         [[GETTER:%[^,]+]] = function_ref @swift_getAtKeyPath
 // CHECK:         [[VALUE:%[^,]+]] = apply [[GETTER]]<MyInt, Int>([[CONTAINER]], [[KEYPATH_UP]])
+// CHECK:         end_access [[CONTAINER_ACCESS]]
 // CHECK:         destroy_value [[KEYPATH_UP]]
 // CHECK:         return [[VALUE]] : $Int                                
 // CHECK-LABEL: } // end sil function 'UseGetterOnInout'
@@ -716,7 +737,7 @@ func getInout(_ i: inout MyInt) -> Int {
 protocol IntValuable {
   var value: Int { get }
 }
-// CHECK-LABEL: sil {{.*}}[ossa] @getFromSubscriptOnLValueArray : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @getFromSubscriptOnLValueArray : {{.*}} {
 // CHECK:       bb0([[ARRAY_ADDR:%[^,]+]] :
 // CHECK:         [[ARRAY_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[ARRAY_ADDR]]
 // CHECK:         [[ARRAY:%[^,]+]] = load_borrow [[ARRAY_ACCESS]]
@@ -744,7 +765,7 @@ protocol MutatingFooable {
   mutating func foo()
 }
 
-// CHECK-LABEL: sil {{.*}}@callMutatingFooOnInoutExistential : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[opaque] @callMutatingFooOnInoutExistential : {{.*}} {
 // CHECK:       bb0([[EXISTENTIAL_ADDR:%[^,]+]] :
 // CHECK:         [[EXISTENTIAL_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[EXISTENTIAL_ADDR]]
 // CHECK:         [[OPEN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[EXISTENTIAL_ACCESS]]
@@ -757,13 +778,13 @@ func callMutatingFooOnInoutExistential(_ i: inout any MutatingFooable) {
   i.foo()
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen7WeakBoxV1txSgvg : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s20opaque_values_silgen7WeakBoxV1txSgvg : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
 // CHECK:         [[STRONG_OPTIONAL:%[^,]+]] = strong_copy_weak_value [[WEAK_OPTIONAL]]
 // CHECK:         return [[STRONG_OPTIONAL]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen7WeakBoxV1txSgvg'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen7WeakBoxV1tACyxGxSg_tcfC : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s20opaque_values_silgen7WeakBoxV1tACyxGxSg_tcfC : {{.*}} {
 // CHECK:       bb0([[STRONG_OPTIONAL:%[^,]+]] :
 // CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = weak_copy_value [[STRONG_OPTIONAL]]
 // CHECK:         destroy_value [[STRONG_OPTIONAL]]
@@ -774,7 +795,7 @@ struct WeakBox<T : AnyObject> {
   weak var t: T?
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @intIntoAnyHashableVar : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @intIntoAnyHashableVar : {{.*}} {
 // CHECK:         [[VAR_BOX_ADDR:%[^,]+]] = project_box
 // CHECK:         [[INT:%[^,]+]] = apply
 // CHECK:         [[CONVERT:%[^,]+]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF
@@ -786,7 +807,7 @@ func intIntoAnyHashableVar() {
   var anyHashable: AnyHashable = 0
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @intIntoAnyHashableLet : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @intIntoAnyHashableLet : {{.*}} {
 // CHECK:         [[INT:%[^,]+]] = apply
 // CHECK:         [[CONVERT:%[^,]+]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF
 // CHECK:         [[INSTANCE:%[^,]+]] = apply [[CONVERT]]<Int>([[INT]])
@@ -796,7 +817,7 @@ func intIntoAnyHashableLet() {
   let anyHashable: AnyHashable = 0
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfOwnedAddrOnlyValue : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @consumeExprOfOwnedAddrOnlyValue : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[T_LIFETIME:%[^,]+]] = begin_borrow [[T]]
 // CHECK:         [[T_COPY:%[^,]+]] = copy_value [[T_LIFETIME]]
@@ -811,7 +832,7 @@ func consumeExprOfOwnedAddrOnlyValue<T>(_ t: __owned T) {
   sink(consume t)
 }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfLoadExprOfOwnedAddrOnlyLValue : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @consumeExprOfLoadExprOfOwnedAddrOnlyLValue : {{.*}} {
 // CHECK:         [[VAR:%[^,]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
 // CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR]]
 // CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
@@ -835,7 +856,7 @@ func consumeExprOfLoadExprOfOwnedAddrOnlyLValue<T>(_ ty: T.Type) {
 struct Twople<T> {
   var storage: (T, T)
 
-// CHECK-LABEL: sil {{.*}}[ossa] @Twople_init_from_t1_t2 : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @Twople_init_from_t1_t2 : {{.*}} {
 // CHECK:       bb0([[T1:%[^,]+]] : 
 // CHECK-SAME:      [[T2:%[^,]+]] : 
 // CHECK-SAME:  ):
@@ -875,7 +896,7 @@ struct Twople<T> {
   }
 }
 
-// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValue : {{.*}} -> @error Err {
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @throwTypedValue : {{.*}} -> @error Err {
 // CHECK:       bb0([[E:%[^,]+]] :
 // CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
 // CHECK:         apply [[SWIFT_WILL_THROW_TYPED]]<Err>([[E]])
@@ -884,7 +905,7 @@ struct Twople<T> {
 @_silgen_name("throwTypedValue")
 func throwTypedValue(_ e: Err) throws(Err) { throw e }
 
-// CHECK-LABEL: sil{{.*}} [ossa] @callTypedThrowsFunc : {{.*}} -> @error any Error {
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @callTypedThrowsFunc : {{.*}} -> @error any Error {
 // CHECK:       bb0:
 // CHECK:         [[TYPED_THROW_FN:%[^,]+]] = function_ref @throwTypedValue
 // CHECK:         try_apply [[TYPED_THROW_FN]]({{%[0-9]+}}) : $@convention(thin) (Err) -> @error Err, normal bb1, error bb2
@@ -904,7 +925,7 @@ func callTypedThrowsFunc() throws {
   try throwTypedValue(Err())
 }
 
-// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValueGeneric : {{.*}} <GenErr where GenErr : Error> (@in_guaranteed GenErr) -> @error_indirect GenErr {
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @throwTypedValueGeneric : {{.*}} <GenErr where GenErr : Error> (@in_guaranteed GenErr) -> @error_indirect GenErr {
 // CHECK:       bb0([[BORROWED_ERR:%[^,]+]] : @guaranteed $GenErr):
 // CHECK:         [[E:%[^,]+]] = copy_value [[BORROWED_ERR]]
 // CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
@@ -914,7 +935,7 @@ func callTypedThrowsFunc() throws {
 @_silgen_name("throwTypedValueGeneric")
 func throwTypedValueGeneric<GenErr: Error>(_ e: GenErr) throws(GenErr) { throw e }
 
-// CHECK-LABEL: sil{{.*}} [ossa] @callTypedThrowsFuncGeneric : {{.*}} -> @error any Error {
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @callTypedThrowsFuncGeneric : {{.*}} -> @error any Error {
 // CHECK:       bb0:
 // CHECK:         [[ERR_VAL:%[^,]+]] = apply {{.*}} -> Err
 // CHECK:         [[GEN_TYPED_THROW_FN:%[^,]+]] = function_ref @throwTypedValueGeneric
@@ -937,7 +958,7 @@ func callTypedThrowsFuncGeneric() throws {
 
 struct Err : Error {}
 
-// CHECK-LABEL: sil{{.*}} [ossa] @copy_expr_generic : {{.*}} {
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @copy_expr_generic : {{.*}} {
 // CHECK:       bb0([[E:%[^,]+]] : @guaranteed $T
 // CHECK:         [[E_COPY:%[^,]+]] = explicit_copy_value [[E]]
 // CHECK:         apply {{.*}}<T>([[E_COPY]])
@@ -947,3 +968,72 @@ func copy_expr_generic<T>(_ t: T)  {
   eat_generic(copy t)
 }
 func eat_generic<T>(_ t: consuming T) {}
+
+struct LoadBorrowNC: ~Copyable {
+  var x: Int = 0
+}
+final class LoadBorrowHolder {
+  var inner: LoadBorrowNC
+  init(inner: consuming LoadBorrowNC) { self.inner = inner }
+}
+func load_borrow_in_guaranteed_borrowMe<T: ~Copyable>(_ n: borrowing T) {}
+
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @load_borrow_in_guaranteed_caller :
+// CHECK:         ref_element_addr {{%[^,]+}}, #LoadBorrowHolder.inner
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign]
+// CHECK:         [[BORROWED:%[^,]+]] = load_borrow
+// CHECK-NOT:     load [copy]
+// CHECK:         apply {{.*}}<LoadBorrowNC>([[BORROWED]])
+// CHECK:         end_borrow [[BORROWED]]
+// CHECK-LABEL: } // end sil function 'load_borrow_in_guaranteed_caller'
+@_silgen_name("load_borrow_in_guaranteed_caller")
+func load_borrow_in_guaranteed_caller(_ h: LoadBorrowHolder) {
+  load_borrow_in_guaranteed_borrowMe(h.inner)
+}
+
+
+func existentialErrorPassThrough(_ body: () throws(Error) -> Void) throws(Error) {
+  try body()
+}
+@_silgen_name("forceIndirectErrorThunk")
+func forceIndirectErrorThunk<T: Error>(_ x: () throws(T) -> Void) throws {
+  try existentialErrorPassThrough(x)
+}
+
+// CHECK-LABEL: sil{{.*}} [ossa] [opaque] @forceIndirectErrorThunk : {{.*}} {
+// CHECK:       [[CONVERTED:%[^,]+]] = convert_function {{%[^,]+}} : {{.*}} to $@noescape @callee_guaranteed () -> @error_indirect T
+// CHECK:       [[THUNK_FN:%[^,]+]] = function_ref @$sxIgzr_s5Error_pIegzo_sAARzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@guaranteed @noescape @callee_guaranteed () -> @error_indirect τ_0_0) -> @error any Error
+// CHECK:       [[PARTIAL:%[^,]+]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T>([[CONVERTED]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@guaranteed @noescape @callee_guaranteed () -> @error_indirect τ_0_0) -> @error any Error
+// CHECK:       [[NOESCAPE:%[^,]+]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL]] : $@callee_guaranteed () -> @error any Error to $@noescape @callee_guaranteed () -> @error any Error
+// CHECK:       [[PASSTHROUGH_FN:%[^,]+]] = function_ref @$s20opaque_values_silgen27existentialErrorPassThroughyyyyKXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @error any Error) -> @error any Error
+// CHECK:       try_apply [[PASSTHROUGH_FN]]([[NOESCAPE]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @error any Error) -> @error any Error, normal {{bb[0-9]+}}, error [[ERROR_BB:bb[0-9]+]]
+
+// CHECK:       [[ERROR_BB]]({{%[^,]+}} : @owned $any Error):
+// CHECK: } // end sil function 'forceIndirectErrorThunk'
+
+
+// CHECK-LABEL: sil{{.*}} [reabstraction_thunk] [ossa] [opaque] @$sxIgzr_s5Error_pIegzo_sAARzlTR : $@convention(thin) <T where T : Error> (@guaranteed @noescape @callee_guaranteed () -> @error_indirect T) -> @error any Error {
+// CHECK:       bb0([[CLOSURE:%[^,]+]] : @guaranteed $@noescape @callee_guaranteed () -> @error_indirect T):
+// CHECK-NEXT:    try_apply [[CLOSURE]]() : {{.*}}, normal {{bb[0-9]+}}, error [[ERROR_BB:bb[0-9]+]]
+
+// CHECK:       [[ERROR_BB]]({{%[^,]+}} : @owned $T):
+// CHECK:         throw {{%[^,]+}} : $any Error
+// CHECK-LABEL: } // end sil function '$sxIgzr_s5Error_pIegzo_sAARzlTR'
+
+
+
+struct CCC {
+  var members: [Member]
+  var isInverted: Bool
+}
+enum Member {
+  case atom(Int)
+  case custom(CCC)
+  indirect case intersection(CCC, CCC)
+}
+
+// Ensure we treat infinite types as non-trivial & loadable (rdar://180569048)
+// CHECK-LABEL: sil {{.*}}3CCCV7membersSayAA6MemberOGvs : $@convention(method) (@owned Array<Member>, @inout CCC) -> () {
+// CHECK: bb0(%0 : @owned $Array<Member>
+// CHECK:   destroy_value %0
+// CHECK: } // end sil function

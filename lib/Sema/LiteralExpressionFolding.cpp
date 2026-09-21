@@ -125,8 +125,8 @@ static ConcreteDeclRef getIntTypeBuiltinInit(Type type, ASTContext &ctx) {
 
 /// Check if the type is a signed integer type
 static bool isSignedIntegerType(Type type) {
-  return type->isInt() || type->isInt128() || type->isInt64() || type->isInt32() ||
-         type->isInt16() || type->isInt8();
+  return type->isInt() || type->isInt128() || type->isInt64() ||
+         type->isInt32() || type->isInt16() || type->isInt8();
 }
 
 /// A move-only value that's either a `FoldingError` or some parameterized type
@@ -231,6 +231,7 @@ private:
     ASTContext &Ctx;
     llvm::DenseMap<Expr *, FoldingErrorOr<ConstantValuePtr>>
         ConstValuesOrErrors;
+
   public:
     ConstantWalker(ASTContext &ctx) : Ctx(ctx) {}
 
@@ -262,7 +263,9 @@ private:
         return tryFoldParenExpr(parenExpr);
       if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr))
         return foldDeclRefExpr(declRefExpr);
-      
+      if (auto *memberRefExpr = dyn_cast<MemberRefExpr>(expr))
+        return foldMemberRefExpr(memberRefExpr);
+
       return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
@@ -270,19 +273,36 @@ private:
     tryFoldLiteralExpression(const LiteralExpr *expr) {
       if (auto *intLiteralExpr = dyn_cast<IntegerLiteralExpr>(expr))
         return foldIntegerLiteralExpr(intLiteralExpr);
-      
+
       return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
-    ConstantValuePtr foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
+    FoldingErrorOr<ConstantValuePtr>
+    foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
-      auto value = expr->getValue();
+      // The walker reaches every subexpression, so a digit-only literal that
+      // adopted a non-integer type (e.g. the '2' in 'Int(2.5 * 2)') arrives here
+      // too. 'getIntegerBitWidth' asserts on those.
+      if (!exprType || !exprType->isStdlibInteger())
+        return FoldingError(IllegalConstError::TypeNotSupported,
+                            expr->getLoc());
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
-      if (isSignedIntegerType(exprType))
-        return std::make_unique<IntegerValue>(value.sextOrTrunc(resultBitWidth),
-                                              true);
-      return std::make_unique<IntegerValue>(value.zextOrTrunc(resultBitWidth),
-                                            false);
+      bool isSigned = isSignedIntegerType(exprType);
+      // A literal whose value doesn't fit the target type is left unfolded so
+      // the existing overflow diagnostic still fires, rather than folding it to
+      // a wrapped value. A negative literal never fits an unsigned type.
+      if (!isSigned && expr->isNegative())
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      auto value = expr->getValue();
+      unsigned neededBits =
+          isSigned ? value.getSignificantBits() : value.getActiveBits();
+      if (neededBits > resultBitWidth)
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      if (isSigned)
+        return ConstantValuePtr(std::make_unique<IntegerValue>(
+            value.sextOrTrunc(resultBitWidth), true));
+      return ConstantValuePtr(std::make_unique<IntegerValue>(
+          value.zextOrTrunc(resultBitWidth), false));
     }
 
     FoldingErrorOr<ConstantValuePtr> tryFoldBinaryExpr(const BinaryExpr *expr) {
@@ -350,45 +370,78 @@ private:
     }
 
     FoldingErrorOr<ConstantValuePtr> foldDeclRefExpr(const DeclRefExpr *expr) {
-      if (const VarDecl *varDecl = dyn_cast<VarDecl>(expr->getDecl())) {
-        // Swift source `let` bindings whose access level is broader than
-        // internal participate in the ABI surface of their module and may
-        // not appear in a literal expression. Emit the diagnostic inline so
-        // we can carry the access level, and return `UpstreamError` so no
-        // further generic "not a literal expression" message is added.
-        // A `var` that reaches here falls through to the existing
-        // opaque-decl-ref path, which is the correct diagnostic for it.
-        if (!varDecl->hasClangNode() && varDecl->isLet()) {
-          auto access = varDecl->getFormalAccess();
-          if (access >= AccessLevel::Package) {
-            Ctx.Diags.diagnose(expr->getLoc(), diag::const_public_let_ref,
-                               access);
-            return FoldingError(IllegalConstError::UpstreamError,
-                                expr->getLoc());
-          }
-        }
-
-        // For other `@const` or `@section` values, we expect
-        // their initializer to be foldable. For other values which
-        // have a default value, we attempt to fold the
-        // corresponding initializer expression.
-        if (varDecl->isConstValue() || varDecl->hasInitialValue())
-          if (auto initExpr = varDecl->getParentInitializer())
-            return tryFoldDeclRefInitializerExpr(initExpr, expr->getLoc());
-
-        // Clang constants are imported as a ValueDecl
-        // with simple getter returning a literal value.
-        if (varDecl->hasClangNode() && !varDecl->isDynamic() &&
-            !varDecl->isObjC() &&
-            varDecl->getImplInfo().getReadImpl() == ReadImplKind::Get)
-          if (auto accessor = varDecl->getAccessor(AccessorKind::Get))
-            if (auto singleRetStmt = dyn_cast<ReturnStmt>(
-                    accessor->getBody()->getSingleActiveStatement()))
-              return tryFoldDeclRefInitializerExpr(singleRetStmt->getResult(),
-                                                   expr->getLoc());
-      }
+      if (const VarDecl *varDecl = dyn_cast<VarDecl>(expr->getDecl()))
+        return foldVarDeclRef(varDecl, expr->getLoc());
 
       return FoldingError(IllegalConstError::OpaqueDeclRef, expr->getLoc());
+    }
+
+    FoldingErrorOr<ConstantValuePtr>
+    foldMemberRefExpr(const MemberRefExpr *expr) {
+      // A reference to a type's static property (e.g. `MyType.count`)
+      // type-checks to a `MemberRefExpr` rather than a `DeclRefExpr`. Fold it
+      // by looking through to the referenced declaration, just like a direct
+      // reference.
+      if (const VarDecl *varDecl =
+              dyn_cast<VarDecl>(expr->getMember().getDecl()))
+        if (varDecl->isStatic())
+          return foldVarDeclRef(varDecl, expr->getLoc());
+
+      return FoldingError(IllegalConstError::OpaqueDeclRef, expr->getLoc());
+    }
+
+    /// Fold a reference to variable/property \p varDecl occurring at
+    /// \p referenceLoc, shared by the `DeclRefExpr` and `MemberRefExpr` paths.
+    FoldingErrorOr<ConstantValuePtr> foldVarDeclRef(const VarDecl *varDecl,
+                                                    SourceLoc referenceLoc) {
+      // Reject `let` bindings that are part of the module's ABI surface:
+      // package/public/open by access, and `internal` bindings marked
+      // `@usableFromInline` (or `@inlinable`), whose value an inlinable
+      // function could fold into client binaries. Return `UpstreamError` to
+      // suppress the generic "not a literal expression" follow-up. A `var`
+      // falls through to the opaque-decl-ref path, its correct diagnostic.
+      if (!varDecl->hasClangNode() && varDecl->isLet()) {
+        auto access = varDecl->getFormalAccess();
+        if (access >= AccessLevel::Package) {
+          Ctx.Diags.diagnose(referenceLoc, diag::const_public_let_ref, access);
+          return FoldingError(IllegalConstError::UpstreamError, referenceLoc);
+        }
+
+        // Safe here: the package/public/open cases returned above, so the
+        // formal access is below public as `isUsableFromInline()` asserts.
+        if (varDecl->isUsableFromInline()) {
+          Ctx.Diags.diagnose(referenceLoc,
+                             diag::const_usable_from_inline_let_ref);
+          return FoldingError(IllegalConstError::UpstreamError, referenceLoc);
+        }
+      }
+
+      // Only fold a reference that is guaranteed to resolve to this exact
+      // declaration, and hence this exact value, at runtime: guard against
+      // `dynamic` members and `class` properties.
+      if (varDecl->isDynamic() || varDecl->isSyntacticallyOverridable())
+        return FoldingError(IllegalConstError::OpaqueDeclRef, referenceLoc);
+
+      // For other `@const` or `@section` values, we expect
+      // their initializer to be foldable. For other values which
+      // have a default value, we attempt to fold the
+      // corresponding initializer expression.
+      if (varDecl->isConstValue() || varDecl->hasInitialValue())
+        if (auto initExpr = varDecl->getParentInitializer())
+          return tryFoldDeclRefInitializerExpr(initExpr, referenceLoc);
+
+      // Clang constants are imported as a ValueDecl
+      // with simple getter returning a literal value.
+      if (varDecl->hasClangNode() && !varDecl->isDynamic() &&
+          !varDecl->isObjC() &&
+          varDecl->getImplInfo().getReadImpl() == ReadImplKind::Get)
+        if (auto accessor = varDecl->getAccessor(AccessorKind::Get))
+          if (auto singleRetStmt = dyn_cast<ReturnStmt>(
+                  accessor->getBody()->getSingleActiveStatement()))
+            return tryFoldDeclRefInitializerExpr(singleRetStmt->getResult(),
+                                                 referenceLoc);
+
+      return FoldingError(IllegalConstError::OpaqueDeclRef, referenceLoc);
     }
 
     FoldingErrorOr<ConstantValuePtr>
@@ -480,10 +533,8 @@ private:
       // The stdlib shift operators take `where RHS : BinaryInteger`, so the
       // RHS does not share signedness or bit width with the LHS. The true
       // bitwise operators `& | ^` do operate on two `Self` values.
-      bool isShift =
-          operatorIdentifier.is("<<") || operatorIdentifier.is(">>");
-      assert(isShift ||
-             lhsVal->getIsSigned() == rhsVal->getIsSigned());
+      bool isShift = operatorIdentifier.is("<<") || operatorIdentifier.is(">>");
+      assert(isShift || lhsVal->getIsSigned() == rhsVal->getIsSigned());
 
       APInt result;
       if (operatorIdentifier.is("&"))
@@ -587,7 +638,12 @@ private:
     // because it is represented as a 'negative value' on the resulting
     // `IntegerLiteralExpr`.
     if (isSigned)
-      intResult.abs().toString(resultStr, 10, true);
+      // 'abs()' of a signed type's minimum overflows and stays negative, which
+      // would put a second minus sign in the digits. Widen first, then print
+      // the magnitude unsigned. 'setNegative' below carries the sign.
+      intResult.sext(intResult.getBitWidth() + 1)
+          .abs()
+          .toString(resultStr, 10, /*Signed=*/false);
     else
       intResult.toString(resultStr, 10, false);
 
@@ -615,7 +671,10 @@ Expr *swift::foldLiteralExpression(const Expr *expr, ASTContext *ctx) {
 
 Expr *ConstantFoldExpression::evaluate(Evaluator &evaluator, const Expr *expr,
                                        ASTContext *ctx) const {
-  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions)) {
+  // Only integer literal expressions are folded. Expressions of other types
+  // (non-integer literals, tuples, arrays, etc.) are returned unchanged.
+  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      expr->getType() && expr->getType()->isStdlibInteger()) {
     ConstantFolder folder(*ctx);
     if (auto result = folder.fold(expr))
       return result;

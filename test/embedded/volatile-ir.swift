@@ -3,7 +3,6 @@
 // RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature Embedded -O | %FileCheck %s
 // RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature Embedded -Osize | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: volatile
 // REQUIRES: swift_feature_Embedded

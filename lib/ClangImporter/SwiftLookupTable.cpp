@@ -18,8 +18,6 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -81,18 +79,14 @@ class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   importer::ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   SwiftLookupTableWriter(
       clang::ModuleFileExtension *extension, clang::ASTWriter &writer,
       ASTContext &ctx,
       importer::ClangSourceBufferImporter &buffersForDiagnostics,
-      const PlatformAvailability &avail,
-      ClangImporter::Implementation *importerImpl)
+      const PlatformAvailability &avail)
       : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        importerImpl(importerImpl) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -1307,7 +1301,7 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
-  NameImporter nameImporter(swiftCtx, availability, sema, importerImpl);
+  NameImporter nameImporter(swiftCtx, availability, sema);
 
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
@@ -2083,17 +2077,31 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
       }
 
       // Add this entry.
-      auto name = nameImporter.importMacroName(macro.first, info);
+      const clang::Module *Module =
+          moduleMacro ? moduleMacro->getOwningModule() : nullptr;
+      auto name = nameImporter.importMacroName(macro.first, info, Module);
       if (name.empty())
         return;
-      if (moduleMacro)
-        table.addEntry(name, moduleMacro, tu);
-      else
-        table.addEntry(name, info, tu);
+
+      auto addEntry = [&](Identifier entryName) {
+        if (moduleMacro)
+          table.addEntry(entryName, moduleMacro, tu);
+        else
+          table.addEntry(entryName, info, tu);
+      };
+
+      addEntry(name);
+
+      // If APINotes renamed this macro, also register it under its original C
+      // name so that a reference to the old name still resolves (to an
+      // unavailable redirect synthesized in importMacro).
+      auto rawName = nameImporter.getIdentifier(macro.first->getName());
+      if (!rawName.empty() && rawName != name)
+        addEntry(rawName);
     };
 
     ArrayRef<clang::ModuleMacro *> moduleMacros =
-        macro.second.getActiveModuleMacros(pp, macro.first);
+        macro.second.getModuleInfo(pp, macro.first).ActiveModuleMacros;
     if (moduleMacros.empty()) {
       // Handle the bridging header case.
       clang::MacroDirective *MD = pp.getLocalMacroDirective(macro.first);
@@ -2224,9 +2232,8 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
-  return std::make_unique<SwiftLookupTableWriter>(this, writer, swiftCtx,
-                                                  buffersForDiagnostics,
-                                                  availability, importerImpl);
+  return std::make_unique<SwiftLookupTableWriter>(
+      this, writer, swiftCtx, buffersForDiagnostics, availability);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>

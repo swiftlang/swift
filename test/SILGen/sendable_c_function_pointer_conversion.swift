@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -swift-version 5 -verify %s
 
 // In Swift 6 mode, we introduce an implicit `@Sendable` conversion on the

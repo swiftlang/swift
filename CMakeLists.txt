@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.24)
 
 
 #  set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
@@ -466,9 +466,8 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HO
 endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
     set(BRIDGING_MODE "INLINE")
@@ -637,7 +636,7 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "16.0" CACHE STRING
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "16.0" CACHE STRING
     "Minimum deployment target version for tvOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "6.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "9.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS "1.0" CACHE STRING
@@ -767,10 +766,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
   TRUE)
 
-option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
-  "Install the <swift/bridging> C++ interoperability header alongside compiler"
-  TRUE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
@@ -829,8 +824,8 @@ cmake_dependent_option(SWIFT_ENABLE_SOURCEKIT_TESTS
 option(SWIFT_THREADING_PACKAGE
   "Override the threading package used for the build.  This can either be a
    single package name, or a semicolon separated sequence of sdk:package pairs.
-   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
-   or the empty string for the SDK default.")
+   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none',
+   'embedded', or the empty string for the SDK default.")
 
 option(SWIFT_THREADING_HAS_DLSYM
   "Enable the use of the dlsym() function.  This gets used to provide TSan
@@ -886,6 +881,26 @@ endif()
 option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
+
+# Whether the compiler's own Swift sources are built.
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED TRUE)
+else()
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
+endif()
+
+option(SWIFT_BUILD_SARIF
+  "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
+  FALSE)
+# SARIF serialization runs through DiagnosticBridge, so it needs those sources.
+if(SWIFT_BUILD_SARIF AND NOT SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
+  message(WARNING "Force setting SWIFT_BUILD_SARIF=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_SARIF OFF)
+endif()
+
+option(SWIFT_BUILD_IMMEDIATE_MODE
+  "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
+  TRUE)
 
 option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
     "Build the Swift regex parser as part of the compiler."
@@ -985,6 +1000,24 @@ else()
   swift_common_unified_build_config(SWIFT)
 endif()
 
+# Mirror HandleLLVMOptions.cmake's LLVM_ENABLE_INDEX_STORE behavior for the
+# Swift compile language. HandleLLVMOptions only appends -index-store-path to
+# CMAKE_C_FLAGS / CMAKE_CXX_FLAGS, so swiftc invocations would otherwise miss
+# the flag. Forwarding it here lets sourcekit-lsp's IndexStoreDB resolve
+# Swift-side symbols (stdlib, swift-syntax, libswift compiler modules) and
+# answer cross-language queries between Swift and the C++ toolchain. Probe
+# CMAKE_Swift_COMPILER for the flag so we no-op against a swiftc that does
+# not understand it, matching the check_{c,cxx}_compiler_flag gating used on
+# the C/C++ side.
+if(LLVM_ENABLE_INDEX_STORE AND CMAKE_Swift_COMPILER AND NOT XCODE AND NOT MSVC_IDE)
+  swift_supports_compiler_arguments(SWIFT_SUPPORTS_INDEX_STORE
+    -index-store-path "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/IndexStore")
+  if(SWIFT_SUPPORTS_INDEX_STORE)
+    add_compile_options(
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-index-store-path ${INDEX_DATA_STORE_PATH}>")
+  endif()
+endif()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
@@ -1047,7 +1080,7 @@ if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
   endif()
 endif()
 
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+if(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -1061,6 +1094,14 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
+endif()
+
+if(SWIFT_BUILD_SARIF)
+  add_definitions(-DSWIFT_BUILD_SARIF)
+endif()
+
+if(SWIFT_BUILD_IMMEDIATE_MODE)
+  add_definitions(-DSWIFT_BUILD_IMMEDIATE_MODE)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
@@ -1101,9 +1142,7 @@ set(SWIFT_MODULE_CACHE_PATH
 
 # Check what linux distribution is being used.
 # This can be used to determine the default linker to use.
-if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
-  cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
-endif()
+cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
 
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
@@ -1421,6 +1460,26 @@ if(SWIFT_PARALLEL_LINK_JOBS)
   endif()
 endif()
 
+# Cap concurrency for embedded-stdlib Swift compilations.
+#
+# `SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS` defaults to a small fraction of
+# the host's logical cores so the C++ build phase still gets to run at
+# full parallelism; only the embedded Swift compilations queue up through
+# this pool.
+if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
+  if(NOT DEFINED SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS)
+    cmake_host_system_information(
+      RESULT _swift_embedded_pool_cores QUERY NUMBER_OF_LOGICAL_CORES)
+    math(EXPR SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS
+         "(${_swift_embedded_pool_cores} + 3) / 4")
+    if(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS LESS 1)
+      set(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS 1)
+    endif()
+  endif()
+  set_property(GLOBAL APPEND PROPERTY
+    JOB_POOLS swift_embedded_compile_job_pool=${SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS})
+endif()
+
 # Set the CMAKE_OSX_* variables in a way that minimizes conflicts.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
@@ -1443,6 +1502,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
+  message(STATUS "  SARIF support:  ${SWIFT_BUILD_SARIF}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")

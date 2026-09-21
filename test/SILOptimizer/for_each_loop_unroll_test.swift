@@ -66,8 +66,10 @@ func unrollLetArrayLiteralWithClosures(i: Int32, j: Int32) {
   // CHECK: [[ARRAYTUP:%[0-9]+]] = apply [[ALLOCATE]]<() -> Int32>
   // CHECK: [[ARRAYVAL:%[0-9]+]] =  tuple_extract [[ARRAYTUP]] : $(Array<() -> Int32>, Builtin.RawPointer), 0
   // CHECK: [[STORAGEADDR:%[0-9]+]] =  ref_tail_addr
-  // CHECK: store [[CLOSURE1:%[0-9]+]] to [[STORAGEADDR]]
-  // CHECK: [[INDEX1:%[0-9]+]] = index_addr [[STORAGEADDR]]
+  // CHECK: [[INDEX0:%[0-9]+]] = integer_literal $Builtin.Word, 0
+  // CHECK: [[INDEXADDR0:%[0-9]+]] = index_addr [projection] [[STORAGEADDR]] : ${{.*}}, [[INDEX0]] : $Builtin.Word
+  // CHECK: store [[CLOSURE1:%[0-9]+]] to [[INDEXADDR0]]
+  // CHECK: [[INDEX1:%[0-9]+]] = index_addr [projection] [[STORAGEADDR]]
   // CHECK: store [[CLOSURE2:%[0-9]+]] to [[INDEX1]]
   
   // CHECK-NOT: forEach

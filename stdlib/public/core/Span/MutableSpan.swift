@@ -29,14 +29,14 @@ public struct MutableSpan<Element: ~Copyable>
   internal let _count: Int
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _start() -> UnsafeMutableRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
   /// Create an empty span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @_lifetime(immortal)
   public init() {
@@ -45,13 +45,25 @@ public struct MutableSpan<Element: ~Copyable>
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow start)
   internal init(
     _unchecked start: UnsafeMutableRawPointer?,
     count: Int
   ) {
     unsafe _pointer = start
+    _count = count
+  }
+
+  @unsafe
+  @export(implementation)
+  @_lifetime(borrow start)
+  @_transparent
+  internal init(
+    _unchecked start: UnsafeMutablePointer<Element>,
+    count: Int
+  ) {
+    unsafe _pointer = UnsafeMutableRawPointer(start)
     _count = count
   }
 }
@@ -65,7 +77,7 @@ extension MutableSpan: @unchecked Sendable where Element: Sendable & ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow elements)
   internal init(
     _unchecked elements: UnsafeMutableBufferPointer<Element>
@@ -75,22 +87,22 @@ extension MutableSpan where Element: ~Copyable {
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
+
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @_lifetime(borrow start)
   public init(
@@ -109,7 +121,7 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan {
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow elements)
   public init(
     _unsafeElements elements: borrowing Slice<UnsafeMutableBufferPointer<Element>>
@@ -125,7 +137,7 @@ extension MutableSpan {
 extension MutableSpan where Element: BitwiseCopyable {
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
@@ -147,7 +159,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafeMutableRawPointer,
@@ -162,7 +174,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
@@ -184,7 +196,7 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   /// this initializer will trap at runtime.
   ///
   /// - Parameter mutableBytes: A raw span to reinterpret as typed elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&mutableBytes)
   public init(mutating mutableBytes: inout MutableRawSpan) {
     _precondition(
@@ -210,7 +222,7 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   /// this initializer will trap at runtime.
   ///
   /// - Parameter mutableBytes: A raw span to reinterpret as typed elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy mutableBytes)
   public init(mutableBytes: consuming MutableRawSpan) {
     _precondition(
@@ -233,7 +245,7 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow mutableSpan)
   public init(_mutableSpan mutableSpan: borrowing MutableSpan<Element>) {
     let pointer =
@@ -251,7 +263,7 @@ extension Span where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   /// Borrow the underlying initialized memory for read-only access.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var span: Span<Element> {
     @_lifetime(borrow self)
@@ -265,7 +277,7 @@ extension MutableSpan where Element: ~Copyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension RawSpan {
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @_lifetime(borrow mutableSpan)
   public init<Element>(
@@ -283,7 +295,7 @@ extension RawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var _description: String {
     let addr = unsafe String(
       UInt(bitPattern: _pointer), radix: 16, uppercase: false
@@ -298,12 +310,12 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   /// The number of elements in the span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 
   /// A Boolean value indicating whether the span is empty.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var isEmpty: Bool { _count == 0 }
 
@@ -311,7 +323,7 @@ extension MutableSpan where Element: ~Copyable {
   public typealias Index = Int
 
   /// The range of valid indices for subscripting the span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
   }
@@ -324,7 +336,7 @@ extension MutableSpan where Element: Copyable {
   /// Construct a raw span over the memory represented by this span.
   ///
   /// - Returns: A `RawSpan` over the memory represented by this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   public var bytes: RawSpan {
@@ -346,7 +358,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   /// bit pattern in the corresponding instance of `Element`.
   ///
   /// - Returns: A `MutableRawSpan` over the memory represented by this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   public var mutableBytes: MutableRawSpan {
@@ -363,7 +375,7 @@ extension MutableSpan where Element: ConvertibleToBytes {
   /// A raw span over the memory represented by this span.
   ///
   /// - Returns: A RawSpan over the memory represented by this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var bytes: RawSpan {
     @_lifetime(borrow self)
@@ -379,7 +391,7 @@ extension MutableSpan where Element: ConvertibleToBytes & ConvertibleFromBytes {
   /// A mutable raw span over the memory represented by this span.
   ///
   /// - Returns: A MutableRawSpan over the memory represented by this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var mutableBytes: MutableRawSpan {
     @_lifetime(&self)
@@ -395,17 +407,30 @@ extension MutableSpan where Element: ~Copyable {
   // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
   @inline(__always)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _checkIndex(_ position: Index) {
     _precondition(indices.contains(position), "index out of bounds")
   }
+
+  // SILOptimizer looks for fixed_storage.check_range semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_range")
+  @inline(__always)
+  @export(implementation)
+  internal func _checkRange(lowerBound: Index, upperBound: Index) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: upperBound) <= _assumeNonNegative(_count),
+      "Index range out of bounds"
+    )
+  }
+
   /// Accesses the element at the specified index in the `MutableSpan`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(_ position: Index) -> Element {
     @_transparent
     borrow {
@@ -429,12 +454,13 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(unchecked position: Index) -> Element {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
-      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: position))
+      unsafe UnsafePointer<Element>(
+        _unsafeAddressOfElement(unchecked: position)).pointee
     }
     @_transparent
     @_unsafeSelfDependentResult
@@ -446,13 +472,17 @@ extension MutableSpan where Element: ~Copyable {
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _unsafeAddressOfElement(
     unchecked position: Index
   ) -> Builtin.RawPointer {
+#if $BuiltinGepProjection
+    unsafe Builtin.gepProjection_Word(_start()._rawValue, position._builtinWordValue, Element.self)
+#else
     let elementOffset = position &* MemoryLayout<Element>.stride
     return unsafe _start().advanced(by: elementOffset)._rawValue
+#endif
   }
 }
 
@@ -464,7 +494,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
     _precondition(indices.contains(Index(i)))
@@ -479,7 +509,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
     let ri = unsafe _unsafeAddressOfElement(unchecked: i)
@@ -509,7 +539,7 @@ extension MutableSpan where Element: ~Copyable {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   //FIXME: mark closure parameter as non-escaping
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @safe
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
@@ -532,7 +562,7 @@ extension MutableSpan where Element: ~Copyable {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   //FIXME: mark closure parameter as non-escaping
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @_lifetime(self: copy self)
   @safe
@@ -570,7 +600,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   //FIXME: mark closure parameter as non-escaping
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
@@ -594,7 +624,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   //FIXME: mark closure parameter as non-escaping
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @_lifetime(self: copy self)
   @safe
@@ -616,7 +646,7 @@ extension MutableSpan {
   /// Update every element of this span to the given value.
   ///
   /// - Parameter repeatedValue: The value to set for every element.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func update(repeating repeatedValue: consuming Element) {
     guard !isEmpty else { return }
@@ -631,97 +661,81 @@ extension MutableSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _mutatingExtracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(_ bounds: Range<Index>) -> Self {
     _mutatingExtracting(bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _consumingExtracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
@@ -730,48 +744,44 @@ extension MutableSpan where Element: ~Copyable {
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(unchecked bounds: Range<Index>) -> Self {
     unsafe _mutatingExtracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
@@ -780,22 +790,20 @@ extension MutableSpan where Element: ~Copyable {
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(
     _ bounds: some RangeExpression<Index>
@@ -803,23 +811,21 @@ extension MutableSpan where Element: ~Copyable {
     _mutatingExtracting(bounds.relative(to: indices))
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(
     _ bounds: some RangeExpression<Index>
@@ -827,20 +833,18 @@ extension MutableSpan where Element: ~Copyable {
     _mutatingExtracting(bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(
     _ bounds: some RangeExpression<Index>
@@ -848,25 +852,23 @@ extension MutableSpan where Element: ~Copyable {
     _consumingExtracting(bounds.relative(to: indices))
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(
     unchecked bounds: ClosedRange<Index>
@@ -877,26 +879,24 @@ extension MutableSpan where Element: ~Copyable {
     return unsafe _mutatingExtracting(unchecked: range)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(
     unchecked bounds: ClosedRange<Index>
@@ -904,23 +904,21 @@ extension MutableSpan where Element: ~Copyable {
     unsafe _mutatingExtracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `MutableSpan`.
-  ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
+  /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(
     unchecked bounds: ClosedRange<Index>
@@ -931,18 +929,17 @@ extension MutableSpan where Element: ~Copyable {
     return unsafe _consumingExtracting(unchecked: range)
   }
 
-  /// Constructs a new span over all the items of this span.
+  /// Constructs a new span over all the elements of this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Returns: A `MutableSpan` over all the items of this span.
+  /// - Returns: A `MutableSpan` over all the elements of this span.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(_: UnboundedRange) -> Self {
     unsafe _overrideLifetime(
@@ -950,40 +947,38 @@ extension MutableSpan where Element: ~Copyable {
     )
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal var _reborrowed: Self {
     @_lifetime(&self)
     mutating get { _mutatingExtracting(...) }
   }
 
-  /// Constructs a new span over all the items of this span.
+  /// Constructs a new span over all the elements of this span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Returns: A `MutableSpan` over all the items of this span.
+  /// - Returns: A `MutableSpan` over all the elements of this span.
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(_: UnboundedRange) -> Self {
     _mutatingExtracting(...)
   }
 
-  /// Constructs a new span over all the items of this span.
+  /// Constructs a new span over all the elements of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Returns: A `MutableSpan` over all the items of this span.
+  /// - Returns: A `MutableSpan` over all the elements of this span.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(_: UnboundedRange) -> Self {
     self
@@ -1003,16 +998,12 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1033,17 +1024,13 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(first:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(first maxLength: Int) -> Self {
     _mutatingExtracting(first: maxLength)
@@ -1055,16 +1042,12 @@ extension MutableSpan where Element: ~Copyable {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1077,23 +1060,19 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of elements at the end.
+  /// - Returns: A span leaving off the specified number of trailing elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1107,44 +1086,36 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of elements at the end.
+  /// - Returns: A span leaving off the specified number of trailing elements.
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingLast:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(droppingLast k: Int) -> Self {
     _mutatingExtracting(droppingLast: k)
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of elements at the end.
+  /// - Returns: A span leaving off the specified number of trailing elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1158,24 +1129,23 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1190,17 +1160,16 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1208,28 +1177,27 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(last:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(last maxLength: Int) -> Self {
     _mutatingExtracting(last: maxLength)
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1244,23 +1212,22 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
   /// - Returns: A span starting after the specified number of elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1276,16 +1243,15 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
@@ -1293,27 +1259,26 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingFirst:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   mutating public func extracting(droppingFirst k: Int) -> Self {
     _mutatingExtracting(droppingFirst: k)
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
   /// - Returns: A span starting after the specified number of elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
@@ -1332,12 +1297,20 @@ extension MutableSpan where Element: ~Copyable {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension MutableSpan: BorrowingSequence where Element: ~Copyable {
+extension MutableSpan: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  public typealias Failure = Never
+
+  @export(implementation)
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
   @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
-    SpanIterator(self.span)
+  public func makeBorrowingIterator() -> Span<Element>.BorrowingIterator {
+    .init(self.span)
   }
 }
 #endif

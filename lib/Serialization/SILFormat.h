@@ -90,6 +90,8 @@ enum class ExtraStringFlavor : uint8_t {
   WasmImportModule,
   /// wasm import field/name for @_extern(wasm)
   WasmImportName,
+  /// @_target string
+  TargetFeatures,
 };
 
 enum class IsNestedEncoding : uint8_t {
@@ -206,6 +208,7 @@ namespace sil_block {
     SIL_DEBUG_VALUE_DELIMITER,
     SIL_DEBUG_VALUE,
     SIL_EXTRA_STRING,
+    SIL_DEBUG_RECONSTRUCTION_BLOCK,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -338,6 +341,7 @@ namespace sil_block {
     SILLinkageField,            // Linkage
     BCFixed<1>,                 // Is declaration?
     BCFixed<2>,                 // Is serialized?
+    BCFixed<1>,                 // Is default?    
     DifferentiabilityKindField, // Differentiability kind
     GenericSignatureIDField,    // Derivative function generic signature
     DeclIDField,                // JVP function name
@@ -367,11 +371,11 @@ namespace sil_block {
   using SILDebugValueLayout = BCRecordLayout<
     SIL_DEBUG_VALUE,
 
-    SILTypeCategoryField, /// operand type category
     SILTypeCategoryField, /// debug var type category
-    BCFixed<11>,          /// poison, movableValueDebuginfo, trace,
-                          /// hasDebugVar, isLet, isDenseMapSingleton(two
-                          /// bits), hasSource, hasLoc, hasExpr
+    BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
+                          /// trace, hasDebugVar, isLet,
+                          /// isDenseMapSingleton(two bits), hasType,
+                          /// hasScope, hasLoc, hasExpr
     BCArray<ValueIDField> /// operand info: operand, type, debug var info:
                           /// name, argno, optional stuff: typeid
   >;
@@ -379,6 +383,12 @@ namespace sil_block {
   using DebugValueDelimiterLayout = BCRecordLayout<
     SIL_DEBUG_VALUE_DELIMITER
     >;
+
+  // Has an optional argument list where each argument is a typed valueref.
+  using SILDebugReconstructionBlockLayout = BCRecordLayout<
+    SIL_DEBUG_RECONSTRUCTION_BLOCK,
+    BCArray<DeclIDField> // The array contains type-value pairs.
+  >;
 
   using SourceLocLayout = BCRecordLayout<
     SIL_SOURCE_LOC,
@@ -554,6 +564,7 @@ namespace sil_block {
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
     BCFixed<2>,           // ApplyOptions
+    BCFixed<1>,           // HasArgumentLocs (1 = NumCallArguments source-loc records follow)
     SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type

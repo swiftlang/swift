@@ -146,14 +146,14 @@ extension OSLogArguments {
 /// specified by os_log. Note that this is marked transparent instead of
 /// @inline(__always) as it is used in optimize(none) functions.
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func doubleSizeInBytes() -> Int {
   return 8
 }
 
 /// Serialize a double at the buffer location that `position` points to and
 /// increment `position` by the byte size of the double.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func serialize(
   _ value: Double,

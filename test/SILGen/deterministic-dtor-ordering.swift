@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name horse -primary-file %S/Inputs/deterministic-dtor-ordering-other.swift -primary-file %s -module-name horse | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name horse %S/Inputs/deterministic-dtor-ordering-other.swift -primary-file %s -module-name horse | %FileCheck %s
 

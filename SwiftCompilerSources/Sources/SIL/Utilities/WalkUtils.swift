@@ -360,8 +360,14 @@ extension ValueDefUseWalker {
       } else {
         return unmatchedPath(value: operand, path: path)
       }
+    case let oce as OpenCOMExistentialInst:
+      if let path = path.popIfMatches(.existential, index: 0) {
+        return walkDownUses(ofValue: oce, path: path)
+      } else {
+        return unmatchedPath(value: operand, path: path)
+      }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
     case let urc as UncheckedRefCastInst:
@@ -403,16 +409,6 @@ extension ValueDefUseWalker {
         return walkDownUses(ofValue: val, path: path)
       } else {
         return .continueWalk
-      }
-    case let cbr as CondBranchInst:
-      if let val = cbr.getArgument(for: operand) {
-        if let path = walkDownCache.needWalk(for: val, path: path) {
-          return walkDownUses(ofValue: val, path: path)
-        } else {
-          return .continueWalk
-        }
-      } else {
-        return leafUse(value: operand, path: path)
       }
     case let se as SwitchEnumInst:
       if let (caseIdx, path) = path.pop(kind: .enumCase),
@@ -483,6 +479,8 @@ public protocol AddressDefUseWalker {
   /// of the initial address in an instruction recognized by the walker
   /// but for which the requested `path` does not allow the walk to continue.
   mutating func unmatchedPath(address: Operand, path: Path) -> WalkResult
+
+  mutating func typeUse(typeDependentOperand: Operand, path: Path) -> WalkResult
 }
 
 extension AddressDefUseWalker {
@@ -494,6 +492,10 @@ extension AddressDefUseWalker {
     return .continueWalk
   }
   
+  public mutating func typeUse(typeDependentOperand: Operand, path: Path) -> WalkResult {
+    return .continueWalk
+  }
+
   public mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
 
@@ -533,15 +535,17 @@ extension AddressDefUseWalker {
       } else {
         return unmatchedPath(address: operand, path: path)
       }
-    case let ia as IndexAddrInst:
-      if let (pathIdx, subPath) = path.pop(kind: .indexedElement) {
-        if let idx = ia.constantIndex,
-           idx == pathIdx {
+    case let ia as IndexAddrInst where ia.isProjection:
+      if let idx = ia.constantIndex {
+        if let subPath = path.popIfMatches(.indexedElement, index: idx) {
           return walkDownUses(ofAddress: ia, path: subPath)
         }
-        return walkDownUses(ofAddress: ia, path: subPath.push(.anyIndexedElement, index: 0))
+      } else {
+        if let subPath = path.popIfMatches(.indexedElement, index: nil) {
+          return walkDownUses(ofAddress: ia, path: subPath)
+        }
       }
-      return walkDownUses(ofAddress: ia, path: path)
+      return unmatchedPath(address: operand, path: path)
     case is MarkUninitializedInst,
          is MoveOnlyWrapperToCopyableAddrInst,
          is CopyableToMoveOnlyWrapperAddrInst,
@@ -569,7 +573,13 @@ extension AddressDefUseWalker {
   }
   
   public mutating func walkDownUses(ofAddress: Value, path: Path) -> WalkResult {
-    for operand in ofAddress.uses where !operand.isTypeDependent {
+    for operand in ofAddress.uses {
+      if operand.isTypeDependent {
+        if typeUse(typeDependentOperand: operand, path: path) == .abortWalk {
+          return .abortWalk
+        }
+        continue
+      }
       if walkDown(address: operand, path: path) == .abortWalk {
         return .abortWalk
       }
@@ -578,7 +588,13 @@ extension AddressDefUseWalker {
   }
 
   private mutating func walkDownNonEndAccessUses(of beginAccess: BeginAccessInst, path: Path) -> WalkResult {
-    for operand in beginAccess.uses where !operand.isTypeDependent {
+    for operand in beginAccess.uses {
+      if operand.isTypeDependent {
+        if typeUse(typeDependentOperand: operand, path: path) == .abortWalk {
+          return .abortWalk
+        }
+        continue
+      }
       if !(operand.instruction is EndAccessInst),
          walkDown(address: operand, path: path) == .abortWalk {
         return .abortWalk
@@ -723,9 +739,11 @@ extension ValueUseDefWalker {
       }
     case let oer as OpenExistentialRefInst:
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
+    case let oce as OpenCOMExistentialInst:
+      return walkUp(value: oce.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
-         is BeginDeallocRefInst, is MarkDependenceInst,
+         is BeginDeallocRefInst, is MarkDependenceInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let urc as UncheckedRefCastInst:
@@ -837,7 +855,7 @@ extension AddressUseDefWalker {
       return walkUp(address: uteda.enum, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
-    case let ia as IndexAddrInst:
+    case let ia as IndexAddrInst where ia.isProjection:
       if let idx = ia.constantIndex {
         return walkUp(address: ia.base, path: path.push(.indexedElement, index: idx))
       } else {
@@ -854,20 +872,8 @@ extension AddressUseDefWalker {
          is MarkUnresolvedNonCopyableValueInst,
          is DropDeinitInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)
-  default:
+    default:
       return rootDef(address: def, path: path)
     }
   }
 }
-
-private extension IndexAddrInst {
-  var constantIndex: Int? {
-    if let literal = index as? IntegerLiteralInst,
-       let indexValue = literal.value
-    {
-      return indexValue
-    }
-    return nil
-  }
-}
-

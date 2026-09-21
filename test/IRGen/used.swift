@@ -7,7 +7,6 @@
 // RUN: %target-swift-frontend -primary-file %s    -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 
-// REQUIRES: swift_in_compiler
 
 @used var g0: Int = 1
 @used var g1: (Int, Int) = (42, 43)

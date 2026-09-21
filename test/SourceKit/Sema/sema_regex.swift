@@ -4,7 +4,7 @@ public func retRegex() -> Regex<Substring> {
 
 // REQUIRES: swift_swift_parser
 
-// RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-bare-slash-regex -Xfrontend -disable-availability-checking | %FileCheck %s
+// RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-bare-slash-regex  | %FileCheck %s
 
 // CHECK: [
 // CHECK:   {

@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -enable-stack-protector -Onone -emit-ir %s -o - | %FileCheck %s
 // RUN: %target-swift-frontend -enable-stack-protector -O -emit-ir %s -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 @_silgen_name("escape")
 func f(_ arg: UnsafePointer<Int>)

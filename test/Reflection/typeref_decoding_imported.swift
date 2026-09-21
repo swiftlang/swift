@@ -2,9 +2,6 @@
 //
 // LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
 // UNSUPPORTED: OS=xros
-//
-// https://github.com/apple/swift/issues/55339
-// XFAIL: OS=openbsd
 
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
@@ -20,14 +17,6 @@
 
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/ImportedTypes.swift %S/Inputs/ImportedTypesOther.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect) -I %S/Inputs -whole-module-optimization -num-threads 2
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
-
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
-
-// lld on FreeBSD relocates some of the metadata sections resulting in invalid
-// offsets in section headers, breaking the Swift reflection data ELF parser
-// resulting in missing metadata.
-// rdar://159139154
-// XFAIL: OS=freebsd
 
 // CHECK-32: FIELDS:
 // CHECK-32: =======

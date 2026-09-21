@@ -47,11 +47,14 @@ bb1:
   %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
   %u4 = load %u3 : $*X
   end_access %u3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func dont_hoist_access_with_conflict() {
@@ -76,11 +79,14 @@ bb1:
   %u3 = begin_access [read] [dynamic] %0 : $*X
   %u4 = load %u3 : $*X
   end_access %u3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func hoist_access_with_may_release() {
@@ -109,11 +115,14 @@ bb1:
   %u4 = load %u3 : $*X
   strong_release %alloc : ${ var Int32 }
   end_access %u3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func dont_hoist_access_with_may_release() {
@@ -140,11 +149,14 @@ bb1:
   %u4 = load %u3 : $*X
   end_access %u3 : $*X
   strong_release %alloc : ${ var Int32 }
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func hoist_access_static() {
@@ -173,11 +185,14 @@ bb1:
   %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
   %u4 = load %u3 : $*X
   end_access %u3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func hoist_access_static_and_dynamic() {
@@ -209,11 +224,14 @@ bb1:
   %y3 = begin_access [read] [dynamic] %1 : $*X
   %y4 = load %y3 : $*X
   end_access %y3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func dont_hoist_access_static_and_dynamic() {
@@ -246,11 +264,14 @@ bb1:
   %y3 = begin_access [read] [dynamic] %1 : $*X
   %y4 = load %y3 : $*X
   end_access %y3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil [ossa] @dont_hoist_access_with_conflict_with_store :

@@ -66,6 +66,13 @@ extension BranchTag: CustomDebugStringConvertible {
   }
 }
 
+/// Returns the index of the newest tag whose snapshot date is on or before
+/// `date`, given a tag list sorted newest-first as produced by
+/// `getTagsFromSwiftRepo`. Returns nil if no such tag exists.
+func selectTagIndex(_ tags: [BranchTag], onOrBefore date: Date) -> Int? {
+  tags.firstIndex(where: { $0.tag.date(branch: $0.branch) <= date })
+}
+
 func getTagsFromSwiftRepo(branch: Branch, dryRun: Bool = false) async throws -> [BranchTag] {
   let github_tag_list_url: URL
   if !dryRun {

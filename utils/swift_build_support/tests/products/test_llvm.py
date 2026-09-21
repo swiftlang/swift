@@ -187,3 +187,42 @@ class LLVMTestCase(unittest.TestCase):
             '-DCLANG_DEFAULT_LINKER=lld',
             llvm.cmake_options
         )
+
+    def _host_cmake_options_args(self, **overrides):
+        # host_cmake_options() reads these args fields. Use linux-x86_64 as
+        # the host_target so we hit only the unconditional code path
+        # (no Darwin/Android branch fields required).
+        defaults = dict(
+            lit_args='-sv',
+            lit_jobs=1,
+            clang_profile_instr_use=None,
+            swift_profile_instr_use=None,
+            coverage_db=None,
+            lto_type=None,
+            llvm_enable_index_store=True,
+        )
+        defaults.update(overrides)
+        for key, value in defaults.items():
+            setattr(self.args, key, value)
+
+    def test_llvm_enable_index_store_default_on(self):
+        self._host_cmake_options_args()
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        llvm_opts, swift_opts, _ = llvm.host_cmake_options('linux-x86_64')
+        self.assertIn('-DLLVM_ENABLE_INDEX_STORE:BOOL=TRUE', llvm_opts)
+        self.assertIn('-DLLVM_ENABLE_INDEX_STORE:BOOL=TRUE', swift_opts)
+
+    def test_llvm_enable_index_store_disabled(self):
+        self._host_cmake_options_args(llvm_enable_index_store=False)
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        llvm_opts, swift_opts, _ = llvm.host_cmake_options('linux-x86_64')
+        self.assertIn('-DLLVM_ENABLE_INDEX_STORE:BOOL=FALSE', llvm_opts)
+        self.assertIn('-DLLVM_ENABLE_INDEX_STORE:BOOL=FALSE', swift_opts)

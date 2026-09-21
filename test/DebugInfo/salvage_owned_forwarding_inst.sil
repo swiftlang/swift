@@ -1,0 +1,241 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-combine %s | %FileCheck %s
+
+// SILCombine removes owned forwarding casts along several paths:
+//   - CanonicalizeInstruction's eliminateUnneededForwardingUnarySingleValueInst,
+//     when the only non-debug uses are destroy_values.
+//   - SILCombiner::trySinkOwnedForwardingInst, when the cast is sunk to its
+//     single consuming use in another block.
+//   - SingleBlockOwnedForwardingInstFolder, which folds a chain of casts into
+//     one and deletes the intermediates.
+// The deleted instructions must be salvaged in all cases.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Base {}
+class Mid : Base {}
+class Leaf : Mid {}
+
+class Unrelated {}
+class Other {}
+
+sil @consume_base : $@convention(thin) (@owned Base) -> ()
+sil @consume_unrelated : $@convention(thin) (@owned Unrelated) -> ()
+sil @consume_other : $@convention(thin) (@owned Other) -> ()
+sil @consume_base_fn : $@convention(thin) (@owned @callee_guaranteed () -> @owned Base) -> ()
+
+// The cast's only non-debug use is a destroy_value in the same block.
+//
+// CHECK-LABEL: sil [ossa] @destroy_in_same_block :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "b", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = upcast %0 : $Leaf to $Base
+// CHECK-NEXT:      return %1 : $Base
+// CHECK:         }
+// CHECK-NEXT:    destroy_value %0 : $Leaf
+// CHECK-LABEL: } // end sil function 'destroy_in_same_block'
+sil [ossa] @destroy_in_same_block : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = upcast %0 : $Leaf to $Base
+  debug_value %1 : $Base, let, name "b"
+  destroy_value %1 : $Base
+  %r = tuple ()
+  return %r : $()
+}
+
+// The cast's only non-debug use is a destroy_value in another block.
+//
+// CHECK-LABEL: sil [ossa] @destroy_in_other_block :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "b", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = upcast %0 : $Leaf to $Base
+// CHECK-NEXT:      return %1 : $Base
+// CHECK:         }
+// CHECK-NEXT:    br bb1
+// CHECK-LABEL: } // end sil function 'destroy_in_other_block'
+sil [ossa] @destroy_in_other_block : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = upcast %0 : $Leaf to $Base
+  debug_value %1 : $Base, let, name "b"
+  br bb1
+
+bb1:
+  destroy_value %1 : $Base
+  %r = tuple ()
+  return %r : $()
+}
+
+// The cast has two destroy_value uses, so it is eliminated after both are
+// rewired to the forwarded operand.
+//
+// CHECK-LABEL: sil [ossa] @two_destroys :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "b", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = upcast %0 : $Leaf to $Base
+// CHECK-NEXT:      return %1 : $Base
+// CHECK:         }
+// CHECK-NEXT:    cond_br undef, bb1, bb2
+// CHECK-LABEL: } // end sil function 'two_destroys'
+sil [ossa] @two_destroys : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = upcast %0 : $Leaf to $Base
+  debug_value %1 : $Base, let, name "b"
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Base
+  br bb3
+
+bb2:
+  destroy_value %1 : $Base
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The cast is consumed by an apply in another block, so it is sunk.
+// Its debug value stays behind in bb0.
+//
+// CHECK-LABEL: sil [ossa] @sunk_to_apply :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "b", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = upcast %0 : $Leaf to $Base
+// CHECK-NEXT:      return %1 : $Base
+// CHECK:         }
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK:         upcast %0 : $Leaf to $Base
+// CHECK-LABEL: } // end sil function 'sunk_to_apply'
+sil [ossa] @sunk_to_apply : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = upcast %0 : $Leaf to $Base
+  debug_value %1 : $Base, let, name "b"
+  br bb1
+
+bb1:
+  %f = function_ref @consume_base : $@convention(thin) (@owned Base) -> ()
+  %c = apply %f(%1) : $@convention(thin) (@owned Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// The SingleBlockOwnedForwardingInstFolder folds a cast of a cast.
+// Debug values on the middle cast must be salvaged.
+
+// upcast(upcast x) -> upcast x
+//
+// CHECK-LABEL: sil [ossa] @fold_upcast_of_upcast :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "m", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = upcast %0 : $Leaf to $Mid
+// CHECK-NEXT:      return %1 : $Mid
+// CHECK:         }
+// CHECK-NEXT:    upcast %0 : $Leaf to $Base
+// CHECK-LABEL: } // end sil function 'fold_upcast_of_upcast'
+sil [ossa] @fold_upcast_of_upcast : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = upcast %0 : $Leaf to $Mid
+  debug_value %1 : $Mid, let, name "m"
+  %2 = upcast %1 : $Mid to $Base
+  %f = function_ref @consume_base : $@convention(thin) (@owned Base) -> ()
+  %c = apply %f(%2) : $@convention(thin) (@owned Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// unchecked_ref_cast(unchecked_ref_cast x) -> unchecked_ref_cast x
+//
+// CHECK-LABEL: sil [ossa] @fold_urc_of_urc :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "u", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = unchecked_ref_cast %0 : $Leaf to $Unrelated
+// CHECK-NEXT:      return %1 : $Unrelated
+// CHECK:         }
+// CHECK-NEXT:    unchecked_ref_cast %0 : $Leaf to $Other
+// CHECK-LABEL: } // end sil function 'fold_urc_of_urc'
+sil [ossa] @fold_urc_of_urc : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = unchecked_ref_cast %0 : $Leaf to $Unrelated
+  debug_value %1 : $Unrelated, let, name "u"
+  %2 = unchecked_ref_cast %1 : $Unrelated to $Other
+  %f = function_ref @consume_other : $@convention(thin) (@owned Other) -> ()
+  %c = apply %f(%2) : $@convention(thin) (@owned Other) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// unchecked_ref_cast(upcast x) -> unchecked_ref_cast x
+//
+// CHECK-LABEL: sil [ossa] @fold_urc_of_upcast :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "m", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = upcast %0 : $Leaf to $Mid
+// CHECK-NEXT:      return %1 : $Mid
+// CHECK:         }
+// CHECK-NEXT:    unchecked_ref_cast %0 : $Leaf to $Unrelated
+// CHECK-LABEL: } // end sil function 'fold_urc_of_upcast'
+sil [ossa] @fold_urc_of_upcast : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = upcast %0 : $Leaf to $Mid
+  debug_value %1 : $Mid, let, name "m"
+  %2 = unchecked_ref_cast %1 : $Mid to $Unrelated
+  %f = function_ref @consume_unrelated : $@convention(thin) (@owned Unrelated) -> ()
+  %c = apply %f(%2) : $@convention(thin) (@owned Unrelated) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// bridge_object_to_ref(unchecked_ref_cast x) -> bridge_object_to_ref x
+//
+// CHECK-LABEL: sil [ossa] @fold_bridge_object_to_ref :
+// CHECK:       bb0(%0 : @owned $Leaf):
+// CHECK-NEXT:    debug_value %0 : $Leaf, let, name "b", transform {
+// CHECK:         bb0(%0 : $Leaf):
+// CHECK-NEXT:      %1 = unchecked_ref_cast %0 : $Leaf to $Builtin.BridgeObject
+// CHECK-NEXT:      return %1 : $Builtin.BridgeObject
+// CHECK:         }
+// CHECK-NEXT:    unchecked_ref_cast %0 : $Leaf to $Other
+// CHECK-LABEL: } // end sil function 'fold_bridge_object_to_ref'
+sil [ossa] @fold_bridge_object_to_ref : $@convention(thin) (@owned Leaf) -> () {
+bb0(%0 : @owned $Leaf):
+  %1 = unchecked_ref_cast %0 : $Leaf to $Builtin.BridgeObject
+  debug_value %1 : $Builtin.BridgeObject, let, name "b"
+  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $Other
+  %f = function_ref @consume_other : $@convention(thin) (@owned Other) -> ()
+  %c = apply %f(%2) : $@convention(thin) (@owned Other) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// convert_function(convert_function x) -> convert_function x
+//
+// CHECK-LABEL: sil [ossa] @fold_convert_of_convert :
+// CHECK:       bb0(%0 : @owned $@callee_guaranteed () -> @owned Leaf):
+// CHECK-NEXT:    debug_value %0 : $@callee_guaranteed () -> @owned Leaf, let, name "fn", transform {
+// CHECK:         bb0(%0 : $@callee_guaranteed () -> @owned Leaf):
+// CHECK-NEXT:      %1 = convert_function %0 : $@callee_guaranteed () -> @owned Leaf to $@callee_guaranteed () -> @owned Mid
+// CHECK-NEXT:      return %1 : $@callee_guaranteed () -> @owned Mid
+// CHECK:         }
+// CHECK-NEXT:    convert_function %0 : $@callee_guaranteed () -> @owned Leaf to $@callee_guaranteed () -> @owned Base
+// CHECK-LABEL: } // end sil function 'fold_convert_of_convert'
+sil [ossa] @fold_convert_of_convert : $@convention(thin) (@owned @callee_guaranteed () -> @owned Leaf) -> () {
+bb0(%0 : @owned $@callee_guaranteed () -> @owned Leaf):
+  %1 = convert_function %0 : $@callee_guaranteed () -> @owned Leaf to $@callee_guaranteed () -> @owned Mid
+  debug_value %1 : $@callee_guaranteed () -> @owned Mid, let, name "fn"
+  %2 = convert_function %1 : $@callee_guaranteed () -> @owned Mid to $@callee_guaranteed () -> @owned Base
+  %f = function_ref @consume_base_fn : $@convention(thin) (@owned @callee_guaranteed () -> @owned Base) -> ()
+  %c = apply %f(%2) : $@convention(thin) (@owned @callee_guaranteed () -> @owned Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}

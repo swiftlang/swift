@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/availability_overloads_other.swiftmodule -emit-module -primary-file %S/Inputs/availability_overloads_other.swift
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 -I %t -primary-file %s
 // RUN: %target-swift-emit-silgen -swift-version 5 -I %t -primary-file %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT-5
 // RUN: %target-swift-emit-ir -swift-version 5 -I %t %s
 

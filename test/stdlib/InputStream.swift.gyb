@@ -13,7 +13,7 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
-// UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=wasip1 || OS=emscripten
 
 import StdlibUnittest
 

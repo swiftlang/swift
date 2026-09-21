@@ -119,12 +119,11 @@ private func shell(_ command: String, environment: [String: String] = [:],
   return (stdout: stdoutData, stderr: stderrData, Int(task.terminationStatus))
 }
 
-func downloadToolchainAndRunTest(
+// Downloads and extracts a toolchain snapshot, returning the toolchain root directory.
+func downloadAndExtractToolchain(
   platform: Platform, tag: Tag, branch: Branch,
-  workspace: String, script: String,
-  extraArgs: [String],
-  verbose: Bool = false
-) async throws -> Int {
+  workspace: String
+) async throws -> String {
   let fileType = platform.fileType
   let toolchainType = platform.toolchainType
 
@@ -153,23 +152,35 @@ func downloadToolchainAndRunTest(
     } else {
       log("[INFO] No need to install: \(downloadPath)")
     }
-
-    let swiftcPath = "\(toolchainDir)/usr/bin/swiftc"
-    let swiftFrontendPath = "\(toolchainDir)/usr/bin/swift-frontend"
-    // Just for now just support macosx.
-    let platform = "macosx"
-    let swiftLibraryPath = "\(toolchainDir)/usr/lib/swift/\(platform)"
-    log(shell("\(swiftcPath) --version").stdout)
-    let exitCode = shell(
-      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath,
-        "SWIFT_LIBRARY_PATH": swiftLibraryPath],
-      mustSucceed: false,
-      verbose: verbose,
-      extraArgs: extraArgs
-    ).exitCode
-    log("[INFO] Exit code: \(exitCode). Tag: \(tag.name). Script: \(script)")
-    return exitCode
   case .ubuntu1404, .ubuntu1604, .ubuntu1804:
     fatalError("Unsupported platform: \(platform)")
   }
+
+  return toolchainDir
+}
+
+func downloadToolchainAndRunTest(
+  platform: Platform, tag: Tag, branch: Branch,
+  workspace: String, script: String,
+  extraArgs: [String],
+  verbose: Bool = false
+) async throws -> Int {
+  let toolchainDir = try await downloadAndExtractToolchain(
+    platform: platform, tag: tag, branch: branch, workspace: workspace)
+
+  // downloadAndExtractToolchain fatal-errors on non-osx platforms, so by here
+  // platform is .osx.
+  let swiftcPath = "\(toolchainDir)/usr/bin/swiftc"
+  let swiftFrontendPath = "\(toolchainDir)/usr/bin/swift-frontend"
+  let swiftLibraryPath = "\(toolchainDir)/usr/lib/swift/macosx"
+  log(shell("\(swiftcPath) --version").stdout)
+  let exitCode = shell(
+    "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath,
+      "SWIFT_LIBRARY_PATH": swiftLibraryPath],
+    mustSucceed: false,
+    verbose: verbose,
+    extraArgs: extraArgs
+  ).exitCode
+  log("[INFO] Exit code: \(exitCode). Tag: \(tag.name). Script: \(script)")
+  return exitCode
 }

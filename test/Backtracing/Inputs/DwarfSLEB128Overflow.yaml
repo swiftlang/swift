@@ -1,0 +1,34 @@
+## A hand-crafted ELF object with a single DW_TAG_compile_unit DIE holding
+## one DW_AT_const_value attribute encoded as DW_FORM_sdata (SLEB128).
+##
+## The value 0xC000000000000000 (as a 64-bit two's complement quantity)
+## requires exactly 9 SLEB128 bytes, and its final continuation byte leaves
+## the decoder's running bit-shift at 63 with the sign bit set. That is the
+## regression scenario for fetchSLEB128's sign-extension step: computing
+## `-(1 << 63)` traps (Int64.min has no positive counterpart), whereas
+## `Int64(-1) << 63` produces the identical bit pattern without overflowing.
+##
+## SLEB128 bytes: 80 80 80 80 80 80 80 80 40 (verified with llvm-dwarfdump).
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_const_value
+              Form:      DW_FORM_sdata
+  debug_info:
+    - Version: 4
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0xC000000000000000 # DW_AT_const_value (SLEB128 needs 9 bytes)

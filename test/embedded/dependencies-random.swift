@@ -5,10 +5,20 @@
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: %if OS=macosx %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: %if OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
-// RUN: test ! -s %t/extra.txt
+// RUN: %if OS=macosx %{ test ! -s %t/extra.txt %}
+// RUN: %if OS=wasip1 %{ test ! -s %t/extra.txt %}
+
+// Linux has two valid dependency sets, because the embedded runtime calls
+// `arc4random_buf` when the C library provides it and `getrandom` when it
+// doesn't (glibc older than 2.36).
+//
+// Each list must stay sorted with no trailing blank line: GNU comm rejects
+// unsorted input, while the BSD comm on Darwin silently accepts it.
+// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_arc4random.txt %t/actual-dependencies.txt > %t/extra_arc4random.txt %}
+// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_getrandom.txt %t/actual-dependencies.txt > %t/extra_getrandom.txt %}
+// RUN: %if OS=linux-gnu %{ test ! -s %t/extra_arc4random.txt || test ! -s %t/extra_getrandom.txt %}
 
 // Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
 // XFAIL: swift_embedded_platform
@@ -22,12 +32,21 @@ _memmove
 _memset
 _posix_memalign
 _putchar
-
-//--- allowed-dependencies_linux.txt
+//--- allowed-dependencies_linux_arc4random.txt
 __stack_chk_fail
 __stack_chk_guard
 arc4random_buf
 free
+memmove
+memset
+posix_memalign
+putchar
+//--- allowed-dependencies_linux_getrandom.txt
+__errno_location
+__stack_chk_fail
+__stack_chk_guard
+free
+getrandom
 memmove
 memset
 posix_memalign
@@ -45,17 +64,19 @@ posix_memalign
 putchar
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang -x c -c %S/Inputs/linux-rng-support.c -o %t/linux-rng-support.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// UNSUPPORTED: OS=emscripten
+// arc4random_buf is not provided by emscripten's musl-derived libc
+// (`wasm-ld: error: undefined symbol: arc4random_buf`).
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
+// REQUIRES: embedded_stdlib_default_codegen
 
 @_extern(c, "putchar")
 @discardableResult

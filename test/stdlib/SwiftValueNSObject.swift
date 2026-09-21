@@ -16,12 +16,10 @@
 // RUN: %target-build-swift %s -g -I %S/Inputs/SwiftValueNSObject/ -Xlinker %t/SwiftValueNSObject.o -o %t/SwiftValueNSObject
 // RUN: %target-codesign %t/SwiftValueNSObject
 // RUN: %target-run %t/SwiftValueNSObject 2> %t/log.txt
-// RUN: cat %t/log.txt 1>&2
 // RUN: %FileCheck %s < %t/log.txt
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar127008956
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

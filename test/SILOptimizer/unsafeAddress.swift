@@ -54,7 +54,7 @@ func mod(_ nc: inout NC) {}
 
 // CHECK-LABEL: sil hidden @$s4main11testCBorrow1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: [[ADR:%.*]] = pointer_to_address %4 to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on %0
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on %0
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -65,7 +65,7 @@ func testCBorrow(c: C) {
 
 // CHECK-LABEL: sil hidden @$s4main8testCMod1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on %0
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on %0
 // CHECK: begin_access [modify] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -76,7 +76,7 @@ func testCMod(c: C) {
 
 // CHECK-LABEL: sil hidden @$s4main11testSBorrow1syAA1SV_tF : $@convention(thin) (@guaranteed S) -> () {
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on %0
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on %0
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -88,7 +88,7 @@ func testSBorrow(s: S) {
 // CHECK-LABEL: sil hidden @$s4main8testSMod1syAA1SVz_tF : $@convention(thin) (@inout S) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[ACCESS]]
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on [[ACCESS]]
 // CHECK: begin_access [modify] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -103,7 +103,7 @@ func testSMod(s: inout S) {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0
 // CHECK: [[LD:%.*]] = load [[ACCESS]]
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[LD]]
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on [[LD]]
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -116,7 +116,7 @@ func testSInoutBorrow(mut_s s: inout S) {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0
 // CHECK: [[LD:%.*]] = load [[ACCESS]]
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[ACCESS]]
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on [[ACCESS]]
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -128,7 +128,7 @@ func testSInoutMutBorrow(mut_s s: inout S) {
 // CHECK-LABEL: sil hidden @$s4main13testSInoutMod5mut_syAA1SVz_tF : $@convention(thin) (@inout S) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[ACCESS]]
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on [[ACCESS]]
 // CHECK: begin_access [modify] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -139,7 +139,7 @@ func testSInoutMod(mut_s s: inout S) {
 
 // CHECK-LABEL: sil hidden @$s4main13testSNCBorrow3sncyAA3SNCV_tF : $@convention(thin) (@guaranteed SNC) -> () {
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on %0
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on %0
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -150,7 +150,7 @@ func testSNCBorrow(snc: borrowing SNC) {
 
 // CHECK-LABEL: sil hidden @$s4main16testSNCMutBorrow3sncyAA3SNCV_tF : $@convention(thin) (@guaranteed SNC) -> () {
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on %0
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on %0
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -162,7 +162,7 @@ func testSNCMutBorrow(snc: borrowing SNC) {
 // CHECK-LABEL: sil hidden @$s4main10testSNCMod7mut_sncyAA3SNCVz_tF : $@convention(thin) (@inout SNC) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[ACCESS]]
+// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on [[ACCESS]]
 // CHECK: begin_access [modify] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access

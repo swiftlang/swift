@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s -I %t -enable-library-evolution
 // RUN: %target-swift-emit-silgen -primary-file %s -I %t -enable-library-evolution | %FileCheck %s
 import property_wrapper_defs
 

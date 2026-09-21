@@ -49,12 +49,11 @@ bool BuiltinInfo::isReadNone() const {
 
 const llvm::AttributeSet &
 IntrinsicInfo::getOrCreateFnAttributes(ASTContext &Ctx) const {
-  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeSet>;
-  if (DenseMapInfo::isEqual(FnAttrs, DenseMapInfo::getEmptyKey())) {
+  if (!FnAttrs) {
     FnAttrs =
         llvm::Intrinsic::getFnAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return FnAttrs;
+  return FnAttrs.value();
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -984,6 +983,11 @@ static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
                             _rawPointer);
 }
 
+static ValueDecl *getDereferenceable(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
+                            _rawPointer);
+}
+
 static ValueDecl *getCopyArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
@@ -1127,6 +1131,14 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &ctx,
                             _word);
 }
 
+static ValueDecl *getTypedAllocationIDOperation(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_metatype(_typeparam(0))),
+                            _int(64));
+}
+
 static ValueDecl *getIsPODOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -1169,6 +1181,34 @@ static ValueDecl *getAllocOperation(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getDeallocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer, _word, _word),
+                            _void);
+}
+
+static ValueDecl *getAllocRawTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_word, _word,
+                                        _metatype(_typeparam(0))),
+                            _rawPointer);
+}
+
+static ValueDecl *getDeallocRawTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_rawPointer, _word, _word,
+                                        _metatype(_typeparam(0))),
+                            _void);
+}
+
+static ValueDecl *getAllocErrorBoxTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getDeallocErrorBoxTypedOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawPointer, _word, _word),
                             _void);
@@ -1454,7 +1494,8 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
-        return FunctionType::get(params, fnResultGen.build(builder), extInfo);
+        return FunctionType::get(params, /* yields */ {},
+                                 fnResultGen.build(builder), extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
@@ -1524,8 +1565,8 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      auto innerFunction =
-          FunctionType::get(params, linearFnResultGen.build(builder), info);
+      auto innerFunction = FunctionType::get(
+          params, /* yields */ {}, linearFnResultGen.build(builder), info);
       return innerFunction->withExtInfo(extInfo);
     }
   };
@@ -1690,7 +1731,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
     operationResultType = makeGenericParam().build(builder); // <T>
   }
   builder.addParameter(
-      makeConcrete(FunctionType::get({}, operationResultType, extInfo)),
+      makeConcrete(FunctionType::get({}, {}, operationResultType, extInfo)),
       ParamSpecifier::Default,
       areSendingArgsEnabled /*isSending*/); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
@@ -1701,7 +1742,7 @@ static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
-          _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
+        _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
       _typeparam(0));
 }
 
@@ -1780,7 +1821,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
                      .withSendingResult(hasSendingResult)
                      .build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({}, {}, genericParam, extInfo)));
 
   // -> Builtin.RawPointer
   builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
@@ -2227,7 +2268,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                    /*throws*/ false, Type())
           .withClangFunctionType(ClangType)
           .build();
-  auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
+  auto BlockTy = FunctionType::get(CFuncParams, /* yields */ {}, VoidTy, Thin);
   SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
   if (withContext) {
     ArgTypes.push_back(ContextTy);
@@ -2260,7 +2301,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
 
   auto voidTy = ctx.TheEmptyTupleType;
   auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
-  auto *fnTy = FunctionType::get(params, voidTy, extInfo);
+  auto *fnTy = FunctionType::get(params, /* yields */ {}, voidTy, extInfo);
 
   builder.addParameter(makeConcrete(fnTy));
 
@@ -2375,9 +2416,9 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
       .withThrows(/* throws */ true, E.build(builder))
       .build();
 
-  auto fnParamTy = FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
-                                     ctx.TheEmptyTupleType,
-                                     extInfo);
+  auto fnParamTy =
+      FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
+                        /* yields */ {}, ctx.TheEmptyTupleType, extInfo);
 
   builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
   builder.setResult(T);
@@ -2390,7 +2431,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
 static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
                                                 Identifier id) {
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-  auto fnType = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+  auto fnType = FunctionType::get({}, {}, ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", fnType)),
                             _unsafeRawPointer);
@@ -2402,6 +2443,20 @@ static ValueDecl *getTaskRemoveCancellationHandler(ASTContext &ctx,
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
+static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
+                                                           Identifier id) {
+  // (UInt8) -> ()
+  std::array<AnyFunctionType::Param, 1> params = {
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+  };
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto *functionType = FunctionType::get(params, /* yields */ {},
+                                         ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", functionType)),
+                            _unsafeRawPointer);
+}
+
 static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
                                                       Identifier id) {
   std::array<AnyFunctionType::Param, 2> params = {
@@ -2410,8 +2465,8 @@ static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
   };
   // (UInt8, UInt8) -> ()
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-  auto *functionType =
-      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  auto *functionType = FunctionType::get(params, /* yields */ {},
+                                         ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", functionType)),
                             _unsafeRawPointer);
@@ -2419,6 +2474,37 @@ static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
 
 static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
                                                          Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
+  // <C: Clock & Identifiable, I> (clock: borrowing C, instant: borrowing I)
+  //   -> UnsafeRawPointer
+  //
+  // Operands are borrowed at +0. No copies of the clock or instant are made,
+  // the record stores borrowed pointers into the caller's frame.
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _generics(_unrestricted,
+                _conformsTo(_typeparam(0), _clock),
+                _conformsTo(_typeparam(0), _identifiable),
+                _unrestricted),
+      _parameters(_label("clock", _borrowing(_typeparam(0))),
+                  _label("instant", _borrowing(_typeparam(1)))),
+      _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskCancellationScopePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
@@ -2653,12 +2739,12 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
+  case IITDescriptor::WasmExternref:
+  case IITDescriptor::WasmFuncref:
   case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
   case IITDescriptor::AMX:
   case IITDescriptor::Metadata:
-  case IITDescriptor::ExtendArgument:
-  case IITDescriptor::TruncArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
@@ -2699,6 +2785,22 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     auto vecType = argType->getAs<BuiltinVectorType>();
     if (!vecType) return Type();
     return vecType->getElementType();
+  }
+
+  case IITDescriptor::ExtendArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    if (auto vecType = argType->getAs<BuiltinVectorType>())
+      return vecType->getExtended(Context);
+    return Type();
+  }
+
+  case IITDescriptor::TruncArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    if (auto vecType = argType->getAs<BuiltinVectorType>())
+      return vecType->getTruncated(Context);
+    return Type();
   }
 
   // A pointer to an immediate type.
@@ -3090,6 +3192,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
+  case BuiltinValueKind::GepProjection:
+  case BuiltinValueKind::UnprotectedGepProjection:
+    if (Types.size() != 1) return nullptr;
+    return getGepOperation(Context, Id, Types[0]);
+
   case BuiltinValueKind::GetTailAddr:
     if (Types.size() != 1) return nullptr;
     return getGetTailAddrOperation(Context, Id, Types[0]);
@@ -3110,6 +3217,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getAssumeAlignment(Context, Id);
+
+  case BuiltinValueKind::Dereferenceable:
+    if (!Types.empty())
+      return nullptr;
+    return getDereferenceable(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
@@ -3246,6 +3358,21 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
+
+  case BuiltinValueKind::AllocRawTyped:
+    return getAllocRawTypedOperation(Context, Id);
+
+  case BuiltinValueKind::DeallocRawTyped:
+    return getDeallocRawTypedOperation(Context, Id);
+
+  case BuiltinValueKind::AllocErrorBoxTyped:
+    return getAllocErrorBoxTypedOperation(Context, Id);
+
+  case BuiltinValueKind::DeallocErrorBoxTyped:
+    return getDeallocErrorBoxTypedOperation(Context, Id);
+
+  case BuiltinValueKind::TypedAllocationID:
+    return getTypedAllocationIDOperation(Context, Id);
 
   case BuiltinValueKind::StackAlloc:
   case BuiltinValueKind::UnprotectedStackAlloc:
@@ -3574,11 +3701,26 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TaskRemoveCancellationHandler:
     return getTaskRemoveCancellationHandler(Context, Id);
 
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
+    return getTaskAddCancellationHandlerWithReason(Context, Id);
+
   case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     return getTaskAddPriorityEscalationHandler(Context, Id);
 
   case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
     return getTaskRemovePriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskPushDeadline:
+    return getTaskPushDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskPopDeadline:
+    return getTaskPopDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopePush:
+    return getTaskCancellationScopePush(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopePop:
+    return getTaskCancellationScopePop(Context, Id);
 
   case BuiltinValueKind::TaskLocalValuePush:
     return getTaskLocalValuePush(Context, Id);

@@ -16,7 +16,6 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
@@ -52,8 +51,10 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
   auto cExternAttr = ExternAttr::find(gDecl->getAttrs(), ExternKind::C);
   if (gDecl->getAttrs().hasAttribute<SILGenNameAttr>() || cExternAttr) {
-    silLinkage = SILLinkage::DefaultForDeclaration;
-    if (! gDecl->hasInitialValue()) {
+    // `@_extern(c)` and body-less `@_silgen_name` declarations name a symbol
+    // defined elsewhere; the SIL global is just a forward declaration.
+    if (!gDecl->hasInitialValue()) {
+      silLinkage = SILLinkage::DefaultForDeclaration;
       forDef = NotForDefinition;
     }
   }
@@ -75,8 +76,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
       M, silLinkage, IsNotSerialized, mangledName, silTy, std::nullopt, gDecl);
   silGlobal->setDeclaration(!forDef);
 
-  if (auto sectionAttr = gDecl->getAttrs().getAttribute<SectionAttr>())
-    silGlobal->setSection(sectionAttr->Name);
+  if (auto sectionName = gDecl->getSection())
+    silGlobal->setSection(*sectionName);
 
   if (cExternAttr) {
     silGlobal->setAsmName(cExternAttr->getCName(gDecl));

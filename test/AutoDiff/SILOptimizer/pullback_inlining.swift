@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -emit-sil -O -verify -Xllvm -debug-only=sil-inliner %s 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
-// REQUIRES: swift_in_compiler
 // UNSUPPORTED: OS=windows-msvc
 
 import _Differentiation

@@ -33,8 +33,8 @@ func test() {
 
 
   deprecated_in_26_0()
-  // expected-macosx-warning@-1 {{'deprecated_in_26_0()' was deprecated in any Apple OS 26.0}}
-  // expected-ios-warning@-2 {{'deprecated_in_26_0()' was deprecated in any Apple OS 26.0}}
+  // expected-macosx-warning@-1 {{'deprecated_in_26_0()' was deprecated in macOS 26.0}}
+  // expected-ios-warning@-2 {{'deprecated_in_26_0()' was deprecated in iOS 26.0}}
 
   obsoleted_in_26_0()
   // expected-macosx-error@-1 {{'obsoleted_in_26_0()' is unavailable in macOS}}

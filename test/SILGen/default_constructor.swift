@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
 
 struct B {
@@ -64,6 +65,7 @@ class E {
 // CHECK-NEXT: end_borrow [[BORROWED_SELF]]
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK-NEXT: destroy_value [[SELF]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[SELF_COPY]] : $E
 
 class F : E { }
@@ -83,6 +85,7 @@ class F : E { }
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [init] [[PB]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*F
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[SELFLIFE]]
 // CHECK-NEXT: destroy_value [[SELF]] : ${ var F }
 // CHECK-NEXT: return [[SELFP]] : $F

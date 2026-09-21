@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name lifetime -Xllvm -sil-full-demangle -parse-as-library -primary-file %s | %FileCheck %s
 
 struct Buh<T> {
@@ -285,6 +286,7 @@ class He {
   // CHECK-NEXT: [[UNINITIALIZED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]]
   // CHECK-NEXT: [[UNINITIALIZED_SELF_COPY:%.*]] = copy_value [[UNINITIALIZED_SELF]]
   // CHECK-NEXT: destroy_value [[UNINITIALIZED_SELF]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[UNINITIALIZED_SELF_COPY]]
   // CHECK: } // end sil function '$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fc'
 

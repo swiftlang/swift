@@ -136,8 +136,7 @@ public:
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;
 
 class SwiftEditorDocumentFileMap {
-  WorkQueue Queue{ WorkQueue::Dequeuing::Concurrent,
-                   "sourcekit.swift.EditorDocFileMap" };
+  std::mutex DocsMtx;
   struct DocInfo {
     SwiftEditorDocumentRef DocRef;
     std::string ResolvedPath;

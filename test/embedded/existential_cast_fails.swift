@@ -27,7 +27,6 @@
 // RUN: %target-not-crash %target-run %t/t4.out 2>&1 | %FileCheck %s --check-prefix=CHECK-T4
 
 // REQUIRES: swift_test_mode_optimize_none
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded

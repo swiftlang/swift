@@ -14,7 +14,6 @@
 // Test for canImport of an embedded module into a non-embedded module
 // RUNx: %target-typecheck-verify-swift -I %t/embedded
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 

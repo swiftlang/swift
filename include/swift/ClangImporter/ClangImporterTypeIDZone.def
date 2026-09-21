@@ -28,19 +28,13 @@ SWIFT_REQUEST(ClangImporter, ObjCInterfaceAndImplementationRequest,
               ObjCInterfaceAndImplementation(Decl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ForeignReferenceTypeInfoRequest,
-              ForeignReferenceTypeInfo(ForeignReferenceTypeInfoDescriptor), Uncached,
+              ForeignReferenceTypeInfo(ForeignReferenceTypeInfoDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
               CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordAsSwiftType,
               ValueDecl *(CxxRecordSemanticsDescriptor), Cached,
-              NoLocationInfo)
-SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
-              bool(SafeUseOfCxxRecordDescriptor), Cached,
-              NoLocationInfo)
-SWIFT_REQUEST(ClangImporter, CustomRefCountingOperation,
-              CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
               CxxEscapability(EscapabilityLookupDescriptor), Cached,

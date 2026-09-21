@@ -150,6 +150,10 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| of type %2}3 cannot be used on"
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
+ERROR(metatype_extension_member_on_conforming_type,none,
+      "metatype extension member %1 cannot be used on conforming type %0; "
+      "it is only available on the protocol metatype",
+      (Type, const ValueDecl *))
 GROUPED_ERROR(could_not_use_member_on_existential,ExistentialMemberAccess,none,
       "member %1 cannot be used on value of type %0; consider using a"
       " generic constraint instead",
@@ -328,6 +332,8 @@ ERROR(cannot_convert_initializer_value_anyobject,none,
       "value of type %0 expected to be instance of class or "
       "class-constrained type",
       (Type, Type))
+ERROR(cannot_convert_noncopyable_value_to_anyobject,none,
+      "value of noncopyable type %0 cannot be converted to %1", (Type, Type))
 ERROR(cannot_convert_initializer_value_nil,none,
       "'nil' cannot initialize specified type %0", (Type))
 
@@ -731,8 +737,9 @@ ERROR(expr_swift_keypath_anyobject_root,none,
 ERROR(expr_keypath_protocol_metatype_static_member,none,
       "key path cannot refer to static member %0 of protocol type %1",
       (DeclNameRef, Type))
-ERROR(expr_keypath_multiparam_func_conversion, none,
-      "cannot convert key path into a multi-argument function type %0", (Type))
+ERROR(expr_keypath_wrong_param_func_conversion, none,
+      "cannot convert key path literal to %0, "
+      "expected single-parameter function type %1", (Type, Type))
 ERROR(cannot_convert_type_to_keypath_subscript_index,none,
       "cannot use value of type %0 as a key path subscript index; argument must be"
       " a key path",
@@ -829,6 +836,9 @@ ERROR(const_public_let_ref,none,
       "reference to a %select{%error|%error|%error|package|public|open}0 "
       "'let' binding is not permitted in a literal expression",
       (AccessLevel))
+ERROR(const_usable_from_inline_let_ref,none,
+      "reference to a '@usableFromInline' 'let' binding is not permitted "
+      "in a literal expression", ())
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
@@ -889,6 +899,24 @@ REMARK(serialization_skipped_invalid_type,none,
 REMARK(serialization_skipped_invalid_type_unknown_name,none,
        "serialization skipped for invalid type",
        ())
+REMARK(serialization_scheduled_implementation_only_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because its defining "
+       "module was imported with '@_implementationOnly' and it contributes "
+       "to the ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+REMARK(serialization_scheduled_internal_bridging_header_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because it was "
+       "imported through '-internal-import-bridging-header' and contributes "
+       "to the ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+REMARK(serialization_scheduled_recovered_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because it was "
+       "recovered from a hidden type representation and contributes to the "
+       "ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+NOTE(serialization_hidden_type_layout_abi_exposure,none,
+     "layout of %kind0 is ABI-exposed through %kind1",
+     (const ValueDecl *, const ValueDecl *))
 ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))
@@ -1331,6 +1359,10 @@ GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
+NOTE(cannot_find_module_version_use_underlying,none,
+     "the underlying Clang module '%0' has version %1; use "
+     "'_underlyingVersion' to check it", (StringRef, llvm::VersionTuple))
+
 GROUPED_WARNING(canimport_missing_module,CanImportMissingModule,none,
         "cannot find module '%0' for canImport check; the directive will"
         " evaluate to false", (StringRef))
@@ -1366,6 +1398,9 @@ ERROR(nonstatic_operator_in_extension,none,
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
+ERROR(foreign_reference_subclass_must_be_final,none,
+      "%kind0 must be 'final' because it subclasses a C++ foreign reference type",
+      (const ValueDecl *))
 ERROR(operator_in_unrelated_type,none,
       "member operator %2%select{| of protocol %0}1 must have at least one "
       "argument of type %select{%0|'Self'}1",
@@ -1664,6 +1699,18 @@ ERROR(argument_out_of_order_unnamed_unnamed,none,
 ERROR(argument_out_of_order_binary_op,none,
       "operator argument #%0 must precede operator argument #%1",
       (unsigned, unsigned))
+NOTE(argument_out_of_order_note_named, none,
+     "candidate expects argument %0 must precede argument %1",
+     (Identifier, Identifier))
+NOTE(argument_out_of_order_note_unnamed, none,
+     "candidate expects argument #%0 must precede argument #%1",
+     (unsigned, unsigned))
+NOTE(argument_out_of_order_note_named_unnamed, none,
+     "candidate expects argument %0 must precede argument #%1",
+     (Identifier, unsigned))
+NOTE(argument_out_of_order_note_unnamed_named, none,
+     "candidate expects argument #%0 must precede argument #%1",
+     (unsigned, Identifier))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
@@ -1748,7 +1795,7 @@ GROUPED_ERROR(invalid_dynamic_callable_type,DynamicCallable,none,
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
 GROUPED_ERROR(missing_dynamic_callable_kwargs_method,DynamicCallable,none,
       "'@dynamicCallable' type %0 cannot be applied with keyword arguments; "
-      "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
+      "missing 'dynamicallyCall(withKeywordArguments:)' method", (Type))
 
 ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
@@ -1781,6 +1828,13 @@ ERROR(too_many_dynamic_member_lookups,none,
       "could not find member %0; exceeded the maximum number of nested "
       "dynamic member lookups",
       (DeclNameRef))
+
+ERROR(keypath_dynamic_member_lookup_expects_class_base, none,
+      "referencing %kind1 on %0 requires it to be a class type",
+      (Type, ValueDecl *))
+NOTE(keypath_dynamic_member_lookup_expects_class_base_note, none,
+     "'subscript(dynamicMember:)' declared in %0 uses 'ReferenceWritableKeyPath'"
+     " which only supports classes", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1889,6 +1943,8 @@ NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,none,
       "add '!' to form an implicitly unwrapped optional", ())
+NOTE(note_use_nil_for_cxx_optional,none,
+     "use the 'nil' literal instead", ())
 
 ERROR(invalid_ibdesignable_extension,none,
       "'@IBDesignable' can only be applied to classes and extensions "
@@ -1952,6 +2008,10 @@ ERROR(attr_objc_implementation_func_not_found,none,
       "could not find imported function '%0' matching %kind1; make sure you "
       "import the module or header that declares it",
       (StringRef, ValueDecl*))
+ERROR(attr_objc_implementation_func_ambiguous_overload,none,
+      "%kind0 could implement any of several imported overloads of '%1' that "
+      "have the same signature in Swift",
+      (ValueDecl*, StringRef))
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
@@ -1968,6 +2028,9 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (AvailabilityDomain, AvailabilityRange))
+ERROR(objc_implementation_extension_restricted,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it %1",
+      (const ValueDecl *, StringRef))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -2082,6 +2145,17 @@ ERROR(objc_implementation_mismatched_error_convention_other,none,
       "sample project, as the compiler should be able to describe the mismatch",
       (const ValueDecl *))
 
+ERROR(objc_implementation_availability_mismatch_only_available_in,none,
+      "%kind0 does not match the declaration in the header because it "
+      "%select{is|must be}1 only available in %2%select{| %4 or newer}3",
+      (const ValueDecl *, /*mustBe=*/bool, AvailabilityDomain, bool,
+       AvailabilityRange))
+
+ERROR(objc_implementation_availability_mismatch_unavailable,none,
+      "%kind0 does not match the declaration in the header because it "
+      "%select{is|must be}1 unavailable%select{ in %3|}2",
+      (const ValueDecl *, /*mustBe=*/bool, bool, AvailabilityDomain))
+
 ERROR(objc_implementation_wrong_objc_name,none,
       "selector %0 for %kind1 not found in header; did you mean %2?",
       (ObjCSelector, ValueDecl *, ObjCSelector))
@@ -2132,6 +2206,11 @@ NOTE(objc_implementation_init_turn_required_to_convenience, none,
      "initializer",
      ())
 
+WARNING(objc_implementation_missing_inherited_init,none,
+        "'@objc @implementation' extension does not implement %kind0 inherited "
+        "from its superclass; invoking it from Objective-C will trap at runtime",
+        (const ValueDecl *))
+
 // Fallback diagnostic; super-general by nature.
 ERROR(objc_implementation_member_requires_vtable, none,
       "%kind0 is not valid in an '@objc @implementation' extension because it "
@@ -2159,6 +2238,57 @@ ERROR(cdecl_throws,none,
 ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
+ERROR(cdecl_ref_counting_operation,none,
+      "%0 %select{function|instance method}3 implementing the "
+      "%select{retain|release}1 operation of foreign reference type %2 will "
+      "cause infinite recursion%select{; use `Unmanaged` or a pointer type "
+      "like `UnsafeMutableRawPointer`|}3",
+      (DeclAttribute, unsigned, Type, unsigned))
+ERROR(cdecl_unretained_result_unsupported,none,
+      "%kind0 cannot implement %select{C|C++}1 function '%2' because it "
+      "returns a foreign reference type %select{without a "
+      "'SWIFT_RETURNS_RETAINED' annotation|unretained "
+      "('SWIFT_RETURNS_UNRETAINED')}3, which is not yet supported",
+      (ValueDecl *, bool, StringRef, unsigned))
+
+// @cxx
+ERROR(cxx_attr_requires_cxx_interop,none,
+      "'%0' requires C++ interoperability; enable it with "
+      "'-cxx-interoperability-mode=default' or "
+      "'-enable-experimental-cxx-interop'", (StringRef))
+ERROR(cxx_incompatible_with_objc,none,
+      "cannot apply both '@cxx' and '@objc' to %kindonly0",
+      (const Decl *))
+ERROR(cxx_incompatible_with_cdecl,none,
+      "cannot apply both '@cxx' and '%0' to %kindonly1",
+      (DeclAttribute, const Decl *))
+ERROR(cxx_attr_requires_implementation,none,
+      "'@cxx' must be combined with '@implementation'",
+      ())
+ERROR(cxx_self_ownership_unsupported,none,
+      "%kindonly0 cannot be marked '@cxx' because 'self' is "
+      "'%select{borrowing|consuming}1'; a C++ method receives 'this' from its "
+      "caller, so the implementation must take 'self' with default ownership",
+      (const AbstractFunctionDecl *, unsigned))
+ERROR(cxx_invalid_context,none,
+      "%0 can only be applied to global functions or functions in extensions "
+      "of C++ namespaces, structs, and classes", (DeclAttribute))
+ERROR(cxx_func_defined,none,
+      "%kind0 cannot implement C++ function '%1' because it "
+      "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
+      (ValueDecl *, StringRef, unsigned))
+ERROR(cxx_virtual_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because virtual methods are "
+      "not yet supported",
+      (ValueDecl *, StringRef))
+ERROR(cxx_mutating_mismatch,none,
+      "%kind0 should%select{|| not}1 be 'mutating' to match "
+      "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
+      (ValueDecl *, unsigned, const ValueDecl *))
+ERROR(cxx_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because reference "
+      "parameters and return types are not yet supported",
+      (ValueDecl *, StringRef))
 
 // @used and @section
 ERROR(section_empty_name,none,
@@ -2186,6 +2316,99 @@ WARNING(extern_c_maybe_invalid_name, none,
         (StringRef))
 ERROR(extern_variable_initializer, none,
       "'@_extern' variable cannot have an initializer", ())
+
+// @com
+ERROR(attr_com_requires_flag, none, "'@com' requires '-enable-experimental-com-interop'", ())
+ERROR(attr_com_invalid_guid, none,
+      "'%0' is not a valid GUID; expected format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'", (StringRef))
+ERROR(attr_com_protocol_requires_iid, none,
+      "'@com' on a protocol requires 'interface:' argument", ())
+ERROR(attr_com_protocol_unexpected_arg, none,
+      "'@com' on a protocol must only have 'interface:'; '%0' is not allowed", (StringRef))
+ERROR(attr_com_class_unexpected_iid, none,
+      "'@com' on a class must not have 'interface:'; use 'implementation:' instead", ())
+ERROR(attr_com_explicit_iswiftobject, none,
+      "'ISwiftObject' conformance is compiler-managed and cannot be declared explicitly", ())
+NOTE(attr_com_iswiftobject_implied, none,
+     "'@com' automatically provides 'ISwiftObject' conformance", ())
+ERROR(attr_com_missing_module, none,
+      "'COM' module not imported, required for '@com'", ())
+ERROR(com_module_missing_type, none,
+      "type '%0' not found in the 'COM' module", (StringRef))
+ERROR(com_interface_inherits_non_marker, none,
+      "COM interface %0 cannot inherit non-COM, non-marker protocol %1",
+      (DeclName, DeclName))
+ERROR(com_interface_inherits_non_protocol, none,
+      "COM interface %0 cannot inherit non-protocol type %1",
+      (DeclName, Type))
+ERROR(com_interface_multiple_abi_bases, none,
+      "COM interface %0 cannot inherit unrelated COM interfaces %1 and %2",
+      (DeclName, DeclName, DeclName))
+ERROR(com_interface_refinement_requires_identity, none,
+      "protocol %0 refines COM interface %1 and must declare its own "
+      "'@com(interface:)' identity", (DeclName, DeclName))
+ERROR(com_interface_repeated_iid, none,
+      "COM interface %0 and inherited interface %1 use the same interface "
+      "identifier '%2'", (DeclName, DeclName, StringRef))
+ERROR(com_interface_unsupported_requirement, none,
+      "requirement %1 cannot be %select{used|static|generic|async|throwing}0 in a COM interface",
+      (int, DeclName))
+ERROR(com_interface_unsupported_parameter, none,
+      "parameter %0 of COM interface requirement %1 cannot be represented in C",
+      (DeclName, DeclName))
+ERROR(com_interface_unsupported_type, none,
+      "type %0 of COM interface requirement %1 cannot be represented in C",
+      (Type, DeclName))
+ERROR(com_identity_existential, none,
+      "'any %0' is invalid because '%0' describes a COM metatype identity",
+      (StringRef))
+ERROR(com_identity_explicit_conformance, none,
+      "%0 conformance is compiler-managed and cannot be declared explicitly",
+      (DeclName))
+ERROR(com_identity_invalid_requirement, none,
+      "expected '%0' to declare 'var %1: %2 { get }'",
+      (StringRef, StringRef, StringRef))
+ERROR(com_identity_unsupported_requirement, none,
+      "requirement %0 of %1 is not supported by this compiler",
+      (DeclName, DeclName))
+ERROR(com_existential_multiple_interfaces, none,
+      "COM existential cannot contain interfaces %0 and %1 because neither refines the other",
+      (DeclName, DeclName))
+ERROR(com_existential_non_marker_protocol, none,
+      "COM existential containing interface %0 cannot also contain non-marker protocol %1",
+      (DeclName, DeclName))
+ERROR(com_existential_anyobject, none,
+      "COM existential containing interface %0 cannot also contain 'AnyObject'",
+      (DeclName))
+ERROR(com_existential_superclass, none,
+      "COM existential containing interface %0 cannot also contain class constraint %1",
+      (DeclName, Type))
+ERROR(com_conformance_requires_class, none,
+      "non-class type %0 cannot conform to COM interface %1", (Type, Type))
+ERROR(com_conformance_must_be_in_type_module, none,
+      "conformance of %0 to COM interface %1 must be declared in the same module as %0",
+      (Type, Type))
+ERROR(com_conditional_conformance, none,
+      "conditional conformance of %0 to COM interface %1 is not supported",
+      (Type, Type))
+ERROR(com_actor_implementation, none,
+      "actor %0 cannot provide a COM implementation", (DeclName))
+ERROR(com_non_native_implementation, none,
+      "class %0 cannot provide a COM implementation because it does not use the native Swift object model",
+      (DeclName))
+ERROR(com_generic_activatable_implementation, none,
+      "generic class %0 cannot declare a COM implementation identifier",
+      (DeclName))
+
+ERROR(metatype_extension_com_only, none,
+      "protocol metatype extensions are reserved for COM interop", ())
+ERROR(metatype_extension_non_protocol, none,
+      "metatype extension can only extend a protocol, not %0", (Type))
+ERROR(metatype_extension_self, none,
+      "'Self' cannot be referenced in a protocol metatype extension", ())
+ERROR(metatype_extension_associated_type, none,
+      "associated type %0 cannot be referenced in a protocol metatype extension",
+      (DeclName))
 
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
@@ -2438,6 +2661,20 @@ ERROR(originally_definedin_must_not_before_available_version,none,
 WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
+
+// @called(once)
+ERROR(called_once_cannot_be_used_with_borrowing,none,
+      "'@called(once)' cannot be used together with 'borrowing'", ())
+ERROR(called_once_function_type_mismatch,none,
+      "invalid conversion from '@called(once)' function of type %0 "
+      "to function type %1", (Type, Type))
+ERROR(sending_capture_requires_experimental_feature,none,
+      "'sending' capture is only valid when experimental feature "
+      "'CalledAttribute' is enabled",
+      ())
+ERROR(sending_capture_decl_requires_called_once,none,
+      "'sending' capture may only be declared in a '@called(once)' closure",
+      ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -2763,6 +3000,14 @@ ERROR(spi_only_imports_not_enabled, none,
       "'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'",
       ())
 
+ERROR(cannot_synthesize_memberwise_init,none,
+      "cannot automatically synthesize memberwise initializer for %0",
+      (const StructDecl *))
+NOTE(unavailable_init_accessor_prevent_memberwise_init_synthesis,none,
+     "%select{potentially |}0unavailable %kind1 with init accessor prevents "
+     "automatic synthesis of memberwise initializer",
+     (bool, const VarDecl *))
+
 WARNING(warn_use_of_compat_memberwise_init,Deprecation,
         "synthesized memberwise initializer no longer includes "
         "%select{private properties with initial values|%1}0; uses of it "
@@ -3000,6 +3245,9 @@ ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
 ERROR(type_does_not_conform_decl_owner,none,
       "%kind0 requires that %1 conform to %2",
       (const ValueDecl *, Type, Type))
+NOTE(missing_conformance_unloaded_module,none,
+     "the conformance of %0 to %1 could not be loaded because module %2 was not "
+     "imported; add import of module %2", (Type, Type, Identifier))
 ERROR(type_does_not_conform_anyobject_decl_owner,none,
       "%kind0 requires that %1 be a class type",
       (const ValueDecl *, Type, Type))
@@ -3120,6 +3368,10 @@ ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
       (const ValueDecl *, bool, Type))
+ERROR(witness_initializer_cxx_not_inherited,none,
+      "initializer requirement %0 cannot be satisfied by a C++ constructor of "
+      "non-final foreign reference type %1",
+      (const ValueDecl *, Type))
 ERROR(witness_initializer_failability,none,
       "non-failable initializer requirement %0"
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "
@@ -3326,6 +3578,11 @@ ERROR(ambiguous_associated_type_from_parameterized_protocols,none,
      (const AssociatedTypeDecl *, const ProtocolDecl *))
 NOTE(associated_type_candidate_from_parameterized_protocol,none,
      "candidate inferred from parameterized protocol here", ())
+ERROR(associated_type_inference_too_complex,none,
+     "the compiler is unable to infer the associated types in this "
+     "conformance of %0 to %1 in reasonable time",
+     (Type, const ProtocolDecl *))
+
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_non_sendable,none,
@@ -3338,6 +3595,11 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (WitnessType, StringRef))
+NOTE(protocol_witness_iuo_conflict,none,
+     "candidate %select{type|result type|parameter type}0 is "
+     "%select{an optional|an implicitly unwrapped optional}1, but the protocol "
+     "requires %select{an implicitly unwrapped optional|an optional}1%2",
+     (unsigned, bool, StringRef))
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as|%error|%error}2 %1", (Type, Type, unsigned))
@@ -3931,7 +4193,7 @@ NOTE(enum_raw_type_here,none,
 ERROR(objc_enum_no_raw_type,none,
       "'%0' enum must declare an integer raw type", (DeclAttribute))
 ERROR(objc_enum_raw_type_not_integer,none,
-      "'%0' enum raw type %1 is not an integer type", (DeclAttribute, Type))
+      "'%0' enum raw type %1 must be an integer type expressible in %2", (DeclAttribute, Type, StringRef))
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
@@ -4034,9 +4296,10 @@ NOTE(spi_only_import_conflict_here,none,
 ERROR(error_public_import_of_private_module,none,
       "private module %0 is imported publicly from the public module %1",
       (Identifier, Identifier))
-ERROR(error_import_of_ipi_module,none,
-      "Project internal module %0 cannot be imported publicly from non-internal module %1",
-      (Identifier, Identifier))
+GROUPED_WARNING(warn_import_of_ipi_module,PublicImportOfProjectInternalModule,none,
+      "Project internal module %0 cannot be imported publicly because "
+      "%1 has '-library-level %select{api|spi}2'",
+      (Identifier, Identifier, unsigned))
 
 ERROR(inconsistent_implicit_access_level_on_import,none,
       "ambiguous implicit access level for import of %0; it is imported as "
@@ -4243,6 +4506,13 @@ ERROR(attr_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
 ERROR(attr_only_valid_on_func_or_init_params,none,
       "'%0' may only be used on function or initializer parameters", (StringRef))
+ERROR(subscript_consuming_parameter_separate_accessors,none,
+      "'%0' may not be used on the parameter of a subscript whose read and "
+      "write go through separate accessors; a read-modify-write access would "
+      "consume the argument more than once", (StringRef))
+NOTE(subscript_consuming_parameter_use_coroutine,none,
+      "use a '%0' accessor instead, so that a single accessor performs the "
+      "whole access", (StringRef))
 ERROR(attr_not_on_variadic_parameters,none,
       "'%0' must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_stored_properties,none,
@@ -4292,6 +4562,22 @@ ERROR(final_not_allowed_here,none,
 ERROR(attr_incompatible_with_attr,none,
       "'%0' cannot be used with '%1'",
       (DeclAttribute, DeclAttribute))
+
+ERROR(attr_target_empty_string,none,
+      "'@_target' requires a non-empty target string", ())
+
+ERROR(attr_target_unsupported_feature,none,
+      "unsupported target feature '%0' in '@_target'", (StringRef))
+
+ERROR(attr_target_unsupported_cpu,none,
+      "unsupported CPU '%0' in '@_target'", (StringRef))
+
+ERROR(attr_target_duplicate_option,none,
+      "duplicate '%0' option in '@_target'", (StringRef))
+
+ERROR(attr_target_invalid_branch_protection,none,
+      "invalid branch protection specification '%0' in '@_target'",
+      (StringRef))
 
 ERROR(attr_incompatible_with_non_final,none,
       "'%0' cannot be applied to a non-final %kindonly1",
@@ -4562,7 +4848,7 @@ ERROR(derivative_attr_result_func_type_mismatch,none,
 NOTE(derivative_attr_result_func_type_mismatch_note,none,
      "%0 does not have expected type %1", (Identifier, Type))
 NOTE(derivative_attr_result_func_original_note,none,
-     "%0 defined here", (const ValueDecl *))
+     "%0 %select{declared|defined}1 here", (const ValueDecl *, bool))
 ERROR(derivative_attr_original_stored_property_unsupported,none,
       "cannot register derivative for stored property %0", (DeclNameRef))
 ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
@@ -4577,10 +4863,6 @@ NOTE(derivative_attr_unsupported_accessor_kind,none,
 ERROR(derivative_attr_class_setter_unsupported,none,
       "cannot yet register derivative for class property or subscript setters",
       ())
-// TODO(TF-982): Remove this temporary diagnostic.
-NOTE(derivative_attr_protocol_requirement_unsupported,none,
-     "cannot yet register derivative default implementation for protocol "
-     "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (const ValueDecl *))
 NOTE(derivative_attr_duplicate_note,none,
@@ -5242,6 +5524,10 @@ ERROR(passing_noattrfunc_to_attrfunc,none,
       "passing %select{non-escaping|non-Sendable}0 parameter %1 to function "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
+NOTE(candidate_expects_escaping_argument,none,
+     "candidate expects %select{an '@escaping'|a '@Sendable'}0 closure for "
+     "parameter #%1, but argument %2 is %select{non-escaping|non-Sendable}0",
+     (unsigned, unsigned, StringRef))
 ERROR(converting_noescape_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
@@ -5513,7 +5799,7 @@ GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inlinable' function|" \
-  "an '@_alwaysEmitIntoClient' function|" \
+  "an '@export(implementation)' function|" \
   "a default argument value|" \
   "a property initializer in a '@frozen' type|" \
   "a '@backDeployed' function|" \
@@ -5809,7 +6095,7 @@ ERROR(main_function_must_be_mainActor,none,
       "main() must be '@MainActor'", ())
 
 // Keep aligned with enum ForeignLanguage
-#define FOREIGN_LANG_SELECT "select{C|Objective-C}"
+#define FOREIGN_LANG_SELECT "select{C|C++|Objective-C}"
 
 ERROR(not_objc_function_async,none,
       "'async' %kindonly0 cannot be represented in Objective-C",
@@ -5884,6 +6170,10 @@ ERROR(actor_cannot_inherit_distributed_actor_protocol,none,
       "actor type %0 cannot conform to the 'DistributedActor' protocol. "
       "Isolation rules of these actor types are not interchangeable.",
       (DeclName))
+ERROR(distributed_actor_cannot_be_actor_system,none,
+      "distributed actor cannot conform to the "
+      "'DistributedActorSystem' protocol",
+      ())
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 ERROR(broken_distributed_actor_system_requirement,none,
@@ -6044,12 +6334,86 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+
+ERROR(distributed_embedded_any_some_param_not_supported,none,
+      "parameter %0 of type %1 in %kindonly2 is not supported in Embedded Swift; "
+      "only concrete types, or 'any'/'some' types of an '@Resolvable protocol' "
+      "may appear in 'distributed func' signatures",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_embedded_any_some_result_not_supported,none,
+      "return type %0 of %kindonly1 is not supported in Embedded Swift; "
+      "only concrete types, or 'any'/'some' types of an '@Resolvable' protocol may "
+      "appear in 'distributed func' signatures",
+      (Type, const AbstractFunctionDecl *))
+ERROR(distributed_embedded_some_result_not_supported,none,
+      "'some' return type %0 of %kindonly1 is not supported in Embedded Swift; "
+      "use 'any %2' instead",
+      (Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_embedded_generic_func_not_supported,none,
+      "generic 'distributed func' is not supported in Embedded Swift; "
+      "use concrete parameter and return types in %kindonly0",
+      (const AbstractFunctionDecl *))
+ERROR(distributed_embedded_generic_actor_system_not_supported,none,
+      "distributed actor cannot be generic over its actor system in Embedded Swift; "
+      "specify a concrete 'ActorSystem'",
+      ())
+ERROR(distributed_embedded_distributed_var_not_supported,none,
+      "'distributed' computed properties are not supported in Embedded Swift; "
+      "use a 'distributed func' instead",
+      (DeclName))
+ERROR(distributed_embedded_requires_feature,none,
+      "'distributed actor' in Embedded Swift requires '-enable-experimental-feature EmbeddedDistributed'",
+      ())
+ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
+      "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
+      "ActorSystem (%5)",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName, Type, Type))
+NOTE(distributed_actor_func_param_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system,none,
+      "parameter %0 of type %1 in %kindonly2 uses '@Resolvable protocol' %3 "
+      "without a concrete 'ActorSystem' constraint",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName))
+NOTE(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,none,
+     "add 'where Self.ActorSystem == ...' to %0", (DeclName))
+ERROR(distributed_actor_func_param_resolvable_protocol_composition_ambiguous,none,
+      "parameter %0 of type %1 in %kindonly2 contains more than one '@Resolvable protocol'",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_actor_func_result_resolvable_protocol_composition_ambiguous,none,
+      "result type %0 of %kindonly1 contains more than one '@Resolvable protocol'",
+      (Type, const ValueDecl *))
+NOTE(distributed_actor_func_resolvable_protocol_composition_ambiguous_note,none,
+     "declare a new '@Resolvable protocol' that refines those protocols and use it instead",
+     ())
+ERROR(distributed_actor_func_result_resolvable_actor_system_mismatch,none,
+      "result type %0 of %kindonly1 must match the enclosing actor's actor system %3",
+      (Type, const ValueDecl *, DeclName, Type))
+NOTE(distributed_actor_func_result_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_result_resolvable_protocol_no_concrete_actor_system,none,
+      "result type %0 of %kindonly1 uses '@Resolvable protocol' %2 "
+      "without a concrete 'ActorSystem' constraint",
+      (Type, const ValueDecl *, DeclName))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))
 ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
       "'SerializationRequirement' type witness %0 must be a protocol type",
       (Type))
+ERROR(distributed_actor_target_serialization_req_not_concrete,none,
+      "%kind0 cannot be checked because actor system %1 does not specify a "
+      "concrete 'SerializationRequirement'",
+      (const ValueDecl *, Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_note,none,
+     "constrain %0 with concrete actor system or 'SerializationRequirement', "
+     "e.g. 'DistributedActorSystem<any Codable>'",
+     (Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_extension_note,none,
+     "constrain this extension with concrete actor system or "
+     "'SerializationRequirement', e.g. 'DistributedActorSystem<any Codable>'",
+     ())
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
@@ -6091,11 +6455,6 @@ NOTE(shared_state_nonisolated_unsafe,none,
 NOTE(note_actor_isolated_witness,none,
      "%0 %kind1 cannot satisfy %2 requirement",
      (ActorIsolation, const ValueDecl *, ActorIsolation))
-ERROR(actor_cannot_conform_to_global_actor_protocol,none,
-      "actor %0 cannot conform to global-actor-isolated protocol %1",
-      (Type, Type))
-NOTE(protocol_isolated_to_global_actor_here,none,
-     "%0 is isolated to global actor %1 here", (Type, Type))
 GROUPED_ERROR(conformance_mismatched_isolation,ConformanceIsolation,none,
       "conformance of %0 to %kind1 involves isolation mismatches "
       "and can cause data races",
@@ -6150,19 +6509,19 @@ NOTE(in_derived_witness, none,
 ERROR(non_sendable_arg_into_actor,none,
       "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_arg_exits_actor,none,
+GROUPED_ERROR(non_sendable_arg_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_param_in_witness,none,
+GROUPED_ERROR(non_sendable_param_in_witness,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable parameter type %0 cannot be sent from caller of "
       "protocol requirement %1 into %2 implementation",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_param_in_override,none,
+GROUPED_ERROR(non_sendable_param_in_override,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable parameter type %0 cannot be sent from caller of "
       "superclass %kind1 into %2 override",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_param_in_objc,none,
+GROUPED_ERROR(non_sendable_param_in_objc,NonSendableObjCInterop,none,
       "non-Sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
       "boundary",
       (Type, const ValueDecl *, ActorIsolation))
@@ -6171,39 +6530,39 @@ ERROR(non_sendable_result_into_actor,none,
       "non-Sendable result type %0 cannot be sent from %2 context in call "
       "to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_exits_actor,none,
+GROUPED_ERROR(non_sendable_result_exits_actor,NonSendableExitingActor,none,
       "non-Sendable result type %0 cannot exit %2 context in call to "
       "nonisolated %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_in_witness,none,
+GROUPED_ERROR(non_sendable_result_in_witness,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_in_override,none,
+GROUPED_ERROR(non_sendable_result_in_override,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_in_objc,none,
+GROUPED_ERROR(non_sendable_result_in_objc,NonSendableObjCInterop,none,
       "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
-ERROR(non_sendable_property_exits_actor,none,
+GROUPED_ERROR(non_sendable_property_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 of %kind1 cannot exit %2 context",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_into_actor,none,
       "non-Sendable type %0 of nonisolated %kind1 cannot be sent to "
       "%2 context",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_property_in_witness,none,
+GROUPED_ERROR(non_sendable_property_in_witness,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_property_in_override,none,
+GROUPED_ERROR(non_sendable_property_in_override,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_property_in_objc,none,
+GROUPED_ERROR(non_sendable_property_in_objc,NonSendableObjCInterop,none,
       "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
@@ -6224,10 +6583,12 @@ ERROR(concurrent_value_outside_source_file,none,
       (const ValueDecl *))
 ERROR(concurrent_value_nonfinal_class,none,
       "non-final class %0 cannot conform to the 'Sendable' protocol", (DeclName))
-ERROR(concurrent_value_inherit,none,
-      "'Sendable' class %1 cannot inherit from another class"
-      "%select{| other than 'NSObject'}0",
-      (bool, DeclName))
+GROUPED_ERROR(concurrent_value_nonsendable_superclass,NonSendableSuperclass,none,
+      "class %0 cannot conform to the 'Sendable' protocol", (DeclName))
+NOTE(concurrent_value_nonsendable_superclass_note,none,
+     "a 'Sendable' class cannot inherit from a non-Sendable class", ())
+NOTE(concurrent_value_nonsendable_superclass_here,none,
+     "inherits from non-Sendable class %0", (DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
 GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
@@ -6336,8 +6697,9 @@ ERROR(distributed_actor_func_static,none,
       "'distributed' method cannot be 'static'",
       ())
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
-      "'distributed' method can only be declared within 'distributed actor'",
-      ())
+      "distributed %select{method|computed property}0 can only be declared "
+      "in 'DistributedActor' type",
+      (bool))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
@@ -6384,6 +6746,20 @@ ERROR(global_actor_arg,none,
       (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
+
+GROUPED_WARNING(global_actor_shared_non_let_witness,
+                UnstableGlobalActorShared,none,
+                "GlobalActor witness %kind0 may return different actor "
+                "instances, which would lead to global actor isolation "
+                "violations",
+                (const ValueDecl *))
+NOTE(global_actor_shared_non_let_witness_use_let,none,
+     "declare it as 'static let' to guarantee a stable instance",
+     ())
+NOTE(global_actor_shared_non_let_witness_silence,none,
+     "if this property always returns the same instance, silence the warning "
+     "with '@diagnose(UnstableGlobalActorShared, as: ignored)'",
+     ())
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
 ERROR(global_actor_access,none,
@@ -6619,6 +6995,12 @@ ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
 ERROR(downcast_to_foreign_reference_type,none,
       "downcast from %0 to %1 is not supported for foreign reference types",
       (Type, Type))
+ERROR(cxx_super_pure_virtual_call,none,
+      "cannot use 'super' to call C++ pure virtual method %0; it has no base "
+      "class implementation", (const ValueDecl *))
+ERROR(cxx_super_safe_interop_wrapper_call,none,
+      "calling safe interop wrapper %0 in foreign reference type %1 using "
+      "'super' is not supported", (const ValueDecl *, const ValueDecl *))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -6664,8 +7046,14 @@ ERROR(unsupported_convention,none,
 ERROR(invalid_isolated_and_convention_attributes,none,
       "'@convention(%0)' attribute is not allowed on '@isolated' types",
       (StringRef))
+ERROR(invalid_called_and_attr_attributes,none,
+      "%0 attribute is not allowed on '@called' types",
+      (TypeAttribute *))
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
+ERROR(non_inferrable_opaque_generic_parameter,none,
+      "opaque generic parameter %0 appears in position that cannot be inferred "
+      "from a function call", (TypeRepr *))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
       "mean '@convention(c, cType: \"%1\")' or "
@@ -6749,7 +7137,7 @@ ERROR(illegal_sil_type,none,
 ERROR(sil_box_arg_mismatch,none,
       "SIL box type has wrong number of generic arguments for layout", ())
 ERROR(sil_pack_element_uuid_not_found,none,
-      "open_pack_element instruction not found for '@pack_element' type UUID; "
+      "open_pack_element instruction not found for '@pack_element' type ID; "
       "possible forward reference?", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
@@ -6833,8 +7221,6 @@ ERROR(objc_setter_for_nonobjc_property,none,
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
 
-ERROR(objc_enum_generic,none,
-      "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,
       "'@objc' %kindonly0 must have a simple name", (const Decl *))
 ERROR(objc_name_subscript,none,
@@ -6868,7 +7254,7 @@ ERROR(objc_cannot_infer_name_raw_identifier,none,
       (const ValueDecl *))
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked '@c'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
+#define OBJC_ATTR_SELECT "select{marked '@c'|marked '@cxx'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -6920,7 +7306,7 @@ NOTE(not_objc_swift_struct,none,
       "Swift structs cannot be represented in %" FOREIGN_LANG_SELECT "0",
      (ForeignLanguage))
 NOTE(not_cdecl_or_objc_swift_enum,none,
-     "Swift enums not marked '@c'%select{| or '@objc'}0 cannot be "
+     "Swift enums not marked '@c'%select{|| or '@objc'}0 cannot be "
      "represented in %" FOREIGN_LANG_SELECT "0",
      (ForeignLanguage))
 NOTE(not_objc_generic_type_param,none,
@@ -6963,10 +7349,13 @@ ERROR(objc_borrow_mutate_accessor, none,
 ERROR(objc_invalid_on_func_variadic,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has a variadic "
       "parameter", (const AbstractFunctionDecl*, unsigned))
+ERROR(objc_enum_generic,none,
+      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it is generic",
+      (const Decl *, unsigned))
 ERROR(objc_invalid_on_func_inout,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because inout "
       "parameters cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
+      (const ValueDecl*, unsigned, ForeignLanguage))
 ERROR(objc_invalid_on_func_param_type,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "2 because the type of the "
       "parameter %1 cannot be represented in %" FOREIGN_LANG_SELECT "3",
@@ -7128,6 +7517,9 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
       "%kindonly0 cannot be '@_borrowed' if it is an '@objc' protocol "
       "requirement",
       (const AbstractStorageDecl *))
+ERROR(objc_borrowing_accessor,none,
+      "'borrow' and 'yielding borrow' accessors are not supported in "
+      "Objective-C", ())
 ERROR(borrowed_with_effect,none,
       "%kindonly0 cannot be '@_borrowed' if it is 'async' or 'throws'",
       (const AccessorDecl *))
@@ -7228,12 +7620,12 @@ ERROR(availability_must_occur_alone, none,
       (AvailabilityDomain, bool))
 ERROR(availability_unexpected_version, none,
       "unexpected version number for %0", (AvailabilityDomain))
-GROUPED_ERROR(availability_unrecognized_platform_name,
+GROUPED_ERROR(availability_domain_not_found,
         AvailabilityUnrecognizedName, PointsToFirstBadToken,
-        "unrecognized platform name %0", (Identifier))
-GROUPED_ERROR(availability_suggest_platform_name,
+        "cannot find availability domain %0", (Identifier))
+GROUPED_ERROR(availability_suggest_domain,
         AvailabilityUnrecognizedName, PointsToFirstBadToken,
-        "unrecognized platform name %0; did you mean '%1'?",
+        "cannot find availability domain %0; did you mean '%1'?",
         (Identifier, StringRef))
 WARNING(availability_unsupported_version_number, none,
         "'%0' is not a supported version number", (llvm::VersionTuple))
@@ -7278,8 +7670,8 @@ GROUPED_WARNING(attr_availability_domain_always_available,
                 (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
-      "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
-      (const ValueDecl *, bool, AvailabilityDomain, StringRef))
+      "%0 %1",
+      (const ValueDecl *, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -7289,15 +7681,15 @@ ERROR(availability_decl_unavailable_rename, none,
 
 NOTE(availability_marked_unavailable, none,
      "%0 has been explicitly marked unavailable here",
-     (const ValueDecl *))
+     (const Decl *))
 
 NOTE(availability_introduced_in_version, none,
      "%0 was introduced in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
@@ -7331,8 +7723,8 @@ NOTE(availability_decl_more_than_enclosing_here, none,
      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_decl_only_in, none,
-      "%0 is only available in %1%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+      "%0 %1",
+      (const ValueDecl *, StringRef))
 
 ERROR(availability_decl_only_in_for_clients, none,
       "%0 is only available in %1%select{| %3 or newer}2"
@@ -7384,9 +7776,8 @@ NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
 
 ERROR(availability_inout_accessor_only_in, none,
-      "cannot pass as inout because %0 is only available in %1"
-      "%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+      "cannot pass as inout because %0 %1",
+      (const ValueDecl *, StringRef))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
@@ -7421,13 +7812,21 @@ ERROR(availability_global_script_no_unavailable,
       none, "global variable cannot be marked unavailable "
       "with '@available' in script mode", ())
 
-ERROR(availability_stored_property_no_potential,
-      none, "stored properties cannot be marked potentially unavailable with "
-      "'@available'", ())
+#define NO_AVAILABLE_ON_PROPERTY_SELECT "select{" \
+      "stored properties|" \
+      "computed property with initial value}"
 
-ERROR(availability_stored_property_no_unavailable,
-      none, "stored properties cannot be marked unavailable with '@available'",
-      ())
+ERROR(availability_stored_property_no_potential, none,
+      "%" NO_AVAILABLE_ON_PROPERTY_SELECT "0 "
+      "cannot be marked potentially unavailable with '@available'",
+      (unsigned))
+
+ERROR(availability_stored_property_no_unavailable, none,
+      "%" NO_AVAILABLE_ON_PROPERTY_SELECT "0 "
+      "cannot be marked unavailable with '@available'",
+      (unsigned))
+
+#undef NO_AVAILABLE_ON_PROPERTY_SELECT
 
 ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
@@ -7458,13 +7857,6 @@ ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
       (DeclAttribute, const Decl *, StringRef))
 
-// This doesn't display as an availability diagnostic, but it's
-// implemented there and fires when these subscripts are marked
-// unavailable, so it seems appropriate to put it here.
-ERROR(availability_string_subscript_migration, none,
-      "subscripts returning String were obsoleted in Swift 4; explicitly "
-      "construct a String from subscripted result", ())
-
 NOTE(availability_unavailable_implicit_init, none,
      "call to unavailable %kind0 from superclass %1 occurs implicitly at the "
      "end of this initializer", (const ValueDecl *, DeclName))
@@ -7472,9 +7864,8 @@ NOTE(availability_unavailable_implicit_init, none,
 // Conformance availability checking diagnostics
 
 ERROR(conformance_availability_unavailable, none,
-      "conformance of %0 to %1 is unavailable"
-      "%select{ in %3|}2%select{|: %4}4",
-      (Type, Type, bool, AvailabilityDomain, StringRef))
+      "conformance of %0 to %1 %2",
+      (Type, Type, StringRef))
 
 NOTE(conformance_availability_marked_unavailable, none,
      "conformance of %0 to %1 has been explicitly marked "
@@ -7494,14 +7885,6 @@ GROUPED_WARNING(conformance_availability_deprecated,
                 "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
                 (Type, Type, bool, AvailabilityDomain, bool, AvailabilityRange,
                  StringRef))
-
-ERROR(conformance_availability_only_version_newer, none,
-      "conformance of %0 to %1 is only available in %2 %3 or newer",
-      (Type, Type, AvailabilityDomain, AvailabilityRange))
-
-ERROR(conformance_availability_not_available, none,
-      "conformance of %0 to %1 is only available in %2",
-      (Type, Type, AvailabilityDomain))
 
 GROUPED_WARNING(availability_use_any_apple_os,
                 UseAnyAppleOSAvailability, none,
@@ -7627,7 +8010,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
+      "'%select{@_transparent|@inlinable|@export(implementation)|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
@@ -7710,11 +8093,11 @@ GROUPED_WARNING(variable_never_used, NoUsage, NoUsage,
 GROUPED_WARNING(immutable_value_never_used_but_assigned, NoUsage, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
-WARNING(variable_never_mutated, none,
+GROUPED_WARNING(variable_never_mutated, VariableNeverMutated, none,
         "variable %0 was never mutated; "
         "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
         (Identifier, bool))
-WARNING(variable_tuple_elt_never_mutated, none,
+GROUPED_WARNING(variable_tuple_elt_never_mutated, VariableNeverMutated, none,
         "variable %0 was never mutated; "
         "consider changing the pattern to 'case (..., let %1, ...)'",
         (Identifier, StringRef))
@@ -7777,17 +8160,16 @@ ERROR(possibly_non_exhaustive_switch,none,
       "the compiler is unable to check that this switch is exhaustive in reasonable time",
       ())
 
-NOTE(missing_several_cases,none,
-     "add "
-     "%select{missing cases|a default clause}0", (bool))
+NOTE(missing_cases,none,
+     "add missing %select{case|cases}0: %1", (bool, StringRef))
+NOTE(missing_default_case,none,
+     "add a default clause", ())
 NOTE(missing_unknown_case,none,
      "handle unknown values using \"@unknown default\"", ())
 
 NOTE(non_exhaustive_switch_drop_unknown,none,
      "remove '@unknown' to handle remaining values", ())
 
-NOTE(missing_particular_case,none,
-     "add missing case: '%0'", (StringRef))
 WARNING(redundant_particular_case,none,
         "case is already handled by previous patterns; consider removing it",())
 WARNING(redundant_particular_literal_case,none,
@@ -8405,6 +8787,12 @@ WARNING(macro_on_import_not_loadable, none,
         "could not load macro '%0'; this may cause errors down the line",
         (StringRef))
 
+WARNING(swiftify_nullable_as_empty_span_param_missing, none,
+        "the loaded _SwiftifyImport macro plugin does not support the "
+        "'nullableAsEmptySpan' parameter; generated safe wrappers will "
+        "retain the legacy Optional-propagating behavior for _Nullable "
+        "__counted_by and __sized_by pointers", ())
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
@@ -8586,19 +8974,9 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(borrowingsequence_experimental,none,
-      "'%0' requires -enable-experimental-feature BorrowingSequence",
-      (StringRef))
-
 ERROR(for_loop_sequence_conformance_unavailable,none,
-      "for-in loop requires %0 to conform to %1, which is "
-      "only available in %2 %3 or newer",
-      (Type, ProtocolDecl *, StringRef, StringRef))
-
-ERROR(for_loop_sequence_conformance_unavailable_unconditionally,none,
-      "for-in loop requires %0 to conform to %1, "
-      "but the conformance is unavailable",
-      (Type, ProtocolDecl *))
+      "for-in loop requires %0 to conform to %1, which %2",
+      (Type, ProtocolDecl *, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -8624,9 +9002,6 @@ ERROR(init_accessor_invalid_member_ref,none,
       "refer to instance properties listed in 'initializes' and "
       "'accesses' attributes",
       (DeclNameRef))
-ERROR(cannot_synthesize_memberwise_due_to_property_init_order,none,
-      "cannot synthesize memberwise initializer",
-      ())
 NOTE(out_of_order_access_in_init_accessor,none,
      "init accessor for %0 cannot access stored property %1 because it "
      "is called before %1 is initialized",
@@ -8749,6 +9124,9 @@ ERROR(lifetime_dependence_cannot_infer_kind, none,
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
       (StringRef, StringRef))
+ERROR(lifetime_dependence_scope_foreign_by_value, none,
+      "cannot borrow the lifetime of '%0', which is passed by value on %1",
+      (StringRef, StringRef))
 NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,
      "use '@_lifetime(%0: copy %0) to forward the inout dependency",
      (StringRef))
@@ -8842,7 +9220,7 @@ ERROR(safe_and_unsafe_attr,none,
       "%kindbase0 cannot be both '@safe' and '@unsafe'", (const Decl *))
 
 GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
-     "%kindbase0 has superclass involving unsafe type %1", 
+     "%kindbase0 has superclass involving unsafe type %1",
      (const ValueDecl *, Type))
 
 GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
@@ -8867,9 +9245,15 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryEffectMarker,none,
+GROUPED_ERROR(always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "expression uses constructs that are very hard to use correctly and must "
+      "be marked with 'unsafe'", ())
+GROUPED_ERROR(for_always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "for-in loop uses constructs that are very hard to use correctly and "
+      "must be marked with 'unsafe'", ())
+GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryEffectMarker,none,
+GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "
@@ -8914,7 +9298,8 @@ ERROR(integer_generic_expr_closure_not_supported,none,
 //===----------------------------------------------------------------------===//
 
 ERROR(inlinearray_literal_incorrect_count,none,
-      "expected %0 elements in inline array literal, but got %1", (Type, Type))
+      "expected %0 elements in inline array literal, but got %1",
+      (unsigned, unsigned))
 
 ERROR(inline_array_type_backwards,none,
       "element count must precede inline array element type", ())
@@ -8931,14 +9316,35 @@ GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
                 none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
                 (const Decl *, bool))
+GROUPED_ERROR(generic_open_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot be 'open' in Embedded Swift",
+              (const Decl *))
+GROUPED_ERROR(generic_override_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot override another method in "
+              "Embedded Swift",
+              (const Decl *))
 GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
                 (const Decl *, Type))
-GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
+GROUPED_ERROR(dynamic_cast_involving_protocol_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
+              (const Decl *))
+
+GROUPED_WARNING(open_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
-                "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
-                (const Decl *))
+                "cannot open existential type %0 in Embedded Swift",
+                (Type))
+
+GROUPED_WARNING(open_existential_argument_in_embedded_swift,
+                EmbeddedRestrictions, none,
+                "cannot open existential type %0 when passing it as an "
+                "argument to %kind1 in Embedded Swift",
+                (Type, const ValueDecl *))
+NOTE(open_existential_argument_coerce_in_embedded_swift, none,
+     "coerce the argument to %0 to pass the existential value without opening "
+     "it", (Type))
 
 GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               EmbeddedRestrictions, none,
@@ -9226,12 +9632,22 @@ ERROR(nonexhaustive_attr_on_internal_type,none,
       (DeclName, AccessLevel))
 
 //===----------------------------------------------------------------------===//
-// MARK: `using` declaration
+// MARK: `default` declaration
 //===----------------------------------------------------------------------===//
 ERROR(invalid_redecl_of_file_isolation,none,
-      "invalid redeclaration of file-level default actor isolation", ())
+      "invalid redeclaration of file-level default isolation", ())
 NOTE(invalid_redecl_of_file_isolation_prev,none,
-     "default isolation was previously declared here", ())
+     "file-level default isolation previously declared here", ())
+ERROR(invalid_actor_for_file_isolation,none,
+     "global actor %0 is not a valid file-level default",
+     (Type))
+NOTE(invalid_actor_for_file_isolation_note,none,
+     "file-level default isolation must be '@MainActor' or 'nonisolated'", ())
+ERROR(file_default_invalid_attribute,none,
+     "'%0' is not a valid file-level default",
+     (DeclAttribute))
+NOTE(file_default_invalid_attribute_note,none,
+     "a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute

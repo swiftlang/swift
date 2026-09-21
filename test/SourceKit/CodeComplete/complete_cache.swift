@@ -36,7 +36,7 @@ func test2() {
 
 // VOID_1: key.name: "fooHelperSubFunc1(:)",
 // VOID_1-NEXT: key.description:
-// VOID_1-NEXT: key.typename: "Int32",
+// VOID_1-NEXT: key.typename: "CInt",
 // VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
 // VOID_1-NEXT: key.moduleimportdepth: 2,
 // VOID_1-NEXT: key.num_bytes_to_erase: 0,

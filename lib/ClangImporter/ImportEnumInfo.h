@@ -17,9 +17,9 @@
 #ifndef SWIFT_CLANG_IMPORT_ENUM_H
 #define SWIFT_CLANG_IMPORT_ENUM_H
 
-#include "swift/AST/Decl.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
+#include "swift/AST/Decl.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace clang {
@@ -120,12 +120,6 @@ public:
 
   EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getEnumInfo(decl).getKind();
-  }
-
-  /// The prefix to be stripped from the names of the enum constants within the
-  /// given enum.
-  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *decl) {
-    return getEnumInfo(decl).getConstantNamePrefix();
   }
 };
 

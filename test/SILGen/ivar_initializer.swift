@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk-nosource -I %t) -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/ivar_initializer_other.swift
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -primary-file %s %S/Inputs/ivar_initializer_other.swift | %FileCheck %s
 
 // REQUIRES: objc_interop

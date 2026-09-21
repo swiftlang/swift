@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-O -Xllvm -sil-disable-pass=deadobject-elim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xllvm -sil-disable-pass=dead-object-elimination) | %FileCheck %s
 
 // REQUIRES: executable_test
 

@@ -10,7 +10,7 @@
 // RUN: %FileCheck -check-prefix YESOPT %s < %t/yesopt.ll
 
 // Run without optimization.
-// RUN: %target-clang %t/a.o %target-embedded-posix-shim -o %t/noopt.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivitySingleThreaded
+// RUN: %target-embedded-link %t/a.o -o %t/noopt.out %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run not --crash %t/noopt.out
 
 // Build with optimization.
@@ -22,16 +22,20 @@
 // RUN: %FileCheck -check-prefix NOOPT %s < %t/noopt.ll
 
 // Run with optimization.
-// RUN: %target-clang %t/a.o %target-embedded-posix-shim -o %t/opt.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivitySingleThreaded
+// RUN: %target-embedded-link %t/a.o -o %t/opt.out%target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run not --crash %t/opt.out
 
 // REQUIRES: executable_test
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDynamicExclusivity
+// REQUIRES: embedded_stdlib_default_codegen
 
 // UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=emscripten
+// The RUN line asserts a trap via LLVM's `not --crash`, but emscripten-run.py
+// passes its arguments to `node`, which then cannot load `not` as a JS module
+// (`Error: Cannot find module 'not'`).
 
 struct NC: ~Copyable {
   var i: Int = 1

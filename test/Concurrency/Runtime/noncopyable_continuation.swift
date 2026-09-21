@@ -25,7 +25,7 @@ struct UniqueResource: ~Copyable {
   static func main() async {
     let tests = TestSuite("Continuation: ~Copyable")
 
-    #if !os(WASI)
+    #if !os(WASI) && !os(Emscripten)
     tests.test("trap on dropped continuation") {
       expectCrashLater()
 

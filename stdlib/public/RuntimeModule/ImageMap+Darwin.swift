@@ -19,7 +19,7 @@
 import Swift
 
 internal import Darwin
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 
 fileprivate func getSysCtlString(_ name: String) -> String? {
   return withUnsafeTemporaryAllocation(byteCount: 256, alignment: 16) {

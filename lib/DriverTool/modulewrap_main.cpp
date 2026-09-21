@@ -27,16 +27,13 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 
 using namespace llvm::opt;
@@ -205,7 +202,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   ModuleDecl *M =
       ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(
-      new Lowering::TypeConverter(*M, ASTCtx.SILOpts.EnableSILOpaqueValues));
+      new Lowering::TypeConverter(*M));
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, *TC, SILOpts);
   createSwiftModuleObjectFile(*SM, (*ErrOrBuf)->getBuffer(),
                               Invocation.getOutputFilename());

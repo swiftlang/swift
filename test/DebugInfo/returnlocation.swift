@@ -185,7 +185,7 @@ public class Class1 {
     print("hello")
     // CHECK_INIT: call {{.*}}@"$ss5print_9separator10terminatoryypd_S2StF"{{.*}}, !dbg ![[PRINTLOC:[0-9]+]]
     // FIXME: ret has an incorrect line number because it is generated with "isHiddenFromDebugInfo"
-    // CHECK_INIT: ret i{{32|64}} 0, !dbg ![[LINE_0:[0-9]+]]
+    // CHECK_INIT: ret ptr null, !dbg ![[LINE_0:[0-9]+]]
     // CHECK_INIT-DAG: [[PRINTLOC]] = !DILocation(line: [[@LINE-4]]
     // CHECK_INIT-DAG: [[LINE_0]] = !DILocation(line: 0
     return nil

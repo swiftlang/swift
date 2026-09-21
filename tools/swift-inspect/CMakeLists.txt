@@ -32,6 +32,10 @@ add_library(SymbolicationShims INTERFACE)
 target_include_directories(SymbolicationShims INTERFACE
   Sources/SymbolicationShims)
 
+if(WIN32 OR ANDROID OR LINUX)
+  find_package(SwiftOverlay CONFIG QUIET)
+endif()
+
 if(WIN32)
   add_library(SwiftInspectClientInterface INTERFACE)
   target_include_directories(SwiftInspectClientInterface INTERFACE
@@ -80,9 +84,11 @@ add_executable(swift-inspect
   Sources/swift-inspect/Operations/DumpRawMetadata.swift
   Sources/swift-inspect/AndroidRemoteProcess.swift
   Sources/swift-inspect/Backtrace.swift
+  Sources/swift-inspect/Cleanup.swift
   Sources/swift-inspect/DarwinRemoteProcess.swift
   Sources/swift-inspect/LinuxRemoteProcess.swift
   Sources/swift-inspect/main.swift
+  Sources/swift-inspect/OpaqueRef.swift
   Sources/swift-inspect/Process.swift
   Sources/swift-inspect/RemoteMirror+Extensions.swift
   Sources/swift-inspect/RemoteProcess.swift
@@ -98,6 +104,18 @@ target_link_libraries(swift-inspect PRIVATE
 if(WIN32)
   target_link_libraries(swift-inspect PRIVATE
     SwiftInspectClientInterface)
+  if(TARGET ClangModules)
+    target_link_libraries(swift-inspect PRIVATE
+      ClangModules)
+  endif()
+endif()
+if(ANDROID AND TARGET SwiftAndroid)
+  target_link_libraries(swift-inspect PRIVATE
+    SwiftAndroid)
+endif()
+if(LINUX AND TARGET SwiftGlibcClangOverlay)
+  target_link_libraries(swift-inspect PRIVATE
+    SwiftGlibcClangOverlay)
 endif()
 if(ANDROID)
   target_link_libraries(swift-inspect PRIVATE

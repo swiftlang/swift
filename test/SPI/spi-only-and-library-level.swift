@@ -65,11 +65,11 @@ public func publicClient() -> LibStruct { fatalError() } // expected-error {{can
 
 //--- APISpiOnlyIPI.swift
 
-@_spiOnly import IPILib // expected-error {{Project internal module 'IPILib' cannot be imported publicly from non-internal module 'APISpiOnlyIPI'}}
+@_spiOnly import IPILib // expected-warning {{Project internal module 'IPILib' cannot be imported publicly because 'APISpiOnlyIPI' has '-library-level api'}}
 
 //--- SPISpiOnlyIPI.swift
 
-@_spiOnly import IPILib // expected-error {{Project internal module 'IPILib' cannot be imported publicly from non-internal module 'SPISpiOnlyIPI'}}
+@_spiOnly import IPILib // expected-warning {{Project internal module 'IPILib' cannot be imported publicly because 'SPISpiOnlyIPI' has '-library-level spi'}}
 
 //--- IPISpiOnlyIPI.swift
 

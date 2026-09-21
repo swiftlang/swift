@@ -38,6 +38,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
@@ -50,6 +51,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-self-import>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
+- <doc:unstable-global-actor-shared>
+- <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>
@@ -58,6 +61,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:unavailable-sendable-conformance>
 - <doc:unknown-warning-group>
 - <doc:unnecessary-effect-marker>
+- <doc:unnecessary-unsafe>
 - <doc:unsupported-scoped-import>
 - <doc:untyped-throws>
 - <doc:unused-import-access>
@@ -66,12 +70,14 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:use-any-apple-os-availability>
 - <doc:useless-availability-check>
 - <doc:useless-conditional-statement>
+- <doc:variable-never-mutated>
 
 
 ## Topics
 - <doc:dynamic-callable-requirements>
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
+- <doc:always-unsafe>
 - <doc:trailing-closure-matching>
 - <doc:actor-isolated-mutating-async>
 - <doc:actor-isolated-call>
@@ -88,6 +94,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:getting-non-sendable-values-out-of-actors>
+- <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
@@ -102,13 +110,18 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-self-import>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
+- <doc:non-sendable-types-and-objective-c-interoperability>
+- <doc:non-sendable-values-in-async-conformances-and-overrides>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:exclusivity-violation>
 - <doc:performance-hints>
+- <doc:unstable-global-actor-shared>
 - <doc:property-wrapper-requirements>
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
+- <doc:public-import-of-project-internal-module>
+- <doc:region-isolation-isolation-history>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>
@@ -118,11 +131,13 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:temporary-pointers>
+- <doc:non-sendable-superclass>
 - <doc:unavailable-sendable-conformance>
 - <doc:opaque-type-inference>
 - <doc:region-isolation-unknown-pattern>
 - <doc:unknown-warning-group>
 - <doc:unnecessary-effect-marker>
+- <doc:unnecessary-unsafe>
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
 - <doc:unsupported-scoped-import>
@@ -134,3 +149,4 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:useless-availability-check>
 - <doc:useless-conditional-statement>
 - <doc:existential-member-access-limitations>
+- <doc:variable-never-mutated>

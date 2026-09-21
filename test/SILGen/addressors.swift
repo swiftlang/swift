@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
@@ -185,7 +186,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32>
-// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[WRITE]] : $*CArray<(Int32) -> Int32>
+// CHECK:   [[MD:%.*]] = mark_dependence [[T3]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[WRITE]] : $*CArray<(Int32) -> Int32>
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]]
 // CHECK:   store {{%.*}} to [[ACCESS]] :
   array[0] = id_int
@@ -266,7 +267,7 @@ func test_d(_ array: inout D) -> Int32 {
   take_int_inout(&array[1])
 
 // CHECK:   [[READ:%.*]] = begin_access [read] [static] [[ARRAY]] : $*D
-// CHECK:   [[T0:%.*]] = load [[READ]]
+// CHECK:   [[T0:%.*]] = struct $D ()
 // CHECK:   [[T1:%.*]] = function_ref @$s10addressors1DVys5Int32VAEcig
 // CHECK:   [[T2:%.*]] = apply [[T1]]({{%.*}}, [[T0]])
 // CHECK:   return [[T2]]
@@ -343,10 +344,10 @@ struct Foo<Base>: FooProtocol {
 // CHECK-LABEL: sil_vtable Base {
 // CHECK-NEXT: #Base.data!getter: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
 // CHECK-NEXT: #Base.data!setter: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!modify: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
+// CHECK-NEXT: #Base.data!modify: (Base) -> @yield_once () yields (inout UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
 // CHECK-NEXT: #Base.value!getter: (Base) -> () -> Int32 : @$s10addressors4BaseC5values5Int32Vvg
 // CHECK-NEXT: #Base.value!setter: (Base) -> (Int32) -> () : @$s10addressors4BaseC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!modify: (Base) -> () -> () : @$s10addressors4BaseC5values5Int32VvM
+// CHECK-NEXT: #Base.value!modify: (Base) -> @yield_once () yields (inout Int32) -> () : @$s10addressors4BaseC5values5Int32VvM
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors4BaseCACycfC
 // CHECK-NEXT: #Base.deinit!deallocator: @$s10addressors4BaseCfD
 // CHECK-NEXT: }
@@ -354,10 +355,10 @@ struct Foo<Base>: FooProtocol {
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT: #Base.data!getter: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
 // CHECK-NEXT: #Base.data!setter: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!modify: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
+// CHECK-NEXT: #Base.data!modify: (Base) -> @yield_once () yields (inout UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
 // CHECK-NEXT: #Base.value!getter: (Base) -> () -> Int32 : @$s10addressors3SubC5values5Int32Vvg
 // CHECK-NEXT: #Base.value!setter: (Base) -> (Int32) -> () : @$s10addressors3SubC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!modify: (Base) -> () -> () : @$s10addressors3SubC5values5Int32VvM
+// CHECK-NEXT: #Base.value!modify: (Base) -> @yield_once () yields (inout Int32) -> () : @$s10addressors3SubC5values5Int32VvM
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors3SubCACycfC
 // CHECK-NEXT: #Sub.deinit!deallocator: @$s10addressors3SubCfD
 // CHECK-NEXT: }

@@ -1,3 +1,5 @@
+// FIXME: crashes under opaque values (unexpectedly doesn't produce the INTERNAL ERROR)
+
 // RUN: %target-swift-emit-silgen \
 // RUN: -enable-experimental-feature BuiltinModule \
 // RUN: -enable-experimental-feature AddressableTypes \

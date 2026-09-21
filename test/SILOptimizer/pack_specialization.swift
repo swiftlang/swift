@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-ir -O -solver-disable-crash-on-valid-salvage | %FileCheck %s
-// RUN: not --crash %target-swift-frontend %s -emit-ir -O -solver-enable-crash-on-valid-salvage
+// RUN: %target-swift-frontend %s -emit-ir -O -solver-disable-diagnose-valid-salvage | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage
 
-// REQUIRES: swift_in_compiler
 
 // When no witness methods are called on pack elements, all pack code can be fully eliminated.
 // CHECK: define {{.*}} { i32, ptr, double } @"$s19pack_specialization8copyPack2xsxxQp_txxQp_tRvzlFs5Int32V_SPys5Int16VGSdQP_Tg5Tf8xx_n"(i32 %0, ptr %1, double %2)
@@ -32,7 +31,9 @@ func addTogether<each A: Numeric>(xs: repeat each A) -> (repeat each A) {
 }
 
 public func addTogetherCaller() -> Int32 {
+  // This is only diagnosed when we RUN with -solver-enable-diagnose-valid-salvage.
   return addTogether(xs: 1)
+  // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
 }
 
 // Dependent/member types (e.g. each T.IntegerLiteralType) must also resolve to

@@ -34,7 +34,12 @@ target_link_libraries(swiftCxxStdlib PUBLIC
 target_include_directories(swiftCxxStdlib INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
-install(FILES std.apinotes
+# Keep the files in sync with the apinotes list in
+# stdlib/public/Cxx/std/CMakeLists.txt.
+install(FILES
+  std.apinotes
+  std_span.apinotes
+  std_string_view.apinotes
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)
 install(TARGETS swiftCxxStdlib
   EXPORT SwiftCxxOverlayTargets

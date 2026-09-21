@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2026 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import argparse
+import shutil
+import sys
+from pathlib import Path
+
+from update_checkout.update_checkout.git_command import Git
+from update_checkout.update_checkout.update_checkout import output_prefix
+
+
+class RemoveWorktreeCliArguments(argparse.Namespace):
+    worktree_dir: Path
+    force: bool
+    verbose: bool
+
+    @staticmethod
+    def parse_args() -> "RemoveWorktreeCliArguments":
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description="""
+Remove a set of Git worktrees created by add-worktree. Each repository worktree
+found in the worktree directory is removed from its own repository.
+
+By default a worktree with uncommitted changes is reported and left in place.
+Pass '--force' to remove worktrees even when they have uncommitted changes.
+    """,
+        )
+        parser.add_argument(
+            "worktree_dir",
+            help="The worktree directory to remove (as passed to add-worktree).",
+            type=Path,
+        )
+        parser.add_argument(
+            "--force",
+            help="Remove worktrees even if they have uncommitted changes.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Increases the script's verbosity.",
+            action="store_true",
+        )
+
+        return parser.parse_args(namespace=RemoveWorktreeCliArguments())
+
+
+def iter_worktrees(worktree_dir: Path):
+    """Yields the path of each Git worktree in a worktree directory.
+
+    A linked worktree has a '.git' file (not a directory) pointing back at its
+    repository, which is how these differ from primary checkouts.
+
+    Args:
+        worktree_dir (Path): the directory containing the worktrees.
+
+    Yields:
+        Path: the path to each immediate subdirectory that is a Git worktree.
+    """
+
+    for path in worktree_dir.iterdir():
+        if path.joinpath(".git").exists():
+            yield path
+
+
+def dirty_paths(worktree_path: Path):
+    """Returns the set of paths with modified or untracked content.
+
+    Args:
+        worktree_path (Path): the worktree to inspect.
+
+    Returns:
+        set[str]: repository-relative paths reported as changed, including
+            submodules whose contents differ.
+    """
+
+    changes, _, _ = Git.run(
+        worktree_path, ["status", "--porcelain", "--ignore-submodules=none"]
+    )
+    paths = set()
+    for line in changes.splitlines():
+        # Porcelain v1 lines are '<status> <path>'. The status code is one or
+        # two non-space characters; strip the line first (Git.run strips the
+        # overall output, which drops the leading space on the first line only)
+        # and split off that code. A rename or copy is '<old> -> <new>'.
+        parts = line.strip().split(None, 1)
+        if len(parts) < 2:
+            continue
+        path = parts[1]
+        if " -> " in path:
+            path = path.split(" -> ")[-1]
+        paths.add(path.strip('"'))
+    return paths
+
+
+def submodule_paths(worktree_path: Path):
+    """Returns the set of submodule paths in a worktree.
+
+    Args:
+        worktree_path (Path): the worktree to inspect.
+
+    Returns:
+        set[str]: repository-relative paths of the worktree's submodules.
+    """
+
+    status, _, _ = Git.run(worktree_path, ["submodule", "status"])
+    paths = set()
+    for line in status.splitlines():
+        # Each line is '<flag><sha> <path> (<describe>)'.
+        fields = line.split()
+        if len(fields) >= 2:
+            paths.add(fields[1])
+    return paths
+
+
+def remove_worktree(worktree_path: Path, force: bool, verbose: bool) -> int:
+    """Removes a single Git worktree.
+
+    Removal always uses `git worktree remove --force` because git refuses to
+    remove a worktree containing submodules otherwise. When `force` is False the
+    worktree is first checked for modified or untracked files and left in place
+    if any are found, so this check is what protects uncommitted work.
+
+    Args:
+        worktree_path (Path): the path to the worktree to remove.
+        force (bool): remove even if the worktree has uncommitted changes.
+        verbose (bool): whether to echo the executed commands.
+
+    Returns:
+        int: 0 on success, 1 if the worktree was skipped or removal failed.
+    """
+
+    prefix = output_prefix(worktree_path.name)
+    if not force:
+        changed = dirty_paths(worktree_path)
+        if changed:
+            # When the only changes are inside submodules, point at the
+            # submodule(s) rather than the worktree so the dirt is easy to
+            # find. Otherwise report the worktree, matching git's own
+            # `worktree remove` wording either way.
+            submodules = submodule_paths(worktree_path)
+            dirty_submodules = sorted(changed & submodules)
+            if dirty_submodules and not (changed - submodules):
+                report_paths = [worktree_path.joinpath(s) for s in dirty_submodules]
+            else:
+                report_paths = [worktree_path]
+            for report_path in report_paths:
+                print(
+                    f"{prefix}'{report_path}' contains modified or untracked "
+                    "files, use --force to delete it"
+                )
+            return 1
+
+    Git.run(
+        worktree_path,
+        ["worktree", "remove", "--force", str(worktree_path)],
+        echo=verbose,
+        prefix=prefix,
+    )
+    return 0
+
+
+def main() -> int:
+    args = RemoveWorktreeCliArguments.parse_args()
+    worktree_dir = args.worktree_dir.resolve()
+
+    if not worktree_dir.is_dir():
+        print(f"No such worktree directory: '{worktree_dir}'")
+        return 1
+
+    fail_count = 0
+    for worktree_path in iter_worktrees(worktree_dir):
+        fail_count += remove_worktree(worktree_path, args.force, args.verbose)
+
+    if fail_count > 0:
+        print("remove-worktree finished with worktrees left in place")
+        return fail_count
+
+    # Every worktree was removed; delete the (now non-worktree) directory and
+    # anything else left inside it.
+    shutil.rmtree(worktree_dir)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

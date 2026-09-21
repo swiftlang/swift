@@ -449,9 +449,7 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
       case SILInstructionKind::LoadBorrowInst:
         break;
       case SILInstructionKind::DebugValueInst:
-        if (DebugValueInst::hasAddrVal(user))
-          break;
-        LLVM_FALLTHROUGH;
+        break;
       default:
         if (!mayWriteToIdentifyableObject(user)) {
           // We don't handle user. It is some instruction which may write to

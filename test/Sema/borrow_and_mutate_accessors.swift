@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature CoroutineAccessors
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature CoroutineAccessors
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
@@ -202,6 +202,28 @@ struct S10 {
                     // expected-error@-1 {{lazy properties must have an initializer}}
     borrow {
       return _i
+    }
+  }
+}
+
+protocol CxxStorage: AnyObject {
+  associatedtype State: ~Copyable
+
+  @unsafe
+  var swiftStateRawSlot: UnsafeMutableRawPointer? { get set }
+}
+
+extension CxxStorage where State: ~Copyable {
+  @export(interface)
+  @safe
+  var state: State {
+    @_unsafeSelfDependentResult
+    borrow {
+      unsafe self.swiftStateRawSlot!.assumingMemoryBound(to: State.self).pointee
+    }
+    @_unsafeSelfDependentResult
+    mutate {
+      unsafe &self.swiftStateRawSlot!.assumingMemoryBound(to: State.self).pointee
     }
   }
 }

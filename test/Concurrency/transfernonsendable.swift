@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix ni- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix ni-ns- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-6.0-abi-triple -verify -verify-additional-prefix ni- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-6.0-abi-triple -verify -verify-additional-prefix ni-ns- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability

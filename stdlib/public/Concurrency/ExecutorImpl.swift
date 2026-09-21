@@ -43,6 +43,7 @@ internal func donateToGlobalExecutor(
   condition: @convention(c) (_ ctx: UnsafeMutableRawPointer) -> CBool,
   context: UnsafeMutableRawPointer
 ) {
+  #if !$Embedded
   if #available(StdlibDeploymentTarget 6.3, *) {
     if let runnableExecutor = Task.defaultExecutor as? RunLoopExecutor {
       try! runnableExecutor.runUntil { unsafe Bool(condition(context)) }
@@ -52,6 +53,9 @@ internal func donateToGlobalExecutor(
   } else {
     fatalError("this should never happen")
   }
+  #else
+  fatalError("Global executor does not support thread donation")
+  #endif
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -68,6 +72,7 @@ internal func getMainExecutor() -> UnownedSerialExecutor {
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
 @diagnose(UselessAvailabilityCheck, as: ignored)
+@diagnose(DeprecatedDeclaration, as: ignored)
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(StdlibDeploymentTarget 6.3, *) {

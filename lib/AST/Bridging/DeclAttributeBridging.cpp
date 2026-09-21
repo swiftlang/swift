@@ -17,7 +17,6 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -198,6 +197,37 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
       atLoc, range, platform, cVersion.unbridged(), /*Implicit=*/false);
 }
 
+static swift::COMThreadingModel unbridge(BridgedCOMThreadingModel value) {
+  switch (value) {
+    case BridgedCOMThreadingModelSingle:
+      return swift::COMThreadingModel::Single;
+    case BridgedCOMThreadingModelApartment:
+      return swift::COMThreadingModel::Apartment;
+    case BridgedCOMThreadingModelFree:
+      return swift::COMThreadingModel::Free;
+    case BridgedCOMThreadingModelBoth:
+      return swift::COMThreadingModel::Both;
+    case BridgedCOMThreadingModelNeutral:
+      return swift::COMThreadingModel::Neutral;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+
+BridgedCOMAttr BridgedCOMAttr_createParsed(BridgedASTContext context,
+                                           swift::SourceLoc location,
+                                           swift::SourceRange range,
+                                           BridgedStringRef interface,
+                                           BridgedStringRef implementation,
+                                           BridgedCOMThreadingModel threading) {
+  std::optional<StringRef> CLSID;
+  if (implementation.unbridged().data())
+    CLSID = implementation.unbridged();
+  return new (context.unbridged()) COMAttr(location, range,
+                                           interface.unbridged(), CLSID,
+                                           unbridge(threading));
+}
+
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                SourceLoc atLoc,
                                                SourceRange range,
@@ -206,6 +236,14 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), atLoc, range,
                 /*Implicit=*/false, /*Underscored*/ underscored);
+}
+
+BridgedCxxDeclAttr BridgedCxxDeclAttr_createParsed(BridgedASTContext cContext,
+                                                   SourceLoc atLoc,
+                                                   SourceRange range,
+                                                   BridgedStringRef cName) {
+  return new (cContext.unbridged())
+      CxxDeclAttr(cName.unbridged(), atLoc, range, /*Implicit=*/false);
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(
@@ -707,9 +745,12 @@ BridgedReferenceOwnershipAttr_createParsed(BridgedASTContext cContext,
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    SourceLoc atLoc,
                                                    SourceRange range,
+                                                   bool isDefault,
                                                    BridgedStringRef cName) {
-  return new (cContext.unbridged()) SectionAttr(cName.unbridged(), atLoc, range,
-                                                /*Implicit=*/false);
+  return new (cContext.unbridged()) SectionAttr(
+      isDefault ? std::nullopt
+                : std::optional<StringRef>(cName.unbridged()),
+      atLoc, range, /*Implicit=*/false);
 }
 
 BridgedSemanticsAttr
@@ -718,6 +759,14 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return new (cContext.unbridged())
       SemanticsAttr(cValue.unbridged(), atLoc, range,
                     /*Implicit=*/false);
+}
+
+BridgedTargetAttr
+BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, BridgedStringRef cValue) {
+  return new (cContext.unbridged())
+      TargetAttr(cValue.unbridged(), atLoc, range,
+                /*Implicit=*/false);
 }
 
 BridgedSetterAccessAttr
@@ -820,4 +869,17 @@ BridgedUnavailableFromAsyncAttr_createParsed(BridgedASTContext cContext,
                                              BridgedStringRef cMessage) {
   return new (cContext.unbridged()) UnavailableFromAsyncAttr(
       cMessage.unbridged(), atLoc, range, /*implicit=*/false);
+}
+
+BridgedUnsafeAttr
+BridgedUnsafeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, bool isAlways) {
+  return new (cContext.unbridged()) UnsafeAttr(atLoc, range, isAlways);
+}
+
+BridgedCalledAttr
+BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range,
+                               swift::ExecutionSemantics semantics) {
+  return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
 }

@@ -364,7 +364,7 @@ extension ConstantVPrintFIntegerFormatting {
 
   /// Constructs an os_log format specifier for the given `type`.
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_optimize(none)
   @_effects(readonly)
   internal func formatSpecifier<I: FixedWidthInteger>(
@@ -608,7 +608,7 @@ extension ConstantVPrintFInterpolation {
   ///     messages. An example of an attribute is "xcode:size-in-bytes". If the target tool
   ///     that processes these messages doesn't understand the attribute it would be ignored.
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_optimize(none)
   @_semantics("oslog.requires_constant_arguments")
   public mutating func appendInterpolation<T: FixedWidthInteger>(
@@ -623,7 +623,7 @@ extension ConstantVPrintFInterpolation {
   /// format string property. Also, append the integer along with necessary headers
   /// to the ConstantVPrintFArguments property.
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_optimize(none)
   internal mutating func appendInteger<T>(
     _ number: @escaping () -> T,
@@ -680,7 +680,7 @@ extension ConstantVPrintFInterpolation {
   /// - Parameters:
   ///   - argumentString: The interpolated expression of type String, which is autoclosured.
   @_semantics("constant_evaluable")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_optimize(none)
   @_semantics("oslog.requires_constant_arguments")
   public mutating func appendInterpolation(
@@ -855,9 +855,8 @@ internal func constant_vprintf_backend(
 }
 
 @_semantics("oslog.requires_constant_arguments")
-@inlinable
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 @_optimize(none)
 public func print(_ message: ConstantVPrintFMessage) {
   let formatString = message.interpolation.formatString

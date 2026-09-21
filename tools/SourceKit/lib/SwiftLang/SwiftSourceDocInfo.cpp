@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
@@ -21,7 +20,6 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -29,7 +27,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/IDERequests.h"
@@ -43,16 +40,13 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 
-#include <numeric>
 
 using namespace SourceKit;
 using namespace swift;
@@ -118,6 +112,8 @@ static StringRef getTagForParameter(PrintStructureKind context) {
   case PrintStructureKind::DeclResultTypeClause:
   case PrintStructureKind::FunctionParameterList:
   case PrintStructureKind::FunctionParameterType:
+  case PrintStructureKind::CoroutineYieldsTypes:
+  case PrintStructureKind::CoroutineYield:
     // These kinds are ignored by 'isIgnoredPrintStructureKind()'
     llvm_unreachable("ignored structure kind");
   }
@@ -257,6 +253,8 @@ private:
     case PrintStructureKind::DeclResultTypeClause:
     case PrintStructureKind::FunctionParameterList:
     case PrintStructureKind::FunctionParameterType:
+    case PrintStructureKind::CoroutineYieldsTypes:
+    case PrintStructureKind::CoroutineYield:
       return true;
     default:
       return false;
@@ -538,7 +536,7 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
     auto type = DC->getDeclaredInterfaceType();
     if (!type->is<ErrorType>()) {
       DC->lookupQualified(type, DeclNameRef(VD->getBaseName()),
-                          VD->getLoc(), NL_QualifiedDefault,
+                          VD->getLoc(), NLFlags::QualifiedDefault,
                           results);
     }
   } else {
@@ -548,7 +546,7 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
                                namelookup::ResolutionKind::Overloadable,
                                DC->getModuleScopeContext(),
                                VD->getLoc(),
-                               NL_UnqualifiedDefault);
+                               NLFlags::UnqualifiedDefault);
   }
 
   SmallVector<ValueDecl *, 8> RelatedDecls;
@@ -974,6 +972,7 @@ static LocationInfo getDeclLocationInfo(const ValueDecl *VD) {
         return Location;
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::PrettyPrinted:
+      case GeneratedSourceInfo::SyntheticMacro:
         setLocationInfoForRange(SM, VDRange, VDBufID, Location);
         return Location;
       }

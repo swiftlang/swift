@@ -30,7 +30,7 @@ func test(_ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
 
 func test(_ p: UnsafeMutableBufferPointer<CInt>) -> NonescapableStruct {
     // expected-error@+2{{missing argument for parameter #2 in call}}
-    // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'Int32'}}
+    // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'CInt' (aka 'Int32')}}
     let ret = unsafe nonescapableReturnNoLifetime(p)
     // expected-error@+1{{cannot convert return expression of type 'NonescapableStruct.Type' to return type 'NonescapableStruct'}}
     return NonescapableStruct

@@ -10,7 +10,6 @@
 
 // RUN: %FileCheck %s < %t/Lib.sil
 
-// REQUIRES: swift_in_compiler
 
 //--- Lib.swift
 package protocol PkgProto {

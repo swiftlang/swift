@@ -73,8 +73,7 @@ extension AsyncSequence {
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
   @preconcurrency 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult>
@@ -109,8 +108,7 @@ extension AsyncSequence {
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
   @preconcurrency 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult>
@@ -145,8 +143,7 @@ extension AsyncSequence {
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
   @preconcurrency 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult>

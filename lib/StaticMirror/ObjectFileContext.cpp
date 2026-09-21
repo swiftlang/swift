@@ -11,19 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/StaticMirror/ObjectFileContext.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Unreachable.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/RemoteInspection/ReflectionContext.h"
-#include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
-#include "swift/Remote/CMemoryReader.h"
 
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Object/Archive.h"
 #include "llvm/Object/MachOUniversal.h"
 
-#include "llvm/Object/Archive.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/ELFTypes.h"
@@ -31,9 +23,7 @@
 #include "llvm/Object/RelocationResolver.h"
 #include "llvm/Object/Wasm.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/StringSaver.h"
 
-#include <sstream>
 
 using namespace llvm::object;
 
@@ -234,12 +224,6 @@ void Image::scanELF(const llvm::object::ELFObjectFileBase *O) {
   } else {
     return;
   }
-
-  // FIXME: ReflectionContext tries to read bits of the ELF structure that
-  // aren't normally mapped by a phdr. Until that's fixed,
-  // allow access to the whole file 1:1 in address space that isn't otherwise
-  // mapped.
-  Segments.push_back({HeaderAddress, O->getData()});
 }
 
 void Image::scanCOFF(const llvm::object::COFFObjectFile *O) {
@@ -375,6 +359,35 @@ remote::RemoteAbsolutePointer Image::getDynamicSymbol(uint64_t Addr) const {
   return remote::RemoteAbsolutePointer(
       remote::RemoteAddress(found->second.OffsetOrAddress,
                             remote::RemoteAddress::DefaultAddressSpace));
+}
+
+std::optional<uint64_t> Image::getSymbolAddress(StringRef Name) const {
+  auto findIn = [&](auto &&Symbols) -> std::optional<uint64_t> {
+    for (const auto &Symb : Symbols) {
+      auto SymbName = Symb.getName();
+      if (!SymbName) {
+        llvm::consumeError(SymbName.takeError());
+        continue;
+      }
+      if (*SymbName != Name)
+        continue;
+      auto Value = Symb.getValue();
+      if (!Value) {
+        llvm::consumeError(Value.takeError());
+        continue;
+      }
+      return *Value;
+    }
+    return std::nullopt;
+  };
+  // Prefer the regular symbol table and then fall back to the dynamic symbol
+  // table.
+  if (auto Addr = findIn(O->symbols()))
+    return Addr;
+  if (const auto *ELF = dyn_cast<llvm::object::ELFObjectFileBase>(O))
+    if (auto Addr = findIn(ELF->getDynamicSymbolIterators()))
+      return Addr;
+  return std::nullopt;
 }
 
 std::pair<const Image *, uint64_t>
@@ -526,6 +539,24 @@ ObjectMemoryReader::getImageStartAddress(unsigned i) const {
                             reflection::RemoteAddress::DefaultAddressSpace)));
 }
 
+reflection::RemoteAddress
+ObjectMemoryReader::getSymbolAddress(reflection::RemoteAddress imageStart,
+                                     const std::string &name) {
+  const Image *image;
+  uint64_t imageAddr;
+  std::tie(image, imageAddr) =
+      decodeImageIndexAndAddress(imageStart.getRawAddress());
+  if (!image)
+    return reflection::RemoteAddress();
+
+  auto symbolAddr = image->getSymbolAddress(name);
+  if (!symbolAddr)
+    return reflection::RemoteAddress();
+  return reflection::RemoteAddress(encodeImageIndexAndAddress(
+      image, remote::RemoteAddress(
+                 *symbolAddr, reflection::RemoteAddress::DefaultAddressSpace)));
+}
+
 ReadBytesResult ObjectMemoryReader::readBytes(reflection::RemoteAddress Addr,
                                               uint64_t Size) {
   auto addrValue = Addr.getRawAddress();
@@ -581,7 +612,17 @@ ObjectMemoryReader::getDynamicSymbol(reflection::RemoteAddress Addr) {
   if (!image)
     return nullptr;
 
-  return image->getDynamicSymbol(imageAddr);
+  auto resolved = image->getDynamicSymbol(imageAddr);
+  if (!resolved)
+    return resolved;
+
+  // A relocation that resolves to an absolute address is image-relative. Mix
+  // the image index back into the result so the resulting address refers to the
+  // same image, mirroring `resolvePointer`.
+  if (resolved.getSymbol().empty())
+    return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+        encodeImageIndexAndAddress(image, resolved.getResolvedAddress())));
+  return resolved;
 }
 
 uint64_t ObjectMemoryReader::getPtrauthMask() {

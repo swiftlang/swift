@@ -9,7 +9,7 @@ struct TL {
   static var number: Int = 0
   /*
   expected-expansion@-2:29{{
-    expected-note@1:8{{change 'let' to 'var' to make it mutable}}
+    expected-note@1:20{{change 'let' to 'var' to make it mutable}}
   }}
   */
 

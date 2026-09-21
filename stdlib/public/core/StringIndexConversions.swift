@@ -243,7 +243,7 @@ extension String.UnicodeScalarView {
   ///    shared by this view.
   /// - Returns: The largest valid index within this view that doesn't exceed
   ///     `i`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // SPI(Foundation) FIXME: This should be API
   func _index(roundingDown i: Index) -> Index {
     _guts.validateInclusiveScalarIndex(i)
@@ -264,7 +264,7 @@ extension Substring.UnicodeScalarView {
   ///    substring shared by this view.
   /// - Returns: The largest valid index within this view that doesn't exceed
   ///     `i`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // SPI(Foundation) FIXME: This should be API
   func _index(roundingDown i: Index) -> Index {
     _wholeGuts.validateInclusiveScalarIndex(i, in: _bounds)
@@ -285,7 +285,7 @@ extension String.UTF8View {
   ///    substring shared by this view.
   /// - Returns: The largest valid index within this view that doesn't exceed
   ///     `i`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // SPI(Foundation) FIXME: This should be API
   func _index(roundingDown i: Index) -> Index {
     let i = _guts.validateInclusiveSubscalarIndex(i)
@@ -308,7 +308,7 @@ extension Substring.UTF8View {
   ///    substring shared by this view.
   /// - Returns: The largest valid index within this view that doesn't exceed
   ///     `i`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // SPI(Foundation) FIXME: This should be API
   func _index(roundingDown i: Index) -> Index {
     let i = _wholeGuts.validateInclusiveSubscalarIndex(i, in: _bounds)
@@ -329,7 +329,7 @@ extension String.UTF16View {
   ///    substring shared by this view.
   /// - Returns: The valid index in `self` that this view considers equivalent
   ///    to `i`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // SPI(Foundation) FIXME: This should be API
   func _index(roundingDown i: Index) -> Index {
     let i = _guts.validateInclusiveSubscalarIndex(i)
@@ -350,7 +350,7 @@ extension Substring.UTF16View {
   ///    substring shared by this view.
   /// - Returns: The valid index in `self` that this view considers equivalent
   ///    to `i`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // SPI(Foundation) FIXME: This should be API
   func _index(roundingDown i: Index) -> Index {
     let i = _wholeGuts.validateInclusiveSubscalarIndex(i, in: _bounds)

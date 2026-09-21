@@ -20,10 +20,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/AST/InFlightSubstitution.h"
-#include "swift/AST/PackConformance.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -273,10 +270,8 @@ public:
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.
     if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
-      auto substType = IFS.withNewOptions(
-        SubstFlags::PreservePackExpansionLevel, [&] {
-          return selfType.subst(IFS)->getCanonicalType();
-        });
+      InFlightSubstitution::OptionsAdjustmentScope saveOptions(IFS, SubstFlags::PreservePackExpansionLevel);
+      auto substType = selfType.subst(IFS)->getCanonicalType();
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
             substConformance, typeExpansionContext);

@@ -20,16 +20,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/FileUnit.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -1924,7 +1919,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
   if (IfWasImplicitlyInserted) {
     // The code was invalid due to a missing 'if' (e.g. 'else x < y {') and a
     // fixit implicitly inserted it.
-    IfLoc = Tok.getLoc();
+    IfLoc = PreviousLoc;
   } else {
     IfLoc = consumeToken(tok::kw_if);
   }

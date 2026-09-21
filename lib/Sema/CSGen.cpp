@@ -22,22 +22,20 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <utility>
@@ -570,7 +568,7 @@ namespace {
       // to the input type of the subscript operator.
       auto addApplicableFn = [&]() {
         CS.addApplicationConstraint(
-            FunctionType::get(params, outputTy), memberTy,
+            FunctionType::get(params, /* yields */ {}, outputTy), memberTy,
             /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
       };
 
@@ -648,9 +646,9 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
-                                  /*trailingClosureMatching=*/std::nullopt,
-                                  CurDC, fnLocator);
+      CS.addApplicationConstraint(
+          FunctionType::get(params, /* yields */ {}, outputTy), memberTy,
+          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
       return outputTy;
     }
 
@@ -708,7 +706,8 @@ namespace {
     /// Records a fix for an invalid AST node, and returns a hole for it.
     Type recordInvalidNode(ASTNode node) {
       CS.recordFix(
-          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)),
+          FixImpact::InvalidAST);
 
       // Ideally we wouldn't need a type variable here, but we don't have a
       // suitable placeholder originator for all the cases here.
@@ -972,7 +971,7 @@ namespace {
           TVO_CanBindToNoEscape);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType), memberType,
+          FunctionType::get(params, /* yields */ {}, resultType), memberType,
           /*trailingClosureMatching=*/std::nullopt, CurDC, fnLoc);
 
       if (constr->isFailable())
@@ -2068,7 +2067,8 @@ namespace {
         extInfo = extInfo.withSendable();
       }
 
-      auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
+      auto *fnTy =
+          FunctionType::get(closureParams, /* yields */ {}, resultTy, extInfo);
       return CS.replaceInferableTypesWithTypeVars(
           fnTy, CS.getConstraintLocator(closure))->castTo<FunctionType>();
     }
@@ -2433,9 +2433,14 @@ namespace {
         auto enumPattern = cast<EnumElementPattern>(pattern);
 
         // Create a type variable to represent the pattern.
+        //
+        // This type is contextually dependent in cases like `.a` where
+        // `patternType` represents an implicit base type of `.a` and so
+        // should be allowed to bind to a hole just like regular leading-dot
+        // syntax.
         Type patternType =
             CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape);
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
         // Form the member constraint for a reference to a member of this
         // type.
@@ -2537,7 +2542,8 @@ namespace {
           // Equal constraints require ExtInfo comparison.
           // FIXME: Verify ExtInfo state is correct, not working by accident.
           FunctionType::ExtInfo info;
-          Type functionType = FunctionType::get(params, outputType, info);
+          Type functionType =
+              FunctionType::get(params, /* yields */ {}, outputType, info);
 
           // TODO: Convert to own constraint? Note that ApplicableFn isn't quite
           // right, as pattern matching has data flowing *into* the apply result
@@ -2847,7 +2853,8 @@ namespace {
       getMatchingParams(expr->getArgs(), params);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType, extInfo), CS.getType(fnExpr),
+          FunctionType::get(params, /* yields */ {}, resultType, extInfo),
+          CS.getType(fnExpr),
           /*trailingClosureMatching=*/std::nullopt, CurDC,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
@@ -3117,9 +3124,16 @@ namespace {
       // like this to be the smallest possible nesting level of
       // optional types, e.g. T? over T??; otherwise we don't really
       // have a preference.
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                           TVO_PrefersSubtypeBinding |
-                                           TVO_CanBindToNoEscape);
+      unsigned options = TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape;
+
+      // In completion mode we don't care about fixes, let's allow
+      // the result of an optional chain to be bound to a hole to
+      // for a solution for situations like `a?<#token#>.b`.
+      if (CS.isForCodeCompletion())
+        options |= TVO_CanBindToHole;
+
+      auto valueTy =
+          CS.createTypeVariable(CS.getConstraintLocator(expr), options);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
       if (!optTy)
@@ -3613,12 +3627,9 @@ namespace {
           TVO_CanBindToNoEscape);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType),
-          macroRefType,
-          /*trailingClosureMatching=*/std::nullopt,
-          CurDC,
-          CS.getConstraintLocator(
-            expr, ConstraintLocator::ApplyFunction));
+          FunctionType::get(params, /* yields */ {}, resultType), macroRefType,
+          /*trailingClosureMatching=*/std::nullopt, CurDC,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       return resultType;
     }
@@ -3667,13 +3678,11 @@ namespace {
 
       auto &ctx = CS.getASTContext();
 
+      bool existentialUpperBound = false;
       auto join =
-          Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-      if (!join)
-        return ErrorType::get(ctx);
-
-      return MetatypeType::get(*join, ctx)->getCanonicalType();
+          subtypeJoin(lhsMeta->getInstanceType(), rhsMeta->getInstanceType(),
+                      &existentialUpperBound);
+      return MetatypeType::get(join, ctx);
     }
 
     /// Assuming that we are solving for code completion, assign \p expr a fresh
@@ -4238,6 +4247,13 @@ bool ConstraintSystem::generateConstraints(
           target.getPatternBindingOfUninitializedVar(),
           target.getIndexOfUninitializedVar());
 
+      // If `typeCheckPattern` produced a type with errors, let's turn pattern
+      // type into a hole to avoid a recording fallback fix.
+      if (target.getTypeOfUninitializedVar()->hasError()) {
+        increaseScore(SK_Hole, locator);
+        recordTypeVariablesAsHoles(patternType);
+      }
+
       return !patternType;
     }
   }
@@ -4370,7 +4386,7 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
   }
 }
 
-ConstraintSystem::TypeMatchResult
+ConstraintSystem::SolutionKind
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType,
     Type paramType,
@@ -4382,16 +4398,16 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     PreparedOverloadBuilder *preparedOverload) {
   Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
-  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
+  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> SolutionKind {
     if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
+      return SolutionKind::Error;
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    if (recordFix(fix, /*impact=*/1, preparedOverload))
-      return getTypeMatchFailure(locator);
+    if (recordFix(fix, /*impact=*/FixImpact::Mismatch, preparedOverload))
+      return SolutionKind::Error;
 
-    return getTypeMatchSuccess();
+    return SolutionKind::Solved;
   };
 
   // Incorrect use of projected value argument
@@ -4444,10 +4460,10 @@ ConstraintSystem::applyPropertyWrapperToParameter(
                          { wrapperType, PropertyWrapperInitKind::WrappedValue },
                          preparedOverload);
   } else {
-    return getTypeMatchFailure(locator);
+    return SolutionKind::Error;
   }
 
-  return getTypeMatchSuccess();
+  return SolutionKind::Solved;
 }
 
 struct ResolvedMemberResult::Implementation {

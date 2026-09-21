@@ -110,7 +110,7 @@ extension OSLogArguments {
 
 /// Serialize an NSObject pointer at the buffer location pointed by
 /// `bufferPosition`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func serialize(
   _ object: NSObject,

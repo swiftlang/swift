@@ -21,14 +21,18 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
         }
       }
 
-* Non-final generic methods in a class, which are prohibited because they cannot be specialized for every possible call site. For example:
+* Overriding and `open` generic methods in a class, which are prohibited because they cannot be specialized for every possible call site. For example:
 
-      class MyGenericClass<T> {
-        func f<U>(value: U) { } // warning: generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift
+      open class MyGenericClass<T> {
+        open func f<U>(value: U) { }  // warning: generic instance method 'f(value:)' in a class cannot be 'open' in Embedded Swift
 
         func g() { } // okay, not generic relative to the class itself
 
-        class func h() where T: P { } // warning: generic class method 'h()' in a class must be 'final' in Embedded Swift
+        class func h() where T: P { }
+      }
+
+      class MyGenericSubclass<T>: MyGenericClass<T> {
+        override class func h() where T: P { } // warning: generic class method 'h' in a class cannot override another method in Embedded Swift
       }
 
 * Generic methods used on values of protocol type, which are prohibited because they cannot be specialized for every possible call site. For example:
@@ -46,6 +50,15 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
       func testValuesOfProtocolType(value: any P, i: Int) {
         value.doNothing()        // okay
         value.doSomething(on: i) // warning: cannot use generic instance method 'doSomething(on:)' on a value of type 'any P' in Embedded Swift
+      }
+
+* Passing a value of protocol type to a generic function that opens the existential, which requires unspecialized generics because the function cannot be specialized for a dynamically-provided type. For example:
+
+      func acceptAny<T>(_ value: T) { }
+
+      func testPassingValueOfProtocolType(value: any P) {
+        acceptAny(value)              // warning: cannot open existential type 'any P' when passing it as an argument to global function 'acceptAny' in Embedded Swift
+        acceptAny(value as any P)     // okay, passes the existential itself
       }
 
 ## See Also

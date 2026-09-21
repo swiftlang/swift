@@ -17,6 +17,7 @@ struct SwiftSnapshotTool: ParsableCommand {
     abstract: "A utility for working with swift snapshots from swift.org.",
     subcommands: [
       BisectToolchains.self,
+      DownloadSnapshot.self,
       ListSnapshots.self,
       RunToolchains.self,
     ])

@@ -1,12 +1,13 @@
-// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple -debug-diagnostic-names
+// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_ObjCImplementation
+// REQUIRES: OS=macosx
 
 import objc_implementation_internal
 
-// FIXME: [availability] An implementation that is less available than the interface it implements should be diagnosed
-@available(*, unavailable)
+@available(macOS, unavailable)
 @objc @implementation extension ObjCPropertyTest {
+  // expected-warning@-1 {{'@objc @implementation' extension cannot implement class 'ObjCPropertyTest' because it is unavailable in macOS; this will be an error in a future Swift language mode}}
+  // expected-note@-3 {{extension of 'ObjCPropertyTest' has been explicitly marked unavailable here}}
   let prop1: Int32
 
   var prop2: Int32 {

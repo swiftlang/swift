@@ -54,6 +54,8 @@ class NinjaBuilder(product.ProductBuilder):
     def build(self):
         if os.path.exists(self.ninja_bin_path):
             return
+        if self.toolchain.cmake is None:
+            raise ValueError(f"CMake not installed")
 
         print("--- Local Ninja Build ---")
         with log_time_in_scope('local ninja'):

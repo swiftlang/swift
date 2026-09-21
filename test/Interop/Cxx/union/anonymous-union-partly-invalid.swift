@@ -8,5 +8,5 @@ let a = sPtr![0].f()
 // CHECK: i32 @main
 // CHECK-NEXT: entry:
 // CHECK-NEXT: call ptr
-// CHECK-NEXT: ptrtoint ptr
+// CHECK-NEXT: store ptr
 

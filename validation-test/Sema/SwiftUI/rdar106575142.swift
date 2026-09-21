@@ -19,15 +19,3 @@ extension S {
     }
   }
 }
-
-@available(*, unavailable)
-extension S {
-  class NestedAlwaysUnavailable {
-    @Published var x: Int = 0
-    @Binding var y: Bool
-
-    init(y: Binding<Bool>) {
-      _y = y
-    }
-  }
-}

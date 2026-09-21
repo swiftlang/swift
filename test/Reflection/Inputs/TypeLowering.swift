@@ -286,8 +286,10 @@ public enum NormalSinglePayloadEnum {
   case b
 }
 
+@available(SwiftStdlib 6.2, *)
 public struct AFD { var x: [1 of Int] }
 
+@available(SwiftStdlib 6.2, *)
 public enum AFDSinglePayloadEnum {
   case a(AFD)
   case b
@@ -298,6 +300,7 @@ public enum NormalMultiPayloadEnum {
   case b(Int)
 }
 
+@available(SwiftStdlib 6.2, *)
 public enum AFDMultiPayloadEnum {
   case a(AFD)
   case b(Int)
@@ -308,6 +311,7 @@ public struct NormalStruct {
   var b: Int
 }
 
+@available(SwiftStdlib 6.2, *)
 public struct AFDStruct {
   var a: AFD
   var b: Int
@@ -323,4 +327,27 @@ public struct AlmostBig {
 
 public struct Big {
   var a, b, c, d, e: Int
+}
+
+public class ClassBox<T>: P1 {
+  public let v: T
+  public init(_ v: T) { self.v = v }
+}
+
+public struct ClassBoundCompositionHolder<T> {
+  public let field: (ClassBox<T> & P1)?
+}
+
+public class PPClassBox<X>: P1, PP {
+  public typealias T = X
+  public let v: X
+  public init(_ v: X) { self.v = v }
+}
+
+public struct ParameterizedProtocolHolder<T> {
+  public let field: (any PP<T> & P1)?
+}
+
+public struct ClassBoundParameterizedProtocolHolder<T> {
+  public let field: (PPClassBox<T> & PP<T> & P1)?
 }

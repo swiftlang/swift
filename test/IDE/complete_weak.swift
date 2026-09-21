@@ -1,8 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_VARS_1 | %FileCheck %s -check-prefix=WEAK_VARS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_NO_DOT_1 | %FileCheck %s -check-prefix=WEAK_NO_DOT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WEAK_DOT_1 | %FileCheck %s -check-prefix=WEAK_DOT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNOWNED_NO_DOT_1 | %FileCheck %s -check-prefix=UNOWNED_NO_DOT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNOWNED_DOT_1 | %FileCheck %s -check-prefix=UNOWNED_DOT_1
+// RUN: %batch-code-completion
+
+protocol P {}
 
 class CompleteWeak {
   func instanceFunc() {}
@@ -39,4 +37,12 @@ class CompleteWeak {
   }
 // UNOWNED_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
 
+  func takesSomeP(_ x: some P) {}
+
+  func weakInGenericArg() {
+    // Make sure we correctly strip the weak reference type here when computing type relation.
+    weak var weakSelf = self
+    takesSomeP(#^WEAK_IN_GENERIC_ARG^#)
+    // WEAK_IN_GENERIC_ARG-DAG: Decl[LocalVar]/Local: weakSelf[#CompleteWeak?#]{{; name=.+$}}
+  }
 }

@@ -22,6 +22,21 @@
   func f0(_ x: C1?) { } // okay: all is permitted with IUO requirements
 }
 
+// A non-@objc protocol requires an exact match instead.
+protocol ParameterIUO2 {
+  func f0(_ x: C1!) // expected-note{{protocol requires function 'f0' with type '(C1?) -> ()'}}
+}
+
+struct ParameterIUO2a : ParameterIUO2 {
+  func f0(_ x: C1!) { } // okay: exact match
+}
+
+struct ParameterIUO2b : ParameterIUO2 {
+  // expected-error@-1{{type 'ParameterIUO2b' does not conform to protocol 'ParameterIUO2'}}
+  // expected-note@-2{{add stubs for conformance}}
+  func f0(_ x: C1?) { } // expected-note{{candidate parameter type is an optional, but the protocol requires an implicitly unwrapped optional}}{{18-19=!}}
+}
+
 // ------------------------------------------------------------------------
 // Parameters of optional type.
 // ------------------------------------------------------------------------
@@ -40,6 +55,22 @@
 
 @objc class ParameterOpt1c : ParameterOpt1 {
   func f0(_ x: C1) { } // expected-error{{different optionality than required}}{{18-18=?}}
+}
+
+// A non-@objc protocol rejects the implicitly unwrapped witness. Both types
+// print as 'C1?', so the candidate note names the difference.
+protocol ParameterOpt2 {
+  func f0(_ x: C1?) // expected-note{{protocol requires function 'f0' with type '(C1?) -> ()'}}
+}
+
+struct ParameterOpt2a : ParameterOpt2 {
+  func f0(_ x: C1?) { } // okay: exact match
+}
+
+struct ParameterOpt2b : ParameterOpt2 {
+  // expected-error@-1{{type 'ParameterOpt2b' does not conform to protocol 'ParameterOpt2'}}
+  // expected-note@-2{{add stubs for conformance}}
+  func f0(_ x: C1!) { } // expected-note{{candidate parameter type is an implicitly unwrapped optional, but the protocol requires an optional}}{{18-19=?}}
 }
 
 // ------------------------------------------------------------------------
@@ -66,6 +97,18 @@
 }
 extension ParameterNonOpt1d : ParameterNonOpt1 {} // expected-warning{{parameter of 'f0' has different optionality than expected by protocol 'ParameterNonOpt1'}} {{none}}
 
+// A non-@objc protocol reports the type conflict, because the witness differs
+// by more than the implicit unwrapping.
+protocol ParameterNonOpt2 {
+  func f0(_ x: C1) // expected-note{{protocol requires function 'f0' with type '(C1) -> ()'}}
+}
+
+struct ParameterNonOpt2a : ParameterNonOpt2 {
+  // expected-error@-1{{type 'ParameterNonOpt2a' does not conform to protocol 'ParameterNonOpt2'}}
+  // expected-note@-2{{add stubs for conformance}}
+  func f0(_ x: C1!) { } // expected-note{{candidate has non-matching type '(C1?) -> ()'}}
+}
+
 // ------------------------------------------------------------------------
 // Result of IUO type.
 // ------------------------------------------------------------------------
@@ -83,6 +126,25 @@ extension ParameterNonOpt1d : ParameterNonOpt1 {} // expected-warning{{parameter
 
 @objc class ResultIUO1c : ResultIUO1 {
   func f0() -> C1? { } // okay: all is permitted with IUO requirements
+}
+
+// A non-@objc protocol requires an exact match instead, for a property as well
+// as for a function result.
+protocol ResultIUO2 {
+  func f0() -> C1! // expected-note{{protocol requires function 'f0()' with type '() -> C1?'}}
+  var v: C1! { get } // expected-note{{protocol requires property 'v' with type 'C1?'}}
+}
+
+struct ResultIUO2a : ResultIUO2 {
+  func f0() -> C1! { nil } // okay: exact match
+  var v: C1! // okay: exact match
+}
+
+struct ResultIUO2b : ResultIUO2 {
+  // expected-error@-1{{type 'ResultIUO2b' does not conform to protocol 'ResultIUO2'}}
+  // expected-note@-2{{add stubs for conformance}}
+  func f0() -> C1? { nil } // expected-note{{candidate result type is an optional, but the protocol requires an implicitly unwrapped optional}}{{18-19=!}}
+  var v: C1? // expected-note{{candidate type is an optional, but the protocol requires an implicitly unwrapped optional}}{{12-13=!}}
 }
 
 // ------------------------------------------------------------------------
@@ -104,6 +166,28 @@ extension ParameterNonOpt1d : ParameterNonOpt1 {} // expected-warning{{parameter
   func f0() -> C1! { } // expected-warning{{different optionality}}{{18-19=?}}
 }
 
+// A non-@objc protocol rejects the implicitly unwrapped witness, for a property
+// and a subscript element as well as for a function result.
+protocol ResultOpt2 {
+  func f0() -> C1? // expected-note{{protocol requires function 'f0()' with type '() -> C1?'}}
+  var v: C1? { get } // expected-note{{protocol requires property 'v' with type 'C1?'}}
+  subscript(i: Int) -> C1? { get } // expected-note{{protocol requires subscript with type '(Int) -> C1?'}}
+}
+
+struct ResultOpt2a : ResultOpt2 {
+  func f0() -> C1? { nil } // okay: exact match
+  var v: C1? // okay: exact match
+  subscript(i: Int) -> C1? { nil } // okay: exact match
+}
+
+struct ResultOpt2b : ResultOpt2 {
+  // expected-error@-1{{type 'ResultOpt2b' does not conform to protocol 'ResultOpt2'}}
+  // expected-note@-2{{add stubs for conformance}}
+  func f0() -> C1! { nil } // expected-note{{candidate result type is an implicitly unwrapped optional, but the protocol requires an optional}}{{18-19=?}}
+  var v: C1! // expected-note{{candidate type is an implicitly unwrapped optional, but the protocol requires an optional}}{{12-13=?}}
+  subscript(i: Int) -> C1! { nil } // expected-note{{candidate result type is an implicitly unwrapped optional, but the protocol requires an optional}}{{26-27=?}}
+}
+
 // ------------------------------------------------------------------------
 // Result of non-optional type.
 // ------------------------------------------------------------------------
@@ -121,6 +205,18 @@ extension ParameterNonOpt1d : ParameterNonOpt1 {} // expected-warning{{parameter
 
 @objc class ResultNonOpt1c : ResultNonOpt1 {
   func f0() -> C1! { } // expected-warning{{different optionality}}{{18-19=}}
+}
+
+// A non-@objc protocol reports the type conflict, because the witness differs
+// by more than the implicit unwrapping.
+protocol ResultNonOpt2 {
+  func f0() -> C1 // expected-note{{protocol requires function 'f0()' with type '() -> C1'}}
+}
+
+struct ResultNonOpt2a : ResultNonOpt2 {
+  // expected-error@-1{{type 'ResultNonOpt2a' does not conform to protocol 'ResultNonOpt2'}}
+  // expected-note@-2{{add stubs for conformance}}
+  func f0() -> C1! { nil } // expected-note{{candidate has non-matching type '() -> C1?'}}
 }
 
 // ------------------------------------------------------------------------

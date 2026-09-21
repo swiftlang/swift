@@ -15,6 +15,14 @@
 // RUN:     -sil-verify-all                                         \
 // RUN:     -I %t
 
+// RUN: %target-swift-frontend                                      \
+// RUN:     %t/Client.swift                                         \
+// RUN:     -emit-sil -verify                                       \
+// RUN:     -debug-diagnostic-names                                 \
+// RUN:     -sil-verify-all                                         \
+// RUN:     -enable-sil-opaque-values                               \
+// RUN:     -I %t
+
 
 //--- Library.swift
 

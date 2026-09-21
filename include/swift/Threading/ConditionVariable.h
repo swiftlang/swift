@@ -23,6 +23,8 @@
 
 namespace swift {
 
+#if SWIFT_THREADING_HAS_CONDITION_VARIABLE
+
 // A condition variable.
 //
 // Note that use of this class should be minimised because there is no
@@ -87,8 +89,14 @@ public:
   /// After this method returns, the associated mutex will be locked.
   ///
   /// Precondition: ConditionVariable locked by this thread.
-  template <class Rep, class Period>
-  bool wait(std::chrono::duration<Rep, Period> duration) {
+  ///
+  /// \p Duration is normally a std::chrono duration type; it's a deduced
+  /// template parameter rather than std::chrono::duration<Rep, Period> so that
+  /// this header works in freestanding builds, where <chrono> may not be
+  /// available (see the comment on cond_wait in Impl/Nothreads.h).  The
+  /// selected threading implementation decides which timeout types it accepts.
+  template <class Duration>
+  bool wait(Duration duration) {
     return threading_impl::cond_wait(Handle, duration);
   }
 
@@ -97,6 +105,11 @@ public:
   /// After this method returns, the associated mutex will be locked.
   ///
   /// Precondition: ConditionVariable locked by this thread.
+  ///
+  /// std::chrono::system_clock is a hosted-only facility (it represents
+  /// wall-clock time, which requires OS support), so this API is
+  /// unavailable in freestanding/embedded builds.
+#if __STDC_HOSTED__
   template <class Rep, class Period>
   bool waitUntil(std::chrono::time_point<std::chrono::system_clock,
                  std::chrono::duration<Rep, Period>> deadline) {
@@ -104,6 +117,7 @@ public:
       std::chrono::system_clock::duration>(deadline);
     return threading_impl::cond_wait(Handle, sysdeadline);
   }
+#endif
 
   /// Acquires lock before calling the supplied critical section and releases
   /// lock on return from critical section.
@@ -139,6 +153,8 @@ public:
 private:
   threading_impl::cond_handle Handle;
 };
+
+#endif // SWIFT_THREADING_HAS_CONDITION_VARIABLE
 
 }
 

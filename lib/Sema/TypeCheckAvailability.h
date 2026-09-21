@@ -14,16 +14,16 @@
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class ApplyExpr;
@@ -46,7 +46,8 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// We allow a type to conform to a protocol that is less available than the
   /// type itself. This enables a type to retroactively model or directly conform
   /// to a protocol only available on newer OSes and yet still be used on older
-  /// OSes.
+  /// OSes. This exception only applies to platform domains; potential
+  /// unavailability in other domains, like custom domains, is still diagnosed.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
 
   /// Diagnose uses of declarations in versions before they were introduced, but
@@ -232,8 +233,9 @@ void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
-/// diagnostics by only checking the Type if the TypeRepr succeeded.
-void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+/// diagnostics by only checking the Type if the TypeRepr succeeded. Returns
+/// true if the TypeRepr was diagnosed as unavailable.
+bool diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                               const ExportContext &context,
                               DeclAvailabilityFlags flags = std::nullopt);
 
@@ -245,6 +247,16 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 Type replacementTy=Type(),
                                 bool warnIfConformanceUnavailablePreSwift6 = false,
                                 bool preconcurrency = false);
+
+/// Resolve the conformance of \p type to \p proto and diagnose its
+/// availability. This is for a conformance that a declaration's interface
+/// requires implicitly, and that therefore has no `TypeRepr` of its own; the
+/// thrown error type of a typed throws clause is one. Does nothing if \p proto
+/// is null or if the conformance cannot be resolved in this context. Returns
+/// true if a diagnostic was emitted.
+bool diagnoseConformanceAvailability(SourceLoc loc, Type type,
+                                     ProtocolDecl *proto,
+                                     const ExportContext &where);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -260,9 +272,9 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,
-/// returns a result that describes the unsatisfied constraint.
+/// returns a result that describes the unsatisfied restriction.
 /// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint> getUnsatisfiedAvailabilityConstraint(
+std::optional<AvailabilityRestriction> getUnsatisfiedAvailabilityRestriction(
     const Decl *decl, const DeclContext *referenceDC, SourceLoc referenceLoc);
 
 /// Diagnose uses of the runtime support of the given type, such as
@@ -280,6 +292,19 @@ void checkExplicitAvailability(Decl *decl);
 void fixAvailability(SourceRange ReferenceRange, const DeclContext *ReferenceDC,
                      const AvailabilityDomainAndRange &DomainAndRange,
                      ASTContext &Context);
+
+/// If \p candidate is not available in all contexts in which \p requirement is
+/// available, returns the primary availability restriction that makes
+/// \p candidate less available.
+///
+/// If \p baseAvailability is given, the availability of \p requirement is
+/// further constrained by it, so that \p candidate may be restricted to that
+/// range without being considered less available.
+std::optional<AvailabilityRestriction>
+getRequirementMatchAvailabilityRestriction(
+    const Decl *requirement, const Decl *candidate,
+    AvailabilityRestrictionFlags flags = std::nullopt,
+    std::optional<AvailabilityContext> baseAvailability = std::nullopt);
 
 } // namespace swift
 

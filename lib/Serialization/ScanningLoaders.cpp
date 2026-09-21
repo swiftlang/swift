@@ -15,14 +15,9 @@
 #include "ModuleFileSharedCore.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticSuppression.h"
-#include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -31,7 +26,6 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -86,7 +80,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
 
 bool SwiftModuleScanner::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   if (path.hasSubmodule())
     return false;
 
@@ -105,7 +99,7 @@ bool SwiftModuleScanner::canImportModule(
   }
 
   return SerializedModuleLoaderBase::canImportModule(
-      path, loc, versionInfo, isTestableDependencyLookup);
+      path, loc, versionInfo, isTestableDependencyLookup, isSourceCanImport);
 }
 
 bool SwiftModuleScanner::handlePossibleTargetMismatch(
@@ -427,7 +421,8 @@ SwiftModuleScanner::lookupSwiftModule(Identifier moduleName,
   // Execute the check to determine whether there is a module with this name
   // that we can import. This check will populate the result fields if one is
   // found.
-  canImportModule(modulePath, SourceLoc(), nullptr, isTestableImport);
+  canImportModule(modulePath, SourceLoc(), nullptr, isTestableImport,
+                  /*isSourceCanImport=*/true);
   return SwiftModuleScannerQueryResult(
       std::move(foundDependencyInfo), std::move(incompatibleCandidates));
 }

@@ -17,6 +17,11 @@ module CFAndObjC {
   export *
 }
 
+module CFRedeclaredTag {
+  header "CFRedeclaredTag.h"
+  export *
+}
+
 module CInsideObjC {
   header "CInsideObjC.h"
   export *
@@ -300,5 +305,10 @@ module CVarArgs {
 
 module SystemModuleWithWarnings {
   header "SystemModuleWithWarnings.h"
+  export *
+}
+
+module RawIdentifierSwiftNames {
+  header "RawIdentifierSwiftNames.h"
   export *
 }

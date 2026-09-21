@@ -23,8 +23,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -143,27 +141,28 @@ bool TreatRValueAsLValue::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-unsigned TreatRValueAsLValue::assessImpact(ConstraintSystem &cs,
-                                           ConstraintLocator *atLoc) {
-    // Results of calls can never be l-value.
-    unsigned impact = isExpr<CallExpr>(atLoc->getAnchor()) ? 2 : 1;
-    // An overload choice that isn't settable is least interesting for
-    // diagnosis.
-    auto *calleeLoc = cs.getCalleeLocator(atLoc, /*lookThroughApply=*/false);
-    if (auto overload = cs.findSelectedOverloadFor(calleeLoc)) {
-      if (auto *var = dyn_cast_or_null<AbstractStorageDecl>(
-              overload->choice.getDeclOrNull())) {
-        impact += !var->isSettableInSwift(cs.DC) ? 1 : 0;
-      } else {
-        impact += 1;
-      }
+FixImpact TreatRValueAsLValue::assessImpact(ConstraintSystem &cs,
+                                            ConstraintLocator *atLoc) {
+  // Results of calls can never be l-value.
+  auto impact = isExpr<CallExpr>(atLoc->getAnchor()) ? FixImpact::TypeMismatch
+                                                     : FixImpact::Mismatch;
+  // An overload choice that isn't settable is least interesting for
+  // diagnosis.
+  auto *calleeLoc = cs.getCalleeLocator(atLoc, /*lookThroughApply=*/false);
+  if (auto overload = cs.findSelectedOverloadFor(calleeLoc)) {
+    if (auto *var = dyn_cast_or_null<AbstractStorageDecl>(
+            overload->choice.getDeclOrNull())) {
+      impact += !var->isSettableInSwift(cs.DC) ? 1 : 0;
+    } else {
+      impact += 1;
     }
+  }
 
-    // This is extra impactful if location has other issues.
-    if (cs.hasFixFor(atLoc) || cs.hasFixFor(calleeLoc))
-      impact += 2;
+  // This is extra impactful if location has other issues.
+  if (cs.hasFixFor(atLoc) || cs.hasFixFor(calleeLoc))
+    impact += FixImpact::TypeMismatch;
 
-    return impact;
+  return impact;
 }
 
 TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
@@ -1040,6 +1039,22 @@ AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
       AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
 }
 
+bool AllowMetatypeExtensionMemberOnConformingType::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidMetatypeExtensionMemberRefFailure failure(
+      solution, getBaseType(), getMember(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMetatypeExtensionMemberOnConformingType *
+AllowMetatypeExtensionMemberOnConformingType::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member,
+    DeclNameRef usedName, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMetatypeExtensionMemberOnConformingType(
+          cs, baseType, member, usedName, locator);
+}
+
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,
                                               bool asNote) const {
   PartialApplicationFailure failure(isWarning, solution, getLocator());
@@ -1255,15 +1270,18 @@ AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
 
 bool AllowMultiArgFuncKeyPathMismatch::diagnose(const Solution &solution,
                                                 bool asNote) const {
-  MultiArgFuncKeyPathFailure failure(solution, functionType, getLocator());
+  MultiArgFuncKeyPathFailure failure(solution, functionType, expectedType,
+                                     getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowMultiArgFuncKeyPathMismatch *
-AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs, Type fnType,
+AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs,
+                                         Type fnType,
+                                         Type expectedType,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator())
-  AllowMultiArgFuncKeyPathMismatch(cs, fnType, locator);
+      AllowMultiArgFuncKeyPathMismatch(cs, fnType, expectedType, locator);
 }
 
 bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
@@ -1274,7 +1292,8 @@ bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
 }
 
 TreatKeyPathSubscriptIndexAsHashable *
-TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs,
+                                             Type type,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
@@ -1920,7 +1939,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   auto result = cs.matchTypes(elementType, paramType, ConstraintKind::Subtype,
                               options, builder);
 
-  if (result.isFailure())
+  if (result == ConstraintSystem::SolutionKind::Error)
     return nullptr;
 
   return new (cs.getAllocator())
@@ -1970,9 +1989,12 @@ unsigned AllowArgumentMismatch::getParamIdx() const {
 
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
-  ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
-                                  getLocator());
-  return failure.diagnose(asNote);
+  std::optional<ArgumentMismatchFailure> failure =
+      ArgumentMismatchFailure::create(solution, getFromType(), getToType(),
+                                      getLocator());
+  if (!failure)
+    return false;
+  return failure.value().diagnose(asNote);
 }
 
 AllowArgumentMismatch *
@@ -1994,10 +2016,14 @@ RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
 
 bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
-  NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
-                                        getToType(), ConversionKind,
-                                        fixBehavior);
-  return failure.diagnose(asNote);
+
+  std::optional<NonEphemeralConversionFailure> failure =
+      NonEphemeralConversionFailure::create(solution, getLocator(),
+                                            getFromType(), getToType(),
+                                            ConversionKind, fixBehavior);
+  if (failure.has_value())
+    return failure.value().diagnose(asNote);
+  return false;
 }
 
 TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
@@ -2216,7 +2242,7 @@ UnwrapOptionalBaseKeyPathApplication::attempt(ConstraintSystem &cs, Type baseTy,
   auto result =
       cs.matchTypes(nonOptionalTy, rootTy, ConstraintKind::Subtype,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
-  if (result.isFailure())
+  if (result == ConstraintSystem::SolutionKind::Error)
     return nullptr;
 
   return new (cs.getAllocator())
@@ -2860,8 +2886,9 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
 }
 
 AllowInlineArrayLiteralCountMismatch *
-AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
-                                             Type rhsCount,
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs,
+                                             unsigned lhsCount,
+                                             unsigned rhsCount,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
@@ -2897,5 +2924,35 @@ IgnoreIsolatedConformance::create(ConstraintSystem &cs,
 bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
                                          bool asNote) const {
   DisallowedIsolatedConformance failure(solution, conformance, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreClassRequirementForDynamicMemberLookup *
+IgnoreClassRequirementForDynamicMemberLookup::create(
+    ConstraintSystem &cs, Type baseTy, ValueDecl *member,
+    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreClassRequirementForDynamicMemberLookup(cs, baseTy, member, locator);
+}
+
+bool IgnoreClassRequirementForDynamicMemberLookup::diagnose(
+    const Solution &solution, bool asNote) const {
+  NonClassBaseInDynamicMemberLookup failure(solution, BaseType, Member,
+                                            getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExecutionSemanticsMismatch *
+ExecutionSemanticsMismatch::create(ConstraintSystem &cs, FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      ExecutionSemanticsMismatch(cs, fromType, toType, locator);
+}
+
+bool ExecutionSemanticsMismatch::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics failure(
+      solution, getFromType(), getToType(), getLocator());
   return failure.diagnose(asNote);
 }

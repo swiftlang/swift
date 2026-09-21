@@ -11,6 +11,9 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: rdar://180495612
+// UNSUPPORTED: OS=xros
+
 import CAssoc
 
 extension TheColor {

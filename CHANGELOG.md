@@ -5,6 +5,67 @@
 
 ## Swift (next)
 
+* Actors are now allowed to conform to protocols annotated with global actor
+  attributes. To support this, actors will no longer infer invalid global actor
+  annotations from isolated property wrappers, or from protocols with inferred
+  MainActor isolation. This will change the isolation of static methods and
+  initializers of actors in those cases, leading to limited source breaks.
+
+  Inferred isolation of protocols under `-default-isolation MainActor`:
+
+  ```swift
+  @MainActor func mainActorFn() {}
+
+  protocol P {} // inferred @MainActor
+
+  actor A: P {
+    // conforming to P used to result in invalid `@MainActor actor A`, propagated to static methods
+    static func staticMethod() { mainActorFn() }
+    // ^ nonisolated after this change, cannot call mainActorFn without @MainActor annotation
+  }
+  ```
+
+  Inferred isolation from wrappers without `DisableOutwardActorInference`:
+
+  ```swift
+  @MainActor func mainActorFn() {}
+
+  @propertyWrapper public struct MainActorWrap<T: Sendable> {
+  	@MainActor public var wrappedValue: T
+  	public init(wrappedValue: T) { self.wrappedValue = wrappedValue }
+  }
+
+  actor A {
+    // wrapper used to result in invalid `@MainActor actor A`, propagated to static methods
+  	@MainActorWrap var x: Int = 0
+  	static func staticMethod() { mainActorFn() }
+    // ^ nonisolated after this change, cannot call mainActorFn without @MainActor annotation
+  }
+  ```
+
+* Embedded Swift now has complete support for key paths. Key paths that
+  are not entirely folded away at compile time will be emitted as
+  static immortal objects when there are no captures. For example:
+
+  ```swift
+  struct Point {
+    var x, y: Double
+  }
+
+  struct DataPoint {
+    var location: Point
+    var label: String
+  }
+
+  let kp: KeyPath = \DataPoint.location.y
+  ```
+
+  When there are captures, such as `\Array<Double>.[i]`, a key path
+  instance will still dynamically allocated, Such cases can be detected
+  by enabling the KeyPathAllocation diagnostic group.
+
+## Swift 6.4
+
 * [SE-0522][]: Introduced the `@diagnose` declaration attribute for source-level
   control over compiler warning behavior. `@diagnose(GroupID, as: error|warning|ignored)`
   overrides diagnostic behavior for the specified warning group within the
@@ -186,6 +247,20 @@
   ```swift
   if #available(anyAppleOS 26.0, macOS 26.4, *) {
     // Executes on macOS 26.4 and version 26 of all other Apple OSes.
+  }
+  ```
+
+* [SE-0508][]:
+  Trailing closures syntax is now supported following array literals. This enables support for
+  calling `Array` and `Dictionary` trailing closure initializers using sugared type syntax:
+
+  ```swift
+  let value = [String] {
+    "a"
+  }
+
+  let value = [String: Int] {
+    (key: "a", value: 42)
   }
   ```
 
@@ -11202,6 +11277,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
 [SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0508]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0508-array-expression-trailing-closures.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [#64927]: <https://github.com/apple/swift/issues/64927>

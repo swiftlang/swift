@@ -34,6 +34,9 @@ StringRef platformString(PlatformKind platform);
 
 /// Returns the platform kind corresponding to the passed-in short platform name
 /// or None if such a platform kind does not exist.
+///
+/// The wildcard `"*"` is not a platform and yields `nullopt`. Callers that need
+/// to recognize a wildcard must check for it before calling this.
 std::optional<PlatformKind> platformFromString(StringRef Name);
 
 /// Safely converts the given unsigned value to a valid \c PlatformKind value or
@@ -67,22 +70,26 @@ inline bool isApplicationExtensionPlatform(PlatformKind Platform) {
 /// considered active when the target operating system is OS X and app extension
 /// restrictions are enabled, but OSXApplicationExtension is not considered
 /// active when the target platform is OS X and app extension restrictions are
-/// disabled. PlatformKind::none is always considered active.
+/// disabled.
 /// If ForTargetVariant is true then for zippered builds the target-variant
 /// triple will be used rather than the target to determine whether the
 /// platform is active.
 bool isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                       bool ForTargetVariant = false, bool ForRuntimeQuery = false);
 
-/// Returns the target platform for the given language options.
-PlatformKind targetPlatform(const LangOptions &LangOpts);
+/// Returns the target platform for the given language options, or `nullopt` if
+/// the target triple does not correspond to a platform.
+std::optional<PlatformKind> targetPlatform(const LangOptions &LangOpts);
 
-/// Returns the target variant platform for the given language options.
-PlatformKind targetVariantPlatform(const LangOptions &LangOpts);
+/// Returns the target variant platform for the given language options, or
+/// `nullopt` if there is no target variant or it does not correspond to a
+/// platform.
+std::optional<PlatformKind> targetVariantPlatform(const LangOptions &LangOpts);
 
-/// Returns the target platform for the given triple and options.
-PlatformKind platformForTriple(const llvm::Triple &triple,
-                               bool enableAppExtensionRestrictions);
+/// Returns the target platform for the given triple and options, or `nullopt`
+/// if the triple does not correspond to a platform.
+std::optional<PlatformKind>
+platformForTriple(const llvm::Triple &triple, bool enableAppExtensionRestrictions);
 
 /// Returns true when availability attributes from the "parent" platform
 /// should also apply to the "child" platform for declarations without
@@ -95,6 +102,12 @@ tripleOSTypeForPlatform(PlatformKind platform);
 
 llvm::VersionTuple canonicalizePlatformVersion(
     PlatformKind platform, const llvm::VersionTuple &version);
+
+/// Canonicalizes \p version for \p platform. Returns \p version unmodified when
+/// there is no platform, since canonicalization is platform specific.
+llvm::VersionTuple
+canonicalizePlatformVersion(std::optional<PlatformKind> platform,
+                            const llvm::VersionTuple &version);
 
 /// Returns true if \p Platform should be considered to be SPI and therefore not
 /// printed in public `.swiftinterface` files, for example.

@@ -22,8 +22,10 @@ namespace clang {
 class ASTContext;
 class CompilerInstance;
 class Decl;
+class FunctionDecl;
 class Module;
 class Preprocessor;
+class RecordDecl;
 class Sema;
 class TargetInfo;
 class Type;
@@ -204,6 +206,26 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Register a Clang declaration synthesized by the importer so that it is
+  /// discoverable by Swift name lookup and so that it can be resolved when
+  /// a cross-reference to it is deserialized (e.g., during SIL cross-module
+  /// optimization).
+  ///
+  /// Declarations are added to the SwiftLookupTable for the \a anchorDecl
+  /// as well as the one for its owning module, to handle the case where a C++
+  /// namespace spans across multiple Clang modules.
+  ///
+  /// Also mark \a synthesizedDecl as always-visible.
+  ///
+  /// \param synthesizedDecl The synthesized Clang function to register.
+  /// \param anchorDecl The Clang declaration whose SwiftLookupTable(s)
+  /// the declaration should be registered in. Pass the enclosing record for a
+  /// synthesized member, or \p synthesizedDecl itself for a translation-unit
+  /// -level thunk.
+  virtual void
+  registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                               const clang::Decl *anchorDecl) = 0;
+
   /// Returns a decl that was imported earlier or null if it was not found in
   /// the cache.
   virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) = 0;
@@ -223,9 +245,20 @@ public:
   /// Returns the original method if \param decl is a clone from a base class
   virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
 
+  /// If \param decl is a synthesized thunk for a virtual method of a foreign
+  /// reference type, returns the originally-imported (un-thunked) method.
+  virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
+
   /// Returns the forwarding method in the derived class that calls the base
   /// method.
   virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;
+
+  /// Returns the (retain, release) Clang functions that implement the custom
+  /// reference counting of the foreign reference type with Clang record
+  /// \p decl, or {nullptr, nullptr} if it has no custom reference counting
+  /// (i.e. it is immortal or not a valid foreign reference type).
+  virtual std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) = 0;
 
   /// Returns true if we synthesize this member for every type so no need to
   /// clone it for the derived classes.
@@ -320,6 +353,19 @@ public:
   virtual bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) = 0;
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
+
+  /// Emit a note explaining why \p decl or \p type was imported as unsafe,
+  /// located at the responsible C++ declaration.
+  ///
+  /// Emits nothing when the entity did not come from C++, when the unsafety
+  /// was spelled out in the header, or when no reason can be attributed with
+  /// confidence: a missing explanation is preferable to a wrong one.
+  ///
+  /// \param decl The unsafe declaration, or null when only a type is known.
+  /// \param type The unsafe type, or null when only a declaration is known.
+  /// \param useLoc Fallback location, used if the C++ location is invalid.
+  virtual void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                         SourceLoc useLoc) = 0;
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 

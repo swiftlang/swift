@@ -65,8 +65,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -75,10 +73,7 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Format.h"
 #include <cstring>
 
@@ -95,8 +90,14 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
+  // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
+  // refer to the project_box. Undef debug_values, however, should always
+  // have the type of the variable.
+  if (auto *abi = dyn_cast<AllocBoxInst>(*original))
+    undef = SILUndef::get(original->getFunction(),
+                          abi->getAddressType().getObjectType());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), DontPoisonRefs,
+                                  *original.getVarInfo(),
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -106,8 +107,11 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
+  if (auto *abi = dyn_cast<AllocBoxInst>(*original))
+    undef = SILUndef::get(original->getFunction(),
+                          abi->getAddressType().getObjectType());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), DontPoisonRefs,
+                                  *original.getVarInfo(),
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -122,7 +126,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
          "Unexpected debug reconstruction block in Onone-only Pass");
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -136,7 +140,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
          "Unexpected debug reconstruction block in Onone-only Pass");
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), UsesMoveableValueDebugInfo);
 }
 
 namespace {
@@ -426,6 +430,17 @@ void DebugInfoPropagator::performInitialLocalDataflow() {
         LLVM_DEBUG(
             llvm::dbgs()
             << "    Found a moved debug that was moved... continuing!\n");
+        continue;
+      }
+
+      if (debugInst.hasDebugReconstructionBlock()) {
+        // Ideally those should be handled, but this seems to only happen
+        // in embedded swift, when the optimized stdlib is inlined into
+        // unoptimized async code.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    Found a debug value with a debug reconstruction block..."
+                   "continuing!\n");
         continue;
       }
 

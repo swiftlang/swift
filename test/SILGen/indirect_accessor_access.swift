@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // rdar://143334632
 
 // RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck %s

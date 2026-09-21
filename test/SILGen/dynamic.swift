@@ -2,6 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: -sdk %S/Inputs -I %t) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift | %FileCheck %s
 // RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify
 

@@ -135,8 +135,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Returns true if there are other store_borrows enclosed within a store_borrow
 /// \p sbi's scope
 bool hasOtherStoreBorrowsInLifetime(StoreBorrowInst *sbi,
-                                    SSAPrunedLiveness *liveness,
-                                    DeadEndBlocks *deadEndBlocks);
+                                    SSAPrunedLiveness *liveness);
 
 } // namespace swift
 

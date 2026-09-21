@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
-// RUN:   -I %swift_src_root%{fs-sep}lib%{fs-sep}ClangImporter%{fs-sep}SwiftBridging -I %t%{fs-sep}Inputs \
+// RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -verify-ignore-unrelated \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
@@ -10,7 +10,7 @@
 // RUN:   -enable-experimental-feature LifetimeDependence
 
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
-// RUN:   -I %swift_src_root%{fs-sep}lib%{fs-sep}ClangImporter%{fs-sep}SwiftBridging -I %t%{fs-sep}Inputs \
+// RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -verify-ignore-unrelated \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \

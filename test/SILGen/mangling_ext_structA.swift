@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_structA.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name ext_structA -I %t %s
 // RUN: %target-swift-emit-silgen -module-name ext_structA -I %t %s | %FileCheck %s
 
 // Ensure that members of extensions of types from another module are mangled

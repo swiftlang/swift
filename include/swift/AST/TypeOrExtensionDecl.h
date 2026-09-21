@@ -19,6 +19,7 @@
 #define SWIFT_TYPE_OR_EXTENSION_DECL_H
 
 #include "swift/AST/TypeAlignments.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace llvm {

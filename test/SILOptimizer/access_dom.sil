@@ -148,7 +148,7 @@ bb2:
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: br bb1
-// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: cond_br {{.*}}, bb3, bb2
 // CHECK: bb2:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK: load [[BEGIN]] : $*X
@@ -162,10 +162,10 @@ bb0:
   %2 = load %1 : $*X
   end_access %1 : $*X
   br bb1
-  
+
 bb1:
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb1, bb2
+  cond_br %cond, bb3, bb2
 
 bb2:
   %4 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*X
@@ -173,6 +173,9 @@ bb2:
   end_access %4 : $*X
   %7 = tuple ()
   return %7 : $()
+
+bb3:
+  br bb1
 }
 
 // public func testIrreducibleGraph() {
@@ -187,15 +190,15 @@ bb2:
 // CHECK: [[BEGIN2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: cond_br {{.*}}, bb5, bb6
 // CHECK: [[BEGIN3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
-// CHECK: cond_br {{.*}}, bb3, bb4
+// CHECK: cond_br {{.*}}, bb7, bb4
 // CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN4]] : $*X
 // CHECK-NEXT: end_access [[BEGIN4]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb1
+// CHECK: cond_br {{.*}}, bb8, bb9
 // CHECK: [[BEGIN5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN5]] : $*X
 // CHECK-NEXT: end_access [[BEGIN5]] : $*X
@@ -214,28 +217,43 @@ bb1:
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond1 = integer_literal $Builtin.Int1, 1
-  cond_br %cond1, bb2, bb3
-  
+  cond_br %cond1, t12, t13
+
 bb2:
   %6 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %7 = load %6 : $*X
   end_access %6 : $*X
   %cond2 = integer_literal $Builtin.Int1, 1
-  cond_br %cond2, bb3, bb4
+  cond_br %cond2, t23, bb4
 
 bb3:
   %8 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %9 = load %8 : $*X
   end_access %8 : $*X
   %cond3 = integer_literal $Builtin.Int1, 1
-  cond_br %cond3, bb2, bb1
-  
+  cond_br %cond3, t32, t31
+
 bb4:
   %10 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %11 = load %10 : $*X
   end_access %10 : $*X
   %12 = tuple ()
   return %12 : $()
+
+t12:
+  br bb2
+
+t13:
+  br bb3
+
+t23:
+  br bb3
+
+t32:
+  br bb2
+
+t31:
+  br bb1
 }
 
 // public func testIrreducibleGraph2() {
@@ -244,7 +262,7 @@ bb4:
 // CHECK-LABEL: sil @testIrreducibleGraph2 : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK-NEXT: br bb1
-// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: cond_br {{.*}}, bb6, bb7
 // CHECK: bb2:
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
@@ -258,7 +276,7 @@ bb4:
 // CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN4]] : $*X
 // CHECK-NEXT: end_access [[BEGIN4]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb5
+// CHECK: cond_br {{.*}}, bb8, bb5
 // CHECK: [[BEGIN5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN5]] : $*X
 // CHECK-NEXT: end_access [[BEGIN5]] : $*X
@@ -271,8 +289,8 @@ bb0:
 
 bb1:
   %cond1 = integer_literal $Builtin.Int1, 1
-  cond_br %cond1, bb2, bb3
-  
+  cond_br %cond1, t12, t13
+
 bb2:
   %6 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %7 = load %6 : $*X
@@ -284,20 +302,29 @@ bb3:
   %9 = load %8 : $*X
   end_access %8 : $*X
   br bb4
-  
+
 bb4:
   %10 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %11 = load %10 : $*X
   end_access %10 : $*X
   %cond2 = integer_literal $Builtin.Int1, 1
-  cond_br %cond2, bb2, bb5
-  
+  cond_br %cond2, t42, bb5
+
 bb5:
   %13 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %14 = load %13 : $*X
   end_access %13 : $*X
   %16 = tuple ()
   return %16 : $()
+
+t12:
+  br bb2
+
+t13:
+  br bb3
+
+t42:
+  br bb2
 }
 
 // public func testDomUnpaired() {
@@ -346,29 +373,32 @@ bb0:
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderSimple'
 sil @testLoopDominatingAccessAdderSimple : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalX: $*X
   br bb1
-  
+
 bb1:
   br bb2
 
 bb2:
   br bb3
-  
+
 bb3:
   %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }
 
 // public func testLoopDominatingAccessAdderBailSimple() {
@@ -382,29 +412,32 @@ bb4:
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderBailSimple'
 sil @testLoopDominatingAccessAdderBailSimple : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalX: $*X
   br bb1
-  
+
 bb1:
   br bb2
 
 bb2:
   br bb3
-  
+
 bb3:
   %4 = begin_access [read] [dynamic] %0 : $*X
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }
 
 // public func testLoopDominatingAccessAdderMulti() {
@@ -422,19 +455,19 @@ bb4:
 // CHECK: [[BEGIN3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderMulti'
 sil @testLoopDominatingAccessAdderMulti : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalX: $*X
   br bb1
-  
+
 bb1:
   br bb2
 
 bb2:
   br bb3
-  
+
 bb3:
   %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %5 = load %4 : $*X
@@ -443,11 +476,14 @@ bb3:
   %7 = load %6 : $*X
   end_access %6 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }
 
 // public func testLoopDominatingAccessAdderMultiChangeKind() {
@@ -469,19 +505,19 @@ bb4:
 // CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN4]] : $*X
 // CHECK-NEXT: end_access [[BEGIN4]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderMultiChangeKind'
 sil @testLoopDominatingAccessAdderMultiChangeKind : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalX: $*X
   br bb1
-  
+
 bb1:
   br bb2
 
 bb2:
   br bb3
-  
+
 bb3:
   %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
   %5 = load %4 : $*X
@@ -493,11 +529,14 @@ bb3:
   %9 = load %8 : $*X
   end_access %8 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }
 
 // public func testBailOnNestedDomWrite() {

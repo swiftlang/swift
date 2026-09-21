@@ -12,9 +12,6 @@ gyb_expand(FloatingPointTypes.swift.gyb FloatingPointTypes.swift
 gyb_expand(IntegerTypes.swift.gyb IntegerTypes.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
-gyb_expand(LegacyInt128.swift.gyb LegacyInt128.swift
-  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
-
 gyb_expand(UnsafeBufferPointer.swift.gyb UnsafeBufferPointer.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
@@ -141,6 +138,19 @@ add_library(swiftCore
   REPL.swift
   Result.swift
   Reverse.swift
+
+  # RigidArray sources
+  RigidArray/RigidArray.swift
+  RigidArray/RigidArray+Append.swift
+  RigidArray/RigidArray+Container.swift
+  RigidArray/RigidArray+Descriptions.swift
+  RigidArray/RigidArray+Equatable.swift
+  RigidArray/RigidArray+Hashable.swift
+  RigidArray/RigidArray+Initializers.swift
+  RigidArray/RigidArray+Insertions.swift
+  RigidArray/RigidArray+Removals.swift
+  RigidArray/RigidArray+Replacements.swift
+
   Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift
@@ -200,7 +210,6 @@ add_library(swiftCore
   Substring.swift
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
-  ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
   UnicodeData.swift
@@ -211,6 +220,19 @@ add_library(swiftCore
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   UnicodeSPI.swift
+
+  # UniqueArray sources
+  UniqueArray/UniqueArray.swift
+  UniqueArray/UniqueArray+Append.swift
+  UniqueArray/UniqueArray+Container.swift
+  UniqueArray/UniqueArray+Descriptions.swift
+  UniqueArray/UniqueArray+Equatable.swift
+  UniqueArray/UniqueArray+Hashable.swift
+  UniqueArray/UniqueArray+Initializers.swift
+  UniqueArray/UniqueArray+Insertions.swift
+  UniqueArray/UniqueArray+Removals.swift
+  UniqueArray/UniqueArray+Replacements.swift
+
   UniqueBox.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
@@ -260,7 +282,6 @@ add_library(swiftCore
   "${CMAKE_CURRENT_BINARY_DIR}/FloatingPointParsing.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/FloatingPointTypes.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/IntegerTypes.swift"
-  "${CMAKE_CURRENT_BINARY_DIR}/LegacyInt128.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeRawBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Tuple.swift")

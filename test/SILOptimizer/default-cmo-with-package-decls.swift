@@ -6,7 +6,6 @@
 // RUN: %target-build-swift -Xfrontend -enable-default-cmo -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -emit-sil -o %t/Main.sil
 // RUN: %FileCheck %s < %t/Main.sil
 
-// REQUIRES: swift_in_compiler
 
 import Module
 import ModuleTBD

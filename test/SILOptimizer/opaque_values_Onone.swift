@@ -132,7 +132,7 @@ func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
 // CHECK:         apply {{%[^,]+}}<(Int, (Value, (Value, (Value, Int), Value)), Int)>({{%[^,]+}}, [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate_with_int3'
 // CHECK-LABEL: sil private @$s19opaque_values_Onone19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), [[IN_ADDR:%[^,]+]] : $*Value):
+// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), [[IN_ADDR:%[^,]+]] : @closureCapture $*Value):
 // CHECK:         [[OUT_1_ADDR:%[^,]+]] = tuple_element_addr [[OUT_ADDR]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), 1
 // CHECK:         [[OUT_1_0_ADDR:%[^,]+]] = tuple_element_addr [[OUT_1_ADDR]] : $*(Value, (Value, (Value, Int), Value)), 0
 // CHECK:         copy_addr [[IN_ADDR]] to [init] [[OUT_1_0_ADDR]]
@@ -180,7 +180,7 @@ func get_a_generic_tuple<This>(ty: This.Type) {
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
 // CHECK:         store [[SRC]] to [[SRC_ADDR]]
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[SRC_ADDR]]
@@ -196,7 +196,7 @@ func castAnyObjectToMeta(_ ao: any AnyObject) -> AnyObject.Type {
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $T
 // CHECK:         copy_addr [[SRC]] to [init] [[SRC_ADDR]]
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[SRC_ADDR]]

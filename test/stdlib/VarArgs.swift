@@ -1,5 +1,6 @@
 // RUN: %target-run-stdlib-swift -parse-stdlib %s | %FileCheck %s
 // REQUIRES: executable_test
+// XFAIL: OS=emscripten
 
 import Swift
 
@@ -26,6 +27,9 @@ runAllTests()
   typealias CGFloat = Double
 #elseif os(WASI)
   import WASILibc
+  typealias CGFloat = Double
+#elseif os(Emscripten)
+  import EmscriptenLibc
   typealias CGFloat = Double
 #elseif canImport(Android)
   import Android

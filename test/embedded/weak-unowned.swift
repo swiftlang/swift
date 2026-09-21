@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-ir %s -wmo
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -verify
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded

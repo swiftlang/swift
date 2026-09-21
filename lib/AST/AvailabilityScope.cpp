@@ -17,16 +17,16 @@
 #include "swift/AST/AvailabilityScope.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -61,6 +61,7 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
   SourceRange range;
   AvailabilityScope *parentContext = nullptr;
   switch (SF->Kind) {
+  case SourceFileKind::SyntheticMacro:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::DefaultArgument: {
     // Look up the parent context in the enclosing file that this file's
@@ -71,9 +72,42 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
     if (auto parentScope = enclosingSF->getAvailabilityScope()) {
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
+
       auto originalNode = SF->getNodeInEnclosingSourceFile();
-      parentContext = parentScope->findMostRefinedSubContext(
-          originalNode.getStartLoc(), Ctx);
+      SourceLoc lookupLoc = originalNode.getStartLoc();
+
+      // For peer, conformance, and extension macros, the expansion is a
+      // sibling of the attached declaration rather than nested inside it.
+      // The expansion should therefore inherit availability from the
+      // enclosing context, not from the attached declaration, so ignore the
+      // scopes that the attached declaration introduces when looking up the
+      // parent scope.
+      ASTNode stopAtNode;
+      if (auto role = SF->getFulfilledMacroRole()) {
+        switch (*role) {
+        case MacroRole::Peer:
+        case MacroRole::Conformance:
+        case MacroRole::Extension:
+          if (auto *attachedDecl = originalNode.dyn_cast<Decl *>())
+            stopAtNode = const_cast<Decl *>(
+                attachedDecl->getConcreteSyntaxDeclForAttributes());
+          break;
+        case MacroRole::Expression:
+        case MacroRole::Declaration:
+        case MacroRole::CodeItem:
+        case MacroRole::Accessor:
+        case MacroRole::MemberAttribute:
+        case MacroRole::Member:
+        case MacroRole::Body:
+        case MacroRole::Preamble:
+          break;
+        }
+      }
+
+      parentContext = lookupLoc.isValid()
+                          ? parentScope->findMostRefinedSubContext(
+                                lookupLoc, Ctx, stopAtNode)
+                          : parentScope;
     }
     break;
   }
@@ -169,6 +203,42 @@ AvailabilityScope *AvailabilityScope::createForWhileStmtBody(
                                      S->getBody()->getSourceRange(), Info);
 }
 
+AvailabilityScope *AvailabilityScope::createForSwitchStmt(
+    ASTContext &Ctx, SwitchStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
+  ASSERT(S);
+  ASSERT(Parent);
+  // Use the brace range so that the subject expression (which sits between
+  // the `switch` keyword and the opening brace) isn't covered by this
+  // scope's source range. The subject is type-checked before the case label
+  // items, so excluding it avoids triggering this scope's lazy expansion
+  // before the patterns are ready.
+  //
+  // Widen the source range to the end of its last token so it contains
+  // child availability scopes that extend their ranges similarly (such as
+  // implicit decl scopes).
+  SourceRange range(S->getLBraceLoc(), S->getRBraceLoc());
+  if (range.End.isValid())
+    range.End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, range.End);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(S, DC), Parent, range, Info);
+}
+
+AvailabilityScope *AvailabilityScope::createForSwitchStmtCaseBody(
+    ASTContext &Ctx, CaseStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
+  ASSERT(S);
+  ASSERT(Parent);
+  // Widen the body source range to the end of its last token so it contains
+  // child availability scopes that extend their ranges similarly (such as
+  // implicit decl scopes).
+  SourceRange range = S->getBody()->getSourceRange();
+  if (range.End.isValid())
+    range.End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, range.End);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(S, DC), Parent, range, Info);
+}
+
 void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {
   bool validSourceRange = Child->getSourceRange().isValid();
   ASSERT(validSourceRange);
@@ -199,16 +269,29 @@ void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {
   Children.insert(iter, Child);
 }
 
-AvailabilityScope *
-AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
+AvailabilityScope *AvailabilityScope::findMostRefinedSubContextImpl(
+    SourceLoc Loc, ASTContext &Ctx,
+    llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack,
+    ASTNode stopAtASTNode) {
   DEBUG_ASSERT(Loc.isValid());
 
   if (SrcRange.isValid() && !Ctx.SourceMgr.containsTokenLoc(SrcRange, Loc))
     return nullptr;
 
+  // If this scope was introduced by the node that the caller is asking about,
+  // treat it as not containing the location. The caller wants the availability
+  // of the position that the node appears in, and expanding this scope may
+  // require querying the availability that the node introduces, which may be
+  // what triggered this lookup in the first place.
+  if (stopAtASTNode && getASTNode() == stopAtASTNode)
+    return nullptr;
+
   (void)evaluateOrDefault(Ctx.evaluator,
                           ExpandChildAvailabilityScopesRequest{this}, {});
   DEBUG_ASSERT(!getNeedsExpansion());
+
+  if (ScopeStack)
+    ScopeStack->push_back(this);
 
   // Do a binary search to find the first child with a source range that
   // ends after the given location.
@@ -221,13 +304,28 @@ AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
   // Check whether the matching child or any of its descendants contain
   // the given location.
   if (iter != Children.end()) {
-    if (auto found = (*iter)->findMostRefinedSubContext(Loc, Ctx))
+    if (auto found = (*iter)->findMostRefinedSubContextImpl(
+            Loc, Ctx, ScopeStack, stopAtASTNode))
       return found;
   }
 
   // The location is in this context's range but not in any child's, so this
   // context must be the innermost context.
   return this;
+}
+
+AvailabilityScope *
+AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx,
+                                             ASTNode stopAtASTNode) {
+  return findMostRefinedSubContextImpl(Loc, Ctx, /*ScopeStack=*/nullptr,
+                                       stopAtASTNode);
+}
+
+AvailabilityScope *AvailabilityScope::findMostRefinedSubContext(
+    SourceLoc Loc, ASTContext &Ctx,
+    llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack,
+    ASTNode stopAtASTNode) {
+  return findMostRefinedSubContextImpl(Loc, Ctx, &ScopeStack, stopAtASTNode);
 }
 
 void AvailabilityScope::dump(SourceManager &SrcMgr) const {
@@ -237,6 +335,61 @@ void AvailabilityScope::dump(SourceManager &SrcMgr) const {
 void AvailabilityScope::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
   print(OS, SrcMgr, 0);
   OS << '\n';
+}
+
+ASTNode AvailabilityScope::getASTNode() const {
+  switch (getReason()) {
+  case Reason::Root:
+    // A source file cannot be represented as an `ASTNode`.
+    return ASTNode();
+
+  case Reason::Decl:
+  case Reason::DeclImplicit:
+    return Node.getAsDecl();
+
+  case Reason::IfStmtThenBranch:
+  case Reason::IfStmtElseBranch:
+    return static_cast<Stmt *>(Node.getAsIfStmt());
+
+  case Reason::ConditionFollowingAvailabilityQuery:
+    return ASTNode();
+
+  case Reason::GuardStmtFallthrough:
+  case Reason::GuardStmtElseBranch:
+    return static_cast<Stmt *>(Node.getAsGuardStmt());
+
+  case Reason::WhileStmtBody:
+    return static_cast<Stmt *>(Node.getAsWhileStmt());
+
+  case Reason::SwitchStmt:
+    return static_cast<Stmt *>(Node.getAsSwitchStmt());
+
+  case Reason::SwitchStmtCaseBody:
+    return static_cast<Stmt *>(Node.getAsCaseStmt());
+  }
+
+  llvm_unreachable("Unhandled Reason in switch.");
+}
+
+bool AvailabilityScope::isIntroducedByStmt() const {
+  switch (getReason()) {
+  case Reason::Root:
+  case Reason::Decl:
+  case Reason::DeclImplicit:
+    return false;
+
+  case Reason::IfStmtThenBranch:
+  case Reason::IfStmtElseBranch:
+  case Reason::ConditionFollowingAvailabilityQuery:
+  case Reason::GuardStmtFallthrough:
+  case Reason::GuardStmtElseBranch:
+  case Reason::WhileStmtBody:
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
+    return true;
+  }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }
 
 SourceLoc AvailabilityScope::getIntroductionLoc() const {
@@ -258,6 +411,12 @@ SourceLoc AvailabilityScope::getIntroductionLoc() const {
 
   case Reason::WhileStmtBody:
     return Node.getAsWhileStmt()->getStartLoc();
+
+  case Reason::SwitchStmt:
+    return Node.getAsSwitchStmt()->getStartLoc();
+
+  case Reason::SwitchStmtCaseBody:
+    return Node.getAsCaseStmt()->getStartLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -347,6 +506,8 @@ SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
         Node.getAsWhileStmt()->getCond(), Node.getDeclContext(), Domain,
         Version);
 
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
   case Reason::Root:
   case Reason::DeclImplicit:
     return SourceRange();
@@ -360,13 +521,15 @@ AvailabilityScope::getExplicitAvailabilityRange(AvailabilityDomain domain,
                                                 ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::Root:
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
     return std::nullopt;
 
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
-    if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
-            decl, AvailabilityContext::forAlwaysAvailable(ctx), domain))
-      return constraint->getAttr().getIntroducedRange(ctx);
+    if (auto restriction = AvailabilityContext::forAlwaysAvailable(ctx)
+                               .restrictionForDeclInDomain(decl, domain))
+      return restriction->getAttr().getIntroducedRange(ctx);
 
     return std::nullopt;
   }
@@ -478,6 +641,12 @@ StringRef AvailabilityScope::getReasonName(Reason R) {
 
   case Reason::WhileStmtBody:
     return "while_body";
+
+  case Reason::SwitchStmt:
+    return "switch_stmt";
+
+  case Reason::SwitchStmtCaseBody:
+    return "switch_case_body";
   }
 
   llvm_unreachable("Unhandled Reason in switch.");

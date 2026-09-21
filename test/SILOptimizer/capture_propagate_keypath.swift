@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend  -primary-file %s -swift-version 6 -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
+// RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil -enable-sil-opaque-values | %FileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -swift-version 6 -O -sil-verify-all -module-name=test -emit-sil -enable-sil-opaque-values | %FileCheck %s
+
 // Also do an end-to-end test to check if the generated code is correct.
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out

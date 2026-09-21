@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && !os(WASI)
+#if !$Embedded && !os(WASI) && !os(Emscripten)
 
 import Swift
 
@@ -169,4 +169,4 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
                                UnownedJob(job))
 }
 
-#endif // !$Embedded && !os(WASI)
+#endif // !$Embedded && !os(WASI) && !os(Emscripten)

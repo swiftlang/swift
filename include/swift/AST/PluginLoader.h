@@ -14,10 +14,9 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 
@@ -32,6 +31,11 @@ public:
   struct PluginEntry {
     StringRef libraryPath;
     StringRef executablePath;
+
+    /// The paths as passed to the frontend, before the loader unmapped them to
+    /// load the plugin from disk. Empty if no prefix mapping is in effect.
+    StringRef prefixMappedLibraryPath;
+    StringRef prefixMappedExecutablePath;
   };
 
 private:

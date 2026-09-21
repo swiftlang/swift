@@ -318,6 +318,12 @@ public:
 
 BridgedOStream Bridged_dbgs();
 
+/// Returns true if LLVM debug output is currently enabled
+bool Bridged_isDebugFlagEnabled();
+
+/// Returns true if the given debug type is currently active.
+bool Bridged_isCurrentDebugType(BridgedStringRef type);
+
 //===----------------------------------------------------------------------===//
 // MARK: std::vector<BridgedCharSourceRange>
 //===----------------------------------------------------------------------===//
@@ -386,6 +392,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
   BridgedGeneratedSourceFileKindPrettyPrinted,
   BridgedGeneratedSourceFileKindDefaultArgument,
   BridgedGeneratedSourceFileKindAttributeFromClang,
+  BridgedGeneratedSourceFileKindSyntheticMacro,
 
   BridgedGeneratedSourceFileKindNone,
 };

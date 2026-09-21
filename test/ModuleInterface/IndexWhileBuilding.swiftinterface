@@ -12,7 +12,7 @@ import Swift
 public struct MyStruct {
   // CHECK:      [[@LINE-1]]:15 | struct/Swift | s:18IndexWhileBuilding8MyStructV | Def
   public init()
-  // CHECK:      [[@LINE-1]]:10 | constructor/Swift | s:18IndexWhileBuilding8MyStructVACycfc | Def,RelChild
+  // CHECK:      [[@LINE-1]]:10 | constructor(public)/Swift | s:18IndexWhileBuilding8MyStructVACycfc | Def,RelChild
   // CHECK-NEXT:    RelChild | s:18IndexWhileBuilding8MyStructV
 }
 
@@ -27,7 +27,7 @@ public struct MyStruct {
   // CHECK-NEXT:    RelChild | s:18IndexWhileBuilding6myFuncyyF
   // CHECK:      [[@LINE-7]]:11 | struct/Swift | s:18IndexWhileBuilding8MyStructV | Ref,RelCont
   // CHECK-NEXT:    RelCont | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp
-  // CHECK:      [[@LINE-9]]:11 | constructor/Swift | s:18IndexWhileBuilding8MyStructVACycfc | Ref,Call,RelCall,RelCont
+  // CHECK:      [[@LINE-9]]:11 | constructor(public)/Swift | s:18IndexWhileBuilding8MyStructVACycfc | Ref,Call,RelCall,RelCont
   // CHECK-NEXT:    RelCont | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp
   // CHECK-NEXT:    RelCall | s:18IndexWhileBuilding6myFuncyyF
   _ = s

@@ -269,11 +269,6 @@ BridgedDeclObj BridgedPassContext::getModuleDecl() const {
 
 // SIL modifications
 
-bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
-  return swift::eliminateDeadAllocations(f.getFunction(),
-                                         this->getDomTree().di);
-}
-
 OptionalBridgedFunction BridgedPassContext::getFirstFunctionInModule() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   if (mod->getFunctions().empty())
@@ -371,6 +366,13 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
   swift::SILPassManager *pm = invocation->getPassManager();
   return pm->continueWithNextSubpassRun(
       inst.unbridged(), invocation->getFunction(), invocation->getTransform());
+}
+
+bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedValue value) const {
+  swift::SILPassManager *pm = invocation->getPassManager();
+  swift::SILValue silValue = value.getSILValue();
+  return pm->continueWithNextSubpassRun(
+      silValue, invocation->getFunction(), invocation->getTransform());
 }
 
 BridgedContext BridgedPassContext::initializeNestedPassContext(BridgedFunction newFunction) const {

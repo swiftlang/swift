@@ -1,0 +1,28 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+// REQUIRES: asserts
+
+// The SIL verifier rejects a `debug_value undef, name "$error"` in a
+// function whose SIL type has no error result. `$error` is a placeholder
+// for the function's error-result slot; IRGen's `visitDebugValueInst`
+// reads `getErrorResult()` on it unconditionally.
+//
+// An inlined occurrence (`inlined_at` debug scope) is allowed — IRGen
+// skips emission in that case, and this SIL shape can legitimately
+// persist after a throwing function is inlined into a non-throwing one.
+
+// CHECK: SIL verification failed: '$error' debug_value may only appear in a function whose SIL type has an error result
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @stray_error_debug_value : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $any Error, var, name "$error", argno 1
+  %0 = tuple ()
+  return %0 : $()
+}

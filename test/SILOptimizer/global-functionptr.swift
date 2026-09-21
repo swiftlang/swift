@@ -16,7 +16,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 internal protocol P {
   init()

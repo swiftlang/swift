@@ -14,9 +14,15 @@ public func adder<each T: BinaryInteger>(xs: repeat each T) -> (repeat each T) {
 // CHECK: debug_value %0, let, name "x", {{.*}} scope [[CALL_ADDER_FUNCTION]]
 // CHECK: debug_value %1, let, name "y", {{.*}} scope [[CALL_ADDER_FUNCTION]]
 // CHECK: debug_value %2, let, name "z", {{.*}} scope [[CALL_ADDER_FUNCTION]]
-// CHECK: debug_value %0, let, name "xs", argno 1, type $(Int32, Int16, Int8), expr op_tuple_fragment:$(Int32, Int16, Int8):0, {{.*}} scope [[INLINED_ADDER]]
-// CHECK: debug_value %1, let, name "xs", argno 1, type $(Int32, Int16, Int8), expr op_tuple_fragment:$(Int32, Int16, Int8):1, {{.*}} scope [[INLINED_ADDER]]
-// CHECK: debug_value %2, let, name "xs", argno 1, type $(Int32, Int16, Int8), expr op_tuple_fragment:$(Int32, Int16, Int8):2, {{.*}} scope [[INLINED_ADDER]]
+// CHECK: [[S0:%.*]] = struct_extract %0
+
+// TODO: those debug_value instructions are removed by LegacyDeadObjectElimination. Remove the "-NOT" once we have removed LegacyDeadObjectElimination.
+
+// CHECK-NOT: debug_value [[S0]], let, name "xs", argno 1, type $(Int32, Int16, Int8), expr op_tuple_fragment:$(Int32, Int16, Int8):0:op_fragment:#Int32._value, {{.*}} scope [[INLINED_ADDER]]
+// CHECK: [[S1:%.*]] = struct_extract %1
+// CHECK-NOT: debug_value [[S1]], let, name "xs", argno 1, type $(Int32, Int16, Int8), expr op_tuple_fragment:$(Int32, Int16, Int8):1:op_fragment:#Int16._value, {{.*}} scope [[INLINED_ADDER]]
+// CHECK: [[S2:%.*]] = struct_extract %2
+// CHECK-NOT: debug_value [[S2]], let, name "xs", argno 1, type $(Int32, Int16, Int8), expr op_tuple_fragment:$(Int32, Int16, Int8):2:op_fragment:#Int8._value, {{.*}} scope [[INLINED_ADDER]]
 // CHECK: } // end sil function '$s1a9callAdder1x1y1zs5Int32V_s5Int16Vs4Int8VtAG_AiKtF'
 public func callAdder(x: Int32, y: Int16, z: Int8) -> (Int32, Int16, Int8) {
   adder(xs: x, y, z)

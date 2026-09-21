@@ -105,6 +105,12 @@ public:
                                 std::string Name)
       : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
+      if (Size < Self::getMinimumRecordSize()) {
+        // The section is too small to contain even a record header. Treat the
+        // section as empty.
+        this->Size = 0;
+        return;
+      }
       auto NextRecord = this->operator*();
       if (!NextRecord) {
         // NULL record pointer, don't attempt to proceed. Setting size to 0 will
@@ -113,13 +119,22 @@ public:
         return;
       }
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
-      if (NextSize > Size) {
+      if (!NextSize) {
+        std::cerr << "!!! Reflection record has an invalid record stride\n"
+                  << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        // Set this iterator equal to the end. This section is effectively
+        // empty.
+        this->Size = 0;
+        return;
+      }
+      if (*NextSize > Size) {
         std::cerr
             << "!!! Reflection section too small to contain first record\n"
             << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Section size: " << Size
-                  << ", size of first record: " << NextSize << std::endl;
+                  << ", size of first record: " << *NextSize << std::endl;
         // Set this iterator equal to the end. This section is effectively
         // empty.
         this->Size = 0;
@@ -136,13 +151,39 @@ public:
   Self &operator++() {
     auto CurRecord = this->operator*();
     auto CurSize = Self::getCurrentRecordSize(CurRecord);
-    Cur = Cur.atByteOffset(CurSize);
-    Size -= CurSize;
+    if (!CurSize || *CurSize > Size) {
+      // Every record is validated before it becomes the current one, so this
+      // should not happen. Check anyway: advancing by an unvalidated size would
+      // move Cur outside the section and underflow Size.
+      assert(false && "iterating an unvalidated reflection record size");
+      std::cerr << "!!! Reflection record has an invalid record stride\n"
+                << std::endl;
+      std::cerr << "Section Type: " << Name << std::endl;
+      Size = 0;
+      return asImpl();
+    }
+    Cur = Cur.atByteOffset(*CurSize);
+    Size -= *CurSize;
 
     if (Size > 0) {
+      if (Size < Self::getMinimumRecordSize()) {
+        // The trailing bytes are too small to contain even a record header, so
+        // end iteration here.
+        Size = 0;
+        return asImpl();
+      }
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
-      if (NextSize > Size) {
+      if (!NextSize) {
+        std::cerr << "!!! Reflection record has an invalid record stride\n"
+                  << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        std::cerr << "Offset in section: " << (OriginalSize - Size)
+                  << std::endl;
+        Size = 0;
+        return asImpl();
+      }
+      if (*NextSize > Size) {
         int offset = (int)(OriginalSize - Size);
         std::cerr << "!!! Reflection section too small to contain next record\n"
                   << std::endl;
@@ -150,7 +191,7 @@ public:
         std::cerr << "Remaining section size: " << Size
                   << ", total section size: " << OriginalSize
                   << ", offset in section: " << offset
-                  << ", size of next record: " << NextSize << std::endl;
+                  << ", size of next record: " << *NextSize << std::endl;
         const uint8_t *p =
             reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
         std::cerr << "Last bytes of previous record: ";
@@ -179,6 +220,13 @@ public:
   }
 
   bool operator!=(const Self &other) const { return !(*this == other); }
+
+  // The minimum number of bytes that must remain in the section for the record
+  // header to be safely read by getCurrentRecordSize() and operator*(). The
+  // default is the full descriptor size; iterators whose descriptor ends in a
+  // flexible array member (so its sizeof is smaller than its readable header)
+  // override this.
+  static uint64_t getMinimumRecordSize() { return sizeof(Descriptor); }
 };
 
 class FieldDescriptorIterator
@@ -188,8 +236,14 @@ public:
   FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
-    return sizeof(FieldDescriptor) + FR->NumFields * FR->FieldRecordSize;
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
+    // We only ever emit FieldRecordSize equal to sizeof(FieldRecord). If it's
+    // anything else, consider it to be bad data and ignore it.
+    if (FR->FieldRecordSize != sizeof(FieldRecord))
+      return std::nullopt;
+    return sizeof(FieldDescriptor) +
+           (uint64_t)FR->NumFields * (uint64_t)FR->FieldRecordSize;
   }
 };
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
@@ -201,10 +255,16 @@ public:
   AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType") {}
 
-  static uint64_t
+  static std::optional<uint64_t>
   getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR) {
+    // We only ever emit AssociatedTypeRecordSize equal to
+    // sizeof(AssociatedTypeRecord). If it's anything else, consider it to be
+    // bad data and ignore it.
+    if (ATR->AssociatedTypeRecordSize != sizeof(AssociatedTypeRecord))
+      return std::nullopt;
     return sizeof(AssociatedTypeDescriptor) +
-           ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
+           (uint64_t)ATR->NumAssociatedTypes *
+               (uint64_t)ATR->AssociatedTypeRecordSize;
   }
 };
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
@@ -216,7 +276,8 @@ public:
   BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
     return sizeof(BuiltinTypeDescriptor);
   }
 };
@@ -229,10 +290,12 @@ public:
   CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+    // Use 64-bit arithmetic to avoid overflowing with extremely large values.
     return sizeof(CaptureDescriptor) +
-           CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
-           CR->NumMetadataSources * sizeof(MetadataSourceRecord);
+           (uint64_t)CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
+           (uint64_t)CR->NumMetadataSources * sizeof(MetadataSourceRecord);
   }
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
@@ -244,9 +307,16 @@ public:
   MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum") {}
 
-  static uint64_t
+  static std::optional<uint64_t>
   getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
     return MPER->getSizeInBytes();
+  }
+
+  static uint64_t getMinimumRecordSize() {
+    // MultiPayloadEnumDescriptor ends in a flexible `contents` array, so its
+    // sizeof only covers TypeName. getSizeInBytes() reads contents[0], so we
+    // need room for TypeName plus that first content word.
+    return sizeof(MultiPayloadEnumDescriptor) + sizeof(uint32_t);
   }
 };
 using MultiPayloadEnumSection =
@@ -282,13 +352,15 @@ struct FieldTypeInfo {
   const TypeRef *TR;
   bool Indirect;
   bool Generic;
+  bool Artificial;
 
   FieldTypeInfo()
-      : Name(""), Value(0), TR(nullptr), Indirect(false), Generic(false) {}
+      : Name(""), Value(0), TR(nullptr), Indirect(false), Generic(false),
+        Artificial(false) {}
   FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR,
-                bool Indirect, bool Generic)
-      : Name(Name), Value(Value), TR(TR), Indirect(Indirect), Generic(Generic) {
-  }
+                bool Indirect, bool Generic, bool Artificial = false)
+      : Name(Name), Value(Value), TR(TR), Indirect(Indirect), Generic(Generic),
+        Artificial(Artificial) {}
 
   static FieldTypeInfo forEmptyCase(std::string Name, int Value) {
     return FieldTypeInfo(Name, Value, nullptr, false, false);
@@ -406,11 +478,11 @@ public:
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
-  Mangle::ManglingFlavor getManglingFlavor() {
-    return Mangle::ManglingFlavor::Default;
-  }
+  Mangle::ManglingFlavor getManglingFlavor() { return Flavor; }
 
 private:
+  Mangle::ManglingFlavor Flavor;
+
   Demangle::Demangler Dem;
 
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
@@ -770,7 +842,8 @@ public:
                                                           PointerSize>
           conformanceReader(
               Builder.OpaqueByteReader, Builder.OpaqueStringReader,
-              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver);
+              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver,
+              Builder.getManglingFlavor());
       for (const auto &section : ReflectionInfos) {
         auto ConformanceBegin = section.Conformance.startAddress();
         auto ConformanceEnd = section.Conformance.endAddress();
@@ -952,6 +1025,14 @@ public:
 
   const TypeRef *createIntegerType(intptr_t value) {
     return IntegerTypeRef::create(*this, value);
+  }
+
+  // TypeRefs model generic values as distinct IntegerTypeRefs, so a value
+  // argument is never misinterpreted as a type; the demangler's value/type
+  // consistency check is unnecessary here.
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(const BuiltTypeDecl &, unsigned numArgs) {
+    return {};
   }
 
   const TypeRef *createNegativeIntegerType(intptr_t value) {
@@ -1500,7 +1581,10 @@ public:
 
   // Only for testing. A TypeRefBuilder built this way will not be able to
   // decode records in remote memory.
-  explicit TypeRefBuilder(ForTesting_t) : TC(*this), RDF(*this, nullptr) {}
+  explicit TypeRefBuilder(
+      ForTesting_t,
+      Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(flavor), TC(*this), RDF(*this, nullptr) {}
 
 private:
   /// Indexes of Reflection Infos we've already processed.
@@ -1566,6 +1650,10 @@ private:
   RefDemangler TypeRefDemangler;
   UnderlyingTypeReader OpaqueUnderlyingTypeReader;
 
+  /// Reason the most recent TypeRefDemangler run produced a null node.
+  remote::DemangleFailureReason LastTypeRefDemangleFailure =
+      remote::DemangleFailureReason::None;
+
   // Opaque fields captured from the MetadataReader's MemoryReader
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
@@ -1580,14 +1668,17 @@ public:
   template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr,
-                 DescriptorFinder *externalDescriptorFinder = nullptr)
-      : TC(*this), EDF(externalDescriptorFinder), RDF(*this, externalCache),
+                 DescriptorFinder *externalDescriptorFinder = nullptr,
+                 Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(flavor), TC(*this), EDF(externalDescriptorFinder),
+        RDF(*this, externalCache),
         PointerSize(sizeof(typename Runtime::StoredPointer)),
         TypeRefDemangler([this, &reader](RemoteRef<char> string,
                                          bool useOpaqueTypeSymbolicReferences)
                              -> Demangle::Node * {
           return reader.demangle(string, remote::MangledNameKind::Type, Dem,
-                                 useOpaqueTypeSymbolicReferences);
+                                 useOpaqueTypeSymbolicReferences,
+                                 &LastTypeRefDemangleFailure);
         }),
         OpaqueUnderlyingTypeReader(
             [&reader](remote::RemoteAddress descriptorAddr,
@@ -1669,6 +1760,12 @@ public:
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
     return TypeRefDemangler(string, useOpaqueTypeSymbolicReferences);
+  }
+
+  /// Reason the most recent demangleTypeRef() produced a null node (or None).
+  /// Valid only immediately after that call.
+  remote::DemangleFailureReason getLastDemangleFailure() const {
+    return LastTypeRefDemangleFailure;
   }
 
   TypeConverter &getTypeConverter() { return TC; }
@@ -1986,6 +2083,8 @@ private:
         remote::RemoteAddress protocolDescriptorAddress) {
       std::optional<std::string> protocolName =
           readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+      if (!protocolName.has_value())
+        return std::nullopt;
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(
@@ -2007,15 +2106,19 @@ private:
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
     }
 
-    remote::RemoteAddress getParentDescriptorAddress(
+    std::optional<remote::RemoteAddress> getParentDescriptorAddress(
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor) {
       auto parentOffsetAddress = contextDescriptorAddress.applyRelativeOffset(
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes =
+      auto parentOffsetBytes =
           OpaqueByteReader(parentOffsetAddress, sizeof(uint32_t));
-      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      if (!parentOffsetBytes.get()) {
+        Error = "Failed to read parent offset in a context descriptor.";
+        return std::nullopt;
+      }
+      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
       auto parentTargetAddress =
           parentOffsetAddress.applyRelativeOffset(*parentFieldOffset);
       return parentTargetAddress;
@@ -2071,9 +2174,19 @@ private:
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor,
-        std::vector<ContextNameInfo> &chain) {
-      const auto parentDescriptorAddress = getParentDescriptorAddress(
+        std::vector<ContextNameInfo> &chain,
+        int recursion_limit = remote::defaultTypeRecursionLimit) {
+      if (recursion_limit <= 0) {
+        Error = "Parent context chain is too deep.";
+        return;
+      }
+
+      const auto optionalParentDescriptorAddress = getParentDescriptorAddress(
           contextDescriptorAddress, contextDescriptor);
+      if (!optionalParentDescriptorAddress.has_value())
+        return;
+      const auto parentDescriptorAddress =
+          optionalParentDescriptorAddress.value();
 
       auto addParentNameAndRecurse =
           [&](remote::RemoteAddress parentContextDescriptorAddress,
@@ -2096,7 +2209,7 @@ private:
         chain.push_back(parentNameInfo.value());
         if (!isModuleDescriptor(parentDescriptor)) {
           getParentContextChain(parentContextDescriptorAddress,
-                                parentDescriptor, chain);
+                                parentDescriptor, chain, recursion_limit - 1);
         }
       };
 
@@ -2109,9 +2222,17 @@ private:
             Demangle::Context Ctx;
             auto demangledRoot =
                 Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-            assert(demangledRoot->getKind() == Node::Kind::Global);
-            std::string nodeName =
-                nodeToString(demangledRoot->getChild(0)->getChild(0));
+            if (!demangledRoot ||
+                demangledRoot->getKind() != Node::Kind::Global) {
+              Error = "Failed to demangle indirect parent context symbol.";
+              return;
+            }
+            auto globalChild = demangledRoot->getChild(0);
+            if (!globalChild || globalChild->getNumChildren() < 1) {
+              Error = "Failed to demangle indirect parent context symbol.";
+              return;
+            }
+            std::string nodeName = nodeToString(globalChild->getChild(0));
             chain.push_back(
                 ContextNameInfo{nodeName, adjustedParentTargetAddress, false});
           } else {
@@ -2204,14 +2325,16 @@ private:
     // Given that at a given offset from the opaque type descriptor base there
     // is an offset to a TypeRef string, read it.
     auto readRequirementTypeRefAddress =
-        [&](uintptr_t offsetFromOpaqueDescBase,
-            uintptr_t requirementAddress) -> remote::RemoteAddress {
+        [&](uintptr_t offsetFromOpaqueDescBase, uintptr_t requirementAddress)
+        -> std::optional<remote::RemoteAddress> {
       std::string typeRefString = "";
       auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
                                (uintptr_t)opaqueTypeDescriptor;
       auto fieldOffsetAddress = opaqueTypeDescriptorAddress + fieldOffsetOffset;
       auto fieldOffsetBytes =
           OpaqueByteReader(fieldOffsetAddress, sizeof(uint32_t));
+      if (!fieldOffsetBytes.get())
+        return std::nullopt;
       auto fieldOffset = (const int32_t *)fieldOffsetBytes.get();
       auto fieldAddress = fieldOffsetAddress.applyRelativeOffset(*fieldOffset);
       return fieldAddress;
@@ -2242,19 +2365,25 @@ private:
         auto conformanceRequirementProtocolName =
             nameReader.readFullyQualifiedProtocolName(
                 protocolDescriptorAddress);
+        if (!conformanceRequirementProtocolName.has_value())
+          continue;
         protocolRequirements.push_back(*conformanceRequirementProtocolName);
       }
       if (req.getKind() == GenericRequirementKind::SameType) {
         // Read Param Name
         auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
                                                           (uintptr_t)(&req));
-        std::string demangledParamName =
-            nodeToString(demangleTypeRef(RDF.readTypeRef(paramAddress)));
+        if (!paramAddress.has_value())
+          continue;
+        std::string demangledParamName = nodeToString(
+            demangleTypeRef(RDF.readTypeRef(paramAddress.value())));
 
         // Read the substituted Type Name
         auto typeAddress = readRequirementTypeRefAddress(
             req.getSameTypeNameOffset(), (uintptr_t)(&req));
-        auto typeTypeRef = RDF.readTypeRef(typeAddress);
+        if (!typeAddress.has_value())
+          continue;
+        auto typeTypeRef = RDF.readTypeRef(typeAddress.value());
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;
@@ -2282,18 +2411,22 @@ private:
     std::string Error;
     PointerReader OpaquePointerReader;
     ByteReader OpaqueByteReader;
+    StringReader OpaqueStringReader;
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
     QualifiedContextNameReader<ObjCInteropKind, PointerSize> NameReader;
+    Mangle::ManglingFlavor Flavor;
 
     ProtocolConformanceDescriptorReader(
         ByteReader byteReader, StringReader stringReader,
         PointerReader pointerReader,
-        DynamicSymbolResolver dynamicSymbolResolver)
+        DynamicSymbolResolver dynamicSymbolResolver,
+        Mangle::ManglingFlavor flavor)
         : Error(""), OpaquePointerReader(pointerReader),
-          OpaqueByteReader(byteReader),
+          OpaqueByteReader(byteReader), OpaqueStringReader(stringReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver),
           NameReader(byteReader, stringReader, pointerReader,
-                     dynamicSymbolResolver) {}
+                     dynamicSymbolResolver),
+          Flavor(flavor) {}
 
     /// Extract conforming type's name from a Conformance Descriptor
     /// Returns a pair of (mangledTypeName, fullyQualifiedTypeName)
@@ -2308,7 +2441,29 @@ private:
       // return class name
       if (conformanceDescriptor.getTypeKind() ==
           TypeReferenceKind::DirectObjCClassName) {
-        auto className = conformanceDescriptor.getDirectObjCClassName();
+        // The class name is a RelativeDirectPointer stored in the descriptor's
+        // TypeRef field. We only hold a local copy of the descriptor, so we
+        // must not resolve that relative pointer in place (getDirectObjCClassName
+        // would resolve the stored offset against our local buffer and read out
+        // of bounds). Instead re-derive the field's remote address and issue a
+        // bounded read, the same way the type-descriptor kinds below do.
+        auto nameFieldAddress = conformanceDescriptorAddress.applyRelativeOffset(
+            (int32_t)conformanceDescriptor.getTypeRefDescriptorOffset());
+        auto nameOffsetBytes =
+            OpaqueByteReader(nameFieldAddress, sizeof(int32_t));
+        if (!nameOffsetBytes.get()) {
+          Error = "Failed to read direct ObjC class name field in conformance "
+                  "descriptor.";
+          return std::nullopt;
+        }
+        auto nameOffset = (const int32_t *)nameOffsetBytes.get();
+        auto nameAddress = nameFieldAddress.applyRelativeOffset(*nameOffset);
+        std::string className;
+        if (!OpaqueStringReader(nameAddress, className)) {
+          Error = "Failed to read direct ObjC class name in conformance "
+                  "descriptor.";
+          return std::nullopt;
+        }
         typeName = MANGLING_MODULE_OBJC.str() + std::string(".") + className;
         return std::make_pair(mangledTypeName, typeName);
       }
@@ -2346,15 +2501,23 @@ private:
           Demangle::Context Ctx;
           auto demangledRoot =
               Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-          assert(demangledRoot->getKind() == Node::Kind::Global);
+          // The symbol name comes from the inspected image and may not
+          // demangle to the expected shape. Guard every dereference rather
+          // than relying on the asserts, which are compiled out in release
+          // builds.
+          if (!demangledRoot || demangledRoot->getKind() != Node::Kind::Global)
+            return std::nullopt;
           auto nomTypeDescriptorRoot = demangledRoot->getChild(0);
-          assert(nomTypeDescriptorRoot->getKind() ==
-                 Node::Kind::NominalTypeDescriptor);
+          if (!nomTypeDescriptorRoot || nomTypeDescriptorRoot->getKind() !=
+                                            Node::Kind::NominalTypeDescriptor)
+            return std::nullopt;
           auto typeRoot = nomTypeDescriptorRoot->getChild(0);
+          if (!typeRoot)
+            return std::nullopt;
           typeName = nodeToString(typeRoot);
 
           auto typeMangling =
-              Demangle::mangleNode(typeRoot, Mangle::ManglingFlavor::Default);
+              Demangle::mangleNode(typeRoot, Flavor);
           if (!typeMangling.isSuccess())
             mangledTypeName = "";
           else

@@ -54,7 +54,7 @@ extension undeclared { // expected-error{{cannot find type 'undeclared' in scope
   @_dynamicReplacement(for: property)
   var replacement_property: Int { return 2 }
 
-  @_dynamicReplacement(for: func)
+  @_dynamicReplacement(for: func) // expected-error {{replaced function 'func' could not be found}}
   func func2() -> Int { return 2 }
 }
 

@@ -22,9 +22,9 @@
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/ScopedAddressUtils.h"
@@ -207,7 +207,7 @@ GuaranteedOwnershipExtension::checkBorrowExtension(
   assert(guaranteedLiveness.empty());
   borrow.computeTransitiveLiveness(guaranteedLiveness);
 
-  if (guaranteedLiveness.areUsesWithinBoundary(newUses, &deBlocks))
+  if (guaranteedLiveness.areUsesWithinBoundary(newUses))
     return Valid; // reuse the borrow scope as-is
 
   beginBorrow = dyn_cast<BeginBorrowInst>(borrow.value);
@@ -254,7 +254,7 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
       ownedLifetime.updateForUse(user, true);
     }
   }
-  if (ownedLifetime.areUsesWithinBoundary(newUses, &deBlocks))
+  if (ownedLifetime.areUsesWithinBoundary(newUses))
     return Valid;
 
   return ExtendLifetime; // Can't cover newUses without destroy sinking.
@@ -288,6 +288,54 @@ void GuaranteedOwnershipExtension::transform(Status status) {
 //                          Utility Helper Functions
 //===----------------------------------------------------------------------===//
 
+/// Whether a destroy_value, which is created to compensate for deleting the
+/// consuming operand \p op, should be marked [dead_end].
+///
+/// If `op`'s user forwards ownership, the new destroy_value takes over the role
+/// of the destroys which ended the forwarded lifetime. Therefore it must only be
+/// a "meaningful" destroy - one which is guaranteed to run the deinitializer -
+/// if one of those destroys was meaningful, too. Otherwise the deinitializer was
+/// never guaranteed to run and earlier optimizations may have left the value
+/// only partially initialized. Running its deinit would then be a miscompile.
+static IsDeadEnd_t isDeadEndCleanup(Operand *op) {
+  ValueWorklist worklist(op->getUser()->getFunction());
+
+  // Pushes all values which take over the forwarded ownership of \p inst,
+  // which also includes the block arguments of forwarding terminators, like
+  // `switch_enum`.
+  // Returns false if \p inst doesn't forward ownership.
+  auto pushForwardedValues = [&](SILInstruction *inst) {
+    ForwardingOperation forwarding(inst);
+    if (!forwarding)
+      return false;
+    return forwarding.visitForwardedValues([&](SILValue value) {
+      worklist.pushIfNotVisited(value);
+      return true;
+    });
+  };
+
+  if (!pushForwardedValues(op->getUser()))
+    return IsntDeadEnd;
+
+  bool foundDeadEndDestroy = false;
+  while (SILValue value = worklist.pop()) {
+    for (Operand *use : value->getUses()) {
+      if (!use->isLifetimeEnding())
+        continue;
+      if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
+        if (!dvi->isDeadEnd())
+          return IsntDeadEnd;
+        foundDeadEndDestroy = true;
+        continue;
+      }
+      // Follow forwarded lifetimes.
+      if (!pushForwardedValues(use->getUser()))
+        return IsntDeadEnd;
+    }
+  }
+  return foundDeadEndDestroy ? IsDeadEnd : IsntDeadEnd;
+}
+
 static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
                                           InstModCallbacks &callbacks) {
   SILBuilderWithScope builder(oldValue);
@@ -300,7 +348,8 @@ static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
     case OwnershipKind::Any:
       llvm_unreachable("Invalid ownership for value");
     case OwnershipKind::Owned: {
-      auto *dvi = builder.createDestroyValue(oldValue->getLoc(), op.get());
+      auto *dvi = builder.createDestroyValue(oldValue->getLoc(), op.get(),
+                                             isDeadEndCleanup(&op));
       callbacks.createdNewInst(dvi);
       continue;
     }
@@ -484,8 +533,7 @@ bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
     return false;
   }
 
-  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
-                                 &ctx->deBlocks)) {
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints)) {
     return false;
   }
   return true;
@@ -504,15 +552,13 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
     auto *function = value->getFunction();
     MultiDefPrunedLiveness liveness(function);
     borrowedValue.computeTransitiveLiveness(liveness);
-    DeadEndBlocks deadEndBlocks(function);
-    return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
+    return liveness.areUsesWithinBoundary(uses);
   }
 
   return false;
 }
 
-bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
-                                       DeadEndBlocks *deBlocks) {
+bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses) {
   assert(value->getFunction()->hasOwnership());
 
   if (value->getOwnershipKind() == OwnershipKind::None) {
@@ -539,7 +585,7 @@ bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
   SSAPrunedLiveness liveness(value->getFunction());
   liveness.initializeDef(value);
   liveness.computeSimple();
-  return liveness.areUsesWithinBoundary(uses, deBlocks);
+  return liveness.areUsesWithinBoundary(uses);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1477,7 +1523,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
     invalidate();
     return;
   }
-  if (addressOwnership.areUsesWithinLifetime(oldValueUses, ctx->deBlocks)) {
+  if (addressOwnership.areUsesWithinLifetime(oldValueUses)) {
     // We do not need to copy the base value! Clear the extra info we have.
     ctx->extraAddressFixupInfo.clear();
     return;
@@ -1921,7 +1967,6 @@ bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
 
 bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
                               SmallVectorImpl<Operand *> &newUses,
-                              DeadEndBlocks *deadEndBlocks,
                               InstModCallbacks callbacks) {
   ScopedAddressValue scopedAddress(sbi);
 
@@ -1934,7 +1979,7 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
       scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
 
   // If all new uses are within store_borrow boundary, no need for extension.
-  if (storeBorrowLiveness.areUsesWithinBoundary(newUses, deadEndBlocks)) {
+  if (storeBorrowLiveness.areUsesWithinBoundary(newUses)) {
     return true;
   }
 
@@ -1945,15 +1990,13 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
   // store_borrow extension is possible only when there are no other
   // store_borrows to the same destination within the store_borrow's lifetime
   // built from newUsers.
-  if (hasOtherStoreBorrowsInLifetime(sbi, &storeBorrowLiveness,
-                                     deadEndBlocks)) {
+  if (hasOtherStoreBorrowsInLifetime(sbi, &storeBorrowLiveness)) {
     return false;
   }
 
   InstModCallbacks tempCallbacks = callbacks;
   InstructionDeleter deleter(std::move(tempCallbacks));
-  GuaranteedOwnershipExtension borrowExtension(deleter, *deadEndBlocks,
-                                               sbi->getFunction());
+  GuaranteedOwnershipExtension borrowExtension(deleter, sbi->getFunction());
   auto status = borrowExtension.checkBorrowExtension(
       BorrowedValue(sbi->getSrc()), newUses);
   if (status == GuaranteedOwnershipExtension::Invalid) {

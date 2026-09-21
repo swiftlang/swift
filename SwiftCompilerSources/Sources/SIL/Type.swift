@@ -46,6 +46,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isTrivial(function.bridged)
   }
 
+  /// Returns true if the type is non-trivial only because it is non-Escapable.
+  public func isNonTrivialOnlyBecauseNonEscapable(in function: Function) -> Bool {
+    return bridged.isNonTrivialOnlyBecauseNonEscapable(function.bridged)
+  }
+
   /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
   public func isTrivialNonPointer(in function: Function) -> Bool {
     return !bridged.isNonTrivialOrContainsRawPointer(function.bridged)
@@ -146,13 +151,7 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   /// such arguments, no metadata is needed, except the isa-pointer of the class.
   public var hasValidSignatureForEmbedded: Bool {
     let genericSignature = invocationGenericSignatureOfFunction
-    for genParam in genericSignature.genericParameters {
-      let mappedParam = genericSignature.mapTypeIntoEnvironment(genParam)
-      if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
-        return false
-      }
-    }
-    return true
+    return genericSignature.isEmpty || genericSignature.canBeEmittedInEmbeddedSwift
   }
 
   //===--------------------------------------------------------------------===//
@@ -182,6 +181,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return PackElementArray(type: self)
   }
 
+  public static var maxNumFieldsToExpand: Int {
+    BridgedType.getMaxNumFieldsToExpand()
+  }
+
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {
@@ -204,6 +207,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
       return nil
     }
     return EnumCases(enumType: self, function: function)
+  }
+
+  public func getEnumCasePayload(of enumCase: EnumElementDecl, in function: Function) -> Type? {
+    return bridged.getEnumCasePayload(enumCase.bridged, function.bridged).typeOrNil
   }
 
   public func getIndexOfEnumCase(withName name: String) -> Int? {

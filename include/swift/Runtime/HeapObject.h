@@ -140,6 +140,14 @@ SWIFT_RUNTIME_EXPORT
 SWIFT_REFCOUNT_CC
 HeapObject *swift_retain(HeapObject *object);
 
+/// Atomically increments the strong reference count of \p object and returns
+/// the new strong reference count. This is the count-only retain; unlike
+/// `swift_retain` it returns the count rather than the object.
+///
+/// \param object - may be null, in which case this is a no-op returning 0.
+SWIFT_RUNTIME_EXPORT
+size_t swift_retainReturningCount(HeapObject *object);
+
 SWIFT_RUNTIME_EXPORT
 HeapObject *swift_retain_n(HeapObject *object, uint32_t n);
 
@@ -176,6 +184,17 @@ bool swift_isDeallocating(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 SWIFT_REFCOUNT_CC
 void swift_release(HeapObject *object);
+
+/// Atomically decrements the strong reference count of \p object and returns
+/// the new strong reference count, or 0 if this released the last strong
+/// reference (in which case the object is deinited exactly as by
+/// `swift_release`). The returned count is taken from the decrementing
+/// operation itself; it must not be re-read from the object, which may already
+/// be deallocated.
+///
+/// \param object - may be null, in which case this is a no-op returning 0.
+SWIFT_RUNTIME_EXPORT
+size_t swift_releaseReturningCount(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
 void swift_nonatomic_release(HeapObject *object);

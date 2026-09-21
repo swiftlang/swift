@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -enable-library-evolution -module-name Library -enable-experimental-feature CoroutineAccessors -target %target-swift-5.9-abi-triple
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
 // RUN:     -enable-library-evolution                       \
@@ -17,6 +18,12 @@
 // RUN: | %FileCheck %s --check-prefixes=CHECK
 
 // REQUIRES: swift_feature_CoroutineAccessors
+
+// This test asserts that the old ABI is additively emitted for resilient
+// public storage, which only holds on an ABI-stable platform (elsewhere there
+// is no prebuilt binary to stay compatible with, so only the new ABI is
+// emitted).
+// REQUIRES: swift_stable_abi
 
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: OS=freebsd

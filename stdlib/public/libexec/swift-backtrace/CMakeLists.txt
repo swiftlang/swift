@@ -52,6 +52,7 @@ set(BACKTRACING_COMPILE_FLAGS
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
   "-disable-upcoming-feature;MemberImportVisibility"
+  "-Xfrontend;-enable-sil-opaque-values"
   "-Xfrontend;-disable-availability-checking")
 
 set(BACKTRACING_SOURCES

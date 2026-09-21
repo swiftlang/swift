@@ -33,7 +33,7 @@
 // CHECK: 00000030  {{(([A-F0-9]{2} ){16})}}|
 
 // CACHE-MISS: remark: cache miss for input
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': id 'llvmcas://{{.*}}'
 
 /// Check that -write-output-hash-xattr with -cas-backend is an error.
 // RUN: not %target-swift-frontend-plain -c -cache-compile-job \

@@ -18,7 +18,6 @@
 #endif
 
 #include "swift/AST/Attr.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILCloner.h"
@@ -28,6 +27,7 @@
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/Test.h"
 #include <string>
@@ -339,6 +339,14 @@ bool BridgedFunction::isAutodiffVJP() const {
     }
   }
 
+  // Best-effort attempt to detect an explicit VJP
+  if (auto *afd = getFunction()->getDeclRef().getAbstractFunctionDecl()) {
+    if (auto *derivativeAttr = afd->getAttrs().getAttribute<DerivativeAttr>()) {
+      return derivativeAttr->getDerivativeKind() ==
+             AutoDiffDerivativeFunctionKind::VJP;
+    }
+  }
+
   return false;
 }
 
@@ -587,16 +595,9 @@ BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
-bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(unbridged());
-}
-
-bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(unbridged());
-}
-
-bool BridgedInstruction::maySynchronize() const {
-  return ::maySynchronize(unbridged());
+BridgedType
+BridgedInstruction::KeyPathInst_getStaticInstanceClassType() const {
+  return getAs<swift::KeyPathInst>()->getStaticInstanceClassType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -651,6 +652,14 @@ class BridgedClonerImpl : public SILCloner<BridgedClonerImpl> {
   friend class SILCloner<BridgedClonerImpl>;
 
   bool hasFixedLocation;
+
+  /// When true, operands, successor blocks, and locations/scopes are reused
+  /// unchanged (only local archetypes registered via
+  /// `registerLocalArchetypeRemapping` are remapped). Used for cloning
+  /// instructions one at a time within the same function, as opposed to
+  /// cloning a whole region.
+  bool identityMapping = false;
+
   union {
     SILDebugLocation fixedLocation;
     ScopeCloner scopeCloner;
@@ -664,10 +673,10 @@ public:
       hasFixedLocation(true),
       fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
 
-  BridgedClonerImpl(SILInstruction *insertionPoint)
+  BridgedClonerImpl(SILInstruction *insertionPoint, SILDebugLocation loc)
     : SILCloner<BridgedClonerImpl>(*insertionPoint->getFunction()),
       hasFixedLocation(true),
-      fixedLocation(insertionPoint->getDebugLocation()) {
+      fixedLocation(loc) {
     Builder.setInsertionPoint(insertionPoint);
   }
 
@@ -676,12 +685,29 @@ public:
       hasFixedLocation(false),
       scopeCloner(ScopeCloner(emptyFunction)) {}
 
+  BridgedClonerImpl(SILFunction &function, bool identityMapping)
+      : SILCloner<BridgedClonerImpl>(function), hasFixedLocation(true),
+        identityMapping(identityMapping),
+        fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
+
   ~BridgedClonerImpl() {
     if (hasFixedLocation) {
       fixedLocation.~SILDebugLocation();
     } else {
       scopeCloner.~ScopeCloner();
     }
+  }
+
+  SILValue getMappedValue(SILValue value) {
+    if (identityMapping)
+      return value;
+    return SILCloner<BridgedClonerImpl>::getMappedValue(value);
+  }
+
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *block) {
+    if (identityMapping)
+      return block;
+    return SILCloner<BridgedClonerImpl>::remapBasicBlock(block);
   }
 
   SILValue getClonedValue(SILValue v) {
@@ -696,12 +722,14 @@ public:
   }
 
   SILLocation remapLocation(SILLocation loc) {
-    if (hasFixedLocation)
-      return fixedLocation.getLocation();
-    return loc;
+    if (identityMapping || !hasFixedLocation)
+      return loc;
+    return fixedLocation.getLocation();
   }
 
   const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (identityMapping)
+      return DS;
     if (hasFixedLocation)
       return fixedLocation.getScope();
     return scopeCloner.getOrCreateClonedScope(DS);
@@ -746,14 +774,21 @@ BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedContext context)
   context.context->notifyNewCloner();
 }
 
-BridgedCloner::BridgedCloner(BridgedInstruction inst,
+BridgedCloner::BridgedCloner(BridgedInstruction inst, BridgedLocation loc,
                              BridgedContext context)
-    : cloner(new BridgedClonerImpl(inst.unbridged())) {
+    : cloner(new BridgedClonerImpl(inst.unbridged(), loc.getLoc())) {
   context.context->notifyNewCloner();
 }
 
 BridgedCloner::BridgedCloner(BridgedFunction emptyFunction, BridgedContext context)
   : cloner(new BridgedClonerImpl(*emptyFunction.getFunction())) {
+  context.context->notifyNewCloner();
+}
+
+BridgedCloner::BridgedCloner(BridgedFunction function, BridgedContext context,
+                             bool forLocalArchetypeRemapping)
+    : cloner(new BridgedClonerImpl(*function.getFunction(),
+                                   forLocalArchetypeRemapping)) {
   context.context->notifyNewCloner();
 }
 
@@ -790,6 +825,19 @@ BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
 void BridgedCloner::setInsertionBlockIfNotSet(BridgedBasicBlock block) const {
   if (!cloner->getBuilder().hasValidInsertionPoint())
     cloner->getBuilder().setInsertionPoint(block.unbridged());
+}
+
+void BridgedCloner::setInsertionPoint(BridgedInstruction beforeInst) const {
+  cloner->getBuilder().setInsertionPoint(beforeInst.unbridged());
+}
+
+void BridgedCloner::registerLocalArchetypeRemapping(
+    BridgedGenericEnvironment from, BridgedGenericEnvironment to) const {
+  cloner->registerLocalArchetypeRemapping(from.unbridged(), to.unbridged());
+}
+
+BridgedType BridgedCloner::getOpType(BridgedType type) const {
+  return cloner->getOpType(type.unbridged());
 }
 
 BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
@@ -848,6 +896,22 @@ BridgedOwnedString BridgedContext::getModuleDescription() const {
 
 OptionalBridgedFunction BridgedContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
   return {context->getModule()->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
+}
+
+OptionalBridgedFunction BridgedContext::
+lookUpSpecializedDeinitFunction(BridgedType nominalType) const {
+  auto *deinit =
+      context->getModule()->lookUpSpecializedMoveOnlyDeinit(nominalType.unbridged());
+  return {deinit ? deinit->getImplementation() : nullptr};
+}
+
+void BridgedContext::addSpecializedDeinit(BridgedType nominalType,
+                                          BridgedFunction deinitFunc) const {
+  swift::SILType nominalTy = nominalType.unbridged();
+  swift::SILMoveOnlyDeinit::create(*context->getModule(),
+                                   nominalTy.getNominalOrBoundGenericNominal(),
+                                   nominalTy, swift::IsNotSerialized,
+                                   deinitFunc.getFunction());
 }
 
 BridgedFunction BridgedContext::

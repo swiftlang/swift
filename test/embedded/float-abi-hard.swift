@@ -5,7 +5,6 @@
 // RUN:  -target armv7em-none-none-eabi -Xcc -mthumb -Xcc -mcpu=cortex-m7 -Xcc -mfloat-abi=hard -Xcc -mfpu=fpv5-sp-d16 -Xcc -D__FPU_USED=1 -Xcc -falign-functions=16
 
 // UNSUPPORTED: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling

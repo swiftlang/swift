@@ -176,16 +176,16 @@ extension NonSendableGlobalActorIsolatedEnum {
       return nil
     }
     return x
-  } // expected-error {{sending 'x.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+  } // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{main actor-isolated 'x' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   mutating func test3a() -> sending NonSendableKlass? {
     if case let .second(x) = self {
       return x
     }
     return nil
-  } // expected-error {{sending 'x.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+  } // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{main actor-isolated 'x' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
 extension NonSendableGlobalActorIsolatedKlass {

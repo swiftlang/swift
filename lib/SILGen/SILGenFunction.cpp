@@ -35,8 +35,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -50,16 +48,24 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> SILGenOwnershipForTrivial(
+    "silgen-ownership-for-trivial", llvm::cl::init(false),
+    llvm::cl::desc("Emit functions in SILGen with ownership for trivial values"));
+
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC, bool IsEmittingTopLevelCode)
-    : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
-      StartOfPostmatter(F.end()), B(*this),
+    : SGM(SGM), F(F), silConv(SILAddressConventions::forFunction(F)),
+      FunctionDC(DC), StartOfPostmatter(F.end()), B(*this),
       SF(DC ? DC->getParentSourceFile() : nullptr), Cleanups(*this),
       StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F),
       IsEmittingTopLevelCode(IsEmittingTopLevelCode) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
+
+  if (SILGenOwnershipForTrivial) {
+    F.setOwnershipForTrivialValues(true);
+  }
 
   // Populate VarDeclScopeMap.
   SourceLoc SLoc = F.getLocation().getSourceLoc();
@@ -183,6 +189,7 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
 DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   switch (ref.kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk:
     if (auto closure = ref.getAbstractClosureExpr())
       return getMagicFunctionName(closure);
     return getMagicFunctionName(cast<FuncDecl>(ref.getDecl()));
@@ -388,6 +395,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     break;
   }
   return Result;
@@ -671,12 +679,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       auto captureKind = SGM.Types.getDeclCaptureKind(capture, expansion);
       switch (captureKind) {
       case CaptureKind::Constant:
+      case CaptureKind::Consuming:
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
       case CaptureKind::Immutable:
       case CaptureKind::StorageAddress: {
         auto ty = getLoweredType(type);
-        if (SGM.M.useLoweredAddresses())
+        if (!SGM.M.usesOpaqueValues())
           ty = ty.getAddressType();
         capturedArgs.push_back(emitUndef(ty));
         break;
@@ -701,12 +710,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
                                bool forLValue) -> SILValue {
-      if (!SGM.M.useLoweredAddresses() && !forLValue && !isPack) {
+      if (SGM.M.usesOpaqueValues() && !forLValue && !isPack) {
         // In opaque values mode, addresses aren't used except by lvalues.
         auto &lowering = getTypeLowering(entryValue->getType());
         if (entryValue->getType().isAddress()) {
           // If the value is currently an address, load it, copying if needed.
-          if (lowering.isTrivial()) {
+          if (lowering.isTrivial(&F)) {
             SILValue result = lowering.emitLoad(
                 B, loc, entryValue, LoadOwnershipQualifier::Trivial);
             return result;
@@ -724,19 +733,19 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           }
         } else {
           // Otherwise, just return it, copying if needed.
-          if (forceCopy && !lowering.isTrivial()) {
+          if (forceCopy && !lowering.isTrivial(&F)) {
             auto result = B.emitCopyValueOperation(loc, entryValue);
             return result;
           }
           return entryValue;
         }
-      } else if (SGM.M.useLoweredAddresses() &&
+      } else if (!SGM.M.usesOpaqueValues() &&
                  SGM.Types
                      .getTypeLowering(
                          valueType, TypeExpansionContext::
                                         noOpaqueTypeArchetypesSubstitution(
                                             expansion.getResilienceExpansion()))
-                     .isAddressOnly() &&
+                     .getRecursiveProperties().isAddressOnly() &&
                  !entryValue->getType().isAddress()) {
 
         assert(!isPack);
@@ -838,6 +847,28 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       capturedArgs.push_back(emitManagedRValueWithCleanup(val));
       break;
     }
+    case CaptureKind::Consuming: {
+      assert(!isPack);
+      assert(val->getType().isAddress() &&
+             "@called(once) values are bound as local boxed storage");
+
+      auto &tl = getTypeLowering(valueType);
+
+      // Consuming a capture means taking the original value out of its local
+      // storage and moving it into the closure. Any further use of the outer
+      // variable afterward is then caught by the move checker as a double
+      // consumption, same as any other noncopyable local.
+      if (val->getType().isMoveOnly()) {
+        val = B.createMarkUnresolvedNonCopyableValueInst(
+            loc, val,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
+      }
+
+      val = emitLoad(loc, val, tl, SGFContext(), IsTake).forward(*this);
+      capturedArgs.push_back(emitManagedRValueWithCleanup(val));
+      break;
+    }
     case CaptureKind::Immutable: {
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
@@ -854,7 +885,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (!useLoweredAddresses()) {
           auto &lowering = getTypeLowering(addr->getType());
           auto rvalue =
-              lowering.isTrivial()
+              lowering.isTrivial(&F)
                   ? ManagedValue::forObjectRValueWithoutOwnership(addr)
                   : ManagedValue::forOwnedRValue(addr,
                                                  CleanupHandle::invalid());
@@ -1084,14 +1115,24 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
-    auto calleeConvention = ParameterConvention::Direct_Guaranteed;
+    // A `@called(once)` closure value's callee convention must be
+    // `Direct_Owned` to match DefaultCalledOnceConventions, or the
+    // ABI-difference check treats it as needing a reabstraction thunk
+    // (which then fails: thunks are always Thin, and Thin + CalledOnce
+    // is an invalid combination).
+    auto calleeConvention = typeContext.ExpectedLoweredType->isCalledOnce()
+                                ? ParameterConvention::Direct_Owned
+                                : ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
                             : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention, resultIsolation);
+                           calleeConvention, resultIsolation,
+                           PartialApplyInst::OnStackKind::NotOnStack,
+                           StackAllocationIsNested, nullptr,
+                           typeContext.ExpectedLoweredType->isCalledOnce());
     result = emitManagedRValueWithCleanup(toClosure);
   }
 
@@ -1140,10 +1181,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(fd,
-                  fd->getResultInterfaceType(),
-                  fd->getEffectiveThrownErrorType(),
-                  CleanupLocation(fd));
+    prepareEpilog(fd, fd->getResultInterfaceType(),
+                  fd->getEffectiveThrownErrorType(), CleanupLocation(fd));
 
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
@@ -1251,7 +1290,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SmallVector<ValueDecl *, 2> results;
     UIKit->lookupQualified(UIKit,
                            DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
-                           SourceLoc(), NL_QualifiedDefault,
+                           SourceLoc(), NLFlags::QualifiedDefault,
                            results);
 
     // As the comment above alludes, using a qualified lookup into UIKit is
@@ -1270,7 +1309,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     auto UIApplicationMainFn =
         builder.getOrCreateFunction(mainClass, mainRef, NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
-    SILFunctionConventions fnConv(fnTy, SGM.M);
+    SILFunctionConventions fnConv(fnTy,
+                                  SILAddressConventions::forFunction(F));
 
     // Get the class name as a string using NSStringFromClass.
     CanType mainClassTy = mainClass->getDeclaredInterfaceType()
@@ -1902,7 +1942,8 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
                                       getTypeExpansionContext());
   };
 
-  SILFunctionConventions setterConv(getSetterType(setterFRef), SGM.M);
+  SILFunctionConventions setterConv(
+      getSetterType(setterFRef), SILAddressConventions::forFunction(F));
 
   // Emit captures for the setter
   SmallVector<SILValue, 4> capturedArgs;
@@ -2000,7 +2041,8 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   // Check whether value is supposed to be passed indirectly and
   // materialize if required.
   {
-    SILFunctionConventions initConv(initTy, SGM.M);
+    SILFunctionConventions initConv(
+        initTy, SILAddressConventions::forFunction(F));
 
     auto newValueArgIdx = initConv.getSILArgIndexOfFirstParam();
     auto newValueParamInfo = initConv.getParamInfoForSILArg(newValueArgIdx);

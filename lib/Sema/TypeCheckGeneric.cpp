@@ -28,8 +28,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
@@ -185,8 +185,10 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                 /*packElementOpener*/ nullptr)
                                 .resolveType(constraint);
 
-      if (constraintType->hasError())
+      if (constraintType->hasError()) {
+        currentRepr->setInvalid();
         return nullptr;
+      }
 
       RequirementKind kind;
       if (constraintType->isConstraintType())
@@ -674,8 +676,8 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       if (paramDecl->isOpaqueType()) {
         paramDecl->getASTContext().Diags
           .diagnose(paramDecl->getOpaqueTypeRepr()->getLoc(),
-                    diag::unreferenced_generic_parameter,
-                    paramDecl->getNameStr());
+                    diag::non_inferrable_opaque_generic_parameter,
+                    paramDecl->getOpaqueTypeRepr());
       } else {
         paramDecl->diagnose(diag::unreferenced_generic_parameter,
                             paramDecl->getNameStr());
@@ -945,8 +947,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
+        bool isCoroutine = func ? func->isCoroutine() : false;
+        TypeResolutionOptions resultOptions(TypeResolverContext::FunctionResult);
+        if (isCoroutine)
+          resultOptions |= TypeResolutionFlags::Coroutine;
         const auto resultType =
-            resolution.withOptions(TypeResolverContext::FunctionResult)
+            resolution.withOptions(resultOptions)
                 .resolveType(resultTypeRepr);
 
         inferenceSources.push_back(resultType.getPointer());
@@ -954,6 +960,13 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
+
+    // A protocol metatype extension has no generic signature — its members are
+    // static members of the protocol metatype and cannot reference Self.  Bail
+    // before inspecting the extended type, which is the metatype `(any P).Type`
+    // rather than a nominal that requirements could be collected from.
+    if (ext->isMetatypeExtension())
+      return nullptr;
 
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
@@ -1194,9 +1207,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
-                                      &isolatedConformances)) {
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1227,22 +1238,6 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
       break;
-    }
-
-    if (!isolatedConformances.empty() && signature) {
-      // Dig out the original type parameter for the requirement.
-      // FIXME: req might not be the right pre-substituted requirement,
-      // if this came from a conditional requirement.
-      for (const auto &isolatedConformance : isolatedConformances) {
-        (void)isolatedConformance;
-        if (auto failed =
-                signature->prohibitsIsolatedConformance(req.getFirstType())) {
-            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-              req, substReq,
-              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-              failed->second);
-        }
-      }
     }
   }
 

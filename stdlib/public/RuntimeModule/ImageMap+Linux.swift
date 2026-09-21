@@ -24,7 +24,7 @@ internal import Glibc
 internal import Musl
 #endif
 
-internal import BacktracingImpl.ImageFormats.Elf
+@_implementationOnly import BacktracingImpl.ImageFormats.Elf
 
 fileprivate func readOSRelease(fd: CInt) -> [String:String]? {
   let len = lseek(fd, 0, SEEK_END)

@@ -23,7 +23,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
@@ -249,6 +248,8 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
     return BridgedGeneratedSourceFileKindDefaultArgument;
   case GeneratedSourceInfo::AttributeFromClang:
     return BridgedGeneratedSourceFileKindAttributeFromClang;
+  case GeneratedSourceInfo::SyntheticMacro:
+    return BridgedGeneratedSourceFileKindSyntheticMacro;
   }
 }
 
@@ -311,6 +312,7 @@ bool shouldParseViaASTGen(SourceFile &SF) {
     case SourceFileKind::Interface:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       break;
   }
 
@@ -446,6 +448,7 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
     switch (generatedInfo->kind) {
     case GeneratedSourceInfo::DeclarationMacroExpansion:
     case GeneratedSourceInfo::CodeItemMacroExpansion:
+    case GeneratedSourceInfo::SyntheticMacro:
       if (parser.CurDeclContext->isTypeContext()) {
         parser.parseExpandedMemberList(items);
       } else {

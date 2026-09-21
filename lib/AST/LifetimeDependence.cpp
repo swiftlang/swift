@@ -19,7 +19,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
@@ -29,6 +28,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -211,6 +211,9 @@ void LifetimeDependenceInfo::getConcatenatedData(
   }
   if (hasAddressableParamIndices()) {
     pushData(getAddressableIndices());
+  }
+  if (hasConditionallyAddressableParamIndices()) {
+    pushData(getConditionallyAddressableIndices());
   }
 }
 
@@ -475,27 +478,30 @@ class LifetimeDependenceChecker {
   bool performedDiagnostics = false;
 
 public:
-  static unsigned getResultIndex(AbstractFunctionDecl *afd) {
-    return afd->isInstanceMethod()
-               ? (unsigned)(afd->getParameters()->size() + 1)
-               : (unsigned)afd->getParameters()->size();
-  }
-
   static unsigned getResultIndex(EnumElementDecl *eed) {
     auto *paramList = eed->getParameterList();
     return paramList ? (unsigned)(paramList->size() + 1) : 1;
   }
 
   static Type getResultOrYieldInterface(DeclContext *functionDC) {
-    if (auto *accessor = dyn_cast<AccessorDecl>(functionDC);
-        accessor && accessor->isCoroutine()) {
-      return accessor->getStorage()->getValueInterfaceType();
-    }
+    Type resultType;
     if (auto fn = dyn_cast<FuncDecl>(functionDC)) {
-      return fn->getResultInterfaceType();
+      resultType = fn->getResultInterfaceType();
+      if (fn->isCoroutine()) {
+        SmallVector<AnyFunctionType::Yield, 1> yields;
+        fn->getYieldInterfaceTypes(yields);
+
+        // TODO: Extend tracking to coroutines with multiple yields and / or
+        // yields and results.
+        ASSERT(/*resultType->isEqual(fn->getASTContext().TheEmptyTupleType) &&*/
+               yields.size() == 1);
+        resultType = yields.front().getType();
+      }
+    } else {
+      auto ctor = cast<ConstructorDecl>(functionDC);
+      resultType =  ctor->getResultInterfaceType();
     }
-    auto ctor = cast<ConstructorDecl>(functionDC);
-    return ctor->getResultInterfaceType();
+    return resultType;
   }
 
   static SourceLoc getReturnLoc(AbstractFunctionDecl *afd) {
@@ -504,7 +510,7 @@ public:
   }
 
   static std::optional<ParamInfo> getSelfParamInfo(AbstractFunctionDecl *afd) {
-    if (!afd->isInstanceMethod())
+    if (!afd->hasSelfInLifetimeDependenceIndices())
       return std::nullopt;
     auto *selfDecl = afd->getImplicitSelfDecl();
     if (!selfDecl)
@@ -598,7 +604,7 @@ public:
         escapableDecl(ctx.getProtocol(
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(afd->getGenericEnvironment()),
-        resultIndex(getResultIndex(afd)),
+        resultIndex(afd->getLifetimeDependenceResultIndex()),
         resultTy(afd->mapTypeIntoEnvironment(getResultOrYieldInterface(afd))),
         returnLoc(getReturnLoc(afd)),
         implicitSelfParamInfo(getSelfParamInfo(afd)),
@@ -621,15 +627,22 @@ public:
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(env),
         resultIndex(funcType->getParams().size()),
-        resultTy(
-          GenericEnvironment::mapTypeIntoEnvironment(env,
-                                                     funcType->getResult())),
         returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
         implicitSelfParamInfo(std::nullopt),
         depBuilder(resultIndex),
         isImplicit(false),
         isInit(false),
-        hasUnsafeNonEscapableResult(false) {}
+        hasUnsafeNonEscapableResult(false) {
+    if (funcType->isCoroutine()) {
+      assert(funcType->getYields().size() == 1);
+      resultTy = GenericEnvironment::mapTypeIntoEnvironment(
+        env, funcType->getYields().front().getType());
+    } else {
+      resultTy = 
+          GenericEnvironment::mapTypeIntoEnvironment(env,
+                                                     funcType->getResult());
+    }
+  }
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
@@ -858,10 +871,12 @@ protected:
         return qualifier;
       }
     }
+    if (isInit) {
+      // An imported C++ constructor has no 'self' in the lifetime dependence
+      // index space, so this cannot rely on 'implicitSelfParamInfo'.
+      return "an initializer";
+    }
     if (implicitSelfParamInfo.has_value()) {
-      if (isInit) {
-        return "an initializer";
-      }
       if (implicitSelfParamInfo->param.isInOut()) {
         return "a mutating method";
       }
@@ -930,6 +945,53 @@ protected:
   // ==========================================================================
   // MARK: attribute parsing and inference helpers
   // ==========================================================================
+
+  /// A scoped dependency needs borrowable storage in the caller. If the callee
+  /// receives \p paramInfo as its own copy, diagnose at \p loc and return true.
+  ///
+  /// Imported C records are addressable-for-dependencies, so a scoped
+  /// dependency on one lowers to an address dependency; a by-value copy has no
+  /// storage in the caller to form that on. Pointer and lvalue reference
+  /// parameters do.
+  ///
+  /// getLoweredOwnership() cannot answer this: it sees only the Swift
+  /// signature, where an imported by-value record is a plain parameter. Nor can
+  /// lowering be consulted, since it depends on the dependencies computed here
+  /// (see paramsWithScopedDependencies in SILFunctionType.cpp).
+  bool diagnoseScopeOnForeignByValue(ParamInfo const &paramInfo,
+                                     SourceLoc loc) {
+    if (!afd)
+      return false;
+
+    // 'self' is not a Clang parameter, so its index is out of range here.
+    auto *params = afd->getParameters();
+    if (!params || paramInfo.index >= params->size())
+      return false;
+
+    auto *clangParam = dyn_cast_or_null<clang::ParmVarDecl>(
+        params->get(paramInfo.index)->getClangDecl());
+    if (!clangParam)
+      return false;
+
+    auto clangParamTy = clangParam->getType();
+    // An rvalue reference is imported as 'consuming', which likewise leaves
+    // nothing to borrow.
+    if (auto *rvalueRef = clangParamTy->getAs<clang::RValueReferenceType>())
+      clangParamTy = rvalueRef->getPointeeType();
+    if (!clangParamTy->isRecordType())
+      return false;
+
+    // C++ allows unnamed parameters; describe those positionally.
+    SmallString<32> paramName;
+    if (paramInfo.name().empty())
+      (Twine("parameter #") + Twine(paramInfo.index + 1)).toVector(paramName);
+    else
+      paramName.append(paramInfo.name());
+
+    diagnose(loc, diag::lifetime_dependence_scope_foreign_by_value, paramName,
+             diagnosticQualifier());
+    return true;
+  }
 
   // Attribute parsing helper.
   bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind,
@@ -1395,6 +1457,10 @@ protected:
 
       return;
     }
+    if (lifetimeKind == LifetimeDependenceKind::Scope &&
+        diagnoseScopeOnForeignByValue(*paramInfo, source.getLoc())) {
+      return;
+    }
     addDescriptorIndices(deps, source, sourceIndex, *lifetimeKind);
   }
 
@@ -1457,14 +1523,14 @@ protected:
       // regular methods...
     }
 
-    // Infer non-Escapable results.
+    // Infer non-Escapable results / yields
     if (isDiagnosedNonEscapable(resultTy)) {
       if (isInit && isImplicitOrSIL()) {
         inferImplicitInit();
       } else {
         // Apply the same-type rule before the single parameter rule. The
         // same-type rule does not trigger any diagnostics.
-        inferNonEscapableResultOnSameTypeParam();
+        inferNonEscapableResultOnSameTypeParam(resultTy);
 
         if (hasImplicitSelfParam()) {
           // Methods that return a non-Escapable value - single parameter
@@ -1496,7 +1562,7 @@ protected:
   //     @_lifetime(copy a) // OK: Optional<T>: Escapable requires T: Escapable
   //     func foo<T: ~Escapable>(a: T?) -> T {
   //
-  void inferNonEscapableResultOnSameTypeParam() {
+  void inferNonEscapableResultOnSameTypeParam(Type resultType) {
     // Check that no @_lifetime annotation is present for the function result.
     TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!targetDeps)
@@ -1846,6 +1912,11 @@ protected:
       return;
     }
     auto kind = LifetimeDependenceKind::Scope;
+    // Do not infer a dependency that cannot be lowered; an explicit annotation
+    // is required instead.
+    if (diagnoseScopeOnForeignByValue(paramInfo, returnLoc)) {
+      return;
+    }
     if (!isCompatibleWithOwnership(kind, paramInfo)) {
       diagnose(returnLoc,
                diag::lifetime_dependence_cannot_infer_scope_ownership,
@@ -2389,7 +2460,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
     switch (source.getDescriptorKind()) {
     case LifetimeDescriptor::DescriptorKind::Ordered: {
       auto index = source.getIndex();
-      if (index > capacity) {
+      if (index >= capacity) {
         diags.diagnose(source.getLoc(),
                        diag::lifetime_dependence_invalid_param_index, index);
         return std::nullopt;

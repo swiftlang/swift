@@ -31,16 +31,13 @@
 
 #define DEBUG_TYPE "diagnose-lifetime-issues"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -215,6 +212,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         return CanEscape;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::BitwiseEscape:
         if (updateLivenessAndWeakStores)
           liveness->updateForUse(user, /*lifetimeEnding*/ false);
@@ -293,9 +291,8 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
   if (!ai.isArgumentOperand(*applyOperand))
     return CanEscape;
 
-  SILBasicBlock *entryBlock = callee->getEntryBlock();
-  unsigned calleeIdx = ai.getCalleeArgIndex(*applyOperand);
-  auto *arg = cast<SILFunctionArgument>(entryBlock->getArgument(calleeIdx));
+  auto *arg =
+      cast<SILFunctionArgument>(ai.getCalleeArgument(callee, *applyOperand));
 
   // Check if we already cached the analysis result.
   auto iter = argumentStates.find(arg);
@@ -323,7 +320,7 @@ static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
-  return !liveness.isWithinBoundary(inst, /*deadEndBlocks=*/nullptr);
+  return !liveness.isWithinBoundary(inst);
 }
 
 /// Reports a warning if the stored object \p storedObj is never loaded within

@@ -1,5 +1,7 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// Also run with -O, which is where the tuple-return-across-suspension miscompile appeared.
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -O) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault) | %FileCheck %s
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -54,8 +56,44 @@ func test_sum_nextOnPending() async {
   assert(sum == expected, "Expected: \(expected), got: \(sum)")
 }
 
+enum ReproError: Error { case boom }
+
+func echoIndex(_ index: Int) async throws -> Int {
+  await Task.yield()
+  if index < 0 { throw ReproError.boom }
+  return index
+}
+
+func test_tuple_result_across_suspend() async {
+  var results: [Int: Int] = [:]
+  await withTaskGroup(of: (Int, Result<Int, any Error>).self) { group in
+    for index in 0..<6 {
+      group.addTask {
+        // Note that the index is readily available, and would previously be attempted to
+        // be written before suspending for the echoIndex call. This would result in corrupting
+        // the tuple value when the write completes after the suspension.
+        do {
+          return (index, .success(try await echoIndex(index)))
+        } catch {
+          return (index, .failure(error))
+        }
+      }
+    }
+    while let (index, result) = await group.next() {
+      if case .success(let value) = result {
+        results[index] = value
+      }
+    }
+  }
+
+  // Check values returned through tuples were not corrupted:
+  // CHECK: tuple-result keys=[0, 1, 2, 3, 4, 5]
+  print("tuple-result keys=\(results.keys.sorted())")
+}
+
 @main struct Main {
   static func main() async {
     await test_sum_nextOnPending()
+    await test_tuple_result_across_suspend()
   }
 }

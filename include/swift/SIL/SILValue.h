@@ -29,6 +29,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -38,8 +39,8 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
-class InstructionIndices;
 class SILInstruction;
+class SILModule;
 class SILArgument;
 class SILLocation;
 class DeadEndBlocks;
@@ -49,7 +50,7 @@ class NonConsumingUseIterator;
 class TypeDependentUseIterator;
 class NonTypeDependentUseIterator;
 class SILValue;
-class SILModuleConventions;
+class SILAddressConventions;
 
 /// An enumeration which contains values for all the concrete ValueBase
 /// subclasses.
@@ -259,7 +260,7 @@ struct ValueOwnershipKind {
                      SILArgumentConvention convention);
   ValueOwnershipKind(const SILFunction &f, SILType type,
                      SILArgumentConvention convention,
-                     SILModuleConventions moduleConventions);
+                     SILAddressConventions moduleConventions);
 
   /// Parse Value into a ValueOwnershipKind.
   ///
@@ -729,7 +730,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -836,6 +837,11 @@ struct OperandOwnership {
     /// to a small number of operations that are allowed to take Unowned values.
     /// (copy_value, single-instruction apply with @unowned argument))
     UnownedInstantaneousUse,
+
+    /// A debug_value use. Semantically equivalent to UnownedInstantaneousUse
+    /// but the value is not required to be alive. The OwnershipModelEliminator
+    /// automatically removes such invalid debug uses.
+    DebugUse,
 
     /// Forwarding instruction with an Unowned result. Its operands may have any
     /// ownership.
@@ -968,6 +974,7 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::NonUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
@@ -998,6 +1005,7 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   switch (operandOwnership) {
   case OperandOwnership::NonUse:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
@@ -1019,7 +1027,7 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
 
 /// Return true if all OperandOwnership invariants hold.
 bool checkOperandOwnershipInvariants(const Operand *operand,
-                                     SILModuleConventions *silConv = nullptr);
+                                     SILAddressConventions *silConv = nullptr);
 
 /// Return the OperandOwnership for a forwarded operand when the forwarding
 /// operation has this "forwarding ownership" (as returned by
@@ -1087,6 +1095,13 @@ private:
 
   // For details see SILNode::lastInitializedBitfieldID
   uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
+
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
 
 public:
   Operand(SILInstruction *owner)
@@ -1162,12 +1177,12 @@ public:
   ///
   /// NOTE: This is implemented in OperandOwnership.cpp.
   OperandOwnership
-  getOperandOwnership(SILModuleConventions *silConv = nullptr) const;
+  getOperandOwnership(SILAddressConventions *silConv = nullptr) const;
 
   /// Return the ownership constraint that restricts what types of values this
   /// Operand can contain.
   OwnershipConstraint
-  getOwnershipConstraint(SILModuleConventions *silConv = nullptr) const {
+  getOwnershipConstraint(SILAddressConventions *silConv = nullptr) const {
     return getOperandOwnership(silConv).getOwnershipConstraint();
   }
 
@@ -1175,11 +1190,11 @@ public:
   /// ownership kind, without rewriting the instruction, would not cause the
   /// operand to violate the operand's ownership constraints.
   bool canAcceptKind(ValueOwnershipKind kind,
-                     SILModuleConventions *silConv = nullptr) const;
+                     SILAddressConventions *silConv = nullptr) const;
 
   /// Returns true if this operand and its value satisfy the operand's
   /// operand constraint.
-  bool satisfiesConstraints(SILModuleConventions *silConv = nullptr) const;
+  bool satisfiesConstraints(SILAddressConventions *silConv = nullptr) const;
 
   /// Returns true if this operand acts as a use that ends the lifetime its
   /// associated value, either by consuming the owned value or ending the

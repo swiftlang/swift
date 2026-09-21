@@ -23,9 +23,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-    static var shared: Custom {
-        return Custom()
-    }
+    static let shared = Custom()
 }
 
 @MainActor func transferToMain<T>(_ t: T) async {}

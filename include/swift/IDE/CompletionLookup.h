@@ -18,7 +18,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ImportCache.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -326,7 +325,7 @@ public:
 
   void addImportModuleNames();
 
-  void addUsingSpecifiers();
+  void addFileDefaultSpecifiers();
 
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason,

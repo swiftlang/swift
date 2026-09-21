@@ -23,12 +23,9 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
-#include "clang/AST/DeclObjC.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace swift::Lowering;
@@ -100,10 +97,9 @@ clang::CXXRecordDecl *Lowering::getBridgedSmartPtr(AbstractionPattern pattern) {
 
   auto ty = pattern.getClangType();
   if (auto rd = ty->getAsCXXRecordDecl())
-    for (auto attr : rd->getAttrs())
-      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-        if (swiftAttr->getAttribute().starts_with("@_refCountedPtr"))
-          return rd;
+    for (auto *swiftAttr : rd->specific_attrs<clang::SwiftAttrAttr>())
+      if (swiftAttr->getAttribute().starts_with("@_refCountedPtr"))
+        return rd;
 
   return nullptr;
 }
@@ -128,6 +124,7 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     // Map native types back to bridged types.
 
@@ -214,7 +211,8 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::ObjCMethod:
-    case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionType::Representation::COMMethod:
+    case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
@@ -241,7 +239,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
           newParams, {newResult}, FunctionTypeRepresentation::Block);
 
       return FunctionType::get(
-          newParams, newResult,
+          newParams, /* yields */ {}, newResult,
           funTy->getExtInfo()
               .intoBuilder()
               .withRepresentation(FunctionType::Representation::Block)

@@ -209,6 +209,12 @@ namespace swift {
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;
 
+    /// Causes the compiler to use weak linkage for symbols belonging to
+    /// declarations that are back deployed by the Span compatibility library
+    /// when the deployment target predates the OS release that introduced
+    /// those declarations.
+    bool WeakLinkSpanCompatibilityLib = false;
+
     /// Should the editor placeholder error be downgraded to a warning?
     bool WarnOnEditorPlaceholder = false;
 
@@ -262,6 +268,9 @@ namespace swift {
 
     /// Emit remarks for unexpected conditions when serializing a module.
     bool EnableModuleSerializationRemarks = false;
+
+    /// Emit remarks about hidden type layout serialization.
+    bool EnableHiddenTypeLayoutSerializationRemarks = false;
 
     /// Emit remarks about the source of each element exposed by the module API.
     bool EnableModuleApiImportRemarks = false;
@@ -328,6 +337,29 @@ namespace swift {
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
+
+    /// Enable COM interop code generation and build configuration options.
+    bool EnableCOMInterop = false;
+
+    /// The COM interop model, selecting an environment's conventions. Today it
+    /// picks the root type an `@com` class conforms to; other conventions (byte
+    /// order, ref-counting) attach here as they are implemented. Empty exactly
+    /// when interop is off; defaulted from the target otherwise, and the user
+    /// may override it. `ISwiftObject` is compiler-managed under every model.
+    enum class COMInteropModel {
+      Microsoft,      ///< Microsoft COM: `IUnknown` root.
+      CoreFoundation, ///< CoreFoundation CFPlugIn: no protocol root.
+    };
+    std::optional<COMInteropModel> COMModel = std::nullopt;
+
+    /// Return the compiler-owned conditional-compilation identifier for the
+    /// selected COM interop model, or an empty string when COM interop is
+    /// disabled.
+    StringRef getCOMInteropModelConditionalCompilationFlag() const;
+
+    /// Whether \p Name is reserved for a COM interop model's
+    /// conditional-compilation identifier.
+    static bool isCOMInteropModelConditionalCompilationFlag(StringRef Name);
 
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
@@ -426,6 +458,9 @@ namespace swift {
 
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
+
+    /// Disable the implicit import of the COM module.
+    bool DisableImplicitCOMModuleImport = false;
 
     /// Disable the implicit import of the Cxx module.
     bool DisableImplicitCxxModuleImport = false;
@@ -646,6 +681,9 @@ namespace swift {
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
+
+    /// Maximum iteration count for associated type inference.
+    unsigned AssociatedTypeInferenceIterations = 1000000;
 
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
@@ -960,7 +998,7 @@ namespace swift {
 
     /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+    unsigned SolverMemoryThreshold = 516 * 1024 * 1024;
 
     /// The maximum number of scopes we explore before giving up.
     unsigned SolverScopeThreshold = 1024 * 1024;
@@ -1023,9 +1061,13 @@ namespace swift {
     /// debugging
     unsigned ShuffleDisjunctionChoicesSeed = 0;
 
-    /// If true, we will crash if the constraint solver found a valid solution
-    /// in diagnostic mode.
-    bool CrashOnValidSalvage = false;
+    /// If true, we will emit a fallback diagnostic if the constraint solver
+    /// finds a valid solution in diagnostic mode.
+    bool DiagnoseValidSalvage = false;
+
+    /// If true, trigger an assertion failure whenever we emit the fallback
+    /// diagnostic.
+    bool CrashFailDiagnostic = false;
 
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
@@ -1059,17 +1101,20 @@ namespace swift {
     /// Enable generation of transitive conformance constraints.
     bool SolverEnableTransitiveConformance = true;
 
-    /// Enable experimental optimization to speed up binding of type variables.
-    bool SolverEnableBindingOptimizations = true;
-
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = true;
 
-    /// Enable experimental optimization to skip operators defined in protocol
-    /// extensions if they are a refinement of a protocol requirement that also
-    /// appears in the disjunction.
-    bool SolverOptimizeOperatorDefaults = true;
+    /// Enable an inefficient form of inference, which will sometimes prevent
+    /// exact binding promotion from taking place. This will be off by default
+    /// eventually.
+    bool SolverEnableEnumerateSupertypes = true;
+
+    /// Enable type variable joins. This will be on by default eventually.
+    bool SolverEnableTypeVariableJoins = false;
+
+    /// Enable type variable joins. This will be on by default eventually.
+    bool SolverEnablePromoteSupertypes = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1199,6 +1244,14 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-class-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendClassSelectorStubs = std::nullopt;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

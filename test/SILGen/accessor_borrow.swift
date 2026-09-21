@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name accessor_borrow -enable-experimental-feature LifetimeDependence %s
 // RUN: %target-swift-emit-silgen -module-name accessor_borrow \
 // RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: %s | %FileCheck %s

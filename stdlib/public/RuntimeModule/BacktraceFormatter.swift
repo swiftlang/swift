@@ -19,7 +19,7 @@ import Swift
 
 #if os(anyAppleOS)
 internal import Darwin
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #elseif os(Windows)
 internal import ucrt
 #elseif canImport(Glibc)

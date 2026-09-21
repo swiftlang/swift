@@ -18,15 +18,11 @@
 #include "ManagedValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
-#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
-#include "swift/AST/ASTMangler.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -298,7 +294,8 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
 
   // `initialValue`
   {
-    SILFunctionConventions fnConv(fnType, SGF.SGM.M);
+    SILFunctionConventions fnConv(
+        fnType, SILAddressConventions::forFunction(SGF.F));
     auto startArgIdx = fnConv.getSILArgIndexOfFirstParam();
 
     SmallVector<ManagedValue> initialValues;
@@ -326,9 +323,11 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
   arguments.push_back(SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy)));
 
   SubstitutionMap subs;
-  if (auto *env =
-          accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
-    subs = env->getForwardingSubstitutionMap();
+  if (fnType->getInvocationGenericSignature()) {
+    if (auto *env =
+            accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
+      subs = env->getForwardingSubstitutionMap();
+    }
   }
 
   (void)SGF.B.createApply(loc, accessorRef, subs, arguments, ApplyOptions());
@@ -904,7 +903,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the indirect return slot.
   InitializationPtr dest;
-  if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!enumTI.isLoadableOrOpaque(F)) {
     auto &AC = getASTContext();
     auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -962,7 +961,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     scope.pop();
     B.createReturn(ReturnLoc, emitEmptyTuple(CleanupLocation(Loc)));
   } else {
-    assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
+    assert(enumTI.isLoadableOrOpaque(F));
     SILValue result = mv.ensurePlusOne(*this, ReturnLoc).forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
@@ -1201,6 +1200,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
     B.emitDebugDescription(PrologueLoc, selfArg.getValue(), DbgVar);
+    enterFormalScopeCleanup(selfDecl, selfArg.getValue());
   }
 
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
@@ -1571,7 +1571,7 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
   if (!init)
     return;
 
-  auto *varPattern = member->getPattern(0);
+  auto *varPattern = member->getCheckedPattern(0);
 
   // Cleanup after this initialization.
   FullExpr scope(Cleanups, varPattern);
@@ -1604,14 +1604,19 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
     B.createEndAccess(loc, selfRef.getValue(), /*aborted=*/false);
 }
 
-void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
-                                           PatternBindingDecl *field,
-                                           SubstitutionMap substitutions) {
+void SILGenFunction::emitMemberInitializer(
+    DeclContext *dc, VarDecl *selfDecl, PatternBindingDecl *field,
+    SubstitutionMap substitutions,
+    const llvm::SmallPtrSetImpl<VarDecl *> &initAccessorSubsumedStorage) {
   assert(!field->isStatic());
 
   for (auto i : range(field->getNumPatternEntries())) {
+    auto *var = field->getAnchoringVarDecl(i);
+    if (var)
+      (void)var->getImplInfo(); // trigger expansion of attached accessor macros
+
     auto init = field->getExecutableInit(i);
-    if (!init)
+    if (!init || (var && initAccessorSubsumedStorage.count(var)))
       continue;
 
     // Member initializer expressions are only used in a constructor with
@@ -1619,7 +1624,6 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // initializer from being evaluated synchronously (or propagating required
     // isolation through closure bodies), then the default value cannot be used
     // and the member must be explicitly initialized in the constructor.
-    auto *var = field->getAnchoringVarDecl(i);
     auto requiredIsolation = var->getInitializerIsolation();
     auto contextIsolation = getActorIsolationOfContext(dc);
     switch (requiredIsolation) {
@@ -1651,7 +1655,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     }
     }
 
-    auto *varPattern = field->getPattern(i);
+    auto *varPattern = field->getCheckedPattern(i);
 
     // Cleanup after this initialization.
     FullExpr scope(Cleanups, varPattern);
@@ -1712,10 +1716,38 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
   }
 }
 
+/// The stored properties of \p nominal whose own initializer is subsumed by an
+/// init accessor on another property. This is recomputing a fact that should
+/// be answered via some requestified bit of code that determine whether to call
+/// `setInitializerSubsumed`. That code in Sema is currently only run during
+/// primary-file type checking.
+static void collectInitAccessorSubsumedStorage(
+    NominalTypeDecl *nominal, llvm::SmallPtrSetImpl<VarDecl *> &subsumed) {
+  std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
+  nominal->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
+
+  for (auto &pair : initializedViaAccessor) {
+    VarDecl *backing = pair.first;
+    VarDecl *accessorProp = pair.second;
+    auto *pbd = accessorProp->getParentPatternBinding();
+    if (!pbd)
+      continue;
+    auto idx = pbd->getPatternEntryIndexForVarDecl(accessorProp);
+    // Subsumed only if the accessor has an initializer of its own; force its
+    // possibly synthesized default (e.g., an Optional's 'nil').
+    (void)pbd->getCheckedPatternBindingEntry(idx);
+    if (pbd->isInitialized(idx))
+      subsumed.insert(backing);
+  }
+}
+
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
+
+  llvm::SmallPtrSet<VarDecl *, 4> initAccessorSubsumedStorage;
+  collectInitAccessorSubsumedStorage(nominal, initAccessorSubsumedStorage);
 
   llvm::SmallPtrSet<PatternBindingDecl *, 4> alreadyInitialized;
   for (auto member : nominal->getImplementationContext()->getAllMembers()) {
@@ -1736,7 +1768,8 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           for (auto *property : initAccessor->getAccessedProperties()) {
             auto *PBD = property->getParentPatternBinding();
             if (alreadyInitialized.insert(PBD).second)
-              emitMemberInitializer(dc, selfDecl, PBD, subs);
+              emitMemberInitializer(dc, selfDecl, PBD, subs,
+                                    initAccessorSubsumedStorage);
           }
 
           emitMemberInitializationViaInitAccessor(dc, selfDecl, pbd, subs);
@@ -1744,7 +1777,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         }
       }
 
-      emitMemberInitializer(dc, selfDecl, pbd, subs);
+      emitMemberInitializer(dc, selfDecl, pbd, subs, initAccessorSubsumedStorage);
     }
   }
 }

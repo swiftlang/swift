@@ -4,13 +4,13 @@ public struct Pair<A, B> {}
 
 public struct PublicStruct {
   public struct Inner {}
-  @available(*, unavailable)
-  internal struct Obsolete {} // expected-note * {{marked unavailable here}}
+  @available(*, unavailable) // expected-note * {{marked unavailable here}}
+  internal struct Obsolete {}
   // expected-note@-1 3{{type declared here}}
 }
 
-@available(*, unavailable, renamed: "PublicStruct")
-public typealias ObsoleteAlias = PublicStruct // expected-note * {{marked unavailable here}}
+@available(*, unavailable, renamed: "PublicStruct") // expected-note * {{marked unavailable here}}
+public typealias ObsoleteAlias = PublicStruct
 
 public let a: ObsoleteAlias.Inner? // expected-error {{'ObsoleteAlias' has been renamed to 'PublicStruct'}}
 

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS

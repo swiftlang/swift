@@ -229,21 +229,57 @@ public:
 /// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
+///
+/// ### Cancellation reasons
+/// Swift 6.5 introduced cancellation reason aware handlers, so the record must
+/// invoke the handler with or without the reason, depending which handler API was used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
 public:
   using FunctionType = SWIFT_CC(swift) void(SWIFT_CONTEXT void *);
+  using FunctionTypeWithReason = SWIFT_CC(swift) void(size_t /*reason*/, SWIFT_CONTEXT void *);
 
 private:
-  FunctionType *__ptrauth_swift_cancellation_notification_function Function;
+  enum class Flags : uint8_t {
+    /// Whether the type of the Function is ...WithReason.
+    HasReason = 1 << 0,
+
+    /// Atomic flag to prevent the handler firing multiple times.
+    /// Necessary because multiple cancellation scopes might otherwise
+    /// cause an outer handler to be triggered multiple times.
+    Fired = 1 << 1
+  };
+
+  union {
+    FunctionType *__ptrauth_swift_cancellation_notification_function
+        Function;
+    FunctionTypeWithReason *__ptrauth_swift_cancellation_notification_with_reason_function
+        FunctionWithReason;
+  };
   void *Argument;
+  std::atomic<uint8_t> flags;
+
+
+
 
 public:
   CancellationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
-        Function(fn), Argument(arg) {}
+        Function(fn), Argument(arg), flags(0) {}
 
-  void run() {
-    Function(Argument);
+  CancellationNotificationStatusRecord(FunctionTypeWithReason *fn, void *arg)
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
+        FunctionWithReason(fn), Argument(arg),
+        flags(static_cast<uint8_t>(Flags::HasReason)) {}
+
+  void run(size_t reason) {
+    uint8_t old = flags.fetch_or(static_cast<uint8_t>(Flags::Fired),
+                                      std::memory_order_relaxed);
+    if (old & static_cast<uint8_t>(Flags::Fired))
+      return;
+    if (old & static_cast<uint8_t>(Flags::HasReason))
+      FunctionWithReason(reason, Argument);
+    else
+      Function(Argument);
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -328,21 +364,14 @@ public:
   }
 };
 
-class TaskNameStatusRecord : public TaskStatusRecord {
-private:
-  const char *Name;
-
-public:
-  TaskNameStatusRecord(const char *name)
-      : TaskStatusRecord(TaskStatusRecordKind::TaskName),
-        Name(name) {}
-
-  const char *getName() { return Name; }
-
-  static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::TaskName;
-  }
-};
+// Deprecated: TaskNameStatusRecord was used Swift 6.4 (including)
+// to store the initial task name of a task; However we later optimized
+// this to avoid the ready-for-mutable-operations record infrastructure
+// in order to facilitate quicker task name lookups by tools like lldb, spindump etc.
+//
+//    class TaskNameStatusRecord : public TaskStatusRecord {
+//      const char *Name;
+//    };
 
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
@@ -401,36 +430,34 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
     EnqueuedOnExecutor,
   } DependencyKind;
 
-  // The task that has this task status record - ie a backpointer from the
-  // record to the task with the record. This is not its own +1, we rely on the
-  // fact that since this status record is linked into a task, the task is
-  // already alive and maintained by someone and we can safely borrow the
-  // reference.
-  AsyncTask *WaitingTask;
+  // When the dependency kind is waiting on Task, this pointer contains
+  // the next link in the wait queue of the Task it is waiting on. This
+  // pointer should only be used through the wait queue's functions.
+  AsyncTask *NextWaitingTask;
 
 public:
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, AsyncTask *task) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnTask), WaitingTask(waitingTask) {
-      DependentOn.Task = task;
+  TaskDependencyStatusRecord(AsyncTask *task)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnTask) {
+    DependentOn.Task = task;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, ContinuationAsyncContext *context) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnContinuation), WaitingTask(waitingTask) {
-      DependentOn.Continuation = context;
+  TaskDependencyStatusRecord(ContinuationAsyncContext *context)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnContinuation) {
+    DependentOn.Continuation = context;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, TaskGroup *taskGroup) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnTaskGroup), WaitingTask(waitingTask){
-      DependentOn.TaskGroup = taskGroup;
+  TaskDependencyStatusRecord(TaskGroup *taskGroup)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnTaskGroup) {
+    DependentOn.TaskGroup = taskGroup;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, SerialExecutorRef executor) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(EnqueuedOnExecutor), WaitingTask(waitingTask) {
-      DependentOn.Executor = executor;
+  TaskDependencyStatusRecord(SerialExecutorRef executor)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(EnqueuedOnExecutor) {
+    DependentOn.Executor = executor;
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -442,8 +469,176 @@ public:
     DependentOn.Executor = executor;
   }
 
-  void performEscalationAction(
-      JobPriority oldPriority, JobPriority newPriority);
+  void performEscalationAction(AsyncTask *task, JobPriority oldPriority,
+                               JobPriority newPriority);
+
+  // Assumes that this record is of kind WaitingOnTask
+  AsyncTask *&getNextWaitingTask();
+};
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+/// A status record that represents a task deadline.
+///
+/// The clock and instant are pointers to *borrowed* for the duration of withDeadline values,
+/// and therefore are safe without having to make copies.
+///
+/// ### Deadline nesting
+/// Multiple deadlines may be installed on the same task.
+///
+/// By construction, the innermost record for any given clock identity
+/// always is the "nearest", i.e. a search for nearest deadline can
+/// always stop at the first matching record.
+///
+/// ### Clock identity
+/// Comparing clock identity is fast-pathed for known system clocks,
+/// however needs to do a slow-path Identifiable comparison for any user
+/// defined clocks.
+class TaskDeadlineStatusRecord : public TaskStatusRecord {
+  static constexpr uintptr_t FlagsMask = ~uintptr_t(alignof(void*) - 1);
+
+  /// Clock type metadata, with `Flags` stored in the spare low bits.
+  uintptr_t ClockTypeAndFlags;
+
+  /// Clock.Instant type metadata (Clock is stored in ClockTypeAndFlags).
+  const Metadata *InstantType;
+
+  /// Borrowed pointer to the caller's clock value.
+  OpaqueValue *ClockPtr;
+
+  /// Borrowed pointer to the caller's deadline instant value.
+  OpaqueValue *InstantPtr;
+
+  enum class Flags : uintptr_t {
+    /// True iff the record is the "outermost" deadline in this entire
+    /// task hierarchy.
+    ///
+    /// This allows short-circuiting lookups; if we find the outermost
+    /// record, there's no reason to keep looking at parent tasks and
+    /// records for other deadlines.
+    ///
+    /// This flag does NOT take into account clock identity.
+    IsOutermostDeadline = 1 << 0,
+  };
+
+public:
+  TaskDeadlineStatusRecord(const Metadata *clockType,
+                           const Metadata *instantType,
+                           OpaqueValue *clockPtr,
+                           OpaqueValue *instantPtr,
+                           bool isOutermostDeadline)
+      : TaskStatusRecord(TaskStatusRecordKind::Deadline),
+        ClockTypeAndFlags(reinterpret_cast<uintptr_t>(clockType) |
+                          (isOutermostDeadline
+                               ? static_cast<uintptr_t>(Flags::IsOutermostDeadline)
+                               : 0)),
+        InstantType(instantType),
+        ClockPtr(clockPtr),
+        InstantPtr(instantPtr) {}
+
+  const Metadata *getClockType() const {
+    return reinterpret_cast<const Metadata *>(ClockTypeAndFlags & FlagsMask);
+  }
+  const Metadata *getInstantType() const { return InstantType; }
+
+  /// Borrowed pointer to the caller's clock value.
+  OpaqueValue *getClockPtr() const { return ClockPtr; }
+
+  /// Borrowed pointer to the caller's deadline instant value.
+  OpaqueValue *getInstantPtr() const { return InstantPtr; }
+
+  bool isOutermostDeadline() const {
+    return ClockTypeAndFlags & static_cast<uintptr_t>(Flags::IsOutermostDeadline);
+  }
+  void setIsOutermostDeadline(bool value) {
+    if (value)
+      ClockTypeAndFlags |= static_cast<uintptr_t>(Flags::IsOutermostDeadline);
+    else
+      ClockTypeAndFlags &= ~static_cast<uintptr_t>(Flags::IsOutermostDeadline);
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::Deadline;
+  }
+};
+
+static_assert(sizeof(TaskDeadlineStatusRecord) <=
+                  NumWords_TaskDeadline * sizeof(void *),
+              "TaskDeadlineStatusRecord must fit in NumWords_TaskDeadline");
+
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+/// A status record which represents a scoped cancellation scope that is
+/// independent of whole-task cancellation.
+///
+/// Cancelling the scope does not set the task's own cancellation flag.
+/// Only handlers registered _inside_ the scope's dynamic extent are fired.
+class TaskCancellationScopeRecord : public TaskStatusRecord {
+  /// The task that installed this scope.
+  /// Necessary to trigger cancellation handlers nested in the scope when cancelled.
+  ///
+  /// The scope does not retain the task, it is structurally guaranteed
+  /// to remain alive while the scope is active.
+  AsyncTask *OwningTask;
+
+  /// Packed cancellation state
+  ///
+  /// bit 0:          the cancelled flag;
+  /// bits 1-3:       hold the cancellation reason (same shape as swift_task_cancelWithFlags).
+  /// remaining bits: reserved for future use.
+  std::atomic<uintptr_t> State{0};
+
+  static constexpr uintptr_t CancelledBit = 1;
+  static constexpr uintptr_t ReasonMask = 0b111;
+
+public:
+  explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskCancellationScope),
+        OwningTask(owningTask) {}
+
+  AsyncTask *getOwningTask() const { return OwningTask; }
+
+  bool isCancelled() const {
+    return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
+  }
+  size_t getReason() const {
+    return (State.load(std::memory_order_relaxed) >> 1) & ReasonMask;
+  }
+  /// Cancel the scope, recording `reason`.
+  /// Only 3 bits of the reason are used, remaining bits are reserved for future evolution.
+  ///
+  /// First-cancel-wins: if the scope is already cancelled, this is a no-op.
+  void cancel(size_t reason) {
+    auto oldState = State.load(std::memory_order_relaxed);
+    // bail if the scope was already cancelled - first-cancel-wins.
+    while (!(oldState & CancelledBit)) {
+      auto newState = ((reason & ReasonMask) << 1) | CancelledBit;
+      if (State.compare_exchange_weak(oldState, newState,
+                                       std::memory_order_relaxed,
+                                       std::memory_order_relaxed)) {
+        return;
+      }
+      // CAS failed, retry
+    }
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskCancellationScope;
+  }
+};
+
+/// A status record representing an active `withTaskCancellationShield` block.
+/// 
+/// Its position in the records list relative to any `TaskCancellationScopeRecord`
+/// determines whether a scope's cancellation is masked at a given call site.
+class TaskCancellationShieldRecord : public TaskStatusRecord {
+public:
+  TaskCancellationShieldRecord()
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationShield) {}
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::CancellationShield;
+  }
 };
 
 } // end namespace swift

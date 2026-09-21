@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 func readwrite(_ : inout String) {}
@@ -14,10 +15,12 @@ struct SimpleModify {
 // CHECK-NEXT:    yield [[FIELD]] : $*String, resume bb1, unwind bb2
 // CHECK:       bb1:
 // CHECK-NEXT:    end_access [[SELF]] : $*SimpleModify
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK:       bb2:
 // CHECK-NEXT:    end_access [[SELF]] : $*SimpleModify
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    unwind
     _modify {
       yield &stored
@@ -33,6 +36,8 @@ struct SimpleModify {
 // CHECK-NEXT:    assign [[VALUE]] to [[FIELD]] : $*String
 // CHECK-NEXT:    end_apply [[TOKEN]]
 // CHECK-NEXT:    end_access [[SELF]] : $*SimpleModify
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 mutating func set(string: String) {
@@ -49,6 +54,7 @@ mutating func set(string: String) {
 // CHECK-NEXT:    apply [[READWRITE]]([[FIELD]])
 // CHECK-NEXT:    end_apply [[TOKEN]]
 // CHECK-NEXT:    end_access [[SELF]] : $*SimpleModify
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   mutating func modify() {
@@ -71,6 +77,8 @@ class SetterSynthesisFromModify {
 // CHECK-NEXT:    assign [[VALUE]] to [[FIELD]] : $*String
 // CHECK-NEXT:    end_apply [[TOKEN]]
 // CHECK-NEXT:    end_borrow [[VALUE_BORROW]]
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value %0 : $String
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
@@ -96,6 +104,8 @@ struct ModifyAndSet {
 // CHECK-NEXT:    [[SETTERFN:%.*]] = function_ref @$s15modify_accessor12ModifyAndSetV10modifiableSSvs
 // CHECK-NEXT:    apply [[SETTERFN]]([[VALUE]], [[SELF]])
 // CHECK-NEXT:    end_access [[SELF]] : $*ModifyAndSet
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   mutating func set(string: String) {
@@ -112,6 +122,7 @@ struct ModifyAndSet {
   // CHECK-NEXT:    apply [[READWRITE]]([[FIELD]])
   // CHECK-NEXT:    end_apply [[TOKEN]]
   // CHECK-NEXT:    end_access [[SELF]] : $*ModifyAndSet
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:    [[RET:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RET]] : $()
   mutating func modify() {

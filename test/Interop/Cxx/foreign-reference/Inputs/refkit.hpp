@@ -264,7 +264,7 @@ public:
       return;
     delete const_cast<T *>(static_cast<const T *>(this));
   }
-} SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT;
+};
 
 class Object : public RefCounted<Object> {
   // noncopyable
@@ -277,7 +277,8 @@ protected:
 public:
   enum class Type : unsigned char { SomeType };
   virtual ~Object() { tracePrintf("~Object <- %p", this); }
-} SWIFT_SHARED_REFERENCE(refObject, derefObject);
+} SWIFT_SHARED_REFERENCE(refObject, derefObject)
+  SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT;
 
 MAKE_RETAIN_RELEASE_FUNCTIONS(Object)
 
@@ -304,7 +305,8 @@ public:
 
   float get() const { return value; }
   void set(float v) { value = v; }
-} SWIFT_SHARED_REFERENCE(refNumberObj, derefNumberObj);
+} SWIFT_SHARED_REFERENCE(refNumberObj, derefNumberObj)
+  SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT;
 
 MAKE_RETAIN_RELEASE_FUNCTIONS(NumberObj)
 
@@ -330,7 +332,8 @@ public:
 
 private:
   T m_value;
-} SWIFT_SHARED_REFERENCE(.ref, .deref);
+} SWIFT_SHARED_REFERENCE(.ref, .deref)
+  SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT;
 
 using BoxedFloat = Boxed<float>;
 using RefBoxedFloat = Ref<Boxed<float>>;

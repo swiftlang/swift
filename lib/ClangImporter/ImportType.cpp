@@ -39,19 +39,21 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/ExprCXX.h"
+#include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
+#include <optional>
 
 using namespace swift;
 using namespace importer;
@@ -79,6 +81,121 @@ bool ClangImporter::Implementation::isOverAligned(
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) const {
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
+}
+
+std::optional<StringRef>
+importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
+  switch (type->getKind()) {
+  case clang::BuiltinType::Void:
+    return std::nullopt;
+
+    // Builtin kinds with a Swift stdlib equivalent.
+#define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)                               \
+  case clang::BuiltinType::CLANG_KIND:                                         \
+    return StringRef(#SWIFT_NAME);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+  // Types that cannot be mapped into Swift, and probably won't ever be.
+  case clang::BuiltinType::Dependent:
+  case clang::BuiltinType::ARCUnbridgedCast:
+  case clang::BuiltinType::BoundMember:
+  case clang::BuiltinType::BuiltinFn:
+  case clang::BuiltinType::IncompleteMatrixIdx:
+  case clang::BuiltinType::Overload:
+  case clang::BuiltinType::PseudoObject:
+  case clang::BuiltinType::UnknownAny:
+  case clang::BuiltinType::UnresolvedTemplate:
+    return std::nullopt;
+
+  // FIXME: Types that can be mapped, but aren't yet.
+  case clang::BuiltinType::ShortAccum:
+  case clang::BuiltinType::Accum:
+  case clang::BuiltinType::LongAccum:
+  case clang::BuiltinType::UShortAccum:
+  case clang::BuiltinType::UAccum:
+  case clang::BuiltinType::ULongAccum:
+  case clang::BuiltinType::ShortFract:
+  case clang::BuiltinType::Fract:
+  case clang::BuiltinType::LongFract:
+  case clang::BuiltinType::UShortFract:
+  case clang::BuiltinType::UFract:
+  case clang::BuiltinType::ULongFract:
+  case clang::BuiltinType::SatShortAccum:
+  case clang::BuiltinType::SatAccum:
+  case clang::BuiltinType::SatLongAccum:
+  case clang::BuiltinType::SatUShortAccum:
+  case clang::BuiltinType::SatUAccum:
+  case clang::BuiltinType::SatULongAccum:
+  case clang::BuiltinType::SatShortFract:
+  case clang::BuiltinType::SatFract:
+  case clang::BuiltinType::SatLongFract:
+  case clang::BuiltinType::SatUShortFract:
+  case clang::BuiltinType::SatUFract:
+  case clang::BuiltinType::SatULongFract:
+  case clang::BuiltinType::BFloat16:
+  case clang::BuiltinType::Float128:
+  case clang::BuiltinType::NullPtr:
+  case clang::BuiltinType::Ibm128:
+    return std::nullopt;
+
+  // Objective-C types that aren't mapped directly; rather, pointers to
+  // these types will be mapped.
+  case clang::BuiltinType::ObjCClass:
+  case clang::BuiltinType::ObjCId:
+  case clang::BuiltinType::ObjCSel:
+    return std::nullopt;
+
+  // OpenMP types that don't have Swift equivalents.
+  case clang::BuiltinType::ArraySection:
+  case clang::BuiltinType::OMPArrayShaping:
+  case clang::BuiltinType::OMPIterator:
+    return std::nullopt;
+
+  // OpenCL builtin types that don't have Swift equivalents.
+  case clang::BuiltinType::OCLClkEvent:
+  case clang::BuiltinType::OCLEvent:
+  case clang::BuiltinType::OCLSampler:
+  case clang::BuiltinType::OCLQueue:
+  case clang::BuiltinType::OCLReserveID:
+#define IMAGE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLImageTypes.def"
+#define EXT_OPAQUE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLExtensionTypes.def"
+    return std::nullopt;
+
+    // ARM SVE builtin types that don't have Swift equivalents.
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/AArch64ACLETypes.def"
+    return std::nullopt;
+
+    // PPC SVE builtin types that don't have Swift equivalents.
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
+    return std::nullopt;
+
+    // RISC-V V builtin types that don't have Swift equivalents.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
+    return std::nullopt;
+
+    // WASM builtin types that don't have Swift equivalents.
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+    return std::nullopt;
+
+    // AMDGPU builtin types that don't have Swift equivalents.
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
+  case clang::BuiltinType::Id:
+#include "clang/Basic/AMDGPUTypes.def"
+    return std::nullopt;
+
+    // HLSL intangible builtin types that don't have Swift equivalents.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+    return std::nullopt;
+  }
+
+  llvm_unreachable("Invalid BuiltinType.");
 }
 
 namespace {
@@ -187,7 +304,7 @@ namespace {
                                                     const Type &pointeeType) {
     auto funcTy = pointeeType->castTo<FunctionType>();
     return {FunctionType::get(
-                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getParams(), funcTy->getYields(), funcTy->getResult(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
@@ -269,119 +386,15 @@ namespace {
     }
 
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
-      switch (type->getKind()) {
-      case clang::BuiltinType::Void:
-        return { Type(), ImportHint::Void };
+      const clang::BuiltinType::Kind kind = type->getKind();
+      if (kind == clang::BuiltinType::Void)
+        return {Type(), ImportHint::Void};
 
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)             \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
-        return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
-                                        #SWIFT_TYPE_NAME));
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)       \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), #SWIFT_TYPE_NAME);
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-
-      // Types that cannot be mapped into Swift, and probably won't ever be.
-      case clang::BuiltinType::Dependent:
-      case clang::BuiltinType::ARCUnbridgedCast:
-      case clang::BuiltinType::BoundMember:
-      case clang::BuiltinType::BuiltinFn:
-      case clang::BuiltinType::IncompleteMatrixIdx:
-      case clang::BuiltinType::Overload:
-      case clang::BuiltinType::PseudoObject:
-      case clang::BuiltinType::UnknownAny:
-      case clang::BuiltinType::UnresolvedTemplate:
+      std::optional<StringRef> swiftTypeName = getBuiltinTypeSwiftName(type);
+      if (!swiftTypeName)
         return Type();
 
-      // FIXME: Types that can be mapped, but aren't yet.
-      case clang::BuiltinType::ShortAccum:
-      case clang::BuiltinType::Accum:
-      case clang::BuiltinType::LongAccum:
-      case clang::BuiltinType::UShortAccum:
-      case clang::BuiltinType::UAccum:
-      case clang::BuiltinType::ULongAccum:
-      case clang::BuiltinType::ShortFract:
-      case clang::BuiltinType::Fract:
-      case clang::BuiltinType::LongFract:
-      case clang::BuiltinType::UShortFract:
-      case clang::BuiltinType::UFract:
-      case clang::BuiltinType::ULongFract:
-      case clang::BuiltinType::SatShortAccum:
-      case clang::BuiltinType::SatAccum:
-      case clang::BuiltinType::SatLongAccum:
-      case clang::BuiltinType::SatUShortAccum:
-      case clang::BuiltinType::SatUAccum:
-      case clang::BuiltinType::SatULongAccum:
-      case clang::BuiltinType::SatShortFract:
-      case clang::BuiltinType::SatFract:
-      case clang::BuiltinType::SatLongFract:
-      case clang::BuiltinType::SatUShortFract:
-      case clang::BuiltinType::SatUFract:
-      case clang::BuiltinType::SatULongFract:
-      case clang::BuiltinType::BFloat16:
-      case clang::BuiltinType::Float128:
-      case clang::BuiltinType::NullPtr:
-      case clang::BuiltinType::Ibm128:
-        return Type();
-
-      // Objective-C types that aren't mapped directly; rather, pointers to
-      // these types will be mapped.
-      case clang::BuiltinType::ObjCClass:
-      case clang::BuiltinType::ObjCId:
-      case clang::BuiltinType::ObjCSel:
-        return Type();
-
-      // OpenMP types that don't have Swift equivalents.
-      case clang::BuiltinType::ArraySection:
-      case clang::BuiltinType::OMPArrayShaping:
-      case clang::BuiltinType::OMPIterator:
-        return Type();
-
-      // OpenCL builtin types that don't have Swift equivalents.
-      case clang::BuiltinType::OCLClkEvent:
-      case clang::BuiltinType::OCLEvent:
-      case clang::BuiltinType::OCLSampler:
-      case clang::BuiltinType::OCLQueue:
-      case clang::BuiltinType::OCLReserveID:
-#define IMAGE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/OpenCLImageTypes.def"
-#define EXT_OPAQUE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/OpenCLExtensionTypes.def"
-        return Type();
-
-      // ARM SVE builtin types that don't have Swift equivalents.
-#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/AArch64ACLETypes.def"
-        return Type();
-
-      // PPC SVE builtin types that don't have Swift equivalents.
-#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
-#include "clang/Basic/PPCTypes.def"
-        return Type();
-
-      // RISC-V V builtin types that don't have Swift equivalents.
-#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
-#include "clang/Basic/RISCVVTypes.def"
-        return Type();
-
-#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
-#include "clang/Basic/WebAssemblyReferenceTypes.def"
-        return Type();
-
-      // AMDGPU builtin types that don't have Swift equivalents.
-#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
-      case clang::BuiltinType::Id:
-#include "clang/Basic/AMDGPUTypes.def"
-        return Type();
-
-      // HLSL intangible builtin types that don't have Swift equivalents.
-#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/HLSLIntangibleTypes.def"
-        return Type();
-      }
-
-      llvm_unreachable("Invalid BuiltinType.");
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
     }
 
     ImportResult VisitBitIntType(const clang::BitIntType *type) {
@@ -617,8 +630,8 @@ namespace {
               .withRepresentation(FunctionType::Representation::Block)
               .withClangFunctionType(type)
               .build();
-      auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
+      auto funcTy = FunctionType::get(fTy->getParams(), fTy->getYields(),
+                                      fTy->getResult(), extInfo);
       return { funcTy, ImportHint::Block };
     }
 
@@ -764,9 +777,13 @@ namespace {
         }
 
         auto paramQualType = *param;
-        if (paramQualType->isReferenceType() &&
-            paramQualType->getPointeeType().isConstQualified())
-          paramQualType = paramQualType->getPointeeType();
+        // `inout` is not expressible in `@convention(c)`, so a mutable lvalue
+        // reference stays a pointer; SIL passes it directly to match. Every
+        // other reference kind is lowered indirectly, so it has to be
+        // flattened to the pointee here.
+        if (auto ref = classifyCxxReferenceParameter(paramQualType))
+          if (ref->kind != CxxReferenceParameterKind::Mutating)
+            paramQualType = ref->pointeeType;
 
         // Mark any `sending` parameters if need be.
         ImportTypeAttrs paramAttributes;
@@ -806,7 +823,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy, extInfo);
+      return FunctionType::get(params, /* yields */ {}, resultTy, extInfo);
     }
 
     ImportResult
@@ -820,7 +837,7 @@ namespace {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      return FunctionType::get({}, resultTy, info);
+      return FunctionType::get({}, /* yields */ {}, resultTy, info);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
@@ -892,6 +909,16 @@ namespace {
         return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
       }
 
+      if (const clang::TypedefNameDecl *D = type->getDecl()) {
+        if (D->isImplicit() && D->getDeclName().isIdentifier() &&
+            D->getName().contains(' ')) {
+          // When clang encounters a bounds attribute (e.g. `__single`) applied to
+          // a typedef type (`foo_t`) it uses a hack where it synthesizes a new
+          // typedef with the name `foo_t __single`, including the space.
+          return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
+        }
+      }
+
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(
           Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
@@ -942,27 +969,21 @@ namespace {
           break;
         }
 
-        static const llvm::StringLiteral vaListNames[] = {
-          "va_list", "__gnuc_va_list", "__va_list"
-        };
-
-        ImportHint hint = ImportHint::None;
-        if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "Boolean") {
-          // FIXME: Darwin only?
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "NSUInteger") {
-          hint = ImportHint::NSUInteger;
-        } else if (llvm::is_contained(vaListNames,
-                                      type->getDecl()->getName())) {
-          hint = ImportHint::VAList;
-        } else if (isImportedCFPointer(type->desugar(), mappedType)) {
-          hint = ImportHint::CFPointer;
-        } else if (mappedType->isAnyExistentialType()) { // id, Class
-          hint = ImportHint::ObjCPointer;
-        } else if (type->isPointerType() || type->isBlockPointerType()) {
-          hint = ImportHint::OtherPointer;
+        ImportHint hint =
+            llvm::StringSwitch<ImportHint>(type->getDecl()->getName())
+                // FIXME: Is "Boolean" Darwin only?
+                .Cases({"BOOL", "Boolean"}, ImportHint::Boolean)
+                .Case("NSUInteger", ImportHint::NSUInteger)
+                .Cases({"va_list", "__gnuc_va_list", "__va_list"},
+                       ImportHint::VAList)
+                .Default(ImportHint::None);
+        if (hint == ImportHint::None) {
+          if (isImportedCFPointer(type->desugar(), mappedType))
+            hint = ImportHint::CFPointer;
+          else if (mappedType->isAnyExistentialType()) // id, Class
+            hint = ImportHint::ObjCPointer;
+          else if (type->isPointerType() || type->isBlockPointerType())
+            hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
         return { mappedType, hint };
@@ -1057,14 +1078,10 @@ namespace {
       if (!decl)
         return nullptr;
 
-      if (Bridging == Bridgeability::Full)
-        for (const auto *attr : decl->getAttrs())
-          if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
-            if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                    "_refCountedPtr")) {
-              return ImportResult(decl->getDeclaredInterfaceType(),
-                                  ImportHint::IntrusivelyRefCountedSmartPtr);
-            }
+      if (Bridging == Bridgeability::Full &&
+          importer::getRefCountedPtrAttr(decl))
+        return ImportResult(decl->getDeclaredInterfaceType(),
+                            ImportHint::IntrusivelyRefCountedSmartPtr);
 
       return decl->getDeclaredInterfaceType();
     }
@@ -2411,6 +2428,20 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     }
   }
 
+  // Instantiate the return type (via clang::Sema::isCompleteType()) before
+  // importing, using the FunctionDecl's return location to improve diagnostics.
+  //
+  // Exempt operators for now, since these are imported too eagerly and can
+  // lead to spurious template instantiation failures.
+  if (auto *tagDecl = returnType->getAsTagDecl();
+      tagDecl && !tagDecl->isCompleteDefinition() &&
+      !clangDecl->isOverloadedOperator()) {
+    auto loc = clangDecl->getReturnTypeSourceRange().getBegin();
+    loc = loc.isValid() ? loc : clangDecl->getLocation();
+    if (loc.isValid())
+      (void)getClangSema().isCompleteType(loc, returnType);
+  }
+
   // Import the result type.
   return importType(
       returnType,
@@ -2454,21 +2485,43 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
-  // Only eagerly import the return type if it's not too expensive (the current
-  // heuristic for that is if it's not a record type).
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
   returnType = desugarIfBoundsAttributed(returnType);
 
+  // An explicit nullability specifier on a dependent return type, such as
+  // `T _Nullable` or `T *_Nullable`, decides the optionality of the generic
+  // result. Strip it so the template type parameter can be matched below.
+  OptionalTypeKind optionalityOfDependentReturn = OTK_None;
+  if (auto attributedTy = dyn_cast<clang::AttributedType>(returnType)) {
+    if (auto nullability = attributedTy->getImmediateNullability();
+        nullability && attributedTy->getModifiedType()->isDependentType()) {
+      optionalityOfDependentReturn = translateNullability(*nullability);
+      clang::AttributedType::stripOuterNullability(returnType);
+    }
+  }
+  auto wrapDependentReturn = [&](Type type) -> ImportedType {
+    if (!type)
+      return {type, false};
+    switch (optionalityOfDependentReturn) {
+    case OTK_None:
+      return {type, false};
+    case OTK_Optional:
+      return {OptionalType::get(type), false};
+    case OTK_ImplicitlyUnwrappedOptional:
+      return {OptionalType::get(type), true};
+    }
+    llvm_unreachable("invalid optionality");
+  };
+
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
-    importedType = {findGenericTypeInGenericDecls(
-                        *this, templateType, genericParams,
-                        getImportTypeAttrs(clangDecl), addDiag),
-                    false};
+    importedType = wrapDependentReturn(findGenericTypeInGenericDecls(
+        *this, templateType, genericParams, getImportTypeAttrs(clangDecl),
+        addDiag));
   } else if ((isa<clang::PointerType>(returnType) ||
           isa<clang::ReferenceType>(returnType)) &&
          isa<clang::TemplateTypeParmType>(returnType->getPointeeType())) {
@@ -2483,23 +2536,36 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     auto genericPointerType = genericType->wrapInPointer(pointerKind);
     if (!genericPointerType)
       addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
-    importedType = {genericPointerType, false};
-  } else if (!(isa<clang::RecordType>(returnType) ||
-               isa<clang::TemplateSpecializationType>(returnType)) ||
-             // TODO: we currently don't lazily load operator return types, but
-             // this should be trivial to add.
-             clangDecl->isOverloadedOperator() ||
-             // Dependant types are trivially mapped as Any.
-             returnType->isDependentType()) {
+    importedType = wrapDependentReturn(genericPointerType);
+  } else if (!importedType) {
     // If importedType is already initialized, it means we found the enum that
     // was supposed to be used (instead of the typedef type).
+    importedType =
+        importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
     if (!importedType) {
-      importedType =
-          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
-      if (!importedType) {
+      // If we reach here, it means we can't import this function's return type.
+      // Sometimes, instead of skipping this function entirely, we import the
+      // function but we mark it as unavailable and map its return type to
+      // 'Never' so that it doesn't just get diagnosed as a missing member.
+      //
+      // TODO: unify the policy around unimportable/semi-unimportable types and
+      // decls, and replace this confusingly ad hoc logic.
+      //
+      // The condition below preserves historical compiler behavior for
+      // different kinds of decls.
+      bool importAsUnavailable =
+          isa<clang::RecordType, clang::TemplateSpecializationType>(
+              returnType) &&
+          !clangDecl->isOverloadedOperator() && !returnType->isDependentType();
+      if (!importAsUnavailable) {
+        // Emit diagnostic and return without assigning to parameterList, to
+        // signal that the function decl should not be imported.
         addDiag(Diagnostic(diag::return_type_not_imported));
         return {Type(), false};
       }
+      // Fall through with an empty result type. The path below assigns to
+      // parameterList, which causes importFunctionDecl() to import the function
+      // but mark it unavailable and map the return type to 'Never'.
     }
   }
 
@@ -2522,14 +2588,9 @@ static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
   if (getActorIsolationOfContext(dc).isGlobalActor())
     return true;
 
-  if (!parent->hasAttrs())
-    return false;
-
-  for (const auto *attr : parent->getAttrs()) {
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (isMainActorAttr(swiftAttr))
-        return true;
-    }
+  for (const auto *swiftAttr : parent->specific_attrs<clang::SwiftAttrAttr>()) {
+    if (isMainActorAttr(swiftAttr))
+      return true;
   }
 
   return false;
@@ -2559,13 +2620,40 @@ ClangImporter::Implementation::importParameterType(
   // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
   // have that information in optionalityOfParam.
   if (auto attributedTy = dyn_cast<clang::AttributedType>(paramTy)) {
-    if (attributedTy->getImmediateNullability())
+    if (attributedTy->getImmediateNullability()) {
       clang::AttributedType::stripOuterNullability(paramTy);
+      // In a function template specialization, the substituted template
+      // argument can carry its own specifier underneath, e.g. `T _Nullable`
+      // instantiated with `FRT *_Nonnull`. The outer specifier wins, so drop
+      // the inner one as well.
+      while (auto substTy =
+                 dyn_cast<clang::SubstTemplateTypeParmType>(paramTy)) {
+        paramTy = substTy->desugar();
+        clang::AttributedType::stripOuterNullability(paramTy);
+      }
+    }
   }
 
   ImportTypeKind importKind = paramIsCompletionHandler
                                   ? ImportTypeKind::CompletionHandlerParameter
                                   : ImportTypeKind::Parameter;
+
+  // Instantiate the parameter type (via clang::Sema::isCompleteType()) before
+  // importing, using the parameter's location to improve diagnostics.
+  //
+  // Exempt operators for now, since these are imported too eagerly and can
+  // lead to spurious template instantiation failures.
+  if (auto *tagDecl = paramTy->getAsTagDecl();
+      tagDecl && !tagDecl->isCompleteDefinition()) {
+    if (auto *parentFn = dyn_cast<clang::FunctionDecl>(parent);
+        !parentFn || !parentFn->isOverloadedOperator()) {
+      auto loc = param->getSourceRange().getBegin();
+      loc = loc.isValid() ? loc : param->getLocation();
+      loc = loc.isValid() ? loc : parent->getLocation();
+      if (loc.isValid())
+        (void)getClangSema().isCompleteType(loc, paramTy);
+    }
+  }
 
   // Import the parameter type into Swift.
   auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
@@ -2629,31 +2717,37 @@ ClangImporter::Implementation::importParameterType(
                  dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
     swiftParamTy = findGenericTypeInGenericDecls(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
+    // A template type parameter is only optional when it carries an explicit
+    // nullability specifier (`T _Nullable x`).
+    if (param->getType()->getNullability()) {
+      switch (optionalityOfParam) {
+      case OTK_Optional:
+        swiftParamTy = OptionalType::get(swiftParamTy);
+        break;
+      case OTK_ImplicitlyUnwrappedOptional:
+        swiftParamTy = OptionalType::get(swiftParamTy);
+        isParamTypeImplicitlyUnwrapped = true;
+        break;
+      case OTK_None:
+        break;
+      }
+    }
   }
 
   Bridgeability bridging = Bridgeability::Full;
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
-    if (auto refPointeeType =
-            getCxxReferencePointeeTypeOrNone(paramTy.getTypePtr())) {
+    if (auto ref = classifyCxxReferenceParameter(paramTy)) {
       // We don't support reference type to a dependent type, just bail.
-      if ((*refPointeeType)->isDependentType()) {
+      if (ref->pointeeType->isDependentType())
         return std::nullopt;
-      }
 
-      bool isRvalueRef = paramTy->isRValueReferenceType();
-      // A C++ parameter of type `const <type> &` or `<type> &` becomes `<type>`
-      // or `inout <type>`. Moreover, `const <type> &&` or `<type> &&`
-      // becomes `<type>` or `consuming <type>`. Note that SILGen will use the
-      // indirect parameter convention for such a type.
-      paramTy = *refPointeeType;
-      if (!paramTy.isConstQualified()) {
-        if (isRvalueRef)
-          isConsuming = true;
-        else
-          isInOut = true;
-      }
+      // Note that SILGen will use the indirect parameter convention for such
+      // a type.
+      paramTy = ref->pointeeType;
+      isInOut |= ref->kind == CxxReferenceParameterKind::Mutating;
+      isConsuming |= ref->kind == CxxReferenceParameterKind::Consuming;
       bridging = Bridgeability::None;
     }
   }
@@ -2709,14 +2803,17 @@ ClangImporter::Implementation::importParameterType(
     swiftParamTy = importedType.getType();
   }
 
-  // `isInOut` is set above if we stripped off a mutable `&` before importing
-  // the type. Normally, we want to use an `inout` parameter in this situation.
-  // However, if the parameter belongs to a foreign reference type *and* the
-  // reference we stripped out was directly to that type (rather than to a
-  // pointer to that type), the foreign reference type should "eat" the
-  // indirection of the `&`, so we *don't* want to use an `inout` parameter.
-  if (isInOut && isDirectUseOfForeignReferenceType(paramTy, swiftParamTy))
+  // `isInOut`/`isConsuming` is set above if we stripped off a mutable `&` or an
+  // `&&` before importing the type. Normally, we want an `inout`/`consuming`
+  // parameter in that situation. However, if the parameter belongs to a foreign
+  // reference type *and* the reference we stripped out was directly to that type
+  // (rather than to a pointer to that type), the foreign reference type should
+  // "eat" the indirection of the reference, so we don't want either.
+  if ((isInOut || isConsuming) &&
+      isDirectUseOfForeignReferenceType(paramTy, swiftParamTy)) {
     isInOut = false;
+    isConsuming = false;
+  }
 
   return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
                                    isParamTypeImplicitlyUnwrapped};
@@ -2795,11 +2892,13 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
-      if (attr->getAttribute() == "sending") {
-        paramInfo->setSending();
-      }
-    }
+    // Note: only a 'sending' written on the parameter itself counts here; one
+    // written in type position is handled via ImportTypeAttr::Sending.
+    if (llvm::any_of(param->specific_attrs<clang::SwiftAttrAttr>(),
+                     [](const clang::SwiftAttrAttr *attr) {
+                       return attr->getAttribute() == "sending";
+                     }))
+      paramInfo->setSending();
   }
 
   // C++ types taking a reference might return a reference/pointer to a

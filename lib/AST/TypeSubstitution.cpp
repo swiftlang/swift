@@ -64,7 +64,8 @@ GenericFunctionType::substGenericArgs(SubstitutionMap subs,
   // FIXME: Before dropping the signature, we should assert that
   // subs.getGenericSignature() is equal to this function type's
   // generic signature.
-  Type fnType = FunctionType::get(getParams(), getResult(), getExtInfo());
+  Type fnType =
+      FunctionType::get(getParams(), getYields(), getResult(), getExtInfo());
   return fnType.subst(subs, options)->castTo<FunctionType>();
 }
 
@@ -969,6 +970,11 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
   if (!typeDecl) {
     return true;
   }
+
+  // Embedded has no resilient ABI boundary, so all type metadata is accessible
+  // across modules regardless of access level; the access checks below do not apply.
+  if (ty->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return true;
 
   switch (kind) {
   case OpaqueSubstitutionKind::DontSubstitute:

@@ -2,13 +2,13 @@
 // RUN: split-file %s %t/src
 
 /// Build LibA
-// RUN: %host-build-swift %t/src/LibA.swift -swift-version 5 -enable-experimental-feature KeyPathWithMethodMembers -emit-module -emit-library -enable-library-evolution -module-name LibA -o %t/%target-library-name(LibA) -emit-module-interface-path %t/LibA.swiftinterface
+// RUN: %target-build-swift %t/src/LibA.swift -swift-version 5 -enable-experimental-feature KeyPathWithMethodMembers -emit-module -emit-library -enable-library-evolution -module-name LibA -Xlinker -install_name -Xlinker @executable_path/%target-library-name(LibA) -o %t/%target-library-name(LibA) -emit-module-interface-path %t/LibA.swiftinterface
 
 // Build LibB
-// RUN: %target-build-swift %t/src/LibB.swift -I %t -L %t -l LibA -swift-version 5 -enable-experimental-feature KeyPathWithMethodMembers -emit-module -emit-library -module-name LibB -o %t/%target-library-name(LibB)
+// RUN: %target-build-swift %t/src/LibB.swift -I %t -L %t -l LibA -swift-version 5 -enable-experimental-feature KeyPathWithMethodMembers -emit-module -emit-library -module-name LibB -Xlinker -install_name -Xlinker @executable_path/%target-library-name(LibB) -o %t/%target-library-name(LibB)
 
 // Build LibC
-// RUN: %target-build-swift %t/src/LibC.swift -I %t -L %t -l LibA -swift-version 5 -enable-experimental-feature KeyPathWithMethodMembers -emit-module -emit-library -module-name LibC -o %t/%target-library-name(LibC)
+// RUN: %target-build-swift %t/src/LibC.swift -I %t -L %t -l LibA -swift-version 5 -enable-experimental-feature KeyPathWithMethodMembers -emit-module -emit-library -module-name LibC -Xlinker -install_name -Xlinker @executable_path/%target-library-name(LibC) -o %t/%target-library-name(LibC)
 
 // Build & run main.swift
 // RUN: %target-build-swift -I %t -L %t -l LibA -l LibB -l LibC %t/src/main.swift -o %t/a.out
@@ -16,7 +16,7 @@
 // RUN: %target-codesign %t/%target-library-name(LibB)
 // RUN: %target-codesign %t/%target-library-name(LibC)
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run %t/a.out %t/%target-library-name(LibA) %t/%target-library-name(LibB) %t/%target-library-name(LibC) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx

@@ -24,19 +24,15 @@
 #include "swift/Basic/Cache.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDETool/CompilerInvocation.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
 
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/Chrono.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 
 using namespace SourceKit;
 using namespace swift;
@@ -1056,7 +1052,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
-    if (Mod->isClangHeaderImportModule())
+    if (Mod->isClangBridgingHeaderImportModule())
       continue;
     bool NewVisit = Visited.insert(Mod).second;
     if (!NewVisit)

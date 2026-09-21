@@ -572,7 +572,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
 
   case TypeInfoKind::Borrow: {
-    swift_unreachable("not implemented");
+    // Either a bitwise copy of the referent or a pointer to it. Not
+    // SWIFT_RAW_POINTER even in the latter case: that promises the address of a
+    // heap allocation, and a borrow can point into the interior of one.
+    return SWIFT_BUILTIN;
   }
   }
 
@@ -887,6 +890,9 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
   static_cast<void>(err);
 #else
   strncpy(OutDemangledName, Demangled.c_str(), MaxLength);
+  // Always terminate the output string, as long as it has room for a NUL.
+  if (MaxLength > 0)
+    OutDemangledName[MaxLength - 1] = '\0';
 #endif
   return Demangled.size();
 }
@@ -988,9 +994,11 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
           // systems, while StoredPointer is always the pointer size of the
           // target system.) Convert the array to an array of
           // swift_reflection_ptr_t.
-          std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
-                                                            &Ptrs[Count]};
-          Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+          std::vector<swift_reflection_ptr_t> ConvertedPtrs;
+          if (Ptrs)
+            ConvertedPtrs.assign(Ptrs, Ptrs + Count);
+          Call(AllocationPtr, ConvertedPtrs.size(), ConvertedPtrs.data(),
+               ContextPtr);
         });
     return returnableCString(ContextRef, Error);
   });
@@ -1025,7 +1033,7 @@ swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
     auto [Error, Info] = Context->asyncTaskSlabAllocations(SlabPtr);
 
     swift_async_task_slab_allocations_return_t Result = {};
-    if (Result.Error) {
+    if (Error) {
       Result.Error = returnableCString(ContextRef, Error);
       return Result;
     }
@@ -1097,6 +1105,7 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
 
     Result.RunJob = TaskInfo.RunJob;
     Result.AllocatorSlabPtr = TaskInfo.AllocatorSlabPtr;
+    Result.RegistryNext = TaskInfo.RegistryNext;
 
     auto *ChildTasks =
         ContextRef
@@ -1113,6 +1122,15 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
               std::back_inserter(*AsyncBacktraceFrames));
     Result.AsyncBacktraceFramesCount = AsyncBacktraceFrames->size();
     Result.AsyncBacktraceFrames = AsyncBacktraceFrames->data();
+
+    if (!TaskInfo.Name.empty()) {
+      auto *TmpName =
+          ContextRef->allocateSubsequentTemporaryObject<std::string>();
+      *TmpName = std::move(TaskInfo.Name);
+      Result.Name = TmpName->c_str();
+    } else {
+      Result.Name = nullptr;
+    }
 
     return Result;
   });
@@ -1146,5 +1164,16 @@ swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
   return ContextRef->withContext([&](auto *Context) {
     return Context->nextJob(
         RemoteAddress(JobPtr, RemoteAddress::DefaultAddressSpace));
+  });
+}
+
+const char *swift_reflection_iterateTaskRegistry(
+    SwiftReflectionContextRef ContextRef,
+    swift_taskRegistryIterator Call, void *ContextPtr) {
+  return ContextRef->withContext([&](auto *Context) {
+    auto Error = Context->iterateTaskRegistry([&](auto TaskAddr) {
+      Call(TaskAddr, ContextPtr);
+    });
+    return returnableCString(ContextRef, Error);
   });
 }

@@ -99,6 +99,8 @@ protected:
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
 
+  /// \p isSourceCanImport is threaded to the target-mismatch guard below; see
+  /// \c ModuleLoader::canImportModule.
   virtual bool findModule(
       ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
       SmallVectorImpl<char> *moduleInterfaceSourcePath,
@@ -106,7 +108,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
       std::string *CacheKey, bool isCanImportLookup,
-      bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule);
+      bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule,
+      bool isSourceCanImport);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -235,7 +238,8 @@ public:
   virtual bool
   canImportModule(ImportPath::Module named, SourceLoc loc,
                   ModuleVersionInfo *versionInfo,
-                  bool isTestableDependencyLookup = false) override;
+                  bool isTestableDependencyLookup,
+                  bool isSourceCanImport) override;
 
   /// Import a module with the given module path.
   ///
@@ -363,7 +367,8 @@ public:
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
-                       bool isTestableDependencyLookup = false) override;
+                       bool isTestableDependencyLookup,
+                       bool isSourceCanImport) override;
 
   ModuleDecl *
   loadModule(SourceLoc importLoc,

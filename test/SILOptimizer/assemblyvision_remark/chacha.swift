@@ -1,6 +1,5 @@
 // RUN: %target-swiftc_driver -Osize -emit-sil %s -o /dev/null -Xfrontend -verify
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
-// REQUIRES: swift_in_compiler
 
 // An extraction from the benchmark ChaCha20 that we were not ignoring
 // dealloc_stack and other end scope instructions.
@@ -36,7 +35,7 @@ public func run_ChaCha(_ N: Int) {
   checkResult(checkedtext)
 
 
-  var plaintext = Array(repeating: UInt8(0), count: 30720)
+  var plaintext = Array(repeating: UInt8(0), count: 30720) // expected-note {{of 'plaintext}}
   for _ in 1...N {
     ChaCha20.encrypt(bytes: &plaintext, key: key, nonce: nonce)
     print(plaintext.first!) // expected-remark @:11 {{heap allocated ref of type '}}

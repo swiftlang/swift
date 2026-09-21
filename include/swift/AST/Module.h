@@ -96,12 +96,13 @@ enum class FileUnitKind {
 };
 
 enum class SourceFileKind {
-  Library,  ///< A normal .swift file.
-  Main,     ///< A .swift file that can have top-level code.
-  SIL,      ///< Came from a .sil file.
+  Library,   ///< A normal .swift file.
+  Main,      ///< A .swift file that can have top-level code.
+  SIL,       ///< Came from a .sil file.
   Interface, ///< Came from a .swiftinterface file, representing another module.
-  MacroExpansion, ///< Came from a macro expansion.
+  MacroExpansion,  ///< Came from a macro expansion.
   DefaultArgument, ///< Came from default argument at caller side
+  SyntheticMacro,  ///< Came from a synthesized macro
 };
 
 /// Contains information about where a particular path is used in
@@ -643,7 +644,7 @@ public:
       SmallVectorImpl<ModuleDecl *> &overlays);
 
   /// Returns true if this module is the Clang header import module.
-  bool isClangHeaderImportModule() const;
+  bool isClangBridgingHeaderImportModule() const;
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -1106,8 +1107,11 @@ public:
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
   /// Finds all top-level decls of this module including auxiliary decls.
-  void
-  getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &Results) const;
+  ///
+  /// \p visitFreestanding When \c true (the default), includes any top-level
+  /// freestanding macro expansions.
+  void getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &Results,
+                                          bool visitFreestanding = true) const;
 
   void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 

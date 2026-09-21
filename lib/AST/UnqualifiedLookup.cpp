@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
@@ -27,13 +26,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -499,15 +495,15 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   if (!moduleToLookIn)
     return;
 
-  auto nlOptions = NL_UnqualifiedDefault;
+  NLOptions nlOptions = NLFlags::UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
-    nlOptions |= NL_IncludeUsableFromInline;
+    nlOptions |= NLFlags::IncludeUsableFromInline;
   if (options.contains(Flags::ExcludeMacroExpansions))
-    nlOptions |= NL_ExcludeMacroExpansions;
+    nlOptions |= NLFlags::ExcludeMacroExpansions;
   if (options.contains(Flags::ABIProviding))
-    nlOptions |= NL_ABIProviding;
+    nlOptions |= NLFlags::ABIProviding;
   if (options.contains(Flags::IgnoreAccessControl))
-    nlOptions |= NL_IgnoreAccessControl;
+    nlOptions |= NLFlags::IgnoreAccessControl;
 
   lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
                  CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
@@ -624,19 +620,19 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
     const bool isOriginallyTypeLookup,
     const bool isOriginallyMacroLookup) {
-  NLOptions baseNLOptions = NL_UnqualifiedDefault;
+  NLOptions baseNLOptions = NLFlags::UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
-    baseNLOptions |= NL_ProtocolMembers;
+    baseNLOptions |= NLFlags::ProtocolMembers;
   if (isOriginallyTypeLookup)
-    baseNLOptions |= NL_OnlyTypes;
+    baseNLOptions |= NLFlags::OnlyTypes;
   if (isOriginallyMacroLookup)
-    baseNLOptions |= NL_OnlyMacros;
+    baseNLOptions |= NLFlags::OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
-    baseNLOptions |= NL_IgnoreAccessControl;
+    baseNLOptions |= NLFlags::IgnoreAccessControl;
   if (options.contains(Flags::IgnoreMissingImports))
-    baseNLOptions |= NL_IgnoreMissingImports;
+    baseNLOptions |= NLFlags::IgnoreMissingImports;
   if (options.contains(Flags::ABIProviding))
-    baseNLOptions |= NL_ABIProviding;
+    baseNLOptions |= NLFlags::ABIProviding;
   return baseNLOptions;
 }
 

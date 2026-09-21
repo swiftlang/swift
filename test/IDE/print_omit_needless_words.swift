@@ -57,16 +57,16 @@
 // CHECK-FOUNDATION: func withRange(_: NSRange) -> NSValue
 
 // Note: built-in types.
-// CHECK-FOUNDATION: func add(_: Double) -> NSNumber
+// CHECK-FOUNDATION: func add(_: CDouble) -> NSNumber
 
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(_: Bool) -> NSNumber
 
 // Note: builtin-types.
-// CHECK-FOUNDATION: func add(_: UInt16) -> NSNumber
+// CHECK-FOUNDATION: func add(_: CUnsignedShort) -> NSNumber
 
 // Note: builtin-types.
-// CHECK-FOUNDATION: func add(_: Int32) -> NSNumber
+// CHECK-FOUNDATION: func add(_: CInt) -> NSNumber
 
 // Note: Typedefs with a "_t" suffix".
 // CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
@@ -192,8 +192,8 @@
 // CHECK-FOUNDATION: var guidsInText: [NSGUID] { get }
 
 // Don't strip prefixes from macro names.
-// CHECK-FOUNDATION: var NSTimeIntervalSince1970: Double { get }
-// CHECK-FOUNDATION: var NS_DO_SOMETHING: Int
+// CHECK-FOUNDATION: var NSTimeIntervalSince1970: CDouble { get }
+// CHECK-FOUNDATION: var NS_DO_SOMETHING: CInt
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->

@@ -30,13 +30,9 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/STLExtras.h"
-#include "llvm/Support/Compiler.h"
 #include <algorithm>
-#include <unordered_set>
 
 using namespace swift;
 using namespace ast_scope;
@@ -298,7 +294,8 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
 
-    if (SF->Kind == SourceFileKind::DefaultArgument) {
+    if (SF->Kind == SourceFileKind::DefaultArgument ||
+        SF->Kind == SourceFileKind::SyntheticMacro) {
       auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
           SF->getBufferID());
       parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
@@ -315,7 +312,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     // Determine the parent source location based on the macro role.
     AbstractFunctionDecl *bodyForDecl = nullptr;
 
-    switch (*macroRole) {
+    switch (macroRole.value()) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
     case MacroRole::CodeItem: {
@@ -403,7 +400,8 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-  VISIT_AND_IGNORE(UsingDecl)
+  VISIT_AND_IGNORE(FileDefaultDecl)
+  VISIT_AND_IGNORE(HiddenTypeLayoutInfoDecl)
 
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)

@@ -5,6 +5,7 @@
 
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
+// UNSUPPORTED: OS=emscripten
 // UNSUPPORTED: use_os_stdlib || back_deployment_runtime
 // UNSUPPORTED: swift_stdlib_asserts
 

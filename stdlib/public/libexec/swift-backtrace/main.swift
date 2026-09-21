@@ -116,6 +116,7 @@ internal struct SwiftBacktrace {
   static var outputStream: CFileStream? = nil
 
   static func write(_ string: String, flush: Bool = false) {
+    precondition(outputStream != nil, "Output stream must be set before calling write")
     var stream = outputStream!
 
     print(string, terminator: "", to: &stream)
@@ -125,6 +126,7 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
+    precondition(outputStream != nil, "Output stream must be set before calling writeln")
     var stream = outputStream!
 
     print(string, to: &stream)
@@ -1096,6 +1098,13 @@ Generate a backtrace for the parent process.
       case .all:
         writeln("\n\nImages:\n")
         writeln(formatter.format(images: target.images))
+    }
+    
+    if let taskRegistryAddr = target.concurrencyTaskRegistryAddr,
+       taskRegistryAddr != 0 {
+      writeln("\n\nActive Tasks:\n")
+      writeln(theme.info("  Concurrency Task Registry located at 0x\(String(taskRegistryAddr, radix: 16, uppercase: true))"))
+      writeln(theme.info("  (Run `swift-inspect dump concurrency <pid>` in LLDB or terminal to dump tasks)"))
     }
   }
 

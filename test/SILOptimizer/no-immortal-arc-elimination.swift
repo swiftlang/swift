@@ -1,9 +1,10 @@
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts -module-name=test -O -target %target-cpu-apple-macos10.14 -emit-sil | %FileCheck %s
 
+// REQUIRES: rdar187793719
+
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // Check that the optimizer does not remove "unbalanced" retains for immortal objects
 // prior to a Swift 5.1 runtime (which does not support immortal objects).

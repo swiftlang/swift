@@ -13,12 +13,9 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
-#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
-
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -271,7 +268,10 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
-  void visitUsingDecl(UsingDecl *) {}
+  void visitFileDefaultDecl(FileDefaultDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce SIL");
+  }
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}
@@ -359,6 +359,11 @@ public:
   /// Emits the distributed actor thunk for the decl if there is one associated
   /// with it.
   void emitDistributedThunkForDecl(AbstractFunctionDecl * afd);
+
+  /// Emits the distributed 'resolvable proxy adapter' thunk for the decl
+  /// if there is one associated with it.
+  void emitDistributedResolvableProxyAdapterThunkForDecl(
+      AbstractFunctionDecl *afd);
 
   /// Returns true if the given declaration must be referenced through a
   /// back deployment thunk in a context with the given resilience expansion.
@@ -465,6 +470,11 @@ public:
 
   /// Emit a deinit table for a noncopyable type.
   void emitNonCopyableTypeDeinitTable(NominalTypeDecl *decl);
+
+  /// In Embedded Swift, record a noncopyable type for which IRGen may emit
+  /// type metadata, so that the deinits reachable from its value witnesses can
+  /// be specialized before IRGen runs.
+  void recordNonCopyableTypeWithEmittedMetadata(NominalTypeDecl *decl);
 
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();

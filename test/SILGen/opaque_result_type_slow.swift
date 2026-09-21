@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/opaque_result_type_slow_other.swift -emit-module -emit-module-path %t/opaque_result_type_slow_other.swiftmodule -enable-library-evolution
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -I %t
 // RUN: %target-swift-emit-silgen %s -I %t
 
 import opaque_result_type_slow_other

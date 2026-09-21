@@ -18,7 +18,7 @@
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
-// UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=wasip1 || OS=emscripten
 
 import StdlibUnittest
 

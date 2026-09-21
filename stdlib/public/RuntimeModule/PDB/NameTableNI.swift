@@ -17,7 +17,7 @@
 
 import Swift
 
-internal import BacktracingImpl.ImageFormats.PDB
+@_implementationOnly import BacktracingImpl.ImageFormats.PDB
 
 /// This is the name table from the PDB header, as opposed to the
 /// one in the NameMap stream.
@@ -49,6 +49,10 @@ struct NameTableNI: Sequence {
     // Read the present bitmap
     let present = try Bitset.load(from: &stream)
 
+    guard Int(size) <= present.endIndex else {
+      return nil
+    }
+
     // Read the deleted bitmap
     let _ = try Bitset.load(from: &stream)
 
@@ -61,6 +65,10 @@ struct NameTableNI: Sequence {
       if present[ndx] {
         let stringOffset = Int(try stream.read(as: UInt32.self))
         let ni = try stream.read(as: UInt32.self)
+
+        guard stringOffset < buffer.count else {
+          continue
+        }
 
         // Get the string
         let string = buffer.withUnsafeBytes {

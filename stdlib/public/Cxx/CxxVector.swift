@@ -53,8 +53,8 @@ extension CxxVector {
 @available(SwiftCompatibilitySpan 5.0, *)
 extension CxxVector {
   public var span: Span<Element> {
-    @lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @_lifetime(borrow self)
+    @export(implementation)
     borrowing get {
       let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
       let span = unsafe Span(_unsafeElements: buffer)

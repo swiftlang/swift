@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil %s -min-swift-runtime-version 5.0 -verify -enable-experimental-feature StandaloneSwiftAvailability
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -min-swift-runtime-version 5.0 -enable-experimental-feature StandaloneSwiftAvailability
 // RUN: %target-swift-emit-silgen %s -min-swift-runtime-version 5.0 -enable-experimental-feature StandaloneSwiftAvailability | %FileCheck %s
 
 // REQUIRES: swift_feature_StandaloneSwiftAvailability

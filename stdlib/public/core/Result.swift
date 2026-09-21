@@ -50,7 +50,7 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new success value if this instance represents a success.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_disfavoredOverload // FIXME: Workaround for source compat issue with
                        // functions that used to shadow the original map
                        // (rdar://125016028)
@@ -84,7 +84,7 @@ extension Result {
 
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func _consumingMap<NewSuccess: ~Copyable>(
     _ transform: (consuming Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
@@ -97,7 +97,7 @@ extension Result where Success: ~Copyable {
   }
 
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public borrowing func _borrowingMap<NewSuccess: ~Copyable>(
     _ transform: (borrowing Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
@@ -137,7 +137,7 @@ extension Result where Success: ~Copyable & ~Escapable {
   ///   instance.
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new failure value if this instance represents a failure.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   public consuming func mapError<NewFailure>(
     _ transform: (Failure) -> NewFailure
@@ -193,7 +193,7 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.failure`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_disfavoredOverload // FIXME: Workaround for source compat issue with
                        // functions that used to shadow the original flatMap
                        // (rdar://125016028)
@@ -227,7 +227,7 @@ extension Result {
 
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func _consumingFlatMap<NewSuccess: ~Copyable>(
     _ transform: (consuming Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
@@ -240,7 +240,7 @@ extension Result where Success: ~Copyable {
   }
 
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public borrowing func _borrowingFlatMap<NewSuccess: ~Copyable>(
     _ transform: (borrowing Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
@@ -264,7 +264,7 @@ extension Result where Success: ~Copyable {
   ///   instance.
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.success`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
@@ -310,7 +310,7 @@ extension Result where Success: ~Copyable & ~Escapable {
   ///
   /// - Returns: The success value, if the instance represents a success.
   /// - Throws: The failure value, if the instance represents a failure.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   public consuming func get() throws(Failure) -> Success {
     switch consume self {
@@ -343,7 +343,7 @@ extension Result where Success: ~Copyable {
   /// returned value as a success, or any thrown error as a failure.
   ///
   /// - Parameter body: A potentially throwing closure to evaluate.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(catching body: () throws(Failure) -> Success) {
     // FIXME: This should allow a non-escapable `Success` -- but what's `self`'s lifetime dependence in that case?
     do {

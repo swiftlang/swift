@@ -11,16 +11,33 @@ var DeinitEscapeTestSuite = TestSuite("DeinitEscape")
 var globalObjects1: [AnyObject] = []
 var globalObjects2: [AnyObject] = []
 
+// Hide the array modifications in never-inline functions so the optimizer can't
+// notice that they're dead stores.
+@inline(never)
+func clearGlobalObjects1() {
+  globalObjects1 = []
+}
+
+@inline(never)
+func escapeToGlobalObjects2(_ object: AnyObject) {
+  globalObjects2.append(object)
+}
+
 DeinitEscapeTestSuite.test("deinit escapes self") {
   expectCrashLater()
 
   class C {
     deinit {
-      globalObjects2.append(self)
+      escapeToGlobalObjects2(self)
     }
   }
-  globalObjects1.append(C())
-  globalObjects1 = []
+  do {
+    let c = C()
+    globalObjects1.append(c)
+    _blackHole(c)
+  }
+
+  clearGlobalObjects1()
 
   expectUnreachable()
 }

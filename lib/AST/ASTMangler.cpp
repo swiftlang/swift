@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
@@ -954,7 +955,9 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   NewGlobal->addChild(TyMangling, Dem);
   auto mangling = mangleNodeOld(NewGlobal);
   if (!mangling.isSuccess()) {
-    llvm_unreachable("unexpected mangling failure");
+    // The old mangler doesn't support every kind of type (e.g. opaque types).
+    // Fall back to the new mangling in those cases.
+    return NewName;
   }
   return mangling.result();
 #endif
@@ -2348,6 +2351,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
+  if (fn->isCalledOnce())
+    OpArgs.push_back('O');
+
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
   if (diffKind != DifferentiabilityKind::NonDifferentiable) {
@@ -2403,6 +2409,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
       break;
     case SILFunctionTypeRepresentation::WitnessMethod:
       OpArgs.push_back('W');
+      break;
+    case SILFunctionTypeRepresentation::COMMethod:
+      OpArgs.push_back('V');
       break;
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -2901,6 +2910,12 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
     return;
   }
 
+  // As we're mangling a plain (non-symbolic) name for this protocol,
+  // the enclosing context mangled below must not use a symbolic
+  // reference either so that it will be resolvable at
+  // runtime. Temporarily disable symbolic references.
+  llvm::SaveAndRestore<bool> X(AllowSymbolicReferences, false);
+
   BaseEntitySignature base(protocol);
   appendContextOf(protocol, base);
   auto *clangDecl = protocol->getClangDecl();
@@ -3196,7 +3211,6 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
         return false;
     }
 
-    auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {
       if (auto typedefType = getTypeDefForCXXCFOptionsDefinition(decl)) {
@@ -3233,7 +3247,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // `ClassTemplateSpecializationDecl`'s name does not include information about
       // template arguments, and in order to prevent name clashes we use the
       // name of the Swift decl which does include template arguments.
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       appendIdentifier(namedDecl->getName());
@@ -3252,14 +3266,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // imported as a Swift enum.
       appendOperator("V");
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
-               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl) ||
+               isa<clang::NamespaceAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
       // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
       appendOperator("O");
     } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       llvm_unreachable("unknown imported Clang type");
@@ -3374,6 +3389,8 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
+    } else if (fn->isCalledOnce()) {
+      return appendOperator("XO");
     }
     return appendOperator("c");
 
@@ -3412,7 +3429,12 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
+  if (fn->isCoroutine()) {
+    appendFunctionYieldTypes(fn, fn->getYields(), sig, forDecl, isRecursedInto);
+    appendOperator("Xy");
+  }
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
+
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3590,6 +3612,48 @@ void ASTMangler::appendFunctionInputType(
           sig, nullptr);
       appendListSeparator(isFirstParam);
       paramIndex++;
+    }
+    appendOperator("t");
+    break;
+  }
+}
+
+void ASTMangler::appendFunctionYieldTypes(
+    AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Yield> yields,
+    GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
+
+  switch (yields.size()) {
+  case 0:
+    appendOperator("y");
+    break;
+
+  case 1: {
+    const auto &yield = yields.front();
+    auto type = yield.getType();
+
+    // TODO: decide on lifetime dependencies for yields
+    if (!type->is<TupleType>()) {
+      appendParameterTypeListElement(
+          Identifier(), type,
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
+  default:
+    bool isFirstYield = true;
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      appendParameterTypeListElement(
+          Identifier(), yield.getType(),
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      appendListSeparator(isFirstYield);
     }
     appendOperator("t");
     break;
@@ -4251,7 +4315,7 @@ CanType ASTMangler::getDeclTypeForMangling(
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, info);
+                                  /* yields */ {}, C.TheErrorType, info);
     }
     return C.TheErrorType;
   }
@@ -4275,8 +4339,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
 
-    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getYields(),
+                                 gft.getResult(), gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {
@@ -4478,7 +4542,17 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
       conformance->getDeclContext()->getModuleScopeContext();
   Mod = topLevelSubcontext->getParentModule();
 
-  auto conformingType = conformance->getType();
+  Type conformingType;
+  if (isa<NormalProtocolConformance>(conformance) &&
+      conformance->isReparented()) {
+    // Note: The conforming type of a reparented conformance used to be the
+    // protocol, but that interacted badly with type substitution. Instead
+    // we set the conforming type to be the Self type parameter, but that
+    // requires a special case here to maintain the previous mangling.
+    conformingType = conformance->getDeclContext()->getDeclaredInterfaceType();
+  } else {
+    conformingType = conformance->getType();
+  }
   appendType(conformingType->getCanonicalType(), nullptr);
 
   appendProtocolName(conformance->getProtocol());
@@ -4850,7 +4924,8 @@ void ASTMangler::appendDistributedThunk(
     auto M = thunk->getModuleContext();
 
     SmallVector<ValueDecl *, 1> stubClassLookupResults;
-    Context.lookupInModule(M, llvm::Twine("$", P->getNameStr()).str(), stubClassLookupResults);
+    Context.lookupInModule(M, getDistributedResolvableProtocolStubName(P).str(),
+                           stubClassLookupResults);
 
     assert(stubClassLookupResults.size() <= 1 && "Found multiple distributed stub types!");
     if (stubClassLookupResults.size() > 0) {
@@ -4991,6 +5066,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return appendMacroExpansionLoc();
   }
   
@@ -5043,6 +5119,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     llvm_unreachable("Exited above");
   }
 
@@ -5523,7 +5600,8 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
+    case DeclKind::HiddenTypeLayoutInfo:
       break;
     };
   }

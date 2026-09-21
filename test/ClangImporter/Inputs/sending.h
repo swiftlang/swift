@@ -43,6 +43,11 @@ sendUserDefinedFromGlobalFunction(NonSendableCStruct other) SWIFT_SENDING;
 void sendUserDefinedIntoGlobalFunction(
     NonSendableCStruct arg SWIFT_SENDING);
 
+// 'sending' is found even when another swift_attr precedes it.
+void sendUserDefinedIntoGlobalFunctionPrecededAttr(
+    NonSendableCStruct arg __attribute__((swift_attr("nonisolated(unsafe)")))
+        SWIFT_SENDING);
+
 void sendingWithCompletionHandler(void (^completion)(SWIFT_SENDING NonSendableCStruct arg));
 SWIFT_SENDING NonSendableCStruct sendingWithLazyReturn(SWIFT_SENDING NonSendableCStruct (^makeLazily)(void));
 

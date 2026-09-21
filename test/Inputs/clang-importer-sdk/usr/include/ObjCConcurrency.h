@@ -194,7 +194,7 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
   - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
 @end
 
-@interface GenericObject<T> : NSObject // expected-note {{generic class 'GenericObject' does not conform to the 'Sendable' protocol}}
+@interface GenericObject<T> : NSObject
 - (void)doSomethingWithCompletionHandler:(void (^)(T _Nullable_result, NSError * _Nullable))completionHandler;
 - (void)doAnotherThingWithCompletionHandler:(void (^)(GenericObject<T> *_Nullable))completionHandler;
 @end

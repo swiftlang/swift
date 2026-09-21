@@ -105,12 +105,12 @@ extension Unicode.UTF8 {
   public struct ValidationError: Error, Sendable, Hashable
   {
     /// The kind of encoding error
-    public var kind: Unicode.UTF8.ValidationError.Kind
+    public internal(set) var kind: Unicode.UTF8.ValidationError.Kind
 
     /// The range of offsets into our input containing the error
-    public var byteOffsets: Range<Int>
+    public internal(set) var byteOffsets: Range<Int>
 
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public init(
       _ kind: Unicode.UTF8.ValidationError.Kind,
       _ byteOffsets: Range<Int>
@@ -123,15 +123,15 @@ extension Unicode.UTF8 {
         _precondition(byteOffsets.count == 1)
       }
 
-      self.kind = kind
-      self.byteOffsets = byteOffsets
+      self = unsafe unsafeBitCast((kind, byteOffsets), to: Self.self)
     }
 
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public init(
       _ kind: Unicode.UTF8.ValidationError.Kind, at byteOffset: Int
     ) {
-      self.init(kind, byteOffset..<(byteOffset+1))
+      let bounds = unsafe Range(uncheckedBounds: (byteOffset, byteOffset+1))
+      self.init(kind, bounds)
     }
   }
 }
@@ -143,44 +143,82 @@ extension UTF8.ValidationError {
   @frozen
   public struct Kind: Error, Sendable, Hashable, RawRepresentable
    {
-    public var rawValue: UInt8
+    public internal(set) var rawValue: UInt8
 
-    @inlinable
     public init?(rawValue: UInt8) {
       guard rawValue <= 4 else { return nil }
       self.rawValue = rawValue
     }
 
     /// A continuation byte (`10xxxxxx`) outside of a multi-byte sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var unexpectedContinuationByte: Self {
       .init(rawValue: 0)!
     }
 
     /// A byte in a surrogate code point (`U+D800..U+DFFF`) sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var surrogateCodePointByte: Self {
       .init(rawValue: 1)!
     }
 
     /// A byte in an invalid, non-surrogate code point (`>U+10FFFF`) sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var invalidNonSurrogateCodePointByte: Self {
       .init(rawValue: 2)!
     }
 
     /// A byte in an overlong encoding sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var overlongEncodingByte: Self {
       .init(rawValue: 3)!
     }
 
     /// A multi-byte sequence that is the start of a valid multi-byte scalar
     /// but is cut off before ending correctly
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var truncatedScalar: Self {
       .init(rawValue: 4)!
     }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension UTF8.ValidationError {
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_kind: Kind {
+    get { kind }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvs")
+    set { kind = newValue }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvM")
+    _modify { yield &kind }
+  }
+
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_byteOffsets: Range<Int> {
+    get { byteOffsets }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvs")
+    set { byteOffsets = newValue }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvM")
+    _modify { yield &byteOffsets }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension UTF8.ValidationError.Kind {
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_rawValue: UInt8 {
+    get { rawValue }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvs")
+    set { rawValue = newValue }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvM")
+    _modify { yield &rawValue }
   }
 }
 

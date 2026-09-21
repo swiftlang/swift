@@ -83,7 +83,8 @@ private func simplifyIndexRawPointer(of ptr2Addr: PointerToAddressInst, _ contex
   let newPtr2Addr = builder.createPointerToAddress(pointer: indexRawPtr.base, addressType: ptr2Addr.type,
                                                    isStrict: ptr2Addr.isStrict, isInvariant: ptr2Addr.isInvariant)
   let newIndex = builder.createCastIfNeeded(of: index, toIndexTypeOf: indexRawPtr)
-  let indexAddr = builder.createIndexAddr(base: newPtr2Addr, index: newIndex, needStackProtection: false)
+  let indexAddr = builder.createIndexAddr(base: newPtr2Addr, index: newIndex,
+                                          needStackProtection: false, isProjection: false)
   ptr2Addr.replace(with: indexAddr, context)
   return true
 }
@@ -210,8 +211,12 @@ private extension PointerToAddressInst {
     case .unlimitedLifetime:
       return false
     case .limitedLifetime:
-      var addressUses = AddressUses(of: self, context)
+      var addressUses = AddressUses(context)
       defer { addressUses.deinitialize() }
+      if addressUses.walkDownUses(ofAddress: self, path: UnusedWalkingPath()) == .abortWalk {
+        // We cannot reason about all uses (e.g. a reborrowed `load_borrow`), so bail conservatively.
+        return true
+      }
       return addressUses.hasUsesOutside(of: lifetimeFrontier, beginInstruction: baseAddress)
     }
   }
@@ -258,9 +263,8 @@ private extension AccessBase {
 private struct AddressUses : AddressDefUseWalker {
   var users: InstructionWorklist
 
-  init(of address: Value, _ context: SimplifyContext) {
+  init(_ context: SimplifyContext) {
     users = InstructionWorklist(context)
-    _ = walkDownUses(ofAddress: address, path: UnusedWalkingPath())
   }
 
   mutating func deinitialize() {
@@ -268,7 +272,27 @@ private struct AddressUses : AddressDefUseWalker {
   }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let ia = address.instruction as? IndexAddrInst {
+      // The AddressDefUseWalker treats `index_addr` without the `[projection]` flag as leaf use.
+      return walkDownUses(ofAddress: ia, path: path)
+    }
     users.pushIfNotVisited(address.instruction)
+
+    if let loadBorrow = address.instruction as? LoadBorrowInst {
+      // A `load_borrow` opens a borrow scope which borrows the memory of the address. If the address
+      // is an interior pointer into a borrowed object, that scope must be nested within the object's
+      // borrow scope. The scope can extend beyond the `load_borrow` itself, so its scope-ending
+      // `end_borrow`s are the relevant latest uses of the interior pointer and must be checked against
+      // the object's lifetime.
+      for endOperand in loadBorrow.scopeEndingOperands {
+        // A `load_borrow` can be reborrowed, in which case its scope is ended by a `br` instead of an
+        // `end_borrow`. We cannot track the reborrowed value's uses here, so bail conservatively.
+        guard let endBorrow = endOperand.instruction as? EndBorrowInst else {
+          return .abortWalk
+        }
+        users.pushIfNotVisited(endBorrow)
+      }
+    }
     return .continueWalk
   }
 

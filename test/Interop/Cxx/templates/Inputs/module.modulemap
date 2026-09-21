@@ -158,6 +158,11 @@ module DefineReferencedInline {
   requires cplusplus
 }
 
+module DependentPlacementNew {
+  header "dependent-placement-new.h"
+  requires cplusplus
+}
+
 module DependentTypes {
   header "dependent-types.h"
   requires cplusplus
@@ -195,5 +200,15 @@ module ClassTemplateWithFrt {
 
 module FunctionTemplateWithOptionalFrt {
   header "function-template-with-optional-frt.h"
+  requires cplusplus
+}
+
+module FunctionTemplateParameterPack {
+  header "function-template-parameter-pack.h"
+  requires cplusplus
+}
+
+module FunctionTemplateNullability {
+  header "function-template-nullability.h"
   requires cplusplus
 }

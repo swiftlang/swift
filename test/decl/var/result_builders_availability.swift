@@ -85,8 +85,8 @@ tuplify(true) { x in
   // expected-note@-1{{add 'if #available' version check}}
 }
 
-@available(*, unavailable)
-func unavailableFunc(_ x: Bool) -> Bool {} // expected-note {{'unavailableFunc' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{'unavailableFunc' has been explicitly marked unavailable here}}
+func unavailableFunc(_ x: Bool) -> Bool {}
 
 // https://github.com/apple/swift/issues/55700
 // Availability checking not working in the 'where' clause of a 'for' loop

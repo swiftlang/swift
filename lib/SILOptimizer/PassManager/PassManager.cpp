@@ -14,7 +14,6 @@
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "../../IRGen/IRGenModule.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/MD5Stream.h"
@@ -34,11 +33,13 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 
 #ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
@@ -59,9 +60,32 @@ llvm::cl::opt<bool> SILPrintPassTime(
     "sil-print-pass-time", llvm::cl::init(false),
     llvm::cl::desc("Print the execution time of each SIL pass"));
 
-llvm::cl::opt<bool> SILPrintPassMD5(
-    "sil-print-pass-md5", llvm::cl::init(false),
-    llvm::cl::desc("Print the MD5 of the SIL after each pass"));
+llvm::cl::opt<std::string> SILPrintPassMD5(
+    "sil-print-pass-md5", llvm::cl::init(""),
+    llvm::cl::value_desc("filename"),
+    llvm::cl::desc("Write the MD5 of the SIL after each pass to the given file "
+                   "(\"-\" for stdout). Empty disables the output."));
+
+/// Returns the stream that `-sil-print-pass-md5` output is written to.
+///
+/// The file is opened lazily on first use (truncating) and reused for the rest
+/// of the compilation, so all pass pipelines write to the same file. A file
+/// name of "-" writes to stdout. Writing to the file directly (rather than to
+/// stdout) keeps this diagnostic output out of the compiler's stdout/stderr,
+/// which lets tools like utils/check-incremental collect it without having to
+/// redirect (and without hiding "real" compiler diagnostics).
+static llvm::raw_ostream &getSILPrintPassMD5Stream() {
+  static std::unique_ptr<llvm::raw_fd_ostream> stream = [] {
+    std::error_code EC;
+    auto s = std::make_unique<llvm::raw_fd_ostream>(SILPrintPassMD5, EC,
+                                                    llvm::sys::fs::OF_Text);
+    if (EC)
+      llvm::report_fatal_error(llvm::Twine("-sil-print-pass-md5: cannot open '") +
+                               SILPrintPassMD5 + "': " + EC.message());
+    return s;
+  }();
+  return *stream;
+}
 
 llvm::cl::opt<unsigned> SILMinPassTime(
     "sil-min-pass-time", llvm::cl::init(0),
@@ -209,6 +233,22 @@ static llvm::cl::opt<bool> SILPrintEverySubpass(
     "sil-print-every-subpass", llvm::cl::init(false),
     llvm::cl::desc("Print the function before every subpass run of passes that "
                    "have multiple subpasses"));
+
+/// Attribute SILModuleStats to the subpass which produced them, instead of
+/// the pass. Passes which do not use subpasses are unaffected.
+static llvm::cl::opt<bool> SILStatsSubpass(
+    "sil-stats-subpass", llvm::cl::init(false),
+    llvm::cl::desc("Attribute stats to subpasses of the passes producing them"));
+
+static llvm::cl::opt<std::string> SILViewDom(
+    "sil-view-dom", llvm::cl::init(""),
+    llvm::cl::desc("View the dominator tree of a function at a given pass "
+                   "count"));
+
+static llvm::cl::opt<std::string> SILViewDomOnly(
+    "sil-view-dom-only", llvm::cl::init(""),
+    llvm::cl::desc("View the dominator tree of a function (basic block names "
+                   "only) at a given pass count"));
 
 static bool isInPrintFunctionList(SILFunction *F) {
   for (const std::string &printFnName : SILPrintFunction) {
@@ -481,6 +521,33 @@ bool SILPassManager::continueTransforming() {
   return NumPassesRun < maxNumPassesToRun;
 }
 
+/// The name of the kind of value or instruction a subpass is transforming, used
+/// to identify the subpass in the optimizer statistics.
+static StringRef
+getTransformeeName(std::optional<SILPassManager::Transformee> transformee) {
+  if (!transformee)
+    return "<none>";
+  SILValue value = dyn_cast<SILValue>(*transformee);
+  if (!value)
+    return getSILInstructionName(
+        cast<SILInstruction *>(*transformee)->getKind());
+  if (SILInstruction *inst = value->getDefiningInstruction())
+    return getSILInstructionName(inst->getKind());
+  // The value is not defined by an instruction: name its kind instead.
+  switch (value->getKind()) {
+  case ValueKind::SILFunctionArgument:
+    return "function_argument";
+  case ValueKind::SILPhiArgument:
+    return "phi_argument";
+  case ValueKind::SILUndef:
+    return "undef";
+  case ValueKind::PlaceholderValue:
+    return "placeholder";
+  default:
+    return "<value>";
+  }
+}
+
 bool SILPassManager::continueWithNextSubpassRun(
     std::optional<Transformee> origTransformee, SILFunction *function,
     SILTransform *trans) {
@@ -496,6 +563,12 @@ bool SILPassManager::continueWithNextSubpassRun(
   }
 
   unsigned subPass = numSubpassesRun++;
+
+  if (SILStatsSubpass) {
+    StringRef subpassLabel = getTransformeeName(forTransformee);
+    updateSILModuleStatsBeforeSubpass(function, subpassLabel, trans, *this,
+                                      NumPassesRun, subPass);
+  }
 
   if (SILPrintEverySubpass && isFunctionSelectedForPrinting(function) &&
       doPrintBefore(trans, function)) {
@@ -761,14 +834,18 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                    << " #" << NumPassesRun << " @" << F->getName() << "\n";
     }
   }
-  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+  if (!SILPrintPassMD5.empty() && CurrentPassHasInvalidated) {
     MD5Stream md5Stream;
     F->print(md5Stream);
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
 
-    dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true, llvm::outs());
-    llvm::outs() << " = " << result << "\n";
+    llvm::raw_ostream &os = getSILPrintPassMD5Stream();
+    dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true, os);
+
+    llvm::SmallVector<char, 32> hexStr;
+    llvm::MD5::stringifyResult(result, hexStr);
+    os << " = " << StringRef(hexStr.begin(), 32) << "\n";
   }
 
   if (numRepeats > 1)
@@ -818,6 +895,23 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       runSwiftFunctionVerification(F);
     }
   }
+
+  // View the dominator tree at the specified pass count.
+  auto viewDomAtPassCount = [&](StringRef option, bool shortNames) {
+    unsigned passCount;
+    if (option.getAsInteger(10, passCount))
+      return;
+    if (NumPassesRun == passCount) {
+      if (shortNames)
+        F->viewDomTreeOnly();
+      else
+        F->viewDomTree();
+    }
+  };
+  if (!SILViewDom.empty())
+    viewDomAtPassCount(SILViewDom, /*shortNames=*/false);
+  else if (!SILViewDomOnly.empty())
+    viewDomAtPassCount(SILViewDomOnly, /*shortNames=*/true);
 
   ++NumPassesRun;
 }
@@ -950,14 +1044,18 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
                    << " #" << NumPassesRun << "\n";
     }
   }
-  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+  if (!SILPrintPassMD5.empty() && CurrentPassHasInvalidated) {
     MD5Stream md5Stream;
     Mod->print(md5Stream);
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
 
-    dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true, llvm::outs());
-    llvm::outs() << " = " << result << "\n";
+    llvm::raw_ostream &os = getSILPrintPassMD5Stream();
+    dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true, os);
+
+    llvm::SmallVector<char, 32> hexStr;
+    llvm::MD5::stringifyResult(result, hexStr);
+    os << " = " << StringRef(hexStr.begin(), 32) << "\n";
   }
 
   // If this pass invalidated anything, print and verify.
@@ -969,7 +1067,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   updateSILModuleStatsAfterTransform(*Mod, SMT, *this, NumPassesRun, duration.count());
 
   if (Options.VerifyAll &&
-      (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
+      (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
     Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
     runSwiftModuleVerification();
@@ -1028,13 +1126,16 @@ void SILPassManager::execute() {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
-  if (SILPrintPassMD5) {
+  if (!SILPrintPassMD5.empty()) {
     MD5Stream md5Stream;
     Mod->print(md5Stream);
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
+    llvm::SmallVector<char, 32> hexStr;
+    llvm::MD5::stringifyResult(result, hexStr);
 
-    llvm::outs() << "Initial " << StageName << " MD5 = " << result << "\n";
+    getSILPrintPassMD5Stream()
+        << "Initial " << StageName << " MD5 = " << StringRef(hexStr.begin(), 32) << "\n";
   }
 
   // Run the transforms by alternating between function transforms and
@@ -1507,12 +1608,6 @@ void SwiftPassInvocation::finishedFunctionPassRun() {
 
   updateAnalysis();
 
-  insertedPhisBySSAUpdater.clear();
-  if (ssaUpdater) {
-    delete ssaUpdater;
-    ssaUpdater = nullptr;
-  }
-
   function = nullptr;
   transform = nullptr;
   silCombiner = nullptr;
@@ -1593,6 +1688,8 @@ createEmptyFunction(StringRef name,
       fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
       fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
 
+  newF->setHasLoweredAddresses(fromFn->hasLoweredAddresses());
+
   return newF;
 }
 
@@ -1615,23 +1712,4 @@ SILFunction *SwiftPassInvocation::lookupStdlibFunction(StringRef name) {
   SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
   SILOptFunctionBuilder funcBuilder(*getTransform());
   return funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition);
-}
-
-void SwiftPassInvocation::initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) {
-  insertedPhisBySSAUpdater.clear();
-  if (!ssaUpdater)
-    ssaUpdater = new SILSSAUpdater(&insertedPhisBySSAUpdater);
-  ssaUpdater->initialize(function, type, ownership);
-}
-
-void SwiftPassInvocation::SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) {
-  ssaUpdater->addAvailableValue(block, value);
-}
-
-SILValue SwiftPassInvocation::SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) {
-  return ssaUpdater->getValueAtEndOfBlock(block);
-}
-
-SILValue SwiftPassInvocation::SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) {
-  return ssaUpdater->getValueInMiddleOfBlock(block);
 }

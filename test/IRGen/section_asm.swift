@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %S/section.swift -S -parse-as-library | %FileCheck --check-prefix CHECK%target-os-binfmt-elf %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 // UNSUPPORTED: CPU=wasm32
 
@@ -31,6 +30,14 @@
 // CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
 // CHECKELF-NOT: .section
 // CHECKELF: $s7section3fooyyF:
+
+// CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
+// CHECKELF-NOT: .section
+// CHECKELF: $s7section2g6Sivg:
+
+// CHECKELF: .section{{.*}}"__TEXT,__mymutsection","axR"
+// CHECKELF-NOT: .section
+// CHECKELF: $s7section2g6Sivs:
 
 // CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
 // CHECKELF-NOT: .section

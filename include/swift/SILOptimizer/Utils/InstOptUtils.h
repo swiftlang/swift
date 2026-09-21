@@ -141,23 +141,14 @@ bool canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst);
 /// free the object.
 bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
 
-/// Recursively collect all the uses and transitive uses of the
-/// instruction.
-void collectUsesOfValue(SILValue V,
-                        llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
-
 /// Recursively erase all of the uses of the value (but not the
 /// value itself)
 void eraseUsesOfValue(SILValue value);
 
-/// Return true if \p type is a value type (struct/enum) that requires
-/// deinitialization beyond destruction of its members.
-bool hasValueDeinit(SILType type);
-
 /// Return true if \p value has a value type (struct/enum) that requires
 /// deinitialization beyond destruction of its members.
 inline bool hasValueDeinit(SILValue value) {
-  return hasValueDeinit(value->getType());
+  return value->getType().isValueTypeWithDeinit();
 }
 
 /// Gets the concrete value which is stored in an existential box.
@@ -584,13 +575,22 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
 
-/// Performs "predictable" dead allocation optimizations.
-///
-/// See the PredictableDeadAllocationElimination pass.
-bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
-
 bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeWitnessMethodInst(WitnessMethodInst *wm);
+
+/// Rewrite \p kpi so that its pattern no longer depends on the key path's
+/// substitution map: specialize the accessor thunks referenced by any computed
+/// component and rebuild the pattern with the substitutions applied.
+///
+/// This is what lets Embedded Swift emit a key path formed in a generic context
+/// as a static instance. IRGen takes the address of a pattern's accessor thunks
+/// directly, and every function it emits must be fully specialized, so a
+/// pattern that still names generic thunks cannot be statically instantiated.
+///
+/// Does nothing and returns false if \p kpi has no substitutions, if the
+/// substitutions still contain archetypes, or if any referenced thunk could not
+/// be specialized.
+bool specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform);
 
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,

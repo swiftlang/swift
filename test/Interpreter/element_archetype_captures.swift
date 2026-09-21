@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -enable-sil-opaque-values)
 
 // REQUIRES: executable_test
 

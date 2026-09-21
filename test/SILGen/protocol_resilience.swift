@@ -1,6 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name protocol_resilience -emit-module -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name protocol_resilience -I %t -enable-library-evolution %s
 // RUN: %target-swift-emit-silgen -module-name protocol_resilience -I %t -enable-library-evolution %s | %FileCheck %s
 
 import resilient_protocol

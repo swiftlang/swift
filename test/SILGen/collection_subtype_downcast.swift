@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -module-name collection_subtype_downcast -sdk %S/Inputs %s | %FileCheck %s
 
@@ -11,6 +12,7 @@ struct S { var x, y: Int }
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$ss21_arrayConditionalCastySayq_GSgSayxGr0_lF
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Any, S>([[ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
 // CHECK-NEXT: destroy_value [[ARG_COPY]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]]
 func array_downcast(array: [Any]) -> [S]? {
   return array as? [S]

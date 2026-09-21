@@ -39,7 +39,6 @@ set(swift_runtime_sources
     Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
-    CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
@@ -73,6 +72,7 @@ set(swift_runtime_sources
     Once.cpp
     Paths.cpp
     Portability.cpp
+    Privilege.cpp
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
@@ -99,7 +99,8 @@ set(swift_runtime_backtracing_sources
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     SwiftRT-COFF.cpp
-    SwiftRT-ELF-WASM.cpp
+    SwiftRT-ELF.cpp
+    SwiftRT-WASM.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources}
@@ -179,7 +180,7 @@ endforeach()
 # with LTO, force swift runtime to compile without LTO for Linux.
 add_swift_target_library(swiftImageRegistrationObjectELF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-                  SwiftRT-ELF-WASM.cpp
+                  SwiftRT-ELF.cpp
                   C_COMPILE_FLAGS
                     ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
                     ${swift_enable_backtracing}
@@ -203,7 +204,7 @@ add_swift_target_library(swiftImageRegistrationObjectCOFF
 
 add_swift_target_library(swiftImageRegistrationObjectWASM
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-                  SwiftRT-ELF-WASM.cpp
+                  SwiftRT-WASM.cpp
                   C_COMPILE_FLAGS
                     ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
                     ${swift_enable_backtracing}
@@ -224,10 +225,6 @@ foreach(sdk ${SWIFT_SDKS})
       # to a version which supports it.
       # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}>")
       set(swiftrtSourceName SwiftRT-${SWIFT_SDK_${sdk}_OBJECT_FORMAT}.cpp)
-      if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF" OR
-         "${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "WASM")
-       set(swiftrtSourceName SwiftRT-ELF-WASM.cpp)
-      endif()
       set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}.dir/${swiftrtSourceName}${CMAKE_C_OUTPUT_EXTENSION})
 
       if(sdk STREQUAL "WINDOWS")
@@ -304,17 +301,11 @@ foreach(sdk ${SWIFT_SDKS})
         set(concurrency_libs "-ldispatch -lBlocksRuntime")
       endif()
 
-      file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
--ldl
-${libpthread}
-${android_libraries}
--lswiftCore
-${concurrency_libs}
--lstdc++
--lm
--Xlinker -export-dynamic
--Xlinker --exclude-libs
--Xlinker ALL")
+      configure_file(
+        "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/static-stdlib-args.lnk.in"
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        @ONLY
+        NEWLINE_STYLE LF)
     endif()
 
     swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"

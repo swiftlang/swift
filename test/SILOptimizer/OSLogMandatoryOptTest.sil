@@ -437,12 +437,14 @@ bb0:
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
     // CHECK: [[MDI:%.*]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAY]] : $Array<Int64>
     // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Int64
-    // CHECK: store [[ELEM1INT]] to [trivial] [[STORAGEADDR]] : $*Int64
+    // CHECK: [[INDEX0:%[0-9]+]] = integer_literal $Builtin.Word, 0
+    // CHECK: [[INDEXADDR0:%[0-9]+]] = index_addr [projection] [[STORAGEADDR]] : $*Int64, [[INDEX0]] : $Builtin.Word
+    // CHECK: store [[ELEM1INT]] to [trivial] [[INDEXADDR0]] : $*Int64
     // CHECK: [[INDEX1:%[0-9]+]] = integer_literal $Builtin.Word, 1
-    // CHECK: [[INDEXADDR1:%[0-9]+]] = index_addr [[STORAGEADDR]] : $*Int64, [[INDEX1]] : $Builtin.Word
+    // CHECK: [[INDEXADDR1:%[0-9]+]] = index_addr [projection] [[STORAGEADDR]] : $*Int64, [[INDEX1]] : $Builtin.Word
     // CHECK: store [[ELEM2INT]] to [trivial] [[INDEXADDR1]] : $*Int64
     // CHECK: [[INDEX2:%[0-9]+]] = integer_literal $Builtin.Word, 2
-    // CHECK: [[INDEXADDR2:%[0-9]+]] = index_addr [[STORAGEADDR]] : $*Int64, [[INDEX2]] : $Builtin.Word
+    // CHECK: [[INDEXADDR2:%[0-9]+]] = index_addr [projection] [[STORAGEADDR]] : $*Int64, [[INDEX2]] : $Builtin.Word
     // CHECK: store [[ELEM3INT]] to [trivial] [[INDEXADDR2]] : $*Int64
     // CHECK: [[FINALIZEREF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
     // CHECK: [[FINALIZED:%[0-9]+]] = apply [[FINALIZEREF]]<Int64>([[ARRAY]])
@@ -570,7 +572,9 @@ bb0:
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
     // CHECK: [[MDI:%.*]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAY]] : $Array<String>
     // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*String
-    // CHECK: store [[STRINGCONST]] to [init] [[STORAGEADDR]] : $*String
+    // CHECK: [[INDEX0:%[0-9]+]] = integer_literal $Builtin.Word, 0
+    // CHECK: [[INDEXADDR0:%[0-9]+]] = index_addr [projection] [[STORAGEADDR]] : $*String, [[INDEX0]] : $Builtin.Word
+    // CHECK: store [[STRINGCONST]] to [init] [[INDEXADDR0]] : $*String
     // CHECK: [[FINALIZEREF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
     // CHECK: [[FINALIZED:%[0-9]+]] = apply [[FINALIZEREF]]<String>([[ARRAY]])
     // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[FINALIZED]]

@@ -12,6 +12,8 @@ import StdlibUnittest
   import CRT
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(EmscriptenLibc)
+  import EmscriptenLibc
 #else
 #error("Unsupported platform")
 #endif

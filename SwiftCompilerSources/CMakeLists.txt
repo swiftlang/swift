@@ -154,6 +154,21 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
 
+  # NOTE: We deliberately do NOT pass -index-store-path here.
+  # add_swift_compiler_modules_library invokes swiftc as
+  #   swiftc -wmo -c -o ${module}.o source1.swift source2.swift ...
+  # i.e. WMO with a single merged object output for many input source files.
+  # The Swift indexer walks every SourceFile in the module and expects an
+  # index-unit-output token per source (IndexRecord.cpp's
+  # error_index_inputs_more_than_outputs), but in WMO+single-output mode
+  # only the last input "produces a main output" so only one token is
+  # available - swiftc emits "index output filenames do not match input
+  # source files" and fails. FrontendTool.cpp:2379 has a FIXME calling out
+  # this exact limitation. Until that FIXME is resolved (or the
+  # SwiftCompilerSources build switches to per-source outputs via an
+  # output-file-map), the libswift compiler modules cannot be added to the
+  # IndexStore from this build path.
+
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
   set(sdk_option ${SWIFT_COMPILER_SOURCES_SDK_FLAGS})
@@ -216,6 +231,8 @@ function(add_swift_compiler_modules_library name)
     string(STRIP "${swiftly_dir}" swiftly_dir)
 
     list(APPEND sdk_option "-I" "${swiftly_dir}/usr/lib" "-I" "${swiftly_dir}/usr/lib")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
+    list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/lib")
   else()
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
   endif()
@@ -293,7 +310,11 @@ function(add_swift_compiler_modules_library name)
       COMMENT "Building swift module ${module}")
 
     if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
-      add_dependencies(${dep_target} swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+      # The swift-stdlib target is absent when building against a prebuilt target
+      # stdlib (e.g. a wasm host), so only add the ordering dependency if it exists.
+      if(TARGET swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+        add_dependencies(${dep_target} swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+      endif()
     endif()
     set("${module}_dep_target" ${dep_target})
     set(all_module_targets ${all_module_targets} ${dep_target})

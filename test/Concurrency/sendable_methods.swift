@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -strict-concurrency=complete
-// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -enable-upcoming-feature GlobalActorIsolatedTypesUsability -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -strict-concurrency=complete -solver-enable-promote-supertypes
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -enable-upcoming-feature GlobalActorIsolatedTypesUsability -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete -solver-enable-promote-supertypes | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_InferSendableFromCaptures
@@ -192,7 +192,7 @@ actor TestActor {}
 
 @globalActor
 struct SomeGlobalActor {
-  static var shared: TestActor { TestActor() }
+  static let shared = TestActor()
 }
 
 @SomeGlobalActor
@@ -364,4 +364,27 @@ public struct TestGlobalActorAndSendable<V: Q> : Q {
     compute(test1) // Ok
     compute(test2) // Ok
   }
+}
+
+func testConversionToThin() {
+  let _: @convention(thin) () -> Int = doWork // Ok
+  let _: @Sendable @convention(thin) () -> Int = doWork // Ok
+}
+
+do {
+  struct Test {
+    static func fn() {}
+    static func otherFn() {}
+  }
+
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  func fnRet(cond: Bool) -> () -> Void {
+    cond ? Test.fn : Test.otherFn
+  }
+
+  func forward<T>(_: T) -> T {
+  }
+
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: () -> Void = forward(Test.fn)
 }

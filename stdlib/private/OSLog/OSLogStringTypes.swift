@@ -144,14 +144,14 @@ extension OSLogArguments {
 /// This function must be constant evaluable. Note that it is marked transparent
 /// instead of @inline(__always) as it is used in optimize(none) functions.
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func pointerSizeInBytes() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }
 
 /// Serialize a stable pointer to the string `stringValue` at the buffer location
 /// pointed to by `bufferPosition`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func serialize(
   _ stringValue: String,
@@ -173,7 +173,7 @@ internal func serialize(
 /// Return a pointer that points to a contiguous sequence of null-terminated,
 /// UTF8 characters. If necessary, extends the lifetime of `stringValue` by
 /// using `stringArgumentOwners`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(never)
 internal func getNullTerminatedUTF8Pointer(
   _ stringValue: String,

@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-SIL
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-IR
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 enum MyError : Error {

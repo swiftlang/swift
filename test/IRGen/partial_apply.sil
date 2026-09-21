@@ -131,7 +131,7 @@ sil @partial_apply_twenty_classes_on_stack_non_nested : $@convention(thin) (@own
 entry(%a : $SwiftClass, %b: $SwiftClass, %c: $SwiftClass, %d: $SwiftClass, %e: $SwiftClass, %f: $SwiftClass, %g: $SwiftClass, %h: $SwiftClass, %i: $SwiftClass, %j: $SwiftClass, %k: $SwiftClass, %l: $SwiftClass, %m: $SwiftClass, %n: $SwiftClass, %o: $SwiftClass, %p: $SwiftClass, %q: $SwiftClass, %r: $SwiftClass, %s: $SwiftClass, %t: $SwiftClass, %cond: $Builtin.Int1):
   // We don't limit the size in the entry block, so we also need control flow
   // to trigger the malloc case.
-  cond_br %cond, bb1, bb2
+  cond_br %cond, bb1, bb2trampoline
 
 bb1:
   %function = function_ref @partially_applyable_to_twenty_classes : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
@@ -164,6 +164,9 @@ bb2:
   strong_release %t : $SwiftClass
   %ret = tuple()
   return %ret : $()
+
+bb2trampoline:
+  br bb2
 }
 
 //

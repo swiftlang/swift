@@ -1,8 +1,8 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module | %FileCheck %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK-SIL %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -O -Xllvm -sil-disable-pass=FunctionSignatureOpts | %FileCheck -check-prefix=CHECK-SIL-OPT %s
 
-// REQUIRES: swift_in_compiler
 
 import Swift
 
@@ -12,6 +12,7 @@ class Klass {}
 // CHECK:       bb0([[ARG:%.*]] :
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[ARG]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[EXPLICIT_COPY]]
 // CHECK-LABEL: } // end sil function '$s8moveonly7useCopyyAA5KlassCADF'
 
@@ -36,6 +37,7 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK:       bb0([[ARG:%.*]] :
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[ARG]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[EXPLICIT_COPY]]
 // CHECK-LABEL: } // end sil function '$s8moveonly7useCopyyxxRlzClF'
 

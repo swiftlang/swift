@@ -435,7 +435,7 @@ func test_force_unwrap_not_being_too_eager() {
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
   a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{cannot convert value of type 'Any' to expected argument type 'String'}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
 }
 
 /// https://github.com/apple/swift/issues/54739
@@ -651,4 +651,15 @@ do {
   func test(v: some Syntax, other: [S]) {
     context(from: TestSyntax(v) ?? TestSyntax(other.first?.value), root: v) // Ok (no warnings)
   }
+}
+
+do {
+  struct Test<T> { // expected-note {{'T' declared as parameter to type 'Test'}}
+    var v: T
+    init?(_: Int) {
+    }
+  }
+  _ = Test(0)?.v
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
 }

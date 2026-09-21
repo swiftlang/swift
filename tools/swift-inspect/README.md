@@ -90,6 +90,8 @@ The following inspection operations are available currently.
 
 ##### All Platforms
 
+> FreeBSD is currently not supported; all other platforms, such as macOS, Linux, Windows and some Android offer the following functionality.
+
 dump-cache-nodes &lt;name-or-pid&gt;
 : Print the metadata cache nodes.
 
@@ -102,12 +104,12 @@ dump-generic-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 dump-raw-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 : Print metadata allocations.
 
+dump-concurrency &lt;name-or-pid&gt;
+: Print information about tasks, actors, and threads under Concurrency.
+  On Linux this needs `CAP_SYS_PTRACE` (run as root, via sudo, or grant
+  the binary `cap_sys_ptrace+ep` with setcap).
+
 #### Darwin and Windows Only
 
 dump-arrays &lt;name-or-pid&gt;
 : Print information about array objects in the target
-
-##### Darwin Only
-
-dump-concurrency &lt;name-or-pid&gt;
-: Print information about tasks, actors, and threads under Concurrency.

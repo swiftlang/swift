@@ -8,6 +8,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
+// UNSUPPORTED: OS=emscripten
 
 // for sleep
 #if canImport(Darwin)

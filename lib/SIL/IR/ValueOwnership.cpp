@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
@@ -52,24 +51,36 @@ public:
     return OwnershipKind::OWNERSHIP;                                           \
   }
 
+// Like CONSTANT_OWNERSHIP_INST, but yields None ownership when the result type
+// is trivial. strong_copy_*_value normally produces an owned value, but its
+// result type is trivial for C++ foreign reference types imported with
+// immortal/unsafe (no-op) retain/release.
+#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
+  ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
+      INST##Inst *I) {                                                         \
+    if (I->getType().isTrivial(*I->getFunction()))                            \
+      return OwnershipKind::None;                                              \
+    return OwnershipKind::OWNERSHIP;                                           \
+  }
+
 CONSTANT_OWNERSHIP_INST(Owned, UnownedCopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)                      \
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)           \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
   CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)                                   \
   CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   CONSTANT_OWNERSHIP_INST(None, RefTo##Name)                                   \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
@@ -118,6 +129,7 @@ CONSTANT_OWNERSHIP_INST(None, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(None, ClassMethod)
 CONSTANT_OWNERSHIP_INST(None, ClassifyBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, ObjCMethod)
+CONSTANT_OWNERSHIP_INST(None, COMMethod)
 CONSTANT_OWNERSHIP_INST(None, ExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, FloatLiteral)
 CONSTANT_OWNERSHIP_INST(None, FunctionRef)
@@ -167,10 +179,15 @@ CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(Owned, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
-// TODO: It would be great to get rid of these.
-CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
+// `raw_pointer_to_ref` is only used to implement the `bridgeFromRawPointer`
+// builtin, which in turn is only used to create the empty COW buffer singletons
+// (Array, Set, Dictionary) and for the `UnsafeCurrentTask._task` ABI-compat
+// shim. Those objects are immortal, therefore the result doesn't need any
+// ownership.
+CONSTANT_OWNERSHIP_INST(None, RawPointerToRef)
+// TODO: It would be great to get rid of this.
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
-CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
+CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
@@ -302,6 +319,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
+FORWARDING_OWNERSHIP_INST(OpenCOMExistential)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
@@ -333,13 +351,12 @@ FORWARDING_OWNERSHIP_INST(UncheckedOwnership)
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitEnumInst(EnumInst *I) {
-  if (!I->getModule().useLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
-    // During address lowering, an address-only enum instruction will eventually
-    // be lowered to inject_enum_addr/init_enum_data_addr, initializing a
-    // non-trivial storage location.  So prior to AddressLowering (in opaque
-    // values mode) such an enum instruction produces a non-trivial value,
-    // without regard to whether it is in a trivial case.  Otherwise, non-trivial
-    // storage would fail to be destroy_addr'd.
+  if (!I->getFunction()->hasLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
+    // In opaque-values mode an address-only `enum` is still an SSA value here.
+    // AddressLowering will later replace it with address storage (alloc_stack),
+    // which is non-trivial and must be destroy_addr'd. So the enum's result
+    // must be Owned now, even when the selected case is trivial/payloadless,
+    // otherwise no destroy is emitted for it and the lowered storage leaks.
     assert(!I->getType().isTrivial(*I->getFunction()));
     // An enum instruction is representation changing, so its address-only
     // operand must be owned.
@@ -391,7 +408,19 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   if (isTrivial)
     return OwnershipKind::None;
 
-  SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
+  // If the result type is an address, avoid consulting SILFunctionConventions
+  // to determine its ownership; we know it's None.
+  //
+  // This short-cut is needed _during_ AddressLowering for a @guaranteed_address
+  // result, as a new ApplyInst it creates with an address result happens before
+  // the global lowered-addresses flag is changed to influence getOwnershipKind.
+  if (ResultType.isAddress())
+    return OwnershipKind::None;
+
+  // Per-function conventions (via getSubstCalleeConv): an already-lowered
+  // function's apply has its formally-indirect results as address arguments
+  // with no direct result, even while the module stage is still Raw.
+  SILFunctionConventions fnConv = fai.getSubstCalleeConv();
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
@@ -486,6 +515,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GenericAdd)
 CONSTANT_OWNERSHIP_BUILTIN(None, And)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericAnd)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssumeAlignment)
+CONSTANT_OWNERSHIP_BUILTIN(None, Dereferenceable)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssumeNonNegative)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssumeTrue)
 CONSTANT_OWNERSHIP_BUILTIN(None, BitCast)
@@ -575,6 +605,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(None, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(None, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(None, TypedAllocationID)
 CONSTANT_OWNERSHIP_BUILTIN(None, StringObjectOr)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsPOD)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsConcrete)
@@ -582,6 +613,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IsBitwiseTakable)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(None, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(None, AllocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(None, AllocRawTyped)
+CONSTANT_OWNERSHIP_BUILTIN(None, AllocErrorBoxTyped)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssertConf)
 CONSTANT_OWNERSHIP_BUILTIN(None, InfiniteLoopTrueCondition)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
@@ -623,6 +656,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AssignTakeArray)
 CONSTANT_OWNERSHIP_BUILTIN(None, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(None, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(None, DeallocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(None, DeallocRawTyped)
+CONSTANT_OWNERSHIP_BUILTIN(None, DeallocErrorBoxTyped)
 CONSTANT_OWNERSHIP_BUILTIN(None, Fence)
 CONSTANT_OWNERSHIP_BUILTIN(None, Ifdef)
 CONSTANT_OWNERSHIP_BUILTIN(None, AtomicStore)
@@ -670,6 +705,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandlerWithReason)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
@@ -679,6 +715,10 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AddTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, RemoveTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskPushDeadline)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskPopDeadline)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -749,6 +789,10 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
     // variable. We don't verify ownership there so just return
     // OwnershipKind::None.
     if (!f)
+      return OwnershipKind::None;
+
+    // Debug reconstruction blocks don't participate in the ownership system.
+    if (block->isDebugReconstructionBlock())
       return OwnershipKind::None;
 
     // Now that we know that we do have a block/function, check if we have

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -boolean-literal-folding | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

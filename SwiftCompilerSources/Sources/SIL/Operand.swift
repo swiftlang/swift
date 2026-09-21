@@ -267,7 +267,10 @@ public enum OperandOwnership {
   
   /// Use a value without requiring or propagating ownership. The operation may not have side-effects that could affect ownership. This is limited to a small number of operations that are allowed to take Unowned values. (copy_value, single-instruction apply with @unowned argument))
   case unownedInstantaneousUse
-  
+
+  /// A debug_value use. Behaves like unownedInstantaneousUse, but the value isn't required to be alive.
+  case debugUse
+
   /// Forwarding instruction with an Unowned result. Its operands may have any ownership.
   case forwardingUnowned
   
@@ -308,7 +311,7 @@ public enum OperandOwnership {
   public var endsLifetime: Bool {
     switch self {
     case .nonUse, .trivialUse, .instantaneousUse, .unownedInstantaneousUse,
-         .forwardingUnowned, .pointerEscape, .bitwiseEscape, .borrow,
+         .debugUse, .forwardingUnowned, .pointerEscape, .bitwiseEscape, .borrow,
          .interiorPointer, .anyInteriorPointer, .guaranteedForwarding:
       return false
     case .destroyingConsume, .forwardingConsume, .endBorrow, .reborrow:
@@ -326,6 +329,8 @@ public enum OperandOwnership {
       return BridgedOperand.OperandOwnership.InstantaneousUse
     case .unownedInstantaneousUse:
       return BridgedOperand.OperandOwnership.UnownedInstantaneousUse
+    case .debugUse:
+      return BridgedOperand.OperandOwnership.DebugUse
     case .forwardingUnowned:
       return BridgedOperand.OperandOwnership.ForwardingUnowned
     case .pointerEscape:
@@ -359,6 +364,7 @@ extension Operand {
     case .TrivialUse: return .trivialUse
     case .InstantaneousUse: return .instantaneousUse
     case .UnownedInstantaneousUse: return .unownedInstantaneousUse
+    case .DebugUse: return .debugUse
     case .ForwardingUnowned: return .forwardingUnowned
     case .PointerEscape: return .pointerEscape
     case .BitwiseEscape: return .bitwiseEscape

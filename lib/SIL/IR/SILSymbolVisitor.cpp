@@ -507,10 +507,22 @@ public:
       }
     }
 
-    if (auto distributedThunk = AFD->getDistributedThunk()) {
-      auto thunk = SILDeclRef(distributedThunk).asDistributed();
-      addFunction(thunk);
-      addAsyncFunctionPointer(thunk);
+    {
+      // Distributed functions emit a number of thunks that we need to replicate here.
+
+      // Record the 'distributed_thunk'
+      if (AFD->getDistributedThunk()) {
+        auto thunk = SILDeclRef(AFD).getDistributedThunkDeclRef();
+        addFunction(thunk);
+        addAsyncFunctionPointer(thunk);
+      }
+
+      // Record the recipient-side 'distributed_proxy_adapter_thunk'
+      if (auto adapter = AFD->getDistributedResolvableProxyAdapterThunk()) {
+        auto adapterRef = SILDeclRef(adapter);
+        addFunction(adapterRef);
+        addAsyncFunctionPointer(adapterRef);
+      }
     }
 
     // Add derivative function symbols.
@@ -528,15 +540,15 @@ public:
 
     for (const auto *derivativeAttr :
          AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
-        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
-        derivativeAttr->getParameterIndices());
-      addDerivativeConfiguration(
-          DifferentiabilityKind::Reverse,
-          derivativeAttr->getOriginalFunction(AFD->getASTContext()),
-          AutoDiffConfig(derivativeAttr->getParameterIndices(),
-                         resultIndices,
-                         AFD->getGenericSignature()));
+      for (auto *originaAFD :
+           derivativeAttr->getOriginalFunctions(AFD->getASTContext())) {
+        auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+            originaAFD, derivativeAttr->getParameterIndices());
+        addDerivativeConfiguration(
+            DifferentiabilityKind::Reverse, originaAFD,
+            AutoDiffConfig(derivativeAttr->getParameterIndices(), resultIndices,
+                           AFD->getGenericSignature()));
+      }
     }
 
     visitDefaultArguments(AFD, AFD->getParameters());
@@ -657,7 +669,14 @@ public:
       Visitor.addNominalTypeDescriptor(NTD);
 
       // Generic types do not get metadata directly, only through the function.
-      if (!NTD->isGenericContext()) {
+      // Classes with resilient ancestry also do not get a static metadata
+      // address point; IRGen emits a metadata pattern via the Resilient
+      // strategy in that case.
+      bool hasResilientAncestry = false;
+      if (auto *CD = dyn_cast<ClassDecl>(NTD))
+        hasResilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
+
+      if (!NTD->isGenericContext() && !hasResilientAncestry) {
         Visitor.addTypeMetadataAddress(declaredType);
       }
     }
@@ -726,10 +745,15 @@ public:
     if (CD->getParent()->getSelfClassDecl()) {
       // Class constructors come in two forms, allocating and non-allocating.
       // The default ValueDecl handling gives the allocating one, so we have to
-      // manually include the non-allocating one.
-      addFunction(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
-      if (CD->hasAsync()) {
-        addAsyncFunctionPointer(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+      // manually include the non-allocating one. Only designated and @objc
+      // convenience inits have a separate initializing entry point; non-@objc
+      // convenience inits are lowered as a single allocating entry point (see
+      // SILGenModule::emitConstructor).
+      if (CD->isDesignatedInit() || CD->isObjC()) {
+        addFunction(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+        if (CD->hasAsync()) {
+          addAsyncFunctionPointer(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+        }
       }
     }
 
@@ -808,7 +832,8 @@ public:
     case DeclKind::PostfixOperator:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
+    case DeclKind::HiddenTypeLayoutInfo:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");
@@ -921,7 +946,7 @@ public:
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
-  UNINTERESTING_DECL(Using)
+  UNINTERESTING_DECL(FileDefault)
 
 #undef UNINTERESTING_DECL
 };

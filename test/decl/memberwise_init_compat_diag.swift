@@ -122,7 +122,7 @@ extension H {
 // We don't currently support accessing a property declared later.
 // NOTE: If this restriction is lifted, `emitImplicitValueConstructor` needs
 // updating to ensure we initialize `d` before `b`.
-struct I { // expected-error {{cannot synthesize memberwise initializer}}
+struct I { // expected-error {{cannot automatically synthesize memberwise initializer}}
   var a: Int
   var b: Int
   private var c: Int = 0 {

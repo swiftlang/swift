@@ -162,7 +162,7 @@ extension _StringGuts {
      return _slowPath(_object.isForeign)
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   @safe
   internal func withFastUTF8<R, E: Error>(
     _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> R
@@ -190,7 +190,7 @@ extension _StringGuts {
   }
 #endif // !hasFeature(Embedded)
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   @safe
   internal func withFastUTF8<R, E: Error>(
     range: Range<Int>,
@@ -218,7 +218,7 @@ extension _StringGuts {
   }
 #endif // !hasFeature(Embedded)
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func withFastCChar<R, E: Error>(
     _ f: (UnsafeBufferPointer<CChar>) throws(E) -> R
   ) throws(E) -> R {
@@ -271,7 +271,7 @@ extension _StringGuts {
 
 // C String interop
 extension _StringGuts {
-  @_alwaysEmitIntoClient @inline(__always) // fast-path: already C-string compatible
+  @export(implementation) @inline(__always) // fast-path: already C-string compatible
   internal func withCString<Result, E: Error>(
     _ body: (UnsafePointer<Int8>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -300,7 +300,7 @@ extension _StringGuts {
 #endif // !hasFeature(Embedded)
 
   @inline(never) // slow-path
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _slowWithCString<Result, E: Error>(
     _ body: (UnsafePointer<Int8>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -406,11 +406,11 @@ extension _StringGuts {
   /// If this returns false, then the string is encoded in UTF-16.
   ///
   /// This always returns a value corresponding to the string's actual encoding.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var isUTF8: Bool { _object.isUTF8 }
 
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal func markEncoding(_ i: String.Index) -> String.Index {
     isUTF8 ? i._knownUTF8 : i._knownUTF16
@@ -424,7 +424,7 @@ extension _StringGuts {
   /// is guaranteed to never incorrectly return false. If all loaded binaries
   /// were built in 5.7+, then this method is guaranteed to always return the
   /// correct value.
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func hasMatchingEncoding(_ i: String.Index) -> Bool {
     i._hasMatchingEncoding(isUTF8: isUTF8)
   }
@@ -445,14 +445,14 @@ extension _StringGuts {
   /// not set the flags that this method relies on. However, false positives
   /// cannot happen: if this method detects a mismatch, then it is guaranteed to
   /// be a real one.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal func ensureMatchingEncoding(_ i: Index) -> Index {
     if _fastPath(hasMatchingEncoding(i)) { return i }
     return _slowEnsureMatchingEncoding(i)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   @_effects(releasenone)
   internal func _slowEnsureMatchingEncoding(_ i: Index) -> Index {

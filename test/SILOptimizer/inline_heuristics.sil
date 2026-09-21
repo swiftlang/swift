@@ -4,7 +4,6 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
 // REQUIRES: asserts
 
-// REQUIRES: swift_in_compiler
 
 // This test checks the inline heuristics based on the debug log output of
 // the performance inliner.

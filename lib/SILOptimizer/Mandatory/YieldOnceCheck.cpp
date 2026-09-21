@@ -11,27 +11,24 @@
 //===----------------------------------------------------------------------===//
 
 // This pass statically verifies that yield-once coroutines, such as the
-// generalized accessors `read` and `modify`, yield exactly once in every
+// generalized accessors `_read` and `_modify` and the coroutine accessors
+// `yielding borrow` and `yielding mutate`, yield exactly once in every
 // invocation, and diagnoses any violation of this property. This pass uses a
 // linear-time, data-flow analysis to check that every path in the control-flow
 // graph of the coroutine has a yield instruction before a return instruction.
 
 #define DEBUG_TYPE "yield-once-check"
 
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
-#include "llvm/ADT/DenseSet.h"
 
 using namespace swift;
 
@@ -524,9 +521,14 @@ class YieldOnceCheck : public SILFunctionTransform {
   void run() override {
     auto *fun = getFunction();
 
-    if (fun->getLoweredFunctionType()->getCoroutineKind() !=
-        SILCoroutineKind::YieldOnce)
+    switch (fun->getLoweredFunctionType()->getCoroutineKind()) {
+    case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldOnce2:
+      break;
+    case SILCoroutineKind::None:
+    case SILCoroutineKind::YieldMany:
       return;
+    }
 
     diagnoseYieldOnceUsage(*fun);
   }

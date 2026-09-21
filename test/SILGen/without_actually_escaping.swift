@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name without_actually_escaping %s | %FileCheck %s
 
 var escapeHatch: Any = 0

@@ -26,14 +26,14 @@ public func testOptionalArray() {
   // CHECK: bb0:
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
-  // CHECK: [[SOME_BB]](
-  // CHECK: [[ORIGINAL_OWNER:%.*]] = struct_extract {{%.*}} : $_ContiguousArrayBuffer<Int>, #_ContiguousArrayBuffer._storage
-  // CHECK: [[ORIGINAL_OWNER_EXISTENTIAL:%.*]] = init_existential_ref [[ORIGINAL_OWNER]]
-  // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[ORIGINAL_OWNER_EXISTENTIAL]]
-  // CHECK-NEXT: [[POINTER:%.+]] = struct $UnsafeRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[ORIGINAL_OWNER]]
-  // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[DEP_POINTER]]
-  // CHECK-NEXT: br [[CALL_BRANCH:bb[0-9]+]]([[OPT_POINTER]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
+  // CHECK:     [[SOME_BB]](
+  // CHECK:       [[ORIGINAL_OWNER:%.*]] = struct_extract {{%.*}} : $_ContiguousArrayBuffer<Int>, #_ContiguousArrayBuffer._storage
+  // CHECK:       [[POINTER:%.+]] = struct $UnsafeRawPointer (
+  // CHECK:       [[ORIGINAL_OWNER_EXISTENTIAL:%.*]] = init_existential_ref [[ORIGINAL_OWNER]]
+  // CHECK:       [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[ORIGINAL_OWNER_EXISTENTIAL]]
+  // CHECK-NEXT:  [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[ORIGINAL_OWNER]]
+  // CHECK-NEXT:  [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[DEP_POINTER]]
+  // CHECK-NEXT:  br [[CALL_BRANCH:bb[0-9]+]]([[OPT_POINTER]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
 
   // CHECK: [[CALL_BRANCH]]([[OPT_POINTER:%.+]] : $Optional<UnsafeRawPointer>, [[OWNER:%.+]] : $Optional<AnyObject>):
   // CHECK-NOT: release

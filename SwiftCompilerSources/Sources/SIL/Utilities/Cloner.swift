@@ -40,8 +40,14 @@ public struct Cloner<Context: MutatingContext> {
     self.target = .global(cloneToGlobal)
   }
 
+  /// All cloned instructions get `inst`'s location and scope. 
   public init(cloneBefore inst: Instruction, _ context: Context) {
-    self.bridged = BridgedCloner(inst.bridged, context._bridged)
+    self.init(cloneBefore: inst, location: inst.location, context)
+  }
+
+  /// All cloned instructions get `location`.
+  public init(cloneBefore inst: Instruction, location: Location, _ context: Context) {
+    self.bridged = BridgedCloner(inst.bridged, location.bridged, context._bridged)
     self.context = context
     self.target = .function(inst.parentFunction)
   }
@@ -50,6 +56,17 @@ public struct Cloner<Context: MutatingContext> {
     self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context._bridged)
     self.context = context
     self.target = .function(cloneToEmptyFunction)
+  }
+
+  /// Clones instructions one at a time within `function`, remapping references to one
+  /// local (opened existential) archetype's generic environment to another, already-existing one.
+  ///
+  /// Unlike the other initializers, this does not clone a region: operands and successor blocks
+  /// of the cloned instruction that are not themselves being cloned are reused unchanged.
+  public init(in function: Function, _ context: Context) {
+    self.bridged = BridgedCloner(function.bridged, context._bridged, true)
+    self.context = context
+    self.target = .function(function)
   }
 
   public mutating func deinitialize() {
@@ -163,6 +180,19 @@ public struct Cloner<Context: MutatingContext> {
   public func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value) {
     bridged.recordFoldedValue(origValue.bridged, mappedValue.bridged)
   }
+
+  public func registerLocalArchetypeRemapping(from: GenericEnvironment, to: GenericEnvironment) {
+    bridged.registerLocalArchetypeRemapping(from.bridged, to.bridged)
+  }
+
+  public func setInsertionPoint(before instruction: Instruction) {
+    bridged.setInsertionPoint(instruction.bridged)
+  }
+
+  /// Returns `type` with its local archetypes substituted according to the registered remappings.
+  public func getOpType(_ type: Type) -> Type {
+    bridged.getOpType(type.bridged).type
+  }
 }
 
 public struct TypeSubstitutionCloner<Context: MutatingContext> {
@@ -195,3 +225,4 @@ public struct TypeSubstitutionCloner<Context: MutatingContext> {
     bridged.cloneFunctionBody()
   }
 }
+

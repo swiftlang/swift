@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name pointer_conversion -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop -import-objc-header %S/Inputs/readbytes.h
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name pointer_conversion \
 // RUN:   -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop \
 // RUN:   -import-objc-header %S/Inputs/readbytes.h \

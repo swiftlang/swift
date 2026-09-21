@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s
+// RUN: %target-swift-emit-silgen-ossa %s
 
 func f0<V>(_: () -> any P<V>) {}
 func f1<V>(_: V.Type, _: () -> any P<V>) {}

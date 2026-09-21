@@ -174,8 +174,9 @@ extension RangeSet {
   /// specified indices in the given collection.
   ///
   /// - Parameters:
-  ///   - index: The index to include in the range set. `index` must be a
-  ///     valid index of `collection` that isn't the collection's `endIndex`.
+  ///   - indices: The indices to include in the range set. All members of
+  ///   `indices` must be valid indicies of `collection` that aren't
+  ///   equal to the collection's `endIndex`.
   ///   - collection: The collection that contains `index`.
   @inlinable
   public init<S: Sequence, C: Collection>(

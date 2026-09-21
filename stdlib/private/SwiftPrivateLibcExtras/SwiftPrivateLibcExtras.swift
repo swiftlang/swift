@@ -21,6 +21,8 @@ import Musl
 import Android
 #elseif os(WASI)
 import WASILibc
+#elseif os(Emscripten)
+import EmscriptenLibc
 #elseif os(Windows)
 import CRT
 #endif

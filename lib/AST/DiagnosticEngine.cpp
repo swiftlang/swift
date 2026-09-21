@@ -25,7 +25,6 @@
 #include "swift/AST/DiagnosticList.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
@@ -38,7 +37,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/ASTContext.h"
@@ -108,6 +106,26 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::NoUsage,
                              groupID) {}
 };
+
+/// Whether a SourceFile could carry a syntactic warning control, and needs
+/// the accurate answer from the SwiftWarningControl region tree rather than the
+/// command-line rules alone.
+static bool fileMayHaveWarningControls(const SourceFile *sf) {
+  // If the swift-syntax tree for this file already exists, consulting it costs
+  // nothing extra, so always take the accurate path.
+  if (sf->getASTContext().evaluator.hasCachedResult(
+          ExportedSourceFileRequest{sf}))
+    return true;
+
+  return sf->hasWarningControlAttr();
+}
+
+/// Whether a given SourceFile qualifies for checking for a syntactic
+/// diagnostic group control
+static bool shouldCheckSyntacticWarningControlInFile(const SourceFile *sf) {
+  return sf && sf->Kind != SourceFileKind::Interface &&
+         fileMayHaveWarningControls(sf) && sf->getExportedSourceFile();
+}
 } // end anonymous namespace
 
 // TODO: categorization
@@ -118,9 +136,9 @@ static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define GROUPED_WARNING(ID, Group, Options, Text, Signature)                   \
   StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options,    \
                        DiagGroupID::Group),
-#define NOTE(ID, Options, Text, Signature)                                     \
+#define GROUPED_NOTE(ID, Group, Options, Text, Signature)                      \
   StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
-                       DiagGroupID::no_group),
+                       DiagGroupID::Group),
 #define REMARK(ID, Options, Text, Signature)                                   \
   StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
                        DiagGroupID::no_group),
@@ -602,8 +620,10 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (sf && sf->Kind != SourceFileKind::Interface &&
-      sf->getExportedSourceFile()) {
+  // Consult the syntactic warning control regions only when the file
+  // is known to contain any syntactic controls, to avoid a possible
+  // unnecessary ASTGen re-parse otherwise.
+  if (shouldCheckSyntacticWarningControlInFile(sf)) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
         sf->getExportedSourceFile(), sf->getASTContext(),
@@ -1330,10 +1350,6 @@ DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
 std::optional<DiagnosticBehavior>
 DiagnosticState::determineUserControlledWarningBehavior(
     const Diagnostic &diag, SourceManager &sourceMgr) const {
-  auto &diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
-  if (diagInfo.kind != DiagnosticKind::Warning)
-    return std::nullopt;
-
   // Compute a behavior relying strictly on command-line provided
   // `warningGroupBehaviorMap`.
   std::optional<DiagnosticBehavior> userControlledBehavior;
@@ -1367,8 +1383,7 @@ DiagnosticState::determineUserControlledWarningBehavior(
     if (!sourceFiles.empty()) {
       SourceFile *SF = sourceFiles.front();
       // Don't run syntactic @diagnose controls for .swiftinterface files.
-      if (SF && SF->Kind != SourceFileKind::Interface &&
-          SF->getExportedSourceFile()) {
+      if (shouldCheckSyntacticWarningControlInFile(SF)) {
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
@@ -1583,6 +1598,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::AttributeFromClang:
+      case GeneratedSourceInfo::SyntheticMacro:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1631,6 +1647,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return DeclName();
   }
 }
@@ -1693,6 +1710,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::AttributeFromClang:
+    case GeneratedSourceInfo::SyntheticMacro:
       return childNotes;
     }
 

@@ -336,6 +336,6 @@ protocol Amb where Self : Concrete {}
 
 extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this context}}
   func extensionMethodUsesClassTypes() {
-    _ = ConcreteAlias.self
+    _ = ConcreteAlias.self // expected-error {{cannot find 'ConcreteAlias' in scope}}
   }
 }

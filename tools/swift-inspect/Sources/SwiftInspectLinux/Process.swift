@@ -92,7 +92,14 @@ public class Process {
       var remote = iovec(
         iov_base: UnsafeMutableRawPointer(bitPattern: UInt(address)), iov_len: maxSize)
       let bytesRead = process_vm_readv(self.pid, &local, 1, &remote, 1, 0)
-      initCount = bytesRead / MemoryLayout<T>.stride
+      // process_vm_readv returns -1 on failure (e.g. unmapped page in the
+      // requested range). Clamp to [0, upToCount] so we never trip the
+      // unsafeUninitializedCapacity precondition that initCount <= capacity.
+      if bytesRead <= 0 {
+        initCount = 0
+      } else {
+        initCount = min(bytesRead / MemoryLayout<T>.stride, Int(upToCount))
+      }
     }
 
     guard array.count > 0 else {

@@ -1,0 +1,88 @@
+// RUN: %target-sil-opt -mandatory-dead-object-elimination %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+class Klass {
+  deinit {}
+}
+
+// Trivial deinit for Klass: just deallocates, no side effects.
+sil [ossa] @$s4main5KlassCfD : $@convention(method) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  dealloc_ref %0 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Non-lexical alloc_stack with no debug variable is eliminated.
+//
+// CHECK-LABEL: sil [ossa] @basic_elimination :
+// CHECK-NOT:     alloc_stack
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'basic_elimination'
+sil [ossa] @basic_elimination : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %r = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  return %r : $Klass
+}
+
+// Lexical alloc_stack of non-trivial type is preserved for debug info.
+//
+// CHECK-LABEL: sil [ossa] @preserve_lexical_nontrivial :
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'preserve_lexical_nontrivial'
+sil [ossa] @preserve_lexical_nontrivial : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk : $*Klass
+  %r = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  return %r : $Klass
+}
+
+// Lexical alloc_stack of trivial type is eligible for elimination: trivial
+// types carry no ownership and don't need to be kept around for debug info.
+//
+// CHECK-LABEL: sil [ossa] @eliminate_lexical_trivial :
+// CHECK-NOT:     alloc_stack
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'eliminate_lexical_trivial'
+sil [ossa] @eliminate_lexical_trivial : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %stk = alloc_stack [lexical] $Int
+  store %0 to [trivial] %stk : $*Int
+  %r = load [trivial] %stk : $*Int
+  dealloc_stack %stk : $*Int
+  return %r : $Int
+}
+
+// alloc_ref is not touched by this pass — only alloc_stack allocations are considered.
+//
+// CHECK-LABEL: sil [ossa] @preserve_alloc_ref :
+// CHECK:         alloc_ref $Klass
+// CHECK-LABEL: } // end sil function 'preserve_alloc_ref'
+sil [ossa] @preserve_alloc_ref : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  destroy_value %obj : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// alloc_stack with an associated debug variable is preserved even if non-lexical.
+//
+// CHECK-LABEL: sil [ossa] @preserve_debug_var :
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'preserve_debug_var'
+sil [ossa] @preserve_debug_var : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass, var, name "k"
+  store %0 to [init] %stk : $*Klass
+  %r = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  return %r : $Klass
+}

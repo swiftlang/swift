@@ -12,7 +12,6 @@
 
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -29,21 +28,12 @@ void ValueLifetimeBoundary::visitInsertionPoints(
     }
     auto *predBB = user->getParent();
     for (SILBasicBlock *succ : predBB->getSuccessors()) {
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
-      if (deBlocks && deBlocks->isDeadEnd(succ))
-        continue;
-#endif
 
       ASSERT(succ->getSinglePredecessorBlock() == predBB);
       visitor(succ->begin());
     }
   }
   for (SILBasicBlock *edge : boundaryEdges) {
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
-    if (deBlocks && deBlocks->isDeadEnd(edge))
-      continue;
-#endif
-
     visitor(edge->begin());
   }
 }

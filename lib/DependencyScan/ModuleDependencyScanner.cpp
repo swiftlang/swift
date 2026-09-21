@@ -23,6 +23,7 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
@@ -112,18 +113,25 @@ static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
 static std::string
 computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
                              const ASTContext &ctx) {
+  auto currentWorkingDirectory = [&ctx]() -> std::string {
+    if (auto cwd =
+            ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory())
+      return *cwd;
+    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                       "Could not determine current working directory");
+    return std::string();
+  };
+
   std::string workingDir;
   auto clangWorkingDirPos = std::find(
       commandLineArgs.rbegin(), commandLineArgs.rend(), "-working-directory");
   if (clangWorkingDirPos == commandLineArgs.rend())
-    workingDir =
-        ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+    workingDir = currentWorkingDirectory();
   else {
     if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          "Missing '-working-directory' argument");
-      workingDir =
-          ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+      workingDir = currentWorkingDirectory();
     } else
       workingDir = *(clangWorkingDirPos - 1);
   }
@@ -131,8 +139,8 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
 }
 
 std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
-    const clang::tooling::dependencies::ModuleDeps &clangDeps,
-    clang::tooling::dependencies::ModuleOutputKind moduleOutputKind) const {
+    const clang::dependencies::ModuleDeps &clangDeps,
+    clang::dependencies::ModuleOutputKind moduleOutputKind) const {
   llvm::SmallString<128> outputPath(ModuleOutputPath);
   if (clangDeps.IsInStableDirectories)
     outputPath = SDKModuleOutputPath;
@@ -152,17 +160,17 @@ std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
   llvm::sys::path::append(outputPath, clangDeps.ID.ModuleName + "-" +
                                           clangDeps.ID.ContextHash);
   switch (moduleOutputKind) {
-  case clang::tooling::dependencies::ModuleOutputKind::ModuleFile:
+  case clang::dependencies::ModuleOutputKind::ModuleFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_ClangModuleFile));
     break;
-  case clang::tooling::dependencies::ModuleOutputKind::DependencyFile:
+  case clang::dependencies::ModuleOutputKind::DependencyFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_Dependencies));
     break;
-  case clang::tooling::dependencies::ModuleOutputKind::DependencyTargets:
+  case clang::dependencies::ModuleOutputKind::DependencyTargets:
     return clangDeps.ID.ModuleName + "-" + clangDeps.ID.ContextHash;
-  case clang::tooling::dependencies::ModuleOutputKind::
+  case clang::dependencies::ModuleOutputKind::
       DiagnosticSerializationFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_SerializedDiagnostics));
@@ -247,6 +255,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
       workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
       workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
+      workerASTContext->SILOpts,
       workerCompilerInvocation->getFrontendOptions(),
       /* buildModuleCacheDirIfAbsent */ false,
       getModuleCachePathFromClang(
@@ -321,10 +330,10 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
                                                      isTestableImport);
 }
 
-std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+std::optional<clang::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     Identifier moduleName, LookupModuleOutputCallback lookupModuleOutput,
-    const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+    const llvm::DenseSet<clang::dependencies::ModuleID>
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
   auto clangModuleDependencies =
@@ -354,17 +363,17 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   return clangModuleDependencies.get();
 }
 
-std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+std::optional<clang::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     ModuleDependencyID moduleID,
     std::optional<StringRef> headerPath,
     std::optional<llvm::MemoryBufferRef> sourceBuffer,
     LookupModuleOutputCallback lookupModuleOutput,
-    const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+    const llvm::DenseSet<clang::dependencies::ModuleID>
        &alreadySeenModules) {
   // Scan the specified textual header file and collect its dependencies
   auto scanHeaderDependencies = [&]()
-      -> llvm::Expected<clang::tooling::dependencies::TranslationUnitDeps> {
+      -> llvm::Expected<clang::dependencies::TranslationUnitDeps> {
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
         inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs,
                                          headerPath),
@@ -449,7 +458,7 @@ ModuleDependencyScanner::getModuleImportIdentifier(StringRef moduleName) {
 
 SwiftDependencyTracker::SwiftDependencyTracker(
     std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
-    const CompilerInvocation &CI)
+    const CompilerInvocation &CI, ArrayRef<std::string> ExtraFiles)
     : CAS(CAS), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
 
@@ -485,6 +494,12 @@ SwiftDependencyTracker::SwiftDependencyTracker(
 
   // Add blocklist file.
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
+    addCommonFile(File);
+
+  // Add extra files that are needed at replay time but are not otherwise
+  // named in the Swift invocation (e.g. sanitizer ignorelists auto-injected
+  // by the Clang driver).
+  for (auto &File : ExtraFiles)
     addCommonFile(File);
 
   // Add access notes.
@@ -1608,7 +1623,10 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
   auto extractHeaderContent =
       [&](const SwiftBinaryModuleDependencyStorage &binaryMod)
       -> std::unique_ptr<llvm::MemoryBuffer> {
-    auto header = binaryMod.headerImport;
+    auto header =
+        ReversePrefixMapping
+            ? ReversePrefixMapping->mapToString(binaryMod.headerImport)
+            : binaryMod.headerImport;
     // Check to see if the header input exists on disk.
     auto FS = ScanASTContext.SourceMgr.getFileSystem();
     if (FS->exists(header))
@@ -2144,6 +2162,21 @@ std::string ModuleDependencyScanner::remapPath(StringRef Path) const {
   return PrefixMapper->mapToString(Path);
 }
 
+std::optional<SwiftDependencyTracker>
+ModuleDependencyScanner::createSwiftDependencyTracker(
+    const CompilerInvocation &CI) {
+  if (!CAS)
+    return std::nullopt;
+
+  // Files referenced by cc1 args that the Clang driver implicitly injects
+  // (e.g. sanitizer ignorelists for `-fsanitize=...`) live on the parsed
+  // Clang invocation and must be added to the CAS input tree.
+  const auto &clangLangOpts =
+      ScanASTContext.getClangModuleLoader()->getClangInstance().getLangOpts();
+  return SwiftDependencyTracker(CAS, PrefixMapper.get(), CI,
+                                clangLangOpts.NoSanitizeFiles);
+}
+
 LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
                                          StringRef sdkPath,
                                          const llvm::Triple &target) {
@@ -2172,7 +2205,7 @@ LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
 }
 
 ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
-    const clang::tooling::dependencies::ModuleDeps &clangModuleDep) {
+    const clang::dependencies::ModuleDeps &clangModuleDep) {
   // File dependencies for this module.
   std::vector<std::string> fileDeps;
   clangModuleDep.forEachFileDep(
@@ -2194,7 +2227,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
 
   auto pcmPath = clangModuleOutputPathLookup(
       clangModuleDep,
-      clang::tooling::dependencies::ModuleOutputKind::ModuleFile);
+      clang::dependencies::ModuleOutputKind::ModuleFile);
   swiftArgs.push_back("-o");
   swiftArgs.push_back(pcmPath);
 
@@ -2546,7 +2579,7 @@ ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
                   [this](const auto &cd, auto mok) -> std::string {
                     return clangModuleOutputPathLookup(cd, mok);
                   }, {});
-          if (clangResult)
+          if (clangResult && !clangResult->ModuleGraph.empty())
             return std::make_pair(
                 binaryDepID, clangResult->ModuleGraph[0].ClangModuleMapFile);
           return std::nullopt;

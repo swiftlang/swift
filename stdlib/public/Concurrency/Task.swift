@@ -145,7 +145,7 @@ public struct Task<Success: Sendable, Failure: Error>: Sendable {
   @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
   }
@@ -168,7 +168,7 @@ extension Task {
   ///
   /// - Returns: The task's result.
   public var value: Success {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     // This name is slightly different purely to avoid a clash with
     // the original property and keep the mangling concise.
     @_silgen_name("$sScT6_valuexvg")
@@ -252,6 +252,21 @@ extension Task {
   public func cancel() {
     unsafe _taskCancel(_AsyncTask(_task))
   }
+
+  /// Cancel this task, recording a specific `CancellationError.Reason`.
+  ///
+  /// Semantically identical to ``Task/cancel()``, but the passed `reason` is
+  /// stored on the task and can be read back via ``Task/cancellationReason``.
+  /// First-cancel-wins on the reason: if the task is already cancelled, this
+  /// call is a no-op with respect to both the cancelled state and the
+  /// recorded reason.
+  ///
+  /// Child tasks recursively cancelled through this call inherit the same reason.
+  @export(implementation)
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithFlags(_AsyncTask(_task), UInt(reason._rawValue))
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -332,7 +347,7 @@ public struct TaskPriority: RawRepresentable, Sendable {
 
   public static let high: TaskPriority = .init(rawValue: 0x19)
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var medium: TaskPriority {
     .init(rawValue: 0x15)
   }
@@ -562,7 +577,7 @@ struct JobFlags {
 
 /// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 func taskCreateFlags(
   priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
   inheritContext: Bool, enqueueJob: Bool,
@@ -746,22 +761,21 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 ///
 /// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 6.0, *)
-// Note: Could not be always-emit-into client since the UnsafeCurrentTask initializer was not usableFromInline
-// in 6.0, so we can't make this symbol more available than the availability of UnsafeCurrentTask.init.
+@export(implementation)
 @abi(
-  // abi only necessary to avoid redeclaration clash with previous declaration (__abi_withUnsafeCurrentTask)
-  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsendingExportedImpl<T>(
     body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
   ) async rethrows -> T
 )
 public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
   body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
-  guard let _task = unsafe _getCurrentAsyncTask() else {
-    return try await body(nil)
-  }
-
-  return try unsafe await body(UnsafeCurrentTask(_task))
+  // This is a backdeployment workaround!
+  // We cannot use the UnsafeCurrentTask initializer since it can't be used from a backdeployed function.
+  // We can get the UnsafeCurrentTask using the withUnsafeCurrentTask and escape the reference.
+  // This is safe, because we know this is the _current task_ so it must be alive still anyway.
+  let task: UnsafeCurrentTask? = unsafe withUnsafeCurrentTask { unsafe $0 }
+  return try unsafe await body(task)
 }
 
 // Old version for ABI compatibility
@@ -772,6 +786,19 @@ public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
 )
 internal func __abi_withUnsafeCurrentTask<T>(
   body: (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
+  unsafe try await withUnsafeCurrentTask(body: body)
+}
+
+// Old version for ABI compatibility
+@available(SwiftStdlib 6.4, *)
+@abi(
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+    body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+  ) async rethrows -> T
+)
+public nonisolated(nonsending) func __abi_withUnsafeCurrentTaskNonsending<T>(
+  body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
   unsafe try await withUnsafeCurrentTask(body: body)
 }
@@ -835,7 +862,7 @@ public struct UnsafeCurrentTask {
   /// There is no way to uncancel a task.
   ///
   /// This property returns the actual cancellation state of the task, regardless of whether
-  /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
+  /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
@@ -866,13 +893,13 @@ public struct UnsafeCurrentTask {
   /// Task.isCancelled
   /// ```
   ///
-  /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
-  /// the cancellation status from inside the task.
+  /// Prefer using ``Task/isCancelled-type.property`` (the static property) in most
+  /// situations when checking the cancellation status from inside the task.
   ///
-  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``Task/isCancelled-type.property``
   /// - SeeAlso: ``Task/checkCancellation()``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
     if #available(SwiftStdlib 6.4, *) {
       unsafe _isCancelled(ignoreTaskCancellationShield: true)
@@ -883,7 +910,7 @@ public struct UnsafeCurrentTask {
 
   /// Check if the task is cancelled, optionally ignoring active cancellation shields.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
     let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
     return unsafe _taskIsCancelledWithFlags(_rawTask, flags: flags)
@@ -914,17 +941,50 @@ public struct UnsafeCurrentTask {
   /// Note that cancellation may not be observed if a task is currently executing with an
   /// active task cancellation shield. Refer to cancellation shield documentation for detailed semantics.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
-  /// - SeeAlso: ``Task/hasActiveTaskCancellationShield``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
   public func cancel() {
     unsafe _taskCancel(_rawTask)
   }
 
+  /// Cancel the current task, recording a specific `CancellationError.Reason`.
+  ///
+  /// Semantically identical to `cancel()`, but the passed `reason` is stored
+  /// on the task and can be read back via ``UnsafeCurrentTask/cancellationReason``
+  /// or ``Task/cancellationReason``. First-cancel-wins on the reason: if the
+  /// task is already cancelled, this call is a no-op with respect to both
+  /// the cancelled state and the recorded reason.
+  ///
+  /// Child tasks recursively cancelled as a result of this call inherit the
+  /// same reason.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithFlags(_rawTask, UInt(reason._rawValue))
+  }
+
+  /// The reason for the current task's cancellation, or `nil` if the task
+  /// is not cancelled.
+  ///
+  /// Mirrors ``UnsafeCurrentTask/isCancelled``: once this returns non-nil it
+  /// will consistently return the same value for the remaining life of the
+  /// task. Not affected by cancellation shields.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public var cancellationReason: CancellationError.Reason? {
+    // Packed encoding: bit 0 is the isCancelled flag; bits 1..3 carry the
+    // `CancellationError.Reason` raw value. One runtime call returns both.
+    let packed = unsafe _taskGetIsCancelledWithReason(_rawTask)
+    guard packed & 1 != 0 else { return nil }
+    let raw = UInt8(truncatingIfNeeded: packed >> 1)
+    return CancellationError.Reason(_rawValue: raw) ?? .unspecified
+  }
+
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
-  /// ``withTaskCancellationShield(operation:)`` function.
+  /// ``withTaskCancellationShield(operation:)-(()->Value)`` function.
   ///
   /// An active task cancellation shield prevents a task's ability to observe if it was cancelled,
-  /// i.e. the ``Task/isCancelled`` property will always return `false` when the task is executing
+  /// i.e. the ``Task/isCancelled-type.property`` property will always return `false` when the task is executing
   /// with an active shield.
   ///
   /// This property is primarily aimed at debugging and understanding cancellation behavior
@@ -935,12 +995,12 @@ public struct UnsafeCurrentTask {
   /// Cancellation shields are not automatically inherited by child tasks; each child task must install
   /// its own shield if needed if it, independently, wanted to ignore cancellation during a specific scope.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var hasActiveCancellationShield: Bool {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     get {
       unsafe _taskHasActiveCancellationShield(_rawTask)
     }
@@ -1118,6 +1178,16 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 @usableFromInline
 internal func _taskCancel(_ task: _AsyncTask)
 
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_cancelWithFlags")
+@usableFromInline
+internal func _taskCancelWithFlags(_ task: _AsyncTask, _ flags: UInt)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_getIsCancelledWithReason")
+@usableFromInline
+internal func _taskGetIsCancelledWithReason(_ task: _AsyncTask) -> UInt
+
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
@@ -1233,8 +1303,7 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.8, *)
 extension Task where Failure == Error {
   @available(SwiftStdlib 5.8, *)
-  @_alwaysEmitIntoClient
-  @usableFromInline
+  @export(implementation)
   internal static func _runInlineHelper<T>(
     body: () async -> Result<T, Error>,
     rescue: (Result<T, Error>) throws -> T
@@ -1273,8 +1342,7 @@ extension Task where Failure == Error {
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
-@usableFromInline
+@export(implementation)
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
   Task(operation: body)

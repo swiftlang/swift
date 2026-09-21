@@ -19,15 +19,29 @@
 
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
+// The full Metadata.h is only needed for ResultTypeInfo's non-embedded
+// representation below, which calls value witness methods on Metadata.
+// Everywhere else in this header, Metadata/HeapMetadata are used as opaque
+// pointers, satisfied by the forward declarations in MetadataValues.h and
+// HeapObject.h.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/ABI/Metadata.h"
+#endif
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
+
+#ifndef SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 0
+#else
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 1
+#endif
+#endif
 #include "swift/Basic/STLExtras.h"
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
-#include "bitset"
-#include "queue" // TODO: remove and replace with our own mpsc
+#include "llvm/ADT/PointerIntPair.h"
 
 // Does the runtime integrate with libdispatch?
 #if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
@@ -60,16 +74,31 @@ class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;
 
+// Forward-declared from `stdlib/public/Concurrency/Debug.h` so we can assert
+// against it.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+extern "C" const size_t _swift_concurrency_debug_asyncTaskNameOffset;
+#endif
+
 // lldb knows about some of these internals. If you change things that lldb
 // knows about (or might know about in the future, as a future lldb might be
 // inspecting a process running an older Swift runtime), increment
 // _swift_concurrency_debug_internal_layout_version and add a comment describing
 // the new version.
+//
+// See `Concurrency/Debug.h` for details about each version.
 
 extern const HeapMetadata *jobHeapMetadataPtr;
 extern const HeapMetadata *taskHeapMetadataPtr;
 
 /// A schedulable job.
+///
+/// In general, the header fields of a Job that is currently enqueued
+/// must not be mutated. The executor owns that memory and expects
+/// it to be immutable or (in the case of the schedule-private
+/// storage) under its control until it dequeues the job. Once the
+/// executor calls swift_job_run, the job regains ownership of the
+/// header fields and is generally permitted to change them again.
 class alignas(2 * alignof(void*)) Job :
   // For async-let tasks, the refcount bits are initialized as "immortal"
   // because such a task is allocated with the parent's stack allocator.
@@ -77,9 +106,6 @@ class alignas(2 * alignof(void*)) Job :
 public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
-    /// The next waiting task link, an AsyncTask that is waiting on a future.
-    NextWaitingTaskIndex = 0,
-
     // The Dispatch object header is one pointer and two ints, which is
     // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
     // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
@@ -94,7 +120,13 @@ public:
     DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
-  // Reserved for the use of the scheduler.
+  // This field is reserved for the use of the scheduler between:
+  // - When someone passes the job to the executor's enqueue
+  // - When the executor either enqueues the job to
+  //   another executor or passes it to swift_job_run
+  // Note that this is tied to the lifecycle of the Job. If
+  // this Job is a Task, this field may still be reserved for
+  // the Job's executor at any time in the Task's lifecycle
   void *SchedulerPrivate[2];
 
   /// WARNING: DO NOT MOVE.
@@ -182,6 +214,10 @@ public:
   void runSimpleInFullyEstablishedContext() {
     return RunJob(this); // 'return' forces tail call
   }
+
+  /// Gets the 32-bit Job ID from the job or the 64-bit
+  /// Task ID if this is an AsyncTask or AsyncTaskStealer
+  uint64_t getJobTaskId() const;
 };
 
 // The compiler will eventually assume these.
@@ -283,6 +319,7 @@ struct ResultTypeInfo {
 /// An AsyncTask may have the following fragments:
 ///
 ///    +--------------------------+
+///    | nameFragment?            |
 ///    | childFragment?           |
 ///    | groupChildFragment?      |
 ///    | futureFragment?          |*
@@ -290,6 +327,31 @@ struct ResultTypeInfo {
 ///
 /// * The future fragment is dynamic in size, based on the future result type
 ///   it can hold, and thus must be the *last* fragment.
+///
+/// Since Tasks are often repeatedly enqueued as Jobs, some extra care must
+/// be taken with them because of the runtime's use of TaskStealer Jobs.
+/// When a Task's priority is increased while it is enqueued, the runtime
+/// will enqueue a Job with the higher priority on the same executor to
+/// try to take over the responsibility of running the task. Because the
+/// Task may have started running on behalf of a TaskStealer Job, the Task
+/// object (considered as a Job) may still be enqueued on some executor
+/// even while the Task is logically running, suspended, or complete.
+/// This also means that regular enqueues to resume the Task may enqueue a
+/// TaskStealer Job instead and enqueues to escalate priority may enqueue
+/// the Task's Job if it is available. So while code that's acting on
+/// behalf of the current running Task is free to assume exclusive access
+/// to most of the Task structure, it cannot generally modify the Task's Job
+/// header unless it knows that the Task object is not presently enqueued
+/// as a Job this way. (This is tracked dynamically in the task status.)
+///
+/// However, an important exception to that rule exists for the task resume
+/// function and context. Importantly, these fields are not directly accessed by
+/// executors. Tasks and task stealer jobs coordinate so that only one of them
+/// will advance the task at once. This coordination establishes a rule that any
+/// outstanding jobs (possibly including the Task itself) that were enqueued
+/// for previous suspensions of the task will never actually start running
+/// long enough to access these fields. As a result, code running on behalf
+/// of the current task can freely set the resume fields before suspending.
 class AsyncTask : public Job {
 public:
   // On 32-bit targets, there is a word of tail padding remaining
@@ -326,10 +388,19 @@ public:
     static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
 #endif
 
+#if !SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+    static constexpr size_t TaskRegistryTaskSize = 0;
+#else
+    // registryNext and registryPrev pointers
+    static constexpr size_t TaskRegistryTaskSize = 2 * sizeof(void *);
+#endif
+
     // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
-    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
+    // 8 bytes of padding, the ActiveTaskStatus, a RecursiveMutex, and
+    // potentially 2 task registry pointers.
     static constexpr size_t PrivateStorageSize =
       6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      + TaskRegistryTaskSize
       + sizeof(RecursiveMutex);
 
     char Storage[PrivateStorageSize];
@@ -385,7 +456,7 @@ public:
 
   /// Set the task's ID field to the next task ID.
   void setTaskId();
-  uint64_t getTaskId();
+  uint64_t getTaskId() const;
 
   /// Get the task's resume function, for logging purposes only. This will
   /// attempt to see through the various adapters that are sometimes used, and
@@ -407,6 +478,57 @@ public:
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
 
+  // An exclusion value is a token that represents if a Job is allowed
+  // to invoke a Task. It generally shouldn't be observed or manipulated
+  // outside of tryStartRunning and swift_task_enqueueSelfOrStealer
+  struct ExclusionValue {
+    uint8_t value;
+
+    bool operator==(ExclusionValue const &other) const noexcept {
+      return value == other.value;
+    }
+    bool operator!=(ExclusionValue const &other) const noexcept {
+      return value != other.value;
+    }
+  };
+
+  enum InvokeFlags : uint32_t {
+    InvokeFlagsFromTask = 0x00,
+    InvokeFlagsFromStealer = 0x01,
+  };
+  /// Try to flag that the current thread is going to run this task.
+  /// If there are multiple jobs trying to run the task, this requires
+  /// claiming the right to run the task, which can fail if another job
+  /// wins the race. This may also require increasing changing the priority
+  /// of the current thread, if the current task executor supports that.
+  ///
+  /// Generally, this should be done immediately after updating ActiveTask.
+  ///
+  /// allowedExclusionValue is the local exclusion value of the Job invoking
+  /// this Task. For the Task's Job, this is LocalStealerExclusionValue from
+  /// the Task's private data. For a TaskStealer Job, this is ExclusionValue.
+  ///
+  /// invokeFlags is what type of Job is invoking this
+  /// Task. It's either InvokeFlagsFromTask for the Task's
+  /// Job or InvokeFlagsFromStealer for a TaskStealer Job.
+  ///
+  /// The first (bool) return value is the sucess of this call.
+  /// If this return value is false, the caller should not finish
+  /// establishing the context to run the Task and must not run the Task.
+  ///
+  /// The second return value is an opaque value used to restore the state of
+  /// the thread before returning to the context invoking this Task (either the
+  /// executor or the caller of Task.immediate). When flagAsRunning succeeds,
+  /// Dispatch is the default executor, and priority escalation is enabled,
+  /// this value must be passed to swift_dispatch_thread_reset_override_self.
+  ///
+  /// This function is for when the task starts running after fully suspending.
+  /// If a task starts to suspend itself, but then finds out that it didn't
+  /// need to, it should instead call resumeRunningAfterFailedSuspend,
+  /// which avoids a lot of the extra complexity of this operation.
+  std::pair<bool, uint32_t>
+  tryStartRunning(ExclusionValue allowedExclusionValue,
+                  InvokeFlags invokeFlags = InvokeFlagsFromTask);
   /// A task can have the following states:
   ///   * suspended: In this state, a task is considered not runnable
   ///   * enqueued: In this state, a task is considered runnable
@@ -421,30 +543,17 @@ public:
   ///       running -> completed
   ///       running -> enqueued
   ///
-  /// The 4 methods below are how a task switches from one state to another.
+  /// The methods below are how a task switches from one state to another.
 
-  /// Flag that this task is now running.  This can update
-  /// the priority stored in the job flags if the priority has been
-  /// escalated.
-  ///
-  /// Generally this should be done immediately after updating
-  /// ActiveTask.
-  ///
-  /// When Dispatch is used for the default executor:
-  /// * If the return value is non-zero, it must be passed
-  ///   to swift_dispatch_thread_reset_override_self
-  ///   before returning to the executor.
-  /// * If the return value is zero, it may be ignored or passed to
-  ///   the aforementioned function (which will ignore values of zero).
-  /// The current implementation will always return zero
-  /// if you call flagAsRunning again before calling
-  /// swift_dispatch_thread_reset_override_self with the
-  /// initial value. This supports suspending and immediately
-  /// resuming a Task without returning up the callstack.
-  ///
-  /// For all other default executors, flagAsRunning
-  /// will return zero which may be ignored.
-  uint32_t flagAsRunning();
+  /// This variant may be called if you are resuming immediately
+  /// after suspending. That is, you are on the same thread, you
+  /// have not enqueued onto any executor, and you have not called
+  /// swift_dispatch_thread_reset_override_self or done any other
+  /// cleanup work. This is intended for situations such as awaiting
+  /// where you may mark yourself as suspended but find out during
+  /// atomic state update that you may actually resume immediately.
+  void resumeRunningAfterFailedSuspend(
+      InvokeFlags invokeFlags = InvokeFlagsFromTask);
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.
@@ -456,6 +565,8 @@ private:
   // Helper function
   void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
   void destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord);
+  uint32_t taskFlagAsRunningWithoutDependency(InvokeFlags invokeFlags);
+  void taskRemoveEnqueued();
 
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually
@@ -473,25 +584,18 @@ public:
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
   bool isCancelled(bool ignoreShield) const;
 
-  // ==== INITIAL TASK RECORDS =================================================
-  // A task may have a number of "initial" records set, they MUST be set in the
-  // following order to make the task-local allocation/deallocation's stack
-  // discipline easy to work out at the tasks destruction:
-  //
-  // - Initial TaskName
-  // - Initial ExecutorPreference
-
   // ==== Task Naming ----------------------------------------------------------
 
-  /// At task creation a task may be assigned a name.
-  void pushInitialTaskName(const char* taskName);
-  void dropInitialTaskNameRecord();
-
   /// Get the initial task name that was given to this task during creation,
-  /// or nullptr if the task has no name
+  /// or nullptr if the task has no name.
   const char* getTaskName();
 
-  bool hasInitialTaskNameRecord() const {
+  /// Copy `taskName` into the the task local allocated memory, and store a pointer
+  /// to it in `NameFragment`.
+  void initializeTaskName(const char *taskName);
+
+  /// True only if this task has a `NameFragment`.
+  bool hasTaskName() const {
     return Flags.task_hasInitialTaskName();
   }
 
@@ -523,6 +627,11 @@ public:
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
+  // ==== Task Deadlines -------------------------------------------------------
+
+  /// Inherit the deadline status from parent task if present.
+  void inheritDeadlineFrom(AsyncTask *parent);
+
   // ==== Task Local Values ----------------------------------------------------
 
   void localValuePush(const HeapObject *key,
@@ -542,6 +651,72 @@ public:
   bool cancellationShieldPush();
 
   void cancellationShieldPop();
+
+  // ==== Task Fragment Offsets -----------------------------------------------------
+
+  size_t nameFragmentOffset() const {
+    return sizeof(AsyncTask);
+  }
+
+  size_t childFragmentOffset() const {
+    size_t offset = nameFragmentOffset();
+    if (hasTaskName())
+      offset += sizeof(NameFragment);
+    return offset;
+  }
+
+  size_t groupChildFragmentOffset() const {
+    size_t offset = childFragmentOffset();
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+    return offset;
+  }
+
+  size_t futureFragmentOffset() const {
+    size_t offset = groupChildFragmentOffset();
+    if (hasGroupChildFragment())
+      offset += sizeof(GroupChildFragment);
+    return offset;
+  }
+
+  // ==== Task Name Fragment --------------------------------------------------------
+
+  /// A fragment of an async task that holds the task's name.
+  ///
+  /// This fragment MUST be allocated immediately after the AsyncTask itself,
+  /// as external tools rely on the location of this record to read the task name,
+  /// see `Concurrency/Debug.h`.
+  class NameFragment {
+    /// Pointer to a null-terminated UTF-8 string.
+    /// The string is allocated no the task-local allocator as the first thing
+    /// allocated on it, and must be the last thing we free on it.
+    const char *Name;
+    /// The length of the string stored in Name (not counting the trailing \0).
+    /// Used by tools so they can preallocate a buffer of the right size.
+    size_t NameLength;
+
+  public:
+    NameFragment() : Name(nullptr), NameLength(0) {}
+
+    const char *getName() const { return Name; }
+    size_t getNameLength() const { return NameLength; }
+    void setName(const char *name, size_t length) {
+      Name = name;
+      NameLength = length;
+    }
+  };
+
+  NameFragment *nameFragment() {
+    assert(hasTaskName());
+    auto *offset = reinterpret_cast<char *>(this) + nameFragmentOffset();
+#if !SWIFT_CONCURRENCY_EMBEDDED
+    assert(static_cast<size_t>(offset - reinterpret_cast<char *>(this)) ==
+               _swift_concurrency_debug_asyncTaskNameOffset &&
+           "AsyncTask::nameFragment offset must match "
+           "_swift_concurrency_debug_asyncTaskNameOffset");
+#endif
+    return reinterpret_cast<NameFragment *>(offset);
+  }
 
   // ==== Child Fragment -------------------------------------------------------
 
@@ -600,11 +775,8 @@ public:
 
   ChildFragment *childFragment() {
     assert(hasChildFragment());
-
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-
-    return reinterpret_cast<ChildFragment*>(offset);
+    return reinterpret_cast<ChildFragment *>(
+        reinterpret_cast<char *>(this) + childFragmentOffset());
   }
 
   // ==== TaskGroup Child ------------------------------------------------------
@@ -618,6 +790,18 @@ public:
   private:
     TaskGroup* Group;
 
+    /// The next task in the intrusive singly-linked list of tasks that have
+    /// completed and are ready to be consumed by the owning group's ready
+    /// queue, in FIFO order, with the low bit stealing storage for whether
+    /// this task completed with an error (the ready queue only has access
+    /// to the task itself, not the group's own bookkeeping, when dequeuing).
+    /// A task-group child is only ever offered to (and thus only ever
+    /// linked into the ready queue of) its own group, and only once, so
+    /// it's safe to store this link directly in the task rather than in a
+    /// separately allocated queue node. Only meaningful while this task is
+    /// actually enqueued; see `NaiveTaskGroupQueue` in TaskGroup.cpp.
+    llvm::PointerIntPair<AsyncTask *, 1, bool> NextReadyTaskAndErrorFlag;
+
     friend class AsyncTask;
     friend class TaskGroup;
 
@@ -629,6 +813,20 @@ public:
     TaskGroup* getGroup() {
       return Group;
     }
+
+    AsyncTask *getNextReadyTask() const {
+      return NextReadyTaskAndErrorFlag.getPointer();
+    }
+    void setNextReadyTask(AsyncTask *task) {
+      NextReadyTaskAndErrorFlag.setPointer(task);
+    }
+
+    bool getReadyHadErrorResult() const {
+      return NextReadyTaskAndErrorFlag.getInt();
+    }
+    void setReadyHadErrorResult(bool hadError) {
+      NextReadyTaskAndErrorFlag.setInt(hadError);
+    }
   };
 
   // Checks if task is a child of a TaskGroup task.
@@ -639,13 +837,8 @@ public:
 
   GroupChildFragment *groupChildFragment() {
     assert(hasGroupChildFragment());
-
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasChildFragment())
-      offset += sizeof(ChildFragment);
-
-    return reinterpret_cast<GroupChildFragment *>(offset);
+    return reinterpret_cast<GroupChildFragment *>(
+        reinterpret_cast<char *>(this) + groupChildFragmentOffset());
   }
 
   // ==== Task Executor Preference --------------------------------------------
@@ -783,14 +976,8 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasChildFragment())
-      offset += sizeof(ChildFragment);
-    if (hasGroupChildFragment())
-      offset += sizeof(GroupChildFragment);
-
-    return reinterpret_cast<FutureFragment *>(offset);
+    return reinterpret_cast<FutureFragment *>(
+        reinterpret_cast<char *>(this) + futureFragmentOffset());
   }
 
   /// Wait for this future to complete.
@@ -820,12 +1007,10 @@ public:
   }
 
 private:
-  /// Access the next waiting task, which establishes a singly linked list of
-  /// tasks that are waiting on a future.
-  AsyncTask *&getNextWaitingTask() {
-    return reinterpret_cast<AsyncTask *&>(
-        SchedulerPrivate[NextWaitingTaskIndex]);
-  }
+  /// Access the next waiting task, which establishes a singly linked
+  /// list of tasks that are waiting on a future. This function
+  /// assumes that this Task is suspended waiting on a another Task.
+  AsyncTask *&getNextWaitingTask();
 };
 
 // The compiler will eventually assume these.

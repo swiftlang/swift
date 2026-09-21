@@ -1,4 +1,5 @@
 //RUN: %target-swift-frontend -emit-sil -verify %s
+//RUN: %target-swift-frontend -emit-sil -verify -enable-sil-opaque-values %s
 
 @_silgen_name("cond")
 func cond() -> Bool
