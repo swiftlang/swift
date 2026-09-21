@@ -23,6 +23,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenConcurrency.cpp
   GenDistributed.cpp
   GenDecl.cpp
+  GenDirectRuntime.cpp
   GenDiffFunc.cpp
   GenDiffWitness.cpp
   GenEnum.cpp
