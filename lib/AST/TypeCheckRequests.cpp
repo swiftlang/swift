@@ -1312,7 +1312,8 @@ void ValidatePrecedenceGroupRequest::diagnoseCycle(
   if (auto pathDir = desc.pathDirection) {
     diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
   } else {
-    diags.diagnose(desc.nameLoc, diag::circular_reference);
+    diags.diagnose(desc.nameLoc, diag::circular_reference,
+                   TypeID<ValidatePrecedenceGroupRequest>::getName());
   }
 }
 
