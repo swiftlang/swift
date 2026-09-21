@@ -484,7 +484,7 @@ public:
 
   void addLazyGlobalVariable(SILGlobalVariable *v);
 
-  void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
+  void addDynamicReplacement(SILFunction *f);
 
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
     DefaultIGMForFunction[f] = CurrentIGM;

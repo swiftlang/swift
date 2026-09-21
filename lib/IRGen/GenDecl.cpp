@@ -1804,6 +1804,7 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
   entry.IsDescriptorUsed = true;
 
   if (isNovelUseOfDescriptor) {
+    assert(!FinishedEmittingLazyDefinitions);
     LazyOpaqueTypeDescriptors.push_back(opaque);
   }
 }
@@ -1831,6 +1832,24 @@ static void collectOpaqueResultTypes(
       if (seen.insert(opaque).second)
         opaqueTypes.push_back(opaque);
   });
+}
+
+void IRGenerator::addDynamicReplacement(SILFunction *f) {
+  if (!DynamicReplacements.insert(f))
+    return;
+
+  if (!hasOpaqueResultType(f))
+    return;
+
+  // emitDynamicReplacements() references the opaque type descriptor and the
+  // descriptor accessor of the replacement's result type. It runs after
+  // emitLazyDefinitions() has drained the lazy worklists, so note the use of
+  // those descriptors now, while they can still be emitted.
+  SmallVector<OpaqueTypeArchetypeType *, 8> opaqueTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> seen;
+  collectOpaqueResultTypes(f, opaqueTypes, seen);
+  for (auto *opaque : opaqueTypes)
+    noteUseOfOpaqueTypeDescriptor(opaque->getDecl());
 }
 
 void IRGenerator::noteUseOfExtensionDescriptor(ExtensionDecl *ext) {
