@@ -149,7 +149,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
             """
           } + ["return true"]
       } else {
-        stmtsInCase = [getUnreachableStatement()]
+        stmtsInCase = [unreachableStatement]
       }
 
       let lPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "l")
@@ -211,7 +211,7 @@ func getDiscriminant(
       cases.append(
         """
         case .\(caseInfo.name):
-          \(getUnreachableStatement())
+          \(unreachableStatement)
         """
       )
     }
@@ -247,8 +247,7 @@ func getEnumElementPayloadPattern(
 
 /// A trap used for cases statically known to be unreachable at this call
 /// site (e.g. pruned by availability).
-func getUnreachableStatement() -> String {
+let unreachableStatement: String =
   """
   Swift::fatalError("Unavailable code reached")
   """
-}

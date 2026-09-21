@@ -203,27 +203,61 @@ extension CodableTypeInfo: TypeInfoProtocol {
   }
 }
 
-private func unsafeMark(_ isUnsafe: Bool) -> String {
-  isUnsafe ? "unsafe " : ""
+private let codingKeysRef = "Self.CodingKeys"
+
+private enum CaseDecoding {
+  case unavailable
+  case nested(keysRef: String)
 }
 
-private func codingKeysRef(_ name: String) -> String {
-  "Self.\(name)"
+extension CodableTypeInfo {
+  fileprivate var unsafeMark: String { isUnsafe ? "unsafe " : "" }
 }
 
 extension CodedCase {
-  fileprivate var encodingKeys: (keyName: String, caseCodingKeysName: String)? {
-    guard !isUnavailable, let keyName, let caseCodingKeysName else {
+  fileprivate var caseCodingKeysRef: String? {
+    caseCodingKeysName.map { "Self.\($0)" }
+  }
+
+  fileprivate var encodingKeys: (keyName: String, keysRef: String)? {
+    guard !isUnavailable, let keyName, let caseCodingKeysRef else {
       return nil
     }
-    return (keyName, caseCodingKeysName)
+    return (keyName, caseCodingKeysRef)
   }
 
   fileprivate var isEncodable: Bool { encodingKeys != nil }
 
+  fileprivate var decoding: (keyName: String, decoding: CaseDecoding)? {
+    guard let keyName else { return nil }
+    if isUnavailable {
+      return (keyName, .unavailable)
+    }
+    guard let caseCodingKeysRef else { return nil }
+    return (keyName, .nested(keysRef: caseCodingKeysRef))
+  }
+
+  /// The payload values carrying a key, paired with their binding index.
+  fileprivate var encodedPayload: [(index: Int, keyName: String, useIfPresent: Bool)] {
+    payload.indices.compactMap {
+      index -> (index: Int, keyName: String, useIfPresent: Bool)? in
+      guard let keyName = payload[index].keyName else { return nil }
+      return (index, keyName, payload[index].useIfPresent)
+    }
+  }
+
+  fileprivate var decodedPayload:
+    [(keyName: String, label: String?, typeName: String, useIfPresent: Bool)]
+  {
+    payload.compactMap {
+      value -> (keyName: String, label: String?, typeName: String, useIfPresent: Bool)? in
+      guard let keyName = value.keyName else { return nil }
+      return (keyName, value.label, value.typeName, value.useIfPresent)
+    }
+  }
+
   fileprivate var encodePattern: PatternSyntax {
-    let encodesAnyValue = payload.contains { $0.keyName != nil }
-    if payload.isEmpty || !isEncodable || !encodesAnyValue {
+    guard isEncodable, !encodedPayload.isEmpty else {
       return ".\(raw: name)"
     }
 
@@ -237,6 +271,9 @@ extension CodedCase {
 }
 
 public struct DeriveEncodableMacro: DeclarationMacro {
+
+  let info: CodableTypeInfo
+
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
@@ -244,39 +281,36 @@ public struct DeriveEncodableMacro: DeclarationMacro {
     let info = try node.arguments.expect(
       .init(parser: CodableTypeInfo.fromStringLit))
 
-    return [Self.deriveEncode(info)]
+    return [Self(info: info).encodeDecl]
   }
 
-  static func deriveEncode(_ info: CodableTypeInfo) -> DeclSyntax {
+  var encodeDecl: DeclSyntax {
     """
     func encode(to encoder: any Swift::Encoder) throws {
-      \(getBody(info))
+      \(raw: body)
     }
     """
   }
 
-  static func getBody(_ info: CodableTypeInfo) -> CodeBlockItemListSyntax {
+  var body: String {
     switch info.shape {
     case .structLike(let properties):
-      getStructBody(properties, isUnsafe: info.isUnsafe)
+      structBody(properties)
     case .enumLike(let cases):
-      getEnumBody(cases, info: info)
+      enumBody(cases)
     }
   }
 
-  static func getStructBody(
-    _ properties: [CodedProperty], isUnsafe: Bool
-  ) -> CodeBlockItemListSyntax {
+  func structBody(_ properties: [CodedProperty]) -> String {
     if properties.isEmpty {
       return """
-        _ = encoder.container(keyedBy: \(raw: codingKeysRef("CodingKeys")).self)
+        _ = encoder.container(keyedBy: \(codingKeysRef).self)
         """
     }
 
-    let mark = unsafeMark(isUnsafe)
-    var items: [CodeBlockItemSyntax] = [
+    var items: [String] = [
       """
-      var container = encoder.container(keyedBy: \(raw: codingKeysRef("CodingKeys")).self)
+      var container = encoder.container(keyedBy: \(codingKeysRef).self)
       """
     ]
 
@@ -284,19 +318,17 @@ public struct DeriveEncodableMacro: DeclarationMacro {
       let method = property.useIfPresent ? "encodeIfPresent" : "encode"
       items.append(
         """
-        try \(raw: mark)container.\(raw: method)(self.\(raw: property.memberName), forKey: .\(raw: property.keyName))
+        try \(info.unsafeMark)container.\(method)(self.\(property.memberName), forKey: .\(property.keyName))
         """
       )
     }
 
-    return .init(items)
+    return items.joined(separator: "\n")
   }
 
-  static func getEnumBody(
-    _ cases: [CodedCase], info: CodableTypeInfo
-  ) -> CodeBlockItemListSyntax {
+  func enumBody(_ cases: [CodedCase]) -> String {
     let containerCall: ExprSyntax =
-      "encoder.container(keyedBy: \(raw: codingKeysRef("CodingKeys")).self)"
+      "encoder.container(keyedBy: \(raw: codingKeysRef).self)"
 
     if cases.isEmpty {
       return """
@@ -308,7 +340,7 @@ public struct DeriveEncodableMacro: DeclarationMacro {
     let mutatesContainer = cases.contains { $0.isEncodable }
     let readsContainer = cases.contains { !$0.isUnavailable && !$0.isEncodable }
 
-    let containerDecl: CodeBlockItemSyntax =
+    let containerDecl: String =
       if mutatesContainer {
         "var container = \(containerCall)"
       } else if readsContainer {
@@ -317,47 +349,42 @@ public struct DeriveEncodableMacro: DeclarationMacro {
         "_ = \(containerCall)"
       }
 
-    let caseSyntax = cases.map { getCase($0, isUnsafe: info.isUnsafe) }
+    let caseSyntax = cases.map(encodeCase)
 
-    return """
+    return
+      """
       \(containerDecl)
-      switch \(raw: unsafeMark(info.isUnsafe))self {
-      \(raw: caseSyntax.map { $0.trimmedDescription }.joined(separator: "\n"))
+      switch \(info.unsafeMark)self {
+      \(caseSyntax.joined(separator: "\n"))
       }
       """
   }
 
-  static func getCase(
-    _ codedCase: CodedCase, isUnsafe: Bool
-  ) -> SwitchCaseSyntax {
-    var items: [CodeBlockItemSyntax] = []
+  func encodeCase(_ codedCase: CodedCase) -> String {
+    var items: [String] = []
 
     if codedCase.isUnavailable {
-      items.append(getUnreachableStatement())
-    } else if let (keyName, caseCodingKeysName) = codedCase.encodingKeys {
-      let keysRef = codingKeysRef(caseCodingKeysName)
-      let encoded = codedCase.payload.enumerated().compactMap {
-        (i, value) in value.keyName.map { (i, $0, value.useIfPresent) }
-      }
+      items.append(unreachableStatement)
+    } else if let (keyName, keysRef) = codedCase.encodingKeys {
+      let encoded = codedCase.encodedPayload
 
       if encoded.isEmpty {
         items.append(
           """
-          _ = container.nestedContainer(keyedBy: \(raw: keysRef).self, forKey: .\(raw: keyName))
+          _ = container.nestedContainer(keyedBy: \(keysRef).self, forKey: .\(keyName))
           """
         )
       } else {
         items.append(
           """
-          var nestedContainer = container.nestedContainer(keyedBy: \(raw: keysRef).self, forKey: .\(raw: keyName))
+          var nestedContainer = container.nestedContainer(keyedBy: \(keysRef).self, forKey: .\(keyName))
           """
         )
-        let mark = unsafeMark(isUnsafe)
-        for (i, valueKeyName, useIfPresent) in encoded {
+        for (index, valueKeyName, useIfPresent) in encoded {
           let method = useIfPresent ? "encodeIfPresent" : "encode"
           items.append(
             """
-            try \(raw: mark)nestedContainer.\(raw: method)(a\(raw: i), forKey: .\(raw: valueKeyName))
+            try \(info.unsafeMark)nestedContainer.\(method)(a\(index), forKey: .\(valueKeyName))
             """
           )
         }
@@ -375,17 +402,15 @@ public struct DeriveEncodableMacro: DeclarationMacro {
 
     return """
       case \(codedCase.encodePattern):
-        \(CodeBlockItemListSyntax(items))
+        \(items.joined(separator: "\n"))
       """
   }
 }
 
-private enum CaseDecoding {
-  case unavailable
-  case nested(caseCodingKeysName: String)
-}
-
 public struct DeriveDecodableMacro: DeclarationMacro {
+
+  let info: CodableTypeInfo
+
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
@@ -393,51 +418,48 @@ public struct DeriveDecodableMacro: DeclarationMacro {
     let info = try node.arguments.expect(
       .init(parser: CodableTypeInfo.fromStringLit))
 
-    return [Self.deriveInit(info)]
+    return [Self(info: info).initDecl]
   }
 
-  static func deriveInit(_ info: CodableTypeInfo) -> DeclSyntax {
+  var initDecl: DeclSyntax {
     """
     init(from decoder: any Swift::Decoder) throws {
-      \(getBody(info))
+      \(body)
     }
     """
   }
 
-  static func getBody(_ info: CodableTypeInfo) -> CodeBlockItemListSyntax {
-    switch info.shape {
-    case .structLike(let properties):
-      getStructBody(properties, info: info)
-    case .enumLike(let cases):
-      getEnumBody(cases, info: info)
-    }
-  }
-
-  static func getStructBody(
-    _ properties: [CodedProperty], info: CodableTypeInfo
-  ) -> CodeBlockItemListSyntax {
-    if !info.hasCodingKeys {
+  var body: CodeBlockItemListSyntax {
+    guard info.hasCodingKeys else {
       return ""
     }
 
+    switch info.shape {
+    case .structLike(let properties):
+      return structBody(properties)
+    case .enumLike(let cases):
+      return enumBody(cases)
+    }
+  }
+
+  func structBody(_ properties: [CodedProperty]) -> CodeBlockItemListSyntax {
     if properties.isEmpty {
       return """
-        _ = try decoder.container(keyedBy: \(raw: codingKeysRef("CodingKeys")).self)
+        _ = try decoder.container(keyedBy: \(raw: codingKeysRef).self)
         """
     }
 
     var items: [CodeBlockItemSyntax] = [
       """
-      let container = try decoder.container(keyedBy: \(raw: codingKeysRef("CodingKeys")).self)
+      let container = try decoder.container(keyedBy: \(raw: codingKeysRef).self)
       """
     ]
 
-    let mark = unsafeMark(info.isUnsafe)
     for property in properties {
       let method = property.useIfPresent ? "decodeIfPresent" : "decode"
       items.append(
         """
-        \(raw: mark)self.\(raw: property.memberName) = try container.\(raw: method)(\(raw: property.typeName).self, forKey: .\(raw: property.keyName))
+        \(raw: info.unsafeMark)self.\(raw: property.memberName) = try container.\(raw: method)(\(raw: property.typeName).self, forKey: .\(raw: property.keyName))
         """
       )
     }
@@ -445,27 +467,12 @@ public struct DeriveDecodableMacro: DeclarationMacro {
     return .init(items)
   }
 
-  static func getEnumBody(
-    _ cases: [CodedCase], info: CodableTypeInfo
-  ) -> CodeBlockItemListSyntax {
-    if !info.hasCodingKeys {
-      return ""
-    }
-
-    let decodable = cases.compactMap { c -> (CodedCase, String, CaseDecoding)? in
-      guard let keyName = c.keyName else { return nil }
-      if c.isUnavailable {
-        return (c, keyName, .unavailable)
-      }
-      guard let caseKeys = c.caseCodingKeysName else { return nil }
-      return (c, keyName, .nested(caseCodingKeysName: caseKeys))
-    }
-
+  func enumBody(_ cases: [CodedCase]) -> CodeBlockItemListSyntax {
     var items: [CodeBlockItemSyntax] = []
 
     items.append(
       """
-      let container = try decoder.container(keyedBy: \(raw: codingKeysRef("CodingKeys")).self)
+      let container = try decoder.container(keyedBy: \(raw: codingKeysRef).self)
       """
     )
     items.append(
@@ -481,10 +488,7 @@ public struct DeriveDecodableMacro: DeclarationMacro {
       """
     )
 
-    let caseSyntax = decodable.map { c, keyName, decoding in
-      getCase(
-        c, keyName: keyName, decoding: decoding, isUnsafe: info.isUnsafe)
-    }
+    let caseSyntax = cases.compactMap(decodeCase)
     items.append(
       """
       switch onlyKey {
@@ -496,13 +500,11 @@ public struct DeriveDecodableMacro: DeclarationMacro {
     return .init(items)
   }
 
-  fileprivate static func getCase(
-    _ codedCase: CodedCase,
-    keyName: String,
-    decoding: CaseDecoding,
-    isUnsafe: Bool
-  ) -> SwitchCaseSyntax {
-    let mark = unsafeMark(isUnsafe)
+  func decodeCase(_ codedCase: CodedCase) -> SwitchCaseSyntax? {
+    guard let (keyName, decoding) = codedCase.decoding else {
+      return nil
+    }
+
     var items: [CodeBlockItemSyntax] = []
 
     switch decoding {
@@ -512,12 +514,8 @@ public struct DeriveDecodableMacro: DeclarationMacro {
         throw Swift::DecodingError.dataCorrupted(Swift::DecodingError.Context(codingPath: container.codingPath, debugDescription: "Unavailable enum element encountered.", underlyingError: nil))
         """
       )
-    case .nested(let caseCodingKeysName):
-      let keysRef = codingKeysRef(caseCodingKeysName)
-      let decoded = codedCase.payload.compactMap {
-        value in
-        value.keyName.map { ($0, value.label, value.typeName, value.useIfPresent) }
-      }
+    case .nested(let keysRef):
+      let decoded = codedCase.decodedPayload
 
       if decoded.isEmpty {
         items.append(
@@ -545,13 +543,13 @@ public struct DeriveDecodableMacro: DeclarationMacro {
         let parens = codedCase.payload.isEmpty ? "" : "()"
         items.append(
           """
-          \(raw: mark)self = .\(raw: codedCase.name)\(raw: parens)
+          \(raw: info.unsafeMark)self = .\(raw: codedCase.name)\(raw: parens)
           """
         )
       } else {
         items.append(
           """
-          \(raw: mark)self = .\(raw: codedCase.name)(\(raw: args.joined(separator: ", ")))
+          \(raw: info.unsafeMark)self = .\(raw: codedCase.name)(\(raw: args.joined(separator: ", ")))
           """
         )
       }
