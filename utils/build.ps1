@@ -5492,6 +5492,23 @@ function Build-Inspect([Hashtable] $Platform,
     -Defines $Defines
 }
 
+function Build-SymbolKit([Hashtable] $Platform,
+                         [Hashtable] $Compilers,
+                         [string]    $SwiftSDK) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-docc-symbolkit `
+    -bin (Get-ProjectBinaryCache $Platform SymbolKit) `
+    -Platform $Platform `
+    -CCompiler $Compilers.C `
+    -SwiftCompiler $Compilers.Swift `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    }
+}
+
 function Build-DocC() {
   Build-SPMProject `
     -Action Build `
@@ -5977,6 +5994,10 @@ if ($Toolchain) {
   }
   Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
   Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+  }
+  Invoke-BuildStep Build-SymbolKit $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
