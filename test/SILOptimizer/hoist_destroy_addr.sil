@@ -424,6 +424,37 @@ bb0(%0 : $*X, %1 : @owned $S):
   return %r : $()
 }
 
+// The variable type uses a local archetype, so it can no longer be written once
+// the operand is killed: nothing keeps the open_pack_element alive, as a
+// debug_value has no type dependent operands.  The variable becomes an empty
+// tuple placeholder instead.
+//
+// CHECK-LABEL:   sil hidden [ossa] @kill_local_archetype_debug_value : {{.*}} {
+// CHECK:           [[ALLOC:%.*]] = alloc_stack $@pack_element(1) each T
+// CHECK:           copy_addr {{%.*}} to [init] [[ALLOC]] : $*@pack_element(1) each T
+// CHECK-OPT-NEXT:  destroy_addr [[ALLOC]] : $*@pack_element(1) each T
+// CHECK:           apply
+// CHECK-DEB:       debug_value [[ALLOC]] : $*@pack_element(1) each T, let, name "u", expr op_deref
+// CHECK-OPT:       debug_value undef : $(), let, name "u"
+// CHECK-DEB:       destroy_addr [[ALLOC]] : $*@pack_element(1) each T
+// CHECK-LABEL:   } // end sil function 'kill_local_archetype_debug_value'
+sil hidden [ossa] @kill_local_archetype_debug_value : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
+bb0(%0 : $*Pack{repeat each T}):
+  %i = integer_literal $Builtin.Word, 0
+  %x = dynamic_pack_index %i of $Pack{repeat each T}
+  %o = open_pack_element %x of <each T> at <Pack{repeat each T}>, shape $each T, id 1
+  %g = pack_element_get %x of %0 as $*@pack_element(1) each T
+  %a = alloc_stack $@pack_element(1) each T
+  copy_addr %g to [init] %a : $*@pack_element(1) each T
+  %f = function_ref @nobarrier : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  debug_value %a : $*@pack_element(1) each T, let, name "u", expr op_deref
+  destroy_addr %a : $*@pack_element(1) each T
+  dealloc_stack %a : $*@pack_element(1) each T
+  %r = tuple ()
+  return %r : $()
+}
+
 // Hoist a destroy_addr of a trivial value over a function_ref.  DO NOT fold
 // with the load [trivial].
 //

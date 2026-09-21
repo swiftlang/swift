@@ -99,6 +99,7 @@
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
@@ -558,9 +559,15 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
   // Kill debug operands that use destroyed memory.
   for (auto *debugUse : knownUses.debugUses) {
     auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
+    // Another operand of this instruction may have erased it already.
+    if (debugInst->isDeleted())
+      continue;
     if (!deinitBarriers.deadUsers.contains(debugInst))
       continue;
-    debugInst->killOperand(debugUse->getOperandNumber());
+    if (debugInst->getVarType().hasLocalArchetype())
+      replaceWithVoidVariable(debugInst);
+    else
+      debugInst->killOperand(debugUse->getOperandNumber());
   }
   for (auto *destroyInst : knownUses.originalDestroys) {
     if (reusedDestroys.contains(destroyInst))
