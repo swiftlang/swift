@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NoImplicitCopy
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoImplicitCopy
 
 // REQUIRES: swift_feature_NoImplicitCopy
 

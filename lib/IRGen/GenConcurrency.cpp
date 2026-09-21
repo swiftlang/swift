@@ -17,7 +17,6 @@
 
 #include "GenConcurrency.h"
 
-#include "BitPatternBuilder.h"
 #include "CallEmission.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
@@ -32,7 +31,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/IR/Module.h"
 
 using namespace swift;
@@ -50,6 +48,12 @@ public:
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits),
                                   align, IsTriviallyDestroyable,
                                   IsCopyable, IsFixedSize, IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -1017,6 +1021,12 @@ public:
       : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
                            IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
                            IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {

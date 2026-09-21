@@ -30,7 +30,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
@@ -948,8 +947,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
+        bool isCoroutine = func ? func->isCoroutine() : false;
+        TypeResolutionOptions resultOptions(TypeResolverContext::FunctionResult);
+        if (isCoroutine)
+          resultOptions |= TypeResolutionFlags::Coroutine;
         const auto resultType =
-            resolution.withOptions(TypeResolverContext::FunctionResult)
+            resolution.withOptions(resultOptions)
                 .resolveType(resultTypeRepr);
 
         inferenceSources.push_back(resultType.getPointer());

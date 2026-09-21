@@ -20,7 +20,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/NameLookup.h"
@@ -51,7 +50,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 namespace swift {
 
@@ -4488,8 +4486,6 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
-
-bool isPackExpansionType(Type type);
 
 /// Check whether the type is a tuple consisting of a single unlabeled element
 /// of \c PackExpansionType or a type variable that represents a pack expansion

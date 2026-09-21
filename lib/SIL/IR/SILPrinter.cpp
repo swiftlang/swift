@@ -60,7 +60,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
-#include <set>
 
 using namespace swift;
 using ID = SILPrintContext::ID;
@@ -558,6 +557,7 @@ static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
   case CastConsumptionKind::TakeOnSuccess: return "take_on_success";
   case CastConsumptionKind::CopyOnSuccess: return "copy_on_success";
   case CastConsumptionKind::BorrowAlways: return "borrow_always";
+  case CastConsumptionKind::TestOnly: return "test_only";
   }
   llvm_unreachable("bad cast consumption kind");
 }
@@ -2340,9 +2340,11 @@ public:
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetFormalType() << " in "
-          << getIDAndType(CI->getDest()) << ", "
-          << Ctx.getID(CI->getSuccessBB()) << ", "
+          << " to " << CI->getTargetFormalType();
+    // A test_only cast produces no value, so it has no destination operand.
+    if (CI->hasDest())
+      *this << " in " << getIDAndType(CI->getDest());
+    *this << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
     if (CI->getTrueBBCount())
       *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
@@ -2438,6 +2440,8 @@ public:
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
+    if (CI->isImmortal())
+      *this << "[immortal] ";
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
 
@@ -2786,6 +2790,12 @@ public:
     *this << ", ";
     *this << AMI->getType();
   }
+  void visitCOMMethodInst(COMMethodInst *CMI) {
+    printMethodInst(CMI, CMI->getOperand());
+    *this << " : " << CMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << CMI->getType();
+  }
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
@@ -2815,6 +2825,10 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
+  }
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
     printForwardingOwnershipKind(OI, OI->getOperand());
   }
@@ -3847,12 +3861,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (hasUnsafeNonEscapableResult()) {
     OS << "[unsafe_nonescapable_result] ";
   }
-
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
   }
-  if (isWithoutActuallyEscapingThunk())
+  if (isWithoutActuallyEscapingThunk()) {
     OS << "[without_actually_escaping] ";
+  }
+  if (hasOwnershipForTrivialValues()) {
+    OS << "[ownership_for_trivial] ";
+  }
 
   switch (getSpecialPurpose()) {
   case SILFunction::Purpose::None:
@@ -4313,7 +4330,7 @@ static void printSILLinearMapTypes(SILPrintContext &Ctx,
   Options.PrintInSILBody = false;
 
   SmallVector<Decl *, 32> topLevelDecls;
-  M->getTopLevelDecls(topLevelDecls);
+  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
     if (D->getDeclContext() == M)
       continue;
@@ -4478,7 +4495,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;
-    M->getTopLevelDecls(topLevelDecls);
+    M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;

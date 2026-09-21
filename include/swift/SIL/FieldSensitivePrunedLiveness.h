@@ -25,10 +25,11 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+// SILFunction.h only forward-declares SILModule, but the TypeSubElementCount
+// constructor below dereferences fn->getModule().
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"

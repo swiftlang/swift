@@ -17,7 +17,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 namespace swift {
 

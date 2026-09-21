@@ -48,6 +48,51 @@ public enum AvailableInColoradoAndPacificEquatableEnum {
 }
 
 // CHECK:      @available(Colorado)
+// CHECK-NEXT: public struct NonSendableAvailableInColorado
+@available(Colorado)
+@_nonSendable
+public struct NonSendableAvailableInColorado { }
+
+// CHECK:      @available(Arctic, unavailable)
+// CHECK-NEXT: public struct NonSendableUnavailableInArctic
+@available(Arctic, unavailable)
+@_nonSendable
+public struct NonSendableUnavailableInArctic { }
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(Pacific)
+// CHECK-NEXT: public struct NonSendableAvailableInColoradoAndPacific
+@available(Colorado)
+@available(Pacific)
+@_nonSendable
+public struct NonSendableAvailableInColoradoAndPacific { }
+
+// CHECK:      @available(Pacific)
+// CHECK-NEXT: public struct AvailableInPacificOuter
+@available(Pacific)
+public struct AvailableInPacificOuter {
+  @_nonSendable
+  public struct NonSendableNested { }
+}
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(*, unavailable)
+// CHECK-NEXT: extension Test::NonSendableAvailableInColorado : @unchecked Swift::Sendable {
+
+// CHECK:      @available(Arctic, unavailable)
+// CHECK-NEXT: @available(*, unavailable)
+// CHECK-NEXT: extension Test::NonSendableUnavailableInArctic : @unchecked Swift::Sendable {
+
+// CHECK:      @available(Pacific)
+// CHECK-NEXT: @available(Colorado)
+// CHECK-NEXT: @available(*, unavailable)
+// CHECK-NEXT: extension Test::NonSendableAvailableInColoradoAndPacific : @unchecked Swift::Sendable {
+
+// CHECK:      @available(Pacific)
+// CHECK-NEXT: @available(*, unavailable)
+// CHECK-NEXT: extension Test::AvailableInPacificOuter.Test::NonSendableNested : @unchecked Swift::Sendable {
+
+// CHECK:      @available(Colorado)
 // CHECK-NEXT: @available(Pacific)
 // CHECK-NEXT: extension Test::AvailableInColoradoAndPacificMainActorClass : Swift::Sendable {}
 
@@ -58,3 +103,4 @@ public enum AvailableInColoradoAndPacificEquatableEnum {
 // CHECK:      @available(Colorado)
 // CHECK-NEXT: @available(Pacific)
 // CHECK-NEXT: extension Test::AvailableInColoradoAndPacificEquatableEnum : Swift::Hashable {}
+

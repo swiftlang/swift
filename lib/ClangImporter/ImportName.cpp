@@ -28,12 +28,10 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/ParseDeclName.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -1829,6 +1827,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
           !shouldImportAsInitializer(func, parsedName))
         skipCustomName = true;
+
+      if (!skipCustomName &&
+          parsedName.BaseNameKind == DeclBaseName::Kind::Constructor) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(func))
+          if (method->isStatic() &&
+              getUncachedForeignReferenceTypeInfo(method->getParent())
+                  .isReference())
+            // This lets a Swift subclass of this FRT initialize itself using
+            // base's constructor.
+            result.info.initKind = CtorInitializerKind::ConvenienceFactory;
+      }
     }
 
     if (!skipCustomName) {

@@ -52,6 +52,15 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
         value.doSomething(on: i) // warning: cannot use generic instance method 'doSomething(on:)' on a value of type 'any P' in Embedded Swift
       }
 
+* Passing a value of protocol type to a generic function that opens the existential, which requires unspecialized generics because the function cannot be specialized for a dynamically-provided type. For example:
+
+      func acceptAny<T>(_ value: T) { }
+
+      func testPassingValueOfProtocolType(value: any P) {
+        acceptAny(value)              // warning: cannot open existential type 'any P' when passing it as an argument to global function 'acceptAny' in Embedded Swift
+        acceptAny(value as any P)     // okay, passes the existential itself
+      }
+
 ## See Also
 
 - [A Vision for Embedded Swift](https://github.com/swiftlang/swift-evolution/blob/main/visions/embedded-swift.md)

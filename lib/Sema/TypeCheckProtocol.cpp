@@ -56,7 +56,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
-#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
@@ -72,7 +71,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "Protocol conformance checking"
 #include "llvm/Support/Debug.h"
@@ -1043,8 +1041,7 @@ RequirementMatch swift::matchWitness(
 
     Type reqThrownError = std::get<0>(thrownErrorTypes);
     Type witnessThrownError = std::get<1>(thrownErrorTypes);
-    switch (compareThrownErrorsForSubtyping(witnessThrownError, reqThrownError,
-                                            dc)) {
+    switch (compareThrownErrorsForSubtyping(witnessThrownError, reqThrownError)) {
     case ThrownErrorSubtyping::DropsThrows:
     case ThrownErrorSubtyping::Mismatch:
       return RequirementMatch(witness, MatchKind::ThrowsConflict);
@@ -2981,10 +2978,9 @@ static Type getTypeForDisplay(ValueDecl *decl) {
     if (auto genericFn = type->getAs<GenericFunctionType>()) {
       auto sig = genericFn->getGenericSignature();
       auto resultFn = genericFn->getResult()->castTo<FunctionType>();
-      return GenericFunctionType::get(sig,
-                                      resultFn->getParams(),
-                                      resultFn->getResult(),
-                                      resultFn->getExtInfo());
+      return GenericFunctionType::get(
+          sig, resultFn->getParams(), resultFn->getYields(),
+          resultFn->getResult(), resultFn->getExtInfo());
     }
 
     return type->castTo<FunctionType>()->getResult();
@@ -3023,6 +3019,14 @@ static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
         /*result*/false)));
     }
 
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    for (auto yield : fnTy->getYields()) {
+      // TBD: Verify substType() parameters below
+      yields.emplace_back(substType(yield.getType(),
+                                    /*result*/ false),
+                          yield.getFlags());
+    }
+
     auto result = substType(fnTy->getResult(), /*result*/true);
 
     auto genericSig = fnTy->getOptGenericSignature();
@@ -3037,10 +3041,10 @@ static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
     }
 
     if (genericSig) {
-      return GenericFunctionType::get(genericSig, params, result,
+      return GenericFunctionType::get(genericSig, params, yields, result,
                                       fnTy->getExtInfo());
     }
-    return FunctionType::get(params, result, fnTy->getExtInfo());
+    return FunctionType::get(params, yields, result, fnTy->getExtInfo());
   }
 
   return substType(type, /*result*/ true);
@@ -5930,8 +5934,8 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
   // For subscripts, build a regular function type to skip walking generic
   // requirements.
   if (auto *gft = interfaceTy->getAs<GenericFunctionType>()) {
-    interfaceTy = FunctionType::get(gft->getParams(), gft->getResult(),
-                                    gft->getExtInfo());
+    interfaceTy = FunctionType::get(gft->getParams(), gft->getYields(),
+                                    gft->getResult(), gft->getExtInfo());
   }
 
   if (!interfaceTy->hasTypeParameter())
@@ -6147,10 +6151,11 @@ void ConformanceChecker::resolveValueWitnesses() {
   // These protocol requirements are not expressible in Swift today, but as
   // the type system gains the required abilities, we should strive to move
   // them to plain-old protocol requirements.
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem) ||
-      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder) ||
-      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder) ||
-      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
+  if (!Context.LangOpts.hasFeature(Feature::Embedded) &&
+      (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem) ||
+       Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder) ||
+       Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder) ||
+       Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler))) {
     checkDistributedActorSystemAdHocProtocolRequirements(
         Context, Proto, Conformance, Adoptee, /*diagnose=*/true);
   }

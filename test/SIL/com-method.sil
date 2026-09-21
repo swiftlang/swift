@@ -1,0 +1,102 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -emit-sib -module-name COMMethod %s -o %t/COMMethod.sib
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -emit-sorted-sil -module-name COMMethod %t/COMMethod.sib | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -inline %s | %FileCheck %s --check-prefix=CLONE
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -test-runner %s -o /dev/null | %FileCheck %s --check-prefix=IDENTITY
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IInterface {
+  func method(_ value: Int32) -> Int32
+  var value: Int32 { get }
+  func otherValue() -> Int32
+}
+
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IRefined: IInterface {}
+
+// Cloning must remap both the receiver and the result's opened archetype.
+// CLONE-LABEL: sil [ossa] @clone_lookup
+// CLONE: [[OPEN:%[0-9]+]] = open_com_existential %0 : $any IInterface to $@opened([[ID:[^,]+]], any IInterface) Self
+// CLONE: [[METHOD:%[0-9]+]] = com_method [[OPEN]] : $@opened([[ID]], any IInterface) Self, #IInterface.method : {{.*}}, $@convention(com_method) (Int32, @guaranteed @opened([[ID]], any IInterface) Self) -> Int32
+// CLONE: apply [[METHOD]](%1, [[OPEN]])
+sil [ossa] @clone_lookup : $@convention(thin) (@guaranteed IInterface, Int32) -> Int32 {
+bb0(%value : @guaranteed $IInterface, %argument : $Int32):
+  %function = function_ref @lookup : $@convention(thin) (@guaranteed IInterface, Int32) -> Int32
+  %result = apply %function(%value, %argument) : $@convention(thin) (@guaranteed IInterface, Int32) -> Int32
+  return %result : $Int32
+}
+
+// Instruction equality must distinguish different members with the same type.
+// IDENTITY-LABEL: compare_lookups: instructions-identical with: %first, %second
+// IDENTITY: true
+// IDENTITY-LABEL: compare_lookups: instructions-identical with: %first, %other
+// IDENTITY: false
+sil [ossa] @compare_lookups : $@convention(thin) (@guaranteed IInterface) -> Int32 {
+bb0(%value : @guaranteed $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(3, IInterface) Self
+  %first = com_method %opened : $@opened(3, IInterface) Self, #IInterface.value!getter, $@convention(com_method) (@guaranteed @opened(3, IInterface) Self) -> Int32
+  %second = com_method %opened : $@opened(3, IInterface) Self, #IInterface.value!getter, $@convention(com_method) (@guaranteed @opened(3, IInterface) Self) -> Int32
+  %other = com_method %opened : $@opened(3, IInterface) Self, #IInterface.otherValue, $@convention(com_method) (@guaranteed @opened(3, IInterface) Self) -> Int32
+  specify_test "instructions-identical %first %second"
+  specify_test "instructions-identical %first %other"
+  %a = apply %first(%opened) : $@convention(com_method) (@guaranteed @opened(3, IInterface) Self) -> Int32
+  %b = apply %second(%opened) : $@convention(com_method) (@guaranteed @opened(3, IInterface) Self) -> Int32
+  %result = apply %other(%opened) : $@convention(com_method) (@guaranteed @opened(3, IInterface) Self) -> Int32
+  return %result : $Int32
+}
+
+// Requirements inherited from another interface include property accessors.
+// CHECK-LABEL: sil [ossa] @inherited_getter
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CHECK: [[GETTER:%[0-9]+]] = com_method [[OPEN]] : $@opened({{.*}}, any IRefined) Self, #IInterface.value!getter
+// CHECK: apply [[GETTER]]([[OPEN]])
+sil [ossa] @inherited_getter : $@convention(thin) (@guaranteed IRefined) -> Int32 {
+bb0(%value : @guaranteed $IRefined):
+  %opened = open_com_existential %value : $IRefined to $@opened(2, IRefined) Self
+  %getter = com_method %opened : $@opened(2, IRefined) Self, #IInterface.value!getter, $@convention(com_method) (@guaranteed @opened(2, IRefined) Self) -> Int32
+  %result = apply %getter(%opened) : $@convention(com_method) (@guaranteed @opened(2, IRefined) Self) -> Int32
+  return %result : $Int32
+}
+
+// A lookup produces a context-free COM callee, and borrows its receiver.
+// CHECK-LABEL: sil [ossa] @lookup
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CHECK: [[METHOD:%[0-9]+]] = com_method [[OPEN]] : $@opened([[ID:[^,]+]], any IInterface) Self, #IInterface.method : {{.*}}, $@convention(com_method) (Int32, @guaranteed @opened([[ID]], any IInterface) Self) -> Int32
+// CHECK-SAME: // type-defs: [[OPEN]];
+// CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]](%1, [[OPEN]])
+// CHECK: return [[RESULT]]
+sil [ossa] @lookup : $@convention(thin) (@guaranteed IInterface, Int32) -> Int32 {
+bb0(%value : @guaranteed $IInterface, %argument : $Int32):
+  %opened = open_com_existential %value : $IInterface to $@opened(1, IInterface) Self
+  %method = com_method %opened : $@opened(1, IInterface) Self, #IInterface.method, $@convention(com_method) (Int32, @guaranteed @opened(1, IInterface) Self) -> Int32
+  %result = apply %method(%argument, %opened) : $@convention(com_method) (Int32, @guaranteed @opened(1, IInterface) Self) -> Int32
+  return %result : $Int32
+}
+
+
+// A materialized receiver can be used with an indirect self convention.
+// CHECK-LABEL: sil [ossa] @lookup_address
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CHECK: [[ADDRESS:%[0-9]+]] = alloc_stack
+// CHECK: [[GETTER:%[0-9]+]] = com_method [[ADDRESS]] : $*@opened({{.*}}, any IInterface) Self, #IInterface.value!getter
+// CHECK-SAME: // type-defs: [[OPEN]];
+// CHECK: apply [[GETTER]]([[ADDRESS]])
+// CHECK: destroy_addr [[ADDRESS]]
+sil [ossa] @lookup_address : $@convention(thin) (@owned IInterface) -> Int32 {
+bb0(%value : @owned $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(4, IInterface) Self
+  %address = alloc_stack $@opened(4, IInterface) Self
+  store %opened to [init] %address : $*@opened(4, IInterface) Self
+  %getter = com_method %address : $*@opened(4, IInterface) Self, #IInterface.value!getter, $@convention(com_method) (@in_guaranteed @opened(4, IInterface) Self) -> Int32
+  %result = apply %getter(%address) : $@convention(com_method) (@in_guaranteed @opened(4, IInterface) Self) -> Int32
+  destroy_addr %address : $*@opened(4, IInterface) Self
+  dealloc_stack %address : $*@opened(4, IInterface) Self
+  return %result : $Int32
+}

@@ -186,6 +186,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isGeneric: Bool { bridged.isGeneric() }
 
+  /// SIL-level counterpart of
+  /// `AbstractFunctionDecl.isDistributedWitnessWithAdHocSerializationRequirement`.
+  public var isDistributedAdHocSerializationRequirementWitness: Bool {
+    bridged.isDistributedAdHocSerializationRequirementWitness()
+  }
+
   public var linkage: Linkage { bridged.getLinkage().linkage }
 
   /// True, if the linkage of the function indicates that it is visible outside the current
@@ -697,6 +703,10 @@ extension Function {
       { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
+      },
+      // hasComputedSideEffects  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction) -> Bool in
+        return f.function.effects.sideEffects != nil
       },
       // argumentMayRead  (used by the MemoryLifetimeVerifier)
       { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in

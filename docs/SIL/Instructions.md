@@ -2471,6 +2471,28 @@ Performs Objective-C method dispatch using `objc_msgSend()`.
 
 Objective-C method calls are never candidates for de-virtualization.
 
+### com_method
+
+```
+sil-instruction ::= 'com_method' sil-operand ',' sil-decl-ref ',' sil-type
+
+%method = com_method %self : $@opened(1, any P) Self, #P.method,
+    $@convention(com_method) (@guaranteed @opened(1, any P) Self) -> ()
+```
+
+Looks up an instance requirement in a COM interface's vtable. The receiver is
+an archetype constrained to the declaring interface or an interface that
+inherits from it; it may be a value or an address. Extension helpers do not
+occupy interface vtable slots and cannot be referenced by this instruction.
+
+The result is a context-free function with the `com_method` convention. A
+lookup does not consume its receiver. The receiver remains the final SIL
+argument when applying the resulting function.
+
+The lookup carries type-dependent operands for opened archetypes in both its
+receiver type and its result type. A generic callee type can omit the receiver's
+opened archetype, so the result type alone does not determine these dependencies.
+
 ### super_method
 
 ```
@@ -4098,6 +4120,22 @@ pointer can be used with any operation on archetypes, such as
 [witness_method](#witness_method). When the operand is of metatype type,
 the result will be the metatype of the opened archetype.
 
+### open_com_existential
+
+```
+sil-instruction ::= 'open_com_existential' sil-operand 'to' sil-type
+
+%1 = open_com_existential %0 : $any P to $@opened(1, any P) Self
+```
+
+Opens a COM existential value as a fresh archetype with the same interface
+constraints. Both operand and result are object values. The result preserves
+the existential's interface-pointer representation and forwards ownership of
+the operand. It is a nontrivial, loadable value, not a Swift class reference.
+
+The instruction defines the opened archetype for subsequent instructions in
+the function. Cloning an opening creates a fresh archetype and remaps its uses.
+
 ### init_existential_metatype
 
 ```
@@ -4629,7 +4667,7 @@ does not have ownership semantics. It is undefined behavior to cast a
 ### raw_pointer_to_ref
 
 ```
-sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
+sil-instruction ::= 'raw_pointer_to_ref' '[immortal]'? sil-operand 'to' sil-type
 
 %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
 // $C must be a class type, or Builtin.NativeObject, or AnyObject
@@ -4643,6 +4681,14 @@ ownership semantics for the object on its own). It is undefined behavior
 to cast a `RawPointer` to a type unrelated to the dynamic type of the
 heap object. It is also undefined behavior to cast a `RawPointer` from
 an address to any heap object type.
+
+The `immortal` flag means that the resulting object is immortal, i.e. it is
+never deallocated and therefore doesn't need to be retained or released. In
+OSSA the result of an `immortal` `raw_pointer_to_ref` has `none` ownership,
+whereas the result of a non-`immortal` `raw_pointer_to_ref` is `owned` - the
+instruction "creates" a new reference which must be consumed exactly once.
+Accordingly, lowering out of OSSA inserts a
+[strong_retain](#strong_retain) after a non-`immortal` `raw_pointer_to_ref`.
 
 ### ref_to_unowned
 
@@ -5385,22 +5431,44 @@ sil-terminator ::= 'checked_cast_addr_br'
                     sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
-                    sil-stype 'in' sil-operand ','
+                    sil-stype ('in' sil-operand)? ','
                     sil-identifier ',' sil-identifier
 sil-cast-consumption-kind ::= 'take_always'
 sil-cast-consumption-kind ::= 'take_on_success'
 sil-cast-consumption-kind ::= 'copy_on_success'
+sil-cast-consumption-kind ::= 'test_only'
 
 checked_cast_addr_br take_always $A in %0 : $*@thick A to $B in %2 : $*@thick B, bb1, bb2
 // $A and $B must be both address types
 // bb1 must take a single argument of type $*B
 // bb2 must take no arguments
+
+checked_cast_addr_br test_only $A in %0 : $*@thick A to $B, bb1, bb2
+// A 'test_only' cast has no destination operand
 ```
 
 Performs a checked indirect conversion from `$A` to `$B`. If the
 conversion succeeds, control is transferred to `bb1`, and the result of
 the cast is left in the destination. If the conversion fails, control is
 transferred to `bb2`.
+
+The consumption kind describes what happens to the source operand:
+`take_always` consumes it whether or not the cast succeeds, `take_on_success`
+consumes it only on success, and `copy_on_success` leaves it in place and copies
+into the destination on success.
+
+`test_only` is different in kind: it reports only whether the conversion would
+have succeeded, and produces **no destination value at all**. The source is
+neither taken nor copied, and the instruction carries no destination operand, so
+it names only the target type. `CheckedCastAddrBranchInst::getDest()` returns an
+invalid `SILValue` for it, and `hasDest()` says so up front; code that reads the
+destination of a cast must check.
+
+`test_only` exists because some values cannot answer a cast question any other
+way. Producing the result of the cast would copy a payload whose type forbids
+copying, and taking it would destroy the very value being asked about — so
+neither `copy_on_success` nor `take_on_success` can implement `is` or
+`case is T` on a non-`Copyable` existential.
 
 ### try_apply
 

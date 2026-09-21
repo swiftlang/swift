@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -disable-availability-checking -I %S%{fs-sep}Inputs -module-cache-path %t/mcp -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}methods.h
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -I %S%{fs-sep}Inputs -module-cache-path %t/mcp -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}methods.h
 
 import Methods
 

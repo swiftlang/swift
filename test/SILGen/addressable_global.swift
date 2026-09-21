@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -disable-availability-checking %s
-// RUN: %target-swift-emit-silgen -parse-as-library -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -target %target-swift-6.2-abi-triple %s
+// RUN: %target-swift-emit-silgen -parse-as-library -target %target-swift-6.2-abi-triple %s | %FileCheck %s
 
 enum Color {
     case R, G, B

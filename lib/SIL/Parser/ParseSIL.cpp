@@ -25,14 +25,11 @@
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILArgument.h"
@@ -46,7 +43,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #include <variant>
 
@@ -3324,6 +3320,20 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
+      return true;
+
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+    if (parseForwardingOwnershipKind(forwardingOwnership) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal =
+        B.createOpenCOMExistential(InstLoc, Val, Ty, forwardingOwnership);
+    break;
+  }
+
   case SILInstructionKind::OpenExistentialValueInst: {
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
       return true;
@@ -4446,6 +4456,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool not_guaranteed = false;
     bool without_actually_escaping = false;
     bool needsStackProtection = false;
+    bool isImmortal = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
@@ -4456,6 +4467,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     } if (Opcode == SILInstructionKind::AddressToPointerInst) {
       if (parseSILOptional(needsStackProtection, *this, "stack_protection"))
+        return true;
+    } if (Opcode == SILInstructionKind::RawPointerToRefInst) {
+      if (parseSILOptional(isImmortal, *this, "immortal"))
         return true;
     }
 
@@ -4535,7 +4549,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createRefToRawPointer(InstLoc, Val, Ty);
       break;
     case SILInstructionKind::RawPointerToRefInst:
-      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty);
+      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty, isImmortal);
       break;
 #define LOADABLE_REF_STORAGE(Name, ...)                                        \
   case SILInstructionKind::RefTo##Name##Inst:                                  \
@@ -4639,6 +4653,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                     .Case("take_always", CastConsumptionKind::TakeAlways)
                     .Case("take_on_success", CastConsumptionKind::TakeOnSuccess)
                     .Case("copy_on_success", CastConsumptionKind::CopyOnSuccess)
+                    .Case("test_only", CastConsumptionKind::TestOnly)
                     .Default(std::nullopt);
 
     if (!kind) {
@@ -4648,7 +4663,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     auto consumptionKind = kind.value();
 
-    if (parseSourceAndDestAddress() || parseConditionalBranchDestinations() ||
+    // A test_only cast produces no value, so it names only a formal target
+    // type where the other kinds name a destination address:
+    //   checked_cast_addr_br test_only $A in %0 : $*A to $B, bb1, bb2
+    if (consumptionKind == CastConsumptionKind::TestOnly) {
+      if (parseFormalTypeAndValue(SourceType, SourceAddr) ||
+          parseVerbatim("to") || parseASTType(TargetType))
+        return true;
+    } else if (parseSourceAndDestAddress()) {
+      return true;
+    }
+
+    if (parseConditionalBranchDestinations() ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
@@ -5817,6 +5843,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     case SILInstructionKind::ClassMethodInst:
     case SILInstructionKind::SuperMethodInst:
     case SILInstructionKind::ObjCMethodInst:
+    case SILInstructionKind::COMMethodInst:
     case SILInstructionKind::ObjCSuperMethodInst: {
       SILDeclRef Member;
       SILType MethodTy;
@@ -5843,6 +5870,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         break;
       case SILInstructionKind::ObjCMethodInst:
         ResultVal = B.createObjCMethod(InstLoc, Val, Member, MethodTy);
+        break;
+      case SILInstructionKind::COMMethodInst:
+        ResultVal = B.createCOMMethod(InstLoc, Val, Member, MethodTy);
         break;
       case SILInstructionKind::ObjCSuperMethodInst:
         ResultVal = B.createObjCSuperMethod(InstLoc, Val, Member, MethodTy);

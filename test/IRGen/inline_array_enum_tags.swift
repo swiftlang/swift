@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -O -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -O -emit-ir %s | %FileCheck %s
 
 public struct Foo {
     let x: UInt64

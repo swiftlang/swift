@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-sil %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -emit-sil %s | %FileCheck %s
 
 // A non-escaping closure capturing a ~Escapable value (here a MutableSpan) is wrapped in a
 // mark_dependence on the capture. Closure specialization must look through it; otherwise

@@ -86,11 +86,6 @@ private:
   OutputLanguageMode outputLang;
   llvm::DenseMap<Type, std::optional<ClangRepresentation>> typeRepresentations;
 
-  /// The name 'CFTypeRef'.
-  ///
-  /// Cached for convenience.
-  Identifier ID_CFTypeRef;
-
   Implementation getImpl();
 
 public:

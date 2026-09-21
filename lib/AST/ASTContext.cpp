@@ -27,7 +27,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -63,8 +62,6 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeTransform.h"
-#include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BlockList.h"
@@ -72,8 +69,6 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/Bridging/ASTGen.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -90,13 +85,11 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include <algorithm>
 #include <memory>
-#include <queue>
 
 #if !defined(_WIN32)
 #include <dlfcn.h>
@@ -329,6 +322,10 @@ struct ASTContext::Implementation {
   /** The declaration of MODULE.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownSDKTypes.def"
+
+  /// The declaration of the CGFloat struct, which is not vended by a fixed
+  /// module and so cannot live in KnownSDKTypes.def.
+  StructDecl *CGFloatDecl = nullptr;
 
   /// The declaration of '+' function for two RangeReplaceableCollection.
   FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
@@ -1908,6 +1905,49 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
+StructDecl *ASTContext::getCGFloatDecl() const {
+  if (getImpl().CGFloatDecl)
+    return getImpl().CGFloatDecl;
+
+  // CGFloat is declared by the CoreFoundation overlay on Darwin, and by
+  // Foundation on other platforms. Keep this list in sync with
+  // TypeBase::isCGFloat().
+  const Identifier moduleNames[] = {Id_CoreFoundation, Id_Foundation,
+                                    Id_CoreGraphics};
+
+  for (auto moduleName : moduleNames) {
+    ModuleDecl *M = getLoadedModule(moduleName);
+    if (!M)
+      continue;
+
+    // Note: lookupQualified() will search both the Swift overlay and the
+    // Clang module it imports. On platforms where CGFloat is a C typedef
+    // rather than a Swift struct, we skip the result and try the next
+    // module.
+    SmallVector<ValueDecl *, 2> decls;
+    M->lookupQualified(M, DeclNameRef(Id_CGFloat), SourceLoc(),
+                       NLFlags::OnlyTypes, decls);
+
+    for (auto *found : decls) {
+      auto *decl = dyn_cast<StructDecl>(found);
+      if (!decl || !decl->getDeclContext()->isModuleScopeContext())
+        continue;
+
+      getImpl().CGFloatDecl = decl;
+      return decl;
+    }
+  }
+
+  return nullptr;
+}
+
+Type ASTContext::getCGFloatType() const {
+  auto *decl = getCGFloatDecl();
+  if (!decl)
+    return Type();
+
+  return decl->getDeclaredInterfaceType();
+}
 
 static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
     ASTContext &ctx, Type fromType, Type toType) {
@@ -5093,12 +5133,15 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
+                               ArrayRef<AnyFunctionType::Yield> yields,
                                Type result, Type globalActor, Type thrownError,
                                Type sendableDependentType,
                                Type calledOnceDependentType) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
+  for (auto yield : yields)
+    properties |= yield.getType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();
   if (globalActor)
     properties |= globalActor->getRecursiveProperties();
@@ -5118,9 +5161,9 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
   return properties;
 }
 
-static bool
-isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
-                        Type result) {
+static bool isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
+                                       ArrayRef<AnyFunctionType::Yield> yields,
+                                       Type result) {
   for (auto param : params) {
     if (!param.getPlainType()->isCanonical())
       return false;
@@ -5128,6 +5171,11 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
       // Canonical types don't have internal labels
       return false;
     }
+  }
+
+  for (auto yield : yields) {
+    if (!yield.getType()->isCanonical())
+      return false;
   }
 
   return result->isCanonical();
@@ -5140,6 +5188,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // rather than opt-in.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
+                                      ArrayRef<AnyFunctionType::Yield> yields,
                                       Type result, Type globalActor,
                                       Type thrownError) {
   static_assert(RecursiveTypeProperties::BitWidth == 19,
@@ -5158,6 +5207,8 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
 
   for (auto param : params)
     unionBits(param.getPlainType());
+  for (auto yield : yields)
+    unionBits(yield.getType());
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
@@ -5168,10 +5219,9 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
   return properties;
 }
 
-static bool
-isGenericFunctionTypeCanonical(GenericSignature sig,
-                               ArrayRef<AnyFunctionType::Param> params,
-                               Type result) {
+static bool isGenericFunctionTypeCanonical(
+    GenericSignature sig, ArrayRef<AnyFunctionType::Param> params,
+    ArrayRef<AnyFunctionType::Yield> yields, Type result) {
   if (!sig->isCanonical())
     return false;
 
@@ -5184,16 +5234,21 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
     }
   }
 
+  for (auto yield : yields) {
+    if (!sig->isReducedType(yield.getType()))
+      return false;
+  }
+
   return sig->isReducedType(result);
 }
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
-    return FunctionType::get(getParams(), getResult(), info);
+    return FunctionType::get(getParams(), getYields(), getResult(), info);
 
   auto *genFnTy = cast<GenericFunctionType>(this);
-  return GenericFunctionType::get(genFnTy->getGenericSignature(),
-                                  getParams(), getResult(), info);
+  return GenericFunctionType::get(genFnTy->getGenericSignature(), getParams(),
+                                  getYields(), getResult(), info);
 }
 
 Type AnyFunctionType::Param::getParameterType(bool forCanonical,
@@ -5212,6 +5267,29 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
       type = VariadicSequenceType::get(type);
   }
   return type;
+}
+
+bool AnyFunctionType::canComposeTuple(ArrayRef<Param> params) {
+  if (params.size() == 1)
+    return false;
+
+  for (auto &param : params) {
+    // We generally cannot handle parameter flags, though we can carve out an
+    // exception for ownership flags such as __owned, which we can thunk, and
+    // flags that can freely dropped from a function type such as
+    // @_nonEphemeral. Note that @noDerivative can also be freely dropped, as
+    // we've already ensured that the destination function is not
+    // @differentiable.
+    auto flags = param.getParameterFlags();
+    flags = flags.withOwnershipSpecifier(
+        param.isInOut() ? ParamSpecifier::InOut : ParamSpecifier::Default);
+    flags = flags.withNonEphemeral(false)
+                 .withNoDerivative(false);
+    if (!flags.isNone())
+      return false;
+  }
+
+  return true;
 }
 
 Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
@@ -5268,6 +5346,20 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   }
 }
 
+bool AnyFunctionType::equalYields(ArrayRef<AnyFunctionType::Yield> a,
+                                  ArrayRef<AnyFunctionType::Yield> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
+
 /// Profile \p params into \p ID. In contrast to \c == on \c Param, the profile
 /// *does* take the internal label into account and *does not* canonicalize
 /// the param's type.
@@ -5282,10 +5374,21 @@ static void profileParams(llvm::FoldingSetNodeID &ID,
   }
 }
 
+static void profileYields(llvm::FoldingSetNodeID &ID,
+                          ArrayRef<AnyFunctionType::Yield> yields) {
+  ID.AddInteger(yields.size());
+  for (auto yield : yields) {
+    ID.AddPointer(yield.getType().getPointer());
+    ID.AddInteger(yield.getFlags().toRaw());
+  }
+}
+
 void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
-                           ArrayRef<AnyFunctionType::Param> params, Type result,
+                           ArrayRef<AnyFunctionType::Param> params,
+                           ArrayRef<AnyFunctionType::Yield> yields, Type result,
                            std::optional<ExtInfo> info) {
   profileParams(ID, params);
+  profileYields(ID, yields);
   ID.AddPointer(result.getPointer());
   if (info.has_value()) {
     info->Profile(ID);
@@ -5293,7 +5396,9 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
+                                ArrayRef<AnyFunctionType::Yield> yields,
                                 Type result, std::optional<ExtInfo> info) {
+  assert(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
   Type thrownError;
   Type globalActor;
   Type sendableDependentType;
@@ -5306,7 +5411,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   }
 
   auto properties = getFunctionRecursiveProperties(
-      params, result, globalActor, thrownError, sendableDependentType,
+      params, yields, result, globalActor, thrownError, sendableDependentType,
       calledOnceDependentType);
   auto arena = getArena(properties);
 
@@ -5321,7 +5426,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   }
 
   llvm::FoldingSetNodeID id;
-  FunctionType::Profile(id, params, result, info);
+  FunctionType::Profile(id, params, yields, result, info);
 
   const ASTContext &ctx = result->getASTContext();
 
@@ -5347,15 +5452,16 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
   auto numLifetimeDependencies =
       hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
-  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo,
-                                      Type, size_t, LifetimeDependenceInfo>(
-      params.size(), hasClangInfo ? 1 : 0, numTypes,
-      hasLifetimeDependenceInfo ? 1 : 0,
-      hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
+  size_t allocSize =
+      totalSizeToAlloc<AnyFunctionType::Param, AnyFunctionType::Yield,
+                       ClangTypeInfo, Type, size_t, LifetimeDependenceInfo>(
+          params.size(), yields.size(), hasClangInfo ? 1 : 0, numTypes,
+          hasLifetimeDependenceInfo ? 1 : 0,
+          hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
 
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
-  bool isCanonical = isAnyFunctionTypeCanonical(params, result);
+  bool isCanonical = isAnyFunctionTypeCanonical(params, yields, result);
   if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
       isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
@@ -5372,9 +5478,8 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   if (globalActor && !globalActor->isCanonical())
     isCanonical = false;
 
-  auto funcTy = new (mem) FunctionType(params, result, info,
-                                       isCanonical ? &ctx : nullptr,
-                                       properties);
+  auto funcTy = new (mem) FunctionType(
+      params, yields, result, info, isCanonical ? &ctx : nullptr, properties);
   ctx.getImpl().getArena(arena).FunctionTypes.InsertNode(funcTy, insertPos);
   return funcTy;
 }
@@ -5389,13 +5494,16 @@ isConsistentAboutIsolation(const std::optional<ASTExtInfo> &info,
 #endif
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
+FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
+                           ArrayRef<AnyFunctionType::Yield> yields, Type output,
                            std::optional<ExtInfo> info, const ASTContext *ctx,
                            RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::Function, ctx, output, properties,
-                      params.size(), info) {
+                      params.size(), yields.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  std::uninitialized_copy(yields.begin(), yields.end(),
+                          getTrailingObjects<AnyFunctionType::Yield>());
   assert(isConsistentAboutIsolation(info, params));
   if (info.has_value()) {
     auto clangTypeInfo = info.value().getClangTypeInfo();
@@ -5431,9 +5539,11 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature sig,
                                   ArrayRef<AnyFunctionType::Param> params,
+                                  ArrayRef<AnyFunctionType::Yield> yields,
                                   Type result, std::optional<ExtInfo> info) {
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
+  profileYields(ID, yields);
   ID.AddPointer(result.getPointer());
   if (info.has_value()) {
     info->Profile(ID);
@@ -5442,6 +5552,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
 
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
+                                              ArrayRef<Yield> yields,
                                               Type result,
                                               std::optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
@@ -5453,9 +5564,10 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     return param.getPlainType()->hasTypeVariable();
   }));
   assert(!result->hasTypeVariable());
+  assert(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
 
   llvm::FoldingSetNodeID id;
-  GenericFunctionType::Profile(id, sig, params, result, info);
+  GenericFunctionType::Profile(id, sig, params, yields, result, info);
 
   const ASTContext &ctx = result->getASTContext();
 
@@ -5470,7 +5582,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   // it's canonical.  Unfortunately, isReducedType() can cause
   // new GenericFunctionTypes to be created and thus invalidate our insertion
   // point.
-  bool isCanonical = isGenericFunctionTypeCanonical(sig, params, result);
+  bool isCanonical =
+      isGenericFunctionTypeCanonical(sig, params, yields, result);
 
   assert((!info.has_value() || info.value().getClangTypeInfo().empty()) &&
          "Generic functions do not have Clang types at the moment.");
@@ -5512,31 +5625,36 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   auto numLifetimeDependencies =
       hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
 
-  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type, size_t,
-                                      LifetimeDependenceInfo>(
-      params.size(), numTypes, hasLifetimeDependenceInfo ? 1 : 0,
-      hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
+  size_t allocSize =
+      totalSizeToAlloc<AnyFunctionType::Param, AnyFunctionType::Yield, Type,
+                       size_t, LifetimeDependenceInfo>(
+          params.size(), yields.size(), numTypes,
+          hasLifetimeDependenceInfo ? 1 : 0,
+          hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(
-      params, result, globalActor, thrownError);
-  auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
-                                              isCanonical ? &ctx : nullptr,
-                                              properties);
+      params, yields, result, globalActor, thrownError);
+  auto funcTy =
+      new (mem) GenericFunctionType(sig, params, yields, result, info,
+                                    isCanonical ? &ctx : nullptr, properties);
 
   ctx.getImpl().GenericFunctionTypes.InsertNode(funcTy, insertPos);
   return funcTy;
 }
 
 GenericFunctionType::GenericFunctionType(
-    GenericSignature sig, ArrayRef<AnyFunctionType::Param> params, Type result,
+    GenericSignature sig, ArrayRef<AnyFunctionType::Param> params,
+    ArrayRef<AnyFunctionType::Yield> yields, Type result,
     std::optional<ExtInfo> info, const ASTContext *ctx,
     RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::GenericFunction, ctx, result, properties,
-                      params.size(), info),
+                      params.size(), yields.size(), info),
       Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  std::uninitialized_copy(yields.begin(), yields.end(),
+                          getTrailingObjects<AnyFunctionType::Yield>());
   assert(isConsistentAboutIsolation(info, params));
   if (info) {
     unsigned thrownErrorIndex = 0;

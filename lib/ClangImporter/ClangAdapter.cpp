@@ -104,6 +104,68 @@ importer::getFirstNonLocalDecl(const clang::Decl *D) {
   return *iter;
 }
 
+/// Counts the nullability and bounds-safety annotations carried by \p ty:
+/// a \c _Nonnull / \c _Nullable nullability qualifier and a \c __sized_by /
+/// \c __counted_by bounds attribute each contribute one point. Both accessors
+/// see through intervening sugar, so annotation nesting order is irrelevant.
+static unsigned typeRefinementScore(clang::QualType ty) {
+  unsigned score = 0;
+  if (ty->getNullability())
+    ++score;
+  if (ty->getAs<clang::CountAttributedType>())
+    ++score;
+  return score;
+}
+
+static unsigned functionRefinementScore(const clang::FunctionDecl *fn) {
+  unsigned score = typeRefinementScore(fn->getReturnType());
+  for (const clang::ParmVarDecl *param : fn->parameters())
+    score += typeRefinementScore(param->getType());
+  return score;
+}
+
+const clang::FunctionDecl *
+importer::mostRefinedFunctionRedecl(const clang::FunctionDecl *fn) {
+  const clang::FunctionDecl *best = fn;
+  unsigned bestScore = functionRefinementScore(fn);
+  for (const clang::FunctionDecl *redecl : fn->redecls()) {
+    if (redecl == fn)
+      continue;
+    unsigned score = functionRefinementScore(redecl);
+    if (score > bestScore) {
+      best = redecl;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+void importer::printRecordName(llvm::raw_ostream &out,
+                               const clang::RecordDecl *decl) {
+  if (decl->getIdentifier())
+    out << decl->getName();
+  else if (decl->isAnonymousStructOrUnion())
+    out << "(anonymous record)";
+  else
+    out << "(unnamed record)";
+}
+
+bool importer::anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred) {
+  if (const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    for (const auto &base : cxxRecordDecl->bases())
+      if (pred(base.getType()))
+        return true;
+  }
+
+  for (const auto *field : decl->fields())
+    if (pred(field->getType()))
+      return true;
+
+  return false;
+}
+
 std::optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {

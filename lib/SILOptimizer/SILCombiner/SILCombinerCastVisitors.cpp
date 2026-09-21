@@ -14,22 +14,14 @@
 
 #include "SILCombiner.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -230,10 +222,15 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // %1 = unchecked_ref_cast %x : $X->Z
   //
   // NOTE: For owned values, we only perform this optimization if we can
-  // guarantee that we can eliminate the initial unchecked_ref_cast.
+  // guarantee that we can eliminate the initial unchecked_ref_cast. It's the
+  // ownership of the bypassed cast which matters here - and not the ownership
+  // of its operand: a forwarding instruction can forward `owned` even if its
+  // operand has `none` ownership, e.g. the result of an `immortal`
+  // `raw_pointer_to_ref`. If such a cast would be bypassed it would lose its
+  // consuming use and therefore leak.
   if (auto *otherURCI = dyn_cast<UncheckedRefCastInst>(urci->getOperand())) {
     SILValue otherURCIOp = otherURCI->getOperand();
-    if (otherURCIOp->getOwnershipKind() != OwnershipKind::Owned) {
+    if (SILValue(otherURCI)->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(urci->getLoc(), otherURCIOp,
                                             urci->getType());
     }
@@ -254,11 +251,12 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // %1 = unchecked_ref_cast %x : $X->Z
   //
   // NOTE: For owned values, we only perform this optimization if we can
-  // guarantee that we can eliminate the upcast.
+  // guarantee that we can eliminate the upcast. Like above, the ownership of
+  // the bypassed upcast is checked and not the ownership of its operand.
   if (auto *ui = dyn_cast<UpcastInst>(urci->getOperand())) {
     SILValue uiOp = ui->getOperand();
 
-    if (uiOp->getOwnershipKind() != OwnershipKind::Owned) {
+    if (SILValue(ui)->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(urci->getLoc(), uiOp,
                                             urci->getType());
     }
@@ -292,6 +290,8 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
   if (!isa<UncheckedRefCastInst>(op) && !isa<UpcastInst>(op))
     return nullptr;
   if (!op->hasOneUse())
+    return nullptr;
+  if (op->getOwnershipKind() != OwnershipKind::Owned)
     return nullptr;
 
   SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
@@ -499,7 +499,7 @@ legacyVisitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 }
 
 SILInstruction *
-SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
+SILCombiner::legacyVisitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
   // (raw_pointer_to_ref (ref_to_raw_pointer x X->Y) Y->Z)
   //   ->
   // (unchecked_ref_cast x X->Z)
@@ -686,7 +686,9 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   SILValue val = getConcreteValueOfExistentialBoxAddr(CCABI->getSrc(), CCABI);
   while (auto *cvi = dyn_cast_or_null<CopyValueInst>(val))
     val = cvi->getOperand();
-  if (canBeUsedAsCastDestination(val, CCABI, DA)) {
+  // A test_only cast has no destination to fold the value into; the rewrite
+  // below would have nowhere to store and would leak the copy it makes.
+  if (CCABI->hasDest() && canBeUsedAsCastDestination(val, CCABI, DA)) {
     // We need to insert the copy after the defining instruction of val or at
     // the top of the block if val is an argument.
     {
@@ -709,6 +711,8 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
         break;
       case CastConsumptionKind::BorrowAlways:
         llvm_unreachable("BorrowAlways is not supported on addresses");
+      case CastConsumptionKind::TestOnly:
+        llvm_unreachable("test_only is rejected above");
     }
     builder.emitStoreValueOperation(loc, val, CCABI->getDest(),
                                     StoreOwnershipQualifier::Init);

@@ -21,8 +21,8 @@
 
 #include "Address.h"
 #include "TypeInfo.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/SIL/SILType.h"
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class ConstantInt;
@@ -83,9 +83,6 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }
-
-  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override;
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {

@@ -34,7 +34,6 @@
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -523,12 +522,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 void swift::simple_display(llvm::raw_ostream &out,
                            const CxxRecordDeclDescriptor &desc) {
   out << "Inferring C++ iterator info for '";
-  if (desc.decl->getIdentifier())
-    out << desc.decl->getName();
-  else if (desc.decl->isAnonymousStructOrUnion())
-    out << "(anonymous record)";
-  else
-    out << "(unnamed record)";
+  importer::printRecordName(out, desc.decl);
   out << "'\n";
 }
 
@@ -1066,8 +1060,15 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   } else {
     // Check if begin() returns an iterator.
     auto *iterDecl = iterTy->getAsCXXRecordDecl();
-    if (!iterDecl || !iterDecl->hasDefinition())
+    if (!iterDecl)
       return;
+
+    // NOTE: isCompleteType eagerly instantiates the return type of begin(),
+    // which may lead to spurious template instantiation failures, but is needed
+    // for CxxIteratorInfoRequest and the collection protocol conformances.
+    if (!clangSema.isCompleteType(beginConst->getLocation(), iterTy))
+      return;
+
     auto iterInfo = evaluateOrDefault(
         ctx.evaluator, CxxIteratorInfoRequest({iterDecl, clangSema}), {});
     if (!iterInfo.has_value())

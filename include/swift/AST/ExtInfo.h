@@ -350,7 +350,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
 
   /// The value of the greatest AST function representation.
-  LastAST = CFunctionPointer,
+  LastAST = uint8_t(FunctionTypeRepresentation::Last),
 
   /// The value of the least SIL-only function representation.
   FirstSIL = 8,
@@ -380,6 +380,10 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   KeyPathAccessorSetter,
   KeyPathAccessorEquals,
   KeyPathAccessorHash,
+
+  /// A COM interface method. The interface pointer is passed as the first
+  /// argument using the foreign calling convention.
+  COMMethod,
 };
 
 /// Returns true if the function with this convention doesn't carry a context.
@@ -409,6 +413,7 @@ isThinRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -445,6 +450,7 @@ isKeyPathAccessorRepresentation(SILFunctionTypeRepresentation rep) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Closure:
     case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
       return false;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
@@ -475,6 +481,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
     return {FunctionTypeRepresentation::Block};
   case SILFunctionTypeRepresentation::Thin:
     return {FunctionTypeRepresentation::Thin};
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return {FunctionTypeRepresentation::CFunctionPointer};
@@ -500,6 +507,7 @@ constexpr bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
@@ -524,6 +532,7 @@ template <typename Repr> constexpr bool shouldStoreClangType(Repr repr) {
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::CXXMethod:
     return true;
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
@@ -550,8 +559,8 @@ class ASTExtInfoBuilder {
   // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|called_once|
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |    16     |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|called_once| coroutine |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |    16     |    17     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -566,7 +575,8 @@ class ASTExtInfoBuilder {
     SendingResultMask = 1 << 14,
     InOutResultMask = 1 << 15,
     CalledOnceMask = 1 << 16,
-    NumMaskBits = 17
+    CoroutineMask = 1 << 17,
+    NumMaskBits = 18
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -663,6 +673,8 @@ public:
 
   constexpr bool isCalledOnce() const { return bits & CalledOnceMask; }
 
+  constexpr bool isCoroutine() const { return bits & CoroutineMask; }
+
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
                                  DifferentiabilityMaskOffset);
@@ -734,6 +746,7 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::WitnessMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
@@ -806,6 +819,14 @@ public:
                                      : (bits & ~SendingResultMask),
                              clangTypeInfo, globalActor, thrownError,
                              sendableDependentType, calledOnceDependentType, lifetimeDependencies);
+  }
+
+  [[nodiscard]]
+  ASTExtInfoBuilder withCoroutine(bool coroutine = true) const {
+    return ASTExtInfoBuilder(
+        coroutine ? (bits | CoroutineMask) : (bits & ~CoroutineMask),
+        clangTypeInfo, globalActor, thrownError, sendableDependentType,
+        calledOnceDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]]
@@ -949,6 +970,8 @@ public:
 
   constexpr bool isThrowing() const { return builder.isThrowing(); }
 
+  constexpr bool isCoroutine() const { return builder.isCoroutine(); }
+
   constexpr bool hasSendingResult() const { return builder.hasSendingResult(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
@@ -1028,6 +1051,14 @@ public:
   [[nodiscard]]
   ASTExtInfo withThrows() const {
     return builder.withThrows(true, Type()).build();
+  }
+
+  /// Helper method for changing only the coroutine field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withCoroutine for chaining.
+  [[nodiscard]]
+  ASTExtInfo withCoroutine(bool coroutine = true) const {
+    return builder.withCoroutine(coroutine).build();
   }
 
   /// Helper method for changing only the async field.
@@ -1112,6 +1143,7 @@ SILFunctionLanguage getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     return SILFunctionLanguage::C;
   case SILFunctionTypeRepresentation::Thick:
@@ -1308,6 +1340,7 @@ public:
     case Representation::ObjCMethod:
     case Representation::Method:
     case Representation::WitnessMethod:
+    case Representation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
@@ -1326,6 +1359,7 @@ public:
     case Representation::Method:
     case Representation::WitnessMethod:
     case Representation::Closure:
+    case Representation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case Representation::KeyPathAccessorGetter:
     case Representation::KeyPathAccessorSetter:

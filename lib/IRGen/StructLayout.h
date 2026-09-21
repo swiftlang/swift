@@ -19,10 +19,10 @@
 #define SWIFT_IRGEN_STRUCTLAYOUT_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "IRGen.h"
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class Constant;
@@ -99,6 +99,14 @@ private:
 public:
   static ElementLayout getIncomplete(const TypeInfo &type) {
     return ElementLayout(type);
+  }
+
+  static ElementLayout
+  getFromSerializedStorage(const TypeInfo &type,
+                           const ElementLayoutStorage &storage) {
+    ElementLayout result(type);
+    result.Storage = storage;
+    return result;
   }
 
   void completeFrom(const ElementLayout &other) {

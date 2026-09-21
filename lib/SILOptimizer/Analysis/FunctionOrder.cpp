@@ -11,12 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include <algorithm>
 
 using namespace swift;

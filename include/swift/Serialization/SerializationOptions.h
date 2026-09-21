@@ -25,6 +25,8 @@
 
 namespace swift {
 
+class IRGenOptions;
+
 class SerializationOptions {
 public:
   SerializationOptions() = default;
@@ -155,6 +157,9 @@ public:
   };
   ArrayRef<FileDependency> Dependencies;
   ArrayRef<std::tuple<std::string, bool>> PublicDependentLibraries;
+
+  /// IRGen options used to derive TypeInfo for hidden layout records.
+  const IRGenOptions *IRGenOpts = nullptr;
 
   bool AutolinkForceLoad = false;
   bool SerializeAllSIL = false;

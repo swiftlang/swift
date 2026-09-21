@@ -12,10 +12,9 @@ _ = gradient(at: Float(1), of: { x in identity(x) })
 // Verify that local buffers are immediately set to zero.
 
 // CHECK-SIL-LABEL: sil private @identity16_Differentiation14DifferentiableRzlTJpSpSr
-// CHECK-SIL:      [[ORIG_COTAN:%.*]] = alloc_stack $τ_0_0.TangentVector
-// CHECK-SIL-NEXT: [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
+// CHECK-SIL:      [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
 // CHECK-SIL-NEXT: [[ORIG_COTAN_METATYPE:%.*]] = metatype $@thick τ_0_0.TangentVector.Type
-// CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN]], [[ORIG_COTAN_METATYPE]])
+// CHECK-SIL:      [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>(%0, [[ORIG_COTAN_METATYPE]])
 // CHECK-SIL: }
 
 // Test TF-201: differentiate direct references to generic function.

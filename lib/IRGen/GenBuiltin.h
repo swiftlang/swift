@@ -18,7 +18,6 @@
 #ifndef SWIFT_IRGEN_GENBUILTIN_H
 #define SWIFT_IRGEN_GENBUILTIN_H
 
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/LLVM.h"
 
 namespace swift {

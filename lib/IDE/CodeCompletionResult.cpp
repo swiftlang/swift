@@ -15,7 +15,6 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 
@@ -315,7 +314,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::OpaqueType:
   case DeclKind::BuiltinTuple:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
   case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:

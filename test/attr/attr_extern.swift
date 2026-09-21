@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -target %target-swift-5.1-abi-triple
 
 // REQUIRES: swift_feature_Extern
 

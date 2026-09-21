@@ -659,9 +659,6 @@ public:
       ImportPath::Module path,
       std::vector<std::string> &names) const;
 
-  /// Given a Clang module, decide whether this module is imported already.
-  static bool isModuleImported(const clang::Module *M);
-
   DeclName importName(
       const clang::NamedDecl *D,
       clang::DeclarationName givenName = clang::DeclarationName()) override;
@@ -711,6 +708,9 @@ public:
 
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
+  void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                 SourceLoc useLoc) override;
+
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
   bool needsClosureConstructor(
@@ -751,7 +751,9 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -855,9 +857,9 @@ classifyCxxReferenceParameter(clang::QualType type);
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 
 /// Whether any declaration of \p decl carries one of the given swift_attrs.
-/// A swift_attr propagates to later redeclarations only, and Clang carries just
-/// the first one, so an attribute is not necessarily visible on the declaration
-/// at hand.
+/// Within a translation unit a swift_attr propagates to later redeclarations
+/// only, and a chain assembled across modules is not merged at all, so an
+/// attribute is not necessarily visible on the declaration at hand.
 bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
                                   ArrayRef<StringRef> attrs);
 
@@ -921,6 +923,9 @@ bool declIsCxxOnly(const Decl *decl);
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
 
+/// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
+bool isClangCxxRecord(const DeclContext *dc);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///
@@ -964,15 +969,13 @@ template <typename T>
 std::optional<T>
 matchSwiftAttr(const clang::Decl *decl,
                llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl || !decl->hasAttrs())
+  if (!decl)
     return std::nullopt;
 
-  for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      for (const auto &p : patterns) {
-        if (swiftAttr->getAttribute() == p.first)
-          return p.second;
-      }
+  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    for (const auto &p : patterns) {
+      if (swiftAttr->getAttribute() == p.first)
+        return p.second;
     }
   }
   return std::nullopt;

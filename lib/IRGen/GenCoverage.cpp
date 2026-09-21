@@ -19,7 +19,6 @@
 #include "SwiftTargetInfo.h"
 
 #include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"

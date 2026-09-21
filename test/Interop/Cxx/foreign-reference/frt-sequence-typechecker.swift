@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -I %S/Inputs -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking -disable-typo-correction
+// RUN:   -target %target-swift-5.8-abi-triple -disable-typo-correction
 
 // XFAIL: OS=linux-androideabi
 

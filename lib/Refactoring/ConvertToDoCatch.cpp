@@ -13,7 +13,6 @@
 #include "ContextFinder.h"
 #include "RefactoringActions.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift::refactoring;
 

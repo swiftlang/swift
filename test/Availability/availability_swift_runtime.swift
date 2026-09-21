@@ -29,6 +29,18 @@ func availableSwift6() {
   availableInSwift6_0Runtime()
 }
 
+@available(Swift 6.0, *)
+protocol AvailableInSwift6_0Runtime { }
+
+// Unlike a platform domain, the Swift runtime domain does not allow a
+// conformance to be introduced in a later version than the conforming type.
+struct ConformsToAvailableInSwift6_0Runtime: AvailableInSwift6_0Runtime { // expected-error {{'AvailableInSwift6_0Runtime' is only available in Swift 6.0 or newer}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}{{1-1=@available(Swift 6.0)\n}}
+}
+
+@available(Swift 6.0, *)
+struct ConformsToAvailableInSwift6_0RuntimeInSwift6: AvailableInSwift6_0Runtime { }
+
 @available(Swift, introduced: 5.0, obsoleted: 5.1)
 func obsoletedBeforeSwiftRuntime() {}
 // expected-note@-2 3{{'obsoletedBeforeSwiftRuntime()' was obsoleted in Swift 5.1}}

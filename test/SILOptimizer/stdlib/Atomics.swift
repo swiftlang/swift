@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -disable-availability-checking %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -target %target-swift-6.0-abi-triple %s | %IRGenFileCheck %s
 
 // REQUIRES: synchronization
 

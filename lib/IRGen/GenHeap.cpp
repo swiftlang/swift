@@ -20,12 +20,9 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SipHash.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -33,7 +30,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -139,6 +135,11 @@ namespace {
           ValueTypeAndIsOptional.getPointer()->getContext(), \
           getFixedSize().getValueInBits()); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
   class Nativeness##Name##ReferenceTypeInfo \
@@ -217,6 +218,11 @@ namespace {
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 
   // The nativeness of a reference storage type is a policy decision.
@@ -260,6 +266,11 @@ namespace {
                               Address dest, SILType T, bool isOutlined) \
     const override { \
       return storeHeapObjectExtraInhabitant(IGF, index, dest); \
+    } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
     } \
   };
 #include "swift/AST/ReferenceStorage.def"
@@ -689,6 +700,12 @@ namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
                                  Size size, SpareBitVector spareBits,
                                  Alignment align)
@@ -1623,6 +1640,12 @@ public:
 /// Common implementation for empty box type info.
 class EmptyBoxTypeInfo final : public BoxTypeInfo {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1651,6 +1674,12 @@ public:
 /// Common implementation for non-fixed box type info.
 class NonFixedBoxTypeInfo final : public BoxTypeInfo {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1759,6 +1788,12 @@ static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                              IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
@@ -1768,6 +1803,12 @@ public:
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                                    IGM.getReferenceObjectTypeInfo(refcounting)))
@@ -1807,6 +1848,12 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
   }
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
     : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
   {}

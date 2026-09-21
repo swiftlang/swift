@@ -18,7 +18,6 @@
 #endif
 
 #include "swift/AST/Attr.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILCloner.h"

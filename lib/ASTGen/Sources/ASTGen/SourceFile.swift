@@ -35,9 +35,10 @@ public struct ExportedSourceFile {
   public let syntax: Syntax
 
   /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
-  ///
-  /// Cached so we don't need to re-build the line table every time we need to convert a position.
-  public let sourceLocationConverter: SourceLocationConverter
+  public lazy var sourceLocationConverter: SourceLocationConverter = SourceLocationConverter(
+    fileName: fileName,
+    tree: syntax
+  )
 
   /// Configured regions for this source file.
   ///
@@ -95,6 +96,7 @@ extension Parser.LanguageFeatures {
     mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
     mapFeature(.LiteralExpressions, to: .literalExpressions)
     mapFeature(.CalledAttribute, to: .calledAttribute)
+    mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
   }
 }
 
@@ -184,8 +186,7 @@ public func parseSourceFile(
       buffer: buffer,
       moduleName: moduleName,
       fileName: fileName,
-      syntax: parsed,
-      sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: parsed)
+      syntax: parsed
     )
   )
 

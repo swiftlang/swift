@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/Mutex.swift
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-name stdlib %t/Mutex.swift | %FileCheck %t/Mutex.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -target %target-swift-6.0-abi-triple -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-name stdlib %t/Mutex.swift | %FileCheck %t/Mutex.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_RawLayout

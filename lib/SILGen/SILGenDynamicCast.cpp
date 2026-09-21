@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -235,6 +234,9 @@ namespace {
         case CastConsumptionKind::TakeOnSuccess:
           handleFalse(result);
           break;
+        case CastConsumptionKind::TestOnly:
+          llvm_unreachable(
+              "test_only is emitted directly, not via CheckedCastEmitter");
         }
 
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");

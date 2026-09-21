@@ -36,13 +36,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include <optional>
 
 using namespace swift;
@@ -184,6 +178,8 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("this should never occur here");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only is rejected on entry");
     }
   }
 
@@ -254,6 +250,11 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
 ///
 SILInstruction *
 CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
+  // Every rewrite below produces a value in the cast's destination. A
+  // test_only cast has no destination at all, so leave it alone.
+  if (!producesDestinationValue(dynamicCast.getBridgedConsumptionKind()))
+    return nullptr;
+
   auto kind = dynamicCast.getKind();
   (void)kind;
   assert(((kind == SILDynamicCastKind::CheckedCastAddrBranchInst) ||
@@ -390,6 +391,8 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
   case CastConsumptionKind::BorrowAlways:
     llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+  case CastConsumptionKind::TestOnly:
+    llvm_unreachable("test_only is rejected on entry");
   case CastConsumptionKind::CopyOnSuccess:
     // If we are performing copy_on_success, store the value back into memory
     // here since we loaded it. We may need to cast back to the actual
@@ -619,6 +622,11 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
 /// instance into a bridged ObjC type.
 SILInstruction *
 CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
+  // Every rewrite below produces a value in the cast's destination. A
+  // test_only cast has no destination at all, so leave it alone.
+  if (!producesDestinationValue(dynamicCast.getBridgedConsumptionKind()))
+    return nullptr;
+
   SILInstruction *Inst = dynamicCast.getInstruction();
   const SILFunction *F = Inst->getFunction();
   CastConsumptionKind ConsumptionKind = dynamicCast.getBridgedConsumptionKind();
@@ -684,6 +692,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("Should never hit this");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only is rejected on entry");
     case CastConsumptionKind::CopyOnSuccess:
       // We assume that our caller is correct and will treat our argument as
       // being immutable, so we do not need to do anything here.
@@ -883,8 +893,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     return NewI;
   }
 
-  bool ResultNotUsed = isa<AllocStackInst>(Dest);
-  if (ResultNotUsed) {
+  bool ResultNotUsed = !Dest || isa<AllocStackInst>(Dest);
+  if (ResultNotUsed && Dest) {
     for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
       if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
@@ -921,10 +931,14 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
         auto &srcTL = Builder.getTypeLowering(Src->getType());
         srcTL.emitDestroyAddress(Builder, Loc, Src);
       }
-      for (auto iter = Dest->use_begin(); iter != Dest->use_end();) {
-        SILInstruction *user = (*iter++)->getUser();
-        if (isa<DestroyAddrInst>(user))
-          eraseInstAction(user);
+      // A test_only cast has no destination, and so no destroys of one to
+      // clean up.
+      if (Dest) {
+        for (auto iter = Dest->use_begin(); iter != Dest->use_end();) {
+          SILInstruction *user = (*iter++)->getUser();
+          if (isa<DestroyAddrInst>(user))
+            eraseInstAction(user);
+        }
       }
       eraseInstAction(Inst);
       Builder.setInsertionPoint(BB);
@@ -944,6 +958,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     switch (Inst->getConsumptionKind()) {
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only has no destination, so ResultNotUsed above "
+                       "is always true and has already returned");
     case CastConsumptionKind::CopyOnSuccess:
       if (!Src->getType().isTrivial(*BB->getParent())) {
         copiedSrc = Builder.createAllocStack(Loc, Src->getType());
@@ -1103,6 +1120,11 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
 SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *Inst) {
+  // The rewrite below leaves the cast result in the destination. A test_only
+  // cast has no destination, so there is nothing to rewrite.
+  if (!Inst->hasDest())
+    return nullptr;
+
   auto Loc = Inst->getLoc();
   auto Src = Inst->getSrc();
   auto Dest = Inst->getDest();

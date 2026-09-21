@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TargetAttribute -disable-availability-checking -target x86_64-apple-macosx13.0
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TargetAttribute -target x86_64-apple-macosx13.0
 
 // REQUIRES: swift_feature_TargetAttribute
 // REQUIRES: OS=macosx && CPU=x86_64

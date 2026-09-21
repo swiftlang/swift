@@ -17,8 +17,6 @@
 #ifndef SWIFT_SILOPTIMIZER_REQUESTS_H
 #define SWIFT_SILOPTIMIZER_REQUESTS_H
 
-#include "swift/AST/ASTTypeIDs.h"
-#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SimpleRequest.h"
 

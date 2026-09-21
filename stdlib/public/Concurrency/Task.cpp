@@ -2112,7 +2112,7 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #define HOOKED_OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace,         \
                                       typedArgs, namedArgs)                    \
   attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
-    static Override_##name Override;                                           \
+    static Override_##name __ptrauth_swift_concurrency_hook Override;          \
     static swift_once_t Predicate;                                             \
     swift_once(                                                                \
         &Predicate, [](void *) { Override = getOverride_##name(); }, nullptr); \

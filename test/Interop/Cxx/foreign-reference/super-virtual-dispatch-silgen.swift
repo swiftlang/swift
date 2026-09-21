@@ -1,6 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -disable-availability-checking | %FileCheck %s
-
-// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import SuperVirtualDispatch
 

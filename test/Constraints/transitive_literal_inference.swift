@@ -112,31 +112,22 @@ let _: Float? = f(f(3.0, 3), nil)  // expected-error {{conflicting arguments to 
 
 let _: Float? = (b ? nil : (b ? 3 : 3.0))
 
-// Everything in an #if SALVAGE block is solved in salvage
-#if SALVAGE
-let _: Float? = (b ? nil : (b ? 3.0 : 3))
-#endif
+let _: Float? = (b ? nil : (b ? 3.0 : 3))  // expected-salvage-error {{failed to produce diagnostic for expression}}
 
 let _: Float? = (b ? 3 : (b ? 3.0 : nil))
 let _: Float? = (b ? 3 : (b ? nil : 3.0))
 
-#if SALVAGE
-let _: Float? = (b ? 3.0 : (b ? nil : 3))
-let _: Float? = (b ? 3.0 : (b ? 3 : nil))
-#endif
+let _: Float? = (b ? 3.0 : (b ? nil : 3)) // expected-salvage-error {{failed to produce diagnostic for expression}}
+let _: Float? = (b ? 3.0 : (b ? 3 : nil)) // expected-salvage-error {{failed to produce diagnostic for expression}}
 
 let _: Float? = (b ? (b ? nil : 3) : 3.0)
 
-#if SALVAGE
-let _: Float? = (b ? (b ? nil : 3.0) : 3)
-#endif
+let _: Float? = (b ? (b ? nil : 3.0) : 3) // expected-salvage-error {{failed to produce diagnostic for expression}}
 
 let _: Float? = (b ? (b ? 3 : 3.0) : nil)
 let _: Float? = (b ? (b ? 3 : nil) : 3.0)
 
-#if SALVAGE
-let _: Float? = (b ? (b ? 3.0 : nil) : 3)
-let _: Float? = (b ? (b ? 3.0 : 3) : nil)
-#endif
+let _: Float? = (b ? (b ? 3.0 : nil) : 3) // expected-salvage-error {{failed to produce diagnostic for expression}}
+let _: Float? = (b ? (b ? 3.0 : 3) : nil) // expected-salvage-error {{failed to produce diagnostic for expression}}
 
 // TODO: Add more tests.

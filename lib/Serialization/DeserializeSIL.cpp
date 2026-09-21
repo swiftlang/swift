@@ -26,7 +26,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1483,6 +1482,8 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
     return CastConsumptionKind::CopyOnSuccess;
   case SIL_CAST_CONSUMPTION_BORROW_ALWAYS:
     return CastConsumptionKind::BorrowAlways;
+  case SIL_CAST_CONSUMPTION_TEST_ONLY:
+    return CastConsumptionKind::TestOnly;
   default:
     llvm_unreachable("not a valid CastConsumptionKind for SIL");
   }
@@ -2180,7 +2181,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
-  ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
@@ -2200,6 +2200,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
             getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         /*needsStackProtection=*/Attr != 0);
+    break;
+  }
+  case SILInstructionKind::RawPointerToRefInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createRawPointerToRef(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        /*isImmortal=*/Attr != 0);
     break;
   }
   case SILInstructionKind::ProjectBoxInst: {
@@ -3798,6 +3810,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
@@ -3830,6 +3843,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       break;
     case SILInstructionKind::ObjCMethodInst:
       ResultInst = Builder.createObjCMethod(
+          Loc,
+          getLocalValue(Builder.maybeGetFunction(),
+                        ListOfValues[NextValueIndex], operandTy),
+          DRef, Ty);
+      break;
+    case SILInstructionKind::COMMethodInst:
+      ResultInst = Builder.createCOMMethod(
           Loc,
           getLocalValue(Builder.maybeGetFunction(),
                         ListOfValues[NextValueIndex], operandTy),
@@ -3943,14 +3963,29 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         MF->getType(ListOfValues[5])->getCanonicalType();
     SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    SILValue dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
-                                  targetLoweredType);
+    SILValue dest;
+    if (producesDestinationValue(consumption)) {
+      dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
+                           targetLoweredType);
+    }
 
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultInst = Builder.createCheckedCastAddrBranch(
         Loc, options, consumption, src, srcFormalType, dest,
         targetFormalType, successBB, failureBB);
+    break;
+  }
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createOpenCOMExistential(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        decodeValueOwnership(Attr));
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {

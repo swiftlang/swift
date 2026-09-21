@@ -196,6 +196,9 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
 
+if '@SWIFT_BUILD_SARIF@' == 'TRUE':
+  config.available_features.add('swift_sarif')
+
 config.swift_sdks = "@SWIFT_SDKS@".split(";")
 
 # Let the main config do the real work.

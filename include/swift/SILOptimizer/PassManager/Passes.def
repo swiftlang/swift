@@ -126,6 +126,9 @@ PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
 PASS(DeinitDevirtualizer, "deinit-devirtualizer",
      "Devirtualizes destroys of non-copyable values")
+PASS(ClassDestroyDevirtualizer, "class-destroy-devirtualizer",
+     "Devirtualizes final destroys of classes")
+// TODO: remove the ReleaseDevirtualizer once the ClassDestroyDevirtualizer runs on OSSA
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(LetPropertyLowering, "let-property-lowering",
@@ -154,6 +157,8 @@ PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
      "Mandatory remove short-lived immutable temporary copies")
 PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
+PASS(MandatoryTempLValueElimination, "mandatory-temp-lvalue-elimination",
+     "Mandatory remove short-lived immutable temporary l-values")
 PASS(TempLValueElimination, "temp-lvalue-elimination",
      "Remove short-lived immutable temporary l-values")
 PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",

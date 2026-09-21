@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   AsyncDemotion.swift
   AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift
+  ClassDestroyDevirtualizer.swift
   ConstantCapturePropagation.swift
   CleanupDebugSteps.swift
   ClosureSpecialization.swift

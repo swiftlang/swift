@@ -36,7 +36,6 @@
 #include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
@@ -348,8 +347,8 @@ getDynamicResultSignature(ValueDecl *decl) {
     // for methods, and ensures that we don't take a protocol's generic
     // signature into account for a subscript requirement.
     if (auto *genericFn = ty->getAs<GenericFunctionType>()) {
-      ty = FunctionType::get(genericFn->getParams(), genericFn->getResult(),
-                             genericFn->getExtInfo());
+      ty = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
     }
 
     // Handle properties and subscripts, anchored by the getter's selector.
@@ -3843,6 +3842,9 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::GenericArgument:
     case ConstraintLocator::FunctionArgument:
     case ConstraintLocator::SynthesizedArgument:
+      break;
+
+    case ConstraintLocator::FunctionYield:
       break;
 
     case ConstraintLocator::FunctionResult:

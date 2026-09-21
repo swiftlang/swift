@@ -1358,7 +1358,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If arg is non-trivial and has an address type, make a +1 copy and operate
   // on that.
-  if (!lowering.isTrivial() && arg->getType().isAddress() &&
+  if (!lowering.isTrivial(&SGF.F) && arg->getType().isAddress() &&
       SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);

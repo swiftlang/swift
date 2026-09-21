@@ -12,9 +12,6 @@
 
 #include "SwiftASTManager.h"
 #include "SwiftLangSupport.h"
-#include "SwiftEditorDiagConsumer.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDETool/IDEInspectionInstance.h"
 #include "clang/AST/ASTContext.h"

@@ -16,7 +16,6 @@
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -269,7 +268,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
-  void visitUsingDecl(UsingDecl *) {}
+  void visitFileDefaultDecl(FileDefaultDecl *) {}
   void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
     llvm_unreachable("hidden layout declarations do not produce SIL");
   }

@@ -28,7 +28,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -1105,10 +1104,20 @@ bool ConformanceLookupTable::lookupConformance(
   // Update to record all explicit and inherited conformances.
   updateLookupTable(nominal, ConformanceStage::Inherited);
 
+  auto hasUnexpanded = [&](const ConformanceEntries &entries) {
+    return llvm::any_of(entries, [&](const ConformanceEntry *entry) {
+      return entry->getRankingKind() == ConformanceEntryKind::PreMacroExpansion;
+    });
+  };
+
   // Look for conformances to this protocol.
   auto known = Conformances.find(protocol);
-  if (known == Conformances.end()) {
-    // If we didn't find anything, expand implied conformances.
+  if (known == Conformances.end() || hasUnexpanded(known->second)) {
+    // If we didn't find anything, or have unexpanded macro conformances, expand
+    // implied conformances. We can run into the latter case when we expand a
+    // macro that introduces a conformance that implies another conformance --
+    // the implied conformance needs its source updating to account for the new
+    // explicit conformance.
     updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
     known = Conformances.find(protocol);
 

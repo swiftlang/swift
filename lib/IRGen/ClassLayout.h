@@ -18,10 +18,10 @@
 #ifndef SWIFT_IRGEN_CLASSLAYOUT_H
 #define SWIFT_IRGEN_CLASSLAYOUT_H
 
-#include "llvm/ADT/ArrayRef.h"
 #include "Field.h"
 #include "IRGen.h"
 #include "StructLayout.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 namespace irgen {
@@ -204,6 +204,8 @@ public:
     return (Options.contains(ClassMetadataFlags::ClassHasResilientAncestry) ||
             Options.contains(ClassMetadataFlags::ClassIsGeneric));
   }
+
+  ArrayRef<ElementLayout> getElements() const { return AllElements; }
 
   std::pair<FieldAccess, ElementLayout>
   getFieldAccessAndElement(Field field) const {

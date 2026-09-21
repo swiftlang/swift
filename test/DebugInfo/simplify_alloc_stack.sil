@@ -132,8 +132,8 @@ bb3:
 // already have a reconstruction block are killed as unsalvageable.
 // CHECK-LABEL: sil [ossa] @kill_transform_operand_of_existential :
 // CHECK:         alloc_stack $T
-// CHECK:         debug_value (), var, name "x", type $Builtin.RawPointer, transform {
-// CHECK-NEXT:    bb0:
+// CHECK:         debug_value undef : $*any P, var, name "x", type $Builtin.RawPointer, transform {
+// CHECK-NEXT:    bb0(%0 : $*any P):
 // CHECK-NEXT:      = address_to_pointer undef
 // CHECK:         }
 // CHECK:       } // end sil function 'kill_transform_operand_of_existential'

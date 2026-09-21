@@ -44,6 +44,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -219,7 +220,7 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType,
   Macro,
   MacroExpansion,
-  Using,
+  FileDefault,
   BorrowAccessor,
   MutateAccessor,
   YieldingBorrowAccessor,
@@ -1174,10 +1175,14 @@ public:
   ///
   /// When \p visitFreestandingExpanded is true (the default), this will also
   /// visit the declarations produced by a freestanding macro expansion.
-  void visitAuxiliaryDecls(
-      AuxiliaryDeclCallback callback,
-      bool visitFreestandingExpanded = true
-  ) const;
+  ///
+  /// When \p visitExtensions is true (currently `false` by default), this
+  /// will also visit the top-level extensions for any expanded extension
+  /// macros. Use this with care since in an ASTWalker it would cause a
+  /// non-source-order walk.
+  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback,
+                           bool visitFreestandingExpanded = true,
+                           bool visitExtensions = false) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
@@ -1439,7 +1444,10 @@ public:
 
   /// If this is the Swift implementation of a declaration imported from ObjC,
   /// returns the imported declarations. (There may be several for a main class
-  /// body; if so, the first will be the class itself.) Otherwise return an empty list.
+  /// body; if so, the first will be the class itself. There may also be
+  /// several for an `@implementation` function whose foreign name resolves to
+  /// overloads it could equally implement; that is diagnosed as ambiguous.)
+  /// Otherwise return an empty list.
   ///
   /// \seeAlso ExtensionDecl::isObjCInterface()
   llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
@@ -4913,6 +4921,10 @@ public:
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
 
+  /// Visit the auxiliary extensions for the given nominal. This includes both
+  /// those expanded by macros as well as others synthesized by the compiler.
+  void visitAuxiliaryExtensions(llvm::function_ref<void(Decl *)> visit) const;
+
   /// Whether this nominal type qualifies as an actor, meaning that it is
   /// either an actor type or a protocol whose `Self` type conforms to the
   /// `Actor` protocol.
@@ -5727,6 +5739,11 @@ public:
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
   bool isForeignReferenceType() const;
+
+  /// If this class is a C++ foreign reference type, or a Swift class that
+  /// inherits from one, returns the foreign reference type in its hierarchy
+  /// (which may be this class).
+  ClassDecl *getForeignReferenceSuperclassOrSelf() const;
 
   bool hasRefCountingAnnotations() const;
 };
@@ -8162,7 +8179,10 @@ public:
   };
 
 private:
-  ParameterList *Params;
+  ParameterList *Params = nullptr;
+  // Yield list is nullable: it is non-null only for coroutines (functions and
+  // coroutine accessors) and then cannot be empty.
+  YieldList *Yields = nullptr;
 
 private:
   /// The generation at which we last loaded derivative function configurations.
@@ -8289,6 +8309,8 @@ public:
   /// Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
+
+  bool isCoroutine() const;
 
   // Expose our import as member status
   ImportAsMemberStatus getImportAsMemberStatus() const {
@@ -8711,6 +8733,13 @@ public:
 
   void setParameters(ParameterList *Params);
 
+  /// Retrieve the function's explicit (as spelled in the source code) yield
+  /// list
+  YieldList *getYields() { return Yields; }
+  const YieldList *getYields() const { return Yields; }
+
+  void setYields(YieldList *Yields);
+
   bool hasImplicitSelfDecl() const {
     return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
   }
@@ -8845,6 +8874,7 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
   friend class ResultTypeRequest;
+  friend class YieldsTypeRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -8922,10 +8952,9 @@ public:
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc, bool Async,
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                          TypeRepr *ThrownTyR,
-                          GenericParamList *GenericParams,
-                          ParameterList *BodyParams, TypeRepr *ResultTyR,
-                          DeclContext *Parent);
+                          TypeRepr *ThrownTyR, GenericParamList *GenericParams,
+                          ParameterList *BodyParams, YieldList *BodyYields,
+                          TypeRepr *ResultTyR, DeclContext *Parent);
 
   static FuncDecl *
   createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
@@ -8984,8 +9013,12 @@ public:
     return FnRetType.getSourceRange();
   }
 
-  /// Retrieve the result interface type of this function.
+  /// Retrieve the result interface type of this function
   Type getResultInterfaceType() const;
+
+  /// Same as above, but only yields
+  void
+  getYieldInterfaceTypes(SmallVectorImpl<AnyFunctionType::Yield> &yields) const;
 
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.
@@ -9104,6 +9137,8 @@ class AccessorDecl final : public FuncDecl {
       return Bits.AccessorDecl.IsTransparent;
     return std::nullopt;
   }
+
+  void inferYieldType();
 
   friend class IsAccessorTransparentRequest;
 
@@ -10345,6 +10380,16 @@ public:
   AbstractTypeLayout *Layout = nullptr;
   TypeDecl *ParentDecl = nullptr;
 
+  struct XRefPathPiece {
+    Identifier Name;
+    bool InProtocolExtension;
+    bool ImportedFromClang;
+  };
+  StringRef MangledName;
+  Identifier OriginalModuleName;
+  bool OriginalModuleIsObjCHeader = false;
+  ArrayRef<XRefPathPiece> OriginalXRefPath;
+
   SourceLoc getLocFromSource() const { return SourceLoc(); }
 
   static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
@@ -10356,40 +10401,42 @@ public:
   }
 };
 
-/// UsingDecl - This represents a single `using` declaration, e.g.:
-///   using @MainActor
-class UsingDecl : public Decl {
+/// FileDefaultDecl - This represents a single `default` declaration, e.g.:
+///   default @MainActor
+class FileDefaultDecl : public Decl {
   friend class Decl;
 
 private:
-  SourceLoc UsingLoc;
+  SourceLoc DefaultLoc;
 
   DeclAttributes SpecifiedAttributes;
 
-  UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
-            DeclContext *parent);
+  FileDefaultDecl(SourceLoc defaultLoc, DeclAttributes specifiedAttributes,
+                  DeclContext *parent);
 
 public:
   DeclAttributes getSpecifiedAttributes() const { return SpecifiedAttributes; }
 
-  SourceLoc getLocFromSource() const { return UsingLoc; }
+  SourceLoc getLocFromSource() const { return DefaultLoc; }
   SourceRange getSourceRange() const {
     if (SpecifiedAttributes.isEmpty())
-      return UsingLoc;
+      return DefaultLoc;
     // Head is most recently inserted, last in source order, and there
     // should only be one except for @available where each synthetic
     // attribute should point to the same attribute.
     auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
     if (endLoc.isInvalid())
-      return UsingLoc;
-    return {UsingLoc, endLoc};
+      return DefaultLoc;
+    return {DefaultLoc, endLoc};
   }
 
-  static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
-                           DeclAttributes specifiedAttributes,
-                           DeclContext *parent);
+  static FileDefaultDecl *create(ASTContext &ctx, SourceLoc defaultLoc,
+                                 DeclAttributes specifiedAttributes,
+                                 DeclContext *parent);
 
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::FileDefault;
+  }
 };
 
 inline void

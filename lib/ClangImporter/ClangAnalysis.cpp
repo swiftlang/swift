@@ -1,4 +1,5 @@
 #include "ClangDerivedConformances.h"
+#include "CxxUnsafetyReason.h"
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ParameterList.h"
@@ -21,6 +22,7 @@
 #include <algorithm>
 
 using namespace swift;
+using namespace importer;
 
 bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
@@ -45,9 +47,7 @@ bool importer::isForeignReferenceRecord(const clang::RecordDecl *decl,
         .isReference();
 
   // Without one, a direct annotation is all there is to go on.
-  return llvm::any_of(decl->redecls(), [](const clang::Decl *redecl) {
-    return hasImportReferenceAttr(cast<clang::RecordDecl>(redecl));
-  });
+  return hasSwiftAttributeOnAnyRedecl(decl, {"import_reference"});
 }
 
 bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
@@ -134,22 +134,15 @@ bool isDirectViewTypeImpl(const clang::Type *type, Evaluator &eval,
     if (!seen.insert(recordDecl).second)
       return true;
 
-    auto isSelfContainedOrDirectView = [&](clang::QualType t) {
+    // A base or field that is neither self-contained nor itself a direct view
+    // can dangle, which disqualifies the enclosing record.
+    auto canDangle = [&](clang::QualType t) {
       const clang::Type *ty = t.getTypePtr();
-      return isSelfContainedForDirectView(ty, eval) ||
-             isDirectViewTypeImpl(ty, eval, seen);
+      return !isSelfContainedForDirectView(ty, eval) &&
+             !isDirectViewTypeImpl(ty, eval, seen);
     };
 
-    if (const auto *cxxRecordDecl =
-            dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
-      for (auto base : cxxRecordDecl->bases())
-        if (!isSelfContainedOrDirectView(base.getType()))
-          return false;
-    }
-    for (auto *field : recordDecl->fields())
-      if (!isSelfContainedOrDirectView(field->getType()))
-        return false;
-    return true;
+    return !anySubobjectTypeSatisfies(recordDecl, canDangle);
   }
 
   // (C) Anything else is not itself a direct view.
@@ -172,39 +165,28 @@ bool importer::isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx) {
 }
 
 namespace {
-/// The retain:/release: attributes written directly on a record.
+/// The retain:/release: attributes written on any declaration of a record.
 struct RetainReleaseInfo {
   RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
-    // Only the first swift_attr is propagated to a redeclaration, so
-    // retain:/release: are often missing from the declaration at hand even
-    // though the type is annotated. Read them from the declaration that spells
-    // them, and from that one alone, so inherited copies are not counted twice.
-    auto spellsRetainRelease = [](const clang::RecordDecl *record) {
-      return llvm::any_of(record->specific_attrs<clang::SwiftAttrAttr>(),
-                          [](const clang::SwiftAttrAttr *attr) {
-                            return attr->getAttribute().starts_with("retain:") ||
-                                   attr->getAttribute().starts_with("release:");
-                          });
-    };
-    const clang::RecordDecl *carrier = decl;
-    if (!spellsRetainRelease(carrier)) {
-      for (auto *redecl : decl->redecls()) {
-        auto *record = cast<clang::RecordDecl>(redecl);
-        if (spellsRetainRelease(record)) {
-          carrier = record;
-          break;
+    // The annotation can sit on any declaration of the record, so gather from
+    // the whole chain. Key on the attribute string, so that a copy inherited by
+    // a later redeclaration is not counted as a second annotation.
+    llvm::SmallDenseSet<StringRef, 2> seen;
+    for (auto *redecl : decl->redecls()) {
+      for (auto *attr : redecl->specific_attrs<clang::SwiftAttrAttr>()) {
+        StringRef attrStr = attr->getAttribute();
+        StringRef name = attrStr;
+        if (name.consume_front("retain:")) {
+          if (seen.insert(attrStr).second) {
+            retainAttrs.push_back(attr);
+            retainName = name;
+          }
+        } else if (name.consume_front("release:")) {
+          if (seen.insert(attrStr).second) {
+            releaseAttrs.push_back(attr);
+            releaseName = name;
+          }
         }
-      }
-    }
-
-    for (auto *attr : carrier->specific_attrs<clang::SwiftAttrAttr>()) {
-      StringRef attrStr = attr->getAttribute();
-      if (attrStr.consume_front("retain:")) {
-        retainAttrs.push_back(attr);
-        retainName = attrStr;
-      } else if (attrStr.consume_front("release:")) {
-        releaseAttrs.push_back(attr);
-        releaseName = attrStr;
       }
     }
   }
@@ -467,12 +449,7 @@ public:
 void swift::simple_display(llvm::raw_ostream &out,
                            const ForeignReferenceTypeInfoDescriptor &desc) {
   out << "Checking foreign reference type info for '";
-  if (desc.decl->getIdentifier())
-    out << desc.decl->getName();
-  else if (desc.decl->isAnonymousStructOrUnion())
-    out << "(anonymous record)";
-  else
-    out << "(unnamed record)";
+  printRecordName(out, desc.decl);
   out << "'\n";
 }
 
@@ -483,13 +460,13 @@ swift::extractNearestSourceLoc(const ForeignReferenceTypeInfoDescriptor &desc) {
 
 ForeignReferenceTypeInfo
 importer::getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl) {
-  // A swift_attr propagates to later redeclarations only, so an earlier
-  // declaration does not see the annotation, and the retain/release parameters
-  // of SWIFT_SHARED_REFERENCE declare the type before the annotated declaration
-  // is reached. Answer for the declaration that carries the information: the
-  // definition when there is one, since reference-ness can also be inherited
-  // from a base class, and otherwise the declaration spelling the annotation.
-  // Clients can then use the request without walking the chain themselves.
+  // The annotation can sit on any declaration of the record: within a
+  // translation unit a swift_attr is inherited by later redeclarations only,
+  // and a chain assembled across modules is not merged at all. Answer for the
+  // declaration that carries the information: the definition when there is one,
+  // since reference-ness can also be inherited from a base class, and otherwise
+  // the declaration spelling the annotation. Clients can then use the request
+  // without walking the chain themselves.
   if (auto *definition = decl->getDefinition()) {
     decl = definition;
   } else if (!importer::hasImportReferenceAttr(decl)) {
@@ -643,14 +620,9 @@ void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
 }
 
-static bool isOSObject(const clang::CXXRecordDecl *record) {
-  return record && record->getIdentifier() && record->getName() == "OSObject" &&
-         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
-}
-
-static bool isOSIterator(const clang::CXXRecordDecl *record) {
-  return record && record->getIdentifier() &&
-         record->getName() == "OSIterator" &&
+/// Whether \p record is the top-level libkern class named \p name.
+static bool isLibkernClass(const clang::CXXRecordDecl *record, StringRef name) {
+  return record && record->getIdentifier() && record->getName() == name &&
          record->getDeclContext()->getRedeclContext()->isTranslationUnit();
 }
 
@@ -665,13 +637,13 @@ LibkernSubclass ClangImporter::Implementation::getLibkernSubclass(
     return it->second;
 
   // OSIterator is the strongest answer there is, so no base can change it.
-  if (isOSIterator(record)) {
+  if (isLibkernClass(record, "OSIterator")) {
     libkernSubclasses[record] = LibkernSubclass::OSIterator;
     return LibkernSubclass::OSIterator;
   }
 
-  auto result =
-      isOSObject(record) ? LibkernSubclass::OSObject : LibkernSubclass::None;
+  auto result = isLibkernClass(record, "OSObject") ? LibkernSubclass::OSObject
+                                                   : LibkernSubclass::None;
 
   for (const auto &base : record->bases()) {
     auto baseSubclass =
@@ -1233,39 +1205,36 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
     return false;
   };
 
-  for (auto field : decl->fields()) {
-    if (checkType(field->getType()))
-      return true;
-  }
-
-  for (auto base : decl->bases()) {
-    if (checkType(base.getType()))
-      return true;
-  }
-
-  return false;
+  return anySubobjectTypeSatisfies(decl, checkType);
 }
 
-bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                             ASTContext &ctx) {
+std::optional<importer::CxxUnsafetyReason>
+importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                        ASTContext &ctx) {
+  // Returning the reason rather than reporting it through an out-parameter
+  // keeps the verdict and its explanation inseparable.
+  auto safe = []() -> std::optional<CxxUnsafetyReason> { return std::nullopt; };
+  auto unsafe = [](CxxUnsafetyReason reason)
+      -> std::optional<CxxUnsafetyReason> { return reason; };
+
   // The user explicitly explicitly acknowledged this method's unsafety
   // and asked us to import it as is anyway. No renaming needed.
   if (hasUnsafeAPIAttr(method))
-    return false;
+    return safe();
 
   // If it's a static method, it cannot project anything. It's fine.
   if (method->isOverloadedOperator() || method->isStatic() ||
       isa<clang::CXXConstructorDecl>(method))
-    return false;
+    return safe();
 
   // begin and end methods likely return an iterator, so they're unsafe.
   // This is required so that automatic the conformance to RAC works properly.
   if (method->getNameAsString() == "begin" ||
       method->getNameAsString() == "end")
-    return true;
+    return unsafe(CxxUnsafetyReason::IteratorFromBeginEnd);
 
   if (clangTypeIsForeignReference(method->getReturnType(), ctx))
-    return false;
+    return safe();
 
   auto parentQualType =
       method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
@@ -1278,12 +1247,13 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   // projection (unsafe).
   if (method->getReturnType()->isPointerType() ||
       method->getReturnType()->isReferenceType())
-    return parentIsSelfContained;
+    return parentIsSelfContained ? unsafe(CxxUnsafetyReason::PointerProjection)
+                                 : safe();
 
   // Check if it's one of the known unsafe methods we currently
   // mark as safe by default.
   if (isUnsafeStdMethod(method))
-    return true;
+    return unsafe(CxxUnsafetyReason::KnownUnsafeStdMethod);
 
   // Try to figure out the semantics of the return type. If it's a
   // pointer/iterator, it's unsafe.
@@ -1292,51 +1262,221 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
     if (auto cxxRecordReturnType =
             dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
       if (isSwiftClassType(cxxRecordReturnType))
-        return false;
+        return safe();
 
       if (hasIteratorAPIAttr(cxxRecordReturnType) ||
           hasIteratorCategory(cxxRecordReturnType))
-        return true;
+        return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
       // Mark this as safe to help our diganostics down the road.
       if (!cxxRecordReturnType->getDefinition()) {
-        return false;
+        return safe();
       }
 
       // A projection of a view type (such as a string_view) from a self
       // contained parent is a proejction (unsafe).
       if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
           isViewType(cxxRecordReturnType)) {
-        return parentIsSelfContained;
+        return parentIsSelfContained ? unsafe(CxxUnsafetyReason::ViewProjection)
+                                     : safe();
       }
     }
   }
 
   // Otherwise, it's safe.
-  return false;
-}
-
-/// Whether the C++ standard library overlay in stdlib/public/Cxx already
-/// provides a safe Swift API named after \p method:
-///
-/// - 'basic_string::append' vs 'std.string.append(_:)', which differs only in
-///   its result type and so ambiguates every discarded-result call;
-/// - 'set::insert' etc. vs 'CxxUniqueSet.insert(_:)', a protocol extension
-///   member that a concrete C++ 'insert' would shadow outright;
-/// - 'optional::value' vs the 'CxxOptional.value' property.
-static bool overlayProvidesSafeWrapperNamed(const clang::CXXMethodDecl *method) {
-  if (!method->getParent()->isInStdNamespace() || !method->getIdentifier())
-    return false;
-
-  return llvm::StringSwitch<bool>(method->getName())
-      .Cases({"append", "insert", "value"}, true)
-      .Default(false);
+  return safe();
 }
 
 bool importer::keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
                                              ASTContext &ctx) {
   return ctx.LangOpts.hasFeature(
              Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
-         shouldRenameCXXMethodAsUnsafe(method, ctx) &&
-         !overlayProvidesSafeWrapperNamed(method);
+         shouldRenameCXXMethodAsUnsafe(method, ctx);
+}
+
+/// Whether a note at \p loc would land in a system header. Such a note names
+/// something the user cannot annotate (a libc++ implementation detail, say), so
+/// it is dropped in favour of explaining a type they control.
+static bool isInSystemHeader(const clang::Decl *decl) {
+  return decl->getASTContext().getSourceManager().isInSystemHeader(
+      decl->getLocation());
+}
+
+/// Emit the note explaining \p explanation at \p loc.
+static void
+diagnoseUnsafetyReason(ClangImporter::Implementation &Impl, HeaderLoc loc,
+                       importer::CxxUnsafetyExplanation explanation) {
+  bool named = explanation.culprit;
+  StringRef culprit = named ? explanation.culprit->getName() : StringRef();
+  auto note = [&](auto &&...args) { Impl.diagnose(loc, args...); };
+
+  switch (explanation.reason) {
+  case importer::CxxUnsafetyReason::IteratorFromBeginEnd:
+    return note(diag::cxx_unsafe_iterator_from_begin_end);
+  case importer::CxxUnsafetyReason::PointerProjection:
+    return note(diag::cxx_unsafe_pointer_projection);
+  case importer::CxxUnsafetyReason::KnownUnsafeStdMethod:
+    return note(diag::cxx_unsafe_known_std_method);
+  case importer::CxxUnsafetyReason::ReturnsIterator:
+    return note(diag::cxx_unsafe_returns_iterator);
+  case importer::CxxUnsafetyReason::ViewProjection:
+    return note(diag::cxx_unsafe_view_projection);
+
+  case importer::CxxUnsafetyReason::UnsafeField:
+    return note(diag::cxx_unsafe_field, named, culprit);
+  case importer::CxxUnsafetyReason::UnsafeTemplateArgument:
+    return note(diag::cxx_unsafe_template_argument, named,
+                         culprit);
+  case importer::CxxUnsafetyReason::ExplicitAnnotation:
+    return note(diag::cxx_unsafe_explicit_annotation, named,
+                         culprit);
+  case importer::CxxUnsafetyReason::IndirectView:
+    return note(diag::cxx_unsafe_indirect_view);
+  }
+  llvm_unreachable("covered switch");
+}
+
+/// Emit the note explaining \p unknown at \p loc.
+static void
+diagnoseUnknownEscapability(ClangImporter::Implementation &Impl, HeaderLoc loc,
+                            importer::CxxUnknownEscapabilityReason reason,
+                            const clang::NamedDecl *culpritDecl) {
+  bool named = culpritDecl;
+  StringRef culprit = named ? culpritDecl->getName() : StringRef();
+  auto note = [&](auto &&...args) { Impl.diagnose(loc, args...); };
+  switch (reason) {
+  case importer::CxxUnknownEscapabilityReason::ConditionalArgument:
+    return note(diag::cxx_unknown_escapability_conditional_argument, named,
+                culprit);
+  case importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers:
+    return note(diag::cxx_unknown_escapability_cannot_derive);
+  case importer::CxxUnknownEscapabilityReason::NonEscapableMember:
+    // Named only when the member belongs to the type being explained, as below.
+    return note(diag::cxx_unknown_escapability_nonescapable_member, named,
+                culprit);
+  case importer::CxxUnknownEscapabilityReason::Pointer:
+    // Named only when the member belongs to the type being explained; the
+    // traversal is flattened, so otherwise the caller follows the chain to the
+    // record that owns it.
+    return note(diag::cxx_unknown_escapability_pointer, named,
+                         culprit);
+  }
+  llvm_unreachable("covered switch");
+}
+
+void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                              SourceLoc useLoc) {
+  if (decl)
+    if (auto *original = Impl.getOriginalForClonedMember(decl))
+      decl = original;
+  if (auto *func = dyn_cast_or_null<FuncDecl>(decl))
+    if (auto *original = Impl.getOriginalForVirtualThunk(func))
+      decl = original;
+
+  // A declaration: explain which rule made this method unsafe.
+  if (decl && decl->hasClangNode()) {
+    auto *clangDecl = decl->getClangNode().getAsDecl();
+
+    // As for types below, a note in a system header names something the user
+    // cannot annotate -- 'begin' on std::vector, say -- so it is dropped.
+    if (isInSystemHeader(clangDecl))
+      return;
+
+    // An annotation written in the header speaks for itself, whatever kind of
+    // declaration carries it.
+    if (auto *named = dyn_cast_or_null<clang::NamedDecl>(clangDecl))
+      if (importer::hasSwiftAttribute(named, {"unsafe", "unsafe(always)"}))
+        return;
+
+    // Lifetime inference records its reason when it adds the attribute, since
+    // inferred annotations might make it impossible to reconstruct the same
+    // decision later.
+    auto recorded = Impl.LifetimeUnsafetyReasons.find(decl);
+    if (recorded != Impl.LifetimeUnsafetyReasons.end()) {
+      Impl.diagnose(HeaderLoc(clangDecl->getLocation(), useLoc),
+                    recorded->second);
+      return;
+    }
+
+    if (auto *method = dyn_cast_or_null<clang::CXXMethodDecl>(clangDecl)) {
+      if (auto reason =
+              importer::shouldRenameCXXMethodAsUnsafe(method,
+                                                      Impl.SwiftContext)) {
+        diagnoseUnsafetyReason(Impl,
+                               HeaderLoc(method->getLocation(), useLoc),
+                               {*reason, nullptr});
+        return;
+      }
+    }
+  }
+
+  // A type: explain which part of the record is responsible.
+  if (!type)
+    return;
+  auto *nominal = type->getAnyNominal();
+  if (!nominal || !nominal->hasClangNode())
+    return;
+  auto *recordDecl =
+      dyn_cast_or_null<clang::RecordDecl>(nominal->getClangNode().getAsDecl());
+  if (!recordDecl)
+    return;
+  if (importer::hasSwiftAttributeOnAnyRedecl(recordDecl,
+                                             {"unsafe", "unsafe(always)"}))
+    return;
+
+  // Unknown escapability is the root cause when it applies, and it is what the
+  // user can act on. The safety walk falls through it to the fields, so without
+  // this a conditionally-escapable type such as std::shared_ptr would be
+  // explained by whichever raw pointer its implementation happens to hold.
+  //
+  // Follow the chain of blame to its end, so the last note lands on the type
+  // whose annotation would settle the question. The visited set both prevents
+  // cycles and bounds the walk.
+  llvm::SmallPtrSet<const clang::RecordDecl *, 4> visited;
+  bool explained = false;
+  for (const clang::RecordDecl *current = recordDecl;
+       current && visited.insert(current).second;) {
+    auto unknown =
+        importer::explainUnknownEscapability(current, Impl.SwiftContext);
+    if (!unknown)
+      break;
+    explained = true;
+
+    // We can have a chain of reasons why a type is considered unsafe. Follow
+    // the chain to the record that owns the culprit and let it explain itself,
+    // rather than attributing its member here.
+    const clang::RecordDecl *next = nullptr;
+    if (unknown->owner &&
+        unknown->owner->getCanonicalDecl() != current->getCanonicalDecl())
+      next = unknown->owner;
+    else if (auto *asRecord =
+                 dyn_cast_or_null<clang::RecordDecl>(unknown->culprit);
+             asRecord && asRecord != current)
+      next = asRecord;
+
+    if (!isInSystemHeader(current)) {
+      // Naming the record the explanation moves to, not its member: the next
+      // note describes that record.
+      HeaderLoc loc(current->getLocation(), useLoc);
+      if (next)
+        diagnoseUnknownEscapability(
+            Impl, loc,
+            importer::CxxUnknownEscapabilityReason::ConditionalArgument, next);
+      else
+        diagnoseUnknownEscapability(Impl, loc, unknown->reason,
+                                    unknown->culprit);
+    }
+
+    current = next;
+  }
+  if (explained)
+    return;
+
+  if (isInSystemHeader(recordDecl))
+    return;
+
+  if (auto unsafe = importer::explainRecordUnsafety(
+          recordDecl, Impl.SwiftContext, isa<ClassDecl>(nominal)))
+    diagnoseUnsafetyReason(Impl, HeaderLoc(recordDecl->getLocation(), useLoc),
+                           *unsafe);
 }

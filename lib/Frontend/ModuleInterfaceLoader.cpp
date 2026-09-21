@@ -20,7 +20,6 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/StringExtras.h"
@@ -34,8 +33,6 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
-#include "clang/Frontend/CompileJobCacheResult.h"
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
@@ -48,7 +45,6 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -1815,8 +1811,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
   }
 
-  if (casOpts.EnableCaching) {
+  if (casOpts.EnableCaching || casOpts.ImportModuleFromCAS) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
+    genericSubInvocation.getCASOptions().ImportModuleFromCAS =
+        casOpts.ImportModuleFromCAS;
     genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
@@ -2936,6 +2934,21 @@ static std::string getContextHash(const CompilerInvocation &CI,
           ? CI.getLangOptions().Target
           : getTargetSpecificModuleTriple(CI.getLangOptions().Target);
 
+  // Similarly, include the target variant triple. A zippered target passes the
+  // variant down to Clang as '-darwin-target-variant-triple'. A zippered and a
+  // plain target that share a '-target' therefore depend on different PCMs. If
+  // the variant was absent here, both would also agree on one '.swiftmodule'
+  // path, so the two configurations would share a single file in the module
+  // store that was built against only one of those PCMs.
+  std::string targetVariantStr = "";
+  if (CI.getLangOptions().TargetVariant) {
+    auto targetVariantToHash =
+        useStrictCacheHash
+            ? *CI.getLangOptions().TargetVariant
+            : getTargetSpecificModuleTriple(*CI.getLangOptions().TargetVariant);
+    targetVariantStr = targetVariantToHash.str();
+  }
+
   std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
 
   llvm::hash_code H = llvm::hash_combine(
@@ -2952,6 +2965,9 @@ static std::string getContextHash(const CompilerInvocation &CI,
 
       // The target triple to hash.
       targetToHash.str(),
+
+      // The target variant to hash.
+      targetVariantStr,
 
       // The SDK path is going to affect how this module is imported, so
       // include it.

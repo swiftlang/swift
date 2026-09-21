@@ -21,7 +21,6 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
@@ -1365,6 +1364,11 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx,
 ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
+}
+
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  Buffer << "<yields>";
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx,

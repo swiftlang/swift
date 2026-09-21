@@ -104,7 +104,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       embedded-observation
       swiftObservation
       IS_STDLIB
-      INSTALL_BINARY
 
       ContinuousObservation.swift
       Locking.swift

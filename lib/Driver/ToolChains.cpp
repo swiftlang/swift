@@ -12,27 +12,17 @@
 
 #include "ToolChains.h"
 
-#include "swift/AST/DiagnosticsDriver.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
-#include "swift/Basic/TaskQueue.h"
-#include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/PluginPaths.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
-#include "clang/Basic/Version.h"
-#include "clang/Driver/Util.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
-#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -823,6 +813,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_Dependencies:
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SerializedDiagnostics:
+  case file_types::TY_SARIFDiagnostics:
   case file_types::TY_ClangHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
@@ -1106,6 +1097,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Dependencies:
     case file_types::TY_SwiftModuleDocFile:
     case file_types::TY_SerializedDiagnostics:
+    case file_types::TY_SARIFDiagnostics:
     case file_types::TY_ClangHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:

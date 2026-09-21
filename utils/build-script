@@ -908,6 +908,9 @@ def main_normal():
             not args.caching_remote_service_path and
             os.environ.get('SWIFT_CACHE_DISABLE_MCCAS') is None)
 
+        if not args.caching_enable_mccas:
+            os.environ["CLANG_CACHE_DISABLE_MCCAS"] = '1'
+
     cmake = CMake(args=args, toolchain=toolchain)
     toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
                                            build_root=SWIFT_BUILD_ROOT)
@@ -1038,6 +1041,8 @@ def main_normal():
                     f.write('    export {}={}\n'.format(
                         name, shlex.quote(value)))
                     f.write('fi\n')
+                if not args.caching_enable_mccas:
+                    f.write('export CLANG_CACHE_DISABLE_MCCAS=1\n')
                 f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
                 f.write('  exec "{}" "$@"\n'.format(toolchain.ninja))
                 f.write('else\n')

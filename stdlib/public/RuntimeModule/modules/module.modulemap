@@ -34,6 +34,7 @@ module BacktracingImpl {
     module Windows { header "OS/Windows.h" }
     module WinNTInternals { header "OS/WinNTInternals.h" }
     module Libc { header "OS/Libc.h" }
+    module SafeReadMemory { header "OS/SafeReadMemory.h" }
   }
 
   module Runtime {

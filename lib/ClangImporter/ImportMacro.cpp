@@ -24,7 +24,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -502,9 +501,9 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                                                    D->getLocation());
                        }, /*AllowsNSUIntegerAsInt*/true,
                        Bridgeability::None, { });
-  swift::Type GetterTy = FunctionType::get({}, Ty.getType(), ASTExtInfo{});
+  swift::Type GetterTy = FunctionType::get({}, {}, Ty.getType(), ASTExtInfo{});
   swift::Type SetterTy =
-      FunctionType::get({AnyFunctionType::Param(Ty.getType())},
+      FunctionType::get({AnyFunctionType::Param(Ty.getType())}, /* yields */ {},
                         Ctx.TheEmptyTupleType, ASTExtInfo{});
 
   /* Storage */

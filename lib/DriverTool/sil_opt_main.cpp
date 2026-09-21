@@ -17,35 +17,27 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/Parse/ParseVersion.h"
-#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/YAMLTraits.h"
 #include <cstdio>
 using namespace swift;
 
@@ -543,6 +535,10 @@ struct SILOptOptions {
                        llvm::cl::desc("Enable C++ interop."),
                        llvm::cl::init(false));
 
+  llvm::cl::opt<bool> EnableCOMInterop{"enable-experimental-com-interop",
+                                       llvm::cl::desc("Enable COM interop."),
+                                       llvm::cl::init(false)};
+
   llvm::cl::opt<bool>
       IgnoreAlwaysInline = llvm::cl::opt<bool>("ignore-always-inline",
                          llvm::cl::desc("Ignore [always_inline] attribute."),
@@ -811,6 +807,14 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
   Invocation.computeCXXStdlibOptions();
+
+  if (options.EnableCOMInterop) {
+    auto &LangOpts = Invocation.getLangOptions();
+    LangOpts.EnableCOMInterop = true;
+    LangOpts.COMModel = LangOpts.Target.isOSDarwin()
+                            ? LangOptions::COMInteropModel::CoreFoundation
+                            : LangOptions::COMInteropModel::Microsoft;
+  }
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;

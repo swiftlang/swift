@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "closure-lifetime-fixup"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
@@ -535,7 +534,14 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
       collectStackClosureLifetimeEnds(lifetimeEnds, convert);
       continue;
     }
-    
+
+    // `@called(once)` is always consumed by a call.
+    if (v->getType().isCalledOnce() &&
+        (isa<ApplyInst>(consumer) || isa<TryApplyInst>(consumer))) {
+      lifetimeEnds.push_back(consumer);
+      continue;
+    }
+
     // There shouldn't be any other consuming uses of the value that aren't
     // forwarding.
     assert(consumer->hasResults());
@@ -584,6 +590,16 @@ static SILValue tryRewriteToPartialApplyStack(
   auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
   if (!origPA)
     return SILValue();
+
+  // TODO: Make it possible to stack-promote `@called(once)` closure with
+  //       consuming captures.
+  if (origPA->isCalledOnce()) {
+    ApplySite origSite(origPA);
+    for (auto &arg : origPA->getArgumentOperands()) {
+      if (origSite.getArgumentConvention(arg).isOwnedConventionInCaller())
+        return SILValue();
+    }
+  }
 
   auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
   if (cvt->getOperand() != origPA)
@@ -920,31 +936,49 @@ static SILValue tryRewriteToPartialApplyStack(
     /* DEBUG
     destroy->dump();
     */
-    SILBuilderWithScope builder(std::next(destroy->getIterator()));
     // This getCapturedArg hack attempts to perfectly compensate for all the
     // other hacks involved in gathering new arguments above.
     // argValue may be 'undef'
-    auto getArgToDestroy = [&](SILValue argValue) -> SILValue {
-      // A MoveOnlyWrapperToCopyableValueInst may produce a trivial value. Be
-      // careful not to emit an extra destroy of the original.
-      if (argValue->getType().isTrivial(destroy->getFunction()))
-        return SILValue();
+    auto insertCleanup = [&](SILBuilder &builder) {
+      auto getArgToDestroy = [&](SILValue argValue) -> SILValue {
+        // A MoveOnlyWrapperToCopyableValueInst may produce a trivial value. Be
+        // careful not to emit an extra destroy of the original.
+        if (argValue->getType().isTrivial(destroy->getFunction()))
+          return SILValue();
 
-      // We may have inserted a new begin_borrow->moveonlywrapper_to_copyvalue
-      // when creating the new arguments. Now we need to end that borrow.
-      if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(argValue))
-        if (m->hasGuaranteedInitialKind())
-          argValue = m->getOperand();
-      auto *argBorrow = dyn_cast<BeginBorrowInst>(argValue);
-      if (argBorrow) {
-        argValue = argBorrow->getOperand();
-        builder.createEndBorrow(newPA->getLoc(), argBorrow);
-      }
-      // Don't need to destroy if we borrowed in place .
-      return borrowedOriginals.count(argValue) ? SILValue() : argValue;
+        // We may have inserted a new begin_borrow->moveonlywrapper_to_copyvalue
+        // when creating the new arguments. Now we need to end that borrow.
+        if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(argValue))
+          if (m->hasGuaranteedInitialKind())
+            argValue = m->getOperand();
+        auto *argBorrow = dyn_cast<BeginBorrowInst>(argValue);
+        if (argBorrow) {
+          argValue = argBorrow->getOperand();
+          builder.createEndBorrow(newPA->getLoc(), argBorrow);
+        }
+        // Don't need to destroy if we borrowed in place .
+        return borrowedOriginals.count(argValue) ? SILValue() : argValue;
+      };
+      insertDestroyOfCapturedArguments(newPA, builder, getArgToDestroy,
+                                       newPA->getLoc());
     };
-    insertDestroyOfCapturedArguments(newPA, builder, getArgToDestroy,
-                                     newPA->getLoc());
+
+    // `try_apply` is a terminator: a `@called(once)` closure consumed as the
+    // callee of a throwing call ends its lifetime at the call itself, but
+    // there is no "next instruction in the same block" to insert after. The
+    // consuming callee operand is spent before either successor runs, so the
+    // cleanup has to be duplicated at the start of both.
+    if (auto *tryApply = dyn_cast<TryApplyInst>(destroy)) {
+      for (SILBasicBlock *successor :
+           {tryApply->getNormalBB(), tryApply->getErrorBB()}) {
+        SILBuilderWithScope builder(successor->begin());
+        insertCleanup(builder);
+      }
+      continue;
+    }
+
+    SILBuilderWithScope builder(std::next(destroy->getIterator()));
+    insertCleanup(builder);
   }
   /* DEBUG
   llvm::errs() << "=== function after conversion to stack partial_apply of\n";
@@ -1036,6 +1070,12 @@ static bool tryExtendLifetimeToLastUse(
     }
     return true;
   }
+
+  // Prevent a copy of the closure below because they have owned convention
+  // and are forwarded through the escape -> no-escape conversion into the
+  // callee that consumed the value.
+  if (cvt->getType().isCalledOnce())
+    return false;
 
   // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
   // change the instruction to the guaranteed form.
@@ -1461,7 +1501,15 @@ static bool fixupClosureLifetimes(SILFunction &fn,
       // Otherwise, look at convert_escape_to_noescape [not_guaranteed]
       // instructions.
       auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(&inst);
-      if (!cvt || cvt->isLifetimeGuaranteed())
+      if (!cvt)
+        continue;
+
+      // @called(once) has owned convention so it's always lifetime guaranteed
+      // due to owned convention, but that only means no extra `destroy_value`.
+      // Stack promotion should still be attempted were call that takes it is
+      // a lifetime ending use.
+      bool isCalledOnce = cvt->getType().isCalledOnce();
+      if (cvt->isLifetimeGuaranteed() && !isCalledOnce)
         continue;
 
       // First try to peephole a known pattern.
@@ -1478,6 +1526,13 @@ static bool fixupClosureLifetimes(SILFunction &fn,
                                      /*const*/ modifiedCFG)) {
         changed = true;
         checkStackNesting = true;
+        continue;
+      }
+
+      // A `@called(once)` conversion's ownership is already fully accounted
+      // for even when on-stack promotion above didn't apply.
+      if (isCalledOnce) {
+        assert(cvt->isLifetimeGuaranteed());
         continue;
       }
 

@@ -818,6 +818,9 @@ def create_argument_parser():
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
+    option(['--sarif'], toggle_true('build_sarif'),
+           help='build SARIF diagnostic serialization support into the compiler')
+
     option(['--skip-early-swiftsyntax'],
            toggle_false('build_early_swiftsyntax'),
            help='skip building early SwiftSyntax')

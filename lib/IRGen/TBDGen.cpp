@@ -17,16 +17,10 @@
 #include "swift/IRGen/TBDGen.h"
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/SourceFile.h"
-#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -36,11 +30,8 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILSymbolVisitor.h"
-#include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessTable.h"
-#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
-#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Mangler.h"
@@ -823,15 +814,16 @@ private:
   apigen::APIAvailability getAvailability(const Decl *decl) {
     std::optional<bool> unavailable, spiAvailable;
     std::string introduced, obsoleted;
-    bool hasFallbackUnavailability = false, hasFallbackSPIAvailability = false;
+    // `@_spi_available` requires a specific platform, so only a platform
+    // attribute can make the symbol SPI and there is no fallback for it.
+    bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
     const Decl *declForAvailability = decl->getInnermostDeclWithAvailability();
     if (!declForAvailability)
       return {};
     for (auto attr : declForAvailability->getSemanticAvailableAttrs()) {
-      if (!attr.isPlatformSpecific()) {
-        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
-        hasFallbackSPIAvailability = attr.isSPI();
+      if (attr.getDomain().isUniversal()) {
+        hasFallbackUnavailability |= attr.isUnconditionallyUnavailable();
         continue;
       }
       if (attr.getPlatform() != platform)
@@ -845,7 +837,7 @@ private:
     }
     return {introduced, obsoleted,
             unavailable.value_or(hasFallbackUnavailability),
-            spiAvailable.value_or(hasFallbackSPIAvailability)};
+            spiAvailable.value_or(false)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {

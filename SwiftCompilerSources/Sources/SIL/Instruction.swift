@@ -978,6 +978,16 @@ final public class UnownedToRefInst : SingleValueInstruction, UnaryInstruction {
 final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {
   public var pointer: Value { operand.value }
+
+  /// If true, the resulting object is immortal and therefore doesn't need to be
+  /// retained or released.
+  public var isImmortal: Bool { bridged.RawPointerToRefInst_isImmortal() }
+
+  public func set(isImmortal: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.RawPointerToRefInst_setIsImmortal(isImmortal)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public
@@ -1076,6 +1086,15 @@ class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   /// The generic environment that this instruction's opened archetype lives in.
   public var definedGenericEnvironment: GenericEnvironment {
     GenericEnvironment(bridged: bridged.OpenExistentialRefInst_getDefinedGenericEnvironment())
+  }
+}
+
+final public
+class OpenCOMExistentialInst : SingleValueInstruction, UnaryInstruction {
+  public var existential: Value { operand.value }
+
+  public var definedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenCOMExistentialInst_getDefinedGenericEnvironment())
   }
 }
 
@@ -1676,6 +1695,8 @@ final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {
 final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class COMMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -2469,16 +2490,27 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 
 final public class CheckedCastAddrBranchInst : TermInst {
   public var sourceOperand: Operand { return operands[0] }
-  public var destinationOperand: Operand { return operands[1] }
+
+  /// The destination operand, or nil for a `test_only` cast, which produces
+  /// no value and so has no destination.
+  public var destinationOperand: Operand? {
+    consumptionKind == .TestOnly ? nil : operands[1]
+  }
 
   public var source: Value { sourceOperand.value }
-  public var destination: Value { destinationOperand.value }
+  public var destination: Value? { destinationOperand?.value }
 
   public var sourceFormalType: CanonicalType {
     CanonicalType(bridged: bridged.CheckedCastAddrBranch_getSourceFormalType())
   }
   public var targetFormalType: CanonicalType {
     CanonicalType(bridged: bridged.CheckedCastAddrBranch_getTargetFormalType())
+  }
+
+  /// The lowered address type of the cast's target. Available even for a
+  /// `test_only` cast, which has no destination operand to read it from.
+  public var targetLoweredType: Type {
+    bridged.CheckedCastAddrBranch_getTargetLoweredType().type
   }
 
   public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
@@ -2497,6 +2529,11 @@ final public class CheckedCastAddrBranchInst : TermInst {
     /// The source value is always left in place, and the destination
     /// value is copied into on success.
     case CopyOnSuccess
+
+    /// The cast only reports whether it would have succeeded. The source is
+    /// neither taken nor copied, and no destination value is produced -- the
+    /// instruction has no destination operand at all.
+    case TestOnly
   }
 
   public var consumptionKind: CastConsumptionKind {
@@ -2504,6 +2541,7 @@ final public class CheckedCastAddrBranchInst : TermInst {
     case .TakeAlways:    return .TakeAlways
     case .TakeOnSuccess: return .TakeOnSuccess
     case .CopyOnSuccess: return .CopyOnSuccess
+    case .TestOnly:      return .TestOnly
     default:
       fatalError("invalid cast consumption kind")
     }

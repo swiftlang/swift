@@ -571,6 +571,13 @@ static FunctionType *substGenericArgs(
                     return param.withType(substFn(param.getPlainType()));
                   });
 
+  llvm::SmallVector<AnyFunctionType::Yield, 1> yields;
+  llvm::transform(funcTy->getYields(), std::back_inserter(yields),
+                  [&](const AnyFunctionType::Yield &yield) {
+                    return AnyFunctionType::Yield(substFn(yield.getType()),
+                                                  yield.getFlags());
+                  });
+
   auto resultTy = substFn(funcTy->getResult());
 
   Type thrownError = funcTy->getThrownError();
@@ -578,9 +585,9 @@ static FunctionType *substGenericArgs(
     thrownError = substFn(thrownError);
 
   // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy,
-                           funcTy->getExtInfo().withThrows(
-                              funcTy->isThrowing(), thrownError));
+  return FunctionType::get(
+      params, yields, resultTy,
+      funcTy->getExtInfo().withThrows(funcTy->isThrowing(), thrownError));
 }
 
 FunctionType *ConstraintSystem::openFunctionType(
@@ -956,7 +963,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs,
         loc, loc, preparedOverload);
   }
 
-  return FunctionType::get(adjustedParamTypes, functionType->getResult(),
+  return FunctionType::get(adjustedParamTypes, functionType->getYields(),
+                           functionType->getResult(),
                            functionType->getExtInfo());
 }
 
@@ -1057,9 +1065,9 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         }
 
         // @Sendable since fully uncurried type doesn't capture anything.
-        adjustedTy =
-            FunctionType::get(adjustedTy->getParams(), referenceTy,
-                              adjustedTy->getExtInfo().withSendable());
+        adjustedTy = FunctionType::get(adjustedTy->getParams(), /* yields */ {},
+                                       referenceTy,
+                                       adjustedTy->getExtInfo().withSendable());
       }
     }
   }
@@ -1101,8 +1109,8 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
     }
   }
   assert(newParams.size() == declParams.size());
-  return FunctionType::get(newParams, funcType->getResult(),
-                           funcType->getExtInfo());
+  return FunctionType::get(newParams, funcType->getYields(),
+                           funcType->getResult(), funcType->getExtInfo());
 }
 
 std::pair<Type, Type>
@@ -1570,7 +1578,7 @@ Type ConstraintSystem::getTypeOfMemberTypeReference(
   }
 
   FunctionType::Param baseObjParam(baseObjTy);
-  return FunctionType::get({baseObjParam}, memberTy);
+  return FunctionType::get({baseObjParam}, /* yields */ {}, memberTy);
 }
 
 std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
@@ -1605,7 +1613,7 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
       thrownErrorType = Type();
     }
 
-    refType = FunctionType::get(indices, elementTy, info);
+    refType = FunctionType::get(indices, /* yields */ {}, elementTy, info);
   } else {
     // Delay the adjustment for preconcurrency until after we've formed
     // the function type for this kind of reference. Otherwise we will lose
@@ -1641,8 +1649,9 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
   FunctionType::ExtInfo info;
-  return std::make_pair(FunctionType::get({selfParam}, refType, info),
-                        thrownErrorType);
+  return std::make_pair(
+      FunctionType::get({selfParam}, /* yields */ {}, refType, info),
+      thrownErrorType);
 }
 
 /// Add the constraint on the type used for the 'Self' type for a member
@@ -1838,8 +1847,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
         break;
       }
 
-      type =
-          FunctionType::get(params, fnType->getResult(), fnType->getExtInfo());
+      type = FunctionType::get(params, fnType->getYields(), fnType->getResult(),
+                               fnType->getExtInfo());
     }
   }
 
@@ -1861,14 +1870,14 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
   if (isa<SubscriptDecl>(value)) {
     auto *innerFn = fnTy->getResult()->castTo<FunctionType>();
     resultTy = FunctionType::get(
-        innerFn->getParams(),
+        innerFn->getParams(), innerFn->getYields(),
         OptionalType::get(innerFn->getResult()->getRValueType()),
         innerFn->getExtInfo());
   } else {
     resultTy = OptionalType::get(fnTy->getResult()->getRValueType());
   }
 
-  return FunctionType::get(fnTy->getParams(), resultTy,
+  return FunctionType::get(fnTy->getParams(), fnTy->getYields(), resultTy,
                            fnTy->getExtInfo());
 }
 
@@ -1984,7 +1993,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
           openedType = FunctionType::get(
               param.withType(wasMetaType ? Type(MetatypeType::get(newSelfTy))
                                          : Type(newSelfTy)),
-              FT->getResult(), FT->getExtInfo());
+              /* yields */ {}, FT->getResult(), FT->getExtInfo());
     }
   }
 
@@ -2082,8 +2091,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
           *this, funcDecl, functionRefInfo, functionType,
           locator, preparedOverload);
       openedType =
-          FunctionType::get(fullFunctionType->getParams(), functionType,
-                            fullFunctionType->getExtInfo());
+          FunctionType::get(fullFunctionType->getParams(), /* yields */ {},
+                            functionType, fullFunctionType->getExtInfo());
     }
   }
 
@@ -2104,8 +2113,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
 
       if (newExtInfo) {
         auto *newMethodTy = methodTy->withExtInfo(*newExtInfo);
-        openedType = FunctionType::get(fullTy->getParams(), newMethodTy,
-                                       fullTy->getExtInfo());
+        openedType = FunctionType::get(fullTy->getParams(), /* yields */ {},
+                                       newMethodTy, fullTy->getExtInfo());
       }
     }
   }
@@ -2159,8 +2168,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReferencePost(
           origFnType->getResult(), var, useDC, GetClosureType{*this},
           ClosureIsolatedByPreconcurrency{*this});
 
-    openedType = FunctionType::get(
-                  origFnType->getParams(), resultTy, origFnType->getExtInfo());
+    openedType = FunctionType::get(origFnType->getParams(), /* yields */ {},
+                                   resultTy, origFnType->getExtInfo());
   }
 
   bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
@@ -2252,9 +2261,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   // If we have a generic function type, drop the generic signature; we don't
   // need it for this comparison.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    type = FunctionType::get(genericFn->getParams(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
+    type = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
   }
 
   // If this declaration is within a type context, we might not be able
@@ -2291,8 +2299,9 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
 
       auto info = funcTy->getExtInfo();
       type = adjustFunctionTypeForConcurrency(
-          FunctionType::get(indices, elementTy, info), overload.getBaseType(),
-          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
+          FunctionType::get(indices, /* yields */ {}, elementTy, info),
+          overload.getBaseType(), subscript, useDC, /*numApplies=*/1,
+          /*isMainDispatchQueue=*/false,
           /*openGlobalActorType=*/false, locator);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
@@ -2401,8 +2410,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       recordArgumentList(argLoc, argList);
     }
 
-    auto *callerTy = FunctionType::get(
-        {FunctionType::Param(argTy, ctx.Id_dynamicMember)}, resultTy);
+    auto *callerTy =
+        FunctionType::get({FunctionType::Param(argTy, ctx.Id_dynamicMember)},
+                          /* yields */ {}, resultTy);
 
     ConstraintLocatorBuilder builder(callLoc);
     addApplicationConstraint(
@@ -2596,8 +2606,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      auto adjustedFnTy = FunctionType::get(originalCallerTy->getParams(),
-                                            subscriptResultTy, info);
+      auto adjustedFnTy =
+          FunctionType::get(originalCallerTy->getParams(),
+                            /* yields */ {}, subscriptResultTy, info);
 
       // Add a constraint for the inner application that uses the args of the
       // original call-site, and a fresh type var result equal to the leaf type.
@@ -2747,7 +2758,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         /*isFavored=*/false, preparedOverload);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    return FunctionType::get({inputArg}, output, info);
+    return FunctionType::get({inputArg}, /* yields */ {}, output, info);
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
     // Proceed with a "WithoutActuallyEscaping" operation. The body closure
@@ -2776,7 +2787,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
-    auto bodyClosure = FunctionType::get(arg, result,
+    auto bodyClosure = FunctionType::get(arg, /* yields */ {}, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withIsolation(bodyParamIsolation)
@@ -2794,7 +2805,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       withoutEscapingIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
-    return FunctionType::get(args, result,
+    return FunctionType::get(args, /* yields */ {}, result,
                              FunctionType::ExtInfoBuilder()
                                  .withNoEscape(false)
                                  .withIsolation(withoutEscapingIsolation)
@@ -2828,7 +2839,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
-    auto bodyClosure = FunctionType::get(bodyArgs, result,
+    auto bodyClosure = FunctionType::get(bodyArgs, /* yields */ {}, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withThrows(true, thrownError)
@@ -2846,7 +2857,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       openExistentialIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
-    return FunctionType::get(args, result,
+    return FunctionType::get(args, /* yields */ {}, result,
                              FunctionType::ExtInfoBuilder()
                                  .withNoEscape(false)
                                  .withThrows(true, thrownError)
@@ -3093,12 +3104,14 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     };
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo subscriptInfo;
-    auto subscriptTy = FunctionType::get(indices, elementTy, subscriptInfo);
+    auto subscriptTy =
+        FunctionType::get(indices, /* yields */ {}, elementTy, subscriptInfo);
 
     FunctionType::Param baseParam(choice.getBaseType());
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo fullInfo;
-    auto fullTy = FunctionType::get({baseParam}, subscriptTy, fullInfo);
+    auto fullTy =
+        FunctionType::get({baseParam}, /* yields */ {}, subscriptTy, fullInfo);
     declRefType.openedType = fullTy;
     declRefType.adjustedOpenedType = fullTy;
     // FIXME: @preconcurrency

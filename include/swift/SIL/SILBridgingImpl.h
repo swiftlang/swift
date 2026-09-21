@@ -22,6 +22,7 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
@@ -526,7 +527,8 @@ swift::Identifier BridgedType::getTupleElementLabel(SwiftInt idx) const {
 
 BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
-  auto newTy = fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(true));
+  auto newTy =
+      fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(withNoEscape));
   return swift::SILType::getPrimitiveObjectType(newTy);
 }
 
@@ -958,6 +960,34 @@ bool BridgedFunction::isDestructor() const {
 
 bool BridgedFunction::isGeneric() const {
   return getFunction()->isGeneric();
+}
+
+bool BridgedFunction::isDistributedAdHocSerializationRequirementWitness() const {
+  auto *DC = getFunction()->getDeclContext();
+  while (DC) {
+    if (auto *funcDecl = llvm::dyn_cast<swift::AbstractFunctionDecl>(DC)) {
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+        return true;
+
+      auto &ctx = funcDecl->getASTContext();
+      if (funcDecl->getBaseName() == ctx.Id_invokeHandlerOnReturn) {
+        auto *parentDC = funcDecl->getDeclContext();
+        if (parentDC && parentDC->isTypeContext()) {
+          if (auto *systemProto = ctx.getDistributedActorSystemDecl()) {
+            auto *selfNominal = parentDC->getSelfNominalTypeDecl();
+            if (selfNominal &&
+                !swift::lookupConformance(
+                     selfNominal->getDeclaredInterfaceType(), systemProto)
+                     .isInvalid()) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    DC = DC->getParent();
+  }
+  return false;
 }
 
 bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
@@ -1399,6 +1429,14 @@ bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
   return getAs<swift::AddressToPointerInst>()->needsStackProtection();
 }
 
+bool BridgedInstruction::RawPointerToRefInst_isImmortal() const {
+  return getAs<swift::RawPointerToRefInst>()->isImmortal();
+}
+
+void BridgedInstruction::RawPointerToRefInst_setIsImmortal(bool isImmortal) const {
+  getAs<swift::RawPointerToRefInst>()->setImmortal(isImmortal);
+}
+
 bool BridgedInstruction::IndexAddrInst_needsStackProtection() const {
   return getAs<swift::IndexAddrInst>()->needsStackProtection();
 }
@@ -1456,6 +1494,14 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
 
 BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
   return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
+}
+
+BridgedGenericEnvironment
+BridgedInstruction::OpenCOMExistentialInst_getDefinedGenericEnvironment()
+    const {
+  return {getAs<swift::OpenCOMExistentialInst>()
+              ->getDefinedOpenedArchetype()
+              ->getGenericEnvironment()};
 }
 
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
@@ -2035,6 +2081,10 @@ BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getTargetFormalType() c
   return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetFormalType()};
 }
 
+BridgedType BridgedInstruction::CheckedCastAddrBranch_getTargetLoweredType() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetLoweredType()};
+}
+
 BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getSuccessBlock() const {
   return {getAs<swift::CheckedCastAddrBranchInst>()->getSuccessBB()};
 }
@@ -2050,6 +2100,8 @@ BridgedInstruction::CastConsumptionKind BridgedInstruction::CheckedCastAddrBranc
                 (int)swift::CastConsumptionKind::TakeOnSuccess);
   static_assert((int)BridgedInstruction::CastConsumptionKind::CopyOnSuccess ==
                 (int)swift::CastConsumptionKind::CopyOnSuccess);
+  static_assert((int)BridgedInstruction::CastConsumptionKind::TestOnly ==
+                (int)swift::CastConsumptionKind::TestOnly);
 
   return static_cast<BridgedInstruction::CastConsumptionKind>(
            getAs<swift::CheckedCastAddrBranchInst>()->getConsumptionKind());
@@ -2819,7 +2871,7 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
 
 BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
     BridgedValue source, BridgedCanType sourceFormalType,
-    BridgedValue destination, BridgedCanType targetFormalType,
+    OptionalBridgedValue destination, BridgedCanType targetFormalType,
     BridgedInstruction::CheckedCastInstOptions options,
     BridgedInstruction::CastConsumptionKind consumptionKind,
     BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const
@@ -3614,6 +3666,12 @@ OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformanc
     return {nullptr};
   }
   return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
+}
+
+BridgedConformance BridgedContext::substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const {
+  swift::SILModule *mod = context->getModule();
+  return {swift::substOpaqueTypesWithUnderlyingTypes(conformance.unbridged(),
+                                                     mod->getMaximalTypeExpansionContext())};
 }
 
 bool BridgedContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {

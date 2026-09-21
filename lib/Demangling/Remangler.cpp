@@ -2084,6 +2084,7 @@ ManglingError Remangler::mangleImplFunctionConvention(Node *node,
                       .Case("objc_method", 'O')
                       .Case("closure", 'K')
                       .Case("witness_method", 'W')
+                      .Case("com_method", 'V')
                       .Default(0);
   DEMANGLER_ASSERT(FuncAttr && "invalid impl function convention", node);
   if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
@@ -2521,6 +2522,12 @@ ManglingError Remangler::mangleMetaclass(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
+}
+
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleArgumentTuple(node, depth + 1));
+  Buffer << "Xy";
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, unsigned depth) {

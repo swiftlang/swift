@@ -15,6 +15,7 @@ sil_scope 5 { parent @test_fragment_wrong_parent : $@convention(thin) (Builtin.I
 sil_scope 6 { parent @test_tuple_fragment_type_mismatch : $@convention(thin) (Builtin.Int64) -> () }
 sil_scope 7 { parent @test_arg_count_mismatch : $@convention(thin) (Builtin.Int64) -> () }
 sil_scope 8 { parent @test_no_operand_without_transform : $@convention(thin) () -> () }
+sil_scope 9 { parent @test_undef_address_only : $@convention(thin) () -> () }
 
 // The transform block returns Builtin.Int32 but the fragment narrows to
 // Builtin.Int64.
@@ -118,6 +119,18 @@ bb0(%arg : $Builtin.Int64):
 sil @test_no_operand_without_transform : $@convention(thin) () -> () {
 bb0:
   debug_value (), let, name "x", type $Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+// An object category value of an address-only type cannot be lowered by IRGen.
+// Instead, it should be represented with an address type and an op_deref.
+// CHECK-LABEL: Begin Error in function test_undef_address_only
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_undef_address_only
+sil @test_undef_address_only : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Any, let, name "x", type $Any
   %r = tuple ()
   return %r : $()
 }

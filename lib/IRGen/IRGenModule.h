@@ -29,7 +29,6 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -40,7 +39,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,6 +51,7 @@
 #include "llvm/Target/TargetMachine.h"
 
 #include <atomic>
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class Constant;
@@ -1142,6 +1141,7 @@ public:
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
+  const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
@@ -1631,7 +1631,6 @@ public:
   ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
-  llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   llvm::Constant *
   getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
@@ -1640,6 +1639,12 @@ public:
   /// whose witness can never be reached, so that reaching one traps instead of
   /// requiring us to emit a real (dead) implementation.
   llvm::Function *getOrCreateDeadMethodErrorStub();
+
+  /// Like getOrCreateDeadMethodErrorStub(), but async.
+  llvm::Function *getOrCreateDeadMethodErrorAsyncStub();
+
+  /// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub().
+  llvm::Constant *getOrCreateDeadAsyncMethodErrorFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1669,6 +1674,10 @@ private:                                                                       \
   /// A local stub function that simply calls swift_deletedMethodError(),
   /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
   llvm::Function *DeadMethodErrorStub = nullptr;
+  /// Like DeadMethodErrorStub, but async.
+  llvm::Function *DeadMethodErrorAsyncStub = nullptr;
+  /// A local AsyncFunctionPointer wrapping DeadMethodErrorAsyncStub.
+  llvm::Constant *DeadAsyncMethodErrorFunctionPointer = nullptr;
   /// A Coroutine Function Pointer wrapping the above, suited for
   /// filling vtable/witness slots that point to "callee-allocated"
   /// (new ABI) coroutines.
