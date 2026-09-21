@@ -379,3 +379,8 @@ func testLocalFunctionAndAutoclosure() {
     checkWithClosure { local() } // Ok
   }
 }
+
+protocol A {}
+protocol B {}
+extension C: isolated A {}          // expected-error {{'isolated' may only be used on parameters}}
+struct MultiProtocols: isolated B, isolated C {} // expected-error 2{{'isolated' may only be used on parameters}}
