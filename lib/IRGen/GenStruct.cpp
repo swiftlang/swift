@@ -350,6 +350,25 @@ namespace {
       super::fillWithZerosIfSensitive(IGF, address, T);
     }
 
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
+      // The code below checks the AST to call a deinit method
+      // which we don't support from hidden representations yet
+      assertNotDeserialized("StructTypeInfoBase::assignWithTake");
+
+      // Assignment overwrites an existing value, which must be destroyed
+      // first. If the struct has a deinit, elementwise take-assignment would
+      // skip it, so run a full destroy (which invokes the deinit) and then
+      // take-initialize the destination.
+      if (tryEmitDestroyUsingDeinit(IGF, dest, T)) {
+        super::fillWithZerosIfSensitive(IGF, dest, T);
+        asImpl().initializeWithTake(IGF, dest, src, T, isOutlined,
+                                    /*zeroizeIfSensitive=*/T.isSensitive());
+        return;
+      }
+      super::assignWithTake(IGF, dest, src, T, isOutlined);
+    }
+
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
