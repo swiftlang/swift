@@ -192,7 +192,7 @@ public struct DeriveHashableMacro: DeclarationMacro {
 
   /// Derives the body of `hash(into:)` for an enum
   func getHashBody(_ infos: EnumTypeInfo) -> String {
-    if infos.hasNoAssociatedValues() {
+    if infos.hasNoAssociatedValues {
       Self.getHashBodyNoAssociatedValues(infos)
     } else {
       getHashBodyHasAssociatedValues(infos)

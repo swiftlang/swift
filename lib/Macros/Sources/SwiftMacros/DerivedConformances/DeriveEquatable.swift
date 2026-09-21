@@ -114,7 +114,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   static func getEnumBody(
     _ enumInfo: EnumTypeInfo
   ) -> String {
-    if enumInfo.hasNoAssociatedValues() {
+    if enumInfo.hasNoAssociatedValues {
       getNoAssociatedValuesBody(enumInfo)
     } else {
       getHasAssociatedValuesBody(enumInfo)
@@ -179,7 +179,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
 extension EnumTypeInfo {
   /// True if no case in this enum carries associated values.
-  func hasNoAssociatedValues() -> Bool {
+  var hasNoAssociatedValues: Bool {
     cases.allSatisfy(\.associatedValueLabels.isEmpty)
   }
 

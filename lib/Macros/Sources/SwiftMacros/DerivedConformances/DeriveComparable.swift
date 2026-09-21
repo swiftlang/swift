@@ -42,9 +42,9 @@ public struct DeriveComparableMacro: DeclarationMacro {
   func deriveComparable() -> DeclSyntax {
     return
       """
-      \(getAttributes())
-      static func \(getFunctionName())(_ lhs: Self, _ rhs: Self) -> Bool {
-        \(getBody())
+      \(raw: getAttributes())
+      static func \(raw: getFunctionName())(_ lhs: Self, _ rhs: Self) -> Bool {
+        \(raw: getBody())
       }
       """
   }
@@ -52,7 +52,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
   /// Attributes attached to the generated function. if the module is resilient, just a
   /// plain `<` non-resilient types get the attributes that let the compiler treat it
   /// as the derived conformance witness.
-  func getAttributes() -> AttributeListSyntax {
+  func getAttributes() -> String {
     if isResilient {
       ""
     } else {
@@ -64,7 +64,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
 
   /// Name of the generated function: plain `<` when in a resilient module, otherwise a
   /// derived name.
-  func getFunctionName() -> TokenSyntax {
+  func getFunctionName() -> String {
     if isResilient {
       "<"
     } else {
@@ -73,50 +73,54 @@ public struct DeriveComparableMacro: DeclarationMacro {
   }
 
   /// Dispatches to the right body builder depending on the type's shape.
-  func getBody() -> CodeBlockItemListSyntax {
+  func getBody() -> String {
     if info.isUninhabited() {
-      return Self.getUninhabitedBody()
+      return Self.uninhabitedBody
     }
-    if info.hasNoAssociatedValues() {
-      return getNoAssociatedValuesBody()
+    if info.hasNoAssociatedValues {
+      return noAssociatedValuesBody
     }
-    return getHasAssociatedValuesBody()
+    return getHasAssociatedValuesBody
   }
 
   /// Body for an uninhabited enum: there are no cases to compare.
-  static func getUninhabitedBody() -> CodeBlockItemListSyntax {
+  static var uninhabitedBody: String {
     """
     """
   }
 
   /// `lhs < rhs` for an enum with no associated values: compare discriminants.
-  func getNoAssociatedValuesBody() -> CodeBlockItemListSyntax {
-    var items = getDiscriminant(info, scrutinee: "lhs", discrName: "index_lhs")
-    items += getDiscriminant(info, scrutinee: "rhs", discrName: "index_rhs")
-    items += ["return index_lhs < index_rhs"]
-    return items
+  var noAssociatedValuesBody: String {
+    """
+    \(getDiscriminant(info, scrutinee: "lhs", discrName: "index_lhs"))
+    \(getDiscriminant(info, scrutinee: "rhs", discrName: "index_rhs"))
+    return index_lhs < index_rhs
+    """
   }
 
   /// `lhs < rhs` for an enum with associated values: match `(lhs, rhs)` against
   /// each case pairwise and compare bound payloads.
-  func getHasAssociatedValuesBody() -> CodeBlockItemListSyntax {
-    var cases: [SwitchCaseSyntax] = []
+  var getHasAssociatedValuesBody: String {
+    var cases: [String] = []
     for caseInfo in info.cases {
-      var stmtsInCase: [CodeBlockItemSyntax] = []
+      let stmtsInCase: String
 
       if caseInfo.isReachable {
-        for i in 0..<caseInfo.associatedValueLabels.count {
-          stmtsInCase.append(
-            """
-            guard l\(raw: i) == r\(raw: i) else {
-              return l\(raw: i) < r\(raw: i)
-            }
-            """
-          )
+        let guards = (0..<caseInfo.associatedValueLabels.count).map {
+          i in
+          """
+          guard l\(i) == r\(i) else {
+            return l\(i) < r\(i)
+          }
+          """
         }
-        stmtsInCase.append("return false")
+        stmtsInCase =
+          """
+          \(guards.joined(separator: "\n"))
+          return false
+          """
       } else {
-        stmtsInCase.append(getUnreachableStatement())
+        stmtsInCase = getUnreachableStatement()
       }
 
       let lPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "l")
@@ -125,7 +129,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
       cases.append(
         """
         case (\(lPat), \(rPat)): 
-          \(CodeBlockItemListSyntax(stmtsInCase))
+          \(stmtsInCase)
         """
       )
     }
@@ -133,7 +137,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
     // A single-case enum's `(lhs, rhs)` switch is already exhaustive without a
     // default. Adding one for multi-case enums avoids an exhaustiveness
     // diagnostic for mismatched-case pairs (e.g. `(.foo, .bar)`).
-    // This is unreachable as the case where the discriminants were different 
+    // This is unreachable as the case where the discriminants were different
     // is handled before.
     if info.cases.count > 1 {
       cases.append(
@@ -143,18 +147,16 @@ public struct DeriveComparableMacro: DeclarationMacro {
       )
     }
 
-    var items = getDiscriminant(info, scrutinee: "lhs", discrName: "index_lhs")
-    items += getDiscriminant(info, scrutinee: "rhs", discrName: "index_rhs")
-    items += [
+    return
       """
-      if index_lhs != index_rhs {
-        return index_lhs  < index_rhs
-      }
-      switch (lhs, rhs) {
-      \(raw: cases.map { $0.trimmedDescription }.joined(separator: "\n"))
-      }
+      \(getDiscriminant(info, scrutinee: "lhs", discrName: "index_lhs"))
+      \(getDiscriminant(info, scrutinee: "rhs", discrName: "index_rhs"))
+        if index_lhs != index_rhs {
+          return index_lhs  < index_rhs
+        }
+        switch (lhs, rhs) {
+        \(cases.joined(separator: "\n"))
+        }
       """
-    ]
-    return items
   }
 }
