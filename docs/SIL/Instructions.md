@@ -4667,7 +4667,7 @@ does not have ownership semantics. It is undefined behavior to cast a
 ### raw_pointer_to_ref
 
 ```
-sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
+sil-instruction ::= 'raw_pointer_to_ref' '[immortal]'? sil-operand 'to' sil-type
 
 %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
 // $C must be a class type, or Builtin.NativeObject, or AnyObject
@@ -4681,6 +4681,14 @@ ownership semantics for the object on its own). It is undefined behavior
 to cast a `RawPointer` to a type unrelated to the dynamic type of the
 heap object. It is also undefined behavior to cast a `RawPointer` from
 an address to any heap object type.
+
+The `immortal` flag means that the resulting object is immortal, i.e. it is
+never deallocated and therefore doesn't need to be retained or released. In
+OSSA the result of an `immortal` `raw_pointer_to_ref` has `none` ownership,
+whereas the result of a non-`immortal` `raw_pointer_to_ref` is `owned` - the
+instruction "creates" a new reference which must be consumed exactly once.
+Accordingly, lowering out of OSSA inserts a
+[strong_retain](#strong_retain) after a non-`immortal` `raw_pointer_to_ref`.
 
 ### ref_to_unowned
 
@@ -5020,17 +5028,21 @@ ownership are unsupported.
 ```
 sil-instruction ::= 'unconditional_checked_cast_addr'
                     sil-prohibit-isolated-conformances?
+                    '[copy]'?
                     sil-type 'in' sil-operand 'to'
                     sil-type 'in' sil-operand
 
-unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
-// $A and $B must be both addresses
-// %1 will be of type $*B
-// $A is destroyed during the conversion. There is no implicit copy.
+unconditional_checked_cast_addr A in %0 : $*A to B in %1 : $*B
+// %0 and %1 must both be addresses.
+// Without [copy], %0 is consumed during the conversion.
+// With [copy], %0 remains initialized and is not consumed.
 ```
 
-Performs a checked indirect conversion, causing a runtime failure if the
-conversion fails.
+Performs a checked indirect conversion, initializing the destination on success
+and causing a runtime failure if the conversion fails. The destination must be
+uninitialized. By default, the source value is consumed. `[copy]` preserves
+it and produces an independently owned destination value. Both forms
+terminate execution on failure rather than continuing along a failure edge.
 
 ## Runtime Failures
 
@@ -5423,22 +5435,44 @@ sil-terminator ::= 'checked_cast_addr_br'
                     sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
-                    sil-stype 'in' sil-operand ','
+                    sil-stype ('in' sil-operand)? ','
                     sil-identifier ',' sil-identifier
 sil-cast-consumption-kind ::= 'take_always'
 sil-cast-consumption-kind ::= 'take_on_success'
 sil-cast-consumption-kind ::= 'copy_on_success'
+sil-cast-consumption-kind ::= 'test_only'
 
 checked_cast_addr_br take_always $A in %0 : $*@thick A to $B in %2 : $*@thick B, bb1, bb2
 // $A and $B must be both address types
 // bb1 must take a single argument of type $*B
 // bb2 must take no arguments
+
+checked_cast_addr_br test_only $A in %0 : $*@thick A to $B, bb1, bb2
+// A 'test_only' cast has no destination operand
 ```
 
 Performs a checked indirect conversion from `$A` to `$B`. If the
 conversion succeeds, control is transferred to `bb1`, and the result of
 the cast is left in the destination. If the conversion fails, control is
 transferred to `bb2`.
+
+The consumption kind describes what happens to the source operand:
+`take_always` consumes it whether or not the cast succeeds, `take_on_success`
+consumes it only on success, and `copy_on_success` leaves it in place and copies
+into the destination on success.
+
+`test_only` is different in kind: it reports only whether the conversion would
+have succeeded, and produces **no destination value at all**. The source is
+neither taken nor copied, and the instruction carries no destination operand, so
+it names only the target type. `CheckedCastAddrBranchInst::getDest()` returns an
+invalid `SILValue` for it, and `hasDest()` says so up front; code that reads the
+destination of a cast must check.
+
+`test_only` exists because some values cannot answer a cast question any other
+way. Producing the result of the cast would copy a payload whose type forbids
+copying, and taking it would destroy the very value being asked about — so
+neither `copy_on_success` nor `take_on_success` can implement `is` or
+`case is T` on a non-`Copyable` existential.
 
 ### try_apply
 

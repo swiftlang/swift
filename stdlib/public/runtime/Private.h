@@ -249,6 +249,13 @@ public:
     return  (c->Superclass && c->Superclass != getRootSuperclass());
   }
 
+  /// Complete instance layout and field offsets without registering the class
+  /// with the Objective-C runtime or installing its vtable.
+  SWIFT_RUNTIME_STDLIB_INTERNAL
+  void initClassFieldOffsetVector(ClassMetadata *self, size_t numFields,
+                                  const TypeLayout *const *fieldTypes,
+                                  size_t *fieldOffsets);
+
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///

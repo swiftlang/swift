@@ -180,23 +180,11 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
 }
 
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
-    const clang::NamedDecl *decl) {
-  if (!decl->hasAttrs())
-    return;
-
-  for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (swiftAttr->getAttribute() == "returns_unretained")
-        hasReturnsUnretained = true;
-      else if (swiftAttr->getAttribute() == "returns_retained")
-        hasReturnsRetained = true;
-    } else if (isa<clang::OSReturnsNotRetainedAttr>(attr)) {
-      hasReturnsUnretained = true;
-    } else if (isa<clang::OSReturnsRetainedAttr>(attr)) {
-      hasReturnsRetained = true;
-    }
-  }
-}
+    const clang::NamedDecl *decl)
+    : hasReturnsRetained(decl->hasAttr<clang::OSReturnsRetainedAttr>() ||
+                         hasSwiftAttribute(decl, {"returns_retained"})),
+      hasReturnsUnretained(decl->hasAttr<clang::OSReturnsNotRetainedAttr>() ||
+                           hasSwiftAttribute(decl, {"returns_unretained"})) {}
 
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,

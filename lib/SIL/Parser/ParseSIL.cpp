@@ -4456,6 +4456,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool not_guaranteed = false;
     bool without_actually_escaping = false;
     bool needsStackProtection = false;
+    bool isImmortal = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
@@ -4466,6 +4467,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     } if (Opcode == SILInstructionKind::AddressToPointerInst) {
       if (parseSILOptional(needsStackProtection, *this, "stack_protection"))
+        return true;
+    } if (Opcode == SILInstructionKind::RawPointerToRefInst) {
+      if (parseSILOptional(isImmortal, *this, "immortal"))
         return true;
     }
 
@@ -4545,7 +4549,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createRefToRawPointer(InstLoc, Val, Ty);
       break;
     case SILInstructionKind::RawPointerToRefInst:
-      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty);
+      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty, isImmortal);
       break;
 #define LOADABLE_REF_STORAGE(Name, ...)                                        \
   case SILInstructionKind::RefTo##Name##Inst:                                  \
@@ -4649,6 +4653,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                     .Case("take_always", CastConsumptionKind::TakeAlways)
                     .Case("take_on_success", CastConsumptionKind::TakeOnSuccess)
                     .Case("copy_on_success", CastConsumptionKind::CopyOnSuccess)
+                    .Case("test_only", CastConsumptionKind::TestOnly)
                     .Default(std::nullopt);
 
     if (!kind) {
@@ -4658,7 +4663,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     auto consumptionKind = kind.value();
 
-    if (parseSourceAndDestAddress() || parseConditionalBranchDestinations() ||
+    // A test_only cast produces no value, so it names only a formal target
+    // type where the other kinds name a destination address:
+    //   checked_cast_addr_br test_only $A in %0 : $*A to $B, bb1, bb2
+    if (consumptionKind == CastConsumptionKind::TestOnly) {
+      if (parseFormalTypeAndValue(SourceType, SourceAddr) ||
+          parseVerbatim("to") || parseASTType(TargetType))
+        return true;
+    } else if (parseSourceAndDestAddress()) {
+      return true;
+    }
+
+    if (parseConditionalBranchDestinations() ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
@@ -4678,14 +4694,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
-    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
+    bool isCopy = false;
+    CheckedCastInstOptions options =
+        parseCheckedCastInstOptions(nullptr, &isCopy);
 
     if (parseSourceAndDestAddress() || parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createUnconditionalCheckedCastAddr(
-        InstLoc, options, SourceAddr, SourceType,
-        DestAddr, TargetType);
+        InstLoc, options, SourceAddr, SourceType, DestAddr, TargetType, isCopy);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastInst: {
@@ -8469,7 +8486,8 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
   return parseProtocolConformanceHelper(proto, genericSig, genericParams);
 }
 
-CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact) {
+CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact,
+                                                              bool *isCopy) {
   CheckedCastInstOptions options;
   StringRef attrName;
 
@@ -8481,6 +8499,8 @@ CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact) {
 
     if (attrName == "exact" && isExact)
       *isExact = true;
+    if (attrName == "copy" && isCopy)
+      *isCopy = true;
   }
 
   return options;

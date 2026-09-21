@@ -730,8 +730,8 @@ extension FunctionWorklist {
         break
       case .method(_, let witness):
         if let method = witness,
-           // A new witness table can still contain a generic function if the method couldn't be specialized for
-           // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+           // A witness table can still contain a generic function, even though it's not actually
+           // callable through the witness table.
            !method.isGeneric
         {
           pushIfNotVisited(method)
