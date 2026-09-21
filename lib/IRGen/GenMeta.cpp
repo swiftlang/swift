@@ -881,9 +881,10 @@ namespace {
 
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
-                                     SILDefaultWitnessTable *defaultWitnesses)
-      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.getSwiftModule()->isResilient()) {}
+                              SILDefaultWitnessTable *defaultWitnesses)
+        : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
+          Resilient(IGM.getSwiftModule()->isResilient() &&
+                    !Proto->isCOMInterface()) {}
 
     void layout() {
       super::layout();

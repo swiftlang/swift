@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-com-interop -enable-library-evolution -emit-module-path %t/COM.swiftmodule -module-name COM %S/../Inputs/COM.swift
-// RUN: %target-swift-frontend -enable-experimental-com-interop -enable-library-evolution -I %t -module-name Interfaces -emit-ir %s | %FileCheck %s --check-prefixes=CHECK,RESILIENT
-// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name Interfaces -emit-ir %s | %FileCheck %s --check-prefixes=CHECK,FRAGILE
+// RUN: %target-swift-frontend -enable-experimental-com-interop -enable-library-evolution -I %t -module-name Interfaces -emit-ir %s | %FileCheck %s --check-prefixes=CHECK,RESILIENT --implicit-check-not='{{Interfaces(5IBase|8IDerived)[^"]*T[jq]}}'
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name Interfaces -emit-ir %s | %FileCheck %s --check-prefixes=CHECK,FRAGILE --implicit-check-not='{{Interfaces(5IBase|8IDerived)[^"]*T[jq]}}'
 
 // COM descriptors have the COM special-protocol flag, but no resilience bit:
 // 0x90043 = Any class constraint | COM | unique | protocol.
@@ -26,3 +26,8 @@ public protocol IDerived: IBase {
 public protocol Native {
   func native() -> CInt
 }
+
+// Library evolution still emits method descriptors and dispatch thunks for
+// ordinary Swift protocols.
+// RESILIENT: @"$s10Interfaces6NativeP6natives5Int32VyFTq" ={{( dllexport)?}}{{( protected)?}} alias
+// RESILIENT: define{{.*}} swiftcc i32 @"$s10Interfaces6NativeP6natives5Int32VyFTj"
