@@ -258,7 +258,7 @@ option(SWIFT_BUILD_COMPILER_DYLIB
   "Builds a swift compiler dylib for tools to link against"
   FALSE)
 
-if (SWIFT_BUILD_COMPILER_DYLIB AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if (SWIFT_BUILD_COMPILER_DYLIB AND NOT APPLE)
   message(FATAL_ERROR "SWIFT_BUILD_COMPILER_DYLIB is only supported on Darwin platforms currently.")
 endif()
 
