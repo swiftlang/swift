@@ -6,6 +6,7 @@ Write generic code that works with any collection, or build your own collection 
 
 ### First Steps
 
+- ``Swift/IteratorProtocol``
 - ``Swift/Sequence``
 - ``Swift/Collection``
 
@@ -19,9 +20,9 @@ Write generic code that works with any collection, or build your own collection 
 - ``Swift/MutableCollection``
 - ``Swift/RangeReplaceableCollection``
 
-### Manual Iteration
+### Borrowing Iteration
 
-- ``Swift/IteratorProtocol``
+- ``Swift/Iterable``
 - ``Swift/BorrowingIteratorProtocol``
 - ``Swift/BorrowingIteratorAdapter``
 - ``Swift/BorrowingSequence``
