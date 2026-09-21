@@ -3637,6 +3637,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   auto clangDecl = f->getClangDecl();
   auto cxxCtor = dyn_cast_or_null<clang::CXXConstructorDecl>(clangDecl);
 
+  // An inline definition of a stdlib function corresponding to a builtin keeps
+  // its body in a separate private definition with a ".inline" suffix, and the
+  // unsuffixed symbol stays a declaration of the library function. Redirect to
+  // the private implementation so that we call the inline definition the header
+  // provided.
+  if (auto clangFn = dyn_cast_or_null<clang::FunctionDecl>(clangDecl)) {
+    if (auto *clone = getAddrOfClangInlineBuiltinClone(clangFn, forDefinition))
+      return clone;
+  }
+
   // Check whether we've created the function already. If the function is a C++
   // constructor, don't return the constructor here as a thunk might be needed
   // to call the constructor.
