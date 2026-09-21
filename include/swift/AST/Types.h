@@ -4824,9 +4824,25 @@ public:
     /// DISCUSSION: These are enforced by the SIL verifier to always be in
     /// between indirect results and the explicit parameters.
     ImplicitLeading = 0x8,
-    
+
     /// Set if the given parameter is @const
-    Const = 0x10
+    Const = 0x10,
+
+    /// Set if the C calling convention passes an implicit object-size argument
+    /// alongside this parameter, because it is marked
+    /// `__attribute__((pass_object_size))` or
+    /// `__attribute__((pass_dynamic_object_size))`.
+    PassObjectSize = 0x20,
+
+    /// Set when the implicit object-size argument is a lower bound on the
+    /// object's size rather than an upper bound, i.e. for `pass_object_size`
+    /// types 2 and 3. Only meaningful together with \c PassObjectSize.
+    PassObjectSizeMin = 0x40,
+
+    /// Set when the implicit object-size argument may be computed at runtime,
+    /// i.e. for `pass_dynamic_object_size`. Only meaningful together with
+    /// \c PassObjectSize.
+    PassObjectSizeDynamic = 0x80,
   };
 
   using Options = OptionSet<Flag>;
@@ -4918,6 +4934,20 @@ public:
   }
 
   bool hasOption(Flag flag) const { return options.contains(flag); }
+
+  /// Whether the C calling convention passes an implicit object-size argument
+  /// alongside this parameter.
+  bool hasPassObjectSize() const { return hasOption(PassObjectSize); }
+
+  static Options getForeignImplicitArgumentOptions() {
+    return Options(PassObjectSize) | PassObjectSizeMin | PassObjectSizeDynamic;
+  }
+
+  /// Whether the C calling convention passes arguments alongside this parameter
+  /// that are not part of the formal function type.
+  bool hasForeignImplicitArguments() const {
+    return bool(getOptions() & getForeignImplicitArgumentOptions());
+  }
 
   Options getOptions() const { return options; }
 
@@ -6034,6 +6064,17 @@ public:
   }
 
   ClangTypeInfo getClangTypeInfo() const;
+
+  /// The parameters for which the C calling convention passes an implicit
+  /// object-size argument, because they are marked
+  /// `__attribute__((pass_object_size))`. The returned vector is indexed by
+  /// position within \c getParameters(), but it will have a size of 0 if no
+  /// parameter has the `pass_object_size` attribute.
+  SmallBitVector getPassObjectSizeParameters() const;
+
+  /// Whether any parameter is accompanied by arguments that the C calling
+  /// convention passes but that this type does not mention.
+  bool hasForeignImplicitArguments() const;
 
   bool hasLifetimeDependencies() const {
     return NumLifetimeDependencies != 0;

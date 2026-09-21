@@ -2403,6 +2403,29 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
   return matchTypes(pattern1, pattern2, kind, flags, locator);
 }
 
+/// Whether the value being converted at \p locator is a reference to a C
+/// function that has __attribute__((pass_object_size)) parameters.
+///
+/// The reference may be to a single declaration, or to an overload set whose
+/// choice the solver has already fixed for the solution being explored.
+static bool referencesPassObjectSizeFunction(ConstraintSystem &cs,
+                                             ConstraintLocator *locator) {
+  auto *expr = getAsExpr(simplifyLocatorToAnchor(locator));
+  if (!expr)
+    return false;
+
+  expr = expr->getSemanticsProvidingExpr();
+
+  const ValueDecl *decl = nullptr;
+  if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+    decl = declRef->getDecl();
+  } else if (auto overload = cs.findSelectedOverloadFor(expr)) {
+    decl = overload->choice.getDeclOrNull();
+  }
+
+  return decl && getNumPassObjectSizeParams(decl) > 0;
+}
+
 /// Check where a representation is a subtype of another.
 ///
 /// The subtype relationship is defined as:
@@ -3334,6 +3357,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (!matchFunctionRepresentations(func1->getExtInfo(), func2->getExtInfo(),
                                     kind, Options)) {
     return SolutionKind::Error;
+  }
+
+  // Clang refuses to take the address of a function with
+  // __attribute__((pass_object_size)) because it is not a type attribute and
+  // there is an automatic ABI mismatch between the function and its function
+  // pointer. Disfavor this conversion so that we try to find an overload
+  // without __attribute__((pass_object_size)). If this is still the best fit in
+  // the end, Sema will diagnose.
+  if (func2->getRepresentation() ==
+          FunctionTypeRepresentation::CFunctionPointer &&
+      func1->getRepresentation() !=
+          FunctionTypeRepresentation::CFunctionPointer &&
+      referencesPassObjectSizeFunction(*this, loc)) {
+    increaseScore(SK_DisfavoredOverload, locator);
   }
 
   // Determine how we match up the input/result types.

@@ -1914,6 +1914,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AccessibleFunctionRecord:
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
+      case Node::Kind::ForeignImplicitArgumentThunk:
       case Node::Kind::HasSymbolQuery:
       case Node::Kind::CoroFunctionPointer:
       case Node::Kind::DefaultOverride:
@@ -4152,6 +4153,12 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
 ManglingError Remangler::mangleBackDeploymentThunk(Node *node,
                                                    unsigned depth) {
   Buffer << "Twb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleForeignImplicitArgumentThunk(Node *node,
+                                                            unsigned depth) {
+  Buffer << "Twi";
   return ManglingError::Success;
 }
 

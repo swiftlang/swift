@@ -5327,6 +5327,18 @@ SILParameterInfo TypeResolver::resolveSILParameter(
         parameterOptions |= SILParameterInfo::ImplicitLeading;
         return true;
 
+      case TypeAttrKind::SILPassObjectSize:
+        parameterOptions |= SILParameterInfo::PassObjectSize;
+        return true;
+
+      case TypeAttrKind::SILPassObjectSizeMin:
+        parameterOptions |= SILParameterInfo::PassObjectSizeMin;
+        return true;
+
+      case TypeAttrKind::SILPassObjectSizeDynamic:
+        parameterOptions |= SILParameterInfo::PassObjectSizeDynamic;
+        return true;
+
       default:
         return false;
       }

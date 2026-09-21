@@ -130,6 +130,9 @@ extension ASTGenVisitor {
         .SILWeak,
         .SILSending,
         .SILImplicitLeadingParam,
+        .SILPassObjectSize,
+        .SILPassObjectSizeMin,
+        .SILPassObjectSizeDynamic,
         .CallerIsolated,
         .UnownedInnerPointer:
         // TODO: Diagnose or fallback to CustomAttr?

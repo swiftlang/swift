@@ -1896,6 +1896,23 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
     return SGF.emitUndef(loweredTy);
   }
 
+  // A C function pointer has nowhere to carry the implicit object-size
+  // arguments that __attribute__((pass_object_size)) parameters require, so it
+  // cannot point at the imported entry point directly. Clang refuses to take
+  // the address of a function with pass_object_size parameters, but we forward
+  // through a thunk instead.
+  auto foreignTy = constantInfo.getSILType().castTo<SILFunctionType>();
+  if (foreignTy->hasForeignImplicitArguments() && constant.hasDecl()) {
+    auto *thunk =
+        SGF.SGM.getOrCreateForeignImplicitArgumentThunk(constant, expr);
+    auto thunkTy = thunk->getLoweredType();
+    return convertCFunctionSignature(
+        SGF, conversionExpr, thunkTy, C, [&]() -> ManagedValue {
+          SILValue ref = SGF.B.createFunctionRefFor(expr, thunk);
+          return ManagedValue::forObjectRValueWithoutOwnership(ref);
+        });
+  }
+
   return convertCFunctionSignature(
       SGF, conversionExpr, constantInfo.getSILType(), C, [&]() -> ManagedValue {
         SILValue cRef = SGF.emitGlobalFunctionRef(expr, constant);

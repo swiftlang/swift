@@ -191,6 +191,7 @@ public:
     BackDeploymentThunk,
     BackDeploymentFallback,
     HasSymbolQuery,
+    ForeignImplicitArgumentThunk,
   };
 
   /// lldb overrides \p DWARFMangling to 'true'.

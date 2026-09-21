@@ -450,6 +450,7 @@ $s3foo4main1SVs5Int32VSbTf3npSSi3Si0_n ---> function signature specialization <A
 $e4test4BaseCyxGAA1PA2aEP3fooyyFTWTfr9 ---> representation changed of protocol witness for test.P.foo() -> () in conformance test.Base<A> : test.P in test
 $s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
+$sSo7pos_maxyySpys5Int32VGSgFTwi ---> foreign implicit argument thunk for __C.pos_max(Swift.UnsafeMutablePointer<Swift.Int32>?) -> ()
 $s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
 $s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()

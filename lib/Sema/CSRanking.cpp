@@ -1387,6 +1387,19 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         score1 += weight;
     }
 
+    // Clang's overload resolution prefers the candidate with the most
+    // __attribute__((pass_object_size)) parameters. Those candidates import
+    // into Swift with identical types, so without this rule a call to them is
+    // simply ambiguous.
+    if (decl1->hasClangNode() && decl2->hasClangNode()) {
+      auto count1 = getNumPassObjectSizeParams(decl1);
+      auto count2 = getNumPassObjectSizeParams(decl2);
+      if (count1 > count2)
+        score1 += weight;
+      else if (count2 > count1)
+        score2 += weight;
+    }
+
     // A class member is always better than a curried instance member.
     // If the members agree on instance-ness, a property is better than a
     // method (because a method is usually immediately invoked).

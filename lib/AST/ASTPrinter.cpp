@@ -8659,6 +8659,21 @@ void SILParameterInfo::print(
     Printer << "@const ";
   }
 
+  if (options.contains(SILParameterInfo::PassObjectSize)) {
+    options -= SILParameterInfo::PassObjectSize;
+    Printer << "@sil_pass_object_size ";
+  }
+
+  if (options.contains(SILParameterInfo::PassObjectSizeMin)) {
+    options -= SILParameterInfo::PassObjectSizeMin;
+    Printer << "@sil_pass_object_size_min ";
+  }
+
+  if (options.contains(SILParameterInfo::PassObjectSizeDynamic)) {
+    options -= SILParameterInfo::PassObjectSizeDynamic;
+    Printer << "@sil_pass_object_size_dynamic ";
+  }
+
   if (lifetimeDependence) {
     Printer.printLifetimeDependence(*lifetimeDependence, std::nullopt, Opts);
   }

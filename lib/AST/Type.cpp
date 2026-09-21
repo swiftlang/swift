@@ -4744,6 +4744,25 @@ ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   return *info;
 }
 
+SmallBitVector SILFunctionType::getPassObjectSizeParameters() const {
+  auto params = getParameters();
+  SmallBitVector annotated(params.size());
+  for (unsigned i : indices(params)) {
+    if (params[i].hasPassObjectSize())
+      annotated.set(i);
+  }
+
+  if (annotated.none())
+    return {};
+  return annotated;
+}
+
+bool SILFunctionType::hasForeignImplicitArguments() const {
+  return llvm::any_of(getParameters(), [](SILParameterInfo param) {
+    return param.hasForeignImplicitArguments();
+  });
+}
+
 bool SILFunctionType::hasNonDerivableClangType() {
   auto clangTypeInfo = getClangTypeInfo();
   if (clangTypeInfo.empty())

@@ -1670,16 +1670,33 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     llvm_unreachable("not a C representation");
   }
 
-  // Given an index within the clang parameters list, what do we need
-  // to subtract from it to get to the corresponding index within the
-  // Swift parameters list?
+  // Translate Swift parameters list indices to clang parameter list indices;
+  // in most cases this is a simple as subtracting from the Swift parameter
+  // index, but when the C function uses `__attribute__((pass_object_size))`,
+  // there will be implicit parameters and we need to keep a map instead.
   size_t clangToSwiftParamOffset = paramTys.size();
+  auto passObjectSizeParams = FnType->getPassObjectSizeParameters();
+  SmallVector<size_t, 8> swiftParamForClangArg;
 
   // Convert each parameter to a Clang type.
-  for (auto param : params) {
-    auto clangTy = IGM.getClangType(param, FnType);
+  for (auto index : indices(params)) {
+    auto clangTy = IGM.getClangType(params[index], FnType);
+    swiftParamForClangArg.push_back(index);
     paramTys.push_back(clangTy);
+
+    if (index < passObjectSizeParams.size() && passObjectSizeParams[index]) {
+      swiftParamForClangArg.push_back(index);
+      paramTys.push_back(clangCtx.getSizeType());
+    }
   }
+
+  // Maps a Clang argument index to the Swift parameter it corresponds to. Only
+  // valid for indices at or past \c clangToSwiftParamOffset.
+  auto getSwiftParam = [&](size_t clangArgIndex) -> const SILParameterInfo & {
+    assert(clangArgIndex >= clangToSwiftParamOffset);
+    return params[swiftParamForClangArg[clangArgIndex -
+                                        clangToSwiftParamOffset]];
+  };
 
   // Generate function info for this signature. Preserve the calling
   // convention carried by an imported C or C++ function type rather than
@@ -1751,7 +1768,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
         IGM.addSwiftErrorAttributes(Attrs, getCurParamIndex());
         break;
       case clang::ParameterABI::SwiftIndirectResult: {
-        auto &param = params[i - clangToSwiftParamOffset];
+        auto &param = getSwiftParam(i);
         auto paramTy = getSILFuncConventions().getSILType(
             param, IGM.getMaximalTypeExpansionContext());
         auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
@@ -1791,9 +1808,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       // case, the corresponding Swift param is the last function parameter.
       assert((i >= clangToSwiftParamOffset || clangToSwiftParamOffset == 1) &&
              "Unexpected index for indirect byval argument");
-      auto &param = i < clangToSwiftParamOffset
-                        ? FnType->getParameters().back()
-                        : params[i - clangToSwiftParamOffset];
+      auto &param = i < clangToSwiftParamOffset ? FnType->getParameters().back()
+                                                : getSwiftParam(i);
       auto paramTy = getSILFuncConventions().getSILType(
           param, IGM.getMaximalTypeExpansionContext());
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
@@ -4646,6 +4662,65 @@ Address getForwardableAlloca(const TypeInfo &TI, bool isForwardableArgument,
   return TI.getAddressForPointer(alloca);
 }
 
+namespace {
+/// The `__builtin_object_size` query that the implicit argument of a
+/// `__attribute__((pass_object_size))` parameter has to answer.
+struct ObjectSizeQuery {
+  /// Types 2 and 3 ask for a lower bound on the object's size; 0 and 1 ask for
+  /// an upper bound.
+  bool isMin = false;
+
+  /// Set by `pass_dynamic_object_size`, which allows a runtime computation
+  /// rather than requiring a compile-time answer.
+  bool isDynamic = false;
+};
+} // end anonymous namespace
+
+/// Collects the object-size query for each parameter marked
+/// `__attribute__((pass_object_size))`, indexed by position within \p params.
+/// Returns an empty vector when no parameter is annotated.
+static SmallVector<std::optional<ObjectSizeQuery>, 4>
+getObjectSizeQueries(ArrayRef<SILParameterInfo> params) {
+  SmallVector<std::optional<ObjectSizeQuery>, 4> queries;
+
+  if (llvm::none_of(params, [](SILParameterInfo param) {
+        return param.hasPassObjectSize();
+      }))
+    return queries;
+
+  queries.resize(params.size());
+  for (unsigned i : indices(params)) {
+    if (!params[i].hasPassObjectSize())
+      continue;
+    queries[i] = ObjectSizeQuery{
+        params[i].hasOption(SILParameterInfo::PassObjectSizeMin),
+        params[i].hasOption(SILParameterInfo::PassObjectSizeDynamic)};
+  }
+
+  return queries;
+}
+
+/// Emits the implicit argument for a `__attribute__((pass_object_size))`
+/// parameter.
+static llvm::Value *emitObjectSizeArgument(IRGenFunction &IGF,
+                                           llvm::Value *pointer,
+                                           ObjectSizeQuery query) {
+  // Clang constant-folds this against the argument expression where it can and
+  // emits @llvm.objectsize otherwise. From Swift we only ever have the pointer
+  // value, so we always emit the intrinsic and let LLVM fold it.
+  auto &clangCtx = IGF.IGM.getClangASTContext();
+  auto *resultTy = llvm::IntegerType::get(
+      IGF.IGM.getLLVMContext(), clangCtx.getTypeSize(clangCtx.getSizeType()));
+
+  return IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::objectsize, {resultTy, pointer->getType()},
+      {pointer, llvm::ConstantInt::get(IGF.IGM.Int1Ty, query.isMin),
+       // For GCC compatibility, Clang always treats a null pointer as being of
+       // unknown size.
+       llvm::ConstantInt::get(IGF.IGM.Int1Ty, true),
+       llvm::ConstantInt::get(IGF.IGM.Int1Ty, query.isDynamic)});
+}
+
 void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                                  TemporarySet &temporaries,
@@ -4709,7 +4784,49 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
     }
   }
 
+  // A parameter marked __attribute__((pass_object_size)) is followed by an
+  // implicit size argument, so Clang argument indices and Swift parameter
+  // indices may not line up. Precompute, for each Clang argument past
+  // \c firstParam, the Swift parameter it carries and whether it is one of
+  // those implicit arguments.
+  auto paramQueries = getObjectSizeQueries(params);
+  SmallVector<size_t, 8> swiftParamForClangArg;
+  SmallVector<std::optional<ObjectSizeQuery>, 8> queryForClangArg;
+  if (!paramQueries.empty()) {
+    for (auto p : indices(params)) {
+      swiftParamForClangArg.push_back(p);
+      queryForClangArg.push_back(std::nullopt);
+      if (p < paramQueries.size() && paramQueries[p]) {
+        swiftParamForClangArg.push_back(p);
+        queryForClangArg.push_back(paramQueries[p]);
+      }
+    }
+    assert(swiftParamForClangArg.size() == paramEnd - firstParam &&
+           "implicit object-size arguments do not account for the difference "
+           "between the Clang and Swift parameter lists");
+  }
+
+  // The pointer described by the implicit size argument that follows it, if the
+  // parameter we just emitted was annotated.
+  llvm::Value *pendingObjectSizePointer = nullptr;
+
   for (unsigned i = firstParam; i != paramEnd; ++i) {
+    size_t swiftParamIndex = i - firstParam;
+    if (!paramQueries.empty()) {
+      if (auto query = queryForClangArg[i - firstParam]) {
+        assert(pendingObjectSizePointer &&
+               "object-size argument with no pointer before it");
+        out.add(emitObjectSizeArgument(IGF, pendingObjectSizePointer, *query));
+        pendingObjectSizePointer = nullptr;
+        continue;
+      }
+      swiftParamIndex = swiftParamForClangArg[i - firstParam];
+    }
+
+    // Where this parameter's first value will land in \c out, so that an
+    // implicit size argument can find the pointer it describes.
+    size_t outSizeBeforeParam = out.size();
+
     auto clangParamTy = FI.arg_begin()[i].type;
     auto &AI = FI.arg_begin()[i].info;
 
@@ -4722,11 +4839,11 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
     if (auto *padType = AI.getPaddingType())
       out.add(llvm::UndefValue::get(padType));
 
-    const SILParameterInfo &paramInfo = params[i - firstParam];
+    const SILParameterInfo &paramInfo = params[swiftParamIndex];
     SILType paramType = silConv.getSILType(
         paramInfo, IGF.IGM.getMaximalTypeExpansionContext());
 
-    bool isForwardableArgument = IGF.isForwardableArgument(i - firstParam);
+    bool isForwardableArgument = IGF.isForwardableArgument(swiftParamIndex);
 
     bool passIndirectToDirect = paramInfo.isIndirectInGuaranteed() && paramType.isSensitive();
     if (passIndirectToDirect) {
@@ -4769,7 +4886,8 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
       auto toTy = AI.getCoerceToType();
 
       // Indirect parameters are bridged as Clang pointer types.
-      if (silConv.isSILIndirect(params[i - firstParam]) && !passIndirectToDirect) {
+      if (silConv.isSILIndirect(params[swiftParamIndex]) &&
+          !passIndirectToDirect) {
         assert(paramType.isAddress() && "SIL type is not an address?");
 
         auto addr = in.claimNext();
@@ -4837,6 +4955,14 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
     case clang::CodeGen::ABIArgInfo::InAlloca:
       llvm_unreachable("Need to handle InAlloca when externalizing arguments");
       break;
+    }
+
+    if (swiftParamIndex < paramQueries.size() &&
+        paramQueries[swiftParamIndex]) {
+      auto emitted = out.getAll();
+      assert(emitted.size() > outSizeBeforeParam &&
+             "pass_object_size parameter produced no argument to describe");
+      pendingObjectSizePointer = emitted[outSizeBeforeParam];
     }
   }
 }
