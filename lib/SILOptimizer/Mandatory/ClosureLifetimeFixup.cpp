@@ -419,6 +419,12 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
     if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(arg.get()))
       if (m->hasGuaranteedInitialKind())
         continue;
+
+    // A `@called(once)` closure's on-stack context takes ownership of its
+    // Copyable captures directly.
+    if (pai->isCalledOnce() && !arg.get()->getType().isAddress())
+      continue;
+
     curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
                                   MarkDependenceKind::NonEscaping);
   }
@@ -651,6 +657,16 @@ static SILValue tryRewriteToPartialApplyStack(
           noImplicitCopyWrapperToDelete.push_back(mmci);
         }
       }
+
+      // A `@called(once)` closure's on-stack context takes ownership of
+      // its Copyable captured arguments unlike regular closures that always
+      // borrow. This is done because a `@called(once)` closure has a destructor.
+      if (origPA->isCalledOnce() && !foundNoImplicitCopy &&
+          !argValue->getType().isMoveOnly()) {
+        args.push_back(argValue);
+        continue;
+      }
+
       SILValue borrow = b.createBeginBorrow(origPA->getLoc(), argValue);
       if (foundNoImplicitCopy)
         borrow = b.createGuaranteedMoveOnlyWrapperToCopyableValue(
@@ -956,6 +972,14 @@ static SILValue tryRewriteToPartialApplyStack(
           argValue = argBorrow->getOperand();
           builder.createEndBorrow(newPA->getLoc(), argBorrow);
         }
+
+        // Unlike regular on-stack closures `@called(once)` don't borrow their
+        // non-trivially destroyable Copyable captures because they always have
+        // a destructor and so no separate cleanup for such values in necessary.
+        if (newPA->isCalledOnce() && !argBorrow &&
+            !argValue->getType().isAddress())
+          return SILValue();
+
         // Don't need to destroy if we borrowed in place .
         return borrowedOriginals.count(argValue) ? SILValue() : argValue;
       };

@@ -121,3 +121,78 @@ public func neverCalledEscaping(_ x: Int) {
   let r = Resource(x: x)
   dontCallOnceEscaping { r.use() }
 }
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19allBorrowedCapturesyySiF"(i64 %0)
+// CHECK: [[CTX:%.*]] = alloca i8, i64 32, align 16
+// CHECK: call ptr @swift_initStackObject(ptr {{.*}}, ptr [[CTX]])
+// CHECK: call swiftcc void @"$s4test8callOnceyyyyXEnF"(ptr @"$s4test19allBorrowedCapturesyySiFyyXEfU_TA", ptr %closure)
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19allBorrowedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
+// CHECK: call swiftcc void @"$s4test19allBorrowedCapturesyySiFyyXEfU_"(ptr {{%.*}}, i64 {{%.*}})
+// CHECK-NEXT: call void @swift_release(ptr %0)
+// CHECK-NEXT: ret void
+public func allBorrowedCaptures(_ x: Int) {
+  let t = Tracker()
+  callOnce {
+    _ = t
+    _ = x
+  }
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test30allBorrowedCapturesNeverCalledyySiF"(i64 %0)
+// CHECK: [[CTX:%.*]] = alloca i8, i64 32, align 16
+// CHECK: call ptr @swift_initStackObject(ptr {{.*}}, ptr [[CTX]])
+// CHECK: call swiftcc void @"$s4test12dontCallOnceyyyyXEnF"(ptr @"$s4test30allBorrowedCapturesNeverCalledyySiFyyXEfU_TA", ptr %closure)
+//
+// CHECK-LABEL: define{{.*}} void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
+// CHECK: [[FIELD:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %TSi }>, ptr %0, i32 0, i32 1
+// CHECK: [[TRACKER:%.*]] = load ptr, ptr [[FIELD]]
+// CHECK: call void @swift_release(ptr [[TRACKER]])
+// CHECK-NOT: call void @swift_deallocObject
+// CHECK: ret void
+public func allBorrowedCapturesNeverCalled(_ x: Int) {
+  let t = Tracker()
+  dontCallOnce {
+    _ = t
+    _ = x
+  }
+}
+
+struct BorrowableValue: ~Copyable {
+  var t: Tracker
+  borrowing func peek() -> Tracker { t }
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test26noncopyableBorrowedCaptureyySiF"(i64 %0)
+// CHECK: [[CTX:%.*]] = alloca i8, i64 24, align 16
+// CHECK-NOT: call ptr @swift_retain
+// CHECK: call ptr @swift_initStackObject(ptr {{.*}}, ptr [[CTX]])
+// CHECK: call swiftcc void @"$s4test8callOnceyyyyXEnF"(ptr @"$s4test26noncopyableBorrowedCaptureyySiFyyXEfU_TA", ptr %closure)
+public func noncopyableBorrowedCapture(_ x: Int) {
+  let v = BorrowableValue(t: Tracker())
+  callOnce {
+    _ = v.peek()
+  }
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test26noncopyableBorrowedCaptureyySiFyyXEfU_TA"(ptr swiftself %0)
+// CHECK: call swiftcc void @"$s4test26noncopyableBorrowedCaptureyySiFyyXEfU_"(ptr {{%.*}})
+// CHECK-NEXT: call void @swift_release(ptr %0)
+// CHECK-NEXT: ret void
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test37noncopyableBorrowedCaptureNeverCalledyySiF"(i64 %0)
+// CHECK: [[CTX:%.*]] = alloca i8, i64 24, align 16
+// CHECK-NOT: call ptr @swift_retain
+// CHECK: call ptr @swift_initStackObject(ptr {{.*}}, ptr [[CTX]])
+// CHECK: call swiftcc void @"$s4test12dontCallOnceyyyyXEnF"(ptr @"$s4test37noncopyableBorrowedCaptureNeverCalledyySiFyyXEfU_TA", ptr %closure)
+public func noncopyableBorrowedCaptureNeverCalled(_ x: Int) {
+  let v = BorrowableValue(t: Tracker())
+  dontCallOnce {
+    _ = v.peek()
+  }
+}
+
+// CHECK-LABEL: define{{.*}} void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
+// CHECK-NOT: call void @swift_release
+// CHECK-NOT: call void @swift_deallocObject
+// CHECK: ret void
