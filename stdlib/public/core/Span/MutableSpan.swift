@@ -681,6 +681,36 @@ extension MutableSpan {
     span.updateAll(repeating: repeatedValue)
   }
 
+  /// Updates every element within the supplied range of indices
+  /// to the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - repeatedValue: The value to set for every element in `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>,
+    repeating repeatedValue: consuming Element,
+  ) {
+    updateSubrange(subrange.relative(to: indices), repeating: repeatedValue)
+  }
+
+  /// Updates every element of this span to the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - repeatedValue: The value to set for every element.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange,
+    repeating repeatedValue: consuming Element,
+  ) {
+    updateAll(repeating: repeatedValue)
+  }
+
   /// Copies elements from source into this span.
   ///
   /// `source` must have exactly as many elements as this span.
@@ -715,6 +745,38 @@ extension MutableSpan {
   ) {
     var span = self._mutatingExtracting(subrange)
     span.updateAll(copying: source)
+  }
+
+  /// Copies elements from source into the supplied range of indices
+  /// within this span.
+  ///
+  /// `source` must have exactly as many elements as `subrange`.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to copy into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>, copying source: Span<Element>
+  ) {
+    updateSubrange(subrange.relative(to: indices), copying: source)
+  }
+
+  /// Copies elements from source into this span.
+  ///
+  /// `source` must have exactly as many elements as this span.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - source: The elements to copy into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, copying source: Span<Element>
+  ) {
+    updateAll(copying: source)
   }
 
 #if !SPAN_COMPATIBILITY_STUB
@@ -859,6 +921,43 @@ extension MutableSpan where Element: ~Copyable {
   ) {
     var span = self._mutatingExtracting(subrange)
     span.updateAll(moving: &source)
+  }
+
+  /// Moves elements from source into the supplied range of indices
+  /// within this span, leaving the source empty.
+  ///
+  /// `source` must have exactly as many initialized elements as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>,
+    moving source: inout OutputSpan<Element>
+  ) {
+    updateSubrange(subrange.relative(to: indices), moving: &source)
+  }
+
+  /// Moves elements from source into this span, leaving the source empty.
+  ///
+  /// `source` must have exactly as many initialized elements as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - source: The elements to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, moving source: inout OutputSpan<Element>
+  ) {
+    updateAll(moving: &source)
   }
 }
 

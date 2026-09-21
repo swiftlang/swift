@@ -745,6 +745,36 @@ extension MutableRawSpan {
     span.updateAll(repeating: repeatedByte)
   }
 
+  /// Updates every byte within the supplied range of positions
+  /// to the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of positions. Every position in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - repeatedByte: The value to set for every byte in `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>,
+    repeating repeatedByte: UInt8,
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), repeating: repeatedByte)
+  }
+
+  /// Updates every byte of this span to the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every position of this span.
+  ///   - repeatedByte: The value to set for every byte.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange,
+    repeating repeatedByte: UInt8,
+  ) {
+    updateAll(repeating: repeatedByte)
+  }
+
   /// Copies bytes from source into this span.
   ///
   /// `source` must have exactly as many bytes as this span.
@@ -774,6 +804,38 @@ extension MutableRawSpan {
   ) {
     var span = self._mutatingExtracting(subrange)
     span.updateAll(copying: source)
+  }
+
+  /// Copies bytes from source into the supplied range of positions
+  /// within this span.
+  ///
+  /// `source` must have exactly as many bytes as `subrange`.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of positions. Every position in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to copy into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>, copying source: RawSpan
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), copying: source)
+  }
+
+  /// Copies bytes from source into this span.
+  ///
+  /// `source` must have exactly as many bytes as this span.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every position of this span.
+  ///   - source: The bytes to copy into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, copying source: RawSpan
+  ) {
+    updateAll(copying: source)
   }
 
   /// Moves bytes from source into this span, leaving the source empty.
@@ -810,6 +872,42 @@ extension MutableRawSpan {
   ) {
     var span = self._mutatingExtracting(subrange)
     span.updateAll(moving: &source)
+  }
+
+  /// Moves bytes from source into the supplied range of positions
+  /// within this span, leaving the source empty.
+  ///
+  /// `source` must have exactly as many initialized bytes as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of positions. Every position in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>, moving source: inout OutputRawSpan
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), moving: &source)
+  }
+
+  /// Moves bytes from source into this span, leaving the source empty.
+  ///
+  /// `source` must have exactly as many initialized bytes as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every position of this span.
+  ///   - source: The bytes to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, moving source: inout OutputRawSpan
+  ) {
+    updateAll(moving: &source)
   }
 
 #if !SPAN_COMPATIBILITY_STUB
