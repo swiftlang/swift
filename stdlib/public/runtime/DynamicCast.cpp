@@ -1801,6 +1801,78 @@ tryCastToErrorExistential(
   }
 }
 
+namespace {
+// The reserved ISwiftObject identity must be available without loading the
+// supplemental COM module. Encode {8E369447-5188-5ADA-B9EC-8FCB732D226B} in
+// native GUID byte order, with the alignment required by its integer fields.
+alignas(uint32_t) constexpr TargetCOMInterfaceID<InProcess> IID_ISwiftObject = {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    {0x47, 0x94, 0x36, 0x8e, 0x88, 0x51, 0xda, 0x5a,
+     0xb9, 0xec, 0x8f, 0xcb, 0x73, 0x2d, 0x22, 0x6b}
+#else
+#error GUID representation is byte-order dependent
+#endif
+};
+
+/// A borrowed Swift identity kept alive by an owned ISwiftObject reference.
+///
+/// The incoming interface need not share an address or allocation layout with
+/// the recovered Swift object. Only the ISwiftObject ABI is inspected.
+class COMSwiftObject {
+  void *Interface = nullptr;
+  HeapObject *Object = nullptr;
+  const Metadata *Type = nullptr;
+
+public:
+  explicit COMSwiftObject(void *source) {
+    if (!source)
+      return;
+
+    auto **vtable = *reinterpret_cast<void ***>(source);
+    auto QueryInterface =
+        reinterpret_cast<_SwiftCOMQueryInterfaceFunction>(vtable[0]);
+    void *identity = nullptr;
+    if (QueryInterface(source, IID_ISwiftObject.Bytes, &identity) < 0 ||
+        !identity)
+      return;
+    Interface = identity;
+
+    using ISwiftObject_get_Object = void *(__SWIFT_STDCALL *)(void *);
+    using ISwiftObject_get_Metadata =
+        const Metadata *(__SWIFT_STDCALL *)(void *);
+    vtable = *reinterpret_cast<void ***>(Interface);
+    auto get_Object = reinterpret_cast<ISwiftObject_get_Object>(vtable[3]);
+    auto get_Metadata = reinterpret_cast<ISwiftObject_get_Metadata>(vtable[4]);
+    auto *object = static_cast<HeapObject *>(get_Object(Interface));
+    auto *metadata = get_Metadata(Interface);
+
+    // Both requirements must describe the same native class object before
+    // its identity can be used by ordinary Swift runtime operations.
+    if (!object || !metadata || metadata->getKind() != MetadataKind::Class ||
+        swift_getObjectType(object) != metadata)
+      return;
+    Object = object;
+    Type = metadata;
+  }
+
+  COMSwiftObject(const COMSwiftObject &) = delete;
+  COMSwiftObject &operator=(const COMSwiftObject &) = delete;
+
+  ~COMSwiftObject() {
+    if (Interface) {
+      auto **vtable = *reinterpret_cast<void ***>(Interface);
+      auto Release = reinterpret_cast<_SwiftCOMLifetimeFunction>(vtable[2]);
+      Release(Interface);
+    }
+  }
+
+  explicit operator bool() const { return Object != nullptr; }
+  HeapObject *getObject() const { return Object; }
+  const Metadata *getType() const { return Type; }
+};
+
+} // namespace
+
 static DynamicCastResult
 tryCastUnwrappingExistentialSource(
   OpaqueValue *destLocation, const Metadata *destType,
@@ -1840,12 +1912,33 @@ tryCastUnwrappingExistentialSource(
     srcInnerValue = const_cast<OpaqueValue *>(srcErrorValue);
     break;
   }
-  case ExistentialTypeRepresentation::COM:
-    // COM interface pointers do not carry a Swift dynamic type to unwrap.
-    // Interface-to-interface casts are handled by tryCastToCOMExistential.
+  case ExistentialTypeRepresentation::COM: {
     srcFailureType = srcType;
     destFailureType = destType;
-    return DynamicCastResult::Failure;
+
+    // A COM-to-COM cast has already queried the destination interface. Do not
+    // follow its failure with an unrelated query for Swift identity.
+    if (auto *destination = dyn_cast<ExistentialTypeMetadata>(destType)) {
+      if (destination->getRepresentation() ==
+          ExistentialTypeRepresentation::COM)
+        return DynamicCastResult::Failure;
+    }
+
+    COMSwiftObject identity(*reinterpret_cast<void **>(srcValue));
+    if (!identity)
+      return DynamicCastResult::Failure;
+
+    // The queried interface owns the borrowed object for this recursive cast.
+    // Give a successful Swift result independent ownership. The outer driver
+    // consumes the original COM source when requested.
+    auto *object = identity.getObject();
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&object);
+    srcInnerType = identity.getType();
+    srcFailureType = srcInnerType;
+    return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                   destFailureType, srcFailureType, /*takeOnSuccess=*/false,
+                   mayDeferChecks, prohibitIsolatedConformances);
+  }
   }
 
   srcFailureType = srcInnerType;
