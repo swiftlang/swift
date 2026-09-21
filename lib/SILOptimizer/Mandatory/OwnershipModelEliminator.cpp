@@ -199,6 +199,20 @@ struct OwnershipModelEliminatorVisitor
     eraseInstructionAndRAUW(uoci, uoci->getOperand());
     return true;
   }
+
+  /// In OSSA a non-immortal `raw_pointer_to_ref` produces an owned value.
+  /// Without ownership the reference count has to be incremented explicitly.
+  bool visitRawPointerToRefInst(RawPointerToRefInst *rptr) {
+    if (rptr->isImmortal())
+      return false;
+
+    SILBuilder builder(rptr->getNextInstruction(), builderCtx,
+                       rptr->getDebugScope());
+    builder.createStrongRetain(rptr->getLoc(), rptr,
+                               builder.getDefaultAtomicity());
+    return true;
+  }
+
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);

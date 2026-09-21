@@ -2248,7 +2248,8 @@ SILCloner<ImplClass>::visitRawPointerToRefInst(RawPointerToRefInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createRawPointerToRef(getOpLocation(Inst->getLoc()),
                                                getOpValue(Inst->getOperand()),
-                                               getOpType(Inst->getType())));
+                                               getOpType(Inst->getType()),
+                                               Inst->isImmortal()));
 }
 
 template<typename ImplClass>

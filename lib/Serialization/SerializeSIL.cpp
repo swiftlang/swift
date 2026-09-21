@@ -2363,6 +2363,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       attrs = encodeValueOwnership(opening->getForwardingOwnershipKind());
     } else if (auto *atp = dyn_cast<AddressToPointerInst>(&SI)) {
       attrs = atp->needsStackProtection() ? 1 : 0;
+    } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(&SI)) {
+      attrs = rptr->isImmortal() ? 1 : 0;
     }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;

@@ -432,10 +432,13 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   SILType destType = destLowering.getLoweredType();
 
   // Take the raw pointer argument and cast it to the destination type.
+  // The instruction is not marked `immortal`, i.e. it produces an owned value.
+  // The `immortal` flag is set later by the optimizer if the Swift 5.1 runtime
+  // is available on the deployment target.
   SILValue result = SGF.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
-                                                destType);
-  // The result has ownership semantics, so retain it with a cleanup.
-  return SGF.emitManagedCopy(loc, result, destLowering);
+                                                destType, /*isImmortal=*/false);
+  // The result has ownership semantics, so it owns a reference.
+  return SGF.emitManagedRValueWithCleanup(result, destLowering);
 }
 
 static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,

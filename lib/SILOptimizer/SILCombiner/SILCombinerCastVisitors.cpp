@@ -222,10 +222,15 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // %1 = unchecked_ref_cast %x : $X->Z
   //
   // NOTE: For owned values, we only perform this optimization if we can
-  // guarantee that we can eliminate the initial unchecked_ref_cast.
+  // guarantee that we can eliminate the initial unchecked_ref_cast. It's the
+  // ownership of the bypassed cast which matters here - and not the ownership
+  // of its operand: a forwarding instruction can forward `owned` even if its
+  // operand has `none` ownership, e.g. the result of an `immortal`
+  // `raw_pointer_to_ref`. If such a cast would be bypassed it would lose its
+  // consuming use and therefore leak.
   if (auto *otherURCI = dyn_cast<UncheckedRefCastInst>(urci->getOperand())) {
     SILValue otherURCIOp = otherURCI->getOperand();
-    if (otherURCIOp->getOwnershipKind() != OwnershipKind::Owned) {
+    if (SILValue(otherURCI)->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(urci->getLoc(), otherURCIOp,
                                             urci->getType());
     }
@@ -246,11 +251,12 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // %1 = unchecked_ref_cast %x : $X->Z
   //
   // NOTE: For owned values, we only perform this optimization if we can
-  // guarantee that we can eliminate the upcast.
+  // guarantee that we can eliminate the upcast. Like above, the ownership of
+  // the bypassed upcast is checked and not the ownership of its operand.
   if (auto *ui = dyn_cast<UpcastInst>(urci->getOperand())) {
     SILValue uiOp = ui->getOperand();
 
-    if (uiOp->getOwnershipKind() != OwnershipKind::Owned) {
+    if (SILValue(ui)->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(urci->getLoc(), uiOp,
                                             urci->getType());
     }
@@ -493,7 +499,7 @@ legacyVisitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 }
 
 SILInstruction *
-SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
+SILCombiner::legacyVisitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
   // (raw_pointer_to_ref (ref_to_raw_pointer x X->Y) Y->Z)
   //   ->
   // (unchecked_ref_cast x X->Z)
