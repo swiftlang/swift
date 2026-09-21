@@ -11761,20 +11761,24 @@ class UnconditionalCheckedCastAddrInst final
                UnconditionalCheckedCastAddrInst, NonValueInstruction> {
   friend SILBuilder;
   CheckedCastInstOptions Options;
+  USE_SHARED_UINT8;
 
   UnconditionalCheckedCastAddrInst(SILDebugLocation Loc,
-                                   CheckedCastInstOptions options,
+                                   CheckedCastInstOptions options, bool isCopy,
                                    SILValue src, CanType sourceType,
                                    SILValue dest, CanType targetType,
                                    ArrayRef<SILValue> TypeDependentOperands);
 
   static UnconditionalCheckedCastAddrInst *
-  create(SILDebugLocation DebugLoc, CheckedCastInstOptions options,
-         SILValue src, CanType sourceType,
-         SILValue dest, CanType targetType,
+  create(SILDebugLocation DebugLoc, CheckedCastInstOptions options, bool isCopy,
+         SILValue src, CanType sourceType, SILValue dest, CanType targetType,
          SILFunction &F);
 
 public:
+  bool isCopy() const {
+    return sharedUInt8().UnconditionalCheckedCastAddrInst.isCopy;
+  }
+
   CheckedCastInstOptions getCheckedCastOptions() const { return Options; }
 };
 

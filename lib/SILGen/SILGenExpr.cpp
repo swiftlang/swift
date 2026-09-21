@@ -2498,7 +2498,19 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
       }
     }
   }
-  ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto sourceType = E->getSubExpr()->getType()->getCanonicalType();
+  auto targetType = E->getType()->getCanonicalType().getOptionalObjectType();
+  SGFContext operandContext;
+  switch (computeCastStrategy(SGF, sourceType, targetType)) {
+  case CastStrategy::Address:
+  case CastStrategy::Scalar:
+    break;
+  case CastStrategy::COM:
+    operandContext = SGFContext::AllowGuaranteedPlusZero;
+    break;
+  }
+  ManagedValue operand =
+      SGF.emitRValueAsSingleValue(E->getSubExpr(), operandContext);
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
                                     E->getType(), E->getCastKind(), C,
                                     trueCount, falseCount);

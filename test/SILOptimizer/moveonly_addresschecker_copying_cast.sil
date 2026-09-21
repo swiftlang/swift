@@ -115,3 +115,26 @@ bb3:
   %5 = tuple ()
   return %5 : $()
 }
+
+// A copying forced cast also only reads its source, even though it writes Dest.
+// CHECK-LABEL: sil [ossa] @forced_borrowed_source
+// CHECK: [[WRAPPER:%[0-9]+]] = copyable_to_moveonlywrapper_addr
+// CHECK: [[SOURCE:%[0-9]+]] = moveonlywrapper_to_copyable_addr [[WRAPPER]]
+// CHECK: unconditional_checked_cast_addr [copy] Any in [[SOURCE]] to any P in [[DEST:%[0-9]+]]
+// CHECK: destroy_addr [[DEST]]
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: return
+sil [ossa] @forced_borrowed_source : $@convention(thin) (@in_guaranteed Any) -> () {
+bb0(%0 : $*Any):
+  %1 = copyable_to_moveonlywrapper_addr %0 : $*Any
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*@moveOnly Any
+  %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Any
+  %4 = alloc_stack $any P
+  unconditional_checked_cast_addr [copy] Any in %3 : $*Any to any P in %4 : $*any P
+  destroy_addr %4 : $*any P
+  fix_lifetime %3 : $*Any
+  dealloc_stack %4 : $*any P
+  %5 = tuple ()
+  return %5 : $()
+}

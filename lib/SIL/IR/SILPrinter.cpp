@@ -2331,6 +2331,8 @@ public:
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
+    if (CI->isCopy())
+      *this << "[copy] ";
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());

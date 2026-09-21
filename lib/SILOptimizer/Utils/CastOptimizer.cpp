@@ -800,6 +800,14 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 /// to a required _ObjectiveCType may fail.
 SILInstruction *
 CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
+  // These rewrites temporarily take the source while calling the bridge.
+  // A copying unconditional cast must leave borrowed source storage intact.
+  auto *inst = dynamicCast.getInstruction();
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastAddrInst>(inst)) {
+    if (cast->isCopy())
+      return nullptr;
+  }
+
   CanType source = dynamicCast.getSourceFormalType();
   CanType target = dynamicCast.getTargetFormalType();
   auto &M = dynamicCast.getModule();
@@ -1492,6 +1500,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
   auto SourceType = Inst->getSourceFormalType();
   auto TargetType = Inst->getTargetFormalType();
   auto &Mod = Inst->getModule();
+  auto take = IsTake_t(!Inst->isCopy());
 
   if (TargetType->isAnyExistentialType() &&
       !SourceType->canBeExistential()) {
@@ -1537,13 +1546,14 @@ static bool optimizeStaticallyKnownProtocolConformance(
     case ExistentialRepresentation::Opaque: {
       auto ExistentialAddr = B.createInitExistentialAddr(
           Loc, Dest, SourceType, Src->getType().getObjectType(), Conformances);
-      B.createCopyAddr(Loc, Src, ExistentialAddr, IsTake_t::IsTake,
+      B.createCopyAddr(Loc, Src, ExistentialAddr, take,
                        IsInitialization_t::IsInitialization);
       break;
     }
     case ExistentialRepresentation::Class: {
-      auto Value =
-          B.emitLoadValueOperation(Loc, Src, LoadOwnershipQualifier::Take);
+      auto ownership =
+          take ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+      auto Value = B.emitLoadValueOperation(Loc, Src, ownership);
       auto Existential =
           B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
                                      SourceType, Value, Conformances);
@@ -1558,7 +1568,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
           B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
       // This needs to be a copy_addr (for now) because we must handle
       // address-only types.
-      B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
+      B.createCopyAddr(Loc, Src, Projection, take, IsInitialization);
       B.emitStoreValueOperation(Loc, AllocBox, Dest,
                                 StoreOwnershipQualifier::Init);
       break;
@@ -1626,7 +1636,8 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
 
     if (ResultNotUsed) {
       SILBuilderWithScope B(Inst, builderContext);
-      B.createDestroyAddr(Loc, dynamicCast.getSource());
+      if (!Inst->isCopy())
+        B.createDestroyAddr(Loc, dynamicCast.getSource());
       if (DestroyDestInst)
         eraseInstAction(DestroyDestInst);
       eraseInstAction(Inst);

@@ -1813,17 +1813,19 @@ UncheckedRefCastAddrInst::create(SILDebugLocation Loc, SILValue src,
 }
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, CheckedCastInstOptions options,
-    SILValue src, CanType srcType, SILValue dest,
-    CanType targetType, ArrayRef<SILValue> TypeDependentOperands)
+    SILDebugLocation Loc, CheckedCastInstOptions options, bool isCopy,
+    SILValue src, CanType srcType, SILValue dest, CanType targetType,
+    ArrayRef<SILValue> TypeDependentOperands)
     : AddrCastInstBase(Loc, src, srcType, dest, targetType,
-        TypeDependentOperands),
-      Options(options) {}
+                       TypeDependentOperands),
+      Options(options) {
+  sharedUInt8().UnconditionalCheckedCastAddrInst.isCopy = isCopy;
+}
 
-UnconditionalCheckedCastAddrInst *
-UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc,
-        CheckedCastInstOptions options, SILValue src,
-        CanType srcType, SILValue dest, CanType targetType, SILFunction &F) {
+UnconditionalCheckedCastAddrInst *UnconditionalCheckedCastAddrInst::create(
+    SILDebugLocation Loc, CheckedCastInstOptions options, bool isCopy,
+    SILValue src, CanType srcType, SILValue dest, CanType targetType,
+    SILFunction &F) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 4> allOperands;
   collectTypeDependentOperands(allOperands, F, srcType, targetType);
@@ -1831,7 +1833,7 @@ UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc,
       totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastAddrInst));
   return ::new (Buffer) UnconditionalCheckedCastAddrInst(
-    Loc, options, src, srcType, dest, targetType, allOperands);
+      Loc, options, isCopy, src, srcType, dest, targetType, allOperands);
 }
 
 CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(

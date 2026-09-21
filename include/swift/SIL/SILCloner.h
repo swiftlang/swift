@@ -2318,8 +2318,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
-                              OpLoc, Inst->getCheckedCastOptions(),
-                              SrcValue, SrcType, DestValue, TargetType));
+                              OpLoc, Inst->getCheckedCastOptions(), SrcValue,
+                              SrcType, DestValue, TargetType, Inst->isCopy()));
 }
 
 template <typename ImplClass>

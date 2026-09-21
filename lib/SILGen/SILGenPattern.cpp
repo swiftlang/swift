@@ -17,6 +17,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
+#include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -27,7 +28,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1880,9 +1880,25 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // temporary if necessary.
 
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(
-        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
+  bool requiresAddress;
+  switch (computeCastStrategy(SGF, sourceType, targetType)) {
+  case CastStrategy::COM: {
+    ManagedValue value =
+        prepareCOMCastSource(SGF, loc, src.getFinalManagedValue());
+    if (!value.getType().isAddress()) {
+      auto temporary = SGF.emitTemporaryAllocation(loc, value.getType());
+      value = SGF.B.createStoreBorrowOrTrivial(loc, value.borrow(SGF, loc),
+                                               temporary);
+    }
+    return {value, CastConsumptionKind::CopyOnSuccess};
+  }
+  case CastStrategy::Address:
+    requiresAddress = true;
+    break;
+  case CastStrategy::Scalar:
+    requiresAddress = false;
+    break;
+  }
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);

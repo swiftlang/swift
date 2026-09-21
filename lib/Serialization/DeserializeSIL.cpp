@@ -3930,8 +3930,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
-    // ignore attr.
-    CheckedCastInstOptions options(ListOfValues[6]);
+    unsigned flags = ListOfValues[6];
+    CheckedCastInstOptions options(flags & 0xFF);
+    bool isCopy = (flags >> 8) & 1;
     CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
                                        (SILValueCategory)ListOfValues[3], Fn);
@@ -3945,7 +3946,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                   targetLoweredType);
 
     ResultInst = Builder.createUnconditionalCheckedCastAddr(
-        Loc, options, src, srcFormalType, dest, targetFormalType);
+        Loc, options, src, srcFormalType, dest, targetFormalType, isCopy);
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {

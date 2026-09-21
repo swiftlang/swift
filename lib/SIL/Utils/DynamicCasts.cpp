@@ -1304,6 +1304,18 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
   assert(src->getType().isAddress());
   assert(dest->getType().isAddress());
 
+  if (auto *cast =
+          dyn_cast_or_null<UnconditionalCheckedCastAddrInst>(existingCast)) {
+    if (cast->isCopy()) {
+      // CastEmitter consumes address sources while changing representation.
+      // Only the same-representation copy can be emitted without taking Src.
+      if (src->getType() != dest->getType())
+        return false;
+      B.createCopyAddr(loc, src, dest, IsNotTake, IsInitialization);
+      return true;
+    }
+  }
+
   // Casts between the same types can be always handled here.
   // Casts from non-existentials into existentials and
   // vice-versa cannot be improved yet.

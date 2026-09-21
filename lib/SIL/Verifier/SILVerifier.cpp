@@ -939,7 +939,12 @@ struct ImmutableAddressUseVerifier {
         }
         return true;
       }
-      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+        auto *cast = swift::cast<UnconditionalCheckedCastAddrInst>(inst);
+        if (use->get() == cast->getDest() || !cast->isCopy())
+          return true;
+        break;
+      }
       case SILInstructionKind::UncheckedRefCastAddrInst:
         if (isConsumingOrMutatingMoveAddrUse(use)) {
           return true;
@@ -5408,6 +5413,14 @@ public:
               "Failure dest of checked_cast_br must not take any argument in "
               "non-ownership qualified sil");
     }
+  }
+
+  void checkUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *cast) {
+    require(cast->getSrc()->getType().isAddress(),
+            "unconditional_checked_cast_addr src must be an address");
+    require(cast->getDest()->getType().isAddress(),
+            "unconditional_checked_cast_addr dest must be an address");
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {

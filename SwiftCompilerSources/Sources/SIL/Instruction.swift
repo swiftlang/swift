@@ -746,7 +746,8 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
     CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
   }
 
-  public var isTakeOfSource: Bool { true }
+  public var isCopy: Bool { bridged.UnconditionalCheckedCastAddr_isCopy() }
+  public var isTakeOfSource: Bool { !isCopy }
   public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 

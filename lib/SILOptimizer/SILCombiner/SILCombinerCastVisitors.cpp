@@ -456,7 +456,8 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
     // Then we insert the destroy addr/store at the cast location.
     SILBuilderWithScope builder(uccai, Builder);
     SILLocation loc = uccai->getLoc();
-    builder.createDestroyAddr(loc, uccai->getSrc());
+    if (!uccai->isCopy())
+      builder.createDestroyAddr(loc, uccai->getSrc());
     builder.emitStoreValueOperation(loc, val, uccai->getDest(),
                                     StoreOwnershipQualifier::Init);
     return eraseInstFromFunction(*uccai);

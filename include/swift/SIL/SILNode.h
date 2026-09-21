@@ -201,6 +201,7 @@ protected:
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
+    SHARED_FIELD(UnconditionalCheckedCastAddrInst, bool isCopy);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);
     SHARED_FIELD(RefCountingInst, bool atomicity);
     SHARED_FIELD(EndAccessInst, bool aborting);
