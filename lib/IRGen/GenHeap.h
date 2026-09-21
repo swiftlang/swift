@@ -23,6 +23,7 @@
 
 namespace llvm {
   class Constant;
+  class BitVector;
   template <class T> class SmallVectorImpl;
 }
 
@@ -75,10 +76,14 @@ public:
 
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
-  llvm::Constant *getPrivateMetadata(IRGenModule &IGM,
-                                     llvm::Constant *captureDescriptor,
-                                     std::optional<uint64_t> mallocTypeId,
-                                     const llvm::Twine &name) const;
+  ///
+  /// \param unownedFields Indices of fields that the generated destructor must
+  /// never destroy because they aren't owned. For example, a `@called(once)`
+  /// on-stack closure with a borrowed ~Copyable capture.
+  llvm::Constant *getPrivateMetadata(
+      IRGenModule &IGM, llvm::Constant *captureDescriptor,
+      std::optional<uint64_t> mallocTypeId, const llvm::Twine &name,
+      const llvm::BitVector &unownedFields) const;
 
   std::optional<uint64_t>
   computeTypedMallocTypeDescriptor(IRGenModule &IGM) const;

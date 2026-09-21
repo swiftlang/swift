@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -488,9 +489,10 @@ void irgen::emitDeallocatePartialClassInstanceTyped(
 
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
-                                    std::optional<uint64_t> mallocTypeId,
-                                    const llvm::Twine &layoutName) {
+static llvm::Function *createDtorFn(
+    IRGenModule &IGM, const HeapLayout &layout,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &layoutName,
+    const llvm::BitVector &unownedFields) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
       "__swift_" + layoutName + "_destructor", &IGM.Module);
@@ -522,6 +524,9 @@ static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
     auto &field = layout.getElement(i);
     auto fieldTy = layout.getElementTypes()[i];
     if (field.isTriviallyDestroyable())
+      continue;
+
+    if (!unownedFields.empty() && unownedFields.test(i))
       continue;
 
     field.getType().destroy(
@@ -623,10 +628,11 @@ llvm::Constant *
 HeapLayout::getPrivateMetadata(IRGenModule &IGM,
                                llvm::Constant *captureDescriptor,
                                std::optional<uint64_t> mallocTypeId,
-                               const llvm::Twine &name) const {
+                               const llvm::Twine &name,
+                               const llvm::BitVector &unownedFields) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(
-        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name),
+        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name, unownedFields),
         captureDescriptor, MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
@@ -667,8 +673,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
   }
 
   auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
-  llvm::Value *metadata =
-      layout.getPrivateMetadata(IGM, captureDescriptor, maybeDescriptor, name);
+  llvm::Value *metadata = layout.getPrivateMetadata(
+      IGM, captureDescriptor, maybeDescriptor, name, /*unownedFields=*/{});
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
