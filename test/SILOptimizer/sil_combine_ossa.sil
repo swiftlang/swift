@@ -1628,6 +1628,44 @@ bb0(%0 : @owned $B):
   return %2 : $B
 }
 
+// A forwarding instruction can forward `owned` even if its operand has `none`
+// ownership - e.g. the result of an `immortal` raw_pointer_to_ref. Such a cast
+// must not be bypassed, because it would lose its consuming use and leak.
+
+// CHECK-LABEL: sil [ossa] @dont_bypass_owned_cast_of_immortal_value : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word {
+// CHECK:         [[CAST:%.*]] = unchecked_ref_cast %{{[0-9]+}} : $F to $Builtin.BridgeObject, forwarding: @owned
+// CHECK:         unchecked_ref_cast [[CAST]] : $Builtin.BridgeObject to $Klass
+// CHECK:       } // end sil function 'dont_bypass_owned_cast_of_immortal_value'
+sil [ossa] @dont_bypass_owned_cast_of_immortal_value : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $F
+  %2 = unchecked_ref_cast %1 : $F to $Builtin.BridgeObject, forwarding: @owned
+  %3 = bridge_object_to_word %2 : $Builtin.BridgeObject to $Builtin.Word
+  %4 = unchecked_ref_cast %2 : $Builtin.BridgeObject to $Klass
+  %5 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %4 : $Klass
+  return %3 : $Builtin.Word
+}
+
+// CHECK-LABEL: sil [ossa] @dont_bypass_owned_upcast_of_immortal_value : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK:         [[CAST:%.*]] = upcast %{{[0-9]+}} : $F to $E, forwarding: @owned
+// CHECK:         unchecked_ref_cast [[CAST]] : $E to $Klass
+// CHECK:       } // end sil function 'dont_bypass_owned_upcast_of_immortal_value'
+sil [ossa] @dont_bypass_owned_upcast_of_immortal_value : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $F
+  %2 = upcast %1 : $F to $E, forwarding: @owned
+  %3 = function_ref @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  %4 = apply %3<E>(%2) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  %5 = unchecked_ref_cast %2 : $E to $Klass
+  %6 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_upcast_roundtrip : $@convention(thin) (@owned E) -> @owned E {
 // CHECK-NOT: upcast
 // CHECK-NOT: unchecked_ref_cast
