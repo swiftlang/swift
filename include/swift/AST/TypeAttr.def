@@ -117,6 +117,10 @@ SIMPLE_SIL_TYPE_ATTR(moveOnly, MoveOnly)
 SIMPLE_SIL_TYPE_ATTR(sil_isolated, SILIsolated)
 SIMPLE_SIL_TYPE_ATTR(sil_sending, SILSending)
 SIMPLE_SIL_TYPE_ATTR(sil_implicit_leading_param, SILImplicitLeadingParam)
+// Records that function calls must pass an implicit object-size argument.
+SIMPLE_SIL_TYPE_ATTR(sil_pass_object_size, SILPassObjectSize)
+SIMPLE_SIL_TYPE_ATTR(sil_pass_object_size_min, SILPassObjectSizeMin)
+SIMPLE_SIL_TYPE_ATTR(sil_pass_object_size_dynamic, SILPassObjectSizeDynamic)
 // This is the same as AST's `nonisolated(nonsending)`.
 SIMPLE_SIL_TYPE_ATTR(caller_isolated, CallerIsolated)
 

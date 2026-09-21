@@ -154,6 +154,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::ForeignImplicitArgumentThunk:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::CoroFunctionPointer:
     case Node::Kind::DefaultOverride:
@@ -3314,6 +3315,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'w':
       switch (nextChar()) {
       case 'b': return createNode(Node::Kind::BackDeploymentThunk);
+      case 'i':
+        return createNode(Node::Kind::ForeignImplicitArgumentThunk);
       case 'B': return createNode(Node::Kind::BackDeploymentFallback);
       case 'c':
         return createNode(Node::Kind::CoroFunctionPointer);

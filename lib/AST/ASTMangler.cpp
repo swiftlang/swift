@@ -1134,7 +1134,9 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
-  }
+    case SymbolKind::ForeignImplicitArgumentThunk:
+      return appendOperator("Twi");
+    }
 }
 
 static bool getUnnamedParamIndex(const ParameterList *ParamList,

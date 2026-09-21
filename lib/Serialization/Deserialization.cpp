@@ -7726,6 +7726,23 @@ getActualSILParameterOptions(uint8_t raw) {
     result |= SILParameterInfo::Const;
   }
 
+  if (options.contains(serialization::SILParameterInfoFlags::PassObjectSize)) {
+    options -= serialization::SILParameterInfoFlags::PassObjectSize;
+    result |= SILParameterInfo::PassObjectSize;
+  }
+
+  if (options.contains(
+          serialization::SILParameterInfoFlags::PassObjectSizeMin)) {
+    options -= serialization::SILParameterInfoFlags::PassObjectSizeMin;
+    result |= SILParameterInfo::PassObjectSizeMin;
+  }
+
+  if (options.contains(
+          serialization::SILParameterInfoFlags::PassObjectSizeDynamic)) {
+    options -= serialization::SILParameterInfoFlags::PassObjectSizeDynamic;
+    result |= SILParameterInfo::PassObjectSizeDynamic;
+  }
+
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
   if (bool(options)) {

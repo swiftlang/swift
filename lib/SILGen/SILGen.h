@@ -160,6 +160,12 @@ public:
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
 
+  /// Get or create a `@convention(c)` entry point that forwards to
+  /// \p foreignRef, an imported C function whose ABI takes arguments that its
+  /// formal type does not mention.
+  SILFunction *getOrCreateForeignImplicitArgumentThunk(SILDeclRef foreignRef,
+                                                       SILLocation loc);
+
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(

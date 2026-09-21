@@ -430,6 +430,7 @@ CONTEXT_NODE(MutateAccessor)
 NODE(AsyncMainEntryPoint)
 NODE(CalledOnceFunctionType)
 NODE(YieldTypes)
+NODE(ForeignImplicitArgumentThunk)
 
 #undef CONTEXT_NODE
 #undef NODE

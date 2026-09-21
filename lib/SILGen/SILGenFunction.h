@@ -1153,6 +1153,12 @@ public:
 
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
+
+  /// Generates a `@convention(c)` entry point that forwards to \p foreignRef,
+  /// an imported C function whose ABI takes arguments its formal type does not
+  /// mention.
+  void emitForeignImplicitArgumentThunk(SILDeclRef foreignRef);
+
   /// Generates a thunk from a native function to foreign conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
   /// Generates a stub that launches a detached task for running the NativeToForeignThunk of an

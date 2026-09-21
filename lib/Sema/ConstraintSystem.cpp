@@ -44,6 +44,8 @@
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
 #include "swift/Sema/TypeVariableType.h"
+#include "clang/AST/Attr.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -3941,6 +3943,17 @@ ASTNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
   // We only want the new anchor if all the path elements have been simplified
   // away.
   return path.empty() ? anchor : nullptr;
+}
+
+unsigned constraints::getNumPassObjectSizeParams(const ValueDecl *decl) {
+  auto *clangFn = dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+  if (!clangFn)
+    return 0;
+
+  return llvm::count_if(clangFn->parameters(),
+                        [](const clang::ParmVarDecl *param) {
+                          return param->hasAttr<clang::PassObjectSizeAttr>();
+                        });
 }
 
 Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {

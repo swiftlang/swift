@@ -4321,6 +4321,11 @@ void simplifyLocator(ASTNode &anchor, ArrayRef<LocatorPathElt> &path,
 /// null otherwise.
 ASTNode simplifyLocatorToAnchor(ConstraintLocator *locator);
 
+/// The number of parameters marked `__attribute__((pass_object_size))` on the
+/// Clang declaration \p decl was imported from, or zero if it was not imported
+/// from a Clang function.
+unsigned getNumPassObjectSizeParams(const ValueDecl *decl);
+
 /// Retrieve argument at specified index from given node.
 /// The expression could be "application", "subscript" or "member" call.
 ///

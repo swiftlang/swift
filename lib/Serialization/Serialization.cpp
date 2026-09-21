@@ -5804,6 +5804,21 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     result |= SILParameterInfoFlags::Const;
   }
 
+  if (options.contains(SILParameterInfo::PassObjectSize)) {
+    options -= SILParameterInfo::PassObjectSize;
+    result |= SILParameterInfoFlags::PassObjectSize;
+  }
+
+  if (options.contains(SILParameterInfo::PassObjectSizeMin)) {
+    options -= SILParameterInfo::PassObjectSizeMin;
+    result |= SILParameterInfoFlags::PassObjectSizeMin;
+  }
+
+  if (options.contains(SILParameterInfo::PassObjectSizeDynamic)) {
+    options -= SILParameterInfo::PassObjectSizeDynamic;
+    result |= SILParameterInfoFlags::PassObjectSizeDynamic;
+  }
+
   // If we still have options left, this code is out of sync... return none.
   if (bool(options))
     return {};

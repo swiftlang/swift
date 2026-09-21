@@ -1468,6 +1468,19 @@ public:
   getDirectSelfParameter(const AbstractionPattern &type) const = 0;
   virtual ParameterConvention getPackParameter(unsigned index) const = 0;
 
+  /// Options the lowered parameter at \p index should carry beyond its
+  /// convention. Used by the C conventions to record the implicit object-size
+  /// argument that `__attribute__((pass_object_size))` requires, which has to
+  /// be part of the SIL type so that IRGen sees it wherever the function is
+  /// called from.
+  ///
+  /// This is answered from the function *declaration*, never from a bare
+  /// function type: Clang passes no implicit argument for a call through a
+  /// function pointer whose prototype is annotated, so neither do we.
+  virtual SILParameterInfo::Options getParameterOptions(unsigned index) const {
+    return {};
+  }
+
   // Helpers that branch based on a value ownership.
   ParameterConvention getIndirect(ValueOwnership ownership, bool forSelf,
                                   unsigned index,
@@ -2214,7 +2227,10 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    addParameter(formalParamIndex, loweredType, convention, origFlags);
+    addParameter(formalParamIndex, loweredType, convention, origFlags,
+                 /*isImplicit=*/false,
+                 forSelf ? SILParameterInfo::Options()
+                         : Convs.getParameterOptions(origParamIndex));
   }
 
   /// Recursively expand a tuple type into separate parameters.
@@ -2254,10 +2270,11 @@ private:
 
   /// Add a parameter that we derived from deconstructing the
   /// formal type.
-  void addParameter(int formalParameterIndex,
-                    CanType loweredType, ParameterConvention convention,
-                    ParameterTypeFlags origFlags, bool isImplicit = false) {
-    SILParameterInfo param(loweredType, convention);
+  void addParameter(int formalParameterIndex, CanType loweredType,
+                    ParameterConvention convention,
+                    ParameterTypeFlags origFlags, bool isImplicit = false,
+                    SILParameterInfo::Options extraOptions = {}) {
+    SILParameterInfo param(loweredType, convention, extraOptions);
 
     if (origFlags.isNoDerivative())
       param = param.addingOption(SILParameterInfo::NotDifferentiable);
@@ -4260,6 +4277,29 @@ public:
   }
 };
 
+/// The parameter options implied by a `__attribute__((pass_object_size))`
+/// attribute on the \p index'th parameter of \p decl.
+static SILParameterInfo::Options
+getPassObjectSizeOptions(const clang::FunctionDecl *decl, unsigned index) {
+  if (index >= decl->getNumParams())
+    return {};
+
+  auto *attr = decl->getParamDecl(index)->getAttr<clang::PassObjectSizeAttr>();
+  if (!attr)
+    return {};
+
+  SILParameterInfo::Options options = SILParameterInfo::PassObjectSize;
+  // Types 2 and 3 ask for a lower bound on the object's size. The other bit of
+  // the attribute's argument selects a whole-object or sub-object query, which
+  // only affects Clang's constant folding over the argument expression and has
+  // no counterpart in llvm.objectsize.
+  if (attr->getType() & 2)
+    options |= SILParameterInfo::PassObjectSizeMin;
+  if (attr->isDynamic())
+    options |= SILParameterInfo::PassObjectSizeDynamic;
+  return options;
+}
+
 /// Conventions based on C function declarations.
 class CFunctionConventions : public CFunctionTypeConventions {
   using super = CFunctionTypeConventions;
@@ -4272,6 +4312,10 @@ public:
             ConventionsKind::CFunction,
             decl->getType()->castAs<clang::FunctionType>()),
         TheDecl(decl), Ctx(ctx) {}
+
+  SILParameterInfo::Options getParameterOptions(unsigned index) const override {
+    return getPassObjectSizeOptions(TheDecl, index);
+  }
 
   ParameterConvention getDirectParameter(unsigned index,
                             const AbstractionPattern &type,
@@ -4344,6 +4388,11 @@ public:
             ConventionsKind::CXXMethod,
             decl->getType()->castAs<clang::FunctionType>()),
         TheDecl(decl), isMutating(isMutating), Ctx(ctx) {}
+
+  SILParameterInfo::Options getParameterOptions(unsigned index) const override {
+    return getPassObjectSizeOptions(TheDecl, index);
+  }
+
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
     // The callee may move from '*this', but the caller still owns and destroys

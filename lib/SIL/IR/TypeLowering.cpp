@@ -5442,11 +5442,31 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // TODO: For C language types we should consider the attached Clang types.
   if (fnTy1->getLanguage() == SILFunctionLanguage::C)
     DifferentFunctionTypesHaveDifferentRepresentation = false;
-  
+
   // Fast path -- if both functions were unwrapped from a CanSILFunctionType,
   // we might have pointer equality here.
   if (fnTy1 == fnTy2)
     return ABIDifference::CompatibleRepresentation;
+
+  // A parameter marked __attribute__((pass_object_size)) needs an extra size
+  // argument alongside it, so a prototype that has one is not interchangeable
+  // with one that does not.
+  //
+  // There is also no way to thunk between them at this level, since a thunk
+  // would have to compute the size from an opaque pointer. Report a difference
+  // and let the caller diagnose it.
+  auto implicitArgOptions =
+      SILParameterInfo::getForeignImplicitArgumentOptions();
+  if (fnTy1->getParameters().size() == fnTy2->getParameters().size()) {
+    for (auto i : indices(fnTy1->getParameters())) {
+      auto options1 =
+          fnTy1->getParameters()[i].getOptions() & implicitArgOptions;
+      auto options2 =
+          fnTy2->getParameters()[i].getOptions() & implicitArgOptions;
+      if (options1.toRaw() != options2.toRaw())
+        return ABIDifference::NeedsThunk;
+    }
+  }
 
   // Force unimplementable functions into the thunk path so that we don't
   // have to worry about diagnosing this in a ton of different places.

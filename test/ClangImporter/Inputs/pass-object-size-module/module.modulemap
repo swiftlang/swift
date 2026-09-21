@@ -1,0 +1,4 @@
+module PassObjectSizeOverloads {
+  header "PassObjectSizeOverloads.h"
+  export *
+}

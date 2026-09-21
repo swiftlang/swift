@@ -617,6 +617,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::ForeignImplicitArgumentThunk:
     case Node::Kind::ExtendedExistentialTypeShape:
     case Node::Kind::Uniquable:
     case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
@@ -2483,6 +2484,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::BackDeploymentFallback:
     Printer << "back deployment fallback for ";
+    return nullptr;
+  case Node::Kind::ForeignImplicitArgumentThunk:
+    if (!Options.ShortenThunk) {
+      Printer << "foreign implicit argument thunk for ";
+    }
     return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";
