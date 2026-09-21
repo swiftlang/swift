@@ -79,18 +79,14 @@ class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   importer::ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   SwiftLookupTableWriter(
       clang::ModuleFileExtension *extension, clang::ASTWriter &writer,
       ASTContext &ctx,
       importer::ClangSourceBufferImporter &buffersForDiagnostics,
-      const PlatformAvailability &avail,
-      ClangImporter::Implementation *importerImpl)
+      const PlatformAvailability &avail)
       : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        importerImpl(importerImpl) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -1305,7 +1301,7 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
-  NameImporter nameImporter(swiftCtx, availability, sema, importerImpl);
+  NameImporter nameImporter(swiftCtx, availability, sema);
 
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
@@ -2236,9 +2232,8 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
-  return std::make_unique<SwiftLookupTableWriter>(this, writer, swiftCtx,
-                                                  buffersForDiagnostics,
-                                                  availability, importerImpl);
+  return std::make_unique<SwiftLookupTableWriter>(
+      this, writer, swiftCtx, buffersForDiagnostics, availability);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>
