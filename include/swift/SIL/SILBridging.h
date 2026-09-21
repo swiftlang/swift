@@ -820,10 +820,14 @@ struct BridgedInstruction {
     SwiftInt numFunctions;
   };
 
+  // Values must match swift::CastConsumptionKind; asserted in
+  // CheckedCastAddrBranch_getConsumptionKind(). BorrowAlways (3) is
+  // omitted because checked_cast_addr_br cannot have it.
   enum class CastConsumptionKind {
-    TakeAlways,
-    TakeOnSuccess,
-    CopyOnSuccess
+    TakeAlways = 0,
+    TakeOnSuccess = 1,
+    CopyOnSuccess = 2,
+    TestOnly = 4
   };
 
   struct CheckedCastInstOptions {
@@ -1002,6 +1006,7 @@ struct BridgedInstruction {
       CheckedCastBranch_getCheckedCastOptions() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getTargetFormalType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType CheckedCastAddrBranch_getTargetLoweredType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getFailureBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
@@ -1387,7 +1392,7 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,
-      BridgedValue destination, BridgedCanType targetFormalType,
+      OptionalBridgedValue destination, BridgedCanType targetFormalType,
       BridgedInstruction::CheckedCastInstOptions options,
       BridgedInstruction::CastConsumptionKind consumptionKind,
       BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;

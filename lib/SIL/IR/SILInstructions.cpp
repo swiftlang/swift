@@ -1838,14 +1838,14 @@ CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(
   SILDebugLocation DebugLoc,
   CheckedCastInstOptions options,
   CastConsumptionKind consumptionKind,
-  SILValue src, CanType srcType, SILValue dest, CanType targetType,
-  ArrayRef<SILValue> TypeDependentOperands,
+  ArrayRef<SILValue> allOperands,
+  CanType srcType, SILType destLoweredType, CanType targetType,
   SILBasicBlock *successBB, SILBasicBlock *failureBB,
   ProfileCounter Target1Count, ProfileCounter Target2Count)
-      : AddrCastInstBase(DebugLoc, src, srcType, dest,
-            targetType, TypeDependentOperands, consumptionKind,
-            successBB, failureBB, Target1Count, Target2Count),
-        Options(options) {
+      : AddrCastInstBase(allOperands, DebugLoc, srcType, targetType,
+            consumptionKind, successBB, failureBB,
+            Target1Count, Target2Count),
+        Options(options), DestLoweredTy(destLoweredType) {
   assert(consumptionKind != CastConsumptionKind::BorrowAlways &&
          "BorrowAlways is not supported on addresses");
 }
@@ -1858,15 +1858,32 @@ CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
          SILFunction &F) {
+  bool hasDest = producesDestinationValue(consumptionKind);
+  // Always checked: if this is violated the operand list disagrees with
+  // CheckedCastAddrBranchInst::hasDest(), and getDest() then reads past the
+  // end of it while getNumTypeDependentOperands() underflows.
+  ASSERT(hasDest == (bool)dest &&
+         "a test_only cast must have no destination; every other kind needs one");
+
+  // Use the destination type for `as?` casts, target for `is` (test_only) tests.
+  SILType destLoweredType =
+      hasDest ? dest->getType()
+              : F.getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+                                 targetType)
+                    .getAddressType();
+
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 4> allOperands;
+  allOperands.push_back(src);
+  if (hasDest)
+    allOperands.push_back(dest);
   collectTypeDependentOperands(allOperands, F, srcType, targetType);
   unsigned size =
-      totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
+      totalSizeToAlloc<swift::Operand>(allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastAddrBranchInst));
   return ::new (Buffer) CheckedCastAddrBranchInst(
-    DebugLoc, options, consumptionKind,
-    src, srcType, dest, targetType, allOperands,
+    DebugLoc, options, consumptionKind, allOperands,
+    srcType, destLoweredType, targetType,
     successBB, failureBB, Target1Count, Target2Count);
 }
 

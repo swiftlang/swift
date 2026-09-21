@@ -950,6 +950,7 @@ struct ImmutableAddressUseVerifier {
         case CastConsumptionKind::BorrowAlways:
           llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
         case CastConsumptionKind::CopyOnSuccess:
+        case CastConsumptionKind::TestOnly:
           break;
         case CastConsumptionKind::TakeAlways:
         case CastConsumptionKind::TakeOnSuccess:
@@ -5412,8 +5413,26 @@ public:
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     require(CCABI->getSrc()->getType().isAddress(),
             "checked_cast_addr_br src must be an address");
-    require(CCABI->getDest()->getType().isAddress(),
-            "checked_cast_addr_br dest must be an address");
+
+    // hasDest() is derived from the consumption kind, and the operand list
+    // [src, dest?, typeDependentOperands...] is built to agree with it. If the
+    // two ever disagree, getDest() reads past the end of the operand list and
+    // getNumTypeDependentOperands() underflows, so pin it down here.
+    require(CCABI->getAllOperands().size() >= (CCABI->hasDest() ? 2u : 1u),
+            "checked_cast_addr_br operand list does not match its consumption "
+            "kind");
+
+    // A test_only cast produces no value, so it has no destination operand
+    // at all; see CheckedCastAddrBranchInst::hasDest().
+    if (CCABI->hasDest()) {
+      require(CCABI->getDest()->getType().isAddress(),
+              "checked_cast_addr_br dest must be an address");
+      // The target's lowered type is stored separately, because a test_only
+      // cast has no destination to read it back from. Where there is a
+      // destination the two must not drift apart.
+      require(CCABI->getDest()->getType() == CCABI->getTargetLoweredType(),
+              "checked_cast_addr_br dest must have the cast's target type");
+    }
 
     require(
         CCABI->getSuccessBB()->args_size() == 0,

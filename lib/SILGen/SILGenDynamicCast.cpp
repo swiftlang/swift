@@ -234,6 +234,9 @@ namespace {
         case CastConsumptionKind::TakeOnSuccess:
           handleFalse(result);
           break;
+        case CastConsumptionKind::TestOnly:
+          llvm_unreachable(
+              "test_only is emitted directly, not via CheckedCastEmitter");
         }
 
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");

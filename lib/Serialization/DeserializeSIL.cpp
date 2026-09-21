@@ -1482,6 +1482,8 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
     return CastConsumptionKind::CopyOnSuccess;
   case SIL_CAST_CONSUMPTION_BORROW_ALWAYS:
     return CastConsumptionKind::BorrowAlways;
+  case SIL_CAST_CONSUMPTION_TEST_ONLY:
+    return CastConsumptionKind::TestOnly;
   default:
     llvm_unreachable("not a valid CastConsumptionKind for SIL");
   }
@@ -3961,8 +3963,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         MF->getType(ListOfValues[5])->getCanonicalType();
     SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    SILValue dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
-                                  targetLoweredType);
+    SILValue dest;
+    if (producesDestinationValue(consumption)) {
+      dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
+                           targetLoweredType);
+    }
 
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);

@@ -1375,6 +1375,7 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
   case CastConsumptionKind::TakeOnSuccess: return isIrrefutable;
   case CastConsumptionKind::CopyOnSuccess: return false;
   case CastConsumptionKind::BorrowAlways: return false;
+  case CastConsumptionKind::TestOnly: return false;
   }
   llvm_unreachable("bad consumption kind");
 }
@@ -1631,6 +1632,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::TestOnly:
     return {ManagedValue::forBorrowedRValue(value), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess:
@@ -1648,6 +1650,7 @@ getManagedSubobject(SILGenFunction &SGF, ManagedValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::TestOnly:
     return {value.unmanagedBorrow(), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess: {
@@ -1815,7 +1818,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                                    src.getFinalConsumption());
       }
       case CastConsumptionKind::CopyOnSuccess:
-      case CastConsumptionKind::BorrowAlways: {
+      case CastConsumptionKind::BorrowAlways:
+      case CastConsumptionKind::TestOnly: {
         // We translate copy_on_success => borrow_always.
         auto memberMV = ManagedValue::forBorrowedAddressRValue(member);
         return {SGF.B.createLoadBorrow(loc, memberMV),
@@ -2311,6 +2315,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::CopyOnSuccess:
   case CastConsumptionKind::BorrowAlways:
+  case CastConsumptionKind::TestOnly:
     // No change to src necessary.
     break;
 
@@ -2415,7 +2420,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
         eltValue = SGF.B.createUncheckedEnumDataAddrForTake(loc, finalValue, eltDecl, eltTy);
         break;
       }
-      case CastConsumptionKind::BorrowAlways: {
+      case CastConsumptionKind::BorrowAlways:
+      case CastConsumptionKind::TestOnly: {
         // See if we can apply the projection in-place for this enum.
         SILValue projection;
         if (UncheckedEnumDataAddrInstBase::isDestructive(
@@ -2470,6 +2476,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
           break;
           
         case CastConsumptionKind::BorrowAlways:
+        case CastConsumptionKind::TestOnly:
           eltValue = SGF.B.createLoadBorrow(loc, eltValue);
           break;
           

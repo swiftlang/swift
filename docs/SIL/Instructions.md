@@ -5431,22 +5431,44 @@ sil-terminator ::= 'checked_cast_addr_br'
                     sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
-                    sil-stype 'in' sil-operand ','
+                    sil-stype ('in' sil-operand)? ','
                     sil-identifier ',' sil-identifier
 sil-cast-consumption-kind ::= 'take_always'
 sil-cast-consumption-kind ::= 'take_on_success'
 sil-cast-consumption-kind ::= 'copy_on_success'
+sil-cast-consumption-kind ::= 'test_only'
 
 checked_cast_addr_br take_always $A in %0 : $*@thick A to $B in %2 : $*@thick B, bb1, bb2
 // $A and $B must be both address types
 // bb1 must take a single argument of type $*B
 // bb2 must take no arguments
+
+checked_cast_addr_br test_only $A in %0 : $*@thick A to $B, bb1, bb2
+// A 'test_only' cast has no destination operand
 ```
 
 Performs a checked indirect conversion from `$A` to `$B`. If the
 conversion succeeds, control is transferred to `bb1`, and the result of
 the cast is left in the destination. If the conversion fails, control is
 transferred to `bb2`.
+
+The consumption kind describes what happens to the source operand:
+`take_always` consumes it whether or not the cast succeeds, `take_on_success`
+consumes it only on success, and `copy_on_success` leaves it in place and copies
+into the destination on success.
+
+`test_only` is different in kind: it reports only whether the conversion would
+have succeeded, and produces **no destination value at all**. The source is
+neither taken nor copied, and the instruction carries no destination operand, so
+it names only the target type. `CheckedCastAddrBranchInst::getDest()` returns an
+invalid `SILValue` for it, and `hasDest()` says so up front; code that reads the
+destination of a cast must check.
+
+`test_only` exists because some values cannot answer a cast question any other
+way. Producing the result of the cast would copy a payload whose type forbids
+copying, and taking it would destroy the very value being asked about — so
+neither `copy_on_success` nor `take_on_success` can implement `is` or
+`case is T` on a non-`Copyable` existential.
 
 ### try_apply
 

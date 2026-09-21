@@ -655,8 +655,12 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
+    case CastConsumptionKind::TestOnly:
+      break;
     }
-    if (castInst->getSuccessBB() == block)
+    // A test_only cast produces no value and has no destination, so there is
+    // nothing to mark initialized on the success edge.
+    if (castInst->getSuccessBB() == block && castInst->hasDest())
       locations.genBits(getSet, killSet, castInst->getDest());
   }
 }
@@ -912,7 +916,9 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::CheckedCastAddrBranchInst: {
         auto *castInst = cast<CheckedCastAddrBranchInst>(&I);
         requireBitsSet(bits, castInst->getSrc(), &I);
-        requireBitsClear(bits & nonTrivialLocations, castInst->getDest(), &I);
+        // A test_only cast has no destination to require uninitialized.
+        if (castInst->hasDest())
+          requireBitsClear(bits & nonTrivialLocations, castInst->getDest(), &I);
         break;
       }
       case SILInstructionKind::PartialApplyInst:
