@@ -5509,13 +5509,28 @@ function Build-SymbolKit([Hashtable] $Platform,
     }
 }
 
-function Build-DocC() {
-  Build-SPMProject `
-    -Action Build `
+function Build-DocC([Hashtable] $Platform,
+                    [Hashtable] $Compilers,
+                    [string]    $SwiftSDK) {
+  Build-CMakeProject `
     -Src $SourceCache\swift-docc `
-    -Bin $(Get-ProjectBinaryCache $BuildPlatform DocC) `
-    -Platform $BuildPlatform `
-    --product docc
+    -Bin (Get-ProjectBinaryCache $Platform DocC) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -CCompiler $Compilers.C `
+    -SwiftCompiler $Compilers.Swift `
+    -SwiftSDK $SwiftSDK `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
+      SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
+      SwiftMarkdown_DIR = (Get-ProjectCMakeModules $Platform Markdown);
+      LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
+      SymbolKit_DIR = (Get-ProjectCMakeModules $Platform SymbolKit);
+      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
+    }
 }
 
 function Test-PackageManager() {
@@ -6001,6 +6016,10 @@ if ($Toolchain) {
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
+  Invoke-BuildStep Build-DocC $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
+  }
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
@@ -6012,11 +6031,6 @@ if ($Toolchain) {
   }
 
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
-
-  # FIXME(compnerd) this requires the CMake build to be enabled.
-  if ($false -and -not $IsCrossCompiling) {
-    Invoke-BuildStep Build-DocC $HostPlatform
-  }
 
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
