@@ -260,7 +260,6 @@ public:
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
-  SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *TEDAI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);

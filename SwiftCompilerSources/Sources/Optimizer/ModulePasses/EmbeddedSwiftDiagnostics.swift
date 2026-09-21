@@ -346,14 +346,12 @@ private struct FunctionChecker {
       switch entry {
       case .invalid, .associatedType:
         break
-      case .method(let requirement, let witness):
-        if let witness = witness {
+      case .method(_, let witness):
+        // Witnesses that are not valid for embedded aren't actually put into
+        // the witness table. Ignore them.
+        if let witness = witness, witness.hasValidSignatureForEmbedded {
           callStack.push(CallSite(location: instruction.location, function: instruction.parentFunction,
                                   kind: .conformance))
-          if witness.isGeneric {
-            throw Violation(.embedded_cannot_specialize_witness_method, requirement,
-                            at: witness.location, in: witness)
-          }
           try checkFunction(witness)
           _ = callStack.pop()
         }
@@ -529,6 +527,12 @@ private struct Violation: Error {
 }
 
 private extension Function {
+  /// True if this function can be code-generated in Embedded Swift.
+  var hasValidSignatureForEmbedded: Bool {
+    let genericSignature = loweredFunctionType.invocationGenericSignatureOfFunction
+    return genericSignature.isEmpty || genericSignature.canBeEmittedInEmbeddedSwift
+  }
+
   // The priority (1 = highest) which defines the order in which functions are checked.
   // This is important to get good caller information in diagnostics.
   func priority(_ context: ModulePassContext) -> Int {

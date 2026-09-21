@@ -105,10 +105,10 @@ extension Unicode.UTF8 {
   public struct ValidationError: Error, Sendable, Hashable
   {
     /// The kind of encoding error
-    public internal(set) var kind: Unicode.UTF8.ValidationError.Kind
+    public var kind: Unicode.UTF8.ValidationError.Kind
 
     /// The range of offsets into our input containing the error
-    public internal(set) var byteOffsets: Range<Int>
+    public var byteOffsets: Range<Int>
 
     @export(implementation)
     public init(
@@ -123,15 +123,15 @@ extension Unicode.UTF8 {
         _precondition(byteOffsets.count == 1)
       }
 
-      self = unsafe unsafeBitCast((kind, byteOffsets), to: Self.self)
+      self.kind = kind
+      self.byteOffsets = byteOffsets
     }
 
     @export(implementation)
     public init(
       _ kind: Unicode.UTF8.ValidationError.Kind, at byteOffset: Int
     ) {
-      let bounds = unsafe Range(uncheckedBounds: (byteOffset, byteOffset+1))
-      self.init(kind, bounds)
+      self.init(kind, byteOffset..<(byteOffset+1))
     }
   }
 }
@@ -143,8 +143,9 @@ extension UTF8.ValidationError {
   @frozen
   public struct Kind: Error, Sendable, Hashable, RawRepresentable
    {
-    public internal(set) var rawValue: UInt8
+    public var rawValue: UInt8
 
+    @inlinable
     public init?(rawValue: UInt8) {
       guard rawValue <= 4 else { return nil }
       self.rawValue = rawValue
@@ -180,45 +181,6 @@ extension UTF8.ValidationError {
     public static var truncatedScalar: Self {
       .init(rawValue: 4)!
     }
-  }
-}
-
-@available(SwiftStdlib 6.2, *)
-extension UTF8.ValidationError {
-  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
-  internal var __legacyABI_kind: Kind {
-    get { kind }
-    @usableFromInline
-    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvs")
-    set { kind = newValue }
-    @usableFromInline
-    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvM")
-    _modify { yield &kind }
-  }
-
-  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
-  internal var __legacyABI_byteOffsets: Range<Int> {
-    get { byteOffsets }
-    @usableFromInline
-    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvs")
-    set { byteOffsets = newValue }
-    @usableFromInline
-    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvM")
-    _modify { yield &byteOffsets }
-  }
-}
-
-@available(SwiftStdlib 6.2, *)
-extension UTF8.ValidationError.Kind {
-  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
-  internal var __legacyABI_rawValue: UInt8 {
-    get { rawValue }
-    @usableFromInline
-    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvs")
-    set { rawValue = newValue }
-    @usableFromInline
-    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvM")
-    _modify { yield &rawValue }
   }
 }
 

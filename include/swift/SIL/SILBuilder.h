@@ -1433,9 +1433,9 @@ public:
   }
 
   RawPointerToRefInst *createRawPointerToRef(SILLocation Loc, SILValue Op,
-                                             SILType Ty) {
-    return insert(new (getModule())
-                      RawPointerToRefInst(getSILDebugLocation(Loc), Op, Ty));
+                                             SILType Ty, bool isImmortal) {
+    return insert(new (getModule()) RawPointerToRefInst(
+        getSILDebugLocation(Loc), Op, Ty, isImmortal));
   }
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
@@ -1623,14 +1623,13 @@ public:
         destFormalTy, getFunction(), forwardingOwnershipKind));
   }
 
-  UnconditionalCheckedCastAddrInst *
-  createUnconditionalCheckedCastAddr(SILLocation Loc,
-                                     CheckedCastInstOptions options,
-                                     SILValue src, CanType sourceFormalType,
-                                     SILValue dest, CanType targetFormalType) {
+  UnconditionalCheckedCastAddrInst *createUnconditionalCheckedCastAddr(
+      SILLocation Loc, CheckedCastInstOptions options, SILValue src,
+      CanType sourceFormalType, SILValue dest, CanType targetFormalType,
+      bool isCopy = false) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), options, src, sourceFormalType,
-        dest, targetFormalType, getFunction()));
+        getSILDebugLocation(Loc), options, isCopy, src, sourceFormalType, dest,
+        targetFormalType, getFunction()));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,

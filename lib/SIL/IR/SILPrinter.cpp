@@ -557,6 +557,7 @@ static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
   case CastConsumptionKind::TakeOnSuccess: return "take_on_success";
   case CastConsumptionKind::CopyOnSuccess: return "copy_on_success";
   case CastConsumptionKind::BorrowAlways: return "borrow_always";
+  case CastConsumptionKind::TestOnly: return "test_only";
   }
   llvm_unreachable("bad cast consumption kind");
 }
@@ -2329,6 +2330,8 @@ public:
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
+    if (CI->isCopy())
+      *this << "[copy] ";
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
@@ -2338,9 +2341,11 @@ public:
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetFormalType() << " in "
-          << getIDAndType(CI->getDest()) << ", "
-          << Ctx.getID(CI->getSuccessBB()) << ", "
+          << " to " << CI->getTargetFormalType();
+    // A test_only cast produces no value, so it has no destination operand.
+    if (CI->hasDest())
+      *this << " in " << getIDAndType(CI->getDest());
+    *this << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
     if (CI->getTrueBBCount())
       *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
@@ -2436,6 +2441,8 @@ public:
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
+    if (CI->isImmortal())
+      *this << "[immortal] ";
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
 

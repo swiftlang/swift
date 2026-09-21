@@ -2899,12 +2899,13 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>()) {
-      if (attr->getAttribute() == "sending") {
-        paramInfo->setSending();
-        break;
-      }
-    }
+    // Note: only a 'sending' written on the parameter itself counts here; one
+    // written in type position is handled via ImportTypeAttr::Sending.
+    if (llvm::any_of(param->specific_attrs<clang::SwiftAttrAttr>(),
+                     [](const clang::SwiftAttrAttr *attr) {
+                       return attr->getAttribute() == "sending";
+                     }))
+      paramInfo->setSending();
   }
 
   // C++ types taking a reference might return a reference/pointer to a

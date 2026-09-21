@@ -1121,8 +1121,9 @@ extension CheckedCastAddrBranchInst {
   }
 
   var supportedInEmbeddedSwift: Bool {
+    // Not `destination.type`: a test_only cast has no destination operand.
     return isCastSupportedInEmbeddedSwift(from: source.type,
-                                          to: destination.type)
+                                          to: targetLoweredType)
   }
 }
 

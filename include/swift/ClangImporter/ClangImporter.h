@@ -728,9 +728,6 @@ public:
       ImportPath::Module path,
       std::vector<std::string> &names) const;
 
-  /// Given a Clang module, decide whether this module is imported already.
-  static bool isModuleImported(const clang::Module *M);
-
   DeclName importName(
       const clang::NamedDecl *D,
       clang::DeclarationName givenName = clang::DeclarationName()) override;
@@ -823,7 +820,9 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -1039,15 +1038,13 @@ template <typename T>
 std::optional<T>
 matchSwiftAttr(const clang::Decl *decl,
                llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl || !decl->hasAttrs())
+  if (!decl)
     return std::nullopt;
 
-  for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      for (const auto &p : patterns) {
-        if (swiftAttr->getAttribute() == p.first)
-          return p.second;
-      }
+  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    for (const auto &p : patterns) {
+      if (swiftAttr->getAttribute() == p.first)
+        return p.second;
     }
   }
   return std::nullopt;

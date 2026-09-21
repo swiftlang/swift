@@ -161,6 +161,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(MoveValueInst.self,         { run(MoveValueInst.self, $0) })
   registerForSILCombine(OpenExistentialRefInst.self, { run(OpenExistentialRefInst.self, $0) })
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
+  registerForSILCombine(RawPointerToRefInst.self,   { run(RawPointerToRefInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
   registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
   registerForSILCombine(UncheckedAddrCastInst.self, { run(UncheckedAddrCastInst.self, $0) })

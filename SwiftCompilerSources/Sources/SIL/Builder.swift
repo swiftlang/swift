@@ -342,21 +342,26 @@ public struct Builder {
     return notifyNew(cast.getAs(UpcastInst.self))
   }
   
+  /// - Parameter destination: must be nil for a `.TestOnly` cast, which
+  ///   produces no value, and non-nil for every other consumption kind.
   @discardableResult
   public func createCheckedCastAddrBranch(
     source: Value, sourceFormalType: CanonicalType,
-    destination: Value, targetFormalType: CanonicalType,
+    destination: Value?, targetFormalType: CanonicalType,
     options: CheckedCastInstOptions,
     consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind,
     successBlock: BasicBlock,
     failureBlock: BasicBlock
   ) -> CheckedCastAddrBranchInst {
-    
+    precondition((consumptionKind == .TestOnly) == (destination == nil),
+                 "a test_only cast has no destination; every other kind needs one")
+
     let bridgedConsumption: BridgedInstruction.CastConsumptionKind
     switch consumptionKind {
       case .TakeAlways:    bridgedConsumption = .TakeAlways
       case .TakeOnSuccess: bridgedConsumption = .TakeOnSuccess
-      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess    
+      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess
+      case .TestOnly:      bridgedConsumption = .TestOnly
     }
 
     let cast = bridged.createCheckedCastAddrBranch(source.bridged, sourceFormalType.bridged,
@@ -371,11 +376,12 @@ public struct Builder {
   public func createUnconditionalCheckedCastAddr(
     options: CheckedCastInstOptions,
     source: Value, sourceFormalType: CanonicalType,
-    destination: Value, targetFormalType: CanonicalType
+    destination: Value, targetFormalType: CanonicalType,
+    isCopy: Bool = false
   ) -> UnconditionalCheckedCastAddrInst {
     let cast = bridged.createUnconditionalCheckedCastAddr(
         options.bridged, source.bridged, sourceFormalType.bridged,
-        destination.bridged, targetFormalType.bridged
+        destination.bridged, targetFormalType.bridged, isCopy
     )
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
   }

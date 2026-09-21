@@ -140,6 +140,32 @@ importer::mostRefinedFunctionRedecl(const clang::FunctionDecl *fn) {
   return best;
 }
 
+void importer::printRecordName(llvm::raw_ostream &out,
+                               const clang::RecordDecl *decl) {
+  if (decl->getIdentifier())
+    out << decl->getName();
+  else if (decl->isAnonymousStructOrUnion())
+    out << "(anonymous record)";
+  else
+    out << "(unnamed record)";
+}
+
+bool importer::anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred) {
+  if (const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    for (const auto &base : cxxRecordDecl->bases())
+      if (pred(base.getType()))
+        return true;
+  }
+
+  for (const auto *field : decl->fields())
+    if (pred(field->getType()))
+      return true;
+
+  return false;
+}
+
 std::optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
