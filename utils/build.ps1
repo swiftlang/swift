@@ -217,7 +217,7 @@ param
   [switch] $Windows = $false,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
-  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [string[]] $WindowsSDKArchitectures = @("X64"),
   [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
@@ -696,6 +696,13 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
+
+$script:TestFailures = New-Object System.Collections.Generic.List[string]
+
+function Write-TestFailure([string] $Name, $ErrorRecord) {
+  Write-Host "Test suite '$Name' failed: $ErrorRecord" -ForegroundColor Red
+  $script:TestFailures.Add($Name)
+}
 
 function Add-TimingData {
   param
@@ -3424,7 +3431,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestSwift) {
       $Targets += @("SwiftCompilerPlugin", "check-swift")
     }
-    $LLDBTargets = @()
+    $LLDBTargets = @("check-lldb")
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
     if ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
@@ -3558,13 +3565,29 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
     $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+
+    $Failures = @()
+    try {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    } catch {
+      Write-Host "Tests failed for targets [$($Targets -join ', ')]: $_" -ForegroundColor Red
+      $Failures += $_
+    }
 
     if ($LLDBTargets) {
-      Invoke-IsolatingEnvVars {
-        $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+      try {
+        Invoke-IsolatingEnvVars {
+          $env:SDKROOT = $SwiftSDK
+          Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+        }
+      } catch {
+        Write-Host "Tests failed for targets [$($LLDBTargets -join ', ')]: $_" -ForegroundColor Red
+        $Failures += $_
       }
+    }
+
+    if ($Failures.Count -gt 0) {
+      throw "One or more test suites failed:`n$($Failures -join "`n")"
     }
   }
 }
@@ -6357,6 +6380,10 @@ if ($IncludeSBoM) {
       Copy-File $ToolchainIdentifier-sbom.cyclone.xml $Stage
     }
   }
+}
+
+if ($script:TestFailures.Count -gt 0) {
+  throw "The following test suites failed: $($script:TestFailures -join ', ')"
 }
 
 # Custom exception printing for more detailed exception information
