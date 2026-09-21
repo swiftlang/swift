@@ -740,6 +740,10 @@ public:
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
+  /// Accessors and operator functions synthesized around an imported function,
+  /// mapped back to it.
+  llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -837,6 +841,18 @@ public:
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
+
+  void recordForwardingSource(const ValueDecl *decl, ValueDecl *source) {
+    forwardingSources[decl] = source;
+  }
+  /// The declaration \p decl was synthesized around, whether it is a clone of
+  /// a base class member or an accessor or operator built on an imported
+  /// function.
+  ValueDecl *getForwardingSource(const ValueDecl *decl) {
+    if (auto *source = forwardingSources.lookup(decl))
+      return source;
+    return getOriginalForClonedMember(decl);
+  }
 
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
