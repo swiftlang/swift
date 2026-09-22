@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
@@ -395,9 +396,18 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
-    if (constant.isForeign && decl->hasClangNode() &&
-        !decl->getObjCImplementationDecl())
-      F->setClangNodeOwner(decl);
+    if (constant.isForeign && decl->hasClangNode()) {
+      bool clangProvidesBody = !decl->getObjCImplementationDecl();
+      if (!clangProvidesBody) {
+        if (auto *thunk = dyn_cast<FuncDecl>(decl)) {
+          auto *loader = decl->getASTContext().getClangModuleLoader();
+          clangProvidesBody =
+              loader->getOriginalForVirtualThunk(thunk) != nullptr;
+        }
+      }
+      if (clangProvidesBody)
+        F->setClangNodeOwner(decl);
+    }
 
     if (auto availability = constant.getAvailabilityForLinkage())
       F->setAvailabilityForLinkage(*availability);
