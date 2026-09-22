@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableCasting)
+// RUN: %target-run-simple-swift(-target %target-future-triple -enable-experimental-feature NoncopyableCasting) | %FileCheck %s
 
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: executable_test

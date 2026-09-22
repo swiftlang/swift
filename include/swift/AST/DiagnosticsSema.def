@@ -7776,6 +7776,11 @@ ERROR(availability_escapable_generics_casting_only_version_newer, none,
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
+ERROR(availability_noncopyable_existential_casting_only_version_newer, none,
+      "runtime support for casting out of a non-'Copyable' existential "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
 ERROR(availability_typed_throws_only_version_newer, none,
       "runtime support for typed throws function types is only available in "
       "%0 %1 or newer",
