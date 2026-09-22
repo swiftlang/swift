@@ -89,6 +89,7 @@ void releasePolymorphic(Polymorphic *_Nonnull);
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainPolymorphic")))
 __attribute__((swift_attr("release:releasePolymorphic"))) Polymorphic {
+  // expected-note@+1{{to implement 'virtualMethod' in Swift, declare another non-inline virtual method before it and define that method in C++}}
   virtual int virtualMethod() const;
   int nonVirtualMethod() const;
 };

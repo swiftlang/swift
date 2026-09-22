@@ -69,6 +69,7 @@ struct Rejections {
 };
 
 struct Polymorphic {
+  // expected-note@+1{{to implement 'virtualMethod' in Swift, declare another non-inline virtual method before it and define that method in C++}}
   virtual int virtualMethod() const;
   int nonVirtualMethod() const;
 };
@@ -95,6 +96,7 @@ __attribute__((swift_attr("release:releaseWidget"))) Widget {
   int id;
 
   int tag() const;
+  // expected-note@+1{{to implement 'describe' in Swift, declare another non-inline virtual method before it and define that method in C++}}
   virtual int describe() const;
   static int count();
 };

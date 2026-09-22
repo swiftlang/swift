@@ -2277,10 +2277,26 @@ ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
       (ValueDecl *, StringRef, unsigned))
-ERROR(cxx_virtual_unsupported,none,
-      "%kind0 cannot implement C++ function '%1' because virtual methods are "
-      "not yet supported",
-      (ValueDecl *, StringRef))
+ERROR(cxx_pure_virtual_unsupported,none,
+      "%kind0 cannot implement pure virtual C++ method %1",
+      (ValueDecl *, const clang::NamedDecl *))
+NOTE(cxx_pure_virtual_declared_here,none,
+     "%0 declared pure virtual here",
+     (const clang::NamedDecl *))
+ERROR(cxx_virtual_key_function_unsupported,none,
+      "%kind0 cannot implement C++ method %1 because it is the first "
+      "non-inline virtual method of C++ class %2",
+      (ValueDecl *, const clang::NamedDecl *, const clang::NamedDecl *))
+NOTE(cxx_virtual_key_function_workaround,none,
+     "to implement %0 in Swift, declare another non-inline virtual method "
+     "before it and define that method in C++",
+     (const clang::NamedDecl *))
+ERROR(cxx_virtual_override_unsupported,none,
+      "%kind0 cannot implement C++ method %1 because it overrides a "
+      "virtual method %select{in a class hierarchy that uses multiple "
+      "inheritance|in a class hierarchy that has a virtual base|and changes "
+      "its return type}2",
+      (ValueDecl *, const clang::NamedDecl *, unsigned))
 ERROR(cxx_mutating_mismatch,none,
       "%kind0 should%select{|| not}1 be 'mutating' to match "
       "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
