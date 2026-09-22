@@ -1802,10 +1802,54 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
 
   bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
   entry.IsDescriptorUsed = true;
-  
+
   if (isNovelUseOfDescriptor) {
+    assert(!FinishedEmittingLazyDefinitions);
     LazyOpaqueTypeDescriptors.push_back(opaque);
   }
+}
+
+/// Whether the result type of \p fn contains an opaque archetype.
+static bool hasOpaqueResultType(SILFunction *fn) {
+  return fn->getLoweredFunctionType()
+      ->getAllResultsSubstType(fn->getModule(), TypeExpansionContext::minimal())
+      .getASTType()
+      ->hasOpaqueArchetype();
+}
+
+/// Collect the opaque archetypes appearing in the result type of \p fn,
+/// skipping the ones already present in \p seen.
+static void collectOpaqueResultTypes(
+    SILFunction *fn,
+    llvm::SmallVectorImpl<OpaqueTypeArchetypeType *> &opaqueTypes,
+    llvm::SmallSet<OpaqueTypeArchetypeType *, 8> &seen) {
+  auto resultTy = fn->getLoweredFunctionType()
+                      ->getAllResultsSubstType(fn->getModule(),
+                                               TypeExpansionContext::minimal())
+                      .getASTType();
+  resultTy.visit([&](CanType ty) {
+    if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
+      if (seen.insert(opaque).second)
+        opaqueTypes.push_back(opaque);
+  });
+}
+
+void IRGenerator::addDynamicReplacement(SILFunction *f) {
+  if (!DynamicReplacements.insert(f))
+    return;
+
+  if (!hasOpaqueResultType(f))
+    return;
+
+  // emitDynamicReplacements() references the opaque type descriptor and the
+  // descriptor accessor of the replacement's result type. It runs after
+  // emitLazyDefinitions() has drained the lazy worklists, so note the use of
+  // those descriptors now, while they can still be emitted.
+  SmallVector<OpaqueTypeArchetypeType *, 8> opaqueTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> seen;
+  collectOpaqueResultTypes(f, opaqueTypes, seen);
+  for (auto *opaque : opaqueTypes)
+    noteUseOfOpaqueTypeDescriptor(opaque->getDecl());
 }
 
 void IRGenerator::noteUseOfExtensionDescriptor(ExtensionDecl *ext) {
@@ -1940,29 +1984,14 @@ void IRGenerator::emitDynamicReplacements() {
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> newUniqueOpaqueTypes;
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> origUniqueOpaqueTypes;
   for (auto *newFunc : DynamicReplacements) {
-    auto newResultTy = newFunc->getLoweredFunctionType()
-             ->getAllResultsSubstType(newFunc->getModule(),
-                                      TypeExpansionContext::minimal())
-             .getASTType();
-    if (!newResultTy->hasOpaqueArchetype())
+    if (!hasOpaqueResultType(newFunc))
       continue;
-    newResultTy.visit([&](CanType ty) {
-      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
-        if (newUniqueOpaqueTypes.insert(opaque).second)
-          newFuncTypes.push_back(opaque);
-    });
+    collectOpaqueResultTypes(newFunc, newFuncTypes, newUniqueOpaqueTypes);
+
     auto *origFunc = newFunc->getDynamicallyReplacedFunction();
     assert(origFunc);
-    auto origResultTy = origFunc->getLoweredFunctionType()
-                  ->getAllResultsSubstType(origFunc->getModule(),
-                                           TypeExpansionContext::minimal())
-                  .getASTType();
-    assert(origResultTy->hasOpaqueArchetype());
-    origResultTy.visit([&](CanType ty) {
-      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
-        if (origUniqueOpaqueTypes.insert(opaque).second)
-          origFuncTypes.push_back(opaque);
-    });
+    assert(hasOpaqueResultType(origFunc));
+    collectOpaqueResultTypes(origFunc, origFuncTypes, origUniqueOpaqueTypes);
 
     assert(origFuncTypes.size() == newFuncTypes.size());
   }
