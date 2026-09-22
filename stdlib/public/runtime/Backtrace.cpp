@@ -23,13 +23,10 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Paths.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Runtime/Win32.h"
 
 #include "swift/Demangling/Demangler.h"
-
-#ifdef __linux__
-#include <sys/auxv.h>
-#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -44,17 +41,6 @@
 #endif
 
 #if TARGET_OS_OSX || TARGET_OS_MACCATALYST
-#if __has_include(<sys/codesign.h>)
-#include <sys/codesign.h>
-#else
-// SPI
-#define CS_OPS_STATUS 0
-#define CS_GET_TASK_ALLOW  0x00000004
-#define CS_RUNTIME         0x00010000
-#define CS_PLATFORM_BINARY 0x04000000
-#define CS_PLATFORM_PATH   0x08000000
-extern "C" int csops(int, unsigned int, void *, size_t);
-#endif
 #include <spawn.h>
 #endif
 #include <unistd.h>
@@ -63,6 +49,8 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
+
+SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
 
 #ifdef _WIN32
 // We'll probably want dbghelp.h here
@@ -295,37 +283,6 @@ const char *presetToString(Preset preset) {
 }
 #endif
 
-#ifdef __linux__
-bool isPrivileged() {
-  return getauxval(AT_SECURE);
-}
-#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST
-bool isPrivileged() {
-  if (issetugid())
-    return true;
-
-  uint32_t flags = 0;
-  if (csops(getpid(),
-            CS_OPS_STATUS,
-            &flags,
-            sizeof(flags)) != 0)
-    return true;
-
-  if (flags & (CS_PLATFORM_BINARY | CS_PLATFORM_PATH | CS_RUNTIME))
-    return true;
-
-  return !(flags & CS_GET_TASK_ALLOW);
-}
-#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-bool isPrivileged() {
-  return issetugid();
-}
-#elif _WIN32
-bool isPrivileged() {
-  return false;
-}
-#endif
-
 #if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 #if _WIN32
 bool writeProtectMemory(void *ptr, size_t size) {
@@ -344,8 +301,8 @@ bool writeProtectMemory(void *ptr, size_t size) {
 BacktraceInitializer::BacktraceInitializer() {
   const char *backtracing = swift::runtime::environment::SWIFT_BACKTRACE();
 
-  // Force off for setuid processes.
-  if (isPrivileged()) {
+  // Force off for privileged processes.
+  if (swift::runtime::_swift_isRestrictedProcessForExec()) {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
 
@@ -394,7 +351,8 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 #else
 
-  if (isPrivileged() && _swift_backtraceSettings.enabled != OnOffTty::Off) {
+  if (swift::runtime::_swift_isRestrictedProcessForExec()
+      && _swift_backtraceSettings.enabled != OnOffTty::Off) {
     // You'll only see this warning if you do e.g.
     //
     //    SWIFT_BACKTRACE=enable=on /path/to/some/setuid/binary
@@ -1489,6 +1447,9 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
   _swift_formatAddress(crashInfo, addr_buf);
+  
+  crashInfo->concurrency_task_registry_addr = _swift_concurrency_task_registry_addr;
+  
   #ifdef _WIN32
   _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
   #endif

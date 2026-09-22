@@ -31,7 +31,7 @@ private:
 
 struct SWIFT_ESCAPABLE Owner {};
 
-struct Unannotated {
+struct Unannotated { // expected-note 2 {{this type has unknown escapability: its member 'pointer' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
     Unannotated();
     int *pointer;
 };
@@ -43,7 +43,7 @@ struct SafeEscapableAggregate {
     float b[5];
 };
 
-struct UnknownEscapabilityAggregate {
+struct UnknownEscapabilityAggregate { // expected-note {{this type has unknown escapability: it depends on 'Unannotated', whose escapability is unknown}}
     SafeEscapableAggregate agg;
     Unannotated unann;
 };
@@ -51,23 +51,23 @@ struct UnknownEscapabilityAggregate {
 template <typename T> struct SWIFT_ESCAPABLE_IF(T) EscapableIfT { T t; };
 using SafeEscapableIf = EscapableIfT<int>;
 
-struct ConditionalMemberBeforePointer {
+struct ConditionalMemberBeforePointer { // expected-note {{this type has unknown escapability: its member 'pointer' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
     SafeEscapableIf cond;
     int *pointer;
 };
 
-struct ConditionalMemberAfterPointer {
+struct ConditionalMemberAfterPointer { // expected-note {{this type has unknown escapability: its member 'pointer' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
     int *pointer;
     SafeEscapableIf cond;
 };
 
-struct SharedPtrBeforePointer {
+struct SharedPtrBeforePointer { // expected-note {{this type has unknown escapability: its member 'pointer' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
     std::shared_ptr<int> shared;
     int *pointer;
 };
 
 struct MyContainer {
-    int begin() const { return 0; }
+    int begin() const { return 0; } // expected-note {{'begin' and 'end' are assumed to return iterators, which do not keep the underlying storage alive}}
     int end() const { return -1; }
 };
 
@@ -80,25 +80,25 @@ using UnsafeTuple = std::tuple<int, int*, int>;
 
 View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 // Second non-escapable type is not annotated in any way.
-void unsafeFunc(View v1 [[clang::noescape]], View v2);
+void unsafeFunc(View v1 [[clang::noescape]], View v2); // expected-note {{non-escapable parameter 'v2' has no lifetime annotation}}
 
 // expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-View returnsViewNoAnnotation(const Owner &o);
+View returnsViewNoAnnotation(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 
 struct InferredNonEscapable {
   View v;
 };
-InferredNonEscapable returnsInferredNonEscapable(const Owner &o);
+InferredNonEscapable returnsInferredNonEscapable(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 
 struct HasUnannotatedViewGetter {
   // expected-warning@+2{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
   // expected-error@+1{{cannot infer lifetime dependence on a method because 'self' is BitwiseCopyable, specify '@_lifetime(borrow self)'}}
-  View getView() const;
+  View getView() const; // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 };
 
-// expected-warning@+2{{the returned type 'void' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 struct SWIFT_NONESCAPABLE ViewWithUnannotatedCtor {
-    ViewWithUnannotatedCtor(const Owner &o);
+    ViewWithUnannotatedCtor(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 private:
     const int *member;
 };
@@ -108,11 +108,18 @@ View returnsViewLifetimebound(const Owner &o [[clang::lifetimebound]]);
 // A lifetime dependency whose target is Escapable is dropped, so the annotation
 // is not enforced: import the function as unsafe.
 // expected-warning@+1{{the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies}}
-Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]);
+Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]); // expected-note {{this lifetime annotation is not enforced: the result is Escapable, so Swift drops the dependency}}
 
+// A hand-written lifetime annotation says what the result depends on, so the
+// importer neither asks for an annotation nor infers one.
 __attribute__((swift_attr("@lifetime(borrow o)")))
-// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 View returnsViewHandWrittenLifetime(const Owner &o);
+
+// expected-expansion@+4:6{{
+//   expected-error@1{{cannot borrow the lifetime of 'byValue', which is passed by value on a function}}
+// }}
+__attribute__((swift_attr("@lifetime(borrow byValue)")))
+View returnsViewByValueLifetime(Owner byValue);
 
 __attribute__((swift_attr("safe")))
 // expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
@@ -120,17 +127,47 @@ View returnsViewAuditedSafe(const Owner &o);
 
 class SharedObject {
 public:
-  View getView() const [[clang::lifetimebound]];
+  View getView() const [[clang::lifetimebound]]; // expected-note {{Swift cannot represent the lifetime annotation on 'self', which is imported as a class}}
 private:
   int *p;
 } SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject);
 
-View getViewFromSharedObject(SharedObject* p [[clang::lifetimebound]]);
+View getViewFromSharedObject(SharedObject* p [[clang::lifetimebound]]); // expected-note {{Swift cannot represent the lifetime annotation on parameter 'p', which is imported as a class}}
 
 inline void retainSharedObject(SharedObject *) {}
 inline void releaseSharedObject(SharedObject *) {}
 
 struct DerivedFromSharedObject : SharedObject {};
+
+// Unsafety of a reference type is inherited by the types derived from it, just
+// like for value types.
+struct HasUnsafeReferenceBase : UnsafeReference {}; // expected-note {{'UnsafeReference' is annotated unsafe in C++}}
+struct HasUnsafeReferenceBaseTransitively : HasUnsafeReferenceBase {}; // expected-note {{'UnsafeReference' is annotated unsafe in C++}}
+struct SWIFT_SAFE WrapsUnsafeReferenceBase : UnsafeReference {};
+struct DerivedFromWrapsUnsafeReferenceBase : WrapsUnsafeReferenceBase {};
+
+class SWIFT_UNSAFE ExplicitlyUnsafeSharedObject {
+} SWIFT_SHARED_REFERENCE(retainExplicitlyUnsafeSharedObject,
+                         releaseExplicitlyUnsafeSharedObject);
+
+inline void retainExplicitlyUnsafeSharedObject(ExplicitlyUnsafeSharedObject *) {}
+inline void releaseExplicitlyUnsafeSharedObject(ExplicitlyUnsafeSharedObject *) {}
+
+struct HasExplicitlyUnsafeSharedObjectBase : ExplicitlyUnsafeSharedObject {}; // expected-note {{'ExplicitlyUnsafeSharedObject' is annotated unsafe in C++}}
+
+// The base class may be a class template specialization, as in CRTP.
+template <class Derived>
+struct SWIFT_UNSAFE_REFERENCE CRTPBase {};
+
+struct HasCRTPBase : CRTPBase<HasCRTPBase> {}; // expected-note {{'CRTPBase' is annotated unsafe in C++}}
+struct SWIFT_SAFE WrapsCRTPBase : CRTPBase<WrapsCRTPBase> {};
+
+template <class T> struct DerivedFromParam : T {}; // expected-note {{'UnsafeReference' is annotated unsafe in C++}}
+using HasUnsafeReferenceParamBase = DerivedFromParam<UnsafeReference>;
+
+template <class T> struct MiddleTemplate : CRTPBase<MiddleTemplate<T>> {};
+template <class T> struct BottomTemplate : MiddleTemplate<T> {}; // expected-note {{'CRTPBase' is annotated unsafe in C++}}
+using HasCRTPBaseTransitively = BottomTemplate<int>;
 
 struct OwnedData {
   SpanOfInt getView() const [[clang::lifetimebound]];
@@ -156,20 +193,20 @@ struct HoldsShared {
 };
 
 template <typename F, typename S> struct SWIFT_ESCAPABLE_IF(F, S) TTake2 {};
-template <typename T> struct PassThru {
+template <typename T> struct PassThru { // expected-note {{this type has unknown escapability: it depends on 'IsUnsafe', whose escapability is unknown}}
   T field;
 };
-struct IsUnsafe { int *p; };
-struct HasUnsafe : TTake2<PassThru<HasUnsafe>, IsUnsafe> {};
+struct IsUnsafe { int *p; }; // expected-note 2 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+struct HasUnsafe : TTake2<PassThru<HasUnsafe>, IsUnsafe> {}; // expected-note {{this type has unknown escapability: it depends on 'IsUnsafe', whose escapability is unknown}}
 using AlsoUnsafe = PassThru<HasUnsafe>;
 
 struct SWIFT_UNSAFE ExplicitlyUnsafeStruct {};
-struct HasUnsafeMember {
+struct HasUnsafeMember { // expected-note {{'ExplicitlyUnsafeStruct' is annotated unsafe in C++}}
   HasUnsafeMember();
   ExplicitlyUnsafeStruct member;
 };
 
-struct HasUnsafeBase : ExplicitlyUnsafeStruct {
+struct HasUnsafeBase : ExplicitlyUnsafeStruct { // expected-note {{'ExplicitlyUnsafeStruct' is annotated unsafe in C++}}
   HasUnsafeBase();
 };
 
@@ -307,6 +344,7 @@ func useDefaultConstructedView() {
 func useAnnotatedLifetimeDependency(o: Owner) {
     let _ = returnsViewLifetimebound(o)
     let _ = returnsViewHandWrittenLifetime(o)
+    let _ = returnsViewByValueLifetime(o)
     let _ = returnsViewAuditedSafe(o)
 }
 
@@ -329,6 +367,36 @@ func useSharedReference(frt: SharedObject, x: OwnedData) {
 func useSharedReference(frt: DerivedFromSharedObject, h: HoldsShared) {
   let _ = frt
   let _ = h.getObj()
+}
+
+@available(SwiftStdlib 5.8, *)
+func unsafeReferenceBases(a: HasUnsafeReferenceBase,
+                          b: HasUnsafeReferenceBaseTransitively,
+                          c: WrapsUnsafeReferenceBase,
+                          d: DerivedFromWrapsUnsafeReferenceBase,
+                          e: ExplicitlyUnsafeSharedObject,
+                          f: HasExplicitlyUnsafeSharedObjectBase,
+                          g: HasCRTPBase,
+                          h: WrapsCRTPBase,
+                          i: HasUnsafeReferenceParamBase,
+                          j: HasCRTPBaseTransitively) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = a // expected-note{{reference to parameter 'a' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = b // expected-note{{reference to parameter 'b' involves unsafe type}}
+  _ = c
+  _ = d
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = e // expected-note{{reference to parameter 'e' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = f // expected-note{{reference to parameter 'f' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = g // expected-note{{reference to parameter 'g' involves unsafe type}}
+  _ = h
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = i // expected-note{{reference to parameter 'i' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = j // expected-note{{reference to parameter 'j' involves unsafe type}}
 }
 
 func useTTakeInt(x: TTakeInt) {

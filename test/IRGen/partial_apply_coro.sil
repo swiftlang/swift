@@ -774,7 +774,7 @@ entry(%a : $SwiftClass, %b: $SwiftClass):
 
 // CHECK-32-LABEL: define {{.*}} { ptr, i32 } @generic_captured_param
 // CHECK-64-LABEL: define {{.*}} { ptr, i64 } @generic_captured_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %[[CTX:.*]], [[ARG_TYPE:(i32|i64)]] %[[ARG0:.*]], ptr %[[ARG1:.*]], ptr %[[ARG2:.*]])
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %[[CTX:.*]], [[ARG_TYPE:(i32|i64)]] %[[ARG0:.*]], ptr noalias %[[ARG1:.*]], ptr %[[ARG2:.*]])
 // CHECK: entry:
 // CHECK:   %[[RET0:.*]] = insertvalue { ptr, [[ARG_TYPE]] } poison, ptr @generic_captured_param.resume.0, 0
 // CHECK:   %[[RET1:.*]] = insertvalue { ptr, [[ARG_TYPE]] } %[[RET0]], [[ARG_TYPE]] %[[ARG0]], 1
@@ -825,7 +825,7 @@ bb2:
 // CHECK:   %[[ARG1:.*]] = load ptr, ptr %[[PA_CTX]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @generic_captured_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr %[[ARG1]], ptr @"$sSiN")
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @generic_captured_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias %[[ARG1]], ptr @"$sSiN")
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s22generic_captured_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -870,7 +870,7 @@ entry(%x : $Int):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @generic_captured_and_open_param
-// CHECK: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %0, ptr noalias %1, ptr %2, ptr %T)
+// CHECK: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %0, ptr noalias %1, ptr noalias %2, ptr %T)
 sil public @generic_captured_and_open_param : $@yield_once @convention(thin) <T> (@in T, @inout T) -> (@yields @in T) {
 entry(%i : $*T, %io : $*T):
   %0 = builtin "int_trap"() : $Never
@@ -878,7 +878,7 @@ entry(%i : $*T, %io : $*T):
 }
 
 // CHECK-LABEL: define{{.*}} swiftcc { ptr, ptr } @partial_apply_open_generic_capture
-// CHECK-SAME: (ptr %[[ARG0:.*]], ptr %[[ARG1:.*]])
+// CHECK-SAME: (ptr noalias %[[ARG0:.*]], ptr %[[ARG1:.*]])
 // CHECK: entry:
 // CHECK:   %[[BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata
 // CHECK:   %[[BOXPTR1:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, [{{4|8}} x i8], ptr }>, ptr %[[BOX]], i32 0, i32 1
@@ -901,7 +901,7 @@ entry(%i : $*T, %io : $*T):
 // CHECK:   %[[ARG2:.*]] = load ptr, ptr %[[PA_CTX2]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @generic_captured_and_open_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], ptr noalias %[[ARG0]], ptr %[[ARG2]], ptr %[[ARG1]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @generic_captured_and_open_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], ptr noalias %[[ARG0]], ptr noalias %[[ARG2]], ptr %[[ARG1]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s31generic_captured_and_open_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]

@@ -13,7 +13,6 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "llvm/Support/CommandLine.h"
@@ -51,6 +50,7 @@ static SILValue getRCIdentityPreservingCastOperand(SILValue V) {
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenCOMExistentialInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::ConvertFunctionInst:

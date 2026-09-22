@@ -15,7 +15,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -187,6 +186,10 @@ void CaptureInfo::print(raw_ostream &OS) const {
                  OS << "<direct>";
                if (capture.isNoEscape())
                  OS << "<noescape>";
+               if (capture.isConsumed())
+                 OS << "<consumed>";
+               if (capture.isSending())
+                 OS << "<sending>";
              },
              [&] { OS << ", "; });
 

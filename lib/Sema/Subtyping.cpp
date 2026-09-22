@@ -1,4 +1,4 @@
-//===--- Subtyping.cpp - Swift subtyping and conversion rules 00-----------===//
+//===--- Subtyping.cpp - Swift subtyping and conversion rules -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -203,256 +203,38 @@ bool swift::constraints::isSubtypeOfExistentialType(Type candidateType,
   });
 }
 
-/// T conv $T0
-/// $T0 conforms P
-bool ConstraintSystem::isConformanceTransitiveForSupertype(
-    ConversionBehavior behavior, ProtocolDecl *proto) {
-  // Sendable conformance is too loose to conclude anything.
-  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-    return false;
-
-  auto key = std::make_pair(behavior, proto);
-  auto found = ConformanceTransitiveForSupertypeCache.find(key);
-  if (found != ConformanceTransitiveForSupertypeCache.end())
-    return found->second;
-
-  auto &ctx = getASTContext();
-
-  // Enumerate possible nominal supertypes of a type having the
-  // given conversion behavior.
-  SmallVector<NominalTypeDecl *, 4> declsToCheck;
-
-  if (behavior != ConversionBehavior::Optional) {
-    // Every T converts to Optional<T>.
-    if (auto *optionalDecl = ctx.getOptionalDecl())
-      declsToCheck.push_back(optionalDecl);
-  }
-
-  // Every hashable T converts to AnyHashable.
-  // FIXME: Actually check if the type is hashable.
-  if (auto *anyHashableDecl = ctx.getAnyHashableDecl())
-    declsToCheck.push_back(anyHashableDecl);
-
-  auto addPointers = [&]() {
-    declsToCheck.push_back(ctx.getUnsafePointerDecl());
-    declsToCheck.push_back(ctx.getUnsafeRawPointerDecl());
-  };
-
-  auto addMutablePointers = [&]() {
-    addPointers();
-    declsToCheck.push_back(ctx.getUnsafeMutablePointerDecl());
-    declsToCheck.push_back(ctx.getUnsafeMutableRawPointerDecl());
-  };
-
-  bool result = true;
-
-  switch (behavior) {
-  case ConversionBehavior::None:
-  case ConversionBehavior::Class:
-  case ConversionBehavior::Dictionary:
-  case ConversionBehavior::Set:
-  case ConversionBehavior::Optional:
-  case ConversionBehavior::AnyHashable:
-  case ConversionBehavior::Tuple:
-    break;
-
-  case ConversionBehavior::String:
-    // Strings convert to UnsafePointer.
-    addPointers();
-    break;
-
-  case ConversionBehavior::Array:
-    addPointers();
-    break;
-
-  case ConversionBehavior::Pointer:
-    addMutablePointers();
-    break;
-
-  case ConversionBehavior::Double:
-    // Note this is funny, but valid. We return false if
-    // either Double or CGFloat conform to the protocol,
-    // so the only "transitive" protocols in this case
-    // are those that neither CGFloat nor Double conform
-    // to.
-    if (auto *doubleDecl = ctx.getDoubleDecl())
-      declsToCheck.push_back(doubleDecl);
-    if (auto *cgFloatDecl = ctx.getCGFloatDecl())
-      declsToCheck.push_back(cgFloatDecl);
-    break;
-
-  case ConversionBehavior::Function:
-  case ConversionBehavior::Metatype:
-  case ConversionBehavior::ExistentialMetatype:
-    // FIXME: Metatypes and functions.
-    result = false;
-    break;
-
-  case ConversionBehavior::LValue:
-    ASSERT(false && "Must unwrap lvalue type first!");
-    break;
-
-  case ConversionBehavior::InOut:
-    // InOut types convert to mutable pointers.
-    addMutablePointers();
-    break;
-
-  case ConversionBehavior::Existential:
-    // FIXME: Implement this.
-    result = false;
-    break;
-
-  case ConversionBehavior::Unknown:
-    // Can't say anything in this case.
-    result = false;
-    break;
-  }
-
-  if (result) {
-    // Check if any of our nominal types conform.
-    // If they do, then conformance is not transitive.
-    for (auto *decl : declsToCheck) {
-      SmallVector<ProtocolConformance *, 1> results;
-      decl->lookupConformance(proto, results);
-      if (!results.empty()) {
-        result = false;
-        break;
-      }
-    }
-  }
-
-  // Cache the result.
-  bool inserted =
-    ConformanceTransitiveForSupertypeCache.insert(
-      std::make_pair(key, result)).second;
-  ASSERT(inserted);
-
-  return result;
-}
-
-bool swift::constraints::checkTransitiveSupertypeConformance(
-    ConstraintSystem &cs, Type type, ProtocolDecl *proto) {
-  // Every lvalue type can be converted to its object type, so
-  // we must consider conversions of the object type in this case.
-  if (auto *lvalueType = type->getAs<LValueType>())
-    type = lvalueType->getObjectType();
-  auto behavior = getConversionBehavior(type);
-  if (cs.isConformanceTransitiveForSupertype(behavior, proto)) {
-    // Unwrap InOut and LValue type.
-    return !cs.lookupConformance(type->getWithoutSpecifierType(), proto)
-        .isInvalid();
-  }
-  return true;
-}
-
-/// $T0 conv T
-/// $T0 conforms P
-bool ConstraintSystem::isConformanceTransitiveForSubtype(
-    ConversionBehavior behavior, ProtocolDecl *proto) {
-  // Sendable conformance is too loose to conclude anything.
-  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-    return false;
-
-  switch (behavior) {
-  case ConversionBehavior::None:
-  case ConversionBehavior::String:
-  case ConversionBehavior::Array:
-  case ConversionBehavior::Dictionary:
-  case ConversionBehavior::Set:
-    // All subtypes of these have the same nominal type,
-    // and conform to the same protocols.
-    return true;
-
-  case ConversionBehavior::Tuple:
-    // All subtypes of a tuple remain a tuple, and conform
-    // to the same protocols.
-    return true;
-
-  case ConversionBehavior::Class:
-    // A subclass might conform to more protocols than a
-    // superclass.
-    return false;
-
-  case ConversionBehavior::Double: {
-    auto key = std::make_pair(behavior, proto);
-    auto found = ConformanceTransitiveForSubtypeCache.find(key);
-    if (found != ConformanceTransitiveForSubtypeCache.end())
-      return found->second;
-
-    SmallVector<NominalTypeDecl *, 4> declsToCheck;
-
-    auto &ctx = getASTContext();
-    if (auto *cgFloatDecl = ctx.getCGFloatDecl())
-      declsToCheck.push_back(cgFloatDecl);
-    if (auto *doubleDecl = ctx.getDoubleDecl())
-      declsToCheck.push_back(doubleDecl);
-
-    bool result = false;
-    for (auto *decl : declsToCheck) {
-      SmallVector<ProtocolConformance *, 1> results;
-      decl->lookupConformance(proto, results);
-      if (!results.empty()) {
-        result = true;
-        break;
-      }
-    }
-
-    // Cache the result.
-    bool inserted =
-      ConformanceTransitiveForSubtypeCache.insert(
-        std::make_pair(key, result)).second;
-    ASSERT(inserted);
-
-    return result;
-  }
-
-  case ConversionBehavior::InOut:
-  case ConversionBehavior::LValue:
-    // InOutType and LValueType have no proper subtypes.
-    return true;
-
-  case ConversionBehavior::Optional:
-    // FIXME: Check payload type.
-    return false;
-
-  case ConversionBehavior::AnyHashable:
-    // All Hashable types are subtypes of AnyHashable, so
-    // we cannot conclude anything about protocol conformance
-    // in this case.
-    return false;
-
-  case ConversionBehavior::Pointer:
-    // FIXME: Check pointer types.
-    return false;
-
-  case ConversionBehavior::Function:
-  case ConversionBehavior::Metatype:
-  case ConversionBehavior::ExistentialMetatype:
-    // FIXME: Metatypes and functions.
-    return false;
-
-  case ConversionBehavior::Existential:
-  case ConversionBehavior::Unknown:
-    // Can't say anything in this case.
-    return false;
-  }
-}
-
-bool swift::constraints::checkTransitiveSubtypeConformance(
-    ConstraintSystem &cs, Type type, ProtocolDecl *proto) {
-  auto behavior = getConversionBehavior(type);
-  if (cs.isConformanceTransitiveForSubtype(behavior, proto)) {
-    // Unwrap InOut and LValue type.
-    return !cs.lookupConformance(type->getWithoutSpecifierType(), proto)
-        .isInvalid();
-  }
-  return true;
-}
-
 std::optional<bool>
 swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
   if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
       !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+    // Hack to deal with matchSendableExistentialToAnyInGenericArgumentPosition().
+    {
+      auto hasAnySendable = [](Type t) -> bool {
+        return t.findIf([](Type t) -> bool {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return false;
+          return t->getKnownProtocol() == KnownProtocolKind::Sendable;
+        });
+      };
+
+      auto rewriteAnySendableToAny = [](Type t) -> Type {
+        return t.transformRec([](TypeBase *t) -> std::optional<Type> {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return t;
+          if (t->getKnownProtocol() == KnownProtocolKind::Sendable)
+            return t->getASTContext().TheAnyType;
+          return std::nullopt;
+        });
+      };
+
+      if (hasAnySendable(lhs))
+        lhs = rewriteAnySendableToAny(lhs);
+      if (hasAnySendable(rhs))
+        rhs = rewriteAnySendableToAny(rhs);
+    }
+
     return lhs->isEqual(rhs);
   }
 
@@ -710,19 +492,77 @@ static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
   return nullptr;
 }
 
+static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
+  auto *lhsDecl = lhs->getClassOrBoundGenericClass();
+  auto *rhsDecl = rhs->getClassOrBoundGenericClass();
+
+  if (lhsDecl == nullptr || rhsDecl == nullptr)
+    return;
+
+  // Toll-free bridging CF -> ObjC.
+  if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+      rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
+    if (auto *lhsBridged = getBridgedObjCClass(lhsDecl)) {
+      lhs = lhsBridged->getDeclaredInterfaceType();
+      ASSERT(!lhs->hasTypeParameter());
+    }
+
+  // Toll-free bridging ObjC -> CF.
+  } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
+             rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+    if (auto *rhsBridged = getBridgedObjCClass(rhsDecl)) {
+      rhs = rhsBridged->getDeclaredInterfaceType();
+      ASSERT(!rhs->hasTypeParameter());
+    }
+  }
+}
+
 static bool isCovariantInstanceType(Type t) {
   return t->getClassOrBoundGenericClass() ||
          t->is<ArchetypeType>();
 }
 
 /// More meaningful overload for when you want a boolean result.
-bool swift::constraints::canConvertTo(ConstraintSystem &cs,
+bool swift::constraints::canConvertTo(ConformanceCache &cache,
                                       Type lhs, Type rhs,
                                       GenericSignature sig) {
-  return !checkConversion(cs, lhs, rhs, sig);
+  return !checkConversion(cache, lhs, rhs, sig);
 }
 
-ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
+static ConflictReason
+checkExtInfoConversion(ConformanceCache &cache,
+                       FunctionType *lhsFunc,
+                       FunctionType *rhsFunc,
+                       AnyFunctionType::ExtInfo lhsInfo,
+                       AnyFunctionType::ExtInfo rhsInfo,
+                       GenericSignature sig) {
+  if (lhsInfo.isNoEscape() && !rhsInfo.isNoEscape())
+    return ConflictFlag::FunctionNoEscape;
+
+  if (lhsInfo.isAsync() && !rhsInfo.isAsync())
+    return ConflictFlag::FunctionAsync;
+
+  auto lhsThrows = lhsFunc->getEffectiveThrownErrorType();
+  auto rhsThrows = rhsFunc->getEffectiveThrownErrorType();
+  if (lhsThrows.has_value() && !rhsThrows.has_value()) {
+    auto result = isLikelyExactMatch(*lhsThrows,
+                                     lhsFunc->getASTContext().getNeverType());
+    if (result.has_value() && *result)
+      return ConflictFlag::FunctionThrows;
+  }
+
+  if (lhsThrows.has_value() && rhsThrows.has_value()) {
+    auto reason = checkConversion(cache, *lhsThrows, *rhsThrows, sig);
+    if (reason)
+      return reason | ConflictFlag::FunctionThrows;
+  }
+
+  // FIXME: We can't usefully handle isolation (too complex) or Sendable
+  // (depends on preconcurrency context) here.
+  return std::nullopt;
+}
+
+ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
                                                    Type lhs, Type rhs,
                                                    GenericSignature sig) {
   if (lhs->isEqual(rhs))
@@ -743,48 +583,24 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
     }
 
     case ConversionBehavior::Class: {
+      unwrapTollFreeBridging(lhs, rhs);
+
       // Unwrap DynamicSelfType.
-      bool lhsWasSelf = false;
-      if (auto *lhsSelf = lhs->getAs<DynamicSelfType>()) {
-        lhsWasSelf = true;
-        lhs = lhsSelf->getSelfType();
+      Type lhsSelf;
+      if (auto *dynamicSelf = lhs->getAs<DynamicSelfType>()) {
+        lhsSelf = dynamicSelf->getSelfType();
       }
 
-      bool rhsWasSelf = false;
-      if (auto *rhsSelf = rhs->getAs<DynamicSelfType>()) {
-        rhsWasSelf = true;
-        rhs = rhsSelf->getSelfType();
+      Type rhsSelf;
+      if (auto *dynamicSelf = rhs->getAs<DynamicSelfType>()) {
+        rhsSelf = dynamicSelf->getSelfType();
       }
 
       // DynamicSelfType-to-DynamicSelfType conversions are exact.
-      if (lhsWasSelf && rhsWasSelf) {
-        auto result = isLikelyExactMatch(lhs, rhs);
+      if (lhsSelf && rhsSelf) {
+        auto result = isLikelyExactMatch(lhsSelf, rhsSelf);
         if (result.has_value() && !*result)
           return ConflictFlag::Class;
-      }
-
-      // No conversions to DynamicSelfType.
-      if (rhsWasSelf)
-        return ConflictFlag::Class;
-
-      auto *lhsDecl = lhs->getClassOrBoundGenericClass();
-      auto *rhsDecl = rhs->getClassOrBoundGenericClass();
-
-      // Toll-free bridging CF -> ObjC.
-      if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
-          rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl)) {
-          lhs = lhsBridged->getDeclaredInterfaceType();
-          ASSERT(!lhs->hasTypeParameter());
-        }
-
-      // Toll-free bridging ObjC -> CF.
-      } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
-                 rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl)) {
-          rhs = rhsBridged->getDeclaredInterfaceType();
-          ASSERT(!rhs->hasTypeParameter());
-        }
       }
 
       // Check for a subclassing relationship.
@@ -816,7 +632,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
 
     case ConversionBehavior::Array: {
       // Array-to-Array conversions.
-      auto result = checkConversion(cs,
+      auto result = checkConversion(cache,
                                     lhs->getArrayElementType(),
                                     rhs->getArrayElementType(), sig);
       if (result)
@@ -828,12 +644,12 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
       // Dictionary-to-Dictionary conversions.
       auto lhsPair = *ConstraintSystem::isDictionaryType(lhs);
       auto rhsPair = *ConstraintSystem::isDictionaryType(rhs);
-      auto keyResult = checkConversion(cs,
+      auto keyResult = checkConversion(cache,
                                        lhsPair.first,
                                        rhsPair.first, sig);
       if (keyResult)
         return keyResult | ConflictFlag::DictionaryKey;
-      auto valueResult = checkConversion(cs,
+      auto valueResult = checkConversion(cache,
                                          lhsPair.second,
                                          rhsPair.second, sig);
       if (valueResult)
@@ -845,7 +661,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
       auto lhsElt = *ConstraintSystem::isSetType(lhs);
       auto rhsElt = *ConstraintSystem::isSetType(rhs);
 
-      auto result = checkConversion(cs, lhsElt, rhsElt, sig);
+      auto result = checkConversion(cache, lhsElt, rhsElt, sig);
       if (result)
         return result | ConflictFlag::Set;
       break;
@@ -855,7 +671,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
       auto argObjectType = lhs->getOptionalObjectType();
       auto objectType = rhs->getOptionalObjectType();
 
-      auto result = checkConversion(cs, argObjectType, objectType, sig);
+      auto result = checkConversion(cache, argObjectType, objectType, sig);
       if (result)
         return result | ConflictFlag::Optional;
       break;
@@ -872,14 +688,104 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
         break;
       }
 
-      auto result = checkConversion(cs, argInstanceType, instanceType, sig);
+      auto result = checkConversion(cache, argInstanceType, instanceType, sig);
       if (result)
         return result | ConflictFlag::Metatype;
       break;
     }
-    case ConversionBehavior::Function:
-      // FIXME: Implement.
+    case ConversionBehavior::Function: {
+      auto *lhsFunc = lhs->castTo<FunctionType>();
+      auto *rhsFunc = rhs->castTo<FunctionType>();
+
+      auto lhsInfo = lhsFunc->getExtInfo();
+      auto rhsInfo = rhsFunc->getExtInfo();
+      auto reason = checkExtInfoConversion(cache,
+                                           lhsFunc, rhsFunc,
+                                           lhsInfo, rhsInfo, sig);
+      if (reason)
+        return reason;
+
+      auto result = checkConversion(cache,
+                                    lhsFunc->getResult(),
+                                    rhsFunc->getResult(),
+                                    sig);
+      if (result)
+        return result | ConflictFlag::FunctionResult;
+
+      auto lhsParams = lhsFunc->getParams();
+      auto rhsParams = rhsFunc->getParams();
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams()) {
+        // Handle the "tuple splat" special case.
+        if (isSingleTupleParam(rhsParams) &&
+            AnyFunctionType::canComposeTuple(lhsParams)) {
+          // Implode the left-hand side arguments into a tuple and compare
+          // against the right-hand side parameter type.
+          auto lhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto rhsType = rhsParams[0].getPlainType();
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+          break;
+        } else if (isSingleTupleParam(lhsParams) &&
+                   AnyFunctionType::canComposeTuple(rhsParams)) {
+          // Implode the right-hand side parameters into a tuple and
+          // compare against the left-hand side argument type.
+          auto lhsType = lhsParams[0].getPlainType();
+          auto rhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+
+        }
+
+        // Otherwise, it's a conflict.
+        return ConflictReason(ConflictFlag::FunctionParamCount);
+      }
+
+      // Check each parameter against each argument.
+      for (unsigned i : indices(lhsParams)) {
+        auto lhsParam = lhsParams[i];
+        auto rhsParam = rhsParams[i];
+
+        if (lhsParam.isInOut() != rhsParam.isInOut())
+          return ConflictReason(ConflictFlag::FunctionParamFlags);
+
+        if (lhsParam.isVariadic() != rhsParam.isVariadic())
+          return ConflictReason(ConflictFlag::FunctionParamFlags);
+
+        Type paramType;
+        if (lhsParam.isInOut() || lhsParam.isVariadic()) {
+          auto result = isLikelyExactMatch(lhsParam.getPlainType(),
+                                           rhsParam.getPlainType());
+          if (result.has_value() && !*result)
+            return ConflictReason(ConflictFlag::FunctionParamType);
+        } else {
+          auto result = checkConversion(cache,
+                                        rhsParam.getPlainType(),
+                                        lhsParam.getPlainType(),
+                                        sig);
+          if (result)
+            return result | ConflictFlag::FunctionParamType;
+        }
+      }
+
       break;
+    }
+
     case ConversionBehavior::InOut:
     case ConversionBehavior::LValue: {
       // InOut-to-InOut and LValue-to-LValue conversions are invariant.
@@ -901,7 +807,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
       for (unsigned i : indices(lhsTuple->getElements())) {
         auto lhsElt = lhsTuple->getElementType(i);
         auto rhsElt = rhsTuple->getElementType(i);
-        auto result = checkConversion(cs, lhsElt, rhsElt, sig);
+        auto result = checkConversion(cache, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -938,7 +844,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
 
     } else {
       // Attempt LValue-to-RValue conversion.
-      return checkConversion(cs, lhs->getWithoutSpecifierType(), rhs, sig);
+      return checkConversion(cache, lhs->getWithoutSpecifierType(), rhs, sig);
     }
 
   // Handle case where the kinds don't match, and we're not converting
@@ -983,7 +889,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
     case ConversionBehavior::Optional: {
       // We have a non-optional on the left. Try value-to-optional.
       auto objectType = rhs->getOptionalObjectType();
-      auto result = checkConversion(cs, lhs, objectType, sig);
+      auto result = checkConversion(cache, lhs, objectType, sig);
       if (result)
         return result | ConflictFlag::Optional;
 
@@ -1036,7 +942,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(rhs),
           [&](ProtocolDecl *proto) {
-            return !checkTransitiveSupertypeConformance(cs, lhs, proto);
+            return !cache.checkTransitiveSupertypeConformance(lhs, proto);
           });
       if (failed)
         return ConflictFlag::Conformance;
@@ -1046,7 +952,7 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(lhs),
           [&](ProtocolDecl *proto) {
-            return !checkTransitiveSubtypeConformance(cs, rhs, proto);
+            return !cache.checkTransitiveSubtypeConformance(rhs, proto);
           });
       if (failed)
         return ConflictFlag::Conformance;
@@ -1248,8 +1154,9 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, throwing;
+  bool noEscape, sendable, calledOnce, throwing, async;
   Type sendableDep;
+  Type calledOnceDep;
   Type thrownError;
 
   // Concurrency is too hard to reason about here.
@@ -1259,8 +1166,12 @@ extInfoJoinMeetImpl(Operation op,
   auto lhsSendableDep = lhsInfo.getSendableDependentType();
   auto rhsSendableDep = rhsInfo.getSendableDependentType();
 
+  auto lhsCalledOnceDep = lhsInfo.getCalledOnceDependentType();
+  auto rhsCalledOnceDep = rhsInfo.getCalledOnceDependentType();
+
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
+    async = lhsInfo.isAsync() || rhsInfo.isAsync();
 
     if (lhsSendableDep && rhsSendableDep) {
       // Form a tuple; its Sendable iff both components are Sendable.
@@ -1281,6 +1192,25 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
     }
 
+    if (lhsCalledOnceDep && rhsCalledOnceDep) {
+      // Form a tuple; its @called(once) iff both components are @called(once).
+      SmallVector<TupleTypeElt, 2> elts;
+      elts.push_back(lhsCalledOnceDep);
+      elts.push_back(rhsCalledOnceDep);
+      calledOnceDep = TupleType::get(elts, lhsSendableDep->getASTContext());
+      calledOnce = false;
+    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
+      if (rhsInfo.isCalledOnce())
+        calledOnceDep = lhsCalledOnceDep;
+      calledOnce = false;
+    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
+      if (lhsInfo.isCalledOnce())
+        calledOnceDep = rhsCalledOnceDep;
+      calledOnce = false;
+    } else {
+      calledOnce = lhsInfo.isCalledOnce() && rhsInfo.isCalledOnce();
+    }
+
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
     Type thrownError;
     if (throwing) {
@@ -1295,6 +1225,7 @@ extInfoJoinMeetImpl(Operation op,
     }
   } else {
     noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
+    async = lhsInfo.isAsync() && rhsInfo.isAsync();
 
     if (lhsSendableDep && rhsSendableDep) {
       // We cannot represent the meet of two sendable-dependent types.
@@ -1315,6 +1246,27 @@ extInfoJoinMeetImpl(Operation op,
       }
     } else {
       sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
+    }
+
+    if (lhsCalledOnceDep && rhsCalledOnceDep) {
+      // We cannot represent the meet of two @called(once)-dependent types.
+      return std::nullopt;
+    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
+      if (rhsInfo.isCalledOnce()) {
+        calledOnce = true;
+      } else {
+        calledOnce = false;
+        calledOnceDep = lhsCalledOnceDep;
+      }
+    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
+      if (lhsInfo.isCalledOnce()) {
+        calledOnce = true;
+      } else {
+        calledOnce = false;
+        calledOnceDep = rhsCalledOnceDep;
+      }
+    } else {
+      calledOnce = lhsInfo.isCalledOnce() || rhsInfo.isCalledOnce();
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
@@ -1338,8 +1290,11 @@ extInfoJoinMeetImpl(Operation op,
   return lhsInfo.intoBuilder()
       .withNoEscape(noEscape)
       .withThrows(throwing, thrownError)
+      .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
+      .withCalledOnce(calledOnce)
+      .withCalledOnceDependentType(calledOnceDep)
       .build();
 }
 
@@ -1404,7 +1359,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
     }
 
     case ConversionBehavior::Class: {
-      // FIXME: CF toll-free bridging
+      unwrapTollFreeBridging(lhs, rhs);
 
       auto result = superclassJoinMeetImpl(op, lhs, rhs);
       if (result)
@@ -1461,15 +1416,15 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto *lhsFunc = lhs->castTo<FunctionType>();
       auto *rhsFunc = rhs->castTo<FunctionType>();
 
-      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
-
-      SmallVector<AnyFunctionType::Param, 4> params;
-
       // Note: getConversionBehavior() guarantees the function types don't
       // contain any parameter packs, so we may assume their lengths are
       // known.
       if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
         return fail();
+
+      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
+
+      SmallVector<AnyFunctionType::Param, 4> params;
 
       for (unsigned i : indices(lhsFunc->getParams())) {
         auto lhsParam = lhsFunc->getParams()[i];
@@ -1480,7 +1435,6 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
 
         Type paramType;
         if (lhsParam.isInOut() || lhsParam.isVariadic()) {
-          ASSERT(rhsParam.isInOut());
           auto result = isLikelyExactMatch(lhsParam.getPlainType(),
                                            rhsParam.getPlainType());
           if (!result)
@@ -1508,13 +1462,54 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
         params.push_back(lhsParam.withType(paramType));
       }
 
+      if (lhsFunc->getNumYields() != rhsFunc->getNumYields())
+        return fail();
+
+      SmallVector<AnyFunctionType::Yield, 4> yields;
+      for (unsigned i : indices(lhsFunc->getYields())) {
+        auto lhsYield = lhsFunc->getYields()[i];
+        auto rhsYield = rhsFunc->getYields()[i];
+
+        if (lhsYield.getFlags() != rhsYield.getFlags())
+          return fail();
+        
+        Type yieldType;
+        if (lhsYield.isInOut()) {
+          ASSERT(rhsYield.isInOut());
+          auto result = isLikelyExactMatch(lhsYield.getType(),
+                                           rhsYield.getType());
+          if (!result)
+            return fail();
+          if (!*result)
+            return fail();
+
+          yieldType = lhsYield.getType();
+        } else if (op == Operation::Join) {
+          bool uninhabited = false;
+          yieldType = subtypeMeet(lhsYield.getType(),
+                                  rhsYield.getType(),
+                                  &uninhabited);
+          if (uninhabited)
+            return fail();
+        } else {
+          bool existentialUpperBound = false;
+          yieldType = subtypeJoin(lhsYield.getType(),
+                                  rhsYield.getType(),
+                                  &existentialUpperBound);
+          if (existentialUpperBound)
+            return fail();
+        }
+
+        yields.push_back(lhsYield.withType(yieldType));
+      }
+      
       auto extInfo = extInfoJoinMeetImpl(op,
                                          lhsFunc->getExtInfo(),
                                          rhsFunc->getExtInfo());
-      if(!extInfo.has_value())
+      if (!extInfo.has_value())
         return fail();
 
-      return FunctionType::get(params, result, *extInfo);
+      return FunctionType::get(params, yields, result, *extInfo);
     }
 
     case ConversionBehavior::Metatype: {
@@ -1808,7 +1803,16 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
       params.push_back(param.withType(paramType));
     }
 
-    return FunctionType::get(params, result, funcTy->getExtInfo());
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    for (unsigned i : indices(funcTy->getYields())) {
+      const auto &yield = funcTy->getYields()[i];
+      auto yieldType = rec(yield.getType(),
+                           LocatorPathElt::FunctionYield(),
+                           LocatorPathElt::TupleElement(i));
+      yields.push_back(yield.withType(yieldType));
+    }
+
+    return FunctionType::get(params, yields, result, funcTy->getExtInfo());
   }
 
   case ConversionBehavior::Metatype: {
@@ -1849,6 +1853,48 @@ Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
   return openTypeJoinsAndMeetsRec(cs, type, locator);
 }
 
+bool swift::constraints::isPackExpansionType(Type type) {
+  if (type->is<PackExpansionType>())
+    return true;
+
+  if (auto *typeVar = type->getAs<TypeVariableType>())
+    return typeVar->getImpl().isPackExpansion();
+
+  return false;
+}
+
+/// Check whether given parameter list represents a single tuple
+/// or type variable which could be later resolved to tuple.
+/// This is useful for SE-0110 related fixes in `matchFunctionTypes`.
+bool swift::constraints::isSingleTupleParam(ArrayRef<AnyFunctionType::Param> params) {
+  if (params.size() != 1)
+    return false;
+
+  const auto &param = params.front();
+  if ((param.isVariadic() || isPackExpansionType(param.getPlainType())) ||
+      param.isInOut() || param.hasLabel() || param.isIsolated())
+    return false;
+
+  auto paramType = param.getPlainType();
+
+  // Support following case which was allowed until 5:
+  //
+  // func bar(_: (Int, Int) -> Void) {}
+  // let foo: ((Int, Int)?) -> Void = { _ in }
+  //
+  // bar(foo) // Ok
+  if (!paramType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
+    paramType = paramType->lookThroughAllOptionalTypes();
+
+  // Parameter type should either a tuple or something that can become a
+  // tuple later on. Note that type parameters can appear here when we're
+  // called from disjunction selection to compare a function argument
+  // type against an unopened overload's parameter type.
+  return (paramType->is<TupleType>() ||
+          paramType->isTypeVariableOrMember() ||
+          paramType->isTypeParameter());
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)
@@ -1882,4 +1928,22 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))
     out << " existential";
+  if (reason.contains(ConflictFlag::FunctionResult))
+    out << " function_result";
+  if (reason.contains(ConflictFlag::FunctionParamCount))
+    out << " function_param_count";
+  if (reason.contains(ConflictFlag::FunctionParamFlags))
+    out << " function_param_flags";
+  if (reason.contains(ConflictFlag::FunctionParamType))
+    out << " function_param_type";
+  if (reason.contains(ConflictFlag::FunctionNoEscape))
+    out << " function_no_escape";
+  if (reason.contains(ConflictFlag::FunctionAsync))
+    out << " function_async";
+  if (reason.contains(ConflictFlag::FunctionThrows))
+    out << " function_throws";
+  if (reason.contains(ConflictFlag::FunctionSendable))
+    out << " function_sendable";
+  if (reason.contains(ConflictFlag::FunctionTupleSplat))
+    out << " function_tuple_splat";
 }

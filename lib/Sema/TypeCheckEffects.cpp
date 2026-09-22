@@ -26,13 +26,13 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -680,10 +680,10 @@ public:
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto ECE = dyn_cast<ExplicitCastExpr>(E)) {
-      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType());
+      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType(), /*isMetatype=*/false);
     } else if (auto TE = dyn_cast<TypeExpr>(E)) {
       if (!TE->isImplicit()) {
-        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType());
+        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType(), /*isMetatype=*/true);
       }
     } else if (auto KPE = dyn_cast<KeyPathExpr>(E)) {
       for (auto &component : KPE->getComponents()) {
@@ -1154,7 +1154,8 @@ public:
     if (isNeverThrownError(thrownError))
       return result;
 
-    assert(!thrownError->hasError());
+    if (thrownError->hasError())
+      return forInvalidCode();
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
@@ -2275,7 +2276,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2428,7 +2430,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2542,8 +2545,9 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
-      if (!assumedSafeArguments.contains(E)) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
+      if (!assumedSafeArguments.contains(E) && !isMetatype) {
         SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
         classification.merge(
             Classification::forType(type, loc).onlyUnsafe());
@@ -4098,13 +4102,13 @@ private:
     return ShouldRecurse;
   }
 
-  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type, bool isMetatype) {
     SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
     auto classification = Classification::forType(type, loc);
 
-    // If this expression is covered as a safe argument, drop the unsafe
-    // classification.
-    if (assumedSafeArguments.contains(E))
+    // If this expression is covered as a safe argument or this is a metatype,
+    // drop the unsafe classification.
+    if (assumedSafeArguments.contains(E) || isMetatype)
       classification = classification.withoutUnsafe();
 
     checkEffectSite(E, /*requiresTry=*/false, classification);
@@ -4667,19 +4671,31 @@ private:
     // Unsafety in the next/nextElement call is covered by an "unsafe" effect.
     if (classification.hasUnsafe()) {
       // If there is no such effect, complain.
-      if (S->getUnsafeLoc().isInvalid() &&
-          Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
-                                  /*allowMigration=*/true)) {
-        auto insertionLoc = S->getPattern()->getStartLoc();
-        Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
-          .fixItInsert(insertionLoc, "unsafe ");
+      if (S->getUnsafeLoc().isInvalid()) {
+        auto unsafeUses = classification.getUnsafeUses();
+        SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
+                                                 unsafeUses.end());
+        bool anyAlways = retainUnsafeUsesToDiagnose(
+            usesToDiagnose, /*includeMerelyUnsafe=*/Ctx.LangOpts.hasFeature(
+                Feature::StrictMemorySafety, /*allowMigration=*/true));
 
-        for (auto unsafeUse : classification.getUnsafeUses()) {
-          // If we don't have a source location for this use, use the
-          // location of the `for` instead.
-          if (unsafeUse.getLocation().isInvalid())
-            unsafeUse.replaceLocation(S->getForLoc());
-          diagnoseUnsafeUse(unsafeUse);
+        if (!usesToDiagnose.empty()) {
+          auto insertionLoc = S->getPattern()->getStartLoc();
+          Ctx.Diags.diagnose(S->getForLoc(),
+                             anyAlways
+                                 ? diag::for_always_unsafe_without_unsafe
+                                 : diag::for_unsafe_without_unsafe)
+            .fixItInsert(insertionLoc, "unsafe ")
+            // As above: the marker doesn't survive interface printing.
+            .warnInSwiftInterface(CurContext.getDeclContext());
+
+          for (auto unsafeUse : usesToDiagnose) {
+            // If we don't have a source location for this use, use the
+            // location of the `for` instead.
+            if (unsafeUse.getLocation().isInvalid())
+              unsafeUse.replaceLocation(S->getForLoc());
+            diagnoseUnsafeUse(unsafeUse);
+          }
         }
       }
     }
@@ -4978,15 +4994,57 @@ private:
     return false;
   }
 
+  /// Whether the code being checked was synthesized by the compiler, and so
+  /// cannot have an 'unsafe' marker written into it.
+  bool isSynthesizedContext() const {
+    auto dc = CurContext.getDeclContext();
+    while (dc) {
+      if (auto decl = dc->getAsDecl()) {
+        if (decl->isImplicit())
+          return true;
+      }
+
+      if (!dc->isLocalContext())
+        break;
+
+      dc = dc->getParent();
+    }
+
+    return false;
+  }
+
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
-    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
+    bool strictSafety = Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                                                /*allowMigration=*/true);
+
+    // Compiler-synthesized code cannot be annotated with 'unsafe' by hand, so
+    // an always-unsafe use there isn't actionable. Treat it as merely unsafe,
+    // which keeps it out of the way unless strict memory safety checking asked
+    // to hear about unsafe code at all.
+    bool isSynthesized =
+        (anchor && anchor->isImplicit()) || isSynthesizedContext();
+    if (isSynthesized && !strictSafety)
+      return;
+
+    SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
+                                             unsafeUses.end());
+    bool anyAlways = retainUnsafeUsesToDiagnose(
+        usesToDiagnose, /*includeMerelyUnsafe=*/strictSafety);
+    if (isSynthesized)
+      anyAlways = false;
+    if (usesToDiagnose.empty())
       return;
 
     const auto &[loc, insertText] = getFixItForUncoveredSite(anchor, "unsafe");
-    Ctx.Diags.diagnose(anchor->getStartLoc(), diag::unsafe_without_unsafe)
-      .fixItInsert(loc, insertText);
-    for (const auto &unsafeUse : unsafeUses) {
+    Ctx.Diags.diagnose(anchor->getStartLoc(),
+                       anyAlways ? diag::always_unsafe_without_unsafe
+                                 : diag::unsafe_without_unsafe)
+      .fixItInsert(loc, insertText)
+      // 'unsafe' markers are stripped from inlinable bodies printed into a
+      // .swiftinterface, so this cannot be an error there.
+      .warnInSwiftInterface(CurContext.getDeclContext());
+    for (const auto &unsafeUse : usesToDiagnose) {
       diagnoseUnsafeUse(unsafeUse);
     }
   }
@@ -5259,12 +5317,11 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
 ThrownErrorSubtyping
 swift::compareThrownErrorsForSubtyping(
-    Type subThrownError, Type superThrownError, DeclContext *dc
+    Type subThrownError, Type superThrownError
 ) {
   // Deal with NULL errors. This should only occur when there is no standard
   // library.
   if (!subThrownError || !superThrownError) {
-    assert(!dc->getASTContext().getStdlibModule() && "NULL thrown error type");
     return ThrownErrorSubtyping::ExactMatch;
   }
 
@@ -5338,7 +5395,9 @@ swift::compareThrownErrorsForSubtyping(
 
   // Check whether the subtype's thrown error type is convertible to the
   // supertype's thrown error type.
-  if (TypeChecker::isConvertibleTo(subThrownError, superThrownError, dc))
+  constraints::ConformanceCache cache;
+
+  if (canConvertTo(cache, subThrownError, superThrownError))
     return ThrownErrorSubtyping::Subtype;
 
   // We know it doesn't work.

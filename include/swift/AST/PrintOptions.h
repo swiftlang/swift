@@ -427,6 +427,9 @@ public:
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
 
+  /// Suppress the argument of @unsafe(always) and emit @unsafe instead.
+  bool SuppressUnsafeAlways = false;
+
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;
 

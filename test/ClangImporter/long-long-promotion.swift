@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import macros
 
 func verifyIsSigned(_: Int64) { }

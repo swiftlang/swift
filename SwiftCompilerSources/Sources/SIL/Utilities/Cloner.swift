@@ -40,8 +40,14 @@ public struct Cloner<Context: MutatingContext> {
     self.target = .global(cloneToGlobal)
   }
 
+  /// All cloned instructions get `inst`'s location and scope. 
   public init(cloneBefore inst: Instruction, _ context: Context) {
-    self.bridged = BridgedCloner(inst.bridged, context._bridged)
+    self.init(cloneBefore: inst, location: inst.location, context)
+  }
+
+  /// All cloned instructions get `location`.
+  public init(cloneBefore inst: Instruction, location: Location, _ context: Context) {
+    self.bridged = BridgedCloner(inst.bridged, location.bridged, context._bridged)
     self.context = context
     self.target = .function(inst.parentFunction)
   }

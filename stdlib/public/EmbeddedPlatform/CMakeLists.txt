@@ -49,9 +49,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     embedded-posix-shim
     swiftEmbeddedPlatformPOSIX
     PARTIAL_SOURCES_INTENDED
-    INSTALL_BINARY
     NON_EMPTY_OBJECT_FILE
     DETECT_MALLOC_TYPE
+    DETECT_ARC4RANDOM
 
     EmbeddedPlatformPOSIX.swift
 
@@ -66,7 +66,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     embedded-single-threaded-shim
     swiftEmbeddedPlatformSingleThreaded
     PARTIAL_SOURCES_INTENDED
-    INSTALL_BINARY
     NON_EMPTY_OBJECT_FILE
 
     EmbeddedPlatformSingleThreaded.swift
@@ -92,7 +91,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     embedded-multi-threaded-posix-shim
     swiftEmbeddedPlatformMultiThreadedPOSIX
     PARTIAL_SOURCES_INTENDED
-    INSTALL_BINARY
     NON_EMPTY_OBJECT_FILE
 
     EmbeddedPlatformMultiThreadedPOSIX.c
@@ -114,7 +112,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       embedded-multi-threaded-darwin-shim
       swiftEmbeddedPlatformMultiThreadedDarwin
       PARTIAL_SOURCES_INTENDED
-      INSTALL_BINARY
       NON_EMPTY_OBJECT_FILE
 
       EmbeddedPlatformMultiThreadedDarwin.c

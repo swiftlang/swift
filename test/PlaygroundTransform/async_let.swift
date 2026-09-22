@@ -1,10 +1,10 @@
 // -playground
-// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -disable-availability-checking -Xfrontend -playground) | %FileCheck %s
-// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -disable-availability-checking -Xfrontend -playground) | %FileCheck %s
+// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -playground) | %FileCheck %s
+// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -playground) | %FileCheck %s
 //
 // -pc-macro -playground
-// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -disable-availability-checking -Xfrontend -pc-macro -Xfrontend -playground) | %FileCheck %s
-// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -disable-availability-checking -Xfrontend -pc-macro -Xfrontend -playground) | %FileCheck %s
+// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -pc-macro -Xfrontend -playground) | %FileCheck %s
+// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -pc-macro -Xfrontend -playground) | %FileCheck %s
 //
 // REQUIRES: executable_test
 // REQUIRES: concurrency

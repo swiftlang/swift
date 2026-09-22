@@ -419,6 +419,14 @@ struct ImageSource: CustomStringConvertible {
 // MemoryReader support
 @available(BacktracingDT 6.2, *)
 extension ImageSource: MemoryReader {
+  public func prefetch(from address: Address, byteCount: Int) throws {
+    guard let offset = Int(exactly: address),
+          bytes.count >= byteCount,
+          offset <= bytes.count - byteCount else {
+      throw ImageSourceError.outOfBoundsRead
+    }
+  }
+
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     guard let offset = Int(exactly: address),

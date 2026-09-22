@@ -175,6 +175,7 @@ int * __counted_by(len) noncountedLifetime(int len, int * p __lifetimebound);
 //   expected-experimental-remark@17{{macro content: |}|}}
 // }}
 int * __counted_by(13) _Nullable constant(int * _Nullable p __counted_by_or_null(13) __lifetimebound);
+// expected-experimental-warning@-1{{combining '__counted_by' with non-zero count (which cannot be null) and '_Nullable'; did you mean '__counted_by_or_null' instead?}}
 
 struct EscapableStruct {};
 // make sure __lifetimebound is ignored when return value is escapable

@@ -41,7 +41,9 @@ swift_compiler_sources(Optimizer
   SimplifyMoveValue.swift
   SimplifyOpenExistentialRef.swift
   SimplifyPartialApply.swift
+  SimplifyPhiArgument.swift
   SimplifyPointerToAddress.swift
+  SimplifyRawPointerToRef.swift
   SimplifyRefCasts.swift
   SimplifyRetainReleaseValue.swift
   SimplifyStoreBorrow.swift

@@ -268,11 +268,10 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @checked_downcast_optional_metatype({{(i32|i64)}} %0) {{.*}} {
-// CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} %0 to ptr
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @checked_downcast_optional_metatype(ptr %0) {{.*}} {
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s5casts1BCMa"([[INT]] 0)
 // CHECK:         [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:         [[RESULT:%.*]] = call ptr @swift_dynamicCastMetatype(ptr [[VALUE]], ptr [[METADATA]])
+// CHECK:         [[RESULT:%.*]] = call ptr @swift_dynamicCastMetatype(ptr %0, ptr [[METADATA]])
 // CHECK:         [[COND:%.*]] = icmp ne ptr [[RESULT]], null
 // CHECK:         br i1 [[COND]]
 sil @checked_downcast_optional_metatype : $@convention(thin) (Optional<@thick A.Type>) -> @thick B.Type {
@@ -284,8 +283,9 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @checked_downcast_optional_exmetatype({{(i32 %0, i32 %1|i64 %0, i64 %1)}}) {{.*}} {
-// CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} %0 to ptr
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @checked_downcast_optional_exmetatype(ptr %0, ptr %1) {{.*}} {
+// CHECK:         [[TMP:%.*]] = ptrtoint ptr %0 to {{(i32|i64)}}
+// CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} [[TMP]] to ptr
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s5casts1BCMa"([[INT]] 0)
 // CHECK:         [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:         [[RESULT:%.*]] = call ptr @swift_dynamicCastMetatype(ptr [[VALUE]], ptr [[METADATA]])
@@ -438,7 +438,7 @@ bb3(%11 : $Optional<C & PAnyObject>):
 // CHECK: [[COND:%.*]] = icmp ne ptr {{%.*}}, null
 // CHECK-NEXT: br i1 [[COND]], label %is-non-nil, label %is-nil
 // CHECK: nil-checked-cont:
-// CHECK:   %4 = phi { ptr, ptr } [ {{%.*}}, %is-non-nil ], [ zeroinitializer, %is-nil ]
+// CHECK:   %3 = phi { ptr, ptr } [ {{%.*}}, %is-non-nil ], [ zeroinitializer, %is-nil ]
 sil @checked_cast_optional_metatype : $@convention(thin) (Optional<@thick any Any.Type>) -> Optional<@thick any Q.Type> {
 bb0(%0 : $Optional<@thick any Any.Type>):
   checked_cast_br Optional<any Any.Type> in %0 to any Q.Type, bb1, bb2

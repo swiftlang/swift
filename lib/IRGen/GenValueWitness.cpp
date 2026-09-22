@@ -26,7 +26,6 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/TypeLowering.h"
@@ -37,7 +36,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "ConstantBuilder.h"
-#include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
 #include "GenMeta.h"
@@ -45,7 +43,6 @@
 #include "GenPointerAuth.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
-#include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "MetadataLayout.h"
 #include "StructLayout.h"
@@ -280,7 +277,8 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
   case FixedPacking::Allocate: {
     llvm::Value *box, *address;
     auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    IGF.emitAllocBoxCall(metadata, box, address);
+    IGF.emitAllocBoxCall(metadata, /*mallocTypeId*/ std::nullopt, box,
+                         address);
     IGF.Builder.CreateStore(
         box,
         Address(IGF.Builder.CreateBitCast(buffer.getAddress(), IGF.IGM.PtrTy),

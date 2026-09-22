@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -173,6 +174,9 @@ public:
   static constexpr inline ImportNameVersion forTypes() {
     return ImportNameVersion::maxVersion();
   }
+
+  void dump(llvm::raw_ostream &out) const;
+  SWIFT_DEBUG_DUMP;
 };
 
 /// Describes a name that was imported from Clang.
@@ -366,23 +370,6 @@ public:
 
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
-
-  bool isDereferenceAccessor() const {
-    switch (getAccessorKind()) {
-    case ImportedAccessorKind::None:
-    case ImportedAccessorKind::PropertyGetter:
-    case ImportedAccessorKind::PropertySetter:
-    case ImportedAccessorKind::SubscriptGetter:
-    case ImportedAccessorKind::SubscriptSetter:
-      return false;
-
-    case ImportedAccessorKind::DereferenceGetter:
-    case ImportedAccessorKind::DereferenceSetter:
-      return true;
-    }
-
-    llvm_unreachable("Invalid ImportedAccessorKind.");
-  }
 };
 
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
@@ -401,8 +388,8 @@ enum class CustomAsyncName {
 };
 
 /// Class to determine the Swift name of foreign entities. Currently fairly
-/// stateless and borrows from the ClangImporter::Implementation, but in the
-/// future will be more self-contained and encapsulated.
+/// stateless and borrows from the ClangImporter, but in the future will be
+/// more self-contained and encapsulated.
 class NameImporter {
   ASTContext &swiftCtx;
   const PlatformAvailability &availability;
@@ -423,14 +410,11 @@ class NameImporter {
   llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
                  std::unique_ptr<InheritedNameSet>> allProperties;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema, ClangImporter::Implementation *importerImpl)
+               clang::Sema &cSema)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()),
-        importerImpl(importerImpl) {}
+        enumInfos(clangSema.getPreprocessor()) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -474,7 +458,6 @@ public:
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
-  ClangImporter::Implementation *getImporterImpl() { return importerImpl; }
 
   Identifier getIdentifier(StringRef name) {
     return swiftCtx.getIdentifier(name);

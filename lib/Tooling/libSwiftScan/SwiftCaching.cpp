@@ -40,8 +40,8 @@
 #include "llvm/CAS/CASFSBuilder.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -489,9 +489,21 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
     }
   }
   {
-    clang::cas::CompileJobResultSchema Schema(CAS.getCAS());
-    if (Schema.isRootNode(*Proxy)) {
-      auto Result = Schema.load(Proxy->getRef());
+    // clang 23 replaced the public CompileJobResultSchema(ObjectStore &)
+    // constructor with a fallible create() factory, so that a CAS store
+    // failure surfaces as an Error instead of an invalid cantFail. Wrap the
+    // older constructor in an optional so the code below is spelled the same
+    // either way.
+#if LLVM_VERSION_MAJOR >= 23
+    auto Schema = clang::cas::CompileJobResultSchema::create(CAS.getCAS());
+    if (!Schema)
+      return Schema.takeError();
+#else
+    std::optional<clang::cas::CompileJobResultSchema> Schema(std::in_place,
+                                                             CAS.getCAS());
+#endif
+    if (Schema->isRootNode(*Proxy)) {
+      auto Result = Schema->load(Proxy->getRef());
       if (!Result)
         return Result.takeError();
       return new SwiftCachedCompilationHandle(*KeyRef, *Ref, std::move(*Result),
@@ -984,8 +996,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   const auto &Input = AllInputs[Comp.InputIndex];
 
   // Setup DiagnosticsConsumers.
-  DiagnosticHelper DH = DiagnosticHelper::create(
-      Inst, Invocation, Instance.Args, Err, /*QuasiPID=*/true);
+  DiagnosticHelper DH = DiagnosticHelper::create(Inst, Invocation, Err);
+  DH.initDiagnosticConsumers();
 
   std::string InstanceSetupError;
   if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,
@@ -1006,7 +1018,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
       makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>(), Out);
 
   if (!replayCachedCompilerOutputsForInput(
-          CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(), DH,
+          CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(),
           Backend, Instance.Invocation.getFrontendOptions(), *CDP, Remarks,
           UseCASBackend,
           Instance.Invocation.getCASOptions().WriteOutputHashXAttr)) {

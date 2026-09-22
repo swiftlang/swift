@@ -102,9 +102,10 @@ fileprivate class ConcurrencyDumper {
             type(of: process).GetSymbolAddress
       let ReadBytes: RemoteProcess.ReadBytesFunction =
             type(of: process).ReadBytes
-      let this = process.toOpaqueRef()
-      let addr = GetSymbolAddress(this, symbolName, UInt64(symbolName.utf8.count))
-      if addr != 0, let ptr = ReadBytes(this, addr, UInt64(MemoryLayout<UInt>.size), nil) {
+      let this = OpaqueRef(process)
+      let addr = GetSymbolAddress(this.pointer, symbolName, UInt64(symbolName.utf8.count))
+      if addr != 0,
+         let ptr = ReadBytes(this.pointer, addr, UInt64(MemoryLayout<UInt>.size), nil) {
         return swift_reflection_ptr_t(ptr.load(as: UInt.self))
       }
       return nil
@@ -115,13 +116,23 @@ fileprivate class ConcurrencyDumper {
 
   func gatherHeapInfo() -> HeapInfo {
     var result = HeapInfo()
+    var usedRegistry = false
+
+    do {
+      try context.iterateTaskRegistry { taskAddr in
+        result.tasks.append(taskAddr)
+      }
+      usedRegistry = true
+    } catch {
+      // Fallback to heap scan if task registry fails (e.g. older runtime)
+    }
 
     process.iterateHeap { (pointer, size) in
       let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
       if metadata == 0 || metadata == .max { return }
       if metadata == jobMetadata {
         result.jobs.append(swift_reflection_ptr_t(pointer))
-      } else if metadata == taskMetadata {
+      } else if !usedRegistry && metadata == taskMetadata {
         result.tasks.append(swift_reflection_ptr_t(pointer))
       } else if isActorMetadata(metadata) {
         result.actors.append(swift_reflection_ptr_t(pointer))

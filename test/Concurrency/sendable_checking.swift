@@ -13,7 +13,7 @@ struct NS1 { }
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
 extension NS1: Sendable { }
-// expected-note@-1 4{{conformance of 'NS1' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2 4{{conformance of 'NS1' to 'Sendable' has been explicitly marked unavailable here}}
 
 @available(SwiftStdlib 5.1, *)
 struct NS2 { // expected-note {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
@@ -104,8 +104,8 @@ public actor MyActor: MyProto {
 // Make sure the generic signature doesn't minimize away Sendable requirements.
 class NSClass { }
 
-@available(*, unavailable)
-extension NSClass: @unchecked Sendable {} // expected-note {{conformance of 'NSClass' to 'Sendable' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{conformance of 'NSClass' to 'Sendable' has been explicitly marked unavailable here}}
+extension NSClass: @unchecked Sendable {}
 
 struct WrapClass<T: NSClass> {
   var t: T
@@ -511,7 +511,7 @@ struct UnavailableSendable {}
 
 @available(*, unavailable)
 extension UnavailableSendable: Sendable {}
-// expected-note@-1 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
 
 @available(SwiftStdlib 5.1, *)
 func checkOpaqueType() -> some Sendable {

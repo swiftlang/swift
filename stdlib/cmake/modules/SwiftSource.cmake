@@ -666,9 +666,6 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
-  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
-  list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
-  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
   list(APPEND swift_flags "-enable-experimental-feature" "Lifetimes")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
@@ -1009,7 +1006,7 @@ function(_compile_swift_files
       endif()
     endif()
   endif()
-  set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "${custom_env}")
+  set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "${custom_env}" "--")
 
   if (SWIFT_REPORT_STATISTICS)
     list(GET dirs_to_create 0 first_obj_dir)

@@ -49,15 +49,17 @@ let _ = fooCaller(1, 2)
 
 let _ = constantFolded()
 // CHECK-LABEL: sil {{.*}} @$s8MyModule14constantFoldedSiyF
-// CHECK: debug_value undef : $Builtin.Int{{[0-9]+}}, let, name "a"
+// CHECK: debug_value (), let, name "a"
 // CHECK-SAME: transform {
-// CHECK:   [[LIT1:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]+}}, 2
-// CHECK:   return [[LIT1]]
+// CHECK:   %0 = integer_literal $Builtin.Int{{[0-9]+}}, 2
+// CHECK:   %1 = struct $Int (%0
+// CHECK:   return %1
 // CHECK: }
-// CHECK: debug_value undef : $Builtin.Int{{[0-9]+}}, let, name "b"
+// CHECK: debug_value (), let, name "b"
 // CHECK-SAME: transform {
-// CHECK:   [[LIT2:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]+}}, 3
-// CHECK:   return [[LIT2]]
+// CHECK:   %0 = integer_literal $Builtin.Int{{[0-9]+}}, 3
+// CHECK:   %1 = struct $Int (%0
+// CHECK:   return %1
 // CHECK: }
 
 func test() {
@@ -69,7 +71,7 @@ func test() {
 // CHECK: debug_value %1 : $Int64, let, name "sum", argno 2, loc "{{.*}}MyModule.swift":2:31
 // CHECK: debug_value {{.*}}, var, (name "$i$generator", loc "{{.*}}MyModule.swift":4:14), type $IndexingIterator<Array<Int64>>, expr op_fragment:#IndexingIterator._position:op_fragment:#Int._value, loc "{{.*}}MyModule.swift":4:14
 // CHECK: debug_value {{.*}}, var, (name "$i$generator", loc "{{.*}}MyModule.swift":4:14), type $IndexingIterator<Array<Int64>>, expr op_fragment:#IndexingIterator._position:op_fragment:#Int._value
-// CHECK: debug_value {{.*}} : $Builtin.Int64, var, (name "temp", loc "{{.*}}MyModule.swift":3:9, scope {{.*}}), type $Int64, expr op_fragment:#Int64._value, loc "{{.*}}MyModule.swift":5:14, scope
+// CHECK: debug_value {{.*}} : $Builtin.Int64, var, (name "temp", loc "{{.*}}MyModule.swift":3:9), type $Int64, expr op_fragment:#Int64._value, loc "{{.*}}MyModule.swift":5:14, scope
 
 test()
 // CHECK-NOT: UnknownCode

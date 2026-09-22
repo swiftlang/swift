@@ -24,7 +24,6 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
-#include "llvm/Bitstream/BitCodes.h"
 
 namespace swift {
 class ModuleFile;
@@ -58,7 +57,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1014; // @called(once) attribute support
+const uint16_t SWIFTMODULE_VERSION_MINOR =
+    1030; // unconditional_checked_cast_addr copy flag
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -318,6 +318,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   KeyPathAccessorSetter,
   KeyPathAccessorEquals,
   KeyPathAccessorHash,
+  COMMethod,
 };
 using SILFunctionTypeRepresentationField = BCFixed<5>;
 
@@ -1412,7 +1413,8 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
-    BCFixed<1>                       // called once
+    BCFixed<1>,                      // called once
+    BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1432,6 +1434,12 @@ namespace decls_block {
                      BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
+                     >;
+
+  using FunctionYieldLayout =
+      BCRecordLayout<FUNCTION_YIELD,
+                     TypeIDField,             // type
+                     ParamDeclSpecifierField // inout, shared or owned?
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1515,6 +1523,7 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result,
     BCFixed<1>,                      // called once
+    BCFixed<1>,                      // coroutine?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -2323,6 +2332,7 @@ namespace decls_block {
   using SectionDeclAttrLayout = BCRecordLayout<
     Section_DECL_ATTR,
     BCFixed<1>, // implicit flag
+    BCFixed<1>, // default flag
     BCBlob      // _section
   >;
 
@@ -2331,6 +2341,12 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // underscored flag
     BCBlob      // cname
+  >;
+
+  using CxxDeclDeclAttrLayout = BCRecordLayout<
+    CxxDecl_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // cxx name
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<
@@ -2379,6 +2395,12 @@ namespace decls_block {
     Semantics_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCBlob      // semantics value
+  >;
+
+  using TargetDeclAttrLayout = BCRecordLayout<
+    Target_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // target string
   >;
 
   using EffectsDeclAttrLayout = BCRecordLayout<
@@ -2677,6 +2699,12 @@ namespace decls_block {
                      BCFixed<1>  // implicit flag
                      >;
 
+  using UnsafeDeclAttrLayout =
+      BCRecordLayout<Unsafe_DECL_ATTR,
+                     BCFixed<1>, // whether this is '@unsafe(always)'
+                     BCFixed<1>  // implicit flag
+                     >;
+
   using MacroRoleDeclAttrLayout = BCRecordLayout<
     MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
@@ -2715,6 +2743,83 @@ namespace decls_block {
   using CalledDeclAttrLayout = BCRecordLayout<
     Called_DECL_ATTR,
     BCFixed<2> // execution semantics
+  >;
+
+  constexpr uint8_t NoReferenceCounting =
+      static_cast<uint8_t>(ReferenceCounting::Error) + 1;
+
+  using HiddenTypeLayoutInfoLayout = BCRecordLayout<
+    HIDDEN_TYPE_LAYOUT_INFO,
+    IdentifierIDField, // mangled identity of the hidden type
+    DeclIDField,       // parent type declaration, if any
+    BCFixed<4>         // ReferenceCounting, or NoReferenceCounting
+  >;
+
+  using SerializableSILTypePropertiesLayout = BCRecordLayout<
+    SIL_TYPE_PROPERTIES,
+    BCFixed<16> // SILTypeProperties::Flags
+  >;
+
+  using SerializableTypeInfoLayout = BCRecordLayout<
+    TYPE_INFO,
+    BCFixed<3>, // SerializableHiddenTypeInfoKind
+    BCVBR<8>    // TypeInfoBitfields::OpaqueBits
+  >;
+
+  using SerializableLLVMTypeLayout = BCRecordLayout<
+    LLVM_TYPE,
+    BCFixed<5>, // llvm::Type::TypeID
+    BCVBR<16>,  // integer width, address space, or element count
+    BCFixed<1>, // packed struct
+    BCVBR<8>    // child count
+  >;
+
+  using SerializableFixedTypeInfoLayout = BCRecordLayout<
+    FIXED_TYPE_INFO,
+    BCVBR<32>,           // spare-bit count
+    BCArray<BCVBR<16>>   // spare-bit words
+  >;
+
+  using SerializableLoadableTypeInfoLayout = BCRecordLayout<
+    LOADABLE_TYPE_INFO,
+    BCVBR<16> // explosion-schema element count
+  >;
+
+  using SerializableExplosionSchemaElementLayout = BCRecordLayout<
+    EXPLOSION_SCHEMA_ELEMENT,
+    BCVBR<8> // aggregate alignment, or zero for a scalar
+  >;
+
+  using SerializableRecordTypeInfoLayout = BCRecordLayout<
+    RECORD_TYPE_INFO,
+    BCFixed<1>, // fields are ABI accessible
+    BCVBR<16>,  // explosion size
+    BCVBR<16>   // field count
+  >;
+
+  using SerializableRecordFieldLayout = BCRecordLayout<
+    RECORD_FIELD,
+    TypeIDField, // Swift field type, or zero if it has no Swift representation
+    BCVBR<32>,  // byte offset
+    BCVBR<32>,  // byte offset used during layout
+    BCVBR<16>,  // LLVM struct or non-fixed element index
+    BCFixed<1>, // trivially destroyable
+    BCFixed<3>, // ElementLayoutKind
+    BCVBR<16>,  // explosion range begin
+    BCVBR<16>   // explosion range end
+  >;
+
+  using SerializableLoadableClangRecordTypeInfoLayout = BCRecordLayout<
+    LOADABLE_CLANG_RECORD_TYPE_INFO,
+    BCFixed<1>, // has a reference field
+    BCVBR<16>   // aggregate-lowering input count
+  >;
+
+  using SerializableAggLoweringInputLayout = BCRecordLayout<
+    AGG_LOWERING_INPUT,
+    BCVBR<32>,  // byte range begin
+    BCVBR<32>,  // byte range end
+    BCFixed<1>  // has an LLVM type
   >;
 
   // clang-format on
@@ -2819,7 +2924,9 @@ namespace index_block {
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
-    LastRecordKind = EXPORTED_PRESPECIALIZATION_DECLS,
+    HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
+    HIDDEN_TYPE_FALLBACK_TABLE,
+    LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;

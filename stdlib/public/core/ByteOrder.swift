@@ -12,7 +12,7 @@
 
 /// A byte ordering in memory.
 @frozen
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 public enum ByteOrder: Equatable, Hashable, Sendable {
   /// Bytes are ordered with the most significant bits
   /// starting at the lowest memory address.

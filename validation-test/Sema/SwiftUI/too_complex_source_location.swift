@@ -34,10 +34,10 @@ struct ContentView: View {
           VStack {
             VStack {
               Picker(selection: $selection) {
-                ForEach(["a", "b", "c"], id: \.self) {
-                  Text($0)  // expected-error {{ reasonable time}}
-                    .foregroundStyl(.red) // Typo is here
-                }
+                // Note: The code here is on a single line to ensure we're able to
+                // handle the multiple SDK versions we have in CI.
+                ForEach(["a", "b", "c"], id: \.self) { Text($0).foregroundStyl(.red) } // Typo is here
+                // expected-error@-1 {{ reasonable time}}
               } label: {
               }
               .pickerStyle(.segmented)

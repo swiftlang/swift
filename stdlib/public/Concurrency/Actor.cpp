@@ -24,6 +24,11 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#if !SWIFT_CONCURRENCY_EMBEDDED
+// Private.h pulls in the demangler and other hosted C++ facilities, which are
+// unavailable when building for embedded (freestanding) targets.
+#include "../runtime/Private.h"
+#endif
 #include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
@@ -40,6 +45,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -99,6 +105,25 @@ static bool shouldYieldThread() {
 /*****************************************************************************/
 /******************************* TASK TRACKING ******************************/
 /*****************************************************************************/
+
+/// The currently executing task. If this has thread-local storage (Windows,
+/// Linux) or is a plain global (embedded), give it a stable name and protected
+/// visibility, enabling debuggers to locate the symbol by name and ensuring it
+/// survives stripping the symbol table.
+/// Update swift_concurrency_current_task_storage_kind in
+/// swift/Runtime/ConcurrencyDebug.h if this changes.
+#ifdef SWIFT_THREAD_LOCAL
+extern "C" {
+// (windows) dllexport is not allowed on thread-local variables.
+#if defined(__ELF__)
+SWIFT_ATTRIBUTE_FOR_EXPORTS
+#endif
+#else
+namespace {
+#endif
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
+_swift_concurrency_currentTask;
+}
 
 namespace {
 
@@ -191,23 +216,15 @@ public:
 };
 
 class ActiveTask {
-  /// A thread-local variable pointing to the active tracking
-  /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
-                                 tls_key::concurrency_task) Value;
-
 public:
-  static void set(AsyncTask *task) { Value.set(task); }
-  static AsyncTask *get() { return Value.get(); }
+  static void set(AsyncTask *task) { _swift_concurrency_currentTask.set(task); }
+  static AsyncTask *get() { return _swift_concurrency_currentTask.get(); }
   static AsyncTask *swap(AsyncTask *newTask) {
-    return Value.swap(newTask);
+    return _swift_concurrency_currentTask.swap(newTask);
   }
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
-ActiveTask::Value;
-
 SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
@@ -468,6 +485,11 @@ __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
   // Potentially, override the platform detected mode, primarily used in tests.
 #if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  // The override downgrades the isolation check from fatal to a warning, so it
+  // is unavailable in processes don't allow disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return nullptr;
+
   return swift::runtime::environment::
       concurrencyIsCurrentExecutorLegacyModeOverride();
 #else
@@ -800,6 +822,12 @@ static unsigned unexpectedExecutorLogLevel =
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
+  // SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL can downgrade the executor check from a
+  // fatal error to a warning, so it is unavailable in processes don't allow
+  // disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return;
+
   const char *levelStr = getenv("SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL");
   if (!levelStr)
     return;
@@ -2348,23 +2376,53 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
+enum class ActorClassKind {
+  /// A default actor, i.e. it uses the default actor executor
+  DefaultActor,
+  /// An actor which uses a custom executor
+  NonDefaultActor,
+};
+
+/// Returns what kind of actor (if any) the passed metadata represents.
+static std::optional<ActorClassKind>
+classifyActorClass(const Metadata *metadata) {
+  auto *classMetadata = dyn_cast_or_null<ClassMetadata>(metadata);
+
+  if (!classMetadata || !classMetadata->isTypeMetadata())
+    return std::nullopt;
+
+  bool isActor = false;
+  while (true) {
+    if (!classMetadata->isArtificialSubclass()) {
+      const auto *description = classMetadata->getDescription();
+
+      // Trust the class descriptor if it says it's a default actor
+      if (description->isDefaultActor())
+        return ActorClassKind::DefaultActor;
+
+      isActor |= description->isActor();
+    }
+
+    // Go to the superclass
+    classMetadata = classMetadata->Superclass;
+
+    // If we run out of Swift classes, it's not a default actor
+    if (!classMetadata || !classMetadata->isTypeMetadata())
+      return isActor ? std::optional(ActorClassKind::NonDefaultActor)
+                     : std::nullopt;
+  }
+}
+
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
   assert(metadata->isTypeMetadata());
-  while (true) {
-    // Trust the class descriptor if it says it's a default actor.
-    if (!metadata->isArtificialSubclass() &&
-        metadata->getDescription()->isDefaultActor()) {
-      return true;
-    }
-
-    // Go to the superclass.
-    metadata = metadata->Superclass;
-
-    // If we run out of Swift classes, it's not a default actor.
-    if (!metadata || !metadata->isTypeMetadata()) {
-      return false;
-    }
-  }
+  return classifyActorClass(metadata) == ActorClassKind::DefaultActor;
+}
+#else
+// Every Swift actor that survives to runtime metadata in Embedded Swift
+// is a default actor.
+static bool isDefaultActorClass(const ClassMetadata *metadata) {
+  (void)metadata;
+  return true;
 }
 #endif
 
@@ -2780,7 +2838,7 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   auto _taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
   SWIFT_TASK_DEBUG_LOG(
       "enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
-      serialExecutorRef.getIdentity(), taskExecutorRef.getIdentity());
+      serialExecutorRef.getIdentity(), _taskExecutorRef.getIdentity());
 #endif
 
   assert(job && "no job provided");
@@ -2894,6 +2952,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
 void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *_actor) {
   asImpl(_actor)->initialize();
 }
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 /// Compute the minimal allocation size for a 'remote' distributed actor reference.
 ///
@@ -2902,6 +2961,19 @@ void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedAct
 /// properties beyond those three are never initialized or accessed on a remote
 /// instance, so we can trim the allocation at the offset where the first
 /// user-defined field would begin.
+///
+/// Under embedded Swift this computation is not possible: the embedded
+/// `ClassMetadata` layout is intentionally minimal (just superclass + destroy
+/// + ivarDestroyer pointers; see `stdlib/public/core/EmbeddedRuntime.swift`)
+/// and does NOT carry a `TargetClassDescriptor` or field-offset vector. The
+/// non-embedded path reads `description->NumFields` and projects
+/// `metadata->getFieldOffsets()[3]`, neither of which exists in the embedded
+/// metadata. Embedded therefore does not use this function at all: IRGen
+/// computes the trim size and alignment mask at compile time from `ClassLayout`
+/// and passes them to the dedicated
+/// `swift_distributedActor_remote_initialize_embedded` entry point below. See
+/// `lib/IRGen/GenDistributed.cpp::emitDistributedActorInitializeRemote`
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static size_t
 getDistributedRemoteActorAllocSize(const ClassMetadata *metadata) {
   auto description = metadata->getDescription();
@@ -2914,12 +2986,11 @@ getDistributedRemoteActorAllocSize(const ClassMetadata *metadata) {
   if (numFields >= 4) {
     // The 4th field is the first user-defined stored property.
     // Its offset marks the end of the synthesized fields,
-    // so it is exactly  how much storage we need.
+    // so it is exactly how much storage we need.
     const auto *fieldOffsets = metadata->getFieldOffsets();
     return fieldOffsets[3];
   }
 
-  // Only the three required fields exist, remote-ref and local instances have the same size.
   return metadata->getInstanceSize();
 }
 
@@ -2946,24 +3017,74 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
     actor->initialize(/*remote*/true);
     assert(swift_distributed_actor_is_remote(alloc));
     return reinterpret_cast<OpaqueValue*>(actor);
-  } else {
-    auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
-    actor->initialize(/*remote*/true);
-    assert(swift_distributed_actor_is_remote(alloc));
-    return reinterpret_cast<OpaqueValue*>(actor);
   }
+
+  // Non-default-actor distributed actors are not supported in Embedded Swift.
+  auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(swift_distributed_actor_is_remote(alloc));
+  return reinterpret_cast<OpaqueValue*>(actor);
 }
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+/// Embedded-only variant: accepts the allocation size and alignment mask
+/// pre-computed by the compiler at IR generation time. The minimal embedded
+/// ClassMetadata layout carries no TargetClassDescriptor, field-offset vector,
+/// InstanceSize, or InstanceAlignMask, so the runtime cannot derive either
+/// value itself. IRGen emits the correct trim size (offset of the first
+/// user-defined stored property, or full instance size when there are none)
+/// and the class's alignment mask, and passes both here directly.
+OpaqueValue*
+swift::swift_distributedActor_remote_initialize_embedded(
+    const Metadata *actorType, size_t allocSize, size_t alignMask) {
+  // The only inline definition of Metadata::getClassObject() lives in
+  // ../runtime/Private.h, which the embedded build cannot include (it pulls in
+  // the demangler). Embedded metadata is always native Swift class metadata,
+  // which is its own class object, so cast directly
+  const ClassMetadata *metadata = cast<ClassMetadata>(actorType);
+
+  HeapObject *alloc = swift_allocObject(metadata, allocSize, alignMask);
+
+  // Zero the body so that the destructor can safely release fields without
+  // encountering uninitialized memory.
+  memset((void *)(alloc + 1), 0, allocSize - sizeof(HeapObject));
+
+  // All embedded distributed actors are default actors.
+  auto actor = asImpl(reinterpret_cast<DefaultActor *>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(swift_distributed_actor_is_remote(alloc));
+  return reinterpret_cast<OpaqueValue*>(actor);
+}
+#endif
+
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
-  if (isDefaultActorClass(metadata)) {
+  if (!_actor || isObjCTaggedPointer(_actor))
+    return false;
+
+  auto actorKind = classifyActorClass(swift_getObjectType(_actor));
+  if (!actorKind)
+    return false;
+
+  switch (*actorKind) {
+  case ActorClassKind::DefaultActor:
     return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
-  } else {
+  case ActorClassKind::NonDefaultActor:
     return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
 #else
+  // The embedded ClassMetadata carries no descriptor, so classifyActorClass
+  // cannot run here. Every actor that survives to runtime metadata in
+  // Embedded Swift is a default actor, and non-default-actor distributed
+  // actors are rejected in swift_distributedActor_remote_initialize
+  if (!_actor)
+    return false;
+
+  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
+  if (isDefaultActorClass(metadata))
+    return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
+
   return false;
 #endif
 }

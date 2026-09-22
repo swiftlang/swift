@@ -74,7 +74,7 @@ public:
 
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
-  std::optional<unsigned> SourceBufferID;
+  unsigned SourceBufferID;
   DiagnosticKind Classification;
   SourceLoc Loc;
   unsigned Line;
@@ -92,7 +92,7 @@ struct CapturedDiagnosticInfo {
   bool HasChildren;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
-                         std::optional<unsigned> SourceBufferID,
+                         unsigned SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
@@ -158,6 +158,12 @@ private:
     /// - Errors in the definition of expected diagnostics
     bool HadError;
     bool HadUnexpectedDiag;
+
+    Result &operator |= (const Result &rhs) {
+      HadError |= rhs.HadError;
+      HadUnexpectedDiag |= rhs.HadUnexpectedDiag;
+      return *this;
+    }
   };
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
@@ -167,9 +173,6 @@ private:
   /// diagnostics
   bool verifyUnrelated(
       std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
-
-  bool
-  verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
   std::vector<SMDiagnosticWithNotes> Errors;
 
@@ -208,28 +211,48 @@ private:
   parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
-                     const CapturedDiagnosticInfo &D, unsigned BufferID) const;
+                     const CapturedDiagnosticInfo &D) const;
 
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
-                           unsigned BufferID, unsigned DiagnosticLineNo) const;
+                           unsigned DiagnosticLineNo) const;
 
   public:
   /// Tracks the set of macro-expansion buffers produced at a single source
   /// location. A location can drive several sibling expansions (e.g. multiple
-  /// peer macros on one declaration); their buffers are ordered by the source
-  /// location of the attached-macro attribute that produced each, so that each
+  /// peer macros on one declaration); their buffers are ordered so that each
   /// expansion has a stable "expansion index" matching source order. The
   /// verifier numbers 'expected-expansion' directives at a location in source
   /// order and matches directive #k to expansion index #k.
   class ExpansionContext {
-    /// Each produced sibling expansion as (sortKey, bufferID), kept sorted so
-    /// the expansion index matches the source order of the macros that produced
-    /// the siblings. sortKey is the source-location pointer of the generating
-    /// attached-macro attribute; SourceManager orders locations by pointer (see
-    /// isBeforeInBuffer), so an earlier attribute sorts first. Ties (e.g. no
-    /// attribute) fall back to buffer-ID order.
-    SmallVector<std::pair<uintptr_t, unsigned>, 2> buffers;
+  public:
+    /// Ordering key for a sibling expansion: siblings sharing a source buffer
+    /// (peer macros, at any nesting depth) are compared by \c anchorOffset;
+    /// siblings in different buffers (a template method's per-instantiation
+    /// synthesized attributes) are compared by \c content.
+    struct ExpansionOrderKey {
+      /// Buffer the generating attribute lives in. Used only to tell whether
+      /// two siblings share a buffer, never to order them, so its unstable
+      /// numeric value does not affect the result.
+      unsigned anchorBufferID = 0;
+      /// Byte offset of the generating attribute within that buffer.
+      unsigned anchorOffset = 0;
+      /// Text of the expansion buffer.
+      StringRef content;
+
+      bool operator<(const ExpansionOrderKey &RHS) const {
+        if (anchorBufferID == RHS.anchorBufferID &&
+            anchorOffset != RHS.anchorOffset)
+          return anchorOffset < RHS.anchorOffset;
+        return content.compare(RHS.content) < 0;
+      }
+    };
+
+  private:
+    /// Produced sibling expansions as (orderKey, bufferID), kept sorted so the
+    /// expansion index follows ExpansionOrderKey. Equal keys fall back to
+    /// buffer-ID order.
+    SmallVector<std::pair<ExpansionOrderKey, unsigned>, 2> buffers;
     /// Number of directives already routed to a buffer during verification.
     size_t verifiedCount = 0;
     /// Number of directives already routed to a buffer during parsing.
@@ -238,14 +261,33 @@ private:
   public:
     ExpansionContext() = default;
 
-    void addBuffer(unsigned ID, uintptr_t sortKey) {
+    void addBuffer(unsigned ID, ExpansionOrderKey key) {
       assert(verifiedCount == 0 && parsedCount == 0 &&
              "added buffer after routing began");
       for (const auto &Buffer : buffers)
         if (Buffer.second == ID)
           return;
-      buffers.emplace_back(sortKey, ID);
+      buffers.emplace_back(key, ID);
       llvm::sort(buffers);
+
+#ifndef NDEBUG
+      // operator< orders same-buffer siblings by offset and different-buffer
+      // siblings by content, which is a valid strict weak ordering only if the
+      // group never mixes the two -- i.e. anchor buffers are all equal or all
+      // distinct. Peer macros share a buffer; per-instantiation synthesized
+      // attributes are all distinct. Guard against a future role breaking this.
+      bool sawEqual = false, sawDistinct = false;
+      for (size_t I = 0, E = buffers.size(); I != E; ++I)
+        for (size_t J = I + 1; J != E; ++J) {
+          if (buffers[I].first.anchorBufferID ==
+              buffers[J].first.anchorBufferID)
+            sawEqual = true;
+          else
+            sawDistinct = true;
+        }
+      assert(!(sawEqual && sawDistinct) &&
+             "expansion siblings mix shared and distinct anchor buffers");
+#endif
     }
 
     size_t expansionIndex(unsigned ID) const {
@@ -282,14 +324,15 @@ private:
   llvm::DenseMap<SourceLoc, ExpansionContext> Expansions;
 
   struct MarkerLocation {
-    unsigned BufferID;
+    // nullopt: resolution of the buffer ID has been deferred
+    std::optional<unsigned> BufferID;
     unsigned Line;
   };
 
   /// Map from location marker names to their buffer and line number.
   /// Populated by scanForMarkers() before parsing expected diagnostics. Plain
   /// '// #name' markers are recorded with their resolved location. Expansion-
-  /// relative '// #name@N' markers are recorded with a sentinel buffer of 0
+  /// relative '// #name@N' markers are recorded with a null buffer ID
   /// until the enclosing expected-expansion block is parsed and
   /// processExpansionMarkerDefinitions() binds them.
   llvm::StringMap<MarkerLocation> LocationMarkers;

@@ -163,6 +163,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK:         [[GETTER:%.*]] = function_ref @$s17struct_resilience6MySizeV1wSivg
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]](%0)
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }
@@ -187,6 +188,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK:         [[W_ADDR:%.*]] = struct_element_addr [[ARG]] : $*MySize, #MySize.w
 // CHECK-NEXT:    [[RESULT:%.*]] = load [trivial] [[W_ADDR]] : $*Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }
@@ -199,6 +201,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK:         [[GETTER:%.*]] = function_ref @$s17struct_resilience6MySizeV1wSivg
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]](%0)
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 

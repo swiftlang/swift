@@ -24,13 +24,11 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/ResilienceExpansion.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -47,8 +45,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/Support/Error.h"
-#include <iterator>
 
 #include "GenDecl.h"
 #include "GenMeta.h"
@@ -101,16 +97,28 @@ namespace {
     StructFieldInfo(VarDecl *field, const TypeInfo &type)
       : RecordField(type), Field(field) {}
 
+    StructFieldInfo(VarDecl *field, const ElementLayout &layout,
+                    unsigned explosionBegin, unsigned explosionEnd)
+        : RecordField(layout, explosionBegin, explosionEnd), Field(field),
+          HiddenFieldName("hidden_field") {}
+
     /// The field.
     VarDecl * const Field;
+    StringRef HiddenFieldName;
 
     StringRef getFieldName() const {
+      if (!HiddenFieldName.empty())
+        return HiddenFieldName;
       return Field->getName().str();
     }
 
     SILType getType(IRGenModule &IGM, SILType T) const {
       return T.getFieldType(Field, IGM.getSILModule(),
                             IGM.getMaximalTypeExpansionContext());
+    }
+
+    Type getInterfaceTypeForSerialization() const {
+      return Field ? Field->getInterfaceType() : Type();
     }
   };
 
@@ -144,6 +152,10 @@ namespace {
       // guaranteed to ignore the type passed to it.
       return {};
     }
+
+    Type getInterfaceTypeForSerialization() const {
+      return Field ? Field->getInterfaceType() : Type();
+    }
   };
 
   /// A common base class for structs.
@@ -158,11 +170,31 @@ namespace {
       super::setSubclassKind((unsigned) kind);
     }
 
+    StructTypeInfoBase(
+        StructTypeInfoKind kind, ArrayRef<FieldInfoType> fields,
+        IRGenModule &IGM,
+        const SerializableLoadableStructTypeInfoRepresentation &representation)
+        : super(fields, IGM, representation) {
+      super::setSubclassKind((unsigned) kind);
+    }
+
+    void populateSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM,
+        SerializableLoadableStructTypeInfoRepresentation &representation) const {
+      super::populateSerializableHiddenTypeInfoRepresentation(IGM,
+                                                               representation);
+    }
+
     using super::asImpl;
+    using super::assertNotDeserialized;
 
   public:
 
     const FieldInfoType &getFieldInfo(VarDecl *field) const {
+      // TypeInfo derived from a hidden representation does not support
+      // AST based operations.
+      assertNotDeserialized("StructTypeInfoBase::getFieldInfo");
+
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
         if (fieldInfo.Field == field)
@@ -191,6 +223,8 @@ namespace {
     /// single field.
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 const FieldInfoType &field) const {
+      // We can't access field.Field with deserialized TypeInfo.
+      assertNotDeserialized("StructTypeInfoBase::projectFieldAddress");
       return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
     }
 
@@ -298,6 +332,9 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
+      // The code below checks the AST to call a deinit method
+      // which we don't support from hidden representations yet
+      assertNotDeserialized("StructTypeInfoBase::destroy");
 
       // If the struct has a deinit declared, then call it to destroy the
       // value.
@@ -347,6 +384,8 @@ namespace {
             }
           };
 
+          // We can't access field.Field without AST backed TypeInfo
+          assertNotDeserialized("StructTypeInfoBase::verify");
           FindOffsetOfFieldOffsetVector scanner(IGF.IGM, field.Field);
           scanner.layout();
 
@@ -387,11 +426,46 @@ namespace {
   class LoadableClangRecordTypeInfo final
       : public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                                   ClangFieldInfo> {
-    const clang::RecordDecl *ClangDecl;
     bool HasReferenceField;
+    std::vector<SwiftAggLowering::StorageEntry> AggLoweringInputs;
+
+    static std::vector<SwiftAggLowering::StorageEntry>
+    computeAggLoweringInputs(IRGenModule &IGM,
+                             const clang::RecordDecl *clangDecl) {
+      assert(clangDecl && "decomposing Clang TypeInfo without a Clang decl");
+      std::vector<SwiftAggLowering::StorageEntry> inputs;
+      SwiftAggLowering decomposer(IGM.getClangCGM());
+      auto appendInput = [&](const SwiftAggLowering::StorageEntry &entry) {
+        inputs.push_back(entry);
+      };
+
+      decomposer.decomposeTypedData(clangDecl, clang::CharUnits::Zero(),
+                                    appendInput);
+      return inputs;
+    }
+
+    void populateSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM,
+        SerializableLoadableClangRecordTypeInfoRepresentation
+            &representation) const {
+      StructTypeInfoBase::populateSerializableHiddenTypeInfoRepresentation(
+          IGM, representation);
+      representation.hasReferenceField = HasReferenceField;
+
+      representation.aggLoweringInputs.clear();
+      for (const auto &entry : AggLoweringInputs) {
+        SerializableAggLoweringInputRepresentation input;
+        input.begin = entry.Begin.getQuantity();
+        input.end = entry.End.getQuantity();
+        if (entry.Type)
+          input.type = serializeLLVMType(entry.Type);
+        representation.aggLoweringInputs.push_back(std::move(input));
+      }
+    }
 
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                IRGenModule &IGM,
                                 unsigned explosionSize, llvm::Type *storageType,
                                 Size size, SpareBitVector &&spareBits,
                                 Alignment align,
@@ -404,7 +478,36 @@ namespace {
                              storageType, size, std::move(spareBits), align,
                              isTriviallyDestroyable, isCopyable, IsFixedSize,
                              IsABIAccessible),
-          ClangDecl(clangDecl), HasReferenceField(hasReferenceField) {}
+          HasReferenceField(hasReferenceField),
+          AggLoweringInputs(computeAggLoweringInputs(IGM, clangDecl)) {}
+
+    LoadableClangRecordTypeInfo(
+        ArrayRef<ClangFieldInfo> fields, IRGenModule &IGM,
+        const SerializableLoadableClangRecordTypeInfoRepresentation
+            &representation)
+        : StructTypeInfoBase(
+              StructTypeInfoKind::LoadableClangRecordTypeInfo, fields, IGM,
+              static_cast<const SerializableLoadableStructTypeInfoRepresentation
+                              &>(representation)),
+          HasReferenceField(representation.hasReferenceField) {
+      AggLoweringInputs.reserve(representation.aggLoweringInputs.size());
+      for (const auto &input : representation.aggLoweringInputs) {
+        AggLoweringInputs.push_back({
+            clang::CharUnits::fromQuantity(input.begin),
+            clang::CharUnits::fromQuantity(input.end),
+            input.type ? deserializeLLVMType(IGM, input.type) : nullptr,
+        });
+      }
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation = std::make_unique<
+          SerializableLoadableClangRecordTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -446,15 +549,11 @@ namespace {
       LoadableClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
-    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+    void addToAggLowering(IRGenModule &, SwiftAggLowering &lowering,
                           Size offset) const override {
-      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
-          lowering.addTypedData(base.decl, base.offset.asCharUnits());
-        }
+      for (const auto &input : AggLoweringInputs) {
+        lowering.addDecomposedData(input, offset.asCharUnits());
       }
-
-      lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
 
     std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -506,6 +605,12 @@ namespace {
                              IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
     TypeLayoutEntry
@@ -676,18 +781,14 @@ namespace {
         ctx.Diags.diagnose(copyConstructorLoc, diag::failed_emit_copy,
                            recordDecl);
 
-        bool hasCopyableIfAttr =
-            recordDecl->hasAttrs() &&
-            llvm::any_of(recordDecl->getAttrs(), [&](clang::Attr *attr) {
-              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-                StringRef attrStr = swiftAttr->getAttribute();
-                assert(!attrStr.starts_with("~Copyable") &&
-                       "Trying to emit copy of a type annotated with "
-                       "'SWIFT_NONCOPYABLE'?");
-                if (attrStr.starts_with("copyable_if:"))
-                  return true;
-              }
-              return false;
+        bool hasCopyableIfAttr = llvm::any_of(
+            recordDecl->specific_attrs<clang::SwiftAttrAttr>(),
+            [&](const clang::SwiftAttrAttr *swiftAttr) {
+              StringRef attrStr = swiftAttr->getAttribute();
+              assert(!attrStr.starts_with("~Copyable") &&
+                     "Trying to emit copy of a type annotated with "
+                     "'SWIFT_NONCOPYABLE'?");
+              return attrStr.starts_with("copyable_if:");
             });
 
         bool hasRequiresClause =
@@ -747,6 +848,12 @@ namespace {
                              isCopyable, IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
@@ -950,6 +1057,21 @@ namespace {
                            alwaysFixedSize, isABIAccessible)
     {}
 
+    LoadableStructTypeInfo(
+        ArrayRef<StructFieldInfo> fields, IRGenModule &IGM,
+        const SerializableLoadableStructTypeInfoRepresentation &representation)
+        : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo, fields,
+                             IGM, representation) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializableLoadableStructTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
+
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
       for (auto &field : getFields()) {
@@ -1051,6 +1173,12 @@ namespace {
                            isTriviallyDestroyable, isBT, isCopyable,
                            alwaysFixedSize, isABIAccessible)
     {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -1173,6 +1301,12 @@ namespace {
                            fields, fieldsAccessible,
                            T, align, isTriviallyDestroyable, isBT, isCopyable,
                            structAccessible) {
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
     TypeLayoutEntry
@@ -1444,7 +1578,7 @@ public:
           ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
-        FieldInfos, NextExplosionIndex, llvmType, TotalStride,
+        FieldInfos, IGM, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment,
         (SwiftDecl &&
          (SwiftDecl->hasValueTypeDestructor() || hasReferenceField))
@@ -1799,6 +1933,12 @@ namespace {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
@@ -1806,7 +1946,62 @@ namespace {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
   };
+
+  static const TypeInfo &
+  createRecordFieldTypeInfoFromSerializableRepresentation(
+      IRGenModule &IGM,
+      const SerializableRecordFieldRepresentation &field) {
+    if (field.type) {
+      auto loweredType = IGM.getLoweredType(field.type->getCanonicalType());
+      return IGM.getTypeInfo(loweredType);
+    }
+    if (!field.typeInfo)
+      llvm::report_fatal_error(
+          "serialized record field has no TypeInfo representation");
+    return IGM.adoptTypeInfo(
+        createTypeInfoFromSerializableRepresentation(IGM, *field.typeInfo));
+  }
+
+  template <typename FieldInfo>
+  static void createRecordFieldsFromSerializableRepresentation(
+      IRGenModule &IGM,
+      const SerializableLoadableRecordTypeInfoRepresentation &representation,
+      SmallVectorImpl<FieldInfo> &fields) {
+    fields.reserve(representation.fields.size());
+    for (const auto &field : representation.fields) {
+      const auto &fieldTypeInfo =
+          createRecordFieldTypeInfoFromSerializableRepresentation(IGM, field);
+      auto layout = ElementLayout::getFromSerializedStorage(
+          fieldTypeInfo, field.layout);
+      fields.emplace_back(nullptr, layout, field.storage.Begin,
+                          field.storage.End);
+    }
+  }
+
 } // end anonymous namespace
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createLoadableStructTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableLoadableStructTypeInfoRepresentation &representation) {
+  SmallVector<StructFieldInfo, 8> fields;
+  createRecordFieldsFromSerializableRepresentation(IGM, representation,
+                                                   fields);
+  return std::unique_ptr<TypeInfo>(
+      LoadableStructTypeInfo::create(fields, IGM, representation));
+}
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createLoadableClangRecordTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableLoadableClangRecordTypeInfoRepresentation
+        &representation) {
+  SmallVector<ClangFieldInfo, 8> fields;
+  createRecordFieldsFromSerializableRepresentation(IGM, representation,
+                                                   fields);
+  return std::unique_ptr<TypeInfo>(
+      LoadableClangRecordTypeInfo::create(fields, IGM, representation));
+}
 
 const TypeInfo *
 TypeConverter::convertResilientStruct(IsCopyable_t copyable,

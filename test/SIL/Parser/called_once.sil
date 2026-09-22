@@ -30,4 +30,34 @@ bb0:
   return %r : $@called(once) @callee_guaranteed () -> ()
 }
 
+// `partial_apply` can directly produce a `@called(once)` result via the
+// `[called_once]` attribute, without a separate `convert_function`.
+// CHECK-LABEL: sil [ossa] @produce_called_once_directly : $@convention(thin) () -> @owned @called(once) @callee_guaranteed () -> () {
+// CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [called_once] [[F]]() : $@convention(thin) () -> ()
+// CHECK:   return [[PA]] : $@called(once) @callee_guaranteed () -> ()
+// CHECK: } // end sil function 'produce_called_once_directly'
+sil [ossa] @produce_called_once_directly : $@convention(thin) () -> @owned @called(once) @callee_guaranteed () -> () {
+bb0:
+  %f = function_ref @thin_callee : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] [called_once] %f() : $@convention(thin) () -> ()
+  return %pa : $@called(once) @callee_guaranteed () -> ()
+}
+
+// The same attribute applied to a `partial_apply` that captures an argument,
+// mirroring how SILGen forms a `@called(once)` closure with a capture.
+// CHECK-LABEL: sil [ossa] @produce_called_once_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(once) @callee_owned () -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[F:%.*]] = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [called_once] [[F]]([[ARG]]) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   return [[PA]] : $@called(once) @callee_owned () -> ()
+// CHECK: } // end sil function 'produce_called_once_with_capture'
+sil [ossa] @produce_called_once_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(once) @callee_owned () -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %f = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %pa = partial_apply [called_once] %f(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  return %pa : $@called(once) @callee_owned () -> ()
+}
+
 sil @thin_callee : $@convention(thin) () -> ()
+sil @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()

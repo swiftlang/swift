@@ -17,15 +17,12 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Platform.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "clang/Driver/Driver.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -34,7 +31,6 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
 #include "llvm/TargetParser/Triple.h"
 
@@ -109,8 +105,11 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
   Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
+
+  if (Args.hasArg(OPT_frontend_parseable_output))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-frontend-parseable-output");
 
   Opts.EmitClangHeaderWithNonModularIncludes |=
       Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
@@ -199,8 +198,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
-  Opts.DowngradeInterfaceVerificationError |=
-    Args.hasArg(OPT_downgrade_typecheck_interface_error);
+  if (const Arg *A =
+          Args.getLastArg(OPT_downgrade_typecheck_interface_error,
+                          OPT_no_downgrade_typecheck_interface_error)) {
+    Opts.DowngradeInterfaceVerificationError =
+        A->getOption().matches(OPT_downgrade_typecheck_interface_error);
+  }
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();
@@ -334,6 +337,11 @@ bool ArgsToFrontendOptionsConverter::convert(
       computeMainAndSupplementaryOutputFilenames())
     return true;
 
+  Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
+  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
+    Opts.SymbolGraphOutputDir = A->getValue();
+  }
+
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
@@ -447,12 +455,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
   computeImplicitImportModuleNames(OPT_testable_import_module, /*isTestable=*/true);
   computeLLVMArgs();
-
-  Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
-
-  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
-    Opts.SymbolGraphOutputDir = A->getValue();
-  }
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
@@ -934,8 +936,12 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_summary);
     return true;
   }
-  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
-      !Opts.SymbolGraphOutputDir.empty()) {
+  if (!Opts.SymbolGraphOutputDir.empty() &&
+      !FrontendOptions::doesActionTypeCheckWholeModule(Opts.RequestedAction) &&
+      // Dependency scanning forwards -emit-symbol-graph in the module build
+      // commands it produces, so it must be allowed to carry the flag even
+      // though it does not typecheck the whole module.
+      Opts.RequestedAction != FrontendOptions::ActionType::ScanDependencies) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_symbol_graph);
     return true;
   }

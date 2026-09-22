@@ -1533,41 +1533,6 @@ extension Array {
   }
 #endif
 
-  /// Implementation for:
-  /// Array(unsafeUninitializedCapacity:initializingWith:)
-  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
-  @export(implementation)
-  internal init<E: Error>(
-    _unsafeUninitializedCapacity: Int,
-    initializingWithTypedThrowsInitializer initializer: (
-      _ buffer: inout UnsafeMutableBufferPointer<Element>,
-      _ initializedCount: inout Int
-    ) throws(E) -> Void
-  ) throws(E) {
-    var firstElementAddress: UnsafeMutablePointer<Element>
-    unsafe (self, firstElementAddress) =
-      unsafe Array._allocateUninitialized(_unsafeUninitializedCapacity)
-
-    var initializedCount = 0
-    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: _unsafeUninitializedCapacity)
-    defer {
-      // Update self.count even if initializer throws an error.
-      _precondition(
-        UInt(truncatingIfNeeded: initializedCount) <=
-        UInt(truncatingIfNeeded: _unsafeUninitializedCapacity),
-        "Initialized count must be in 0 ... _unsafeUninitializedCapacity."
-      )
-      unsafe _precondition(
-        buffer.baseAddress == firstElementAddress,
-        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
-      )
-      self._buffer.mutableCount = initializedCount
-      _endMutation()
-    }
-    try unsafe initializer(&buffer, &initializedCount)
-  }
-
   /// Creates an array with the specified capacity, and then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
   ///

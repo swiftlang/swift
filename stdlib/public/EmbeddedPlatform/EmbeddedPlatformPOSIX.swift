@@ -7,14 +7,25 @@ func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _
 @_extern(c, "free")
 func free(_ p: UnsafeMutableRawPointer?)
 
+#if os(Linux) && !SWIFT_STDLIB_HAS_ARC4RANDOM
+// See EmbeddedRuntime.swift: glibc only gained arc4random_buf in 2.36.
+@_extern(c, "getrandom")
+func getrandom(
+  _ buf: UnsafeMutableRawPointer, _ nbytes: Int, _ flags: CUnsignedInt
+) -> Int
+
+@_extern(c, "__errno_location")
+func __errno_location() -> UnsafeMutablePointer<CInt>
+#else
 @_extern(c, "arc4random_buf")
 func arc4random_buf(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
+#endif
 
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
 
 @_extern(c, "exit")
-func exit(_: CInt)
+func exit(_: CInt) /* -> Never */
 
 @_extern(c, "malloc_type_malloc")
 func malloc_type_malloc(_ : Int, _ : UInt64) -> UnsafeMutableRawPointer
@@ -58,16 +69,41 @@ public func _swift_deallocate(_ pointer: UnsafeMutableRawPointer, _ alignment: I
   free(pointer)
 }
 
+private func generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
+#if os(Linux) && !SWIFT_STDLIB_HAS_ARC4RANDOM
+  let EINTR: CInt = 4
+  var buf = buf
+  var remaining = nbytes
+  while remaining > 0 {
+    let count = getrandom(buf, remaining, 0)
+    if count <= 0 {
+      // A signal can interrupt the call while it waits for the entropy pool to
+      // be seeded. Every other failure means there is no entropy source, and
+      // handing back a buffer that was never filled would silently produce
+      // predictable values.
+      if count < 0, unsafe __errno_location().pointee == EINTR { continue }
+      _writeStaticString(
+        "Fatal error: unable to obtain entropy from getrandom\n")
+      _swift_exit(1)
+    }
+    buf += count
+    remaining -= count
+  }
+#else
+  arc4random_buf(buf, nbytes)
+#endif
+}
+
 @export(interface)
 @implementation @c
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
-  arc4random_buf(buf, nbytes)
+  generateRandom(buf, nbytes)
 }
 
 @export(interface)
 @implementation @c
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
-  arc4random_buf(buf, nbytes)
+  generateRandom(buf, nbytes)
 }
 
 @export(interface)
@@ -84,8 +120,9 @@ public func _swift_writeToStandardOutput(
 
 @export(interface)
 @implementation @c
-public func _swift_exit(_ code: CInt) {
+public func _swift_exit(_ code: CInt) -> Never {
   exit(code)
+  Builtin.unreachable()
 }
 
 /// The human-readable prefix that precedes an error message, chosen by the
@@ -144,12 +181,11 @@ public func _swift_reportError(
   _ message: UnsafePointer<UInt8>?,
   _ messageCount: Int,
   _ flags: UInt64
-) -> Never {
+) {
   unsafe _reportError(
     prefix: _reportErrorPrefix(flags),
     fileName: nil, fileNameCount: 0, line: 0,
     message: message, messageCount: messageCount)
-  Builtin.int_trap()
 }
 
 @export(interface)
@@ -161,12 +197,11 @@ public func _swift_reportErrorAt(
   _ fileNameCount: Int,
   _ line: Int,
   _ flags: UInt64
-) -> Never {
+) {
   unsafe _reportError(
     prefix: _reportErrorPrefix(flags),
     fileName: fileName, fileNameCount: fileNameCount, line: line,
     message: message, messageCount: messageCount)
-  Builtin.int_trap()
 }
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
@@ -198,9 +233,11 @@ public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAl
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if _isMallocTypeOSVersionAtLeast() {
-    // This check also forces "default" alignment to use malloc_memalign().
+    // This check also forces "default" alignment (alignMask == -1) to use
+    // malloc_type_posix_memalign(). Note we need to check the signedness of
+    // alignMask because it's signed unlike in swift_slowAllocTyped.
     let MALLOC_ALIGN_MASK = 15
-    if (alignMask <= MALLOC_ALIGN_MASK) {
+    if (alignMask >= 0 && alignMask <= MALLOC_ALIGN_MASK) {
       return unsafe malloc_type_malloc(size, typeId);
     } else {
       var alignment: Int

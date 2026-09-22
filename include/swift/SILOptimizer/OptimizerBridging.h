@@ -199,6 +199,14 @@ struct BridgedPassContext {
 
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
+
+  /// Visits the type of every non-copyable nominal type declared in this
+  /// module for which IRGen may emit type metadata (and therefore value
+  /// witnesses, which destroy the type).
+  void visitTypesWithEmittedMetadata(
+      void *_Nonnull context,
+      void (*_Nonnull callback)(void *_Nonnull context, BridgedType type)) const;
+
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
@@ -209,6 +217,7 @@ struct BridgedPassContext {
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;
+  bool specializeKeyPathInst(BridgedInstruction kpi) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
@@ -241,6 +250,7 @@ struct BridgedPassContext {
   SwiftInt getStaticStride(BridgedType type) const;
   bool canMakeStaticObjectReadOnly(BridgedType type) const;
   bool hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const;
+  bool fitsInOpaqueExistentialPayload(BridgedType type) const;
 
   // Stack nesting and other notifications
 

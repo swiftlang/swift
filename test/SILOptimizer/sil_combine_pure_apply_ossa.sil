@@ -69,6 +69,33 @@ bb0:
   return %4 : $()                                 // id: %5
 }
 
+sil [ossa] [readonly] @readonly_takes_foo : $@convention(thin) (@owned Foo) -> @owned Foo
+
+sil @marker : $@convention(thin) () -> ()
+
+// A debug use of the erased apply's result must not extend the liverange: the
+// owned argument is destroyed at the call site, before the marker call.
+// CHECK-LABEL: sil [ossa] @debug_value_does_not_extend_liverange
+// CHECK:       bb0(%0 : @owned $Foo):
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    // function_ref marker
+// CHECK-NEXT:    [[MARKER:%[0-9]+]] = function_ref @marker
+// CHECK-NEXT:    apply [[MARKER]]()
+// CHECK-NEXT:    [[T:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[T]]
+// CHECK-NEXT:  } // end sil function 'debug_value_does_not_extend_liverange'
+sil [ossa] @debug_value_does_not_extend_liverange : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : @owned $Foo):
+  %1 = function_ref @readonly_takes_foo : $@convention(thin) (@owned Foo) -> @owned Foo
+  %2 = apply %1(%0) : $@convention(thin) (@owned Foo) -> @owned Foo
+  destroy_value %2 : $Foo
+  %3 = function_ref @marker : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  debug_value %2 : $Foo, let, name "unused"
+  %5 = tuple ()
+  return %5 : $()
+}
+
 sil_vtable Foo {
   #Foo.init!initializer: @_TFC4main3FoocfMS0_FT_S0_	// main.Foo.init (main.Foo.Type)() -> main.Foo
 }

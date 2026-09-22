@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -28,14 +27,10 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/JVPCloner.h"
@@ -43,12 +38,11 @@
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/APSInt.h"
-#include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -1190,7 +1184,11 @@ bool DifferentiationTransformer::emitDefaultDerivative(
 
   auto sm = SubstitutionMap::get(
       defaultWitness->getDerivativeGenericSignature(),
-      QuerySubstitutionMap{wtThunkSubMap}, LookUpConformanceInModule());
+      [&](SubstitutableType *type) {
+        auto protoTy = QuerySubstitutionMap{wtThunkSubMap}(type);
+        return fn->mapTypeIntoEnvironment(protoTy->mapTypeOutOfEnvironment());
+      },
+      LookUpConformanceInModule());
 
   auto *entry = fn->createBasicBlock();
   createEntryArguments(fn);
@@ -1226,14 +1224,14 @@ bool DifferentiationTransformer::emitDefaultDerivative(
   builder.emitDestroyValueOperation(loc, defaultDeriv);
   builder.createReturn(loc, vjpResult);
 
-#ifndef NDEBUG
-  fn->verify();
-#endif
-
   auto *pm = &context.getPassManager();
   pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(fn);
   completeAllLifetimes(pm, fn);
   pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
+
+#ifndef NDEBUG
+  fn->verify();
+#endif
 
   return true;
 }
@@ -1327,6 +1325,11 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
                    << *jvp);
       }
     }
+
+    auto *pm = &context.getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(jvp);
+    lowerAddress(pm, jvp);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 
   // If the VJP doesn't exist, need to synthesize it.
@@ -1344,16 +1347,25 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     context.recordGeneratedFunction(vjp);
 
     // See, if we can delegate to default derivative
-    if (auto *defaultWitness = getDefaultDerivativeWitness(witness)) {
-      if (emitDefaultDerivative(witness, defaultWitness, vjp,
-                                AutoDiffDerivativeFunctionKind::VJP))
-        return false;
+    auto *defaultWitness = getDefaultDerivativeWitness(witness);
+    bool noDefault =
+        !defaultWitness ||
+        !emitDefaultDerivative(witness, defaultWitness, vjp,
+                               AutoDiffDerivativeFunctionKind::VJP);
+
+    if (noDefault) {
+      // Emit VJP function.
+      VJPCloner cloner(context, witness, vjp, invoker);
+      if (cloner.run())
+        return true;
     }
 
-    // Emit VJP function.
-    VJPCloner cloner(context, witness, vjp, invoker);
-    return cloner.run();
+    auto *pm = &context.getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);
+    lowerAddress(pm, vjp);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
+
   return false;
 }
 

@@ -142,3 +142,41 @@ bb0(%0 : $OptPayload):
   retain_value %0 : $OptPayload
   return %0 : $OptPayload
 }
+
+// The payload need not be a managed reference: a trivial single pointer (a
+// raw/unsafe pointer) carries its tag in its own extra inhabitants too, so its
+// optional is a `ptr` with `.none` == null.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_unsafe_pointer(ptr %0)
+sil @take_optional_unsafe_pointer : $@convention(thin) (Optional<UnsafeMutablePointer<Int>>) -> Optional<UnsafeMutablePointer<Int>> {
+bb0(%0 : $Optional<UnsafeMutablePointer<Int>>):
+  return %0 : $Optional<UnsafeMutablePointer<Int>>
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_opaque_pointer(ptr %0)
+sil @take_optional_opaque_pointer : $@convention(thin) (Optional<OpaquePointer>) -> Optional<OpaquePointer> {
+bb0(%0 : $Optional<OpaquePointer>):
+  return %0 : $Optional<OpaquePointer>
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_none_unsafe_pointer()
+// CHECK: ret ptr null
+sil @make_none_unsafe_pointer : $@convention(thin) () -> Optional<UnsafeMutablePointer<Int>> {
+bb0:
+  %0 = enum $Optional<UnsafeMutablePointer<Int>>, #Optional.none!enumelt
+  return %0 : $Optional<UnsafeMutablePointer<Int>>
+}
+
+// The `.none` test of a trivial pointer optional is a null comparison too.
+// CHECK-LABEL: define{{.*}} swiftcc void @switch_optional_unsafe_pointer(ptr %0)
+// CHECK: icmp eq ptr %0, null
+sil @switch_optional_unsafe_pointer : $@convention(thin) (Optional<UnsafeMutablePointer<Int>>) -> () {
+bb0(%0 : $Optional<UnsafeMutablePointer<Int>>):
+  switch_enum %0 : $Optional<UnsafeMutablePointer<Int>>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%1 : $UnsafeMutablePointer<Int>):
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}

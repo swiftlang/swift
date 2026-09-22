@@ -280,6 +280,11 @@ def o : JoinedOrSeparate<["-"], "o">,
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
+def experimental_use_gnu_jobserver :
+  Flag<["-"], "experimental-use-gnu-jobserver">,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild, NewDriverOnlyOption]>,
+  HelpText<"Participate in the GNU make jobserver advertised in MAKEFLAGS, letting its token pool (not -j) bound concurrency across the build">;
+
 def sdk : Separate<["-"], "sdk">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
@@ -494,6 +499,10 @@ def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
 
+def remark_hidden_type_layout_serialization : Flag<["-"], "Rhidden-type-layout-serialization">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about hidden type layout serialization">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
@@ -513,6 +522,13 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_EQ
+    : Joined<["-"], "serialize-diagnostics=">,
+      Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput,
+             CacheInvariant]>,
+      HelpText<"Serialize diagnostics in a specific format: 'dia', a binary "
+               "format (the default), or 'sarif'">,
+      MetaVarName<"<format>">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
@@ -1893,6 +1909,14 @@ def enable_autolinking_runtime_compatibility_bytecode_layouts
       HelpText<"Enable autolinking for the bytecode layouts runtime "
                "compatibility library">;
 
+def weak_link_span_compatibility_lib
+    : Flag<[ "-" ], "weak-link-span-compatibility-lib">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Weakly link the symbols that are back deployed by the Span "
+               "compatibility library instead of strongly linking them, when "
+               "the deployment target predates the OS release that introduced "
+               "them">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
@@ -2293,7 +2317,7 @@ def emit_module_dependencies_path:
 def use_frontend_parseable_output:
   Flag<["-"], "use-frontend-parseable-output">,
   Flags<[HelpHidden, NewDriverOnlyOption, CacheInvariant]>,
-  HelpText<"Emit parseable-output from swift-frontend jobs instead of from "
+  HelpText<"Deprecated: Emit parseable-output from swift-frontend jobs instead of from "
            "the driver">;
 
 def print_explicit_dependency_graph:
@@ -2458,6 +2482,13 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
 def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
+
+def print_llvm_backend_diagnostics
+    : Flag<["-"], "print-llvm-backend-diagnostics">,
+      Flags<[FrontendOption, NoDriverOption]>,
+      HelpText<
+          "Print error-severity LLVM backend diagnostics (e.g. object-file "
+          "emission errors) instead of swallowing them">;
 
 def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
   Flags<[FrontendOption, NoDriverOption]>,

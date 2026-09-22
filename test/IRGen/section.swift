@@ -36,6 +36,19 @@ class MyClass {
 var functionptr = testit
 func testit(_ e: consuming Any) -> Any { e }
 
+@section(default)
+func defaultSection() { }
+
+@section(default)
+var gDefault: Int = 7
+
+// A variable with '@section' may have property observers, which can have their
+// own '@section'.
+@section("__DATA,__mysection")
+var gObserved: Int = 9 {
+  @section("__TEXT,__mysection") didSet { }
+}
+
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g0: Int { get set }
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g2: Bool { get set }
@@ -55,6 +68,12 @@ func testit(_ e: consuming Any) -> Any { e }
 // SIL:    @section("__TEXT,__mysection") get
 // SIL:    @section("__TEXT,__mymutsection") set
 // SIL:  }
+// SIL: @section(default) func defaultSection()
+// SIL: @section(default) @_hasStorage @_hasInitialValue var gDefault: Int { get set }
+
+// '@section(default)' places the declaration in the default section, so no
+// section is recorded in SIL.
+// SIL: sil_global hidden @$s7section8gDefaultSivp : $Int = {
 
 // SIL: sil private [global_init_once_fn] @$s7section2g0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g0Sivau : $@convention(thin)
@@ -83,14 +102,25 @@ func testit(_ e: consuming Any) -> Any { e }
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section7MyClassCfd : $@convention(method)
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section7MyClassCfD : $@convention(method)
 // SIL: sil hidden @$s7section6testityypypnF : $@convention(thin) (@in Any) -> @out Any {
+// SIL: sil hidden @$s7section14defaultSectionyyF : $@convention(thin) () -> () {
+
+// The 'didSet' has its own section, which is used for the synthesized 'set'.
+// SIL: sil private [section "__TEXT,__mysection"] @$s7section9gObservedSivW
+// SIL: sil hidden @$s7section9gObservedSivg
+// SIL: sil hidden [section "__TEXT,__mysection"] @$s7section9gObservedSivs
 
 // IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ {{(i64|i32)}} 42 }>, %TSi <{ {{(i64|i32)}} 43 }> }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g2Sbvp" = hidden global %TSb <{ i1 true }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g3Sbvp" = {{.*}}global %TSb <{ i1 true }>, section "__DATA,__mysection"
-// IR:  @"$s7section2g4SpySiGSgvp" = hidden global {{i64|i32}} 0, section "__DATA,__mysection"
-// IR:  @"$s7section2g5SpySiGSgvp" = hidden global {{i64|i32}} 1111638594, section "__DATA,__mysection"
+// IR:  @"$s7section2g4SpySiGSgvp" = hidden global ptr null, section "__DATA,__mysection"
+// The bit pattern may still be wrapped in a ptrtoint/inttoptr constant
+// expression pair; that pair is only eliminated by DataLayout-aware constant
+// folding, which the initializer does not go through.
+// IR:  @"$s7section2g5SpySiGSgvp" = hidden global ptr inttoptr ({{i64|i32}} {{.*}}1111638594{{.*}} to ptr), section "__DATA,__mysection"
 // IR:  @"$s7section8MyStructV7static0SivpZ" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
+// IR:  @"$s7section8gDefaultSivp" = hidden global %TSi <{ {{(i64|i32)}} 7 }>, align {{[0-9]+$}}
 // IR:  define {{.*}}@"$s7section3fooyyF"(){{.*}} section "__TEXT,__mysection"
 // IR:  define {{.*}}@"$s7section8MyStructV3fooyyF"() #0 section "__TEXT,__mysection"
 // IR:  define {{.*}}@"$s7section8MyStructV12initialValueACSi_tcfC"({{.*}}) #0 section "__TEXT,__mysection"
+// IR:  define {{.*}}@"$s7section14defaultSectionyyF"() #{{[0-9]+}} {{[{]$}}

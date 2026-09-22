@@ -50,8 +50,9 @@ getRootProtocol(std::optional<LangOptions::COMInteropModel> model) {
 
   switch (*model) {
   case LangOptions::COMInteropModel::Microsoft:
-  case LangOptions::COMInteropModel::CoreFoundation:
     return KnownProtocolKind::IUnknown;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    return std::nullopt;
   }
   llvm_unreachable("unhandled COMInteropModel");
 }
@@ -195,14 +196,6 @@ VarDecl *synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &ASTContext,
   ext->setExtendedNominal(PD);
   PD->addExtension(ext);
 
-  // Route the extension through the synthesized file unit so it is code-gen'd
-  // and serialized: the `IID` accessor must be emitted for the current module
-  // and reachable by name lookup in modules that import it.  Synthesis only
-  // happens for source-file protocols (see SynthesizeCOMInterfaceIDRequest);
-  // imported protocols recover the extension from the deserialized module.
-  if (auto *file = dyn_cast<FileUnit>(PD->getModuleScopeContext()))
-    file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
-
   VarDecl *property =
       generateIDAccessor(ASTContext, /*DC=*/ext, /*decl=*/PD,
                          /*identifier=*/ASTContext.Id_IID, value,
@@ -270,11 +263,14 @@ const COMAttr *getAttribute(const ClassDecl *CD) {
 
 const COMAttr *getAttribute(const ProtocolDecl *PD) {
   auto *attr = PD->getAttrs().getAttribute<COMAttr>();
-  if (!attr)
+  if (!attr || attr->IID.empty() || attr->CLSID ||
+      !UUID::fromString(attr->IID.str().c_str())) {
+    // Diagnosed by `AttributeChecker::visitCOMAttr`.
+    // FIXME: We should probably be diagnosing in COMDeclInfoRequest itself,
+    // we shouldn't be relying on phase ordering here since it will break lazy
+    // type-checking.
     return nullptr;
-
-  ASSERT(!attr->IID.empty());
-  ASSERT(!attr->CLSID);
+  }
   return attr;
 }
 
@@ -335,15 +331,66 @@ COMDeclInfoRequest::evaluate(Evaluator &evaluator,
 
     return ctx.AllocateObjectCopy(COMDeclInfo::forInterface(attr->IID));
   } else if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    ProtocolDecl *root = nullptr;
+    if (auto interface = ::com::getRootProtocol(ctx.LangOpts.COMModel))
+      root = ctx.getProtocol(*interface);
+
     SmallVector<ProtocolDecl *, 2> interfaces;
     for (auto *proto : CD->getAllProtocols(/*sorted=*/true)) {
-      if (proto->isCOMInterface())
+      if (proto->isCOMInterface() && proto != root &&
+          !proto->isSpecificProtocol(KnownProtocolKind::ISwiftObject))
         interfaces.push_back(proto);
     }
 
+    const COMDeclInfo *superInfo = nullptr;
+    if (auto *superclass = CD->getSuperclassDecl()) {
+      auto *info = superclass->getCOMDeclInfo();
+      if (info && info->isImplementation())
+        superInfo = info;
+    }
+
     auto *attr = ::com::getAttribute(CD);
-    if (!attr && interfaces.empty())
+    if (!attr && interfaces.empty() && !superInfo)
       return nullptr;
+
+    SmallVector<ProtocolDecl *, 2> antichain;
+    if (superInfo) {
+      llvm::append_range(antichain, superInfo->getInterfaceSlots());
+    } else {
+      // Keep the compiler-managed Swift identity interface at the stable
+      // position closest to the Swift heap-object address point.
+      ProtocolDecl *ISO = ctx.getProtocol(KnownProtocolKind::ISwiftObject);
+      ASSERT(ISO);
+      antichain.push_back(ISO);
+    }
+
+    // Preserve every superclass interface position. A more-derived interface
+    // in an existing refinement chain replaces that position; a new
+    // independent chain is appended. This keeps an interface value formed from
+    // a statically typed superclass reference valid for every subclass
+    // instance.
+    for (ProtocolDecl *interface : interfaces) {
+      if (llvm::any_of(interfaces, [&](const ProtocolDecl *PD) {
+                        return PD != interface && PD->inheritsFrom(interface);
+                       }))
+          continue;
+
+      bool inserted = false;
+      for (auto &PD : drop_begin(antichain)) {
+        if (interface == PD || PD->inheritsFrom(interface)) {
+          inserted = true;
+          break;
+        }
+        if (interface->inheritsFrom(PD)) {
+          PD = interface;
+          inserted = true;
+          break;
+        }
+      }
+
+      if (!inserted)
+        antichain.push_back(interface);
+    }
 
     StringRef implementationID;
     std::optional<COMThreadingModel> threadingModel;
@@ -354,7 +401,8 @@ COMDeclInfoRequest::evaluate(Evaluator &evaluator,
     }
 
     return ctx.AllocateObjectCopy(COMDeclInfo::forImplementation(
-        implementationID, threadingModel, ctx.AllocateCopy(interfaces)));
+        implementationID, threadingModel, root, ctx.AllocateCopy(interfaces),
+        ctx.AllocateCopy(antichain)));
   }
 
   return nullptr;
@@ -382,6 +430,7 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
                              /*isSuppressed=*/false);
     }
   } else {
+    // Class constraints do not participate in the COM interface hierarchy.
     bool ignoredAnyObject = false;
     InvertibleProtocolSet inverses;
     inherited = getDirectlyInheritedNominalTypeDecls(protocol, inverses,
@@ -482,13 +531,221 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
       COMInterfaceHierarchy(C.AllocateCopy(markers), C.AllocateCopy(chain)));
 }
 
+void com::validateImplementation(ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  if (!info)
+    return;
+
+  if (CD->isActor())
+    CD->diagnose(diag::com_actor_implementation, CD->getName());
+
+  if (CD->getObjectModel() != ReferenceCounting::Native)
+    CD->diagnose(diag::com_non_native_implementation, CD->getName());
+
+  if (CD->isGenericContext() && info->getImplementationID())
+    CD->diagnose(diag::com_generic_activatable_implementation, CD->getName());
+}
+
+void com::validateConformance(ProtocolConformance *conformance) {
+  auto *normal = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normal || normal->getSourceKind() != ConformanceEntryKind::Explicit)
+    return;
+
+  auto &diagnostics = normal->getDeclContext()->getASTContext().Diags;
+
+  auto *protocol = normal->getProtocol();
+  if (protocol->isCOMIdentity()) {
+    diagnostics.diagnose(normal->getLoc(),
+                         diag::com_identity_explicit_conformance,
+                         protocol->getName());
+    normal->setInvalid();
+    return;
+  }
+
+  if (!protocol->isCOMInterface())
+    return;
+
+  Type type = normal->getType();
+  auto *nominal = type->getAnyNominal();
+  auto *CD = dyn_cast_or_null<ClassDecl>(nominal);
+  if (!CD) {
+    diagnostics.diagnose(normal->getLoc(), diag::com_conformance_requires_class,
+                         type, protocol->getDeclaredInterfaceType());
+    return;
+  }
+
+  auto *typeModule = CD->getParentModule();
+  auto *conformanceModule = normal->getDeclContext()->getParentModule();
+  if (!typeModule->isSameModuleLookingThroughOverlays(conformanceModule))
+    diagnostics.diagnose(normal->getLoc(),
+                         diag::com_conformance_must_be_in_type_module, type,
+                         protocol->getDeclaredInterfaceType());
+
+  if (!normal->getConditionalRequirements().empty())
+    diagnostics.diagnose(normal->getLoc(), diag::com_conditional_conformance,
+                         type, protocol->getDeclaredInterfaceType());
+}
+
+namespace {
+/// Validate a protocol whose sole requirement is the given identity property.
+void validateIdentityRequirement(ProtocolDecl *PD,
+                                 COMIdentityRequirementKind expected,
+                                 Identifier ident) {
+  VarDecl *identity = nullptr;
+  for (auto *requirement : PD->getProtocolRequirements()) {
+    auto kind = classifyCOMIdentityRequirement(requirement);
+    if (!kind || *kind != expected) {
+      requirement->diagnose(diag::com_identity_unsupported_requirement,
+                            requirement->getName(), PD->getName());
+      PD->setInvalid();
+      continue;
+    }
+
+    identity = dyn_cast<VarDecl>(requirement);
+  }
+
+  auto &context = PD->getASTContext();
+  auto *decl =
+      ::com::lookup(context, PD->getDeclContext(), ident, PD->getLoc());
+
+  if (!decl) {
+    PD->setInvalid();
+    return;
+  }
+
+  auto *getter = identity ? identity->getAccessor(AccessorKind::Get) : nullptr;
+  bool hasValidIdentity = identity && !identity->isStatic() &&
+                          !identity->isSettable(nullptr) && getter &&
+                          !getter->hasAsync() && !getter->hasThrows() &&
+                          identity->getValueInterfaceType()->isEqual(
+                              decl->getDeclaredInterfaceType());
+  if (!hasValidIdentity) {
+    PD->diagnose(diag::com_identity_invalid_requirement, PD->getName().str(),
+                 ident.str(), ident.str());
+    PD->setInvalid();
+  }
+}
+
+void validateIdentityProtocol(ProtocolDecl *PD) {
+  auto &context = PD->getASTContext();
+  if (PD->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+    validateIdentityRequirement(PD, COMIdentityRequirementKind::InterfaceID,
+                                context.Id_IID);
+    return;
+  }
+
+  ASSERT(PD->isSpecificProtocol(KnownProtocolKind::COMActivatable));
+  ASSERT(context.LangOpts.COMModel &&
+         "COM activation requires an interop model");
+  switch (*context.LangOpts.COMModel) {
+  case LangOptions::COMInteropModel::Microsoft:
+    validateIdentityRequirement(PD, COMIdentityRequirementKind::ActivationID,
+                                context.Id_CLSID);
+    return;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    // The current CoreFoundation activation contract has no requirements.
+    for (auto *requirement : PD->getProtocolRequirements()) {
+      requirement->diagnose(diag::com_identity_unsupported_requirement,
+                            requirement->getName(), PD->getName());
+      PD->setInvalid();
+    }
+    return;
+  }
+  llvm_unreachable("unhandled COMInteropModel");
+}
+
+bool validateInterfaceMethod(AbstractFunctionDecl *AFD) {
+  bool invalid = false;
+  DeclName name = AFD->getName();
+  if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+    name = accessor->getStorage()->getName();
+
+  if (isa<ConstructorDecl>(AFD)) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 0, name);
+    return true;
+  }
+
+  if (AFD->isStatic()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 1, name);
+    invalid = true;
+  }
+
+  if (AFD->hasGenericParamList()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 2, name);
+    invalid = true;
+  }
+
+  if (AFD->hasAsync()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 3, name);
+    invalid = true;
+  }
+
+  if (AFD->hasThrows()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 4, name);
+    invalid = true;
+  }
+
+  Type RTy = cast<FuncDecl>(AFD)->getResultInterfaceType();
+  if (!RTy->isVoid() && !RTy->isRepresentableIn(ForeignLanguage::C, AFD)) {
+    AFD->diagnose(diag::com_interface_unsupported_type, RTy, name);
+    invalid = true;
+  }
+
+  for (auto *P : *AFD->getParameters()) {
+    if (P->isVariadic() || P->getSpecifier() != ParamSpecifier::Default) {
+      AFD->diagnose(diag::com_interface_unsupported_parameter, P->getName(),
+                    name);
+      invalid = true;
+    }
+
+    Type PTy = P->getTypeInContext();
+    if (!PTy->isRepresentableIn(ForeignLanguage::C, AFD)) {
+      AFD->diagnose(diag::com_interface_unsupported_type, PTy, name);
+      invalid = true;
+    }
+  }
+
+  return invalid;
+}
+
+void validateInterfaceRequirements(ProtocolDecl *PD) {
+  bool invalid = false;
+  for (auto *member : PD->getProtocolRequirements()) {
+    if (auto *AT = dyn_cast<AssociatedTypeDecl>(member)) {
+      AT->diagnose(diag::com_interface_unsupported_requirement, 0,
+                   AT->getName());
+      invalid = true;
+    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
+      invalid |= validateInterfaceMethod(AFD);
+    } else if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+      ASD->visitOpaqueAccessors([&](AccessorDecl *AFD) {
+        if (AFD->requiresNewWitnessTableEntry())
+          invalid |= validateInterfaceMethod(AFD);
+      });
+    }
+  }
+
+  if (invalid)
+    PD->setInvalid();
+}
+
+} // end anonymous namespace
+
+void com::validateProtocol(ProtocolDecl *PD) {
+  if (PD->isCOMIdentity())
+    validateIdentityProtocol(PD);
+  else if (PD->isCOMInterface())
+    validateInterfaceRequirements(PD);
+}
+
 ProtocolConformance *
 com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
   const auto *CD = dyn_cast<ClassDecl>(NTD);
   if (CD == nullptr)
     return nullptr;
 
-  if (!::com::getAttribute(CD))
+  auto *info = CD->getCOMDeclInfo();
+  if (!info || !info->isImplementation())
     return nullptr;
 
   ASTContext &context = NTD->getASTContext();
@@ -548,9 +805,16 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   return ::com::synthesizeIIDProperty(PD, ASTContext, info->getInterfaceID());
 }
 
-VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
-                                                        ClassDecl *CD) const {
+VarDecl *SynthesizeCOMCLSIDRequest::evaluate(Evaluator &evaluator,
+                                             ClassDecl *CD) const {
   auto &ASTContext = CD->getASTContext();
+
+  // CLSID is the Microsoft model's spelling and activation surface. Other
+  // models may consume the implementation UUID through their own policy, but
+  // must not acquire a synthetic Microsoft-named member.
+  if (ASTContext.LangOpts.COMModel != LangOptions::COMInteropModel::Microsoft)
+    return nullptr;
+
   auto *info = CD->getCOMDeclInfo();
   if (!info)
     return nullptr;

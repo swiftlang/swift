@@ -22,7 +22,6 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/PluginLoader.h"
@@ -43,12 +42,12 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -60,7 +59,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
@@ -161,7 +159,7 @@ std::string CompilerInvocation::getConstValuesFilePathForPrimary(
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.SerializedDiagnosticsPath;
+      .SupplementaryOutputs.LLVMBitcodeDiagnosticsPath;
 }
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
@@ -313,6 +311,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.EnableSerializationRemarks =
       getLangOptions().EnableModuleSerializationRemarks;
+  serializationOpts.IRGenOpts = &getIRGenOptions();
+  serializationOpts.EnableHiddenTypeLayoutSerializationRemarks =
+      getLangOptions().EnableHiddenTypeLayoutSerializationRemarks;
 
   return serializationOpts;
 }
@@ -415,8 +416,9 @@ void CompilerInstance::setupStatsReporter() {
   };
 
   auto getClangSourceManager = [](ASTContext &Ctx) -> clang::SourceManager * {
-    if (auto *clangImporter = static_cast<ClangImporter *>(
-            Ctx.getClangModuleLoader())) {
+    if (auto *clangImporter =
+            static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+        clangImporter && clangImporter->getClangInstance().hasASTContext()) {
       return &clangImporter->getClangASTContext().getSourceManager();
     }
     return nullptr;
@@ -614,6 +616,11 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
+  if (setupDiagnosticVerifierIfNeeded()) {
+    Error = "Setting up diagnostics verifier failed";
+    return true;
+  }
+
   if (setUpASTContextIfNeeded()) {
     Error = "Setting up ASTContext failed";
     return true;
@@ -621,11 +628,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
   if (hasASTContext()) {
     setupStatsReporter();
-  }
-
-  if (setupDiagnosticVerifierIfNeeded()) {
-    Error = "Setting up diagnostics verifier failed";
-    return true;
   }
 
   // Setup caching diagnostics processor. It should be setup after all other
@@ -744,6 +746,30 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
+
+    if (CASOpts.CASFSInputOverlay) {
+      // Overlay the input files that exist on disk on top of the CAS file
+      // system, so that editing them takes effect while every other file the
+      // compilation sees still comes from the CAS.
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> InputFS =
+          new llvm::vfs::InMemoryFileSystem();
+      for (const auto &Input :
+           Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
+        StringRef InputPath = Input.getFileName();
+        // An input that is not on disk is provided by the CAS file system.
+        if (InputPath == "-" || !llvm::sys::fs::exists(InputPath))
+          continue;
+        auto Buffer = llvm::MemoryBuffer::getFile(InputPath);
+        if (!Buffer) {
+          Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                               InputPath, Buffer.getError().message());
+          return true;
+        }
+        InputFS->addFile(InputPath, 0, std::move(*Buffer));
+      }
+      OverlayVFS->pushOverlay(std::move(InputFS));
+    }
+
     SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
@@ -950,6 +976,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
         Context->LangOpts, Context->ClangImporterOpts, Context->CASOpts,
+        Context->SILOpts,
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
@@ -1338,6 +1365,13 @@ bool CompilerInstance::supportCaching() const {
 
 bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
   auto &FrontendOpts = Invocation.getFrontendOptions();
+  // An explicit '-downgrade-typecheck-interface-error' or
+  // '-no-downgrade-typecheck-interface-error' takes precedence over the
+  // blocklists, so that the interface of a blocklisted module can still be
+  // verified.
+  if (FrontendOpts.DowngradeInterfaceVerificationError.has_value())
+    return *FrontendOpts.DowngradeInterfaceVerificationError;
+
   if (Context->blockListConfig.hasBlockListAction(FrontendOpts.ModuleName,
                                              BlockListKeyKind::ModuleName,
                         BlockListAction::DowngradeInterfaceVerificationFailure)) {
@@ -1345,7 +1379,7 @@ bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
                             FrontendOpts.ModuleName);
     return true;
   }
-  return FrontendOpts.DowngradeInterfaceVerificationError;
+  return false;
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {

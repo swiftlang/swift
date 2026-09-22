@@ -17,8 +17,10 @@ import Swift
 @_silgen_name("_swift_concurrency_dlopen_noload")
 private func dlopen_noload(_ path: UnsafePointer<CChar>?) -> OpaquePointer?
 
+#if !SWIFT_STDLIB_ENABLE_LAZY_LINK
 @_silgen_name("_swift_concurrency_dlsym")
 private func dlsym(_ handle: OpaquePointer?, _ symbol: UnsafePointer<CChar>?) -> OpaquePointer?
+#endif
 
 // .. Dynamic binding ..........................................................
 
@@ -26,10 +28,23 @@ enum CoreFoundation {
   static let path =
     "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
 
+  // When lazy linking is enabled, dlopen is not needed for dlsym. We'll still
+  // use it for isPresent, since we want to fall back to DispatchMainExecutor
+  // rather than triggering a load of CoreFoundation.
   static let handle = unsafe dlopen_noload(path)
 
   static var isPresent: Bool { return unsafe handle != nil }
 
+#if SWIFT_STDLIB_ENABLE_LAZY_LINK
+  @_extern(c, "CFRunLoopRun")
+  static func CFRunLoopRun()
+
+  @_extern(c, "CFRunLoopGetMain")
+  static func CFRunLoopGetMain() -> OpaquePointer
+
+  @_extern(c, "CFRunLoopStop")
+  static func CFRunLoopStop(_ runLoop: OpaquePointer)
+#else
   static func symbol<T>(_ name: String) -> T {
     guard let result = unsafe dlsym(handle, name) else {
       fatalError("Unable to look up \(name) in CoreFoundation")
@@ -43,6 +58,7 @@ enum CoreFoundation {
     unsafe symbol("CFRunLoopGetMain")
   static let CFRunLoopStop: @convention(c) (OpaquePointer) -> () =
     unsafe symbol("CFRunLoopStop")
+#endif
 }
 
 // .. Main Executor ............................................................

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // Codable struct with non-Codable property.
 struct S1 : Codable {
 // expected-error@-1 {{type 'S1' does not conform to protocol 'Decodable'}}

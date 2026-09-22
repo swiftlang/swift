@@ -32,6 +32,18 @@ public struct Location: ProvidingSourceLocation, Equatable, CustomStringConverti
     return String(taking: bridged.getDebugDescription())
   }
   
+  /// The `SourceLoc` if this location can be resolved to a location in a loaded source file,
+  /// and nil otherwise.
+  ///
+  /// Locations which are de-serialized from a swiftmodule file - e.g. locations of instructions in
+  /// standard library functions - don't have a `SourceLoc`. They consist of a filename + line and
+  /// column indices (see `fileNameAndPosition`) and can only be shown in a diagnostic by loading
+  /// the referenced file with `getSourceLocation(diagnosticEngine:)`.
+  ///
+  /// Note that a valid `SourceLoc` does _not_ mean that the location is in the module which is
+  /// currently compiled: locations of de-serialized _declarations_ of other modules do have a valid
+  /// `SourceLoc` if those modules were built with a swiftsourceinfo file. Use
+  /// `Function.isInCurrentModule` to check that.
   public var sourceLoc: SourceLoc? {
     if hasValidLineNumber {
       return SourceLoc(bridged: bridged.getSourceLocation())
@@ -66,6 +78,12 @@ public struct Location: ProvidingSourceLocation, Equatable, CustomStringConverti
     Location(bridged: bridged.getCleanupLocation())
   }
 
+  /// Keeps the location and debug scope but marks it as setting up the stack frame.
+  /// The first breakpoint location of a function is at the end of its prologue.
+  public var asPrologue: Location {
+    Location(bridged: bridged.getPrologueLocation())
+  }
+
   public func withScope(of other: Location) -> Location {
     Location(bridged: bridged.withScopeOf(other.bridged))
   }
@@ -89,5 +107,45 @@ public struct Location: ProvidingSourceLocation, Equatable, CustomStringConverti
 
   public static var artificialUnreachableLocation: Location {
     Location(bridged: BridgedLocation.getArtificialUnreachableLocation())
+  }
+
+  public var scope: DebugScope? {
+    bridged.getScope().debugScope
+  }
+}
+
+extension OptionalBridgedDebugScope {
+  public var debugScope: DebugScope? {
+    if let scope {
+      return DebugScope(bridged: BridgedDebugScope(scope: scope))
+    }
+    return nil
+  }
+}
+
+/// Wraps `SILDebugScope*` as an opaque, hashable pointer.
+public struct DebugScope : Equatable, Hashable {
+  public let bridged: BridgedDebugScope
+
+  public var parentScope: DebugScope? {
+    bridged.getParentScope().debugScope
+  }
+
+  public var inlinedCallSite: DebugScope? {
+    bridged.getInlinedCallSite().debugScope
+  }
+
+  public static func ==(lhs: DebugScope, rhs: DebugScope) -> Bool {
+    lhs.bridged.scope == rhs.bridged.scope
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.scope)
+  }
+}
+
+extension BridgedSILDebugVariable {
+  public var scope: DebugScope? {
+    getScope().debugScope
   }
 }

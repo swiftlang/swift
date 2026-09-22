@@ -14,7 +14,7 @@
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 
-// CHECK: *** Program crashed: {{(Bad // OPTIMIZED: *** Program crashed: {{(Bad pointer dereference|Access violation)}} at 0x{{0+}}4 ***
+// OPTIMIZED: *** Program crashed: {{(Bad pointer dereference|Access violation)}} at 0x{{0+}}4 ***
 
 // OPTIMIZED: Thread 0 {{(".*" )?}}crashed:
 

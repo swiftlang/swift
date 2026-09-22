@@ -3,8 +3,8 @@
 import CXXInterop
 
 // CHECK-LABEL: define hidden swiftcc void @"$s6cxx_ir13indirectUsageyyF"()
-// CHECK: %0 = call ptr @{{_Z5makeTv|"\?makeT@@YAPE?AVT@ns@@XZ"}}()
-// CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(ptr %2)
+// CHECK: [[P1:%.*]] = call ptr @{{_Z5makeTv|"\?makeT@@YAPE?AVT@ns@@XZ"}}()
+// CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(ptr [[P1]])
 func indirectUsage() {
   useT(makeT())
 }
@@ -24,8 +24,8 @@ func namespaceManglesIntoNameForUsingShadowDecl(arg: NamespacedType) {
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"$s6cxx_ir14accessNSMemberyyF"()
-// CHECK: %0 = call ptr @{{_ZN2ns7doMakeTEv|"\?doMakeT@ns@@YAPEAVT@1@XZ"}}()
-// CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(ptr %2)
+// CHECK: [[P1:%.*]] = call ptr @{{_ZN2ns7doMakeTEv|"\?doMakeT@ns@@YAPEAVT@1@XZ"}}()
+// CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(ptr [[P1]])
 func accessNSMember() {
   useT(ns.doMakeT())
 }

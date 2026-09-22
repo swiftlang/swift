@@ -13,7 +13,6 @@
 #ifndef SWIFT_AST_SEARCHPATHOPTIONS_H
 #define SWIFT_AST_SEARCHPATHOPTIONS_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/PathRemapper.h"
 #include "llvm/ADT/Hashing.h"

@@ -21,11 +21,9 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -35,7 +33,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
-#include "clang/AST/Decl.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -217,7 +214,9 @@ static BridgedFunction::ParseFn parseFunction = nullptr;
 static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
+static BridgedFunction::HasComputedSideEffectsFn hasComputedSideEffectsFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
+static BridgedFunction::ArgumentMayWriteFn argumentMayWriteFunction = nullptr;
 static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
@@ -291,6 +290,7 @@ void SILFunction::init(
   // born after the module advances past Raw are reported lowered by the
   // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
+  this->HasOwnershipForTrivialValues = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -418,6 +418,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
+  newSnapshot->HasLoweredAddresses = HasLoweredAddresses;
 
   SILFunctionCloner cloner(newSnapshot);
   cloner.cloneFunction(this);
@@ -1370,14 +1371,13 @@ void SILFunction::forEachSpecializeAttrTargetFunction(
   }
 }
 
-void BridgedFunction::registerBridging(SwiftMetatype metatype,
-            RegisterFn initFn, RegisterFn destroyFn,
-            WriteFn writeFn, ParseFn parseFn,
-            CopyEffectsFn copyEffectsFn,
-            GetEffectInfoFn effectInfoFn,
-            GetMemBehaviorFn memBehaviorFn,
-            ArgumentMayReadFn argumentMayReadFn,
-            IsDeinitBarrierFn isDeinitBarrierFn) {
+void BridgedFunction::registerBridging(
+    SwiftMetatype metatype, RegisterFn initFn, RegisterFn destroyFn,
+    WriteFn writeFn, ParseFn parseFn, CopyEffectsFn copyEffectsFn,
+    GetEffectInfoFn effectInfoFn, GetMemBehaviorFn memBehaviorFn,
+    HasComputedSideEffectsFn hasComputedSideEffectsFn,
+    ArgumentMayReadFn argumentMayReadFn, ArgumentMayWriteFn argumentMayWriteFn,
+    IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1386,7 +1386,9 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   copyEffectsFunction = copyEffectsFn;
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
+  hasComputedSideEffectsFunction = hasComputedSideEffectsFn;
   argumentMayReadFunction = argumentMayReadFn;
+  argumentMayWriteFunction = argumentMayWriteFn;
   isDeinitBarrierFunction = isDeinitBarrierFn;
 }
 
@@ -1482,11 +1484,26 @@ MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
 }
 
 // Used by the MemoryLifetimeVerifier
+bool SILFunction::hasComputedSideEffects() const {
+  if (!hasComputedSideEffectsFunction)
+    return false;
+
+  return hasComputedSideEffectsFunction({const_cast<SILFunction *>(this)});
+}
+
+// Used by the MemoryLifetimeVerifier
 bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
   if (!argumentMayReadFunction)
     return true;
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
+}
+
+bool SILFunction::argumentMayWrite(Operand *argOp, SILValue addr) {
+  if (!argumentMayWriteFunction)
+    return true;
+
+  return argumentMayWriteFunction({this}, {argOp}, {addr});
 }
 
 bool SILFunction::isDeinitBarrier() {

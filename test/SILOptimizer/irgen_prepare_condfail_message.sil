@@ -1,0 +1,24 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -irgen-prepare | %FileCheck %s
+
+// IRGenPrepare lowers `Builtin.condfail_message` into a
+// `cond_fail`. If the parameter isn't a StringLiteral at this point
+// it ghets replaces by a generic error message.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// A message that is only known at runtime.
+//
+// CHECK-LABEL: sil @opaque_message :
+// CHECK-NOT:     builtin "condfail_message"
+// CHECK:         cond_fail %0 : $Builtin.Int1, "unknown program error"
+// CHECK-NOT:     builtin "condfail_message"
+// CHECK:       } // end sil function 'opaque_message'
+sil @opaque_message : $@convention(thin) (Builtin.Int1, Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.RawPointer):
+  %2 = builtin "condfail_message"(%0 : $Builtin.Int1, %1 : $Builtin.RawPointer) : $()
+  %3 = tuple ()
+  return %3 : $()
+}

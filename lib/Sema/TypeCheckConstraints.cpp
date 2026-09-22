@@ -34,19 +34,12 @@
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/Format.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
-#include <iterator>
-#include <map>
-#include <memory>
-#include <tuple>
 #include <utility>
 
 using namespace swift;
@@ -861,7 +854,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
   // FIXME: This operation doesn't really make sense with a generic function type.
   // We should open the signature instead.
   if (auto *gft = t->getAs<GenericFunctionType>()) {
-    t = FunctionType::get(gft->getParams(), gft->getResult(), gft->getExtInfo());
+    t = FunctionType::get(gft->getParams(), gft->getYields(), gft->getResult(),
+                          gft->getExtInfo());
   }
 
   return t.transformRec(
@@ -894,8 +888,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
                                          bool openArchetypes,
-                                         ConstraintKind kind, DeclContext *dc,
-                                         bool *unwrappedIUO) {
+                                         ConstraintKind kind, DeclContext *dc) {
   // Don't allow any type variables to leak into the nested ConstraintSystem
   // (including as originator types for placeholders). This also ensure that we
   // avoid lifetime issues for e.g cases where we lazily populate the
@@ -914,15 +907,11 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   cs.addConstraint(kind, type1, type2, cs.getConstraintLocator({}));
 
   if (openArchetypes) {
-    assert(!unwrappedIUO && "FIXME");
     SmallVector<Solution, 4> solutions;
     return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
   }
 
   if (auto solution = cs.solveSingle()) {
-    if (unwrappedIUO)
-      *unwrappedIUO = solution->getFixedScore().Data[SK_ForceUnchecked] > 0;
-
     return true;
   }
 
@@ -935,12 +924,10 @@ bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
                                 ConstraintKind::Subtype, dc);
 }
 
-bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc,
-                                  bool *unwrappedIUO) {
+bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
   return typesSatisfyConstraint(type1, type2,
                                 /*openArchetypes=*/false,
-                                ConstraintKind::Conversion, dc,
-                                unwrappedIUO);
+                                ConstraintKind::Conversion, dc);
 }
 
 bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
@@ -951,12 +938,11 @@ bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
           isObjCBridgedTo(type1, type2, dc));
 }
 
-bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
-                                  bool *unwrappedIUO) {
+bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc) {
   return (typesSatisfyConstraint(type1, type2,
                                  /*openArchetypes=*/false,
                                  ConstraintKind::BridgingConversion,
-                                 dc, unwrappedIUO));
+                                 dc));
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
@@ -1617,10 +1603,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,
                                   DeclContext *dc) {
   // If the from/to types are equivalent or convertible, this is a coercion.
-  bool unwrappedIUO = false;
   if (fromType->isEqual(toType) ||
-      (isConvertibleTo(fromType, toType, dc, &unwrappedIUO) &&
-       !unwrappedIUO)) {
+      isConvertibleTo(fromType, toType, dc)) {
     return CheckedCastKind::Coercion;
   }
 
@@ -1643,16 +1627,28 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   // Thus, right now, a move-only type is only a subtype of itself.
   // We also want to prevent conversions of a move-only type's metatype.
-  if (fromType->getMetatypeInstanceType()->isNoncopyable()
-      || toType->getMetatypeInstanceType()->isNoncopyable())
+  //
+  // Exception: under NoncopyableCasting, a noncopyable existential value
+  // may be cast to a concrete (non-existential, non-archetype) type, since
+  // the existential's erased dynamic type is exactly the kind of thing a
+  // runtime cast can meaningfully recover. (This does not apply to
+  // metatypes, handled by the getMetatypeInstanceType() checks above.)
+  bool isSupportedNoncopyableExistentialCast =
+      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
+      fromType->isNoncopyable() && fromType->isExistentialType() &&
+      !toType->isExistentialType() && !toType->is<ArchetypeType>();
+
+  if (!isSupportedNoncopyableExistentialCast &&
+      (fromType->getMetatypeInstanceType()->isNoncopyable()
+       || toType->getMetatypeInstanceType()->isNoncopyable()))
     return CheckedCastKind::Unresolved;
-  
+
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.
   if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
 
-  if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
+  if (isObjCBridgedTo(fromType, toType, dc)){
     return CheckedCastKind::BridgingCoercion;
   }
 
@@ -2132,16 +2128,18 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // This is handled in the runtime, so it doesn't need a special cast
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
+    ConformanceCache cache;
+
     auto nsObject = Context.getNSObjectType();
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (checkConformance(toType, errorTypeProto)) {
         if (nsErrorTy) {
-          if (isSubtypeOf(fromType, nsErrorTy, dc)
+          if (canConvertTo(cache, fromType, nsErrorTy)
               // Don't mask "always true" warnings if NSError is cast to
               // Error itself.
-              && !isSubtypeOf(fromType, toType, dc))
+              && !canConvertTo(cache, fromType, toType))
             return CheckedCastKind::ValueCast;
         }
       }

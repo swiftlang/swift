@@ -1,0 +1,19 @@
+// Without an explicit -I, the SIL tools must pick up the embedded stdlib from
+// the "embedded" sub-directory of the resource directory.
+// Note: sil-llvm-gen shares this code path, but %target-sil-llvm-gen doesn't
+// pass the test resource directory, so it cannot be tested here.
+
+// RUN: %target-sil-opt -enable-experimental-feature Embedded %s -o /dev/null
+
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: embedded_stdlib
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @testit : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  return %0
+}

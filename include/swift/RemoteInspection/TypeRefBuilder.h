@@ -119,13 +119,22 @@ public:
         return;
       }
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
-      if (NextSize > Size) {
+      if (!NextSize) {
+        std::cerr << "!!! Reflection record has an invalid record stride\n"
+                  << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        // Set this iterator equal to the end. This section is effectively
+        // empty.
+        this->Size = 0;
+        return;
+      }
+      if (*NextSize > Size) {
         std::cerr
             << "!!! Reflection section too small to contain first record\n"
             << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Section size: " << Size
-                  << ", size of first record: " << NextSize << std::endl;
+                  << ", size of first record: " << *NextSize << std::endl;
         // Set this iterator equal to the end. This section is effectively
         // empty.
         this->Size = 0;
@@ -142,8 +151,19 @@ public:
   Self &operator++() {
     auto CurRecord = this->operator*();
     auto CurSize = Self::getCurrentRecordSize(CurRecord);
-    Cur = Cur.atByteOffset(CurSize);
-    Size -= CurSize;
+    if (!CurSize || *CurSize > Size) {
+      // Every record is validated before it becomes the current one, so this
+      // should not happen. Check anyway: advancing by an unvalidated size would
+      // move Cur outside the section and underflow Size.
+      assert(false && "iterating an unvalidated reflection record size");
+      std::cerr << "!!! Reflection record has an invalid record stride\n"
+                << std::endl;
+      std::cerr << "Section Type: " << Name << std::endl;
+      Size = 0;
+      return asImpl();
+    }
+    Cur = Cur.atByteOffset(*CurSize);
+    Size -= *CurSize;
 
     if (Size > 0) {
       if (Size < Self::getMinimumRecordSize()) {
@@ -154,7 +174,16 @@ public:
       }
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
-      if (NextSize > Size) {
+      if (!NextSize) {
+        std::cerr << "!!! Reflection record has an invalid record stride\n"
+                  << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        std::cerr << "Offset in section: " << (OriginalSize - Size)
+                  << std::endl;
+        Size = 0;
+        return asImpl();
+      }
+      if (*NextSize > Size) {
         int offset = (int)(OriginalSize - Size);
         std::cerr << "!!! Reflection section too small to contain next record\n"
                   << std::endl;
@@ -162,7 +191,7 @@ public:
         std::cerr << "Remaining section size: " << Size
                   << ", total section size: " << OriginalSize
                   << ", offset in section: " << offset
-                  << ", size of next record: " << NextSize << std::endl;
+                  << ", size of next record: " << *NextSize << std::endl;
         const uint8_t *p =
             reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
         std::cerr << "Last bytes of previous record: ";
@@ -207,8 +236,14 @@ public:
   FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
-    return sizeof(FieldDescriptor) + FR->NumFields * FR->FieldRecordSize;
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
+    // We only ever emit FieldRecordSize equal to sizeof(FieldRecord). If it's
+    // anything else, consider it to be bad data and ignore it.
+    if (FR->FieldRecordSize != sizeof(FieldRecord))
+      return std::nullopt;
+    return sizeof(FieldDescriptor) +
+           (uint64_t)FR->NumFields * (uint64_t)FR->FieldRecordSize;
   }
 };
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
@@ -220,10 +255,16 @@ public:
   AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType") {}
 
-  static uint64_t
+  static std::optional<uint64_t>
   getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR) {
+    // We only ever emit AssociatedTypeRecordSize equal to
+    // sizeof(AssociatedTypeRecord). If it's anything else, consider it to be
+    // bad data and ignore it.
+    if (ATR->AssociatedTypeRecordSize != sizeof(AssociatedTypeRecord))
+      return std::nullopt;
     return sizeof(AssociatedTypeDescriptor) +
-           ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
+           (uint64_t)ATR->NumAssociatedTypes *
+               (uint64_t)ATR->AssociatedTypeRecordSize;
   }
 };
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
@@ -235,7 +276,8 @@ public:
   BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
     return sizeof(BuiltinTypeDescriptor);
   }
 };
@@ -248,10 +290,12 @@ public:
   CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+    // Use 64-bit arithmetic to avoid overflowing with extremely large values.
     return sizeof(CaptureDescriptor) +
-           CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
-           CR->NumMetadataSources * sizeof(MetadataSourceRecord);
+           (uint64_t)CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
+           (uint64_t)CR->NumMetadataSources * sizeof(MetadataSourceRecord);
   }
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
@@ -263,7 +307,7 @@ public:
   MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum") {}
 
-  static uint64_t
+  static std::optional<uint64_t>
   getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
     return MPER->getSizeInBytes();
   }
@@ -986,9 +1030,9 @@ public:
   // TypeRefs model generic values as distinct IntegerTypeRefs, so a value
   // argument is never misinterpreted as a type; the demangler's value/type
   // consistency check is unnecessary here.
-  std::optional<bool> isValueGenericParameter(const BuiltTypeDecl &,
-                                              unsigned index) {
-    return std::nullopt;
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(const BuiltTypeDecl &, unsigned numArgs) {
+    return {};
   }
 
   const TypeRef *createNegativeIntegerType(intptr_t value) {
@@ -2039,6 +2083,8 @@ private:
         remote::RemoteAddress protocolDescriptorAddress) {
       std::optional<std::string> protocolName =
           readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+      if (!protocolName.has_value())
+        return std::nullopt;
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(
@@ -2060,15 +2106,19 @@ private:
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
     }
 
-    remote::RemoteAddress getParentDescriptorAddress(
+    std::optional<remote::RemoteAddress> getParentDescriptorAddress(
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor) {
       auto parentOffsetAddress = contextDescriptorAddress.applyRelativeOffset(
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes =
+      auto parentOffsetBytes =
           OpaqueByteReader(parentOffsetAddress, sizeof(uint32_t));
-      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      if (!parentOffsetBytes.get()) {
+        Error = "Failed to read parent offset in a context descriptor.";
+        return std::nullopt;
+      }
+      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
       auto parentTargetAddress =
           parentOffsetAddress.applyRelativeOffset(*parentFieldOffset);
       return parentTargetAddress;
@@ -2124,9 +2174,19 @@ private:
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor,
-        std::vector<ContextNameInfo> &chain) {
-      const auto parentDescriptorAddress = getParentDescriptorAddress(
+        std::vector<ContextNameInfo> &chain,
+        int recursion_limit = remote::defaultTypeRecursionLimit) {
+      if (recursion_limit <= 0) {
+        Error = "Parent context chain is too deep.";
+        return;
+      }
+
+      const auto optionalParentDescriptorAddress = getParentDescriptorAddress(
           contextDescriptorAddress, contextDescriptor);
+      if (!optionalParentDescriptorAddress.has_value())
+        return;
+      const auto parentDescriptorAddress =
+          optionalParentDescriptorAddress.value();
 
       auto addParentNameAndRecurse =
           [&](remote::RemoteAddress parentContextDescriptorAddress,
@@ -2149,7 +2209,7 @@ private:
         chain.push_back(parentNameInfo.value());
         if (!isModuleDescriptor(parentDescriptor)) {
           getParentContextChain(parentContextDescriptorAddress,
-                                parentDescriptor, chain);
+                                parentDescriptor, chain, recursion_limit - 1);
         }
       };
 
@@ -2265,14 +2325,16 @@ private:
     // Given that at a given offset from the opaque type descriptor base there
     // is an offset to a TypeRef string, read it.
     auto readRequirementTypeRefAddress =
-        [&](uintptr_t offsetFromOpaqueDescBase,
-            uintptr_t requirementAddress) -> remote::RemoteAddress {
+        [&](uintptr_t offsetFromOpaqueDescBase, uintptr_t requirementAddress)
+        -> std::optional<remote::RemoteAddress> {
       std::string typeRefString = "";
       auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
                                (uintptr_t)opaqueTypeDescriptor;
       auto fieldOffsetAddress = opaqueTypeDescriptorAddress + fieldOffsetOffset;
       auto fieldOffsetBytes =
           OpaqueByteReader(fieldOffsetAddress, sizeof(uint32_t));
+      if (!fieldOffsetBytes.get())
+        return std::nullopt;
       auto fieldOffset = (const int32_t *)fieldOffsetBytes.get();
       auto fieldAddress = fieldOffsetAddress.applyRelativeOffset(*fieldOffset);
       return fieldAddress;
@@ -2303,19 +2365,25 @@ private:
         auto conformanceRequirementProtocolName =
             nameReader.readFullyQualifiedProtocolName(
                 protocolDescriptorAddress);
+        if (!conformanceRequirementProtocolName.has_value())
+          continue;
         protocolRequirements.push_back(*conformanceRequirementProtocolName);
       }
       if (req.getKind() == GenericRequirementKind::SameType) {
         // Read Param Name
         auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
                                                           (uintptr_t)(&req));
-        std::string demangledParamName =
-            nodeToString(demangleTypeRef(RDF.readTypeRef(paramAddress)));
+        if (!paramAddress.has_value())
+          continue;
+        std::string demangledParamName = nodeToString(
+            demangleTypeRef(RDF.readTypeRef(paramAddress.value())));
 
         // Read the substituted Type Name
         auto typeAddress = readRequirementTypeRefAddress(
             req.getSameTypeNameOffset(), (uintptr_t)(&req));
-        auto typeTypeRef = RDF.readTypeRef(typeAddress);
+        if (!typeAddress.has_value())
+          continue;
+        auto typeTypeRef = RDF.readTypeRef(typeAddress.value());
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;

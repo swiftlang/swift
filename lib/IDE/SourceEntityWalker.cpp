@@ -22,7 +22,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -65,6 +64,11 @@ private:
 
   MacroWalking getMacroWalkingBehavior() const override {
     return SEWalker.getMacroWalkingBehavior();
+  }
+
+  bool shouldWalkTopLevelAuxiliaryDecls() const override {
+    // Walk top-level expansions whenever we're walking expansions.
+    return shouldWalkMacroArgumentsAndExpansion().second;
   }
 
   QualifiedIdentTypeReprWalkingScheme
@@ -244,8 +248,10 @@ ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPost(Decl *D) {
   if (Action.Action == PostWalkAction::Stop)
     return Action;
 
-  // Walk into peer and conformance expansions if walking expansions
-  if (shouldWalkMacroArgumentsAndExpansion().second) {
+  // Walk into peer and conformance expansions if walking expansions. Avoid
+  // doing this for top-level decls since their auxiliary decls are walked
+  // separately by `SourceFile::walk`.
+  if (shouldWalkMacroArgumentsAndExpansion().second && !Parent.getAsModule()) {
     D->visitAuxiliaryDecls([&](Decl *auxDecl) {
       if (Action.Action == PostWalkAction::Stop)
         return;

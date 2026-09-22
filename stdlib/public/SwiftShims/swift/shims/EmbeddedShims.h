@@ -102,8 +102,19 @@ typedef struct {
   void* _Nonnull (* _Nonnull initializeWithTakeFn)(void *, void*, const void*);
 #endif
   void  *assignWithTakeFn;
-  void  *getEnumTagSinglePayloadFn;
-  void  *storeEnumTagSinglePayload;
+#if __has_feature(ptrauth_calls)
+  unsigned (* __ptrauth(0, 1, 0x60f0) getEnumTagSinglePayloadFn)(
+      const void *, unsigned, const void *);
+#else
+  unsigned (*getEnumTagSinglePayloadFn)(const void *, unsigned, const void *);
+#endif
+#if __has_feature(ptrauth_calls)
+  void (* __ptrauth(0, 1, 0xa0d1) storeEnumTagSinglePayloadFn)(
+      void *, unsigned, unsigned, const void *);
+#else
+  void (*storeEnumTagSinglePayloadFn)(void *, unsigned, unsigned,
+                                      const void *);
+#endif
   __swift_size_t size;
   __swift_size_t stride;
   unsigned flags;
@@ -245,6 +256,91 @@ _swift_embedded_metadata_destroy(const void *metadata, void *value) {
   fullmeta->vwt->destroyFn(value, metadata);
 }
 
+// Read the tag of a single-payload enum (in practice, an `Optional`) held at
+// `enumValue`, without knowing the enum's type statically.
+//
+// Both of these witnesses live on the *payload* type's value witness table and
+// take the payload type's metadata — see `ValueWitness.def` and
+// `swift_getEnumTagSinglePayloadGeneric`. So `payloadMetadata` is the metadata
+// for `Wrapped`, not for `Optional<Wrapped>`.
+//
+// For `Optional`, `emptyCases` is 1 and the result is 0 for `.some` or 1 for
+// `.none`, which is the same numbering the non-embedded key path walker gets
+// from `Builtin.getEnumTag`.
+static inline unsigned
+_swift_embedded_metadata_get_enum_tag_single_payload(
+    const void *payloadMetadata, const void *enumValue, unsigned emptyCases) {
+  EmbeddedMetaDataPrefix *fullmeta =
+      _swift_embedded_get_full_metadata(payloadMetadata);
+  return fullmeta->vwt->getEnumTagSinglePayloadFn(enumValue, emptyCases,
+                                                  payloadMetadata);
+}
+
+// Companion to `_swift_embedded_metadata_get_enum_tag_single_payload`. Writing
+// tag 0 means "the payload case is now initialized"; a nonzero `whichCase`
+// initializes the corresponding empty case (for `Optional`, 1 is `.none`).
+static inline void
+_swift_embedded_metadata_store_enum_tag_single_payload(
+    const void *payloadMetadata, void *enumValue, unsigned whichCase,
+    unsigned emptyCases) {
+  EmbeddedMetaDataPrefix *fullmeta =
+      _swift_embedded_get_full_metadata(payloadMetadata);
+  fullmeta->vwt->storeEnumTagSinglePayloadFn(enumValue, whichCase, emptyCases,
+                                             payloadMetadata);
+}
+
+// Calling-convention bridge for invoking a key-path accessor thunk from
+// the embedded runtime walker.  A key-path getter thunk has SIL type
+// `@convention(keypath_accessor_getter) (@in_guaranteed T) -> @out T`,
+// which at the LLVM level lowers to
+// `void SWIFT_CC(swift)(sret out, in base, args ptr, args size)`.  From
+// Swift we only have a raw function pointer and untyped memory pointers,
+// so we can't express that ABI directly in Swift's type system.  This
+// shim takes the pointers as regular C args and internally casts the
+// function pointer to a swiftcc type with an `SWIFT_INDIRECT_RESULT`
+// parameter — clang then rewrites the call so `out` is passed via the
+// architecture's indirect-result register (x8 on arm64, rdi on x86_64),
+// matching the callee's expectations.
+//
+// `arg` / `argSize` correspond to the KP thunk's trailing "index
+// argument" pair — always `(NULL, 0)` for the components the embedded
+// static-instance emitter produces (no captured subscript indices).
+static inline void
+_swift_embedded_kp_invokeGetter(void *_Nonnull fn,
+                                void *_Nonnull out,
+                                const void *_Nonnull base,
+                                const void *_Nullable arg,
+                                __swift_size_t argSize) {
+  typedef void SWIFT_CC_swift (*Getter)(void *SWIFT_INDIRECT_RESULT,
+                                        const void *, const void *,
+                                        __swift_size_t);
+  ((Getter)fn)(out, base, arg, argSize);
+}
+
+// Companion to `_swift_embedded_kp_invokeGetter` for the setter side of
+// a KP writeback.  A KP setter thunk has SIL type
+// `@convention(keypath_accessor_setter) (@in_guaranteed NewValue,
+//                                        @{in_guaranteed|inout} CurValue) -> ()`,
+// which at the LLVM level lowers to
+// `void SWIFT_CC(swift)(ptr value_in, ptr base_in_or_inout,
+//                       ptr args, size_t args_size)`.  Both mutating and
+// nonmutating setters produce the same LLVM signature — the mutating-vs-
+// nonmutating distinction is purely a source-level statement about
+// aliasing of the base parameter.  Neither uses sret (no return value),
+// so we can call it via a plain-pointer C signature: on arm64/x86_64 the
+// register assignment (x0-x3 / rdi-rcx) matches swiftcc for four
+// pointer/integer args with no return.
+static inline void
+_swift_embedded_kp_invokeSetter(void *_Nonnull fn,
+                                const void *_Nonnull value,
+                                void *_Nonnull base,
+                                const void *_Nullable arg,
+                                __swift_size_t argSize) {
+  typedef void SWIFT_CC_swift (*Setter)(const void *, void *,
+                                        const void *, __swift_size_t);
+  ((Setter)fn)(value, base, arg, argSize);
+}
+
 // Swift implementation of error box destroy logic (defined in EmbeddedRuntime.swift).
 // Takes the object as a regular swiftcc parameter (x0/rdi on arm64/x86_64).
 SWIFT_CC_swift extern void _swift_embedded_error_destroy_impl(void * _Nonnull object);
@@ -263,7 +359,11 @@ _swift_embedded_error_box_destroy(SWIFT_CONTEXT void * _Nonnull object) {
 
 // Returns the address of the calling convention bridge for metadata storage init.
 static inline void * _Nonnull _swift_embedded_error_destroy_ptr(void) {
+#if defined(__AVR__)
+  return (void *)(__UINTPTR_TYPE__)_swift_embedded_error_box_destroy;
+#else
   return (void *)_swift_embedded_error_box_destroy;
+#endif
 }
 
 #ifdef __cplusplus

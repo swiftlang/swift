@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt %s -test-runner -sil-verify-none | %FileCheck %s
+
+// XFAIL: *
+
+// Corner cases for `lifetime_resolution_resolve` that do not hold yet. The CHECK lines
+// describe the intended result, not the current one.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Kl {}
+class Sub : Kl {}
+
+sil @getK : $@convention(thin) () -> @owned Kl
+sil @useK : $@convention(thin) (@guaranteed Kl) -> ()
+sil @consumeK : $@convention(thin) (@owned Kl) -> ()
+sil @consumeTwoK : $@convention(thin) (@owned Kl, @owned Kl) -> ()
+sil @barrierK : $@convention(thin) () -> ()
+
+
+// Two consuming operands on the same instruction: exactly one of them must take a copy,
+// otherwise %0 is consumed twice.
+// CHECK-LABEL: sil [ossa] @test_two_consumes_one_instruction :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: apply {{%.*}}({{.*}}[[COPY]]{{.*}}) : $@convention(thin) (@owned Kl, @owned Kl) -> ()
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_two_consumes_one_instruction : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %consTwoFn = function_ref @consumeTwoK : $@convention(thin) (@owned Kl, @owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  apply %consTwoFn(%0, %0) : $@convention(thin) (@owned Kl, @owned Kl) -> ()
+  %t = tuple ()
+  return %t
+}

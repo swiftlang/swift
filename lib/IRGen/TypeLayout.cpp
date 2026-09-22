@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeLayout.h"
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "FixedTypeInfo.h"
@@ -29,7 +28,6 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Endian.h"
 #include <cstdint>
 
 using namespace swift;

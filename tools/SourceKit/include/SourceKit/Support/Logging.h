@@ -18,12 +18,9 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
-
-namespace llvm {
-class format_object_base;
-}
 
 namespace SourceKit {
   class UIdent;
@@ -92,7 +89,12 @@ public:
   Logger &operator<<(char C) { LogOS << C; return *this; }
   Logger &operator<<(unsigned char C) { LogOS << C; return *this; }
   Logger &operator<<(signed char C) { LogOS << C; return *this; }
-  Logger &operator<<(const llvm::format_object_base &Fmt);
+
+  template <typename... Ts>
+  Logger &operator<<(const llvm::format_object<Ts...> &Fmt) {
+    LogOS << Fmt;
+    return *this;
+  }
 };
 
 } // namespace SourceKit

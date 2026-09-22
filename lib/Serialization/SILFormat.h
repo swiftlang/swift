@@ -63,6 +63,7 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_BORROW_ALWAYS,
+  SIL_CAST_CONSUMPTION_TEST_ONLY,
 };
 
 enum class KeyPathComponentKindEncoding : uint8_t {
@@ -90,6 +91,8 @@ enum class ExtraStringFlavor : uint8_t {
   WasmImportModule,
   /// wasm import field/name for @_extern(wasm)
   WasmImportName,
+  /// @_target string
+  TargetFeatures,
 };
 
 enum class IsNestedEncoding : uint8_t {
@@ -369,7 +372,6 @@ namespace sil_block {
   using SILDebugValueLayout = BCRecordLayout<
     SIL_DEBUG_VALUE,
 
-    SILTypeCategoryField, /// operand type category
     SILTypeCategoryField, /// debug var type category
     BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
                           /// trace, hasDebugVar, isLet,

@@ -12,7 +12,6 @@ target_link_libraries(swiftRemoteMirror PRIVATE
   # FIXME(compnerd) why is this required? These should be transitively applied
   # from `swiftRemoteInspection`
   swiftDemangling
-  $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:swiftDemanglingCR>
   swiftLLVMSupport
   swiftShims)
 

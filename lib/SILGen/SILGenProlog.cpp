@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "FunctionInputGenerator.h"
 #include "Initialization.h"
@@ -19,12 +18,10 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
@@ -55,6 +52,7 @@ SILValue SILGenFunction::emitSelfDeclForClassDeinit(VarDecl *selfDecl) {
   VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
+  enterFormalScopeCleanup(PrologueLoc, selfValue);
   B.emitDebugDescription(PrologueLoc, selfValue, dv);
   return selfValue;
 }
@@ -90,6 +88,7 @@ SILValue SILGenFunction::emitSelfDeclForMoveOnlyDeinit(VarDecl *selfDecl) {
   VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
+  enterFormalScopeCleanup(PrologueLoc, selfValue);
   B.emitDebugDescription(PrologueLoc, selfValue, dv);
   return selfValue;
 }
@@ -763,7 +762,26 @@ public:
 
     // The self parameter follows the formal parameters.
     if (selfParam) {
-      emitParam(selfParam);
+      // A `@cxx @implementation` function in an extension of a C++ namespace
+      // is emitted directly under its C++ entry point, and its lowered type
+      // drops the formal metatype self parameter. There is no SIL argument to
+      // claim, so materialize the metatype and bind it.
+      auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(SGF.FunctionDC);
+      if (afd && afd->getAttrs().hasAttribute<CxxDeclAttr>() &&
+          loweredParams.isFinished() &&
+          selfParam->getTypeInContext()->is<AnyMetatypeType>()) {
+        SILLocation loc(selfParam);
+        loc.markAsPrologue();
+        ++ArgNo;
+        auto ty = SGF.getLoweredType(selfParam->getTypeInContext());
+        SILValue metatype = SGF.B.createMetatype(loc, ty);
+        SILDebugVariable DebugVar(selfParam->isLet(), ArgNo);
+        SGF.B.emitDebugDescription(loc, metatype, DebugVar);
+        SGF.VarLocs[selfParam] =
+            SILGenFunction::VarLoc(metatype, SILAccessEnforcement::Unknown);
+      } else {
+        emitParam(selfParam);
+      }
     }
 
     if (FormalParamTypes) FormalParamTypes->finish();
@@ -996,6 +1014,7 @@ private:
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, varinfo);
+      SGF.enterFormalScopeCleanup(loc, argrv.getValue());
       SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
@@ -1010,6 +1029,7 @@ private:
       }
       SGF.VarLocs[pd] = SILGenFunction::VarLoc(allocStack,
         SILAccessEnforcement::Unknown);
+      SGF.enterFormalScopeCleanup(pd, allocStack);
       SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
@@ -1130,6 +1150,7 @@ private:
     }
     
     SGF.VarLocs[pd] = SILGenFunction::VarLoc(argrv.getValue(), access);
+    SGF.enterFormalScopeCleanup(pd, argrv.getValue());
     SGF.enterLocalVariableAddressableBufferScope(pd);
   }
 
@@ -1374,23 +1395,40 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::Consuming: {
     assert(!isPack);
 
+    auto argIndex = SGF.F.begin()->getNumArguments();
+    auto fnConv = SGF.F.getConventions();
+    bool isIndirect =
+        fnConv.isSILIndirect(fnConv.getParamInfoForSILArg(argIndex));
+    if (isIndirect)
+      ty = ty.getAddressType();
+
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
     ManagedValue val = SGF.emitManagedRValueWithCleanup(fArg);
 
-    // Sema treats the captured decl as an lvalue since it's `Var`-introduced;
-    // materialize an address for it, moving (not copying) the incoming
-    // owned value in, since it can't be copied.
-    auto addr = SGF.emitTemporary(Loc, lowering);
-    SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
-                                  StoreOwnershipQualifier::Init);
-    addr->finishInitialization(SGF);
-    val = addr->getManagedAddress();
+    if (isIndirect) {
+      // The incoming address is already an owned, use it directly instead of
+      // materializing and storing into a separate temporary.
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    } else {
+      // Sema treats the captured decl as an lvalue since it's `Var`-introduced;
+      // materialize an address for it, moving (not copying) the incoming
+      // owned value in, since it can't be copied.
+      auto addr = SGF.emitTemporary(Loc, lowering);
+      SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
+                                    StoreOwnershipQualifier::Init);
+      addr->finishInitialization(SGF);
+      val = addr->getManagedAddress();
 
-    val = val.ensurePlusOne(SGF, Loc);
-    val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        Loc, val,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+      val = val.ensurePlusOne(SGF, Loc);
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    }
 
     arg = val.getValue();
     enforcement = SILAccessEnforcement::Unknown;
@@ -1493,6 +1531,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 
   SGF.VarLocs[VD] = SILGenFunction::VarLoc(arg, enforcement, box);
+  SGF.enterFormalScopeCleanup(VD, arg);
   SGF.enterLocalVariableAddressableBufferScope(VD);
   SILDebugVariable DbgVar(VD->isLet(), ArgNo);
   if (auto *AllocStack = dyn_cast<AllocStackInst>(arg)) {
@@ -1549,11 +1588,11 @@ void SILGenFunction::emitProlog(
       // Opaque values are always passed 'owned', so add a clean up if needed.
       //
       // TODO: Should this be tied to the mv?
-      if (!lowering.isTrivial())
+      if (!lowering.isTrivial(&F))
         enterDestroyCleanup(val);
 
       ManagedValue mv;
-      if (lowering.isTrivial())
+      if (lowering.isTrivial(&F))
         mv = ManagedValue::forObjectRValueWithoutOwnership(val);
       else
         mv = ManagedValue::forUnmanagedOwnedValue(val);

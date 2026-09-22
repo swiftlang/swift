@@ -30,6 +30,14 @@
 #endif
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
+
+#ifndef SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 0
+#else
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 1
+#endif
+#endif
 #include "swift/Basic/STLExtras.h"
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
@@ -380,10 +388,19 @@ public:
     static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
 #endif
 
+#if !SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+    static constexpr size_t TaskRegistryTaskSize = 0;
+#else
+    // registryNext and registryPrev pointers
+    static constexpr size_t TaskRegistryTaskSize = 2 * sizeof(void *);
+#endif
+
     // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
-    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
+    // 8 bytes of padding, the ActiveTaskStatus, a RecursiveMutex, and
+    // potentially 2 task registry pointers.
     static constexpr size_t PrivateStorageSize =
       6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      + TaskRegistryTaskSize
       + sizeof(RecursiveMutex);
 
     char Storage[PrivateStorageSize];
@@ -609,6 +626,11 @@ public:
   /// `swift_task_pushTaskExecutorPreference`, and
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
+
+  // ==== Task Deadlines -------------------------------------------------------
+
+  /// Inherit the deadline status from parent task if present.
+  void inheritDeadlineFrom(AsyncTask *parent);
 
   // ==== Task Local Values ----------------------------------------------------
 

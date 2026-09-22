@@ -20,8 +20,8 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
@@ -33,8 +33,6 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
-#include "clang/Frontend/CompileJobCacheResult.h"
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
@@ -47,7 +45,6 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -1110,7 +1107,7 @@ class ModuleInterfaceLoaderImpl {
     }
     InterfaceSubContextDelegateImpl astDelegate(
         ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-        ctx.ClangImporterOpts, ctx.CASOpts, Opts,
+        ctx.ClangImporterOpts, ctx.CASOpts, ctx.SILOpts, Opts,
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
         backupInterfaceDir, /*replayPrefixMap=*/{},
         /*serializeDependencyHashes*/ false, trackSystemDependencies);
@@ -1481,6 +1478,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+    const SILOptions &SILOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
     StringRef OutPath, StringRef ABIOutputPath,
@@ -1489,7 +1487,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     ModuleInterfaceLoaderOptions LoaderOpts,
     bool silenceInterfaceDiagnostics) {
   InterfaceSubContextDelegateImpl astDelegate(
-      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts,
+      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts, SILOpts,
       LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
       BackupInterfaceDir, replayPrefixMap, SerializeDependencyHashes,
@@ -1646,6 +1644,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+    const SILOptions &silOpts,
     bool suppressNotes, bool suppressRemarks,
     PrintDiagnosticNamesMode printDiagnosticNames) {
   GenericArgs.push_back("-frontend");
@@ -1699,6 +1698,17 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back("-swift-version");
   GenericArgs.push_back(ArgSaver.save(genericSubInvocation.getLangOptions()
     .EffectiveLanguageVersion.asAPINotesVersionString()));
+
+  // Forward the parent's sanitizer selection so the child's ClangImporter
+  // propagates the same flags into its Clang cc1 args. This is important because
+  // -sanitize options can add target-features (e.g. MTE). These are checked when
+  // loading a PCM (and mismatches are fatal).
+  genericSubInvocation.getSILOptions().Sanitizers = silOpts.Sanitizers;
+#define SANITIZER(_, kind, name, __)                                           \
+  if (silOpts.Sanitizers & SanitizerKind::kind) {                              \
+    GenericArgs.push_back("-sanitize=" #name);                                 \
+  }
+#include "swift/Basic/Sanitizers.def"
 
   genericSubInvocation.setImportSearchPaths(
       SearchPathOpts.getImportSearchPaths());
@@ -1801,8 +1811,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
   }
 
-  if (casOpts.EnableCaching) {
+  if (casOpts.EnableCaching || casOpts.ImportModuleFromCAS) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
+    genericSubInvocation.getCASOptions().ImportModuleFromCAS =
+        casOpts.ImportModuleFromCAS;
     genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
@@ -1852,6 +1864,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     SourceManager &SM, DiagnosticEngine *Diags,
     const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+    const SILOptions &silOpts,
     ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
@@ -1864,6 +1877,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
+                                     silOpts,
                                      Diags->getSuppressNotes(),
                                      Diags->getSuppressRemarks(),
                                      Diags->getPrintDiagnosticNamesMode());
@@ -2920,6 +2934,21 @@ static std::string getContextHash(const CompilerInvocation &CI,
           ? CI.getLangOptions().Target
           : getTargetSpecificModuleTriple(CI.getLangOptions().Target);
 
+  // Similarly, include the target variant triple. A zippered target passes the
+  // variant down to Clang as '-darwin-target-variant-triple'. A zippered and a
+  // plain target that share a '-target' therefore depend on different PCMs. If
+  // the variant was absent here, both would also agree on one '.swiftmodule'
+  // path, so the two configurations would share a single file in the module
+  // store that was built against only one of those PCMs.
+  std::string targetVariantStr = "";
+  if (CI.getLangOptions().TargetVariant) {
+    auto targetVariantToHash =
+        useStrictCacheHash
+            ? *CI.getLangOptions().TargetVariant
+            : getTargetSpecificModuleTriple(*CI.getLangOptions().TargetVariant);
+    targetVariantStr = targetVariantToHash.str();
+  }
+
   std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
 
   llvm::hash_code H = llvm::hash_combine(
@@ -2936,6 +2965,9 @@ static std::string getContextHash(const CompilerInvocation &CI,
 
       // The target triple to hash.
       targetToHash.str(),
+
+      // The target variant to hash.
+      targetVariantStr,
 
       // The SDK path is going to affect how this module is imported, so
       // include it.

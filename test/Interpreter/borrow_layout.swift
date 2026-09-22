@@ -40,6 +40,48 @@
 // RUN:   %s
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s
+//
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking \
+// RUN:   -Xfrontend -enable-sil-opaque-values \
+// RUN:   -enable-experimental-feature BuiltinModule \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanPointer \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanPointer \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanPointer \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanNPEnum \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanNPEnum \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanNPEnum \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanAFD \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanAFD \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanAFD \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanNBB \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanNBB \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanNBB \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanNotQuiteBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanNotQuiteBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanNotQuiteBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanAlmostBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanAlmostBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanAlmostBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanBig \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanGrainy \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanGrainy \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanGrainy \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanArray1 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanArray1 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanArray1 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanArray3 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanArray3 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanArray3 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanString \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanString \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanString \
+// RUN:   -o %t/a-opaque-values.out \
+// RUN:   %s
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out 2>&1 | %FileCheck %s
 
 // Type layout verifier is only compiled into the runtime in asserts builds.
 // REQUIRES: swift_stdlib_asserts
@@ -50,7 +92,6 @@
 //
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_BuiltinModule
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // CHECK-NOT: Type verification
 

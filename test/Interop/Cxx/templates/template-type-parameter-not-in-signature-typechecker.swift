@@ -1,8 +1,4 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 import TemplateTypeParameterNotInSignature
 

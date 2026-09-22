@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -enable-experimental-feature RawLayout -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-experimental-feature RawLayout -emit-ir -gdwarf-types -o - | %FileCheck %s
 
 // REQUIRES: swift_feature_RawLayout
 

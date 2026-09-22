@@ -1955,18 +1955,33 @@ public:
     return createNominalType(typeAliasDecl, parent);
   }
 
-  /// Determine whether the generic parameter at the given index is a value
-  /// parameter. Returns std::nullopt if the type isn't generic or the index is
-  /// out of range.
-  std::optional<bool> isValueGenericParameter(BuiltTypeDecl anyTypeDecl,
-                                              unsigned index) const {
+  /// Which of the \p numArgs generic arguments a mangled name binds to
+  /// \p anyTypeDecl are bound to value generic parameters. Returns an empty
+  /// vector if \p anyTypeDecl isn't a generic type, or if the argument count
+  /// matches neither of the two shapes createBoundGenericType accepts: just
+  /// this type's own parameters, or, for a type with no parent, the complete
+  /// set across every level of nesting.
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(BuiltTypeDecl anyTypeDecl,
+                                unsigned numArgs) const {
     auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
-    if (!typeDecl)
-      return std::nullopt;
+    if (!typeDecl || !typeDecl->isGeneric())
+      return {};
     auto localParams = getLocalGenericParams(typeDecl);
-    if (index >= localParams.size())
-      return std::nullopt;
-    return localParams[index].getKind() == GenericParamKind::Value;
+    auto allParams = typeDecl->getGenericContext()->getGenericParams();
+    llvm::ArrayRef<GenericParamDescriptor> params;
+    if (numArgs == localParams.size())
+      params = localParams;
+    else if (numArgs == allParams.size())
+      params = allParams;
+    else
+      return {};
+
+    llvm::SmallVector<bool, 8> flags;
+    flags.reserve(params.size());
+    for (auto param : params)
+      flags.push_back(param.getKind() == GenericParamKind::Value);
+    return flags;
   }
 
   TypeLookupErrorOr<BuiltType>
@@ -2492,6 +2507,11 @@ public:
 
   TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
                                                            BuiltType element) {
+    if (!element.isMetadata())
+      return TYPE_LOOKUP_ERROR_FMT("Tried to build a Builtin.FixedArray "
+                                   "without metadata for the element type");
+    // A count is indistinguishable from a metadata pointer or a pack here, so
+    // the decoder is where a count spelled as a type gets rejected.
     return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
                                                      size.getValue(),
                                                      element.getMetadata()));
@@ -2912,40 +2932,78 @@ static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
   if (!node)
     return nullptr;
 
-  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
-  if (!node)
+  // The signature is the Function node's last child. Searching the subtree for
+  // a Type node instead would find the one belonging to the enclosing context,
+  // which is the Function's first child and can be an entity with a type of its
+  // own, such as a variable.
+  node = node->getLastChild();
+  if (!node || node->getKind() != Node::Kind::Type)
     return nullptr;
 
-  // If this is a generic function, it requires special handling.
-  if (auto genericType =
-          node->findByKind(Node::Kind::DependentGenericType, /*maxDepth=*/1)) {
-    node = genericType->findByKind(Node::Kind::Type, /*maxDepth=*/1);
-    return node->findByKind(Node::Kind::FunctionType, /*maxDepth=*/1);
+  auto funcType = node->getFirstChild();
+  if (!funcType)
+    return nullptr;
+
+  // A generic function wraps its signature in a DependentGenericType.
+  if (funcType->getKind() == Node::Kind::DependentGenericType) {
+    node = funcType->getLastChild();
+    if (!node || node->getKind() != Node::Kind::Type)
+      return nullptr;
+
+    funcType = node->getFirstChild();
+    if (!funcType)
+      return nullptr;
   }
 
-  auto funcType = node->getFirstChild();
-  assert(funcType->getKind() == Node::Kind::FunctionType);
+  if (funcType->getKind() != Node::Kind::FunctionType)
+    return nullptr;
+
   return funcType;
 }
 
 /// For a single unlabeled parameter this function returns whole
-/// `ArgumentTuple`, for everything else a `Tuple` element inside it.
+/// `ArgumentTuple`, for everything else a `Tuple` element inside it. Returns
+/// null if the function type doesn't have a well-formed parameter list.
 static NodePointer getParameterList(NodePointer funcType) {
   assert(funcType->getKind() == Node::Kind::FunctionType);
 
   auto parameterContainer =
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
-  assert(parameterContainer->getNumChildren() > 0);
+  if (!parameterContainer)
+    return nullptr;
 
   // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
-  assert(parameterList->getKind() == Node::Kind::Type);
+  if (!parameterList || parameterList->getKind() != Node::Kind::Type)
+    return nullptr;
 
   auto parameters = parameterList->getFirstChild();
+  if (!parameters)
+    return nullptr;
+
   if (parameters->getKind() == Node::Kind::Tuple)
     return parameters;
 
   return parameterContainer;
+}
+
+/// Return the minimum length required for the decoded generic
+/// substitutions buffer, given the target's `GenericEnvironmentDescriptor`.
+/// 
+/// This acts as a guard before calling
+/// \c swift_func_getReturnTypeInfo, \c swift_func_getParameterTypeInfo
+/// and \c swift_distributed_getWitnessTables which assume the passed
+/// substitutions are sufficiently well formed.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift_distributed_getGenericEnvironmentKeyArgumentCount(
+    GenericEnvironmentDescriptor *genericEnv) {
+  if (!genericEnv)
+    return 0;
+  return llvm::count_if(genericEnv->getGenericParameters(),
+                        [](const GenericParamDescriptor &param) {
+                          return param.hasKeyArgument();
+                        });
 }
 
 SWIFT_CC(swift)
@@ -2960,6 +3018,9 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
     return -1;
 
   auto parameterList = getParameterList(funcType);
+  if (!parameterList)
+    return -1;
+
   return parameterList->getNumChildren();
 }
 
@@ -2976,16 +3037,17 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
     return nullptr;
 
   auto resultType = funcType->getLastChild();
-  if (!resultType)
+  if (!resultType || resultType->getKind() != Node::Kind::ReturnType)
     return nullptr;
-
-  assert(resultType->getKind() == Node::Kind::ReturnType);
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
   auto request = MetadataRequest(MetadataState::Complete);
 
   NodePointer nodePointer = resultType->getFirstChild();
+  if (!nodePointer)
+    return nullptr;
+
   auto typeInfoOrErr = swift_getTypeByMangledNode(
       request, demangler, nodePointer,
       /*arguments=*/genericArguments,
@@ -3036,10 +3098,13 @@ swift_func_getParameterTypeInfo(
     auto nodePointer = parameterList->getChild(index);
 
     if (nodePointer->getKind() == Node::Kind::TupleElement) {
-      assert(nodePointer->getNumChildren() == 1);
-      nodePointer = nodePointer->getFirstChild();
+      nodePointer = nodePointer->getLastChild();
+      if (!nodePointer)
+        return -3;
     }
-    assert(nodePointer->getKind() == Node::Kind::Type);
+
+    if (nodePointer->getKind() != Node::Kind::Type)
+      return -3;
 
     auto request = MetadataRequest(MetadataState::Complete);
 

@@ -22,8 +22,6 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -42,10 +40,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include <functional>
 #include <type_traits>
 using namespace swift;
 
@@ -1969,6 +1965,12 @@ public:
         Out << "\n";
         abort();
       }
+      if (FT->isCoroutine()) {
+        Out << "cannot apply a coroutine yet:";
+        E->getFn()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
       Type ResultExprTy = E->getType();
       if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";
@@ -3444,6 +3446,21 @@ public:
         abort();
       }
 
+      // Yield list is nullable: it is non-null only for coroutines (functions and
+      // coroutine accessors) and then cannot be empty.
+      if (AFD->isCoroutine()) {
+        auto *Yields = AFD->getYields();
+        if (!Yields || !Yields->size()) {
+          Out << "empty yield list for a coroutine\n";
+          AFD->dump(Out);
+          abort();
+        }
+      } else if (AFD->getYields()) {
+        Out << "non-null yield list for non-coroutine\n";
+        AFD->dump(Out);
+        abort();
+      }
+      
       if (AFD->getForeignErrorConvention()
           && !AFD->isObjC() && !AFD->getAttrs().hasAttribute<CDeclAttr>()) {
         Out << "foreign error convention on non-@objc, non-@_cdecl function\n";

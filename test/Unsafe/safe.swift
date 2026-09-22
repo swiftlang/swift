@@ -151,10 +151,9 @@ func casting(value: Any, i: Int) {
 }
 
 func metatypes() {
-  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  let _: Any.Type = UnsafeType.self // expected-note{{reference to unsafe type 'UnsafeType'}}
+  let _: Any.Type = UnsafeType.self
 
-  let _: Any.Type = unsafe UnsafeType.self
+  let _: Any.Type = unsafe UnsafeType.self // expected-warning{{no unsafe operations occur within 'unsafe' expression}}
 }
 
 func testKeyPath() {

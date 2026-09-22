@@ -11,10 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memory-locations"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemoryLocations.h"
 #include "swift/Basic/SmallBitVector.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -509,6 +507,13 @@ bool MemoryLocations::isTrivial(SILType type, SILFunction *inFunction) {
 }
 
 bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
+
+  // An opened existential can be a trivial type. In case an optimization found
+  // the concrete type of the existential, it might have removed the
+  // destroy_addr of such a location, but the type is still the opened
+  // archetype.
+  if (type.is<ExistentialArchetypeType>())
+    return true;
 
   if (inFunction->getTypeProperties(type).isInfinite()) {
     return type.isTrivial(*inFunction);

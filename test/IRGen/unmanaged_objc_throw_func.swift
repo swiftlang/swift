@@ -39,22 +39,20 @@ import Foundation
 // CHECK: [[L2]]:                                     ; preds = %entry
 // CHECK-NEXT: %[[T4:.+]] = phi ptr [ %[[T0]], %entry ]
 // CHECK-NEXT: call void @llvm.objc.release(ptr %{{.+}})
-// CHECK-NEXT: %[[T5:.+]] = ptrtoint ptr %[[T4]] to i{{32|64}}
 // CHECK-NEXT: br label %[[L3:.+]]
 
 // CHECK: [[L1]]:                                     ; preds = %entry
 // CHECK-NEXT: %[[T6:.+]] = phi ptr [ %[[T2]], %entry ]
 // CHECK-NEXT: store ptr null, ptr %swifterror, align {{[0-9]+}}
 // CHECK-NEXT: call void @llvm.objc.release(ptr %{{.+}})
-// CHECK-NEXT: %[[T7:.+]] = icmp eq i{{32|64}} %{{.+}}, 0
+// CHECK-NEXT: %[[T7:.+]] = icmp eq ptr %{{.+}}, null
 // CHECK-NEXT: br i1 %[[T7]], label %[[L4:.+]], label %[[L5:.+]]
 
 // CHECK: [[L5]]:                                     ; preds = %[[L1]]
-// CHECK-NEXT: %[[T8:.+]] = inttoptr i{{32|64}} %{{.+}} to ptr
 // CHECK-NEXT: br label %[[L6:.+]]
 
 // CHECK: [[L6]]:                                     ; preds = %[[L5]]
-// CHECK-NEXT: %[[T9:.+]] = phi ptr [ %[[T8]], %[[L5]] ]
+// CHECK-NEXT: %[[T9:.+]] = phi ptr [ %{{.+}}, %[[L5]] ]
 // CHECK-NEXT: %[[T10:.+]] = call swiftcc ptr @"$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF"(ptr %[[T6]]) #{{[0-9]+}}
 // CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
 // CHECK: br label %[[L7:.+]]
@@ -67,6 +65,5 @@ import Foundation
 // CHECK-NEXT: br label %[[L3]]
 
 // CHECK: [[L3]]:                                     ; preds = %[[L2]], %[[L7]]
-// CHECK-NEXT: %[[T12:.+]] = phi i{{32|64}} [ 0, %[[L7]] ], [ %[[T5]], %[[L2]] ]
-// CHECK-NEXT: %[[T14:.+]] = inttoptr i{{32|64}} %[[T12]] to ptr
-// CHECK-NEXT: ret ptr %[[T14]]
+// CHECK-NEXT: %[[T12:.+]] = phi ptr [ null, %[[L7]] ], [ %[[T4]], %[[L2]] ]
+// CHECK-NEXT: ret ptr %[[T12]]

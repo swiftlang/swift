@@ -14,7 +14,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/PointerIntPair.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/StackAllocation.h"
@@ -203,6 +202,8 @@ static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc)
   case StackAllocationKind::BuiltinAddTaskLocalValue:
   case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
   case StackAllocationKind::BuiltinTaskAddCancellationHandler:
+  case StackAllocationKind::BuiltinTaskPushDeadline:
+  case StackAllocationKind::BuiltinTaskCancellationScopePush:
     llvm_unreachable("cannot insert this builtin; not safely reorderable");
     return;
   case StackAllocationKind::AllocPackMetadata:
@@ -237,6 +238,8 @@ static bool isUnreorderableAllocation(StackAllocation allocation) {
   case StackAllocationKind::BuiltinAddTaskLocalValue:
   case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
   case StackAllocationKind::BuiltinTaskAddCancellationHandler:
+  case StackAllocationKind::BuiltinTaskPushDeadline:
+  case StackAllocationKind::BuiltinTaskCancellationScopePush:
     return true;
   }
   llvm_unreachable("unknown stack allocation");

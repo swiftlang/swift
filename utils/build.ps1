@@ -23,10 +23,21 @@ Default: 'S:\SourceCache'
 The path to a directory where to write build system files and outputs.
 Default: 'S:\b'
 
-.PARAMETER ImageRoot
-The path to a directory that mimics a file system image root, under which the
-"Program Files" subdirectories will be created with the files installed by CMake.
+.PARAMETER ArtifactCache
+The path to a directory containing downloaded build artifacts that can be
+shared by multiple build trees.
+Default: 'S:\ArtifactCache'
+
+.PARAMETER BuildRoot
+The path to the merged file system image populated by the build. The
+"Program Files" subdirectories will be created beneath this directory.
+ImageRoot is retained as a compatibility alias.
 Default: 'S:\'
+
+.PARAMETER ObjectStore
+The path to the content-addressed object store used for build caching.
+Cache is retained as a compatibility alias.
+Default: 'S:\ObjectStore'
 
 .PARAMETER Stage
 The path to a directory where built msi's and the installer executable should be
@@ -48,6 +59,10 @@ tracking.
 .PARAMETER DownloadRetryCount
 The number of attempts to make when downloading a dependency before giving up.
 Default: 3
+
+.PARAMETER ArtifactLockTimeoutSeconds
+The maximum time to wait for another process to release an artifact lock.
+Default: 1800
 
 .PARAMETER ProductVersion
 The product version to be used when building the installer. Supports semantic
@@ -76,8 +91,8 @@ Build Android SDKs. Requires Android NDK to be available.
 
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
-Format: r{number}[{letter}] (e.g., r28c)
-Default: "r28c"
+Format: r{number}[{letter}][-revision-suffix] (e.g., r28c or r30-beta2)
+Default: "r30"
 
 .PARAMETER AndroidAPILevel
 The API Level to target when building the Android SDKs. Must be between 21 and 36.
@@ -134,8 +149,11 @@ param
   # Build Paths
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
   [System.IO.FileInfo] $BinaryCache = "S:\BinaryCache",
-  [System.IO.FileInfo] $ImageRoot = "S:",
-  [System.IO.FileInfo] $Cache = "S:\CAS",
+  [System.IO.FileInfo] $ArtifactCache = "S:\ArtifactCache",
+  [Alias("ImageRoot")]
+  [System.IO.FileInfo] $BuildRoot = "S:",
+  [Alias("Cache")]
+  [System.IO.FileInfo] $ObjectStore = "S:\ObjectStore",
   [string] $Stage = "",
 
   # (Pinned) Bootstrap Toolchain
@@ -151,9 +169,16 @@ param
   [switch] $IncludeSBoM = $false,
   [string] $SyftVersion = "1.40.0",
 
+  # CMake
+  [string] $CMakeVersion = "4.4.1",
+
   # Dependency Download Retries
   [ValidateRange(1, [int]::MaxValue)]
   [int] $DownloadRetryCount = 3,
+
+  # Artifact Lock Timeout
+  [ValidateRange(1, [int]::MaxValue)]
+  [int] $ArtifactLockTimeoutSeconds = 1800,
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
@@ -175,8 +200,8 @@ param
 
   # Android SDK Options
   [switch] $Android = $false,
-  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
-  [string] $AndroidNDKVersion = "r28c",
+  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?(-beta[1-9])?$")]
+  [string] $AndroidNDKVersion = "r30",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
@@ -214,6 +239,9 @@ param
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
 $WindowsSxSAssemblyPublicKeyToken = $WindowsSxSAssemblyPublicKeyToken.ToLowerInvariant()
+# Share Clang modules across build phases without using the per-user cache.
+$ModuleCache = "$BinaryCache\ModuleCache"
+$env:CLANG_MODULE_CACHE_PATH = $ModuleCache
 
 # Avoid being run in a "Developer" shell since this script launches its own sub-shells targeting
 # different architectures, and these variables cause confusion.
@@ -256,14 +284,14 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a-windows10.exe";
-    PinnedSHA256 = "34C90B5535A2D137C874A12D591201D2C3E324FB437CE51B6D057B8A8BA2CC4E";
-    PinnedVersion = "0.0.0";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
+    PinnedSHA256 = "C287DD533A65A73D657B1B9F2305BE50552F89B46199A0F6162A287DEE547149";
+    PinnedVersion = "6.4.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a-windows10-arm64.exe"
-    PinnedSHA256 = "A60198647128269812AA00179801725BBD58D714AE52F2D19E7D0133DC035BF2";
-    PinnedVersion = "0.0.0";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
+    PinnedSHA256 = "8C9F35E37DA08CC598E0CBC7821880D2282E4D02633DD78ECBB248370A5C9985";
+    PinnedVersion = "6.4.0";
   };
 }
 
@@ -384,7 +412,7 @@ $WiX = @{
   EulaIdentifier = "wix7";
   URL = "https://www.nuget.org/api/v2/package/wix/7.0.0";
   SHA256 = "7f992e57c356dcbda2ea961bf3b348e1bd7d31d96795be4ac391e04cf140536d";
-  Path = [IO.Path]::Combine("$BinaryCache\WiX-7.0.0", "tools", "net8.0", "any");
+  Path = [IO.Path]::Combine("$ArtifactCache\WiX-7.0.0", "tools", "net8.0", "any");
 }
 
 $DotNetRuntime = @{
@@ -483,26 +511,61 @@ $KnownNDKs = @{
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
   }
+  r30 = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r30-windows.zip"
+    SHA256 = "b830098aaf18b67a42eb831c404e15e5f2990a474f054ac145b0bc957ac6d729"
+    ClangVersion = 21
+  }
+}
+
+$WinFlexBison = @{
+  Version = "2.5.25"
+  URL = "https://github.com/lexxmark/winflexbison/releases/download/v2.5.25/win_flex_bison-2.5.25.zip"
+  SHA256 = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
 }
 
 $KnownSyft = @{
   "1.29.1" = @{
     AMD64 = @{
+      Artifact = "syft-1.29.1-windows-amd64"
       URL = "https://github.com/anchore/syft/releases/download/v1.29.1/syft_1.29.1_windows_amd64.zip"
       SHA256 = "3C67CD9AF40CDCC7FFCE041C8349B4A77F33810184820C05DF23440C8E0AA1D7"
-      Path = [IO.Path]::Combine("$BinaryCache\syft-1.29.1", "syft.exe")
+      Path = [IO.Path]::Combine("$ArtifactCache\syft-1.29.1-windows-amd64", "syft.exe")
     }
   };
   "1.40.0" = @{
     AMD64 = @{
+      Artifact = "syft-1.40.0-windows-amd64"
       URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_amd64.zip"
       SHA256 = "3F4021EC098B4BCBAF19BBA7028CF7704FEF12936970778CEC3C6D669B740E6D"
-      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+      Path = [IO.Path]::Combine("$ArtifactCache\syft-1.40.0-windows-amd64", "syft.exe")
     };
     ARM64 = @{
+      Artifact = "syft-1.40.0-windows-arm64"
       URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_arm64.zip"
       SHA256 = "CE7129DBCC39809542C9BC5032B179131DFEE72C68C5B3741E3270A3D9ED46E4"
-      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+      Path = [IO.Path]::Combine("$ArtifactCache\syft-1.40.0-windows-arm64", "syft.exe")
+    };
+  }
+}
+
+$KnownCMakes = @{
+  "4.4.1" = @{
+    AMD64 = @{
+      Artifact = "cmake-4.4.1-windows-amd64"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.4.1/cmake-4.4.1-windows-x86_64.zip"
+      SHA256 = "091919E1CDE162B69D2D5E0F3B1F5670C973E72133F78126FBB18042947D6F19"
+      FileName = "cmake-4.4.1-windows-x86_64.zip"
+      CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-amd64", "cmake-4.4.1-windows-x86_64", "share", "cmake-4.4")
+      Path = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-amd64", "cmake-4.4.1-windows-x86_64", "bin", "cmake.exe")
+    };
+    ARM64 = @{
+      Artifact = "cmake-4.4.1-windows-arm64"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.4.1/cmake-4.4.1-windows-arm64.zip"
+      SHA256 = "DC59D9F377F891B8DA42EDE22F53717034A9D093092FCEAF6297FEEEC6AFBA29"
+      FileName = "cmake-4.4.1-windows-arm64.zip"
+      CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-arm64", "cmake-4.4.1-windows-arm64", "share", "cmake-4.4")
+      Path = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-arm64", "cmake-4.4.1-windows-arm64", "bin", "cmake.exe")
     };
   }
 }
@@ -516,17 +579,6 @@ $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.e
 $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -property installationPath
 $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
 
-function Get-CMake {
-  try {
-    return (Get-Command "cmake.exe" -ErrorAction Stop).Source
-  } catch {
-    if (Test-Path -Path "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin" -PathType Container) {
-      return "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-    }
-  }
-  throw "CMake not found on Path nor in the Visual Studio Installation. Please Install CMake to continue."
-}
-
 function Get-Ninja {
   try {
     return (Get-Command "Ninja.exe" -ErrorAction Stop).Source
@@ -538,13 +590,9 @@ function Get-Ninja {
   throw "Ninja not found on Path nor in the Visual Studio Installation. Please Install Ninja to continue."
 }
 
-$cmake = Get-CMake
-$CMakeVersion = if ((& $cmake --version | Select-Object -First 1) -Match '(\d+\.\d+\.\d+)') {
-  [version]$Matches[1]
-}
 $ninja = Get-Ninja
 
-$NugetRoot = "$BinaryCache\nuget"
+$NugetRoot = "$ArtifactCache\nuget"
 
 ## Select and prepare build tools, platforms, parameters, etc.
 
@@ -562,9 +610,6 @@ $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
 $ToolchainVersionIdentifier = $PinnedToolchain -replace 'swift-(.+?)-windows10.*', '$1'
 
 if ($EnableCaching) {
-  if ($PinnedVersion -ne "0.0.0") {
-    throw "CAS currently requires using a main-branch pinned toolchain."
-  }
   $UseHostToolchain = $false
 }
 
@@ -727,23 +772,23 @@ function Get-AndroidNDK {
 }
 
 function Get-AndroidNDKPath {
-  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
+  return Join-Path -Path $ArtifactCache -ChildPath "android-ndk-$AndroidNDKVersion"
 }
 
 function Get-FlexExecutable {
-  return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_flex.exe"
+  return Join-Path -Path $ArtifactCache -ChildPath "win_flex_bison-$($WinFlexBison.Version)\win_flex.exe"
 }
 
 function Get-BisonExecutable {
-  return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
+  return Join-Path -Path $ArtifactCache -ChildPath "win_flex_bison-$($WinFlexBison.Version)\win_bison.exe"
 }
 
 function Get-PythonPath([Hashtable] $Platform) {
-  return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
+  return [IO.Path]::Combine("$ArtifactCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-EmbeddedPythonPath([Hashtable] $Platform) {
-  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
+  return [IO.Path]::Combine("$ArtifactCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-PythonExecutable {
@@ -751,25 +796,29 @@ function Get-PythonExecutable {
 }
 
 function Get-EmbeddedPythonInstallDir() {
-  return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift", "Python-$PythonVersion")
+  return [IO.Path]::Combine("$BuildRoot\", "Program Files", "Swift", "Python-$PythonVersion")
 }
 
 function Get-Syft {
   return $KnownSyft[$SyftVersion][$BuildArchName]
 }
 
+function Get-CMake {
+  return $KnownCMakes[$CMakeVersion][$BuildArchName]
+}
+
 function Get-InstallDir([Hashtable] $Platform) {
   if ($Platform -eq $HostPlatform) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsARM64"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Arm64)", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files (Arm64)", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsX64"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Amd64)", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files (Amd64)", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsX86"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (x86)", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files (x86)", "Swift")
   }
   throw "Unknown Platform"
 }
@@ -842,8 +891,7 @@ enum Project {
 
   EarlySwiftDriver
   EarlySwiftDriverSQLite
-  Stage0Compilers
-  Stage0XML2
+  CompilerXML2
   BootstrapRuntime
   BootstrapOverlay
   BootstrapRuntimeModule
@@ -866,7 +914,6 @@ enum Project {
 
   CDispatch
   Stage2Compilers
-  Stage2XML2
   Compilers
   FoundationMacros
   TestingMacros
@@ -959,15 +1006,13 @@ function Get-TargetInfo([Hashtable] $Platform) {
   # Cache the result of "swiftc -print-target-info" as $Platform.Cache.TargetInfo
   $CacheKey = "TargetInfo"
   if (-not $Platform.Cache.ContainsKey($CacheKey)) {
-    [void](Invoke-IsolatingEnvVars {
-      $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
-      $TargetInfo = & swiftc -target $Platform.Triple -print-target-info
-      if ($LastExitCode -ne 0) {
-        throw "Unable to print target info for '$($Platform.Triple)'"
-      }
-      $TargetInfo = $TargetInfo | ConvertFrom-JSON
-      $Platform.Cache[$CacheKey] = $TargetInfo.target
-    })
+    $SwiftCompiler = Join-Path (Get-PinnedToolchainToolsDir) "swiftc.exe"
+    $TargetInfo = & $SwiftCompiler -target $Platform.Triple -print-target-info
+    if ($LastExitCode -ne 0) {
+      throw "Unable to print target info for '$($Platform.Triple)'"
+    }
+    $TargetInfo = $TargetInfo | ConvertFrom-JSON
+    $Platform.Cache[$CacheKey] = $TargetInfo.target
   }
   return $Platform.Cache[$CacheKey]
 }
@@ -1406,7 +1451,7 @@ function Get-DotNetRuntime() {
 
 function Get-DotNetRuntimeRoot() {
   $Runtime = Get-DotNetRuntime
-  return [IO.Path]::Combine("$BinaryCache", "dotnet-runtime-$($DotNetRuntime.Version)-$($Runtime.RuntimeIdentifier)")
+  return [IO.Path]::Combine("$ArtifactCache", "dotnet-runtime-$($DotNetRuntime.Version)-$($Runtime.RuntimeIdentifier)")
 }
 
 function Get-DotNet() {
@@ -1503,51 +1548,84 @@ function Get-Dependencies {
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
 
       for ($Attempt = 1; $Attempt -le $DownloadRetryCount; $Attempt++) {
+        $TemporaryDestination = "$Destination.$PID.$([Guid]::NewGuid()).tmp"
         try {
-          $WebClient.DownloadFile($URL, $Destination)
-          $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+          $WebClient.DownloadFile($URL, $TemporaryDestination)
+          $SHA256 = Get-FileHash -Path $TemporaryDestination -Algorithm SHA256
           if ($SHA256.Hash -ne $Hash) {
             throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
           }
+
+          try {
+            [IO.File]::Move($TemporaryDestination, $Destination)
+          } catch {
+            if (-not (Test-Path $Destination)) { throw }
+          }
           return
         } catch {
-          Remove-Item -Path $Destination -ErrorAction Ignore
           if ($Attempt -eq $DownloadRetryCount) {
             throw
           }
           Write-Warning "Download of $URL failed (attempt $Attempt/$DownloadRetryCount): $_"
           Start-Sleep -Seconds ([Math]::Pow(2, $Attempt))
+        } finally {
+          Remove-Item -LiteralPath $TemporaryDestination -ErrorAction Ignore
         }
       }
     }
 
-    function Expand-ZipFile {
-      param
-      (
-          [string]$ZipFileName,
-          [string]$ExtractPath,
-          [bool]$CreateExtractPath = $true
-      )
+    function Expand-ArtifactZip([string] $ZipFileName,
+                                [string] $ExtractPath,
+                                [string] $ArchiveRoot = "") {
+      $Source = Join-Path -Path $ArtifactCache -ChildPath $ZipFileName
+      $Destination = Join-Path -Path $ArtifactCache -ChildPath $ExtractPath
+      if (Test-Path $Destination) { return }
 
-      $Source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
-      $Destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
-
-      # Check if the extracted directory already exists and is up to date.
-      if (Test-Path $Destination) {
-          $ZipLastWriteTime = (Get-Item $Source).LastWriteTime
-          $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
-          # Compare the last write times
-          if ($ZipLastWriteTime -le $ExtractedLastWriteTime) {
-              # Write-Output "'$ZipFileName' is already extracted and up to date."
-              return
-          }
+      $TemporaryDestination = Join-Path -Path $ArtifactCache -ChildPath ".$ExtractPath.$PID.$([Guid]::NewGuid()).tmp"
+      try {
+        Expand-Archive -LiteralPath $Source -DestinationPath $TemporaryDestination
+        $PublishedSource = if ($ArchiveRoot) {
+          Join-Path -Path $TemporaryDestination -ChildPath $ArchiveRoot
+        } else {
+          $TemporaryDestination
+        }
+        try {
+          [IO.Directory]::Move($PublishedSource, $Destination)
+        } catch {
+          if (-not (Test-Path $Destination)) { throw }
+        }
+      } finally {
+        Remove-Item -LiteralPath $TemporaryDestination -Recurse -Force -ErrorAction Ignore
       }
+    }
 
-      $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
+    function Invoke-WithArtifactLock([string] $Name, [ScriptBlock] $ScriptBlock) {
+      $LockRoot = Join-Path -Path $ArtifactCache -ChildPath ".locks"
+      New-Item -ItemType Directory -Path $LockRoot -ErrorAction Ignore | Out-Null
+      $LockPath = Join-Path -Path $LockRoot -ChildPath "$Name.lock"
 
-      # Write-Output "Extracting '$ZipFileName' ..."
-      New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
-      Expand-Archive -Path $Source -DestinationPath $Destination -Force
+      $Lock = $null
+      $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+      while (-not $Lock) {
+        try {
+          $Lock = [IO.File]::Open($LockPath, [IO.FileMode]::OpenOrCreate,
+                                  [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        } catch [IO.IOException] {
+          $ErrorCode = $_.Exception.HResult -band 0xffff
+          if ($ErrorCode -notin 32, 33) { throw }
+          if ($Stopwatch.Elapsed.TotalSeconds -ge $ArtifactLockTimeoutSeconds) {
+            throw "Timed out after $ArtifactLockTimeoutSeconds seconds waiting for artifact lock '$LockPath'"
+          }
+          Start-Sleep -Milliseconds 100
+        }
+      }
+      $Stopwatch.Stop()
+
+      try {
+        & $ScriptBlock
+      } finally {
+        $Lock.Dispose()
+      }
     }
 
     function Extract-Toolchain {
@@ -1557,39 +1635,51 @@ function Get-Dependencies {
           [string]$ToolchainName
       )
 
-      $source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
-      $destination = Join-Path -Path $BinaryCache -ChildPath toolchains\$ToolchainName
+      $source = Join-Path -Path $ArtifactCache -ChildPath $InstallerExeName
+      $ToolchainRoot = Join-Path -Path $ArtifactCache -ChildPath "toolchains"
+      $destination = Join-Path -Path $ToolchainRoot -ChildPath $ToolchainName
+      if (Test-Path $destination) { return }
 
-      # Check if the extracted directory already exists and is up to date.
-      if (Test-Path $destination) {
-          $installerWriteTime = (Get-Item $source).LastWriteTime
-          $extractedWriteTime = (Get-Item $destination).LastWriteTime
-          if ($installerWriteTime -le $extractedWriteTime) {
-              # Write-Output "'$InstallerExeName' is already extracted and up to date."
-              return
-          }
-      }
+      New-Item -ItemType Directory -Path $ToolchainRoot -ErrorAction Ignore | Out-Null
+      $TemporaryRoot = Join-Path -Path $ToolchainRoot -ChildPath ".$ToolchainName.$PID.$([Guid]::NewGuid()).tmp"
+      $BundleRoot = Join-Path -Path $TemporaryRoot -ChildPath "bundle"
+      $InstallRoot = Join-Path -Path $TemporaryRoot -ChildPath "root"
+      New-Item -ItemType Directory -Path $InstallRoot | Out-Null
 
-      # Write-Output "Extracting '$InstallerExeName' ..."
+      $RuntimePath = "LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin"
+      $RuntimeDestination = Join-Path -Path $InstallRoot -ChildPath $RuntimePath
+      $RuntimeTarget = [IO.Path]::Combine("X:\", $RuntimePath)
+      New-Item -ItemType Directory -Path $RuntimeDestination -Force | Out-Null
+      $DriveMapped = $false
+      try {
+        Invoke-WithDotNetRuntime {
+          Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $source -out $BundleRoot -outba $BundleRoot
+        }
 
-      # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
-      New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin | Out-Null
-      Invoke-WithDotNetRuntime {
-        Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+        Invoke-Program -OutNull subst.exe X: "$InstallRoot"
+        $DriveMapped = $true
+        Get-ChildItem "$BundleRoot\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+          $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+          # Administrative installs do not run rtl.msi's SetDirectory actions.
+          $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
+          Invoke-Program -OutNull msiexec.exe /lvx! $TemporaryRoot\$LogFile /qn /a $_.FullName ALLUSERS=0 TARGETDIR=$TargetDirectory
+        }
+
+        subst.exe /d X: | Out-Null
+        $DriveMapped = $false
+        [IO.Directory]::Move($InstallRoot, $destination)
+      } finally {
+        if ($DriveMapped) {
+          subst.exe /d X: | Out-Null
+        }
+        Remove-Item -LiteralPath $TemporaryRoot -Recurse -Force -ErrorAction Ignore
       }
-      subst X: "$BinaryCache\toolchains\$ToolchainName"
-      Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
-        $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "X:\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin" } else { "X:\" }
-        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
-      }
-      subst /d X:
     }
 
     if ($IncludeSBoM) {
       $syft = Get-Syft
-      DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
-      Expand-ZipFile syft-$SyftVersion.zip -ExtractPath syft-$SyftVersion
+      DownloadAndVerify $syft.URL "$ArtifactCache\$($syft.Artifact).zip" $syft.SHA256
+      Expand-ArtifactZip "$($syft.Artifact).zip" $syft.Artifact
       Write-Success "syft $SyftVersion"
     }
 
@@ -1604,8 +1694,8 @@ function Get-Dependencies {
     function Install-Python([string] $ArchName, [bool] $EmbeddedPython = $false) {
       $Python = Get-KnownPython $ArchName $EmbeddedPython
       $FileName = $(if ($EmbeddedPython) { "EmbeddedPython$ArchName-$PythonVersion" } else { "Python$ArchName-$PythonVersion" })
-      DownloadAndVerify $Python.URL "$BinaryCache\$FileName.zip" $Python.SHA256
-      Expand-ZipFile "$FileName.zip" -ExtractPath "$FileName"
+      DownloadAndVerify $Python.URL "$ArtifactCache\$FileName.zip" $Python.SHA256
+      Expand-ArtifactZip "$FileName.zip" $FileName
       Write-Success "$ArchName Python $PythonVersion"
     }
 
@@ -1664,55 +1754,61 @@ function Get-Dependencies {
       Install-Python $BuildArchName
       Install-Python $BuildArchName $true
     }
-    Install-PythonModules
+    Invoke-WithArtifactLock (Split-Path -Leaf (Get-PythonPath $BuildPlatform)) {
+      Install-PythonModules
+    }
 
     # WiX is needed both for packaging and for extracting the pinned toolchain
     # installer that bootstraps toolchain builds.
     if ($Toolchain -or $Package) {
       $DotNetRuntimeInfo = Get-DotNetRuntime
       $DotNetArchive = "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier).zip"
-      DownloadAndVerify $DotNetRuntimeInfo.URL "$BinaryCache\$DotNetArchive" $DotNetRuntimeInfo.SHA256
-      Expand-ZipFile $DotNetArchive -ExtractPath "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier)"
+      DownloadAndVerify $DotNetRuntimeInfo.URL "$ArtifactCache\$DotNetArchive" $DotNetRuntimeInfo.SHA256
+      Expand-ArtifactZip $DotNetArchive "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier)"
       Write-Success ".NET Runtime $($DotNetRuntime.Version) ($($DotNetRuntimeInfo.RuntimeIdentifier))"
 
-      DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
-      Expand-ZipFile WiX-$($WiX.Version).zip -ExtractPath WiX-$($WiX.Version)
+      DownloadAndVerify $WiX.URL "$ArtifactCache\WiX-$($WiX.Version).zip" $WiX.SHA256
+      Expand-ArtifactZip "WiX-$($WiX.Version).zip" "WiX-$($WiX.Version)"
       Write-Success "WiX $($WiX.Version)"
     }
 
     if (-not $Toolchain) { return }
 
-    DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
+    DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
 
     if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
       # The make tool isn't part of MSYS
       $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
       $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
-      DownloadAndVerify $GnuWin32MakeURL "$BinaryCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
-      Expand-ZipFile GnuWin32Make-4.4.1.zip -ExtractPath GnuWin32Make-4.4.1
+      DownloadAndVerify $GnuWin32MakeURL "$ArtifactCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
+      Expand-ArtifactZip GnuWin32Make-4.4.1.zip GnuWin32Make-4.4.1
       Write-Success "GNUWin32 make 4.4.1"
     }
 
-    # TODO(compnerd) stamp/validate that we need to re-extract
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-    Extract-Toolchain "$PinnedToolchain.exe" -ToolchainName $ToolchainVersionIdentifier
+    $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+    Invoke-WithArtifactLock "SwiftToolchainExtraction" {
+      Extract-Toolchain "$PinnedToolchain.exe" -ToolchainName $ToolchainArtifact
+    }
     Write-Success "Swift Toolchain $PinnedVersion"
+
+    # Install CMake.
+    $CMake = Get-CMake
+    DownloadAndVerify $CMake.URL "$ArtifactCache\$($CMake.FileName)" $CMake.SHA256
+    Expand-ArtifactZip $CMake.FileName $CMake.Artifact
+    Write-Success "CMake $CMakeVersion"
 
     if ($Android) {
       $NDK = Get-AndroidNDK
-      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
-      Expand-ZipFile "android-ndk-$AndroidNDKVersion-windows.zip" -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+      DownloadAndVerify $NDK.URL "$ArtifactCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
+      Expand-ArtifactZip "android-ndk-$AndroidNDKVersion-windows.zip" "android-ndk-$AndroidNDKVersion" "android-ndk-$AndroidNDKVersion"
       Write-Success "Android NDK $AndroidNDKVersion"
     }
 
     if ($IncludeDS2) {
-      $WinFlexBisonVersion = "2.5.25"
-      $WinFlexBisonURL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
-      $WinFlexBisonHash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
-      DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
-
-      Expand-ZipFile "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
-      Write-Success "flex/bison $WinFlexBisonVersion"
+      $Artifact = "win_flex_bison-$($WinFlexBison.Version)"
+      DownloadAndVerify $WinFlexBison.URL "$ArtifactCache\$Artifact.zip" $WinFlexBison.SHA256
+      Expand-ArtifactZip "$Artifact.zip" $Artifact
+      Write-Success "flex/bison $($WinFlexBison.Version)"
     }
 
     if ($WinSDKVersion) {
@@ -1721,20 +1817,22 @@ function Get-Dependencies {
         Invoke-IsolatingEnvVars { Invoke-VsDevShell $HostPlatform }
       } catch {
         Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
-        Invoke-Program nuget install Microsoft.Windows.SDK.CPP -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Invoke-WithArtifactLock "WindowsSDK-$WinSDKVersion" {
+          Invoke-Program nuget install Microsoft.Windows.SDK.CPP -Version $WinSDKVersion -OutputDirectory $NugetRoot
 
-        # Set to script scope so Invoke-VsDevShell can read it.
-        $script:CustomWinSDKRoot = "$NugetRoot\Microsoft.Windows.SDK.CPP.$WinSDKVersion\c"
+          # Set to script scope so Invoke-VsDevShell can read it.
+          $script:CustomWinSDKRoot = "$NugetRoot\Microsoft.Windows.SDK.CPP.$WinSDKVersion\c"
 
-        # Install each required architecture package and move files under the base /lib directory.
-        $Builds = $WindowsSDKBuilds.Clone()
-        if (-not ($HostPlatform -in $Builds)) {
-          $Builds += $HostPlatform
-        }
+          # Install each required architecture package and move files under the base /lib directory.
+          $Builds = $WindowsSDKBuilds.Clone()
+          if (-not ($HostPlatform -in $Builds)) {
+            $Builds += $HostPlatform
+          }
 
-        foreach ($Build in $Builds) {
-          Invoke-Program nuget install Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-          Copy-Directory "$NugetRoot\Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+          foreach ($Build in $Builds) {
+            Invoke-Program nuget install Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+            Copy-Directory "$NugetRoot\Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+          }
         }
       }
     }
@@ -1745,34 +1843,17 @@ function Get-Dependencies {
 }
 
 function Get-PinnedToolchainToolsDir() {
-  return [IO.Path]::Combine("$BinaryCache\toolchains", "$ToolchainVersionIdentifier",
+  $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+  return [IO.Path]::Combine("$ArtifactCache\toolchains", $ToolchainArtifact,
     "LocalApp", "Programs", "Swift", "Toolchains", "$PinnedVersion+Asserts",
     "usr", "bin")
 }
 
 function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
-  # NOTE: the pinned snapshot ships TWO SDKs side-by-side:
-  #   * `<OS>.sdk`             — built with library evolution ON (resilient)
-  #   * `<OS>Experimental.sdk` — built with library evolution OFF
-  # The single `swiftCore.dll` shipped under `Runtimes/<ver>/usr/bin/` is the
-  # resilient one.  Compiler-build callers (whose binaries dynamically load
-  # that DLL) MUST link against `<OS>.sdk` — linking against the non-resilient
-  # swiftmodule leads to runtime metadata-state mismatches (e.g. `swift_check
-  # MetadataState` illegal-instruction faulting on `DecodingError.Context`
-  # during plugin JSON message decoding).
-  #
-  # Static-stdlib clients of pinned (Build-EarlySwiftDriver) opt explicitly
-  # into `<OS>Experimental.sdk` and don't load the runtime DLL, so the
-  # resilience mismatch doesn't reach them.
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
+  $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+  return [IO.Path]::Combine("$ArtifactCache", "toolchains", $ToolchainArtifact,
     "LocalApp", "Programs", "Swift", "Platforms", $PinnedVersion,
     "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
-}
-
-function Get-PinnedToolchainRuntime() {
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
-    "LocalApp", "Programs", "Swift", "Runtimes", $PinnedVersion,
-    "usr", "bin")
 }
 
 function Add-KeyValueIfNew([hashtable]$Hashtable, [string]$Key, [string]$Value) {
@@ -1792,6 +1873,37 @@ function Add-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value) {
   } else {
     $Defines.Add($Name, $Value)
   }
+}
+
+function ConvertTo-CMakeArgument([string] $Argument) {
+  # Backslashes in CMakeCache.txt are escape characters, but the synthetic CAS
+  # roots deliberately use a UNC spelling. Preserve the complete synthetic
+  # path while normalizing ordinary Windows path separators. A synthetic path
+  # may be the complete argument or the value of an option using `=`.
+  $SyntheticPath = $Argument.IndexOf('\\swift\')
+  if ($SyntheticPath -eq 0 -or
+      ($SyntheticPath -gt 0 -and $Argument[$SyntheticPath - 1] -eq '=')) {
+    $Prefix = $Argument.Substring(0, $SyntheticPath).Replace("\", "/")
+    $Path = $Argument.Substring($SyntheticPath).Replace('$', '$$')
+    return $Prefix + $Path
+  }
+
+  # Preserve a leading double backslash for ordinary UNC paths, while using
+  # forward slashes for the remaining components as before. As above, the UNC
+  # path may be the value of an option using `=`.
+  $UNCPath = if ($Argument.StartsWith("\\")) {
+    0
+  } else {
+    $OptionValue = $Argument.IndexOf("=\\")
+    if ($OptionValue -ge 0) { $OptionValue + 1 } else { -1 }
+  }
+  if ($UNCPath -lt 0) {
+    return $Argument.Replace("\", "/")
+  }
+
+  $Prefix = $Argument.Substring(0, $UNCPath).Replace("\", "/")
+  $Suffix = $Argument.Substring($UNCPath + 2).Replace("\", "/")
+  return "$Prefix\\$Suffix"
 }
 
 function Get-PlatformRoot([OS] $OS) {
@@ -1833,7 +1945,7 @@ $Compilers = @{
     C = @{
       Executable        = "cl.exe"
       DriverStyle       = [DriverStyle]::CL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor")
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/source-charset:utf-8")
       DebugFlags        = { param([string] $Format)
         @()
       }
@@ -1842,7 +1954,7 @@ $Compilers = @{
     CXX = @{
       Executable        = "cl.exe"
       DriverStyle       = [DriverStyle]::CL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/Zc:__cplusplus")
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/Zc:__cplusplus", "/source-charset:utf-8")
       DebugFlags        = { param([string] $Format)
         @()
       }
@@ -1876,69 +1988,10 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          @("-g", "-debug-info-format=dwarf")
-        } else {
-          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-        }
+        @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $false
-    }
-  }
-
-  Stage0 = @{
-    C = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang-cl.exe")
-      DriverStyle       = [DriverStyle]::ClangCL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
-      }
-      AssumeFunctional  = $true
-    }
-
-    CXX = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang-cl.exe")
-      DriverStyle       = [DriverStyle]::ClangCL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
-      }
-      AssumeFunctional  = $true
-    }
-
-    GNUC = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang.exe")
-      DriverStyle       = [DriverStyle]::GNU
-      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
-      }
-      AssumeFunctional  = $true
-    }
-
-    GNUCXX = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang++.exe")
-      DriverStyle       = [DriverStyle]::GNU
-      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
-      }
-      AssumeFunctional  = $true
-    }
-
-    Swift = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "swiftc.exe")
-      DriverStyle       = [DriverStyle]::Swift
-      Flags             = @()
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          @("-g", "-debug-info-format=dwarf")
-        } else {
-          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-        }
-      }
-      AssumeFunctional  = $true
+      SourceInfoMapping = $false
     }
   }
 
@@ -1988,13 +2041,10 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          @("-g", "-debug-info-format=dwarf")
-        } else {
-          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-        }
+        @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $true
+      SourceInfoMapping = $true
     }
   }
 }
@@ -2005,36 +2055,52 @@ $Compilers.Host = @{
 }
 
 $Assemblers = @{
+  MSVC = @{
+    Executable        = { param([Hashtable] $Platform)
+      if ($Platform.Architecture.VSName -eq "x86") { "ml.exe" } else { "ml64.exe" }
+    }
+    Dialect           = "ASM_MASM"
+    Flags             = { param([Hashtable] $Platform)
+      @("/nologo", "/quiet")
+    }
+    DebugFlags        = { param([string] $Format)
+      @()
+    }
+    AssumeFunctional  = $true
+  }
+
   Pinned = @{
-    Executable        = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
+    Executable        = { param([Hashtable] $Platform)
+      Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
+    }
+    Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
     AssumeFunctional  = $false
   }
 
-  Stage0 = @{
-    Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang-cl.exe")
-    DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
-    DebugFlags        = { param([string] $Format)
-      if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
-    }
-    AssumeFunctional  = $true
-  }
-
   Stage1 = @{
-    Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+    Executable        = { param([Hashtable] $Platform)
+      [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+    }
+    Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
     AssumeFunctional  = $true
   }
 }
+
+$Assemblers.Host = if ($UseHostToolchain) { $Assemblers.MSVC } else { $Assemblers.Pinned }
 
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
@@ -2050,7 +2116,6 @@ function Build-CMakeProject {
     [Hashtable] $CCompiler = $null,
     [Hashtable] $CXXCompiler = $null,
     [Hashtable] $SwiftCompiler = $null,
-    [switch] $UseASMMASM = $false,
     [switch] $AddAndroidCMakeEnv = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
@@ -2061,8 +2126,6 @@ function Build-CMakeProject {
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
-  # Enter the developer command shell early so we can resolve cmake.exe
-  # for version checks.
   Invoke-IsolatingEnvVars {
     if ($Platform.OS -eq [OS]::Windows) {
       Invoke-VsDevShell $Platform
@@ -2076,76 +2139,19 @@ function Build-CMakeProject {
     }
 
     $UseASM = $Assembler -ne $null
-    $UseASM_MASM = [bool]$UseASMMASM
     $UseC = $CCompiler -ne $null
     $UseCXX = $CXXCompiler -ne $null
     $UseSwift = $SwiftCompiler -ne $null
     $PlatformDebugFormat = $Platform.DebugFormat
 
-    # Starting with CMake 3.30, CMake propagates linker flags to Swift.
-    $CMakePassesSwiftLinkerFlags = $CMakeVersion -ge [version]'3.30'
-    # CMP0181 enables support for the `LINKER:flag1,flag2,...` syntax in
-    # `CMAKE_[EXE|SHARED|MODULE]_LINKER_FLAGS[_<CONFIG>]` variables.
-    $CMakeSupportsCMP0181 = $CMakeVersion -ge [version]'4.0'
-
-    # We need to manually prefix linker flags with `-Xlinker` if we are using
-    # the GNU driver or if Swift is used as the linker driver.
-    # This is not necessary with CMake 4.0+ as CMP0181 simplifies the handling
-    # of linker arguments.
-    enum LinkerFlagHandling {
-      CMP0181
-      XLinkerPrefix
-      None
-    }
-    # Whether CMake invokes the linker directly with MSVC-style flags (true
-    # for both `cl.exe` and `clang-cl.exe` since CMake detects clang-cl as
-    # MSVC-like and bypasses the compiler driver for the link step).
-    $UsesDirectMSVCLinker =
-      ($UseC   -and $CCompiler.DriverStyle   -in @([DriverStyle]::CL, [DriverStyle]::ClangCL)) -or
-      ($UseCXX -and $CXXCompiler.DriverStyle -in @([DriverStyle]::CL, [DriverStyle]::ClangCL))
-    $FlagHandling = if ($CMakeSupportsCMP0181) {
-      # With CMP0181, the `LINKER:` generator expression can always be used.
-      [LinkerFlagHandling]::CMP0181
-    } elseif ($UsesDirectMSVCLinker) {
-      # `link.exe` / `lld-link.exe` invoked directly does not understand the
-      # `-Xlinker` prefix.  MSVC-style flags (`/INCREMENTAL:NO`, etc.) pass
-      # through verbatim.
-      [LinkerFlagHandling]::None
-    } else {
-      # Otherwise, we are probably using clang and/or swift as the link
-      # driver; prefix the linker flags with `-Xlinker`.
-      [LinkerFlagHandling]::XLinkerPrefix
-    }
-
-    # Helper cmdlet to add linker flags with the appropriate handling based on
-    # the linker driver and CMake version.
-    function Convert-LinkerFlags([string[]]$Value) {
-      switch ($FlagHandling) {
-        CMP0181 {
-          $Value | ForEach-Object { "LINKER:$_" }
-        }
-        XLinkerPrefix {
-          $NewValue = @()
-          foreach ($Flag in $Value) {
-            $NewValue += "-Xlinker"
-            $NewValue += $Flag
-          }
-          $NewValue
-        }
-        None {
-          $Value
-        }
-      }
-    }
-
     function Add-LinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
-      $Value = Convert-LinkerFlags $Value
+      $Value = $Value | ForEach-Object { "LINKER:$_" }
       Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS $Value
       Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $Value
     }
 
     function Add-SharedLinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
-      $Value = Convert-LinkerFlags $Value
+      $Value = $Value | ForEach-Object { "LINKER:$_" }
       Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $Value
       Add-FlagsDefine $Defines CMAKE_MODULE_LINKER_FLAGS $Value
     }
@@ -2153,10 +2159,13 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
 
-    # Always enable CMP0181 if available.
-    if ($CMakeSupportsCMP0181) {
-      Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0181 NEW
-    }
+    # CMake configuration.
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    # Enable CMP0181: Link command-line fragment variables are parsed and re-quoted.
+    Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0181 NEW
+    # Enable CMP0214: Honor CMAKE_EXE_LINKER_FLAGS for Swift executable targets.
+    Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0214 NEW
 
     Add-KeyValueIfNew $Defines CMAKE_BUILD_TYPE Release
 
@@ -2177,29 +2186,33 @@ function Build-CMakeProject {
     switch ($Platform.OS) {
       Windows {
         if ($UseASM) {
-          Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILER $Assembler.Executable
-          Add-KeyValueIfNew $Defines CMAKE_ASM_FLAGS @("--target=$($Platform.Triple)")
-          Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+          $ASMDialect = $Assembler.Dialect
 
-          if ($DebugInfo) {
-            # CMake's MSVC_DEBUG_INFORMATION_FORMAT support also applies to ASM
-            # targets, but clang-cl-as-ASM does not get a built-in mapping for
-            # the Embedded format. Provide the mapping before setting the global
-            # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below.
-            Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
-              $(& $Assembler.DebugFlags $PlatformDebugFormat)
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_COMPILER" (& $Assembler.Executable $Platform)
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_FLAGS" (& $Assembler.Flags $Platform)
+
+          # CMake's assembler detection computes the MSVC-like frontend
+          # correctly but does not cache CMAKE_<ASMDialect>_SIMULATE_ID and
+          # CMAKE_<ASMDialect>_COMPILER_FRONTEND_VARIANT. On every re-configure,
+          # the assembler is reloaded from the saved compiler file with both
+          # fields empty, the Ninja generator then misidentifies it as GCC on
+          # Windows and rewrites the include path with forward slashes,
+          # resulting in a full rebuild.
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_SIMULATE_ID" MSVC
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_COMPILER_FRONTEND_VARIANT" MSVC
+
+          if ($ASMDialect -eq "ASM") {
+            Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+
+            if ($DebugInfo) {
+              # CMake's MSVC_DEBUG_INFORMATION_FORMAT support also applies to ASM
+              # targets, but clang-cl-as-ASM does not get a built-in mapping for
+              # the Embedded format. Provide the mapping before setting the global
+              # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below. MASM has no equivalent.
+              Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
+                $(& $Assembler.DebugFlags $PlatformDebugFormat)
+            }
           }
-        }
-
-        if ($UseASM_MASM) {
-          $ASM_MASM = if ($Platform.Architecture.VSName -eq "x86") {
-            "ml.exe"
-          } else {
-            "ml64.exe"
-          }
-
-          Add-KeyValueIfNew $Defines CMAKE_ASM_MASM_COMPILER $ASM_MASM
-          Add-KeyValueIfNew $Defines CMAKE_ASM_MASM_FLAGS @("/nologo" ,"/quiet")
         }
 
         if ($UseC) {
@@ -2254,20 +2267,13 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
 
-          if ($CMakePassesSwiftLinkerFlags) {
-            # CMake 3.30+ passes all linker flags to Swift as the linker driver,
-            # including those from the internal CMake modules files, without
-            # a `-Xlinker` prefix. This causes build failures as Swift cannot
-            # parse linker flags.
-            # Overwrite the release linker flags to be empty to avoid this.
-            Add-KeyValueIfNew $Defines CMAKE_EXE_LINKER_FLAGS_RELEASE ""
-            Add-KeyValueIfNew $Defines CMAKE_SHARED_LINKER_FLAGS_RELEASE ""
-          } else {
-            # Disable EnC as that introduces padding in the conformance tables
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-Xlinker", "/INCREMENTAL:NO")
-            # Swift requires COMDAT folding and de-duplication
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
-          }
+          # CMake 3.30+ passes all linker flags to Swift as the linker driver,
+          # including those from the internal CMake modules files, without
+          # a `-Xlinker` prefix. This causes build failures as Swift cannot
+          # parse linker flags.
+          # Overwrite the release linker flags to be empty to avoid this.
+          Add-KeyValueIfNew $Defines CMAKE_EXE_LINKER_FLAGS_RELEASE ""
+          Add-KeyValueIfNew $Defines CMAKE_SHARED_LINKER_FLAGS_RELEASE ""
         }
 
         Add-LinkerFlagsDefine $Defines @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
@@ -2359,7 +2365,7 @@ function Build-CMakeProject {
           } elseif ($UseCXX) {
             $CXXCompiler.Executable
           } elseif ($UseASM) {
-            $Assembler.Executable
+            (& $Assembler.Executable $Platform)
           }
           $ld = Join-Path -Path (Split-Path $Executable) -ChildPath "ld.lld"
           if ($UseSwift) {
@@ -2406,8 +2412,23 @@ function Build-CMakeProject {
       }
     }
 
+    if ($UseSwift) {
+      Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+        "-module-cache-path", $ModuleCache
+      )
+    }
+
     if ($EnableCaching) {
-      $env:LLVM_CACHE_CAS_PATH = "$Cache"
+      $env:LLVM_CACHE_CAS_PATH = "$ObjectStore"
+      $SyntheticSourceCache = '\\swift\SourceCache$'
+      $SyntheticBinaryCache = '\\swift\BinaryCache$'
+      $CASPrefixMappings = [ordered]@{
+        [IO.Path]::GetFullPath($SourceCache.FullName) = $SyntheticSourceCache;
+        [IO.Path]::GetFullPath($BinaryCache.FullName) = $SyntheticBinaryCache;
+      }
+      $env:LLVM_CACHE_PREFIX_MAPS = ($CASPrefixMappings.GetEnumerator() | ForEach-Object {
+        "$($_.Key)=$($_.Value)"
+      }) -join ";"
 
       # Skip the clang-cache launcher when targeting Android: cmake auto-detects
       # the NDK's clang (e.g. 19.x) as the actual compiler, but the launcher
@@ -2419,23 +2440,49 @@ function Build-CMakeProject {
       # the launcher.
       $LauncherSafe = ($Platform.OS -ne [OS]::Android)
 
+      # The dependency scanner presents source inputs to Clang using the
+      # synthetic paths from LLVM_CACHE_PREFIX_MAPS. This covers source paths
+      # in debug info, coverage, and macros without putting a host-specific
+      # `-ffile-prefix-map=<physical>=<synthetic>` in the cached command. Set
+      # the remaining compilation directory explicitly, and omit the CodeView
+      # command line because it contains the physical scanner replay mappings.
+      $ClangCachingFlags = @("-ffile-compilation-dir=$SyntheticBinaryCache")
+      if ($DebugInfo) {
+        $ClangCachingFlags += "-gno-codeview-command-line"
+      }
+
       if ($LauncherSafe -and $UseC -and $CCompiler.DriverStyle -ne [DriverStyle]::CL) {
+        Add-FlagsDefine $Defines CMAKE_C_FLAGS $ClangCachingFlags
         Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER `
             (Join-Path -Path (Split-Path $CCompiler.Executable) -ChildPath "clang-cache.exe")
       }
 
       if ($LauncherSafe -and $UseCXX -and $CXXCompiler.DriverStyle -ne [DriverStyle]::CL) {
+        Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $ClangCachingFlags
         Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER `
             (Join-Path -Path (Split-Path $CXXCompiler.Executable) -ChildPath "clang-cache.exe")
       }
 
       if ($UseSwift) {
-        Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+        $SwiftCachingFlags = @(
           "-explicit-module-build",
           "-cache-compile-job",
-          "-cas-path", $Cache,
-          "-incremental-dependency-scan"
+          "-cas-path", $ObjectStore,
+          "-incremental-dependency-scan",
+          "-file-compilation-dir", $SyntheticBinaryCache
         )
+
+        if ($SwiftCompiler.SourceInfoMapping) {
+          $SwiftCachingFlags += @("-Xfrontend", "-prefix-map-sourceinfo")
+        }
+
+        foreach ($Mapping in $CASPrefixMappings.GetEnumerator()) {
+          $SwiftCachingFlags += @(
+            "-scanner-prefix-map-paths", $Mapping.Key, $Mapping.Value
+          )
+        }
+
+        Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftCachingFlags
       }
     }
 
@@ -2457,7 +2504,7 @@ function Build-CMakeProject {
       # where they are interpreted as escapes.
       if ($Define.Value -is [string]) {
         # Single token value, no need to quote spaces, the splat operator does the right thing.
-        $Value = $Define.Value.Replace("\", "/")
+        $Value = ConvertTo-CMakeArgument $Define.Value
       } else {
         # Flags array, multiple tokens, quoting needed for tokens containing spaces
         $Value = ""
@@ -2466,7 +2513,7 @@ function Build-CMakeProject {
             $Value += " "
           }
 
-          $ArgWithForwardSlashes = $Arg.Replace("\", "/")
+          $ArgWithForwardSlashes = ConvertTo-CMakeArgument $Arg
           if ($ArgWithForwardSlashes.Contains(" ")) {
             # Escape the quote so it makes it through. PowerShell 5 and Core
             # handle quotes differently, so we need to check the version.
@@ -2481,20 +2528,20 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$cmake $cmakeGenerateArgs"
-    Invoke-Program $cmake @cmakeGenerateArgs
+    Write-Host "$CMakeBin $cmakeGenerateArgs"
+    Invoke-Program $CMakeBin @cmakeGenerateArgs
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
       if ($Target -eq "default") {
-        Invoke-Program $cmake --build $Bin
+        Invoke-Program $CMakeBin --build $Bin
       } else {
-        Invoke-Program $cmake --build $Bin --target $Target
+        Invoke-Program $CMakeBin --build $Bin --target $Target
       }
     }
 
     if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-      Invoke-Program $cmake --build $Bin --target install
+      Invoke-Program $CMakeBin --build $Bin --target install
     }
   }
 
@@ -2671,7 +2718,16 @@ function Copy-WindowsRuntimeToToolchain([Hashtable] $Platform,
   $BinDir = [IO.Path]::Combine($ToolchainRoot, "usr", "bin")
   New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 
-  $RuntimeFiles = @(Get-ChildItem -Path $RuntimeLocation -File | Sort-Object Name)
+  $RuntimeFiles = @(
+    Get-ChildItem -Path $RuntimeLocation -Directory |
+      ForEach-Object {
+        $DLL = Join-Path $_.FullName "$($_.Name).dll"
+        if (Test-Path $DLL -PathType Leaf) {
+          Get-Item $DLL
+        }
+      } |
+      Sort-Object Name
+  )
   $DLLCount = @($RuntimeFiles | Where-Object { $_.Extension -ieq ".dll" }).Count
   if ($DLLCount -eq 0) {
     throw "Copy-WindowsRuntimeToToolchain: no DLLs found under '$RuntimeLocation'."
@@ -2688,8 +2744,7 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-ProjectBinaryCache $Platform BuildTools) `
     -Platform $Platform `
-    -Assembler $(if ($UseHostToolchain) { $null } else { $Assemblers.Pinned }) `
-    -UseASMMASM:$UseHostToolchain `
+    -Assembler $Assemblers.Host `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
@@ -2725,36 +2780,30 @@ function Build-BuildTools([Hashtable] $Platform) {
 }
 
 function Build-EarlySwiftDriver([Hashtable] $Platform) {
-  # `-static-stdlib` requires static-stdlib content under `lib/swift_static/`,
-  # which only the experimental SDK in pinned ships; the resilient `Windows
-  # .sdk` only has the dynamic stdlib.  Hence the explicit `-Identifier`.
-  Invoke-IsolatingEnvVars {
-    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
-    Build-CMakeProject `
-      -Src $SourceCache\swift-driver `
-      -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
-      -Platform $Platform `
-      -CCompiler $Compilers.Pinned.C `
-      -CXXCompiler $Compilers.Pinned.CXX `
-      -SwiftCompiler $Compilers.Pinned.Swift `
-      -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental") `
-      -BuildTargets default `
-      -Defines @{
-        BUILD_SHARED_LIBS = "NO";
-        BUILD_TESTING = "NO";
-        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        # TODO(compnerd) - remove `-Xfrontend -use-static-resource-dir` - this is inferred by the `-static-stdlib`.
-        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-        SWIFT_DRIVER_BUILD_TOOLS = "NO";
-        SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
-        SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform EarlySwiftDriverSQLite)\SQLite3.lib";
+  Build-CMakeProject `
+    -Src $SourceCache\swift-driver `
+    -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
+    -Platform $Platform `
+    -CCompiler $Compilers.Pinned.C `
+    -CXXCompiler $Compilers.Pinned.CXX `
+    -SwiftCompiler $Compilers.Pinned.Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      # TODO(compnerd) - remove `-Xfrontend -use-static-resource-dir` - this is inferred by the `-static-stdlib`.
+      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+      SWIFT_DRIVER_BUILD_TOOLS = "NO";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform EarlySwiftDriverSQLite)\SQLite3.lib";
 
-        # Prevent re-cloning the sources
-        FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
-        FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
-        FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
-      }
-  }
+      # Prevent re-cloning the sources
+      FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
+      FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
+      FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
+    }
 }
 
 function Write-PList {
@@ -2865,7 +2914,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
     LLDB_PYTHON_DLL_RELATIVE_PATH = "../../../../Python-$PythonVersion/usr/bin";
     LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
-    LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
+    LLDB_TEST_MAKE = "$ArtifactCache\GnuWin32Make-4.4.1\bin\make.exe";
     LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
     LLVM_ENABLE_ASSERTIONS = $(if ($Variant -eq "Asserts") { "YES" } else { "NO" })
     LLVM_ENABLE_LTO = $(switch ($LTO) {
@@ -2928,6 +2977,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
 function Build-Compilers([Hashtable] $Platform,
                          [string]    $Variant,
                          [Project]   $Project          = [Project]::Compilers,
+                         [Hashtable] $Assembler        = $Assemblers.Host,
                          [Hashtable] $CCompiler        = $Compilers.Host.C,
                          [Hashtable] $CXXCompiler      = $Compilers.Host.CXX,
                          [Hashtable] $SwiftCompiler    = $Compilers.Pinned.Swift,
@@ -2938,24 +2988,19 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
 
-  Invoke-IsolatingEnvVars {
-    if ($SwiftCompiler -and $SwiftCompiler.Executable -eq $Compilers.Pinned.Swift.Executable) {
-      $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
-    }
-
-    Build-CMakeProject `
-      -Src $SourceCache\llvm-project\llvm `
-      -Bin (Get-ProjectBinaryCache $Platform $Project) `
-      -InstallTo "$ToolchainRoot\usr" `
-      -Platform $Platform `
-      -CCompiler $CCompiler `
-      -CXXCompiler $CXXCompiler `
-      -SwiftCompiler $SwiftCompiler `
-      -SwiftSDK $SwiftSDK `
-      -BuildTargets @("install-distribution") `
-      -CacheScript $CacheScript `
-      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
-  }
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\llvm `
+    -Bin (Get-ProjectBinaryCache $Platform $Project) `
+    -InstallTo "$ToolchainRoot\usr" `
+    -Platform $Platform `
+    -Assembler $Assembler `
+    -CCompiler $CCompiler `
+    -CXXCompiler $CXXCompiler `
+    -SwiftCompiler $SwiftCompiler `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets @("install-distribution") `
+    -CacheScript $CacheScript `
+    -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
 
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
   if ($RuntimeLocation) {
@@ -3366,6 +3411,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
       "swift-frontend",
       "sourcekitd-test",
+      "swift-refactor",
       "swift-ide-test",
       "swift-plugin-server"
     )
@@ -3392,6 +3438,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     Invoke-IsolatingEnvVars {
       # Test-time tools execute on the build host.
+      # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
+      # the test reconfigure here makes lldb compile expressions against the in-
+      # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
+      # uses the shipped runtime instead.
+      # See https://github.com/swiftlang/swift/issues/91537 for details.
       Invoke-VsDevShell $BuildPlatform
       Set-WindowsSxSToolchainRuntime `
         -BinaryDir              $Stage2BinDir `
@@ -3405,11 +3456,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "swift-synthesize-interface.exe",
                                    "sil-opt.exe",
                                    "sourcekitd-test.exe",
+                                   "swift-refactor.exe",
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
                                    "swiftc-legacy-driver.exe",
-                                   "lldb.exe",
-                                   "repl_swift.exe"
+                                   "lldb.exe"
                                  )
       # SxS only probes the EXE's own directory for the named assembly.
       if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
@@ -3448,37 +3499,14 @@ function Build-mimalloc() {
     [hashtable]$Platform
   )
 
-  # TODO: migrate to the CMake build
-  $MSBuildArgs = @()
-  $MSBuildArgs += "-noLogo"
-  $MSBuildArgs += "-maxCpuCount"
-
-  $Properties = @{}
-  Add-KeyValueIfNew $Properties Configuration Release
-  Add-KeyValueIfNew $Properties OutDir "$BinaryCache\$($Platform.Triple)\mimalloc\bin\"
-  Add-KeyValueIfNew $Properties Platform "$($Platform.Architecture.ShortName)"
-
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $Platform
-    # Avoid hard-coding the VC tools version number
-    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-    if ($VCRedistDir) {
-      Add-KeyValueIfNew $Properties VCRedistDir "$VCRedistDir\"
-    }
+  $MimallocBinaryCache = "$BinaryCache\$($Platform.Triple)\mimalloc"
+  # Match the architecture baselines in mimalloc's Visual Studio projects.
+  # MI_OPT_ARCH may select a newer ARM architecture as mimalloc evolves.
+  $MimallocArchitectureFlag = switch ($Platform.Architecture.ShortName) {
+    "x64" { "/arch:AVX2" }
+    "arm64" { "/arch:armv8.2" }
+    default { throw "Unsupported mimalloc architecture '$($Platform.Architecture.ShortName)'" }
   }
-
-  foreach ($Property in $Properties.GetEnumerator()) {
-    if ($Property.Value.Contains(" ")) {
-      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
-    } else {
-      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
-    }
-  }
-
-  Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-lib.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc\"
-  Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-override-dll.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc-override-dll\"
-
-  $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
   $ToolchainRoots = @($Platform.ToolchainInstallRoot)
   if ($IncludeNoAsserts) {
@@ -3486,12 +3514,21 @@ function Build-mimalloc() {
   }
 
   foreach ($ToolchainRoot in $ToolchainRoots) {
-    New-Item -ItemType Directory -Force "$ToolchainRoot\usr\bin" | Out-Null
-    foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
-      Copy-Item -Force `
-        -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
-        -Destination "$ToolchainRoot\usr\bin\"
-    }
+    Build-CMakeProject `
+      -Src "$SourceCache\mimalloc" `
+      -Bin $MimallocBinaryCache `
+      -InstallTo "$ToolchainRoot\usr" `
+      -Platform $Platform `
+      -CCompiler $Compilers.MSVC.C `
+      -CXXCompiler $Compilers.MSVC.CXX `
+      -Defines @{
+        CMAKE_CXX_FLAGS = @($MimallocArchitectureFlag);
+        MI_BUILD_OBJECT = "NO";
+        MI_BUILD_SHARED = "YES";
+        MI_BUILD_STATIC = "NO";
+        MI_BUILD_TESTS = "NO";
+        MI_NO_OPT_ARCH = "YES";
+      }
   }
 }
 
@@ -3530,19 +3567,35 @@ function Patch-mimalloc() {
     $NoAssertBinaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)}
     $Binaries = $Binaries + $NoAssertBinaries
   }
-  foreach ($Binary in $Binaries) {
-    $Name = [IO.Path]::GetFileName($Binary)
-    # Binary-patch in place
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
-    # Log the import table
-    $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
-    $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
-    # Verify patching
-    $Found = Select-String -Path $LogFile -Pattern "mimalloc"
-    if (-not $Found) {
-      Get-Content $ErrorFile
-      throw "Failed to patch mimalloc for $Name"
+
+  $minject = "$SourceCache\mimalloc\bin\minject$BuildSuffix"
+  # minject creates an intermediate path by extending the input filename.
+  # Stage the input under a short name to avoid its pathname-length bug.
+  $PatchBinary = [IO.Path]::Combine([IO.Path]::GetDirectoryName($minject), "binary.exe")
+
+  try {
+    foreach ($Binary in $Binaries) {
+      $Name = [IO.Path]::GetFileName($Binary)
+
+      Copy-Item -Force -LiteralPath $Binary -Destination $PatchBinary
+      Invoke-Program $minject "-f" "-i" "$PatchBinary"
+      Copy-Item -Force -LiteralPath $PatchBinary -Destination $Binary
+
+      # Log the import table
+      $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
+      $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
+      Invoke-Program "$minject" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
+
+      # Verify patching
+      $Found = Select-String -Path $LogFile -Pattern "mimalloc"
+      if (-not $Found) {
+        Get-Content $ErrorFile
+        throw "Failed to patch mimalloc for $Name"
+      }
+    }
+  } finally {
+    if (Test-Path -LiteralPath $PatchBinary) {
+      Remove-Item -Force -LiteralPath $PatchBinary
     }
   }
 }
@@ -4099,13 +4152,10 @@ function Write-PlatformInfoPlist($PlatformOrOS) {
 }
 
 function Get-SelectedSDKBuilds() {
-  return $KnownPlatforms.Values | Where-Object {
-    switch ($_.OS) {
-      Windows { $Windows }
-      Android { $Android }
-      default { $false }
-    }
-  }
+  $Builds = @()
+  if ($Windows) { $Builds += $WindowsSDKBuilds }
+  if ($Android) { $Builds += $AndroidSDKBuilds }
+  return $Builds
 }
 
 # Promotes C module header directories that libdispatch and Foundation install
@@ -4114,7 +4164,7 @@ function Get-SelectedSDKBuilds() {
 # search path. CMake consumers receive a -vfsoverlay from the target's PUBLIC
 # interface; SDK consumers do not and therefore need the physical headers.
 function Repair-SDKHeaders([string] $SDKRoot) {
-  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims", "_FoundationInternationalizationData")) {
+  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
     foreach ($ResourceType in ("swift", "swift_static")) {
       $ModuleDirectory = "$SDKRoot\usr\lib\$ResourceType\$Module"
       if (Test-Path $ModuleDirectory) {
@@ -4124,11 +4174,12 @@ function Repair-SDKHeaders([string] $SDKRoot) {
   }
 }
 
-# Copies files installed by CMake from the arch-specific platform root,
-# where they follow the layout expected by the installer,
-# to the final platform root, following the installer layout.
+# Completes the SDK layout after all architecture slices have been installed.
+# This reshapes Swift modules and mirrors resources whose CMake install rules
+# do not distinguish between dynamic and static resource trees.
 function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [string] $Identifier = $OS.ToString()) {
-  Repair-SDKHeaders (Get-SwiftSDK -OS $OS -Identifier $Identifier)
+  $SDKRoot = Get-SwiftSDK -OS $OS -Identifier $Identifier
+  Repair-SDKHeaders $SDKRoot
 
   # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
   foreach ($Platform in $Platforms) {
@@ -4139,6 +4190,34 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
           Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
           Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
         }
+      }
+    }
+  }
+
+  $StaticPlatforms = @($Platforms | Where-Object { $_.LinkModes.Contains("static") })
+  if ($OS -eq [OS]::Android -and $StaticPlatforms.Count -gt 0) {
+    $DynamicResources = "$SDKRoot\usr\lib\swift"
+    $StaticResources = "$SDKRoot\usr\lib\swift_static"
+
+    # SwiftBuild currently passes the NDK sysroot as both -sdk and -sysroot,
+    # while using Android.sdk only for the static -resource-dir. Unlike a direct
+    # swiftc invocation, it cannot keep Android.sdk as -sdk and the NDK as
+    # -sysroot, so these SDK resources must be copied into the static tree.
+    Copy-Directory "$DynamicResources\shims\*" "$StaticResources\shims"
+    foreach ($File in ("libcxxshim.h", "libcxxshim.modulemap", "libcxxstdlibshim.h")) {
+      Copy-File "$DynamicResources\android\$File" "$StaticResources\android\$File"
+    }
+
+    foreach ($Platform in $StaticPlatforms) {
+      $Architecture = $Platform.Architecture.LLVMName
+      $DynamicArchitectureResources = "$DynamicResources\android\$Architecture"
+      $StaticArchitectureResources = "$StaticResources\android\$Architecture"
+
+      # The Android Clang overlay also has a fixed dynamic-resource install
+      # destination. Keep the architecture-specific copies together until
+      # swiftlang/swift#80293 allows the overlay to be shared by all slices.
+      foreach ($File in ("android.modulemap", "SwiftAndroidNDK.h", "SwiftBionic.h")) {
+        Copy-File "$DynamicArchitectureResources\$File" "$StaticArchitectureResources\$File"
       }
     }
   }
@@ -4241,7 +4320,9 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     Invoke-VsDevShell $BuildPlatform
 
     Push-Location "${SourceCache}\swift\Runtimes"
-    Start-Process -Wait -WindowStyle Hidden -FilePath $cmake -ArgumentList @("-P", "Resync.cmake")
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
     Pop-Location
   }
 
@@ -5388,6 +5469,17 @@ function Repair-Toolchain([string] $ToolchainInstallRoot) {
 function Build-Inspect([Hashtable] $Platform,
                        [Hashtable] $Compilers,
                        [string]    $SwiftSDK) {
+  $Defines = @{
+    CMAKE_Swift_FLAGS = @(
+      "-Xcc", "-I$SwiftSDK\usr\include",
+      "-Xcc", "-I$SwiftSDK\usr\lib\swift",
+      "-Xcc", "-I$SwiftSDK\usr\include\swift\SwiftRemoteMirror",
+      "-L$SwiftSDK\usr\lib\swift\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)"
+    );
+    ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+  }
+  $Defines.SwiftOverlay_DIR = "$(Get-ProjectBinaryCache $Platform DynamicOverlay)\cmake\SwiftOverlay"
+
   Build-CMakeProject `
     -Src $SourceCache\swift\tools\swift-inspect `
     -Bin (Get-ProjectBinaryCache $Platform SwiftInspect)`
@@ -5397,15 +5489,7 @@ function Build-Inspect([Hashtable] $Platform,
     -CXXCompiler $Compilers.CXX `
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
-    -Defines @{
-      CMAKE_Swift_FLAGS = @(
-        "-Xcc", "-I$SwiftSDK\usr\include",
-        "-Xcc", "-I$SwiftSDK\usr\lib\swift",
-        "-Xcc", "-I$SwiftSDK\usr\include\swift\SwiftRemoteMirror",
-        "-L$SwiftSDK\usr\lib\swift\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)"
-      );
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-    }
+    -Defines $Defines
 }
 
 function Build-DocC() {
@@ -5692,6 +5776,9 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension("bundle\installer.wixproj")).binlog" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
+  # Needed by the swift.org code-signing pipeline, which re-links the bundle
+  # from pre-built artifacts without rebuilding project references.
+  Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\baf.dll" $Stage
   foreach ($Build in $WindowsSDKBuilds) {
     Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Build.Architecture.VSName)\*.msm" $Stage
   }
@@ -5754,49 +5841,28 @@ if ($Toolchain) {
   Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
   Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
 
-  # ── Stage0 Compiler ───────────────────────────────────────────────────────
-  Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Stage0"
-  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage0Compilers @{
-    CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage0-$($BuildPlatform.Architecture.LLVMName).cmake";
+  # ── Stage1 Compiler ───────────────────────────────────────────────────────
+  Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
+  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
+    CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
+    Assembler       = $Assemblers.Host;
     CCompiler       = $Compilers.Host.C;
     CXXCompiler     = $Compilers.Host.CXX;
     SwiftCompiler   = $Compilers.Pinned.Swift;
     SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
-    ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage0Compilers;
-    RuntimeLocation = Get-PinnedToolchainRuntime;
-  }
-
-  # ── Bootstrap SDK ─────────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SDK $BuildPlatform -Context @{
-    SDKIdentifier         = "Bootstrap";
-    Variant               = "Bootstrap";
-    Compilers             = $Compilers.Stage0;
-    Static                = $false;
-    BuildFoundation       = $false;
-    InstallRuntimeToStage = $false;
-    SupplementalRuntimes  = @("StringProcessing");
-  }
-
-  # ── Stage1 Compiler ───────────────────────────────────────────────────────
-  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
-    CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
-    CCompiler       = $Compilers.Stage0.C;
-    CXXCompiler     = $Compilers.Stage0.CXX;
-    SwiftCompiler   = $Compilers.Stage0.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap;
     ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage1Compilers;
-    RuntimeLocation = Get-SDKRuntimeBin $BuildPlatform (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap) $false;
+    RuntimeLocation = Get-PinnedToolchainToolsDir;
   }
 
   # ── Host Platform SDK ─────────────────────────────────────────────────────
   Invoke-BuildStep Build-BootstrapFoundationMacros $BuildPlatform @{
-    SwiftCompiler   = $Compilers.Stage0.Swift;
-    SwiftSDK        = (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap);
+    SwiftCompiler   = $Compilers.Pinned.Swift;
+    SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
   Invoke-BuildStep Build-BootstrapTestingMacros $BuildPlatform @{
-    SwiftCompiler   = $Compilers.Stage0.Swift;
-    SwiftSDK        = (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap);
+    SwiftCompiler   = $Compilers.Pinned.Swift;
+    SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
 
@@ -5811,8 +5877,9 @@ if ($Toolchain) {
 
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
-  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Stage2"
+  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+    Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
     CXXCompiler     = $Compilers.Stage1.CXX;
     SwiftCompiler   = $Compilers.Stage1.Swift;
@@ -5933,6 +6000,7 @@ if ($Toolchain) {
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
     Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
+      Assembler       = $Assemblers.Stage1;
       CCompiler       = $Compilers.Stage1.C;
       CXXCompiler     = $Compilers.Stage1.CXX;
       SwiftCompiler   = $Compilers.Stage1.Swift;

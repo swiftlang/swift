@@ -56,8 +56,8 @@ func passAvailableConformance1a(x: HasAvailableConformance1) {
 // Explicit unavailability
 public struct HasAvailableConformance2 {}
 
-@available(*, unavailable)
-extension HasAvailableConformance2 : Horse {} // expected-note 6 {{conformance of 'HasAvailableConformance2' to 'Horse' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note 6 {{conformance of 'HasAvailableConformance2' to 'Horse' has been explicitly marked unavailable here}}
+extension HasAvailableConformance2 : Horse {}
 
 // Some availability diagnostics become warnings in Swift 5 mode without
 // because they were incorrectly accepted before and rejecting them would break

@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s -plugin-path %swift-plugin-dir -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/GreeterWithDistributedVar.swiftmodule -module-name GreeterWithDistributedVar %S/../Inputs/GreeterWithDistributedVar.swift
+// RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s %S/../Inputs/GreeterWithDistributedVar.swift -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // Run again with library evolution:
-// RUN: %target-build-swift -module-name main -j2 -parse-as-library -enable-library-evolution -I %t %s -plugin-path %swift-plugin-dir -o %t/evo.out
+// RUN: %target-build-swift -module-name main -j2 -parse-as-library -enable-library-evolution -I %t %s %S/../Inputs/GreeterWithDistributedVar.swift -plugin-path %swift-plugin-dir -o %t/evo.out
 // RUN: %target-codesign %t/evo.out
 // RUN: %target-run %t/evo.out | %FileCheck %s --color
 
@@ -20,6 +21,7 @@
 // UNSUPPORTED: OS=watchos
 
 import Distributed
+import GreeterWithDistributedVar
 
 @Resolvable
 @available(SwiftStdlib 6.0, *)
@@ -53,6 +55,11 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
 }
 
 @available(SwiftStdlib 6.0, *)
+func test_crossModuleDistributedVariable<G: Greeter>(_ actor: G) async throws -> String {
+  try await actor.greeting
+}
+
+@available(SwiftStdlib 6.0, *)
 @main struct Main {
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
@@ -68,5 +75,13 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
 
     let v2 = try await actor.distributedVariable
     print("v2 = \(v2)") // CHECK: v2 = implemented variable
+
+    let host = GreeterWithDistributedVar(actorSystem: system)
+
+    let v3 = try await host.greeting
+    print("v3 = \(v3)") // CHECK: v3 = hello
+
+    let v4 = try await test_crossModuleDistributedVariable(host)
+    print("v4 = \(v4)") // CHECK: v4 = hello
   }
 }

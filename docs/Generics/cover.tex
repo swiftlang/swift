@@ -1,0 +1,45 @@
+% This is a simple cover for the book, if you want to print it yourself using
+% one of the various book binding services.
+
+\documentclass{minimal}
+\usepackage[paperwidth=18.535in, paperheight=11.9in, left=0mm, top=0mm, bottom=0mm, right=0mm, margin=0mm]{geometry}
+
+% Spine: 1.745in
+
+\usepackage{tikz}
+\usepackage{xcolor}
+
+\pagecolor{black}
+\tikzstyle{arrow}=[->,>=stealth]
+
+\begin{document}
+
+%\vspace*{2.3in}
+\vspace*{\fill}
+
+\centering
+\hskip 9.895in
+\begin{tikzpicture}[x=2.5cm, y=2.5cm]
+\foreach \a in {0,1,2,3,4,5} {
+  \foreach \b in {0,1,2,3,4,5} {
+    \node (A\a B\b) [white, circle, draw, line width=2pt, outer sep=0.4em] at (\a,\b) {};
+  }
+}
+
+\foreach \a in {0,1,2,3,4,5} {
+  \path [white, arrow, line width=2pt] (A\a B4) edge (A\a B3);
+  \path [white, arrow, line width=2pt] (A\a B2) edge (A\a B1);
+  \path [white, arrow, line width=2pt] (A\a B0) edge (A\a B1);
+}
+
+\foreach \a in {0,1,2,3,4} {
+  \pgfmathtruncatemacro\aa{\a+1}
+  \foreach \b in {0,2,3,4,5} {
+    \path [white, arrow, line width=2pt] (A\a B\b) edge (A\aa B\b);
+  }
+}
+\end{tikzpicture}
+
+\vspace*{\fill}
+
+\end{document}

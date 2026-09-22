@@ -316,6 +316,7 @@ extension ApplySite {
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
                                                 isOnStack: partialAp.isOnStack,
                                                 isNested:  partialAp.isNested,
+                                                isCalledOnce: partialAp.isCalledOnce,
                                                 argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
 
@@ -632,6 +633,11 @@ extension Instruction {
     guard let nominal = type.nominal else {
       return true
     }
+
+    guard type.mayHaveCustomDeinit(in: parentFunction) else {
+      return false
+    }
+
     if nominal.valueTypeDestructor != nil {
       guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
         return true
@@ -1115,8 +1121,9 @@ extension CheckedCastAddrBranchInst {
   }
 
   var supportedInEmbeddedSwift: Bool {
+    // Not `destination.type`: a test_only cast has no destination operand.
     return isCastSupportedInEmbeddedSwift(from: source.type,
-                                          to: destination.type)
+                                          to: targetLoweredType)
   }
 }
 

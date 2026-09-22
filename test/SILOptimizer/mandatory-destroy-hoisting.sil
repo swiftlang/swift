@@ -233,6 +233,91 @@ bb2:
   br bb1
 }
 
+sil @coro : $@yield_once @convention(thin) () -> @yields @inout Int
+
+// CHECK-LABEL: sil [ossa] @non_overlapping_coroutine_scope :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK:         begin_apply
+// CHECK:       } // end sil function 'non_overlapping_coroutine_scope'
+sil [ossa] @non_overlapping_coroutine_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  %1 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int
+  (%2, %3) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int
+  end_apply %3 as $()
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A `modify`/`read` accessor coroutine can hold a formal access open across the yield. That access is
+// not visible as begin_access/end_access in the caller, so the destroy must not be hoisted into the
+// begin_apply/end_apply scope.
+// CHECK-LABEL: sil [ossa] @overlapping_coroutine_scope :
+// CHECK:         end_apply
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       } // end sil function 'overlapping_coroutine_scope'
+sil [ossa] @overlapping_coroutine_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int
+  (%2, %token) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int
+  %3 = move_value %0
+  fix_lifetime %3
+  end_apply %token as $()
+  destroy_value %3
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @overlapping_coroutine_scope_abort :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_apply
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       bb2:
+// CHECK-NEXT:    abort_apply
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       } // end sil function 'overlapping_coroutine_scope_abort'
+sil [ossa] @overlapping_coroutine_scope_abort : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int
+  (%2, %token) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int
+  %3 = move_value %0
+  fix_lifetime %3
+  cond_br undef, bb1, bb2
+bb1:
+  end_apply %token as $()
+  destroy_value %3
+  br bb3
+bb2:
+  abort_apply %token
+  destroy_value %3
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// An access scope and a coroutine scope which make each other overlapping.
+// CHECK-LABEL: sil [ossa] @interleaved_coroutine_and_access_scope :
+// CHECK:         end_apply
+// CHECK-NEXT:    end_access %6
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       } // end sil function 'interleaved_coroutine_and_access_scope'
+sil [ossa] @interleaved_coroutine_and_access_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int
+  (%2, %token) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int
+  %3 = move_value %0
+  fix_lifetime %3
+  %5 = begin_access [modify] [dynamic] undef : $*Int
+  end_apply %token as $()
+  end_access %5
+  destroy_value %3
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [ossa] @dead_end_block :
 // CHECK:       bb0(%0 : @owned $String):
 // CHECK-NEXT:    destroy_value %0

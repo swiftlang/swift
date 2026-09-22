@@ -31,10 +31,19 @@
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 #define SWIFT_THREADING_HAS_LAZY_MUTEX 0
 #define SWIFT_THREADING_HAS_CONDITION_VARIABLE 0
+#define SWIFT_THREADING_PLATFORM_DEFINED 1
 
 static_assert(SWIFT_TLS_KEY_COUNT ==
                   static_cast<int>(swift::tls_key::exclusivity) + 1,
               "EmbeddedPlatform TLS key count must match TLSKeys.h");
+
+// The Embedded Swift build of the Observation library cannot include this
+// header (it is pure Swift and does not link the C++ Threading library), so
+// stdlib/public/Observation/Sources/Observation/ThreadLocal.swift hardcodes the
+// reserved key index it passes to _swift_tls_get/_swift_tls_set. Keep the two
+// in sync.
+static_assert(static_cast<int>(swift::tls_key::observation_transaction) == 6,
+              "Observation's embedded ThreadLocal.swift hardcodes TLS key 6");
 
 namespace swift {
 

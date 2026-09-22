@@ -9,6 +9,8 @@
 // RUN:   -emit-clang-header-path %t/compat.h
 // RUN: %FileCheck %s --input-file %t/compat.h
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 @_cdecl("referencesScalar")
 func referencesScalar() -> Unicode.Scalar { fatalError() }
 // CHECK: SWIFT_EXTERN char32_t referencesScalar(void)

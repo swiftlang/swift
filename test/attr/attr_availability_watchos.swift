@@ -1,23 +1,25 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target i386-apple-watchos2.0 %s
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
               message: "you don't want to do that anyway")
 func doSomething() { }
-// expected-note @-1{{'doSomething()' was obsoleted in watchOS 2.0}}
+// expected-note @-3{{'doSomething()' was obsoleted in watchOS 2.0}}
 
 doSomething() // expected-error{{'doSomething()' is unavailable in watchOS: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 1.5.3)
 func doSomethingElse() { }
-// expected-note @-1{{'doSomethingElse()' was obsoleted in watchOS 1.5.3}}
+// expected-note @-2{{'doSomethingElse()' was obsoleted in watchOS 1.5.3}}
 
 doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in watchOS}}
 
 // Preservation of minor-only version
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2)
 func doSomethingReallyOld() { }
-// expected-note @-1{{'doSomethingReallyOld()' was obsoleted in watchOS 2}}
+// expected-note @-2{{'doSomethingReallyOld()' was obsoleted in watchOS 2}}
 
 doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable in watchOS}}
 

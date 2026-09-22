@@ -1408,8 +1408,15 @@ public:
           parent = nextParent;
         }
         
+        // A subscript only accepts `&` on an argument when its parameters may
+        // be declared `inout`.
+        bool inoutSubscriptArg =
+            isa<SubscriptExpr>(parent) &&
+            Ctx.LangOpts.hasFeature(
+                Feature::SubscriptParametersWithOwnership);
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
-            isa<MacroExpansionExpr>(parent)) {
+            isa<MacroExpansionExpr>(parent) || inoutSubscriptArg) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.
@@ -2135,7 +2142,7 @@ bool PreCheckTarget::correctInterpolationIfStrange(
             Context.Diags
                 .diagnose(argLabelLoc,
                           diag::string_interpolation_label_changing)
-                .highlightChars(argLabelLoc, argLoc);
+                .highlight(SourceRange(argLabelLoc));
             Context.Diags
                 .diagnose(argLabelLoc,
                           diag::string_interpolation_remove_label,
@@ -2533,6 +2540,12 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       assert(ThrownTypeRepr && "Parser ensures that this never fails");
     }
 
+    TupleTypeRepr *YieldsTypeRepr = nullptr;
+    if (auto yieldsTypeExpr = AE->getYieldsExpr()) {
+      YieldsTypeRepr = extractInputTypeRepr(yieldsTypeExpr);
+      assert(YieldsTypeRepr && "Parser ensures that this never fails");
+    }
+
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
@@ -2540,10 +2553,9 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       ResultTypeRepr = makeErrorTypeRepr(AE->getResultExpr());
     }
 
-    auto NewTypeRepr = new (Ctx)
-        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
-                         ResultTypeRepr);
+    auto NewTypeRepr = new (Ctx) FunctionTypeRepr(
+        nullptr, ArgsTypeRepr, AE->getAsyncLoc(), AE->getThrowsLoc(),
+        ThrownTypeRepr, YieldsTypeRepr, AE->getArrowLoc(), ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
@@ -2907,6 +2919,19 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
       return MacroWalking::ArgumentsAndExpansion;
     }
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // Fold sequence expressions (e.g. 'P1 & P2') into BinaryExprs so that the
+      // type-sugar folding in walkToExprPost can recognize them. This matches
+      // the main PreCheckExpression walker, without it a parenthesized
+      // composition that was parsed as a value expression (such as a generic
+      // argument '(P1 & P2, ...)') does not simplify to a type.
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        auto *folded = TypeChecker::foldSequence(seqExpr, DC);
+        folded = folded->walk(*this);
+        if (!folded)
+          return Action::Stop();
+        return Action::SkipNode(folded);
+      }
+
       // Resolve unqualified name references
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);

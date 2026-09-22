@@ -2,16 +2,16 @@
 // RUN: cp -R %S/Inputs/Alpha.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/Alpha.framework/Modules/Alpha.swiftmodule)
 // RUN: %empty-directory(%t/Frameworks/Alpha.framework/Headers/)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -parse-as-library -disable-availability-checking -module-name Alpha \
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -parse-as-library -target %target-swift-6.1-abi-triple -module-name Alpha \
 // RUN:  -emit-module -o %t/Frameworks/Alpha.framework/Modules/Alpha.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:  -enable-objc-interop -disable-objc-attr-requires-foundation-module \
 // RUN:  -emit-objc-header -emit-objc-header-path %t/Frameworks/Alpha.framework/Headers/Alpha-Swift.h %S/Inputs/Alpha.swift
 // RUN: cp -R %S/Inputs/Beta.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/Beta.framework/Headers/)
 // RUN: cp %S/Inputs/Beta.h %t/Frameworks/Beta.framework/Headers/Beta.h
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -typecheck -verify -verify-ignore-unrelated %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck -check-prefix=CHECK-SYMB %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -target %target-swift-6.1-abi-triple -typecheck -verify -verify-ignore-unrelated %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -target %target-swift-6.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -target %target-swift-6.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck -check-prefix=CHECK-SYMB %s
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
@@ -82,8 +82,7 @@ class ProbeGlobal_RoundtripNonisolated: RoundtripNonisolated {
 // MARK: - RoundtripIsolated
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers class ProbeImplicit_RoundtripIsolated : RoundtripIsolated {
-// Note: Type-checked as isolated, but no @MainActor attribute, because attributes are not added for overriding members
-// CHECK: @objc deinit
+// CHECK: @objc @MainActor deinit
 // CHECK: }
 // CHECK-SYMB: ProbeImplicit_RoundtripIsolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
@@ -357,7 +356,7 @@ class ProbeGlobal_DerivedIsolatedClass: DerivedIsolatedClass {
 // executor in the first place.
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers class ProbeImplicit_BaseIsolatedDealloc : BaseIsolatedDealloc {
-// CHECK: @objc deinit
+// CHECK: @objc @MainActor deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ProbeImplicit_BaseIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test33ProbeImplicit_BaseIsolatedDeallocCfZ
@@ -401,8 +400,7 @@ class ProbeGlobal_BaseIsolatedDealloc: BaseIsolatedDealloc {
 // MARK: - DerivedIsolatedDealloc
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers class ProbeImplicit_DerivedIsolatedDealloc : DerivedIsolatedDealloc {
-// Note: Type-checked as isolated, but no @MainActor attribute, because attributes are not added for overriding members
-// CHECK: @objc deinit
+// CHECK: @objc @MainActor deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ProbeImplicit_DerivedIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test36ProbeImplicit_DerivedIsolatedDeallocCfZ

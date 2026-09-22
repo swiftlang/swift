@@ -4,6 +4,7 @@
 // CHECK-LABEL: @$s4main14receive_simpleyyxxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
 // CHECK:       bb0(%0 : $*Pack{repeat each T}):
 // CHECK-NEXT:    debug_value
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func receive_simple<each T>(_ args: repeat each T) {}
@@ -11,6 +12,7 @@ func receive_simple<each T>(_ args: repeat each T) {}
 // CHECK-LABEL: @$s4main20receive_simple_ownedyyxxQpnRvzlF : $@convention(thin) <each T> (@pack_owned Pack{repeat each T}) -> () {
 // CHECK:       bb0(%0 : $*Pack{repeat each T}):
 // CHECK-NEXT:    debug_value
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
@@ -123,6 +125,7 @@ func scalar_test1(i: Int, f: Float, s: String) {
 // CHECK-NEXT:    destroy_addr [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_pack [[PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func pack_test0<each T>(args: repeat each T) {
@@ -155,6 +158,7 @@ func pack_test0<each T>(args: repeat each T) {
 // CHECK-NEXT:    apply [[FN]]<Pack{repeat each T}>([[PACK]])
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_pack [[PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func pack_test1<each T>(args: repeat each T) {
@@ -205,6 +209,9 @@ func pack_test1<each T>(args: repeat each T) {
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_stack [[INT_ADDR]] : $*Int
 // CHECK-NEXT:    dealloc_pack [[PACK]] : $*Pack{Int, repeat each T, String}
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func pack_test2<each T>(args: repeat each T, i: Int, s: String) {

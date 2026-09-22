@@ -43,7 +43,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 using namespace Lowering;
@@ -429,6 +428,16 @@ ManagedValue LogicalPathComponent::project(SILGenFunction &SGF,
   if (isReadAccess(accessKind))
     return std::move(*this).projectForRead(SGF, loc, base, accessKind);
 
+  // A consuming access reads the component exactly once to produce an
+  // owned result; unlike Write/ReadWrite, there's no new value to write
+  // back afterward.
+  if (isConsumeAccess(accessKind))
+    return std::move(*this).projectForRead(
+        SGF, loc, base,
+        accessKind == SGFAccessKind::OwnedAddressConsume
+            ? SGFAccessKind::OwnedAddressRead
+            : SGFAccessKind::OwnedObjectRead);
+
   // AccessKind is Write or ReadWrite. We need to emit a get and set.
   assert(SGF.isInFormalEvaluationScope() &&
          "materializing l-value for modification without writeback scope");
@@ -468,8 +477,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
 
   assert(temporary.getType().isAddress());
   auto &tempTL = SGF.getTypeLowering(temporary.getType());
-  if (!tempTL.isAddressOnly() || !isFinal ||
-      !SGF.silConv.useLoweredAddresses()) {
+  if (tempTL.isLoadableOrOpaque(SGF.F) || !isFinal) {
     if (isFinal) temporary.forward(SGF);
     temporary = SGF.emitLoad(loc, temporary.getValue(), tempTL,
                              SGFContext(), IsTake_t(isFinal));
@@ -1039,6 +1047,8 @@ namespace {
 
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
+      case ExistentialRepresentation::COM:
+        llvm_unreachable("opening a COM existential is not implemented");
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
           assert(!SGF.useLoweredAddresses());
@@ -1199,6 +1209,18 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
+    /// Re-form an l-value referring to the same value, without projecting it.
+    /// See `LValue::copyOfValueReference`.
+    LValue copyAsLValue() const {
+      assert(!hasActorIsolation() &&
+             "projecting an actor-isolated component twice would hop twice");
+      LValue lv;
+      lv.add<ValueComponent>(Value, Enforcement, getTypeData(), IsRValue,
+                             /*actorIso=*/std::nullopt,
+                             IsLazyInitializedGlobal);
+      return lv;
+    }
+
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
       assert(!base && "value component must be root of lvalue path");
@@ -1222,11 +1244,19 @@ namespace {
           // mark_unresolved_non_copyable_value to allow for DI to properly
           // handle delayed initialization of the boxes and convert those to
           // initable_but_not_consumable.
+          //
+          // `@called(once)` values are always consumed by whatever uses
+          // them, so a non-read access to one must permit consuming it,
+          // unlike an ordinary noncopyable var/let box, which only permits
+          // being fully reassigned.
           addr = SGF.B.createMarkUnresolvedNonCopyableValueInst(
               loc, addr,
               isReadAccess(getAccessKind())
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         NoConsumeOrAssign
+              : Value.getType().isCalledOnce()
+                  ? MarkUnresolvedNonCopyableValueInst::CheckKind::
+                        ConsumableAndAssignable
                   : MarkUnresolvedNonCopyableValueInst::CheckKind::
                         AssignableButNotConsumable);
           return ManagedValue::forFormalAccessedAddress(addr, getAccessKind());
@@ -2903,6 +2933,24 @@ LValue LValue::forAddress(SGFAccessKind accessKind, ManagedValue address,
   return lv;
 }
 
+LValue LValue::copyOfValueReference() const {
+  assert(isValid());
+  if (Path.size() != 1)
+    return LValue();
+
+  auto &component = *Path.front();
+  if (component.getKind() != PathComponent::ValueKind)
+    return LValue();
+
+  // An actor-isolated component would hop to that actor's isolation domain
+  // every time it is projected, so it must not be projected more than once.
+  auto &valueComponent = static_cast<ValueComponent &>(component);
+  if (valueComponent.hasActorIsolation())
+    return LValue();
+
+  return valueComponent.copyAsLValue();
+}
+
 void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 AbstractStorageDecl *storage,
                                 SubstitutionMap subs,
@@ -3547,6 +3595,23 @@ namespace {
         FormalRValueType(formalRValueType), AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
+      // Foreign COM interfaces provide getters and setters, not Swift
+      // coroutine accessors. Materialize read-write accesses through them.
+      if (AccessKind == SGFAccessKind::ReadWrite &&
+          strategy.getKind() == AccessStrategy::DispatchToAccessor) {
+        auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
+        if (protocol && protocol->isCOMInterface()) {
+          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
+          if (selfType->is<ExistentialArchetypeType>()) {
+            strategy = AccessStrategy::getMaterializeToTemporary(
+                AccessStrategy::getAccessor(AccessorKind::Get,
+                                            /*dispatched=*/true),
+                AccessStrategy::getAccessor(AccessorKind::Set,
+                                            /*dispatched=*/true));
+          }
+        }
+      }
+
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =
@@ -3654,7 +3719,9 @@ static LValue emitLValueForNonMemberVarDecl(
   auto access = getFormalAccessKind(accessKind);
   auto strategy = var->getAccessStrategy(
       semantics, access, SGF.SGM.M.getSwiftModule(),
-      SGF.F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
+      SGF.F.getResilienceExpansion(),
+      std::make_pair(loc.getSourceRange(), SGF.FunctionDC),
+      /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -5029,7 +5096,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy = ivar->getAccessStrategy(
       semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
+      F.getResilienceExpansion(),
+      std::make_pair(loc.getSourceRange(), FunctionDC), /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -5106,7 +5174,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                        (isAddrGuaranteed ? C.isGuaranteedPlusZeroOk()
                                           : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!rvalueTL.isLoadableOrOpaque(F)) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -5173,7 +5241,7 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
       (isTake == IsNotTake && (isAddressGuaranteed ? C.isGuaranteedPlusZeroOk()
                                                  : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!rvalueTL.isLoadableOrOpaque(F)) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -5417,7 +5485,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           const TypeLowering &rvalueTL,
                                           IsTake_t isTake) {
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
-  assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
+  assert(rvalueTL.isLoadableOrOpaque(F));
 
   SILType srcType = srcTL.getLoweredType();
   SILType rvalueType = rvalueTL.getLoweredType();
@@ -5791,7 +5859,8 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     bool isBaseGuaranteed) {
   AccessStrategy strategy = storage->getAccessStrategy(
       semantics, AccessKind::Read, SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
+      F.getResilienceExpansion(),
+      std::make_pair(loc.getSourceRange(), FunctionDC), /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {
@@ -6021,6 +6090,8 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   auto rep = lv.getTypeOfRValue()
     .getPreferredExistentialRepresentation();
   switch (rep) {
+  case ExistentialRepresentation::COM:
+    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
     lv.add<OpenOpaqueExistentialComponent>(openedArchetype, typeData);

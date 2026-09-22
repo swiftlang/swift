@@ -147,6 +147,19 @@
 // RUN: %swift_driver -### -g -target arm64_32-apple-watchos11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
 // RUN: %swiftc_driver -### -g -target arm64_32-apple-watchos11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
 
+// All ELF targets default to DWARF 5, except Android.
+// which stays on DWARF 4 for compatibility with the NDK's debugging tools.
+// RUN: %swift_driver -### -g -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -target aarch64-unknown-linux-android %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target aarch64-unknown-linux-android %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-unknown-freebsd %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target x86_64-unknown-freebsd %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -target x86_64-unknown-openbsd %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target x86_64-unknown-openbsd %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -dwarf-version=3 -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_3 %s
+// RUN: %swiftc_driver -### -g -dwarf-version=3 -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_3 %s
+
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s

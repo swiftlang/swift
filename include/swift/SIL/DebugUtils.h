@@ -45,36 +45,18 @@ namespace swift {
 
 class SILInstruction;
 
-/// Deletes all of the debug instructions that use \p value.
-inline void deleteAllDebugUses(SILValue value) {
-  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
-    auto *inst = ui->getUser();
-    ++ui;
-    if (inst->isDebugInstruction()) {
-      inst->eraseFromParent();
-    }
-  }
-}
-
-/// Deletes all of the debug uses of any result of \p inst.
-inline void deleteAllDebugUses(SILInstruction *inst) {
-  for (SILValue v : inst->getResults()) {
-    deleteAllDebugUses(v);
-  }
-}
-
 /// Drops all of the debug uses of \p value.
 /// Unlike deleteAllDebugUses, this preserves the debug_value instruction
 /// but replaces its operand with undef and strips non-fragment DIExpr parts.
 /// Use this when salvage has NOT already created a replacement debug_value.
 inline void killAllDebugUses(SILValue value) {
-  SmallVector<DebugValueInst *, 4> debugUsers;
+  SmallVector<Operand *, 4> debugUses;
   for (auto *use : value->getUses()) {
-    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      debugUsers.push_back(dvi);
+    if (isa<DebugValueInst>(use->getUser()))
+      debugUses.push_back(use);
   }
-  for (auto *dvi : debugUsers)
-    dvi->killOperand();
+  for (auto *use : debugUses)
+    cast<DebugValueInst>(use->getUser())->killOperand(use->getOperandNumber());
 }
 
 /// Drops all of the debug uses of any result of \p inst.
@@ -528,7 +510,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getOperand();
+      return cast<DebugValueInst>(**this)->getSingleOperand();
     case Kind::AllocStack:
       return cast<AllocStackInst>(**this);
     case Kind::AllocBox:

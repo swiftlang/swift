@@ -15,7 +15,6 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Driver/Driver.h"
@@ -46,8 +45,7 @@ static std::optional<Path> getActualModuleMapPath(
   Path result;
 
   if (!Opts.RuntimeResourcePath.empty()) {
-    result.append(Opts.RuntimeResourcePath.begin(),
-                  Opts.RuntimeResourcePath.end());
+    result.assign(Opts.RuntimeResourcePath);
     llvm::sys::path::append(result, platform);
     if (isArchSpecific) {
       llvm::sys::path::append(result, arch);
@@ -63,8 +61,7 @@ static std::optional<Path> getActualModuleMapPath(
 
   StringRef SDKPath = Opts.getSDKPath();
   if (!SDKPath.empty()) {
-    result.clear();
-    result.append(SDKPath.begin(), SDKPath.end());
+    result.assign(SDKPath);
     llvm::sys::path::append(result, "usr", "lib", "swift");
     llvm::sys::path::append(result, platform);
     if (isArchSpecific) {
@@ -227,8 +224,8 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList includeArgStrings;
-  const auto &clangToolchain =
-      clangDriver.getToolChain(clangDriverArgs, triple);
+  const auto &clangToolchain = clangDriver.getToolChain(
+      clangDriverArgs, llvm::Triple(triple.normalize()));
   clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs, includeArgStrings);
   auto parsedIncludeArgs = parseClangDriverArgs(clangDriver, includeArgStrings);
 
@@ -307,8 +304,8 @@ static void getLibStdCxxFileMapping(
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList stdlibArgStrings;
-  const auto &clangToolchain =
-      clangDriver.getToolChain(clangDriverArgs, triple);
+  const auto &clangToolchain = clangDriver.getToolChain(
+      clangDriverArgs, llvm::Triple(triple.normalize()));
   clangToolchain.AddClangCXXStdlibIncludeArgs(clangDriverArgs,
                                               stdlibArgStrings);
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
@@ -523,7 +520,8 @@ void GetWindowsFileMappings(
                                        Context.ClangImporterOpts, driverVFS);
   const llvm::opt::InputArgList Args = ClangImporter::createClangArgs(
       Context.ClangImporterOpts, Context.SearchPathOpts, Driver);
-  const clang::driver::ToolChain &ToolChain = Driver.getToolChain(Args, Triple);
+  const clang::driver::ToolChain &ToolChain =
+      Driver.getToolChain(Args, llvm::Triple(Triple.normalize()));
   llvm::vfs::FileSystem &VFS = ToolChain.getVFS();
 
   struct {
@@ -636,11 +634,30 @@ void GetWindowsFileMappings(
     // with empty files to allow a single module definition to work across
     // different MSVC STL releases.
     //
-    // __msvc_bit_utils.hpp was introduced in VS 2022 STL release 17.8.
-    // __msvc_string_view.hpp was introduced in VS 2022 STL release 17.11.
+    // Each entry is annotated with the STL release that introduced the header.
+    // Once we no longer support Visual Studio releases older than a given
+    // release, the corresponding entries can be removed from this list.
     static const char * const kInjectedHeaders[] = {
-      "__msvc_bit_utils.hpp",
-      "__msvc_string_view.hpp",
+      "__msvc_bit_utils.hpp",                    // VS 2022 17.8
+      "__msvc_chrono.hpp",                       // VS 2022 17.3
+      "__msvc_cxx_stdatomic.hpp",                // VS 2022 17.5
+      "__msvc_filebuf.hpp",                      // VS 2022 17.7
+      "__msvc_format_ucd_tables.hpp",            // VS 2022 17.3
+      "__msvc_formatter.hpp",                    // VS 2022 17.10
+      "__msvc_heap_algorithms.hpp",              // VS 2022 17.12
+      "__msvc_int128.hpp",                       // VS 2022 17.2
+      "__msvc_iter_core.hpp",                    // VS 2022 17.4
+      "__msvc_minmax.hpp",                       // VS 2022 17.10
+      "__msvc_ostream.hpp",                      // VS 2022 17.13
+      "__msvc_print.hpp",                        // VS 2022 17.7
+      "__msvc_ranges_to.hpp",                    // VS 2022 17.12
+      "__msvc_ranges_tuple_formatter.hpp",       // VS 2022 17.13
+      "__msvc_sanitizer_annotate_container.hpp", // VS 2022 17.6
+      "__msvc_string_view.hpp",                  // VS 2022 17.11
+      "__msvc_system_error_abi.hpp",             // VS 2019 16.6
+      "__msvc_threads_core.hpp",                 // VS 2022 17.11
+      "__msvc_tzdb.hpp",                         // VS 2019 16.10
+      "__msvc_xlocinfo_types.hpp",               // VS 2022 17.0
     };
 
     for (const char * const header : kInjectedHeaders) {

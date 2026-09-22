@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -30,6 +29,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/HeaderSearch.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -589,11 +589,10 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
         } else {
           SmallVector<llvm::SmallString<128>, 4> sortedIncludes{
               quotedIncludes.begin(), quotedIncludes.end()};
-          std::sort(sortedIncludes.begin(), sortedIncludes.end(),
-                    [](const llvm::SmallString<128> &lhs,
-                       const llvm::SmallString<128> &rhs) {
-                      return lhs.str() < rhs.str();
-                    });
+          llvm::sort(sortedIncludes, [](const llvm::SmallString<128> &lhs,
+                                        const llvm::SmallString<128> &rhs) {
+            return lhs.str() < rhs.str();
+          });
           for (const auto &header : sortedIncludes) {
             out << "#import \"" << header << "\"\n";
           }

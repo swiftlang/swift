@@ -20,7 +20,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 
 using namespace swift;
@@ -206,7 +205,7 @@ public:
 
     ManagedValue value;
     // If the value isn't address-only, go ahead and load.
-    if (!substTL.isAddressOnly()) {
+    if (substTL.isLoadableOrOpaque(SGF.F)) {
       auto load = substTL.emitLoad(SGF.B, loc, resultBuf,
                                    LoadOwnershipQualifier::Take);
       value = SGF.emitManagedRValueWithCleanup(load);
@@ -255,7 +254,7 @@ public:
       auto &substTL = SGF.getTypeLowering(value.getType());
 
       // If the value isn't address-only, go ahead and load.
-      if (!substTL.isAddressOnly()) {
+      if (substTL.isLoadableOrOpaque(SGF.F)) {
         auto load = substTL.emitLoad(SGF.B, loc, value.forward(SGF),
                                      LoadOwnershipQualifier::Take);
         value = SGF.emitManagedRValueWithCleanup(load);
@@ -539,7 +538,7 @@ public:
         // Move the value into the destination.
         ManagedValue eltMV = [&] {
           auto &eltTL = SGF.getTypeLowering(eltAddrTy);
-          if (!eltTL.isAddressOnly()) {
+          if (eltTL.isLoadableOrOpaque(SGF.F)) {
             auto load = eltTL.emitLoad(SGF.B, loc, eltAddr,
                                        LoadOwnershipQualifier::Take);
             return SGF.emitManagedRValueWithCleanup(load, eltTL);
@@ -927,6 +926,10 @@ public:
             SGF.B.createProjectBlockStorage(loc, blockStorage);
 
         ManagedValue continuation;
+        // Set when the continuation had to be loaded as an owned value; this
+        // block is emitted out of line, so it cannot rely on a scope cleanup
+        // and destroys the value explicitly after the resume call below.
+        SILValue continuationToDestroy;
         {
           FormalEvaluationScope scope(SGF);
 
@@ -942,9 +945,17 @@ public:
               SILType::getPrimitiveAddressType(continuationTy));
 
           // If we are calling the unsafe variant, we always pass the value in
-          // registers.
-          if (!checkedBridging)
+          // registers. A checked continuation is passed indirectly, but only
+          // in lowered-address mode; with opaque values the intrinsic takes it
+          // as a value too.
+          if (!checkedBridging) {
             continuation = SGF.B.createLoadTrivial(loc, continuation);
+          } else if (!SGF.silConv.useLoweredAddresses()) {
+            continuationToDestroy = SGF.B.emitLoadValueOperation(
+                loc, continuation.getValue(), LoadOwnershipQualifier::Copy);
+            continuation = ManagedValue::forOwnedRValue(
+                continuationToDestroy, CleanupHandle::invalid());
+          }
         }
 
         auto mappedOutContinuationTy =
@@ -969,6 +980,9 @@ public:
              SGF.B.copyOwnedObjectRValue(loc, bridgedForeignError,
                                          ManagedValue::ScopeKind::Lexical)},
             SGFContext());
+
+        if (continuationToDestroy)
+          SGF.B.createDestroyValue(loc, continuationToDestroy);
 
         // Second, emit a branch from the end of the foreign error block to the
         // await block, to await the continuation which was just fulfilled.
@@ -1417,8 +1431,8 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // do that if we're not using lowered addresses because we prefer to
   // build tuples with scalar operations.
   auto &substTL = SGF.getTypeLowering(substType);
-  assert(substTL.isAddressOnly() || !substHasPackExpansion);
-  if (substTL.isAddressOnly() &&
+  assert(substTL.getRecursiveProperties().isAddressOnly() || !substHasPackExpansion);
+  if (substTL.getRecursiveProperties().isAddressOnly() &&
       (substHasPackExpansion ||
        (init != nullptr && SGF.F.getConventions().useLoweredAddresses()))) {
     // Create a temporary.

@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   AsyncDemotion.swift
   AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift
+  ClassDestroyDevirtualizer.swift
   ConstantCapturePropagation.swift
   CleanupDebugSteps.swift
   ClosureSpecialization.swift
@@ -22,6 +23,7 @@ swift_compiler_sources(Optimizer
   CopySinking.swift
   CopyToBorrowOptimization.swift
   DeadAccessScopeElimination.swift
+  DeadDebugVariableElimination.swift
   DeadObjectElimination.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
@@ -34,6 +36,7 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceDiagnostics.swift
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
+  LifetimeResolution.swift
   LoopInvariantCodeMotion.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
@@ -42,11 +45,14 @@ swift_compiler_sources(Optimizer
   MergeCondFails.swift
   NamedReturnValueOptimization.swift
   RedundantLoadElimination.swift
+  RedundantOverflowCheckRemoval.swift
   ReleaseDevirtualizer.swift
+  RemoveSILGenLifetimes.swift
   SimplificationPasses.swift
   StackPromotion.swift
   StripObjectHeaders.swift
   TempLValueElimination.swift
   TempRValueElimination.swift
+  TrivialOwnershipElimination.swift
   PackSpecialization.swift
 )

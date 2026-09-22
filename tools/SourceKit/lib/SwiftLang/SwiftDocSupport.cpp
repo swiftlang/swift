@@ -31,10 +31,8 @@
 #include "swift/Refactoring/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Config.h"
 
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 
 using namespace SourceKit;
 using namespace swift;
@@ -704,10 +702,11 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
 
   for (auto Attr : getAvailableAttrs(D, Scratch)) {
     UIdent PlatformUID;
-    switch (Attr.getPlatform()) {
-    case PlatformKind::none:
+    auto Platform = Attr.getPlatform();
+    // FIXME: [availability] Handle non-platform availability domains?
+    if (!Platform) {
       PlatformUID = UIdent();
-      break;
+    } else switch (*Platform) {
     case PlatformKind::iOS:
       PlatformUID = PlatformIOS;
       break;
@@ -768,7 +767,6 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       PlatformUID = PlatformAndroid;
       break;
     }
-    // FIXME: [availability] Handle non-platform availability domains?
 
     AvailableAttrInfo Info;
     Info.AttrKind = AvailableAttrKind;

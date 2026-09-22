@@ -16,7 +16,7 @@ protocol P {
 func acceptSendableP<T: P & Sendable>(_: T) {} // expected-note {{'acceptSendableP' declared here}}
 
 //--- ext.swift
-using @MainActor
+default @MainActor
 
 // The file default isolates the extension to the main actor with no SE-0466
 // carve-out, so the inferred conformance is main-actor-isolated.

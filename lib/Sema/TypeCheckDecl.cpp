@@ -17,17 +17,16 @@
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformance/DerivedConformance.h"
+#include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
 #include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -40,7 +39,6 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -54,13 +52,11 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -69,14 +65,21 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
+
+/// Whether expr is a literal of a kind that can serve as an enum raw value
+/// (i.e. one handled by RawValueKey). This excludes literals such as `#file`
+/// and other magic identifiers and regex literals, which are not valid raw
+/// values.
+static bool isValidEnumRawValueLiteral(const LiteralExpr *expr) {
+  return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr) ||
+         isa<StringLiteralExpr>(expr) || isa<BooleanLiteralExpr>(expr);
+}
 
 /// Used during enum raw value checking to identify duplicate raw values.
 /// Character, string, float, and integer literals are all keyed by value.
@@ -862,8 +865,16 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     }
 
     case DeclKind::Func: {
+      auto *FD = cast<FuncDecl>(decl);
+
+      // Distributed actor methods are effectively final because actors don't allow subclassing.
+      // We enable this inference just in Embedded for now, but could enable globally perhaps.
+      if (cls->isDistributedActor() &&
+          decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        return true;
+
       // Methods declared 'static' are final.
-      auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
+      auto staticSpelling = FD->getStaticSpelling();
       if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
                                         staticSpelling))
         return true;
@@ -1053,6 +1064,12 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
   if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
+    return false;
+
+  // Embedded Swift has no unspecialized generic code, so there is no single
+  // implementation to put in a vtable slot for a generic method. Such methods
+  // are dispatched statically instead.
+  if (decl->mustBeStaticallyDispatchedInEmbedded())
     return false;
 
   auto &ctx = dc->getASTContext();
@@ -1282,20 +1299,27 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
       }
     }
 
+    // Literal expressions are folded only for integer raw types; other raw
+    // types use the written literal directly.
     bool literalExprEnabled =
         ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
-    // We must constant-fold the expression here to reduce it to
-    // a LiteralExpr so that:
-    // 1. We validate the expression *is* foldable down to a constant
+    bool foldIntegerRawValue =
+        literalExprEnabled && rawTy && rawTy->isStdlibInteger();
+    // We must reduce the expression to a LiteralExpr here so that:
+    // 1. We validate the expression *is* a usable raw value.
     // 2. We can use it to compute the next automatic raw value expression.
-    prevValue = literalExprEnabled
+    prevValue = foldIntegerRawValue
                     ? dyn_cast<LiteralExpr>(
                           foldLiteralExpression(value, &ED->getASTContext()))
                     : dyn_cast<LiteralExpr>(value);
     if (!prevValue) {
+      // When the feature is disabled, non-literal raw values are already
+      // rejected during parsing; only diagnose here when it is enabled.
       if (literalExprEnabled && value)
         ED->getASTContext().Diags.diagnose(
-            value->getLoc(), diag::nonliteral_int_expr_enum_case_raw_value);
+            value->getLoc(), foldIntegerRawValue
+                                 ? diag::nonliteral_int_expr_enum_case_raw_value
+                                 : diag::nonliteral_enum_case_raw_value);
       continue;
     }
 
@@ -1319,6 +1343,15 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
                             ? elt->getLoc()
                             : uncheckedRawValueOf(elt)->getLoc();
+
+    // Only Integer/Float/String/Bool literals can serve as raw values. Reject
+    // any other literal here.
+    if (!isValidEnumRawValueLiteral(prevValue)) {
+      Diags.diagnose(diagLoc, diag::nonliteral_enum_case_raw_value);
+      prevValue = nullptr;
+      continue;
+    }
+
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
@@ -2045,7 +2078,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     auto *storage = accessor->getStorage();
 
-    switch (accessor->getAccessorKind()) {
+    auto kind = accessor->getAccessorKind();
+    switch (kind) {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
@@ -2068,8 +2102,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::MutableAddress:
       return buildAddressorResultType(accessor, storage->getValueInterfaceType());
 
-    // Coroutine accessors don't mention the value type directly.
-    // If we add yield types to the function type, we'll need to update this.
+    // Coroutine accessors yield their storage value type
     case AccessorKind::Read:
     case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
@@ -2094,16 +2127,6 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         clangFn, decl->getDeclContext());
     if (returnType)
       return *returnType;
-    // Mark the imported Swift function as unavailable.
-    // That will ensure that the function will not be
-    // usable from Swift, even though it is imported.
-    if (!decl->isUnavailable()) {
-      StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
-      auto ua = AvailableAttr::createUniversallyUnavailable(
-          ctx, unavailabilityMsgRef);
-      decl->addAttribute(ua);
-    }
-
     return ctx.getNeverType();
   }
 
@@ -2120,6 +2143,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
   if (decl->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl))
+    if (funcDecl->isCoroutine())
+      options |= TypeResolutionFlags::Coroutine;
 
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
@@ -2127,6 +2153,66 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                       /*placeholderOpener*/ nullptr,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
+}
+
+Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl,
+                                 unsigned idx) const {
+  auto &ctx = decl->getASTContext();
+
+  //  Accessors always inherit their yield type from their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    ASSERT(idx == 0 && "invalid accessor decl yield");
+
+    auto *storage = accessor->getStorage();
+
+    auto kind = accessor->getAccessorKind();
+    switch (kind) {
+    case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
+    case AccessorKind::Borrow:
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
+    case AccessorKind::Set:
+    case AccessorKind::Init:
+    case AccessorKind::Mutate:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      return TupleType::getEmpty(ctx);
+
+    // Coroutine accessors yield storage value types
+    case AccessorKind::Read:
+    case AccessorKind::YieldingBorrow:
+      return storage->getValueInterfaceType();
+
+    case AccessorKind::Modify:
+    case AccessorKind::YieldingMutate:
+      return InOutType::get(storage->getValueInterfaceType());
+    }
+  }
+
+  if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    YieldList *YL = funcDecl->getYields();
+
+    if (!funcDecl->isCoroutine() || !YL || idx >= YL->size())
+      return ErrorType::get(ctx);
+
+    TypeRepr *yieldTyRepr = YL->get(idx).getTypeRepr();
+    assert(funcDecl->isCoroutine() && yieldTyRepr);
+
+    auto options = TypeResolutionOptions(TypeResolverContext::FunctionResult);
+    if (funcDecl->isCoroutine())
+      options |= TypeResolutionFlags::Coroutine;
+
+    auto *const dc = decl->getInnermostDeclContext();
+    return TypeResolution::forInterface(dc, options,
+                                        /*unboundTyOpener*/ nullptr,
+                                        /*placeholderOpener*/ nullptr,
+                                        /*packElementOpener*/ nullptr)
+        .resolveType(yieldTyRepr);
+  }
+
+  ASSERT(false && "unexpected coroutine decl");
+  return ErrorType::get(ctx); // TupleType::getEmpty(ctx);
 }
 
 ParamSpecifier
@@ -2393,9 +2479,21 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
     llvm_unreachable("should not get here");
     return Type();
+
+  case DeclKind::HiddenTypeLayoutInfo: {
+    auto *hiddenDecl = cast<HiddenTypeLayoutInfoDecl>(D);
+    CanType parent;
+    if (auto *parentDecl = hiddenDecl->ParentDecl)
+      parent = parentDecl->getDeclaredInterfaceType()->getCanonicalType();
+
+    auto hiddenType = HiddenType::get(
+        Context, hiddenDecl->MangledName, hiddenDecl->getModuleContext(),
+        hiddenDecl, parent);
+    return MetatypeType::get(hiddenType, Context);
+  }
 
   case DeclKind::GenericTypeParam: {
     auto *paramDecl = cast<GenericTypeParamDecl>(D);
@@ -2556,6 +2654,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
+    // Yields
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    if (auto fn = dyn_cast<FuncDecl>(D); fn && fn->isCoroutine())
+      fn->getYieldInterfaceTypes(yields);
+
     auto lifetimeDependenceInfo = AFD->getLifetimeDependencies();
 
     // (Args...) -> Result
@@ -2580,11 +2683,21 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       infoBuilder = infoBuilder.withSendable(AFD->isSendable());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
-      // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D)) {
-        infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+        if (fd->isDeferBody()) {
+          // Defer bodies must not escape.
+          infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+
+          // Defer is expected to be called only once, making it `@called(once)`
+          // allows it to consume non-Copyable values.
+          if (Context.LangOpts.hasFeature(Feature::CalledAttribute)) {
+            infoBuilder = infoBuilder.withCalledOnce();
+          }
+        }
+
         if (fd->hasSendingResult())
           infoBuilder = infoBuilder.withSendingResult();
+        infoBuilder = infoBuilder.withCoroutine(fd->isCoroutine());
       }
 
       // Lifetime dependencies only apply to the outer function type for
@@ -2597,9 +2710,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
-        funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
+        funcTy = GenericFunctionType::get(sig, argTy, yields, resultTy, info);
       } else {
-        funcTy = FunctionType::get(argTy, resultTy, info);
+        funcTy = FunctionType::get(argTy, yields, resultTy, info);
       }
     }
 
@@ -2620,9 +2733,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
-        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy, selfInfo);
+        funcTy = GenericFunctionType::get(sig, {selfParam}, /* yields */ {},
+                                          funcTy, selfInfo);
       } else {
-        funcTy = FunctionType::get({selfParam}, funcTy, selfInfo);
+        funcTy =
+            FunctionType::get({selfParam}, /* yields */ {}, funcTy, selfInfo);
       }
     }
 
@@ -2648,9 +2763,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     auto info = infoBuilder.build();
     if (auto sig = SD->getGenericSignature()) {
-      funcTy = GenericFunctionType::get(sig, argTy, elementTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, /* yields */ {}, elementTy,
+                                        info);
     } else {
-      funcTy = FunctionType::get(argTy, elementTy, info);
+      funcTy = FunctionType::get(argTy, /* yields */ {}, elementTy, info);
     }
 
     return funcTy;
@@ -2673,7 +2789,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      resultTy = FunctionType::get(argTy, resultTy, info);
+      resultTy = FunctionType::get(argTy, /* yields */ {}, resultTy, info);
     }
 
     auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
@@ -2685,8 +2801,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy,
-                                          infoBuilder.build());
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, /* yields */ {},
+                                          resultTy, infoBuilder.build());
 
     } else {
       FunctionType::ExtInfoBuilder infoBuilder;
@@ -2694,7 +2810,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = FunctionType::get({selfTy}, resultTy, infoBuilder.build());
+      resultTy = FunctionType::get({selfTy}, /* yields */ {}, resultTy,
+                                   infoBuilder.build());
     }
 
     return resultTy;
@@ -2711,11 +2828,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     if (auto genericSig = macro->getGenericSignature()) {
       GenericFunctionType::ExtInfo info;
-      return GenericFunctionType::get(
-          genericSig, paramTypes, resultType, info);
+      return GenericFunctionType::get(genericSig, paramTypes, /* yields */ {},
+                                      resultType, info);
     } else {
       FunctionType::ExtInfo info;
-      return FunctionType::get(paramTypes, resultType, info);
+      return FunctionType::get(paramTypes, /* yields */ {}, resultType, info);
     }
   }
   }
@@ -2967,10 +3084,13 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     (void)nominal->getDistributedActorSystemProperty();
   }
 
-  // Synthesize the COM identity members -- a @com class's CLSID, a @com
-  // protocol's IID -- so they are always present in getAllMembers/getABIMembers
-  // for vtable emission, code completion, and ABI, not only when name lookup
-  // forces them.  For imported types the request finds the deserialized member.
+  // Synthesize the COM identity members:
+  //  - a @com protocol's IID
+  //  - under Microsoft's model, a @com class's CLSID
+  //
+  // so they are always present in getAllMembers/getABIMembers for vtable
+  // emission, code completion, and ABI, not only when name lookup forces them.
+  // For imported types the request finds the deserialized member.
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast_or_null<ProtocolDecl>(nominal)) {
       if (PD->isCOMInterface())
@@ -2978,8 +3098,8 @@ static ArrayRef<Decl *> evaluateMembersRequest(
                                 SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
     } else if (auto *CD = dyn_cast_or_null<ClassDecl>(nominal)) {
       if (CD->isCOMImplementation())
-        (void)evaluateOrDefault(ctx.evaluator,
-                                SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+        (void)evaluateOrDefault(ctx.evaluator, SynthesizeCOMCLSIDRequest{CD},
+                                nullptr);
     }
   }
 
@@ -3209,9 +3329,78 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   }
 }
 
+/// Give \p decl the dependencies of the declaration \p source that it forwards
+/// to. A member operator becomes a static function that takes 'self' as its
+/// leading parameter, which shifts the source's dependence indices; every other
+/// forwarding declaration has the same shape as its source.
+static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+forwardLifetimeDependencies(Evaluator &evaluator, ValueDecl *decl,
+                            ValueDecl *source) {
+  auto dependencies = evaluateOrDefault(
+      evaluator, LifetimeDependenceInfoRequest{source}, std::nullopt);
+  if (!dependencies)
+    return std::nullopt;
+
+  auto *forwarding = dyn_cast<AbstractFunctionDecl>(decl);
+  auto *forwarded = dyn_cast<AbstractFunctionDecl>(source);
+  if (!forwarding || !forwarded ||
+      forwarding->hasSelfInLifetimeDependenceIndices() ==
+          forwarded->hasSelfInLifetimeDependenceIndices())
+    return dependencies;
+
+  // 'self' is now the first parameter, so the source's parameters shift up by
+  // one. The result index does not move: the source's parameters plus 'self' is
+  // this declaration's parameter count.
+  unsigned selfIndex = forwarded->getParameters()->size();
+  ASSERT(forwarding->getParameters()->size() == selfIndex + 1 &&
+         "a forwarding declaration that takes 'self' as its first parameter "
+         "must otherwise have the source's parameters");
+  auto mapIndex = [selfIndex](unsigned index) -> unsigned {
+    if (index == selfIndex)
+      return 0;
+    return index < selfIndex ? index + 1 : index;
+  };
+
+  auto &ctx = decl->getASTContext();
+  unsigned indexCount = forwarding->getLifetimeDependenceResultIndex();
+  auto mapIndices = [&](IndexSubset *indices) -> IndexSubset * {
+    if (!indices)
+      return nullptr;
+    SmallBitVector mapped(indexCount);
+    for (unsigned index : indices->getIndices())
+      mapped.set(mapIndex(index));
+    return IndexSubset::get(ctx, mapped);
+  };
+
+  SmallVector<LifetimeDependenceInfo, 1> mappedDependencies;
+  for (auto &dependence : *dependencies)
+    mappedDependencies.emplace_back(
+        mapIndices(dependence.getInheritIndices()),
+        mapIndices(dependence.getScopeIndices()),
+        mapIndex(dependence.getTargetIndex()),
+        mapIndices(dependence.getAddressableIndices()),
+        mapIndices(dependence.getConditionallyAddressableIndices()),
+        dependence.getFlags());
+  return ctx.AllocateCopy(mappedDependencies);
+}
+
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
                                         ValueDecl *decl) const {
+  // A declaration the C++ importer synthesized around another one -- a member
+  // cloned into a derived class, an accessor, an operator function -- hands back
+  // the value that declaration produces, so it depends on the same things. Only
+  // the original carries the C++ annotations, so inferring dependencies here
+  // instead would give a different, and possibly wider, answer.
+  if (auto *loader = decl->getASTContext().getClangModuleLoader()) {
+    if (auto *source = loader->getForwardingSource(decl)) {
+      // The source may have nothing to forward even when this declaration needs
+      // a dependency: an accessor unwraps a pointer, so its ~Escapable result
+      // comes from a source that returns an Escapable one. Infer as usual then.
+      if (auto forwarded = forwardLifetimeDependencies(evaluator, decl, source))
+        return forwarded;
+    }
+  }
   return LifetimeDependenceInfo::get(decl);
 }
 

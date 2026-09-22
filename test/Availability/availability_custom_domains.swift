@@ -15,17 +15,17 @@ func availableInEnabledDomain() { }
 @available(AlwaysEnabledDomain)
 func availableInAlwaysEnabledDomain() { }
 
-@available(EnabledDomain, unavailable)
-func unavailableInEnabledDomain() { } // expected-note * {{'unavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+@available(EnabledDomain, unavailable) // expected-note * {{'unavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInEnabledDomain() { }
 
-@available(AlwaysEnabledDomain, unavailable)
-func unavailableInAlwaysEnabledDomain() { } // expected-note * {{'unavailableInAlwaysEnabledDomain()' has been explicitly marked unavailable here}}
+@available(AlwaysEnabledDomain, unavailable) // expected-note * {{'unavailableInAlwaysEnabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInAlwaysEnabledDomain() { }
 
 @available(AlwaysEnabledDomain, deprecated)
 func deprecatedInAlwaysEnabledDomain() { }
 
-@available(DisabledDomain, unavailable)
-func unavailableInDisabledDomain() { } // expected-note * {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
+@available(DisabledDomain, unavailable) // expected-note * {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInDisabledDomain() { }
 
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
@@ -33,10 +33,10 @@ func availableInDynamicDomain() { }
 @available(DynamicDomain, deprecated, message: "Use something else")
 func deprecatedInDynamicDomain() { }
 
-@available(DynamicDomain, unavailable)
-func unavailableInDynamicDomain() { } // expected-note * {{'unavailableInDynamicDomain()' has been explicitly marked unavailable here}}
+@available(DynamicDomain, unavailable) // expected-note * {{'unavailableInDynamicDomain()' has been explicitly marked unavailable here}}
+func unavailableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
+@available(UnknownDomain) // expected-error {{cannot find availability domain 'UnknownDomain'}}
 func availableInUnknownDomain() { }
 
 @available(EnabledDomain)
@@ -44,8 +44,8 @@ func availableInUnknownDomain() { }
 func availableInEnabledDomainTwice() { }
 
 @available(EnabledDomain)
-@available(EnabledDomain, unavailable)
-func availableAndUnavailableInEnabledDomain() { } // expected-note {{'availableAndUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+@available(EnabledDomain, unavailable) // expected-note {{'availableAndUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+func availableAndUnavailableInEnabledDomain() { }
 
 func testDeployment() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
   alwaysAvailable()
@@ -64,6 +64,32 @@ func testDeployment() { // expected-note 3 {{add '@available' attribute to enclo
   availableInEnabledDomainTwice() // expected-error {{'availableInEnabledDomainTwice()' is only available in EnabledDomain}}
   // expected-note@-1 {{add 'if #available' version check}}
   availableAndUnavailableInEnabledDomain() // expected-error {{'availableAndUnavailableInEnabledDomain()' is unavailable}}
+}
+
+struct HasAccessorsAvailableInDynamicDomain {
+  var getterRestricted: Int {
+    @available(DynamicDomain)
+    get { 0 }
+    set { }
+  }
+
+  var setterRestricted: Int {
+    get { 0 }
+    @available(DynamicDomain)
+    set { }
+  }
+}
+
+func takesInout<T>(_ value: inout T) { }
+
+func testInoutAccessRestrictedByCustomDomain(
+  // expected-note@-1 2 {{add '@available' attribute to enclosing global function}}
+  _ value: inout HasAccessorsAvailableInDynamicDomain
+) {
+  takesInout(&value.getterRestricted) // expected-error {{cannot pass as inout because getter for 'getterRestricted' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  takesInout(&value.setterRestricted) // expected-error {{cannot pass as inout because setter for 'setterRestricted' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
 }
 
 // FIXME: [availability] Test @inlinable functions.
@@ -284,6 +310,62 @@ func testUniversallyUnavailable() {
   if #available(EnabledDomain) {} // FIXME: [availability] Diagnose?
   if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose?
 }
+
+func testLocalDeclsWithExplicitAvailability() {
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}
+  if #available(EnabledDomain) {
+    @available(DynamicDomain)
+    func restrictedInAnotherDomain() {
+      availableInEnabledDomain()
+      availableInDynamicDomain()
+    }
+
+    restrictedInAnotherDomain() // expected-error {{'restrictedInAnotherDomain()' is only available in DynamicDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
+
+    if #available(DynamicDomain) {
+      restrictedInAnotherDomain()
+    }
+
+    @available(EnabledDomain)
+    func redundantlyRestricted() {
+      availableInEnabledDomain()
+    }
+    redundantlyRestricted()
+
+    @available(EnabledDomain, unavailable)
+    func localUnavailableInEnabledDomain() { }
+    // expected-note@-2 2 {{'localUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+    localUnavailableInEnabledDomain() // expected-error {{'localUnavailableInEnabledDomain()' is unavailable}}
+
+    if #unavailable(EnabledDomain) {
+      // FIXME: [availability] Should not be diagnosed
+      localUnavailableInEnabledDomain() // expected-error {{'localUnavailableInEnabledDomain()' is unavailable}}
+    }
+  }
+}
+
+func testLocalDeclsAfterGuard() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
+  useAfterGuard() // expected-error {{'useAfterGuard()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  useAfterGuardInDynamicDomain() // expected-error {{'useAfterGuardInDynamicDomain()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+
+  guard #available(EnabledDomain) else { return }
+
+  func useAfterGuard() {
+    availableInEnabledDomain()
+  }
+  useAfterGuard()
+
+  @available(DynamicDomain)
+  func useAfterGuardInDynamicDomain() {
+    availableInDynamicDomain()
+  }
+  useAfterGuardInDynamicDomain() // expected-error {{'useAfterGuardInDynamicDomain()' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
+
 
 @available(EnabledDomain)
 struct EnabledDomainAvailable {
@@ -593,33 +675,113 @@ class DerivedUnavailable2: BaseAvailableInEnabledDomain { } // expected-error {{
 @available(DisabledDomain, unavailable)
 class DerivedUnavailable3: BaseAvailableInEnabledDomain { }
 
+@available(EnabledDomain)
+protocol ProtoAvailableInEnabledDomain { }
+
+@available(EnabledDomain, unavailable) // expected-note * {{'ProtoUnavailableInEnabledDomain' has been explicitly marked unavailable here}}
+protocol ProtoUnavailableInEnabledDomain { }
+
+@available(AlwaysEnabledDomain)
+protocol ProtoAvailableInAlwaysEnabledDomain { }
+
+@available(AlwaysEnabledDomain, unavailable) // expected-note * {{'ProtoUnavailableInAlwaysEnabledDomain' has been explicitly marked unavailable here}}
+protocol ProtoUnavailableInAlwaysEnabledDomain { }
+
+struct ConformsMoreAvailable: ProtoAvailableInEnabledDomain { // expected-error {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
+struct ConformsMoreAvailableInExtension { }
+
+// expected-note@+2 {{add '@available' attribute to enclosing extension}}
+// expected-error@+1 {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+extension ConformsMoreAvailableInExtension: ProtoAvailableInEnabledDomain { }
+
+@available(EnabledDomain)
+struct ConformsAsAvailable: ProtoAvailableInEnabledDomain { }
+
+struct ConformsAsAvailableInExtension { }
+
+@available(EnabledDomain)
+extension ConformsAsAvailableInExtension: ProtoAvailableInEnabledDomain { }
+
+@available(DisabledDomain)
+struct ConformsLessAvailable: ProtoAvailableInEnabledDomain { // expected-error {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
+@available(EnabledDomain, unavailable)
+struct ConformsUnavailable: ProtoAvailableInEnabledDomain { } // expected-error {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+
+struct ConformsToUnavailableProto: ProtoUnavailableInEnabledDomain { } // expected-error {{'ProtoUnavailableInEnabledDomain' is unavailable}}
+
+@available(EnabledDomain, unavailable)
+struct ConformsToUnavailableProtoWhenUnavailable: ProtoUnavailableInEnabledDomain { }
+
+struct ConformsToAlwaysEnabledProto: ProtoAvailableInAlwaysEnabledDomain { }
+
+struct ConformsToUnavailableAlwaysEnabledProto: ProtoUnavailableInAlwaysEnabledDomain { } // expected-error {{'ProtoUnavailableInAlwaysEnabledDomain' is unavailable}}
+
+@available(AlwaysEnabledDomain, unavailable)
+struct ConformsToUnavailableAlwaysEnabledProtoWhenUnavailable: ProtoUnavailableInAlwaysEnabledDomain { }
+
+// A conformance is allowed to be introduced in a later OS version than the
+// conforming type, but that exception must not hide a restriction that comes
+// from a custom domain.
+@available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *)
+protocol ProtoAvailableInFutureOS { }
+
+struct ConformsToProtoAvailableInFutureOS: ProtoAvailableInFutureOS { }
+
+@available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *)
+@available(EnabledDomain)
+protocol ProtoAvailableInFutureOSAndEnabledDomain { }
+
+@available(EnabledDomain)
+@available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *)
+protocol ProtoAvailableInEnabledDomainAndFutureOS { }
+
+struct ConformsToProtoAvailableInFutureOSAndEnabledDomain: ProtoAvailableInFutureOSAndEnabledDomain { // expected-error {{'ProtoAvailableInFutureOSAndEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
+struct ConformsToProtoAvailableInEnabledDomainAndFutureOS: ProtoAvailableInEnabledDomainAndFutureOS { // expected-error {{'ProtoAvailableInEnabledDomainAndFutureOS' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
 
 // Protocol conformance availability.
 protocol P { }
 
-struct MyType1 { }
+struct ConformsToPInEnabledDomain { }
 
 @available(EnabledDomain)
-extension MyType1: P { }
+extension ConformsToPInEnabledDomain: P { }
 
-struct MyType2 { }
+struct ConformsToPInAlwaysEnabledDomain { }
 
 @available(AlwaysEnabledDomain)
-extension MyType2: P { }
+extension ConformsToPInAlwaysEnabledDomain: P { }
 
-struct MyType3 { }
+struct ConformsToPInDisabledDomain { }
 
 @available(DisabledDomain)
-extension MyType3: P { }
+extension ConformsToPInDisabledDomain: P { }
+
+struct ConformsToPUnavailableInEnabledDomain { }
+
+@available(EnabledDomain, unavailable) // expected-note {{conformance of 'ConformsToPUnavailableInEnabledDomain' to 'P' has been explicitly marked unavailable here}}
+extension ConformsToPUnavailableInEnabledDomain: P { }
 
 func acceptP<T: P>(_: T.Type) { }
 
 func testP() { // expected-note 2{{add '@available' attribute to enclosing global function}}
-  acceptP(MyType1.self) // expected-error{{conformance of 'MyType1' to 'P' is only available in EnabledDomain}}
-  // expected-note@-1{{add 'if #available' version check}}
-  acceptP(MyType2.self) // okay
-  acceptP(MyType3.self)  // expected-error{{conformance of 'MyType3' to 'P' is only available in DisabledDomain}}
-  // expected-note@-1{{add 'if #available' version check}}
+  acceptP(ConformsToPInEnabledDomain.self) // expected-error {{conformance of 'ConformsToPInEnabledDomain' to 'P' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  acceptP(ConformsToPInAlwaysEnabledDomain.self) // okay
+  acceptP(ConformsToPInDisabledDomain.self) // expected-error {{conformance of 'ConformsToPInDisabledDomain' to 'P' is only available in DisabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  acceptP(ConformsToPUnavailableInEnabledDomain.self) // expected-error {{conformance of 'ConformsToPUnavailableInEnabledDomain' to 'P' is unavailable}}
 }
 
 enum E {

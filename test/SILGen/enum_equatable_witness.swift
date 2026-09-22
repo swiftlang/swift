@@ -1,6 +1,10 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name main %s -verify | %FileCheck %s --check-prefix=FRAGILE
 // RUN: %target-swift-emit-silgen -module-name main %s -verify -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
+// RUN: %target-swift-emit-silgen -module-name main %s -verify -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) | %FileCheck %s --check-prefix=FRAGILE
+// RUN: %target-swift-emit-silgen -module-name main %s -verify -enable-library-evolution -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) | %FileCheck %s --check-prefix=RESILIENT
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // https://github.com/apple/swift/issues/51889
 

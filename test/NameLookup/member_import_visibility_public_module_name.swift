@@ -9,7 +9,7 @@
 //--- main.swift
 
 import Swift
-// expected-note {{add import of module 'Lib'}}
+// expected-note {{add import of module 'Lib'}} {{1-1=internal import Lib\n}}
 
 func foo(_ x: Int) -> Int {
   x.bar // expected-error {{property 'bar' is not available due to missing import of defining module 'Lib'}}

@@ -68,7 +68,7 @@ internal struct _RigidArray<Element: ~Copyable>: ~Copyable {
     }
 
     unsafe _ptr.deinitialize(count: _count)
-    unsafe _ptr.deallocate()
+    unsafe _ptr._deallocate(capacity: _capacity)
   }
 }
 

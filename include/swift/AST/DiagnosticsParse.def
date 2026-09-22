@@ -268,7 +268,8 @@ ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(expected_getreadborrowsetmutate_in_protocol,none,
-      "expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property", ())
+      "expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or "
+      "'yielding mutate' in a protocol property", ())
 
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
@@ -332,6 +333,8 @@ WARNING(old_coroutine_accessor,none,
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
+ERROR(yields_requires_coroutine_functions,none,
+      "`yields` requires '-enable-experimental-feature CoroutineFunctions'", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -1586,6 +1589,13 @@ ERROR(attr_com_unknown_label, none,
 ERROR(attr_com_unknown_threading_model, none,
       "unknown threading model '%0'; expected 'single', 'apartment', 'free', 'both', or 'neutral'", (StringRef))
 
+// @cxx
+ERROR(attr_expected_cxx_name,none,
+      "expected C++ function name in '%0' attribute", (StringRef))
+ERROR(attr_cxx_operator_name_backticks,none,
+      "C++ operator name in '%0' attribute must be enclosed in backticks",
+      (StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
@@ -1734,6 +1744,9 @@ ERROR(expected_rparen_after_thrown_error_type,none,
       "expected ')' after thrown error type", ())
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
+
+ERROR(expected_yield_type,none,
+      "expected yield type after 'yields('", ())
 
 ERROR(attr_isolated_expected_lparen,none,
       "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
@@ -2237,15 +2250,16 @@ ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
 //------------------------------------------------------------------------------
-// MARK: using @<attribute> or using <identifier>
+// MARK: default @<attribute> or default <identifier>
 //------------------------------------------------------------------------------
-ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
-      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'",
+ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
+      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
-ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
-      "'using' is an experimental feature that is currently disabled", ())
-ERROR(using_decl_rejects_attributes,PointsToFirstBadToken,
-      "attribute cannot be attached to a 'using' declaration", ())
+ERROR(experimental_file_default_disabled,PointsToFirstBadToken,
+      "file-level defaults are an experimental feature that is currently "
+      "disabled", ())
+ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
+      "attribute cannot be attached to a file-level default", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

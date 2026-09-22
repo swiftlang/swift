@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
@@ -23,6 +26,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 
+#include "ClangExportCompat.h"
 #include "SymbolGraphASTWalker.h"
 
 using namespace swift;
@@ -66,9 +70,9 @@ bool clangModuleExports(const clang::Module *ClangParent, const clang::Module *C
   if (!ClangParent || !CM) return false;
   if (ClangParent == CM) return true;
 
-  for (auto ClangExport : ClangParent->Exports) {
-    auto *ExportedModule = ClangExport.getPointer();
-    if (ClangExport.getInt()) {
+  for (const auto &ClangExport : ClangParent->Exports) {
+    clang::Module *ExportedModule = getExportedClangModule(ClangExport);
+    if (isWildcardClangExport(ClangExport)) {
       if (!ExportedModule && CM->isSubModuleOf(ClangParent)) {
         return true;
       } else if (ExportedModule && CM->isSubModuleOf(ExportedModule)) {
@@ -190,10 +194,9 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
 }
 
 static bool isUnavailableOrObsoletedOnPlatform(const Decl *D) {
-  if (const auto Avail = D->getUnavailableAttr()) {
-    if (Avail->getPlatform() != PlatformKind::none)
-      return true;
-  }
+  if (const auto Avail = D->getUnavailableAttr())
+    return Avail->getPlatform().has_value();
+
   return false;
 }
 
@@ -342,6 +345,15 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
   if (!BaseDecl && !SG->canIncludeDeclAsNode(VD)) {
     return false;
+  }
+
+  // An implicit Objective-C protocol requirement that is inherited onto a
+  // conforming type keeps the protocol requirement's own USR, regardless of
+  // the type it appears on. That requirement is already explicitly documented
+  // under the protocol itself. Skip the inherited copies.
+  if (VD->isImplicit() && VD->getClangDecl() &&
+      isa<clang::ObjCProtocolDecl>(VD->getClangDecl()->getDeclContext())) {
+    return true;
   }
 
   // If this symbol extends a type from another module, record it in that

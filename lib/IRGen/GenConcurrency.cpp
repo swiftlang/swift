@@ -17,7 +17,6 @@
 
 #include "GenConcurrency.h"
 
-#include "BitPatternBuilder.h"
 #include "CallEmission.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
@@ -32,7 +31,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/IR/Module.h"
 
 using namespace swift;
@@ -50,6 +48,12 @@ public:
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits),
                                   align, IsTriviallyDestroyable,
                                   IsCopyable, IsFixedSize, IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -321,6 +325,9 @@ llvm::Value *irgen::emitBuiltinTaskAddHandler(IRGenFunction &IGF,
     if (kind == BuiltinValueKind::TaskAddCancellationHandler) {
       return IGF.IGM.getTaskAddCancellationHandlerFunctionPointer();
     }
+    if (kind == BuiltinValueKind::TaskAddCancellationHandlerWithReason) {
+      return IGF.IGM.getTaskAddCancellationHandlerWithReasonFunctionPointer();
+    }
     if (kind == BuiltinValueKind::TaskAddPriorityEscalationHandler) {
       return IGF.IGM.getTaskAddPriorityEscalationHandlerFunctionPointer();
     }
@@ -379,6 +386,59 @@ llvm::Value *irgen::emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF) {
 void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
   auto *call =
       IGF.Builder.CreateCall(IGF.IGM.getTaskCancellationShieldPopFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                               llvm::Value *clockPtr,
+                                               llvm::Value *instantPtr,
+                                               llvm::Value *clockType,
+                                               llvm::Value *instantType) {
+  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskDeadline);
+  auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskDeadline),
+                                  "task.deadline.record");
+  auto record = IGF.Builder.CreateBitCast(address.getAddress(),
+                                          IGF.IGM.Int8PtrTy);
+  IGF.Builder.CreateLifetimeStart(record);
+
+  // Runtime signature:
+  //   void swift_task_pushDeadline(TaskDeadlineStatusRecord *record,
+  //                                OpaqueValue *clock,
+  //                                OpaqueValue *instant,
+  //                                const Metadata *clockType,
+  //                                const Metadata *instantType)
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPushDeadlineFunctionPointer(),
+      {record, clockPtr, instantPtr, clockType, instantType});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  return record;
+}
+
+void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
+                                       llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPopDeadlineFunctionPointer(), {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.Builder.CreateLifetimeEnd(record);
+}
+
+llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPushCancellationScopeFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF,
+                                            llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPopCancellationScopeFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
@@ -961,6 +1021,12 @@ public:
       : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
                            IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
                            IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {

@@ -17,6 +17,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
+#include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -27,7 +28,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1375,6 +1375,7 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
   case CastConsumptionKind::TakeOnSuccess: return isIrrefutable;
   case CastConsumptionKind::CopyOnSuccess: return false;
   case CastConsumptionKind::BorrowAlways: return false;
+  case CastConsumptionKind::TestOnly: return false;
   }
   llvm_unreachable("bad consumption kind");
 }
@@ -1631,6 +1632,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::TestOnly:
     return {ManagedValue::forBorrowedRValue(value), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess:
@@ -1648,6 +1650,7 @@ getManagedSubobject(SILGenFunction &SGF, ManagedValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::TestOnly:
     return {value.unmanagedBorrow(), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess: {
@@ -1815,7 +1818,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                                    src.getFinalConsumption());
       }
       case CastConsumptionKind::CopyOnSuccess:
-      case CastConsumptionKind::BorrowAlways: {
+      case CastConsumptionKind::BorrowAlways:
+      case CastConsumptionKind::TestOnly: {
         // We translate copy_on_success => borrow_always.
         auto memberMV = ManagedValue::forBorrowedAddressRValue(member);
         return {SGF.B.createLoadBorrow(loc, memberMV),
@@ -1876,9 +1880,25 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // temporary if necessary.
 
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(
-        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
+  bool requiresAddress;
+  switch (computeCastStrategy(SGF, sourceType, targetType)) {
+  case CastStrategy::COM: {
+    ManagedValue value =
+        prepareCOMCastSource(SGF, loc, src.getFinalManagedValue());
+    if (!value.getType().isAddress()) {
+      auto temporary = SGF.emitTemporaryAllocation(loc, value.getType());
+      value = SGF.B.createStoreBorrowOrTrivial(loc, value.borrow(SGF, loc),
+                                               temporary);
+    }
+    return {value, CastConsumptionKind::CopyOnSuccess};
+  }
+  case CastStrategy::Address:
+    requiresAddress = true;
+    break;
+  case CastStrategy::Scalar:
+    requiresAddress = false;
+    break;
+  }
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
@@ -1893,7 +1913,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // We know that we must have a loadable type at this point since address only
   // types do not need reabstraction and are addresses. So we should have exited
   // above already.
-  assert(src.getType().isLoadable(SGF.F) &&
+  assert(src.getType().isLoadableOrOpaque(SGF.F) &&
          "Should have a loadable value at this point");
 
   // Since our finalValue is loadable, we could not have had a take_on_success
@@ -2219,7 +2239,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         ManagedValue boxedValue =
             SGF.B.createProjectBox(loc, eltCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
-        if (eltTL->isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+        if (eltTL->isLoadableOrOpaque(SGF.F)) {
           boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
           eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
         } else {
@@ -2311,6 +2331,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::CopyOnSuccess:
   case CastConsumptionKind::BorrowAlways:
+  case CastConsumptionKind::TestOnly:
     // No change to src necessary.
     break;
 
@@ -2415,7 +2436,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
         eltValue = SGF.B.createUncheckedEnumDataAddrForTake(loc, finalValue, eltDecl, eltTy);
         break;
       }
-      case CastConsumptionKind::BorrowAlways: {
+      case CastConsumptionKind::BorrowAlways:
+      case CastConsumptionKind::TestOnly: {
         // See if we can apply the projection in-place for this enum.
         SILValue projection;
         if (UncheckedEnumDataAddrInstBase::isDestructive(
@@ -2470,6 +2492,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
           break;
           
         case CastConsumptionKind::BorrowAlways:
+        case CastConsumptionKind::TestOnly:
           eltValue = SGF.B.createLoadBorrow(loc, eltValue);
           break;
           
@@ -3038,6 +3061,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
       // for the pattern match.
       SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
       SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
+      
+      SGF.enterFormalScopeCleanup(vd, mv.getValue());
 
       if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
@@ -4129,4 +4154,3 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   }
 
 }
-

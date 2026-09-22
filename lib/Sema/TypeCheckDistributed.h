@@ -64,6 +64,19 @@ void diagnoseDistributedFunctionInNonDistributedActorProtocol(
 /// Emit a FixIt suggesting to add Codable to the nominal type.
 void addCodableFixIt(const NominalTypeDecl *nominal, InFlightDiagnostic &diag);
 
+/// Create the `_executeDistributedTarget(target:invocationDecoder:resultHandler:)`
+/// instance method for the given distributed actor.
+///
+/// This function replaces the dynamic execution mechanism of Accessible Functions
+/// that non-Embedded Distributed Swift uses, by emitting a large switch over the
+/// identifier, decode in-place and apply the target function directly from the
+/// generated _executeDistributedTarget body.
+///
+/// This is sufficient in Embedded Swift since we do not support cross module
+/// distributed actor extensions, so the list of supported methods is
+/// determined at compile time.
+FuncDecl *createEmbeddedDistributedReceiveDispatch(ClassDecl *actor);
+
 }
 
 #endif /* SWIFT_SEMA_TYPECHECKDISTRIBUTED_H */

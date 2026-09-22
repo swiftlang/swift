@@ -20,7 +20,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/NameLookup.h"
@@ -31,6 +30,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
+#include "swift/Sema/ConformanceCache.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintLocator.h"
@@ -50,7 +50,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 namespace swift {
 
@@ -843,7 +842,7 @@ private:
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
   /// Allocator used for data that is local to this constraint system.
-  llvm::BumpPtrAllocator Allocator;
+  ConstraintSolverAllocator Allocator;
 
   /// Arena used for memory management of constraint-checker-related
   /// allocations.
@@ -1031,10 +1030,6 @@ private:
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>, 4>
       OpenedTypes;
 
-  /// A dictionary of all conformances that have been looked up by the solver.
-  llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
-      Conformances;
-
   /// A cache for unavailability checks peformed by the solver.
   llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
       UnavailableDecls;
@@ -1113,6 +1108,10 @@ public:
   /// ad-hoc distributed `SerializationRequirement` conformances).
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
+
+  /// This is not trail-protected state; it's just a cache for some
+  /// information about Decls.
+  ConformanceCache CC;
 
 private:
   /// Describes the current solver state.
@@ -2800,37 +2799,9 @@ public:
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
-
-  /// We memoize the computation in the below.
-  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
-      ConformanceTransitiveForSupertypeCache;
-
-  /// Suppose we are given a type T with the given conversion behavior,
-  /// and a protocol P, with the following setup:
-  /// - T conv $T0
-  /// - $T0 conforms P
-  /// The question is, does this imply that T must conform to P? This
-  /// returns true if so, false otherwise.
-  ///
-  /// Also see Subtyping.h, checkTranstiveSupertypeConformance().
-  bool isConformanceTransitiveForSupertype(ConversionBehavior behavior,
-                                           ProtocolDecl *proto);
-
-  /// We memoize the computation in the below.
-  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
-      ConformanceTransitiveForSubtypeCache;
-
-  /// Suppose we are given a type T with the given conversion behavior,
-  /// and a protocol P, with the following setup:
-  /// - $T0 conv T
-  /// - $T0 conforms P
-  /// The question is, does this imply that T must conform to P? This
-  /// returns true if so, false otherwise.
-  ///
-  /// Also see Subtyping.h, checkTranstiveSubtypeConformance().
-  bool isConformanceTransitiveForSubtype(ConversionBehavior behavior,
-                                         ProtocolDecl *proto);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P) {
+    return CC.lookupConformance(type, P);
+  }
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
@@ -3182,6 +3153,13 @@ public:
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
+
+  /// Match the execution semantics between two functions currently
+  /// represented by `@called(once)` bit.
+  SolutionKind
+  matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
+                                  ConstraintKind kind, TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
@@ -4104,6 +4082,10 @@ public:
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
 
+  /// Determine whether the given locator represents an argument to a
+  /// subscript.
+  bool isArgumentOfSubscript(ConstraintLocatorBuilder locator);
+
   /// Visit each subexpression that will be part of the constraint system
   /// of the given expression, including those in closure bodies that will be
   /// part of the constraint system.
@@ -4504,8 +4486,6 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
-
-bool isPackExpansionType(Type type);
 
 /// Check whether the type is a tuple consisting of a single unlabeled element
 /// of \c PackExpansionType or a type variable that represents a pack expansion

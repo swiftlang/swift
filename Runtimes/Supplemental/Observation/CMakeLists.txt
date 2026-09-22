@@ -66,9 +66,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependenceMutableAccessors>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-upcoming-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature ExtensionMacros>"
@@ -107,7 +105,9 @@ target_include_directories(swiftObservation PRIVATE
   "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include"
   # For `swift/runtime/CMakeConfig.h`, which should be generated
   # by the Core build system.
-  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}")
+  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}"
+  # For llvm/support headers
+  "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(swiftObservation PRIVATE
   swiftShims
   swiftCore

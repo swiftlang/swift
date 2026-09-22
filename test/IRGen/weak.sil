@@ -36,7 +36,7 @@ bb0(%0 : $*A, %1 : $Optional<C>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store(ptr dereferenceable({{.*}}) %0, ptr %1) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store(ptr noalias dereferenceable({{.*}}) %0, ptr %1) {{.*}} {
 // CHECK:      [[X:%.*]] = getelementptr inbounds{{.*}} [[A:%T4weak1AV]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call ptr @swift_weakLoadStrong(ptr [[X]])
 // CHECK-NEXT: call ptr @swift_weakAssign(ptr returned [[X]], ptr %1)
@@ -56,7 +56,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store_proto(ptr dereferenceable({{.*}}) %0, ptr %1, ptr %2)
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store_proto(ptr noalias dereferenceable({{.*}}) %0, ptr %1, ptr %2)
 // CHECK:      [[X:%.*]] = getelementptr inbounds{{.*}} [[B:%T4weak1BV]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} { [[WEAK:%swift.weak]], ptr }, ptr [[X]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = call ptr @swift_unknownObjectWeakLoadStrong(ptr [[T0]])

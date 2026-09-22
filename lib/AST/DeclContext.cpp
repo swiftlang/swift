@@ -34,9 +34,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ASTContext.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -1131,6 +1129,11 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       if (d->hasClangNode())
         return true;
 
+      // If \p member comes from expanding a synthetic macro, we should skip
+      // checking the source order as it will most certainly be wrong.
+      if (d->isFromSyntheticMacroExpansion())
+        return true;
+      
       return false;
     };
 

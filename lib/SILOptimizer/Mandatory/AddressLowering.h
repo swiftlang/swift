@@ -374,6 +374,7 @@ public:
   void setStorageAddress(SILValue value, SILValue addr) {
     auto &storage = getStorage(value);
     assert(!storage.storageAddress || storage.storageAddress == addr);
+    assert(addr->getType().getCategory() == SILValueCategory::Address);
     storage.storageAddress = addr;
   }
 

@@ -49,6 +49,44 @@ public class C1: P1 {
 }
 
 
+// An actor can conform to a protocol with an isolation annotation,
+// but it shouldn't infer that isolation on the actor / static methods / inits.
+
+// CHECK: {{^}}public actor A1 : Test::P1 {
+// CHECK-NEXT: {{^}}  nonisolated public func method()
+// CHECK-NEXT: {{^}}  public init()
+// CHECK-NEXT: {{^}}  public func nonWitnessMethod()
+// CHECK-NEXT: {{^}}  public static func nonWitnessStatic()
+
+@available(SwiftStdlib 5.1, *)
+public actor A1: P1 {
+  nonisolated public func method() { }
+  public init() { }
+
+  public func nonWitnessMethod() { }
+  public static func nonWitnessStatic() { }
+}
+
+@available(SwiftStdlib 5.1, *)
+nonisolated public protocol NonisolatedProto {
+  func nonisolatedMethod()
+}
+
+// CHECK: {{^}}public actor A2 : Test::NonisolatedProto {
+// CHECK-NEXT: {{^}}  nonisolated public func nonisolatedMethod()
+// CHECK-NEXT: {{^}}  public init()
+// CHECK-NEXT: {{^}}  public func nonWitnessMethod()
+// CHECK-NEXT: {{^}}  public static func nonWitnessStatic()
+
+@available(SwiftStdlib 5.1, *)
+public actor A2: NonisolatedProto {
+  nonisolated public func nonisolatedMethod() { }
+  public init() { }
+
+  public func nonWitnessMethod() { }
+  public static func nonWitnessStatic() { }
+}
+
 @available(SwiftStdlib 5.1, *)
 @SomeGlobalActor
 public class C2 { }

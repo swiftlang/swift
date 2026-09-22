@@ -277,15 +277,32 @@ private:
       return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
-    ConstantValuePtr foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
+    FoldingErrorOr<ConstantValuePtr>
+    foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
-      auto value = expr->getValue();
+      // The walker reaches every subexpression, so a digit-only literal that
+      // adopted a non-integer type (e.g. the '2' in 'Int(2.5 * 2)') arrives here
+      // too. 'getIntegerBitWidth' asserts on those.
+      if (!exprType || !exprType->isStdlibInteger())
+        return FoldingError(IllegalConstError::TypeNotSupported,
+                            expr->getLoc());
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
-      if (isSignedIntegerType(exprType))
-        return std::make_unique<IntegerValue>(value.sextOrTrunc(resultBitWidth),
-                                              true);
-      return std::make_unique<IntegerValue>(value.zextOrTrunc(resultBitWidth),
-                                            false);
+      bool isSigned = isSignedIntegerType(exprType);
+      // A literal whose value doesn't fit the target type is left unfolded so
+      // the existing overflow diagnostic still fires, rather than folding it to
+      // a wrapped value. A negative literal never fits an unsigned type.
+      if (!isSigned && expr->isNegative())
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      auto value = expr->getValue();
+      unsigned neededBits =
+          isSigned ? value.getSignificantBits() : value.getActiveBits();
+      if (neededBits > resultBitWidth)
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      if (isSigned)
+        return ConstantValuePtr(std::make_unique<IntegerValue>(
+            value.sextOrTrunc(resultBitWidth), true));
+      return ConstantValuePtr(std::make_unique<IntegerValue>(
+          value.zextOrTrunc(resultBitWidth), false));
     }
 
     FoldingErrorOr<ConstantValuePtr> tryFoldBinaryExpr(const BinaryExpr *expr) {
@@ -621,7 +638,12 @@ private:
     // because it is represented as a 'negative value' on the resulting
     // `IntegerLiteralExpr`.
     if (isSigned)
-      intResult.abs().toString(resultStr, 10, true);
+      // 'abs()' of a signed type's minimum overflows and stays negative, which
+      // would put a second minus sign in the digits. Widen first, then print
+      // the magnitude unsigned. 'setNegative' below carries the sign.
+      intResult.sext(intResult.getBitWidth() + 1)
+          .abs()
+          .toString(resultStr, 10, /*Signed=*/false);
     else
       intResult.toString(resultStr, 10, false);
 
@@ -649,7 +671,10 @@ Expr *swift::foldLiteralExpression(const Expr *expr, ASTContext *ctx) {
 
 Expr *ConstantFoldExpression::evaluate(Evaluator &evaluator, const Expr *expr,
                                        ASTContext *ctx) const {
-  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions)) {
+  // Only integer literal expressions are folded. Expressions of other types
+  // (non-integer literals, tuples, arrays, etc.) are returned unchanged.
+  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      expr->getType() && expr->getType()->isStdlibInteger()) {
     ConstantFolder folder(*ctx);
     if (auto result = folder.fold(expr))
       return result;

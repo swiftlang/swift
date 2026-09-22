@@ -57,7 +57,7 @@ class CapturedValue {
 private:
   llvm::PointerUnion<ValueDecl *, Expr *> Value;
   // This is really unfortunate but we cannot use PointerIntPair here
-  // since flags need 3 bits and only two are available because union
+  // since flags need 4 bits and only two are available because union
   // needs an extra bit for its discriminator.
   unsigned Flags;
   SourceLoc Loc;
@@ -84,6 +84,11 @@ public:
     /// explicit captures are emitted as fresh variables and initialized with an
     /// owned r-value.
     IsConsumed = 1 << 2,
+
+    /// IsSending is set when the vardecl is declared as a `sending` capture
+    /// i.e. `[sending x]`. Such captures are only valid in a `@called(once)`
+    /// closure.
+    IsSending = 1 << 3,
   };
 
   CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
@@ -99,6 +104,7 @@ public:
   bool isDirect() const { return Flags & IsDirect; }
   bool isNoEscape() const { return Flags & IsNoEscape; }
   bool isConsumed() const { return Flags & IsConsumed; }
+  bool isSending() const { return Flags & IsSending; }
 
   bool isDynamicSelfMetadata() const { return !Value; }
 

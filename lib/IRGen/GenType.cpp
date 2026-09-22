@@ -18,22 +18,24 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/IR/DerivedTypes.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
-#include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "BitPatternBuilder.h"
 #include "CallEmission.h"
@@ -44,6 +46,7 @@
 #include "GenMeta.h"
 #include "GenPoly.h"
 #include "GenProto.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -62,6 +65,144 @@
 
 using namespace swift;
 using namespace irgen;
+
+using SerializableLLVMType = SerializableLLVMTypeRepresentation;
+
+static std::unique_ptr<SerializableLLVMType> serializeLLVMTypeImpl(
+    llvm::Type *type, llvm::SmallPtrSetImpl<llvm::Type *> &activeTypes) {
+  auto create = [](llvm::Type::TypeID kind, uint64_t payload = 0) {
+    auto result = std::make_unique<SerializableLLVMType>(kind);
+    result->payload = payload;
+    return result;
+  };
+
+  switch (type->getTypeID()) {
+  case llvm::Type::HalfTyID:
+  case llvm::Type::BFloatTyID:
+  case llvm::Type::FloatTyID:
+  case llvm::Type::DoubleTyID:
+  case llvm::Type::X86_FP80TyID:
+  case llvm::Type::FP128TyID:
+  case llvm::Type::PPC_FP128TyID:
+    return create(type->getTypeID());
+  case llvm::Type::IntegerTyID:
+    return create(type->getTypeID(),
+                  cast<llvm::IntegerType>(type)->getBitWidth());
+  case llvm::Type::PointerTyID:
+    return create(type->getTypeID(),
+                  cast<llvm::PointerType>(type)->getAddressSpace());
+  case llvm::Type::ArrayTyID: {
+    auto *arrayType = cast<llvm::ArrayType>(type);
+    auto result = create(type->getTypeID(), arrayType->getNumElements());
+    result->children.push_back(serializeLLVMTypeImpl(
+        arrayType->getElementType(), activeTypes));
+    return result;
+  }
+  case llvm::Type::FixedVectorTyID: {
+    auto *vectorType = cast<llvm::FixedVectorType>(type);
+    auto result = create(type->getTypeID(), vectorType->getNumElements());
+    result->children.push_back(serializeLLVMTypeImpl(
+        vectorType->getElementType(), activeTypes));
+    return result;
+  }
+  case llvm::Type::StructTyID: {
+    auto *structType = cast<llvm::StructType>(type);
+    if (structType->isOpaque())
+      llvm::report_fatal_error("cannot serialize an opaque LLVM storage type");
+    if (!activeTypes.insert(type).second)
+      llvm::report_fatal_error("cannot serialize a cyclic LLVM storage type");
+
+    auto result = create(type->getTypeID());
+    result->packed = structType->isPacked();
+    result->children.reserve(structType->getNumElements());
+    for (auto *elementType : structType->elements())
+      result->children.push_back(
+          serializeLLVMTypeImpl(elementType, activeTypes));
+
+    activeTypes.erase(type);
+    return result;
+  }
+  case llvm::Type::VoidTyID:
+  case llvm::Type::LabelTyID:
+  case llvm::Type::MetadataTyID:
+  case llvm::Type::X86_AMXTyID:
+  case llvm::Type::TokenTyID:
+  case llvm::Type::FunctionTyID:
+  case llvm::Type::ScalableVectorTyID:
+  case llvm::Type::TypedPointerTyID:
+  case llvm::Type::TargetExtTyID:
+    llvm::report_fatal_error("unsupported LLVM storage type");
+  }
+
+  llvm_unreachable("unhandled LLVM storage type");
+}
+
+std::unique_ptr<SerializableLLVMType>
+swift::irgen::serializeLLVMType(llvm::Type *type) {
+  llvm::SmallPtrSet<llvm::Type *, 4> activeTypes;
+  return serializeLLVMTypeImpl(type, activeTypes);
+}
+
+static llvm::Type *
+deserializeLLVMTypeImpl(llvm::LLVMContext &ctx,
+                        const SerializableLLVMType &representation) {
+  switch (representation.kind) {
+  case llvm::Type::HalfTyID:
+    return llvm::Type::getHalfTy(ctx);
+  case llvm::Type::BFloatTyID:
+    return llvm::Type::getBFloatTy(ctx);
+  case llvm::Type::FloatTyID:
+    return llvm::Type::getFloatTy(ctx);
+  case llvm::Type::DoubleTyID:
+    return llvm::Type::getDoubleTy(ctx);
+  case llvm::Type::X86_FP80TyID:
+    return llvm::Type::getX86_FP80Ty(ctx);
+  case llvm::Type::FP128TyID:
+    return llvm::Type::getFP128Ty(ctx);
+  case llvm::Type::PPC_FP128TyID:
+    return llvm::Type::getPPC_FP128Ty(ctx);
+  case llvm::Type::IntegerTyID:
+    return llvm::IntegerType::get(ctx, representation.payload);
+  case llvm::Type::PointerTyID:
+    return llvm::PointerType::get(ctx, representation.payload);
+  case llvm::Type::ArrayTyID:
+    assert(representation.children.size() == 1);
+    return llvm::ArrayType::get(
+        deserializeLLVMTypeImpl(ctx, *representation.children.front()),
+        representation.payload);
+  case llvm::Type::FixedVectorTyID:
+    assert(representation.children.size() == 1);
+    return llvm::FixedVectorType::get(
+        deserializeLLVMTypeImpl(ctx, *representation.children.front()),
+        representation.payload);
+  case llvm::Type::StructTyID: {
+    llvm::SmallVector<llvm::Type *, 8> elementTypes;
+    for (auto &element : representation.children)
+      elementTypes.push_back(deserializeLLVMTypeImpl(ctx, *element));
+    return llvm::StructType::get(ctx, elementTypes, representation.packed);
+  }
+  case llvm::Type::VoidTyID:
+  case llvm::Type::LabelTyID:
+  case llvm::Type::MetadataTyID:
+  case llvm::Type::X86_AMXTyID:
+  case llvm::Type::TokenTyID:
+  case llvm::Type::FunctionTyID:
+  case llvm::Type::ScalableVectorTyID:
+  case llvm::Type::TypedPointerTyID:
+  case llvm::Type::TargetExtTyID:
+    llvm::report_fatal_error("unsupported serialized LLVM storage type");
+  }
+
+  llvm_unreachable("unhandled serialized LLVM storage type");
+}
+
+llvm::Type *swift::irgen::deserializeLLVMType(
+    IRGenModule &IGM,
+    const std::unique_ptr<SerializableLLVMType> &representation) {
+  if (!representation)
+    llvm::report_fatal_error("serialized TypeInfo has no LLVM storage type");
+  return deserializeLLVMTypeImpl(IGM.getLLVMContext(), *representation);
+}
 
 Alignment IRGenModule::getCappedAlignment(Alignment align) {
   return std::min(align, Alignment(MaximumAlignment));
@@ -115,6 +256,84 @@ TypeInfo::~TypeInfo() {
     delete nativeReturnSchema;
   if (nativeParameterSchema)
     delete nativeParameterSchema;
+}
+
+TypeInfo::TypeInfo(
+    IRGenModule &IGM,
+    const SerializableHiddenTypeInfoRepresentation &representation)
+    : CreatedFromSerializableHiddenTypeInfoRepresentation(true),
+      StorageType(deserializeLLVMType(IGM, representation.storageType)) {
+  Bits = representation.bits;
+}
+
+void TypeInfo::assertNotDeserialized(const char *operation) const {
+  if (CreatedFromSerializableHiddenTypeInfoRepresentation)
+    llvm::report_fatal_error(
+        llvm::Twine(operation) +
+        " requires AST information unavailable to a reconstructed TypeInfo");
+}
+
+void TypeInfo::unsupportedSerializableHiddenTypeInfoRepresentation() const {
+  llvm::report_fatal_error(
+      "serializing this TypeInfo is not implemented yet");
+}
+
+void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM,
+    SerializableHiddenTypeInfoRepresentation &representation) const {
+  representation.storageType = serializeLLVMType(getStorageType());
+  representation.bits = Bits;
+}
+
+FixedTypeInfo::FixedTypeInfo(
+    IRGenModule &IGM,
+    const SerializableFixedTypeInfoRepresentation &representation)
+    : TypeInfo(IGM, representation),
+      SpareBits(representation.spareBits) {
+  setSpecialTypeInfoKind(SpecialTypeInfoKind::Fixed);
+  assert(SpareBits.size() == getFixedSize().getValue() * uint32_t(8));
+}
+
+void FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM,
+    SerializableFixedTypeInfoRepresentation &representation) const {
+  TypeInfo::populateSerializableHiddenTypeInfoRepresentation(IGM,
+                                                              representation);
+  representation.spareBits = getSpareBits();
+}
+
+LoadableTypeInfo::LoadableTypeInfo(
+    IRGenModule &IGM,
+    const SerializableLoadableTypeInfoRepresentation &representation)
+    : FixedTypeInfo(IGM, representation) {
+  setSpecialTypeInfoKind(SpecialTypeInfoKind::Loadable);
+  // All currently implemented LoadableTypeInfo are bitwise loadable and takable,
+  // so assert we haven't introduced a method to create one which is not
+  // via deserialization.
+  assert(isBitwiseTakable(ResilienceExpansion::Maximal));
+  assert(isBitwiseBorrowable(ResilienceExpansion::Maximal));
+  assert(isLoadable());
+}
+
+void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM,
+    SerializableLoadableTypeInfoRepresentation &representation) const {
+  FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+      IGM, representation);
+  ExplosionSchema schema;
+  getSchema(schema);
+  representation.schema.clear();
+  for (const auto &element : schema) {
+    SerializableExplosionSchemaElement serializedElement;
+    if (element.isScalar()) {
+      serializedElement.type = serializeLLVMType(element.getScalarType());
+    } else {
+      serializedElement.type = serializeLLVMType(element.getAggregateType());
+      serializedElement.aggregateAlignment =
+          element.getAggregateAlignment().getValue();
+    }
+    representation.schema.push_back(std::move(serializedElement));
+  }
 }
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
@@ -986,6 +1205,13 @@ namespace {
                        IsTriviallyDestroyable,
                        IsCopyable,
                        IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1030,6 +1256,27 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
+
+    PrimitiveTypeInfo(
+        IRGenModule &IGM,
+        const SerializablePrimitiveTypeInfoRepresentation &representation)
+        : PODSingleScalarTypeInfo(IGM, representation) {
+      if (representation.schema.size() != 1 ||
+          representation.schema.front().aggregateAlignment != 0 ||
+          deserializeLLVMType(IGM, representation.schema.front().type) !=
+              getStorageType())
+        llvm::report_fatal_error(
+            "serialized PrimitiveTypeInfo has an invalid explosion schema");
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializablePrimitiveTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
   };
 
   /// A TypeInfo implementation for pointers that are:
@@ -1049,6 +1296,12 @@ namespace {
                               Alignment align, Alignment pointeeAlign)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align),
         PointeeAlign(pointeeAlign) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1098,6 +1351,12 @@ namespace {
           storage, size,
           SpareBitVector::getConstant(size.getValueInBits(), false),
           align) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1157,6 +1416,33 @@ namespace {
                        IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
+
+    OpaqueStorageTypeInfo(
+        IRGenModule &IGM,
+        const SerializableOpaqueStorageTypeInfoRepresentation &representation)
+        : ScalarTypeInfo(IGM, representation) {
+      ScalarTypes.reserve(representation.schema.size());
+      for (const auto &element : representation.schema) {
+        if (element.aggregateAlignment != 0)
+          llvm::report_fatal_error(
+              "cannot reconstruct an aggregate explosion element");
+        auto *scalarType = dyn_cast<llvm::IntegerType>(
+            deserializeLLVMType(IGM, element.type));
+        if (!scalarType)
+          llvm::report_fatal_error(
+              "opaque storage explosion element is not an integer");
+        ScalarTypes.push_back(scalarType);
+      }
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializableOpaqueStorageTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
     
     llvm::ArrayType *getStorageType() const {
       return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
@@ -1346,6 +1632,12 @@ namespace {
                               IsNotBitwiseTakable,
                               IsNotCopyable,
                               IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1360,6 +1652,12 @@ namespace {
                               IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1452,6 +1750,12 @@ namespace {
                          IsCopyable,
                          IsFixedSize, IsABIAccessible) {}
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       IGF.emitMemCpy(dest, src, getFixedSize());
@@ -1482,6 +1786,60 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+static std::unique_ptr<TypeInfo>
+createPrimitiveTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializablePrimitiveTypeInfoRepresentation &representation) {
+  return std::make_unique<PrimitiveTypeInfo>(IGM, representation);
+}
+
+static std::unique_ptr<TypeInfo>
+createOpaqueStorageTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableOpaqueStorageTypeInfoRepresentation &representation) {
+  return std::make_unique<OpaqueStorageTypeInfo>(IGM, representation);
+}
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableHiddenTypeInfoRepresentation &representation) {
+  switch (representation.getKind()) {
+  case SerializableHiddenTypeInfoKind::Primitive:
+    return createPrimitiveTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializablePrimitiveTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::OpaqueStorage:
+    return createOpaqueStorageTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializableOpaqueStorageTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::LoadableStruct:
+    return createLoadableStructTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializableLoadableStructTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::LoadableClangRecord:
+    return createLoadableClangRecordTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<
+            const SerializableLoadableClangRecordTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::TypeInfo:
+  case SerializableHiddenTypeInfoKind::Fixed:
+  case SerializableHiddenTypeInfoKind::Loadable:
+  case SerializableHiddenTypeInfoKind::LoadableRecord:
+    llvm::report_fatal_error(
+        "unsupported serialized hidden TypeInfo representation");
+  }
+  llvm_unreachable("invalid serialized hidden TypeInfo kind");
+}
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -1669,6 +2027,21 @@ TypeConverter::~TypeConverter() {
     I = Cur->NextConverted;
     delete Cur;
   }
+}
+
+const TypeInfo &
+TypeConverter::adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo) {
+  assert(typeInfo && "cannot adopt a null TypeInfo");
+  assert(!typeInfo->NextConverted && "TypeInfo is already owned");
+  auto *result = typeInfo.release();
+  result->NextConverted = FirstType;
+  FirstType = result;
+  return *result;
+}
+
+const TypeInfo &
+IRGenModule::adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo) {
+  return Types.adoptTypeInfo(std::move(typeInfo));
 }
 
 void TypeConverter::setGenericContext(CanGenericSignature signature) {
@@ -2455,6 +2828,15 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
+    if (auto *layoutInfo = hidden->getLayoutInfoDecl()) {
+      assert(layoutInfo->Layout &&
+             layoutInfo->Layout->typeInfoRepresentation &&
+             "hidden layout declaration has no TypeInfo representation");
+      return createTypeInfoFromSerializableRepresentation(
+                 IGM, *layoutInfo->Layout->typeInfoRepresentation)
+          .release();
+    }
+
     auto *defining = hidden->getDefiningModule();
     assert(defining &&
            "HiddenType must carry a defining module after deserialization");
@@ -2637,6 +3019,12 @@ public:
                     IsFixedSize /* irrelevant */,
                     IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -3009,12 +3397,16 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
     return false;
   }
 
-  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinit(
-      nominal, false /*deserialize lazily*/);
+  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinitForType(
+      T, false /*deserialize lazily*/);
 
   // If we do not have a deinit table already deserialized, call the value
   // witness instead.
   if (!deinitTable) {
+    // In embedded Swift calling the value witness would recurse infinitely,
+    // therefore it's required to have the deinitTable.
+    ASSERT(!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+           "no deinit available for non-copyable type in embedded Swift");
     irgen::emitDestroyCall(IGF, T, indirect());
     indirectCleanup();
     return true;
@@ -3032,7 +3424,11 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
          && !deinitTy->hasError()
          && "deinit should have only one parameter");
 
-  auto substitutions = ty->getContextSubstitutionMap();
+  // A specialized deinit is non-generic: it already has the concrete type
+  // baked in, so it needs no substitutions (and takes no metadata arguments).
+  auto substitutions = deinitTable->isSpecialized()
+                           ? SubstitutionMap()
+                           : ty->getContextSubstitutionMap();
                                                      
   CalleeInfo info(deinitTy,
                   deinitTy->substGenericArgs(IGF.getSILModule(),
@@ -3147,8 +3543,8 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
     return IsABIAccessible;
 
   if (IGM.getSILModule().isTypeMetadataAccessible(ty) ||
-      IGM.getSILModule().lookUpMoveOnlyDeinit(nom,
-                                              false /*deserialize lazily*/))
+      IGM.getSILModule().lookUpMoveOnlyDeinitForType(
+          SILType::getPrimitiveObjectType(ty), false /*deserialize lazily*/))
     return IsABIAccessible;
 
   return IsNotABIAccessible;

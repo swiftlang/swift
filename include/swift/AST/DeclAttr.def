@@ -847,7 +847,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnreachableInABIAttr,
   159)
 
-SIMPLE_DECL_ATTR(unsafe, Unsafe,
+DECL_ATTR(unsafe, Unsafe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnTypeAlias | OnEnumElement | OnImport,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   160)
@@ -939,7 +939,24 @@ DECL_ATTR(called, Called,
   177)
 DECL_ATTR_FEATURE_REQUIREMENT(Called, CalledAttribute)
 
-LAST_DECL_ATTR(Called)
+DECL_ATTR(cxx, CxxDecl,
+  OnFunc,
+  LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  178)
+DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
+
+DECL_ATTR(_target, Target,
+  OnAbstractFunction,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  179)
+DECL_ATTR_FEATURE_REQUIREMENT(Target, TargetAttribute)
+
+SIMPLE_DECL_ATTR(yield_once, Coroutine,
+  OnFunc,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  180)
+
+LAST_DECL_ATTR(Coroutine)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

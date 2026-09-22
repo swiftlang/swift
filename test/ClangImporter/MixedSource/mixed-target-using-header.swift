@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../Inputs/custom-modules -enable-objc-interop -import-objc-header %S/Inputs/mixed-target/header.h -typecheck -primary-file %s %S/Inputs/mixed-target/other-file.swift -disable-objc-attr-requires-foundation-module -verify
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../Inputs/custom-modules -enable-objc-interop -import-objc-header %S/Inputs/mixed-target/header.h -emit-sil -primary-file %s %S/Inputs/mixed-target/other-file.swift -disable-objc-attr-requires-foundation-module -o /dev/null -D SILGEN
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 func test(_ foo : FooProto) {
   _ = foo.bar as CInt
   _ = ExternIntX.x as CInt

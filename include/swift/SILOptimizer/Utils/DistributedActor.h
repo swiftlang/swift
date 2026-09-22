@@ -68,7 +68,7 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
                         SILValue actorSystem);
 
 /// Emits code to notify the \p actorSystem that the given identity is resigned.
-void emitResignIdentityCall(SILBuilder &B, SILLocation loc, ClassDecl* actDecl,
+void emitResignIDCall(SILBuilder &B, SILLocation loc, ClassDecl* actDecl,
                             SILValue actor, SILValue identityRef);
 
 

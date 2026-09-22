@@ -15,7 +15,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1305,6 +1304,18 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
   assert(src->getType().isAddress());
   assert(dest->getType().isAddress());
 
+  if (auto *cast =
+          dyn_cast_or_null<UnconditionalCheckedCastAddrInst>(existingCast)) {
+    if (cast->isCopy()) {
+      // CastEmitter consumes address sources while changing representation.
+      // Only the same-representation copy can be emitted without taking Src.
+      if (src->getType() != dest->getType())
+        return false;
+      B.createCopyAddr(loc, src, dest, IsNotTake, IsInitialization);
+      return true;
+    }
+  }
+
   // Casts between the same types can be always handled here.
   // Casts from non-existentials into existentials and
   // vice-versa cannot be improved yet.
@@ -1375,6 +1386,13 @@ bool swift::canOptimizeToScalarCheckedCastInstructions(
           targetType)) {
     return false;
   }
+
+  // A scalar cast produces a value in its success block, which is precisely
+  // what test_only must not do. (Unreachable today: test_only is only emitted
+  // for address-only existential sources, which canSILUseScalarCheckedCast-
+  // Instructions already rejects above.)
+  if (consumption == CastConsumptionKind::TestOnly)
+    return false;
 
   if (consumption == CastConsumptionKind::CopyOnSuccess) {
     // If it's a copy-on-success cast, check whether the cast preserves
@@ -1525,6 +1543,8 @@ void swift::emitIndirectConditionalCastWithScalar(
     }
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("should never see a borrow_always here");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only produces no scalar result");
     }
 
     // And then store the succValue into dest.
@@ -1562,6 +1582,8 @@ void swift::emitIndirectConditionalCastWithScalar(
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("borrow_on_success should never appear here");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only produces no scalar result");
     }
 
     B.createBranch(loc, indirectFailBB);

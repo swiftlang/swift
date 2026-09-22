@@ -1,6 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
 
 // CHECK: func isZero(_ value: CInt = cxxDefaultArg) -> CBool
 // CHECK: func isNil(_ ptr: UnsafeMutablePointer<CInt>! = cxxDefaultArg) -> CBool
@@ -49,6 +47,10 @@
 
 // CHECK: struct HasCtorWithDefaultArg {
 // CHECK:   init(_ a: CInt, _ b: CInt = cxxDefaultArg, _ c: CInt = cxxDefaultArg)
+// CHECK: }
+
+// CHECK: struct SelfContainedHasMethodWithDefaultArg {
+// CHECK:   mutating func __withDefaultUnsafe(_ a: CInt = cxxDefaultArg) -> UnsafeMutablePointer<CInt>!
 // CHECK: }
 
 // CHECK: struct TemplatedHasMethodWithDefaultArg<CFloat> {

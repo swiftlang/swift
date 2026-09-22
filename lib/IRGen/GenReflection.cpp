@@ -15,13 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
@@ -350,6 +348,21 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
         auto substT = genericEnv
           ? genericEnv->mapTypeIntoEnvironment(t)->getCanonicalType()
           : t;
+
+        // weak/unowned are storage qualifiers and have no type
+        // metadata of their own (only their referent does), and this
+        // getTypeRefByFunction fallback on older deployment targets
+        // (when the plain mangled string doesn't work, e.g.,
+        // ~Copyable types) would require type metadata, so it won't
+        // work (and will hit the abort in
+        // visitReferenceStorageType). Lie that the field is an empty
+        // tuple instead, as we do below for noncopyable types old
+        // runtimes can't understand.
+        if (isa<ReferenceStorageType>(substT)) {
+          auto phonyRet = IGF.emitTypeMetadataRef(IGM.Context.TheEmptyTupleType);
+          IGF.Builder.CreateRet(phonyRet);
+          goto done_building_function;
+        }
 
         // If a type is noncopyable, lie about the resolved type to reflection
         // APIs unless the runtime is sufficiently aware of noncopyable types.
@@ -1071,7 +1084,9 @@ private:
   void layoutProtocol() {
     auto PD = cast<ProtocolDecl>(NTD);
     FieldDescriptorKind Kind;
-    if (PD->isObjC())
+    if (PD->isCOMInterface())
+      Kind = FieldDescriptorKind::COMProtocol;
+    else if (PD->isObjC())
       Kind = FieldDescriptorKind::ObjCProtocol;
     else if (PD->requiresClass())
       Kind = FieldDescriptorKind::ClassProtocol;
@@ -1814,7 +1829,7 @@ llvm::ArrayRef<CanType> IRGenModule::getOrCreateSpecialStlibBuiltinTypes() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction =
-        CanFunctionType::get({}, Context.TheEmptyTupleType,
+        CanFunctionType::get({}, {}, Context.TheEmptyTupleType,
                              AnyFunctionType::ExtInfo().withRepresentation(
                                  FunctionTypeRepresentation::Thin));
     SpecialStdlibBuiltinTypes.push_back(thinFunction);

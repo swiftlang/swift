@@ -190,6 +190,11 @@ bb23:
 
 //===----------------------------------------------------------------------===//
 //                      Swift SSAUpdater tests
+//
+// Available values are `integer_literal` instructions - available after each of
+// their users - and block arguments which have a `fix_lifetime` user - available
+// after that `fix_lifetime`. All `undef` operands are then replaced by the value
+// which the SSA-updater computes at that place.
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: sil @single_block :
@@ -441,6 +446,109 @@ bb2:
   br bb3
 
 bb3:
+  return undef : $Builtin.Int64
+}
+
+// A pre-existing block argument can be an available value - here the loop-carried
+// argument %a of the loop header bb1.
+//
+// CHECK-LABEL: sil @available_value_is_block_argument :
+// CHECK:       bb1([[A:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK:       bb3:
+// CHECK-NEXT:    return [[A]]
+// CHECK:       } // end sil function 'available_value_is_block_argument'
+sil @available_value_is_block_argument : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  specify_test "ssa_updater"
+  br bb1(%0 : $Builtin.Int64)
+
+bb1(%a : $Builtin.Int64):
+  fix_lifetime %a : $Builtin.Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%a : $Builtin.Int64)
+
+bb3:
+  return undef : $Builtin.Int64
+}
+
+// The available value %a is a pre-existing argument of the loop header bb4 and the
+// loop header needs a phi for the value coming from outside the loop. The updater
+// must not mistake %a for the phi which it inserted into bb4: otherwise bb4 is not
+// invalidated when its value changes from %a to the phi, and the stale %a keeps
+// being forwarded to bb8 - a direct successor of the header which is computed
+// before the header in the current iteration.
+// That would make bb9 see different values from its predecessors and insert a
+// superfluous phi. And if the pre-existing argument is mistaken for an inserted
+// phi in general, bb4 doesn't get a phi at all and %a is forwarded on the path
+// through bb3, where it is not defined.
+// Note: the order of the blocks in this function matters, because it determines
+// the order in which the updater computes the block values.
+//
+// CHECK-LABEL: sil @phi_in_block_with_available_argument :
+// CHECK:       bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:    [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb10([[L1]])
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb4(%0, [[L1]])
+// CHECK:       bb4([[A:%.*]] : $Builtin.Int64, [[PHI1:%.*]] : $Builtin.Int64):
+// CHECK:       bb6:
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK-NEXT:    br bb4([[A]], [[A]])
+// CHECK:       bb7:
+// CHECK-NEXT:    br bb9
+// CHECK:       bb8:
+// CHECK-NEXT:    br bb9
+// CHECK:       bb9:
+// CHECK-NEXT:    br bb10([[PHI1]])
+// CHECK:       bb10([[PHI2:%.*]] : $Builtin.Int64):
+// CHECK:       bb11:
+// CHECK-NEXT:    return [[PHI2]]
+// CHECK:       } // end sil function 'phi_in_block_with_available_argument'
+sil @phi_in_block_with_available_argument : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  specify_test "ssa_updater"
+  %l1 = integer_literal $Builtin.Int64, 1
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+// Reaches the join block bb10 without going through the loop.
+bb2:
+  br bb10
+
+bb3:
+  br bb4(%0 : $Builtin.Int64)
+
+// The loop header. %a is a pre-existing argument which is also an available value.
+bb4(%a : $Builtin.Int64):
+  cond_br undef, bb8, bb5
+
+bb5:
+  cond_br undef, bb7, bb6
+
+bb6:
+  fix_lifetime %a : $Builtin.Int64
+  br bb4(%a : $Builtin.Int64)
+
+// The two loop exits. Both see the same value, therefore bb9 must not get a phi.
+bb7:
+  br bb9
+
+bb8:
+  br bb9
+
+bb9:
+  br bb10
+
+bb10:
+  br bb11
+
+bb11:
   return undef : $Builtin.Int64
 }
 

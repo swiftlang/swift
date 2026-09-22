@@ -878,7 +878,7 @@ fileprivate func fastParse64(
   // but that's too long for a variable name, so...
   var nonZeroDigitCount = 0
   // Collect digits into "leadingDigits"
-  var t = unsafe input[unchecked: i] &- 0x30
+  let t = unsafe input[unchecked: i] &- 0x30
   if t < 10 {
     leadingDigits = UInt64(t)
     i &+= 1
@@ -1871,7 +1871,7 @@ fileprivate func slowDecimalToBinary(
   let significandDigits = min(digitCount, targetFormat.maxDecimalMidpointDigits &+ 1)
   let decimalExponent = Int(parsedExponent) &- significandDigits &+ digitCount &- Int(unparsedDigitCount)
   // Slightly over-estimate the number of bits needed to represent the decimal significand
-  let significandBitsNeeded = (significandDigits &* 1701) >> 9
+  let significandBitsNeeded = (significandDigits &* 1701 + 511) >> 9
   let bitsPerMPWord = MPWord.bitWidth
   let significandWordsNeeded = (significandBitsNeeded &+ (bitsPerMPWord - 1)) / bitsPerMPWord
 

@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -514,12 +515,18 @@ isShortFormAvailabilityImpliedByOther(SemanticAvailableAttr Attr,
   assert(isShortAvailable(Attr));
 
   auto platform = Attr.getDomain().getPlatformKind();
+  if (!platform)
+    return false;
+
   for (auto other : Others) {
     auto otherPlatform = other.getDomain().getPlatformKind();
     if (platform == otherPlatform)
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(platform, otherPlatform))
+    if (!otherPlatform)
+      continue;
+
+    if (!inheritsAvailabilityFromPlatform(*platform, *otherPlatform))
       continue;
 
     if (Attr.getIntroduced() == other.getIntroduced())
@@ -1086,23 +1093,27 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Override: {
     if (!Options.IsForSwiftInterface)
       break;
-    // When we are printing Swift interface, we have to skip the override keyword
-    // if the overridden decl is invisible from the interface. Otherwise, an error
-    // will occur while building the Swift module because the overriding decl
-    // doesn't override anything.
-    // We couldn't skip every `override` keywords because they change the
-    // ABI if the overridden decl is also publicly visible.
-    // For public-override-internal case, having `override` doesn't have ABI
-    // implication. Thus we can skip them.
+    // Skip printing 'override' if it would result in a broken swiftinterface.
+    // For example, 'override' should be suppressed if the base decl is internal
+    // or if the base decl is SPI and the public swiftinterface is being
+    // printed.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
         // If the overridden decl won't be printed, printing override will fail
-        // the build of the interface file.
-        if (!Options.shouldPrint(BD))
+        // the build of the interface file. The exception is a member of an
+        // `@objc @implementation` extension: it's deliberately omitted from
+        // the interface because it's already visible through the imported
+        // Objective-C header, so the override is still resolvable there.
+        auto *overriddenExt = dyn_cast<ExtensionDecl>(BD->getDeclContext());
+        bool overriddenIsObjCImpl =
+            overriddenExt && overriddenExt->isObjCImplementation() &&
+            BD->isObjC();
+        if (!overriddenIsObjCImpl && !Options.shouldPrint(BD))
           return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
-                                      /*treatUsableFromInlineAsPublic*/ true)
+                                      /*treatUsableFromInlineAsPublic=*/true,
+                                      /*ignoreImportAccessLevel=*/true)
                  .isPublicOrPackage()) {
           return false;
         }
@@ -1138,13 +1149,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
-  case DeclAttrKind::OriginallyDefinedIn: {
-    auto Attr = cast<OriginallyDefinedInAttr>(this);
-    auto Name = D->getDeclContext()->getParentModule()->getName().str();
-    if (Options.IsForSwiftInterface && Attr->getManglingModuleName() == Name)
-      return false;
-    break;
-  }
   default:
     break;
   }
@@ -1164,6 +1168,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
+  case DeclAttrKind::Unsafe:
   case DeclAttrKind::NonSendable:
   case DeclAttrKind::ObjCImplementation:
     if (getKind() == DeclAttrKind::Effects &&
@@ -1190,6 +1195,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << ' ';
         // Add @inlinable
         Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else if (getKind() == DeclAttrKind::Unsafe &&
+                 cast<UnsafeAttr>(this)->isAlways() &&
+                 Options.SuppressUnsafeAlways) {
+        // Older compilers don't understand the argument, and plain '@unsafe'
+        // is the closest approximation they can check.
+        Printer.printSimpleAttr("unsafe", /*needAt=*/true);
       } else {
         Printer.printSimpleAttr(attrName, /*needAt=*/true);
       }
@@ -1315,6 +1326,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::CxxDecl: {
+    auto Attr = cast<CxxDeclAttr>(this);
+    Printer << "@cxx";
+    if (!Attr->Name.empty())
+      Printer << "(" << identifierEscapingIfNeeded(Attr->Name) << ")";
+    break;
+  }
+
   case DeclAttrKind::Expose: {
     Printer.printAttrName("@_expose");
     auto Attr = cast<ExposeAttr>(this);
@@ -1357,11 +1376,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Section:
+  case DeclAttrKind::Section: {
     Printer.printAttrName("@section");
-    Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
+    auto sectionAttr = cast<SectionAttr>(this);
+    if (sectionAttr->isDefault())
+      Printer << "(default)";
+    else
+      Printer << "(\"" << *sectionAttr->Name << "\")";
     break;
-      
+  }
+
+  case DeclAttrKind::Target: {
+    Printer.printAttrName("@_target");
+    Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
+    break;
+  }
+
   case DeclAttrKind::Diagnose: {
     auto diagnoseAttr = cast<DiagnoseAttr>(this);
     Printer.printAttrName("@diagnose(");
@@ -1394,7 +1424,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Attr->IID.empty()) {
       Printer << "(interface: \"" << Attr->IID << "\")";
     } else if (!Attr->CLSID->empty()) {
-      Printer << "(implementation: " << Attr->CLSID.value() << ", threading: .";
+      Printer << "(implementation: \"" << Attr->CLSID.value()
+              << "\", threading: .";
       switch (Attr->getThreadingModel()) {
       case COMThreadingModel::Single:
         Printer << "single";
@@ -1973,6 +2004,8 @@ StringRef DeclAttribute::getAttrName() const {
     if (cast<CDeclAttr>(this)->Underscored)
       return "_cdecl";
     return "c";
+  case DeclAttrKind::CxxDecl:
+    return "cxx";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:
@@ -2035,6 +2068,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("Invalid optimization kind");
   }
+  case DeclAttrKind::Unsafe:
+    return cast<UnsafeAttr>(this)->isAlways() ? "unsafe(always)" : "unsafe";
   case DeclAttrKind::Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -2155,6 +2190,8 @@ StringRef DeclAttribute::getAttrName() const {
     case ExecutionSemantics::Once:
       return "called(once)";
     }
+  case DeclAttrKind::Target:
+    return "_target";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -3300,6 +3337,8 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
       typeExpr(type), argList(argList), owner(owner), initContext(initContext) {
   assert(type);
+  if (initContext)
+    initContext->setAttribute(this);
   isArgUnsafeBit = false;
 }
 

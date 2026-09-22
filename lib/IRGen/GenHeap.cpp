@@ -20,12 +20,9 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SipHash.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -33,7 +30,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -139,6 +135,11 @@ namespace {
           ValueTypeAndIsOptional.getPointer()->getContext(), \
           getFixedSize().getValueInBits()); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
   class Nativeness##Name##ReferenceTypeInfo \
@@ -217,6 +218,11 @@ namespace {
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 
   // The nativeness of a reference storage type is a policy decision.
@@ -260,6 +266,11 @@ namespace {
                               Address dest, SILType T, bool isOutlined) \
     const override { \
       return storeHeapObjectExtraInhabitant(IGF, index, dest); \
+    } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
     } \
   };
 #include "swift/AST/ReferenceStorage.def"
@@ -423,11 +434,9 @@ void emitDeallocateUninitializedHeapObjectTyped(IRGenFunction &IGF,
       {object, size, alignMask, typeDescriptor});
 }
 
-void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
-                                           llvm::Value *object,
-                                           llvm::Value *size,
-                                           llvm::Value *alignMask,
-                                           std::optional<uint64_t> mallocTypeId) {
+void irgen::emitDeallocateUninitializedHeapObject(
+    IRGenFunction &IGF, llvm::Value *object, llvm::Value *size,
+    llvm::Value *alignMask, std::optional<uint64_t> mallocTypeId) {
   if (mallocTypeId) {
     auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
                                                   *mallocTypeId);
@@ -691,6 +700,12 @@ namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
                                  Size size, SpareBitVector spareBits,
                                  Alignment align)
@@ -1381,6 +1396,16 @@ void IRGenFunction::emitReleaseBox(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getReleaseBoxFn(), value);
 }
 
+void IRGenFunction::emitReleaseBoxTyped(llvm::Value *value,
+                                        llvm::Value *typeDescriptor) {
+  if (doesNotRequireRefCounting(value))
+    return;
+  auto *call = Builder.CreateCall(IGM.getReleaseBoxTypedFunctionPointer(),
+                                  {value, typeDescriptor});
+  call->setCallingConv(IGM.DefaultCC);
+  call->addFnAttr(llvm::Attribute::NoUnwind);
+}
+
 void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getNativeSetDeallocatingFn(), value);
@@ -1615,6 +1640,12 @@ public:
 /// Common implementation for empty box type info.
 class EmptyBoxTypeInfo final : public BoxTypeInfo {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1643,6 +1674,12 @@ public:
 /// Common implementation for non-fixed box type info.
 class NonFixedBoxTypeInfo final : public BoxTypeInfo {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1655,7 +1692,8 @@ public:
     // Use the runtime to allocate a box of the appropriate size.
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *box, *address;
-    IGF.emitAllocBoxCall(metadata, box, address);
+    IGF.emitAllocBoxCall(metadata, /*mallocTypeId*/ std::nullopt, box,
+                         address);
     address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return {ti.getAddressForPointer(address), box};
   }
@@ -1750,6 +1788,12 @@ static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                              IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
@@ -1759,6 +1803,12 @@ public:
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                                    IGM.getReferenceObjectTypeInfo(refcounting)))
@@ -1798,6 +1848,12 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
   }
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
     : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
   {}
@@ -2275,7 +2331,8 @@ uint64_t getTypedMemoryDescriptorStableSipHash(StringRef Str) {
 } // namespace
 
 std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
-    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes) {
+    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes,
+    bool isArray) {
   if (!IGM.isTypedAllocationAvailable()) {
     return std::nullopt;
   }
@@ -2348,7 +2405,7 @@ std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
       getTypedMemoryDescriptorStableSipHash(layoutString) & 0xffffffff;
 
   uint64_t summary = 0; // Version 0
-  summary |= 1 << 6;    // Callsite flags: fixed size
+  summary |= (isArray ? 2 : 1) << 6; // Callsite flags: Array | FixedSize
   summary |= 2 << 10;   // Type kind: Swift
   summary |= ((uint64_t)layoutSemantics) << 16;
 

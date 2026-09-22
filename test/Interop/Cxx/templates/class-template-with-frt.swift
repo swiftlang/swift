@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop -disable-availability-checking
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop
 
 import ClassTemplateWithFrt
 

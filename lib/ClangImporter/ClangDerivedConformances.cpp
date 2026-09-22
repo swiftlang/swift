@@ -34,7 +34,6 @@
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -96,7 +95,8 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
     return nullptr; // Was not a clang::TypeDecl
 
   if (mustBeComplete &&
-      !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+      !Sema.isCompleteType(td->getLocation(),
+                           td->getASTContext().getTypeDeclType(td)))
     return nullptr;
 
   return td;
@@ -522,12 +522,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 void swift::simple_display(llvm::raw_ostream &out,
                            const CxxRecordDeclDescriptor &desc) {
   out << "Inferring C++ iterator info for '";
-  if (desc.decl->getIdentifier())
-    out << desc.decl->getName();
-  else if (desc.decl->isAnonymousStructOrUnion())
-    out << "(anonymous record)";
-  else
-    out << "(unnamed record)";
+  importer::printRecordName(out, desc.decl);
   out << "'\n";
 }
 
@@ -906,6 +901,13 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
 
   auto valueType = clangCtx.getTypeDeclType(value_type);
 
+  if (getCxxValueSemanticsKind(valueType.getTypePtr(), impl) !=
+      CxxValueSemanticsKind::Copyable) {
+    // CxxOptional doesn't support ~Copyable elements, so skip the constructor
+    // synthesis and the conformance, if the wrapped value is move-only.
+    return;
+  }
+
   auto constRefValueType =
       clangCtx.getLValueReferenceType(valueType.withConst());
   // Create a fake variable with type of the wrapped value.
@@ -1058,8 +1060,15 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   } else {
     // Check if begin() returns an iterator.
     auto *iterDecl = iterTy->getAsCXXRecordDecl();
-    if (!iterDecl || !iterDecl->hasDefinition())
+    if (!iterDecl)
       return;
+
+    // NOTE: isCompleteType eagerly instantiates the return type of begin(),
+    // which may lead to spurious template instantiation failures, but is needed
+    // for CxxIteratorInfoRequest and the collection protocol conformances.
+    if (!clangSema.isCompleteType(beginConst->getLocation(), iterTy))
+      return;
+
     auto iterInfo = evaluateOrDefault(
         ctx.evaluator, CxxIteratorInfoRequest({iterDecl, clangSema}), {});
     if (!iterInfo.has_value())
@@ -1074,10 +1083,19 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   if (!begin || !end)
     return;
 
-  ASSERT(begin->getBaseName() == "__beginUnsafe" &&
-         "begin() should always be __Unsafe");
-  ASSERT(end->getBaseName() == "__endUnsafe" &&
-         "end() should always be __Unsafe");
+  // Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, begin() and end() are always
+  // renamed; with it they keep their original names and the renamed spellings
+  // become migration stubs.
+  if (ctx.LangOpts.hasFeature(
+          Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
+    ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
+           "begin() and end() should keep their names");
+  } else {
+    ASSERT(begin->getBaseName() == "__beginUnsafe" &&
+           "begin() should always be __Unsafe");
+    ASSERT(end->getBaseName() == "__endUnsafe" &&
+           "end() should always be __Unsafe");
+  }
   ASSERT(!begin->isMutating() && !end->isMutating() &&
          "begin() and end() should not be mutating");
 
@@ -1587,6 +1605,13 @@ void swift::deriveAutomaticCxxConformances(
     const clang::CXXRecordDecl *clangDecl) {
 
   ASSERT(result && clangDecl && "this should not be called with nullptrs");
+
+  // A foreign reference type is imported even when it is only declared, so
+  // this can be reached without a definition. Every conformance below is
+  // derived from members, which an incomplete type does not have, and the
+  // requests used to look them up require a definition.
+  if (!clangDecl->isCompleteDefinition())
+    return;
 
   // Skip synthesizing conformances if the associated Clang node is from
   // a module that doesn't require cplusplus, to prevent us from accidentally

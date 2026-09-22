@@ -4,6 +4,8 @@
 // Make sure the lack of the experimental flag disables the feature:
 // RUN: not %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs 2>/dev/null
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // REQUIRES: swift_feature_ParserASTGen
 
 // ModuleSelectorImports

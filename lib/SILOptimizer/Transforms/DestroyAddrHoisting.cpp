@@ -90,9 +90,6 @@
 #define DEBUG_TYPE "destroy-addr-hoisting"
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/GraphNodeWorklist.h"
-#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -131,6 +128,7 @@ struct KnownStorageUses : UniqueStorageUseVisitor {
   SmallPtrSet<SILInstruction *, 16> storageUsers;
   llvm::SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
+  SmallVector<Operand *, 4> debugUses;
 
   KnownStorageUses(AccessStorage storage, SILFunction *function,
                    bool ignoreDeinitBarriers)
@@ -210,6 +208,7 @@ protected:
       storageUsers.insert(use->getUser());
     } else {
       debugInsts.insert(use->getUser());
+      debugUses.push_back(use);
     }
     return true;
   }
@@ -556,9 +555,12 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
     // The destroy does not reach the end of any predecessors.
     insertDestroy(nullptr, &block->front(), knownUses);
   }
-  // Delete dead users before merging destroys.
-  for (auto *deadInst : deinitBarriers.deadUsers) {
-    deleter.forceDelete(deadInst);
+  // Kill debug operands that use destroyed memory.
+  for (auto *debugUse : knownUses.debugUses) {
+    auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
+    if (!deinitBarriers.deadUsers.contains(debugInst))
+      continue;
+    debugInst->killOperand(debugUse->getOperandNumber());
   }
   for (auto *destroyInst : knownUses.originalDestroys) {
     if (reusedDestroys.contains(destroyInst))
@@ -912,6 +914,10 @@ void HoistDestroys::mergeDestroys(SILBasicBlock *mergeBlock) {
   SmallVector<SILInstruction *, 4> deadDestroys;
   for (auto *predecessors : mergeBlock->getPredecessorBlocks()) {
     auto *tailDestroy = predecessors->getTerminator()->getPreviousInstruction();
+    // Debug value instructions don't prevent merging. The destroy can safely
+    // be moved after them.
+    while (isa_and_nonnull<DebugValueInst>(tailDestroy))
+      tailDestroy = tailDestroy->getPreviousInstruction();
     if (!tailDestroy || (!isa<DestroyAddrInst>(tailDestroy) &&
                          !isa<DestroyValueInst>(tailDestroy))) {
       return;

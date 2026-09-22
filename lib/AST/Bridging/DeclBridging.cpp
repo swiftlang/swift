@@ -24,7 +24,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -144,6 +143,17 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
       cThrownType.unbridged(), cDeclContext.unbridged());
 }
 
+void BridgedAccessorDecl_remapLegacyCoroutineAccessorIfEnabled(
+    BridgedAccessorDecl cAccessor) {
+  auto *accessor = cAccessor.unbridged();
+  if (!accessor->getASTContext().LangOpts.hasFeature(
+          Feature::CoroutineAccessors))
+    return;
+  auto kind = accessor->getAccessorKind();
+  if (kind == AccessorKind::Read || kind == AccessorKind::Modify)
+    accessor->changeLegacyCoroutineAccessorToYielding();
+}
+
 static VarDecl::Introducer unbridged(BridgedVarDeclIntroducer introducer) {
   switch (introducer) {
   case BridgedVarDeclIntroducerLet:
@@ -223,7 +233,8 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
     SourceLoc funcKeywordLoc, swift::Identifier name, SourceLoc nameLoc,
     BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, SourceLoc asyncLoc, SourceLoc throwsLoc,
-    BridgedNullableTypeRepr thrownType, BridgedNullableTypeRepr returnType,
+    BridgedNullableTypeRepr thrownType, BridgedNullableYieldList yieldList,
+    BridgedNullableTypeRepr returnType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
 
@@ -235,7 +246,7 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
       context, staticLoc, unbridged(cStaticSpelling), funcKeywordLoc, declName,
       nameLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc,
       thrownType.unbridged(), genericParamList.unbridged(), paramList,
-      returnType.unbridged(), cDeclContext.unbridged());
+      yieldList.unbridged(), returnType.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
 
   return decl;
@@ -594,13 +605,13 @@ BridgedImportDecl BridgedImportDecl_createParsed(
                             std::move(builder).get());
 }
 
-BridgedUsingDecl BridgedUsingDecl_createParsed(
+BridgedFileDefaultDecl BridgedFileDefaultDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    SourceLoc usingKeywordLoc, BridgedDeclAttributes cSpecifiedAttributes) {
+    SourceLoc defaultKeywordLoc, BridgedDeclAttributes cSpecifiedAttributes) {
   ASTContext &ctx = cContext.unbridged();
-  return UsingDecl::create(ctx, usingKeywordLoc,
-                           cSpecifiedAttributes.unbridged(),
-                           cDeclContext.unbridged());
+  return FileDefaultDecl::create(ctx, defaultKeywordLoc,
+                                 cSpecifiedAttributes.unbridged(),
+                                 cDeclContext.unbridged());
 }
 
 BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
@@ -690,4 +701,17 @@ size_t BridgedParameterList_size(BridgedParameterList cParameterList) {
 BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
                                           size_t i) {
   return cParameterList.unbridged()->get(i);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedYieldList
+//===----------------------------------------------------------------------===//
+
+BridgedYieldList BridgedYieldList_createParsed(BridgedASTContext cContext,
+                                               SourceLoc leftParenLoc,
+                                               BridgedArrayRef cYieldTypes,
+                                               SourceLoc rightParenLoc) {
+  ASTContext &context = cContext.unbridged();
+  return YieldList::create(context, leftParenLoc,
+                           cYieldTypes.unbridged<TypeRepr *>(), rightParenLoc);
 }

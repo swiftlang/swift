@@ -13,7 +13,6 @@
 #ifndef SWIFT_BASIC_POINTERINTENUM_H
 #define SWIFT_BASIC_POINTERINTENUM_H
 
-#include "swift/Basic/LLVM.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>
 #include <climits>
@@ -21,7 +20,6 @@
 #include <cstring>
 #include <optional>
 #include <type_traits>
-#include <utility>
 
 namespace swift {
 

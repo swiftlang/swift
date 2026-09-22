@@ -115,7 +115,6 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/Support/YAMLTraits.h"
 
 namespace llvm {
 namespace cas {
@@ -499,7 +498,7 @@ public:
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
-  bool downgradeInterfaceVerificationError = false;
+  std::optional<bool> downgradeInterfaceVerificationError;
   bool strictImplicitModuleContext = false;
   CompilerDebuggingOptions compilerDebuggingOptions;
   std::string mainExecutablePath;
@@ -602,6 +601,7 @@ public:
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
       const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
       const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+      const SILOptions &SILOpts,
       StringRef CacheDir, StringRef PrebuiltCacheDir,
       StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
@@ -679,6 +679,7 @@ private:
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
+                                     const SILOptions &silOpts,
                                      bool suppressNotes, bool suppressRemarks,
                                      PrintDiagnosticNamesMode diagnosticNamesMode);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
@@ -692,6 +693,7 @@ public:
       SourceManager &SM, DiagnosticEngine *Diags,
       const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
       const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+      const SILOptions &silOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
       StringRef backupModuleInterfaceDir,

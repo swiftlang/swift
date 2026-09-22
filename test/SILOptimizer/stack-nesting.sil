@@ -1,7 +1,10 @@
 // RUN: %target-sil-opt -sil-disable-input-verify -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+// REQUIRES: concurrency
+
 import Builtin
 import Swift
+import _Concurrency
 
 class MyClass {}
 
@@ -643,6 +646,57 @@ bb0:
 
   dealloc_stack %a
   dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// The deadline record push/pop builtins cannot be reordered. The `alloc_stack`s
+// that SILGen materializes for the `consuming C`/`consuming I` operands of the
+// generic `taskPushDeadline` are marked [non_nested].
+// CHECK-LABEL: sil [ossa] @test_deadline_non_nested :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[CLOCK:%.*]] = alloc_stack $ContinuousClock
+// CHECK-NEXT:    [[INSTANT:%.*]] = alloc_stack $ContinuousClock.Instant
+// CHECK:         [[RECORD:%.*]] = builtin "taskPushDeadline"<ContinuousClock, ContinuousClock.Instant>([[CLOCK]], [[INSTANT]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[D:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[D]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    builtin "taskPopDeadline"([[RECORD]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[INSTANT]]
+// CHECK-NEXT:    dealloc_stack [[CLOCK]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_deadline_non_nested'
+sil [ossa] @test_deadline_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %clock = alloc_stack $ContinuousClock
+  %instant = alloc_stack $ContinuousClock.Instant
+
+  %record = builtin "taskPushDeadline"<ContinuousClock, ContinuousClock.Instant>(%clock : $*ContinuousClock, %instant : $*ContinuousClock.Instant) : $UnsafeRawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  %d = alloc_stack $Int
+
+  dealloc_stack %d
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "taskPopDeadline"(%record) : $()
+
+  dealloc_stack %c
+  dealloc_stack %instant
+  dealloc_stack %clock
   integer_literal $Builtin.Int32, 4
   %ret = tuple ()
   return %ret : $()

@@ -13,12 +13,12 @@ distributed actor class DAC {}
 
 actor A {
   func normal() async {}
-  distributed func dist() {} // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
-  distributed func distAsync() async {} // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
+  distributed func dist() {} // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
+  distributed func distAsync() async {} // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 actor B {
-  distributed var neverOk: String { // expected-error{{distributed property 'neverOk' declared without importing module 'Distributed'}}
+  distributed var neverOk: String { // expected-error{{distributed computed property can only be declared in 'DistributedActor' type}}
     ""
   }
 }

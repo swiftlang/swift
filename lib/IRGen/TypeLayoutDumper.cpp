@@ -27,13 +27,9 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -121,9 +117,11 @@ static std::optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
 
-  // Collect all nominal types, including nested types.
+  // Collect all nominal types, including nested types. We don't want
+  // freestanding since ASTWalker handles those.
   SmallVector<Decl *, 16> TopLevelDecls;
-  Mod->getTopLevelDecls(TopLevelDecls);
+  Mod->getTopLevelDeclsWithAuxiliaryDecls(TopLevelDecls,
+                                          /*visitFreestanding*/ false);
 
   for (auto *D : TopLevelDecls)
     D->walk(Walker);
@@ -170,7 +168,10 @@ bool swift::performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod) {
 
   auto *Mod = SILMod.getSwiftModule();
   SmallVector<Decl *, 16> AllDecls;
-  Mod->getTopLevelDecls(AllDecls);
+  // Find all top level declarations. We don't want freestanding since ASTWalker
+  // handles those.
+  Mod->getTopLevelDeclsWithAuxiliaryDecls(AllDecls,
+                                          /*visitFreestanding*/ false);
 
   SmallVector<ModuleDecl *, 4> AllModules;
   for (auto *D : AllDecls) {

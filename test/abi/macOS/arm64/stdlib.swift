@@ -1349,3 +1349,32 @@ Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_Sit
 // Changing the ABI of _SwiftCreateBridgedString
 Removed: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSPys5UInt8VG_Sis6UInt32VtF
 Added: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSgSPys5UInt8VG_Sis6UInt32VtF
+
+// Distributed runtime: query key-argument count for the target's generic env
+Added: _swift_distributed_getGenericEnvironmentKeyArgumentCount
+
+// Task Registry
+Added: _concurrencyEnableTaskRegistry
+Added: __swift_concurrency_task_registry_addr
+
+// InlineArray: Equatable, Hashable (SE-0543)
+Added: _$ss11InlineArrayVsSHR_Ri__rlE9hashValueSivg
+Added: _$ss11InlineArrayVsSHR_Ri__rlE9hashValueSivpMV
+Added: _$ss11InlineArrayVyxq_GSHsSHR_Ri__rlMc
+Added: _$ss11InlineArrayVyxq_GSQsSQR_Ri__rlMc
+
+// Privilege gating for environment variables
+Added: __swift_isRestrictedProcess
+
+// Non-consuming dynamic cast test, for `is` / `case is T` on a value that
+// cannot be copied. See CastConsumptionKind::TestOnly.
+Added: _swift_dynamicCastTest
+
+// Setter for typed willThrow hook.
+Added: __swift_setWillThrowTypedHandler
+
+// Prespecialized tuple metadata witness tables
+Added: _swift_tupleWitnesses_nonpod_inline
+Added: _swift_tupleWitnesses_nonpod_noninline
+Added: _swift_tupleWitnesses_pod_inline
+Added: _swift_tupleWitnesses_pod_noninline

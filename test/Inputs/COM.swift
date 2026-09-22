@@ -1,3 +1,4 @@
+
 public struct GUID {
   public var data1: UInt32
   public var data2: UInt16
@@ -20,4 +21,25 @@ public typealias CLSID = GUID
 public protocol IUnknown: AnyObject { }
 
 @com(interface: "8e369447-5188-5ada-b9ec-8fcb732d226b")
-public protocol ISwiftObject: AnyObject { }
+public protocol ISwiftObject {
+  var object: UnsafeMutableRawPointer { get }
+  var metadata: UnsafeRawPointer { get }
+}
+
+public protocol COMInterface {
+  var IID: IID { get }
+}
+
+public protocol COMActivatable {
+#if $_MicrosoftCOM
+  var CLSID: CLSID { get }
+#endif
+}
+
+#if $_MicrosoftCOM
+
+public protocol COMAggregatable: AnyObject {
+  var controller: (any IUnknown)? { get }
+}
+
+#endif

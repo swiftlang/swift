@@ -17,9 +17,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
@@ -736,6 +733,23 @@ void DiagnosticEmitter::emitObjectInstConsumesAndUsesValue(
            diag::sil_movechecking_owned_value_consumed_and_used_at_same_time,
            varName);
   diagnose(astContext, consumingUse->getUser(),
+           diag::sil_movechecking_consuming_and_non_consuming_uses_here);
+  registerDiagnosticEmitted(markedValue);
+}
+
+void DiagnosticEmitter::emitAddressInstConsumesAndUsesValue(
+    MarkUnresolvedNonCopyableValueInst *markedValue, SILInstruction *user) {
+  LLVM_DEBUG(llvm::dbgs() << "Emitting address consumed and used error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
+  LLVM_DEBUG(llvm::dbgs() << "    User: " << *user);
+
+  auto &astContext = markedValue->getModule().getASTContext();
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
+  diagnose(astContext, markedValue,
+           diag::sil_movechecking_owned_value_consumed_and_used_at_same_time,
+           varName);
+  diagnose(astContext, user,
            diag::sil_movechecking_consuming_and_non_consuming_uses_here);
   registerDiagnosticEmitted(markedValue);
 }

@@ -71,7 +71,10 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
     quals.removeConst();
     if (quals.empty()) {
       if (auto record = pointee->getAs<clang::RecordType>()) {
-        auto recordDecl = record->getDecl();
+        // Check the canonical decl only for backwards compatibility.
+        // FIXME: Use getMostRecentDecl() here to pick up redeclaration attrs
+        //        (which would be source-breaking)
+        auto recordDecl = record->getDecl()->getCanonicalDecl();
         if (recordDecl->hasAttr<clang::ObjCBridgeAttr>() ||
             recordDecl->hasAttr<clang::ObjCBridgeMutableAttr>() ||
             recordDecl->hasAttr<clang::ObjCBridgeRelatedAttr>() ||
@@ -100,8 +103,7 @@ StringRef importer::getCFTypeName(
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
     if (pointee.isRecord() || pointee.isTypedef())
-      if (name.ends_with(SWIFT_CFTYPE_SUFFIX))
-        return name.drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
+      name.consume_back(CFTypeSuffix);
 
     return name;
   }

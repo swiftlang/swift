@@ -34,8 +34,9 @@ inline clang::DeclRefExpr *
 createClangDeclRefExpr(clang::ASTContext &ctx, clang::ValueDecl *decl,
                        clang::QualType type,
                        clang::ExprValueKind vk = clang::VK_PRValue) {
-  return new (ctx) clang::DeclRefExpr(ctx, decl, false, type, vk,
-                                      clang::SourceLocation());
+  decl->setIsUsed();
+  return new (ctx)
+      clang::DeclRefExpr(ctx, decl, false, type, vk, decl->getLocation());
 }
 
 inline clang::ReturnStmt *createClangReturnStmt(clang::ASTContext &ctx,

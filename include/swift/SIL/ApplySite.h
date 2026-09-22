@@ -264,6 +264,7 @@ public:
   bool isCalleeThin() const {
     switch (getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
@@ -468,7 +469,7 @@ public:
   /// function this apply can call, i.e. with at least getNumArguments()
   /// arguments.
   SILArgument *getCalleeArgument(SILFunction *callee, const Operand &op) const {
-    assert(callee->getArguments().size() >= getNumArguments() &&
+    ASSERT(callee->getArguments().size() >= getNumArguments() &&
            "applying more arguments than the callee has");
     unsigned idx = argIndexOfFirstAppliedArg(callee->getConventions()) +
                    getAppliedArgIndex(op);

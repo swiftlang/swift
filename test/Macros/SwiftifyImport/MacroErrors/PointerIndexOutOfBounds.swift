@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -verify
+// RUN: %target-typecheck-verify-swift %s -swift-version 5 -module-name main -typecheck -plugin-path %swift-plugin-dir -verify
 
 // expected-error@+1{{pointer index out of bounds}}
 @_SwiftifyImport(.countedBy(pointer: .param(3), count: "len"))

@@ -57,12 +57,10 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <tuple>
 
 using namespace swift;
 
@@ -476,6 +474,8 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
+  // The cloned closure goes into the same section as the original closure.
+  fn->setSection(orig->section());
   return fn;
 }
 
@@ -586,7 +586,7 @@ SILValue ClosureCloner::getProjectBoxMappedVal(SILValue operandValue) {
 /// if its operand is the promoted address argument then lower it to
 /// another debug_value, otherwise it is handled normally.
 void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
-  if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
+  if (SILValue value = getProjectBoxMappedVal(inst->getSingleOperand())) {
     getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
     auto varInfo = *inst->getVarInfo();
     if (varInfo.Scope)
@@ -1579,8 +1579,8 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   // in debug builds if the sizes ever diverge from this 1:1 invariant.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getCalleeConvention(), pai->getResultIsolation(), pai->isOnStack(),
-      pai->isStackAllocationNested(),
+      pai->getCalleeConvention(), pai->getResultIsolation(),
+      pai->isCalledOnce(), pai->isOnStack(), pai->isStackAllocationNested(),
       /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

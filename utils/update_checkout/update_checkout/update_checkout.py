@@ -848,6 +848,47 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
     Git.run(repo_path, ["submodule", "update", "--recursive"], env=env)
 
 
+def remote_url_for_repo(
+    repo_name: str,
+    remote_repo_info: Dict[str, Any],
+    config: Dict[str, Any],
+    clone_with_ssh: bool,
+) -> str:
+    """Computes the URL to clone the given repository from.
+
+    By default, the URL is interpolated from the top-level clone pattern that
+    matches the requested protocol and the repository's remote "id". A
+    repository can override that URL entirely, either per-protocol
+    ("ssh-url", "https-url") or for both protocols at once ("url"). When both
+    kinds of override are present, the one matching the requested protocol
+    wins; when only the override for the other protocol is present, it is used
+    as a last resort, since an override is always more specific than the
+    interpolated URL.
+    """
+
+    # A configuration that does not provide an https clone pattern only
+    # supports ssh, so pick the ssh overrides in that case as well.
+    use_ssh = clone_with_ssh or "https-clone-pattern" not in config
+
+    if use_ssh:
+        url_keys = ["ssh-url", "url", "https-url"]
+    else:
+        url_keys = ["https-url", "url", "ssh-url"]
+
+    for url_key in url_keys:
+        if url_key in remote_repo_info:
+            return remote_repo_info[url_key]
+
+    if "id" not in remote_repo_info:
+        raise RuntimeError(
+            "'remote' for '{0}' must have an 'id', 'url', 'ssh-url' or "
+            "'https-url' item".format(repo_name)
+        )
+
+    clone_pattern_key = "ssh-clone-pattern" if use_ssh else "https-clone-pattern"
+    return config[clone_pattern_key] % remote_repo_info["id"]
+
+
 def obtain_all_additional_swift_sources(
     args: CliArguments,
     config: Dict[str, Any],
@@ -882,17 +923,9 @@ def obtain_all_additional_swift_sources(
             )
             continue
 
-        # If we have a url override, use that url instead of
-        # interpolating.
-        remote_repo_info = repo_info["remote"]
-        if "url" in remote_repo_info:
-            remote = remote_repo_info["url"]
-        else:
-            remote_repo_id = remote_repo_info["id"]
-            if args.clone_with_ssh is True or "https-clone-pattern" not in config:
-                remote = config["ssh-clone-pattern"] % remote_repo_id
-            else:
-                remote = config["https-clone-pattern"] % remote_repo_id
+        remote = remote_url_for_repo(
+            repo_name, repo_info["remote"], config, args.clone_with_ssh
+        )
 
         repo_branch: Optional[str] = None
         repo_not_in_scheme = False

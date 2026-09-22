@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -I %t %s -verify
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import cfuncs
 
 func testNonexistentPowerOperatorWithPowFunctionInScope() {

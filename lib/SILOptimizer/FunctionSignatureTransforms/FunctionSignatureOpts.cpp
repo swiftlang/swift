@@ -31,9 +31,7 @@
 
 #define DEBUG_TYPE "sil-function-signature-opt"
 #include "FunctionSignatureOpts.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -96,6 +94,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   case SILFunctionTypeRepresentation::WitnessMethod:
     return OptForPartialApply;
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::Block:
     return false;
   }
@@ -606,6 +605,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     if (!StringRef(Attr).starts_with("array."))
       NewF->addSemanticsAttr(Attr);
   }
+
+  // The optimized function, which takes over the body of the original
+  // function, goes into the same section as the original function.
+  NewF->setSection(F->section());
 
   // Do the last bit of work to the newly created optimized function.
   DeadArgumentFinalizeOptimizedFunction();

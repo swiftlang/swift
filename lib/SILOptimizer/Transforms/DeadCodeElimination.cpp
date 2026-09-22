@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dce"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -638,13 +636,13 @@ bool DCE::removeDead() {
       // Function arguments cannot be removed from the signature. Don't
       // replace their uses with undef: debug_values should keep referencing
       // the real arg.
-      if (!isa<SILFunctionArgument>(arg))
+      if (!isa<SILFunctionArgument>(arg) && !arg->use_empty()) {
         arg->replaceAllUsesWithUndef();
+        Changed = true;
+      }
 
       if (!F->hasOwnership() || arg->getOwnershipKind() == OwnershipKind::None) {
         i++;
-        Changed = true;
-        BranchesChanged = true;
         continue;
       }
 
@@ -660,10 +658,9 @@ bool DCE::removeDead() {
           SILBuilderWithScope builder(insertPt);
           auto *destroy = builder.createDestroyValue(loc, arg);
           LiveInstructions.insert(destroy);
+          Changed = true;
         }
         i++;
-        Changed = true;
-        BranchesChanged = true;
         continue;
       }
 

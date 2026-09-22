@@ -41,6 +41,10 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+// WORKAROUND #87548
+#if defined(dispatch_STATIC)
+#pragma comment(lib, "dispatch.lib")
+#endif
 #else
 #include <dlfcn.h>
 #endif

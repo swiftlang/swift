@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=default -disable-availability-checking -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}constructors.h -Xcc -Wno-nullability-completeness
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=default -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}constructors.h -Xcc -Wno-nullability-completeness
 
 // XFAIL: OS=linux-androideabi
 

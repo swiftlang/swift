@@ -359,17 +359,9 @@ class Y {}
 
 sil [ossa] @getObject : $@convention(thin) () -> @owned AnyObject
 
-// No overlap (access ignored):
-//     def
-//     use
-//     begin_access
-//     end_access
-//     destroy
-//
 // CHECK-LABEL: sil [ossa] @testNoOverlapInLiveBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK-NOT: copy_value
-// CHECK:   store [[DEF]] to [init]
+// CHECK:   copy_value
 // CHECK:   begin_access
 // CHECK:   end_access
 // CHECK: bb1:
@@ -401,19 +393,9 @@ bb1:
   return %v : $()
 }
 
-// No overlap (access ignored):
-//     def
-//     use
-//     br...
-// bb...
-//     begin_access
-//     end_access
-//     destroy
-//
 // CHECK-LABEL: sil [ossa] @testNoOverlapInDeadBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK-NOT: copy_value
-// CHECK:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   copy_value
 // CHECK: br bb1
 // CHECK: bb1:
 // CHECK:   begin_access
@@ -892,6 +874,39 @@ entry:
   destroy_value %lifetime : $C
   %retval = tuple ()
   return %retval : $()
+}
+
+// Test that copy propagation doesn't hoist a destroy_value corresponding to a
+// move_value [lexical] over a yield.
+// CHECK-LABEL: sil [ossa] @dont_hoist_move_value_lexical_destroy_over_yield : {{.*}} {
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical]
+// CHECK:         [[TAKE_GUARANTEED_C:%[^,]+]] = function_ref @takeGuaranteedC
+// CHECK:         apply [[TAKE_GUARANTEED_C]]([[LIFETIME]])
+// CHECK-NOT:     destroy_value
+// CHECK:         yield {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[RESUME]]:
+// CHECK:         destroy_value [[LIFETIME]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         destroy_value [[LIFETIME]]
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function 'dont_hoist_move_value_lexical_destroy_over_yield'
+sil [ossa] @dont_hoist_move_value_lexical_destroy_over_yield : $@yield_once @convention(thin) (@inout C) -> @yields @inout C {
+entry(%slot : $*C):
+  %getOwnedC = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %instance = apply %getOwnedC() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  %takeGuaranteedC = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %takeGuaranteedC(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  yield %slot : $*C, resume resume_bb, unwind unwind_bb
+
+resume_bb:
+  destroy_value %lifetime : $C
+  %retval = tuple ()
+  return %retval : $()
+
+unwind_bb:
+  destroy_value %lifetime : $C
+  unwind
 }
 
 // Canonicalize the moved-from value when a move_value is deemed redundant and

@@ -39,7 +39,6 @@ set(swift_runtime_sources
     Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
-    CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
@@ -73,6 +72,7 @@ set(swift_runtime_sources
     Once.cpp
     Paths.cpp
     Portability.cpp
+    Privilege.cpp
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
@@ -301,17 +301,11 @@ foreach(sdk ${SWIFT_SDKS})
         set(concurrency_libs "-ldispatch -lBlocksRuntime")
       endif()
 
-      file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
--ldl
-${libpthread}
-${android_libraries}
--lswiftCore
-${concurrency_libs}
--lstdc++
--lm
--Xlinker -export-dynamic
--Xlinker --exclude-libs
--Xlinker ALL")
+      configure_file(
+        "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/static-stdlib-args.lnk.in"
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        @ONLY
+        NEWLINE_STYLE LF)
     endif()
 
     swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"

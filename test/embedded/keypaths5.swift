@@ -1,9 +1,8 @@
-// RUN: %target-swift-emit-sil %s -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -o - | %FileCheck -check-prefix=CHECK-SIL %s
-// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -o - | %FileCheck -check-prefix=CHECK-IR %s
+// RUN: %target-swift-emit-sil %s -enable-experimental-feature Embedded -wmo -o - | %FileCheck -check-prefix=CHECK-SIL %s
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -o - | %FileCheck -check-prefix=CHECK-IR %s
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 public struct MyStruct {
   var x: Int32

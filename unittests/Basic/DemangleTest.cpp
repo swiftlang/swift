@@ -159,3 +159,32 @@ TEST(Demangle, OldFunctionTypeManglingFlagSavedAcrossDemangle) {
       << "IsOldFunctionTypeMangling leaked across DemangleInitRAII";
 }
 
+// A LocalDeclName whose name child is itself a LocalDeclName carries children
+// rather than text, so reading text off it reads the children as a StringRef.
+TEST(Demangle, KeyPathSourceStringNestedLocalDeclName) {
+  static const char nested[] = "$s4main1SVySiAA3fooL_L_VcipACTK";
+  EXPECT_EQ("subscript(_: <unknown>)",
+            keyPathSourceString(nested, sizeof(nested) - 1));
+
+  static const char local[] = "$s4main1SVySiAA3fooL_VcipACTK";
+  EXPECT_EQ("subscript(_: foo #1)",
+            keyPathSourceString(local, sizeof(local) - 1));
+}
+
+// A subscript argument tuple element is not required to have the shape
+// TupleElement -> Type -> <nominal> -> [Module, Identifier]. For example, an
+// empty-tuple element has a childless Tuple as the grandchild, so walking the
+// chain unchecked dereferenced null.
+TEST(Demangle, KeyPathSourceStringMalformedTupleElement) {
+  static const char variadic[] = "$s1m1SVySbSi_SidtcipACTK";
+  EXPECT_EQ("subscript(_: Int)",
+            keyPathSourceString(variadic, sizeof(variadic) - 1));
+
+  static const char firstVariadic[] = "$s1m1SVySbSid_SitcipACTK";
+  EXPECT_EQ("subscript(_: Int)",
+            keyPathSourceString(firstVariadic, sizeof(firstVariadic) - 1));
+
+  static const char emptyTuple[] = "$s1m1SVySbSi_yttcipACTK";
+  EXPECT_EQ("subscript(_: Int)",
+            keyPathSourceString(emptyTuple, sizeof(emptyTuple) - 1));
+}

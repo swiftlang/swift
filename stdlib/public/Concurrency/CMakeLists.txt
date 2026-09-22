@@ -83,6 +83,10 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature"
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+endif()
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -102,10 +106,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   TaskStatus.cpp
   TaskGroup.cpp
   TaskLocal.cpp
+  TaskRegistry.cpp
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStream.cpp
-  linker-support/magic-symbols-for-install-name.c
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
@@ -142,13 +146,14 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
+  Task+Deadline.swift
   TaskCancellation.swift
+  TaskCancellationScope.swift
   TaskGroup.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
   AsyncStreamBuffer.swift
-  AsyncStreamShims.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
   Deque/_DequeBuffer.swift
@@ -186,6 +191,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
   ExecutorImpl.cpp
+  linker-support/magic-symbols-for-install-name.c
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
@@ -271,6 +277,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   C_COMPILE_FLAGS
     -Dswift_Concurrency_EXPORTS ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
     -I${SWIFT_SOURCE_DIR}/stdlib/include
+  # WASI's libc++abi has no exception runtime, even in non-embedded builds.
+  C_COMPILE_FLAGS_WASI
+    -fno-exceptions
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
@@ -388,13 +397,18 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     # the triple list visible to add_embedded_swift_target_library.
     set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
 
+    # Record that embedded Concurrency is available for this triple, so that
+    # libraries built on top of it (e.g. Observation) can build for exactly the
+    # same set of triples instead of duplicating the filtering above.
+    set_property(GLOBAL APPEND PROPERTY
+      SWIFT_EMBEDDED_CONCURRENCY_TARGET_TRIPLES "${entry}")
+
     # lib/swift/embedded/_Concurrency.swiftmodule
     # lib/swift/embedded/<triple>/libswift_Concurrency.a
     add_embedded_swift_target_library(
       embedded-concurrency
       swift_Concurrency
       IS_STDLIB
-      INSTALL_BINARY
 
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
@@ -417,7 +431,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     add_embedded_swift_target_library(
       embedded-concurrency-default-executor
       swift_ConcurrencyDefaultExecutor
-      INSTALL_BINARY
 
       CooperativeGlobalExecutor.cpp
 

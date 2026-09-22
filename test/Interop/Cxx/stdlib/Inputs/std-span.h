@@ -80,7 +80,7 @@ struct DependsOnSelf {
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
 
 struct CaptureByReference {
-    void set(const std::vector<int>& x [[clang::lifetime_capture_by(this)]]) { 
+    void set(const std::vector<int>& x [[clang::lifetime_capture_by_this]]) {
         this->x = ConstSpanOfInt(x.data(), x.size());
     };
     ConstSpanOfInt x;
@@ -389,7 +389,7 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
 };
 
 // CHECK: class DependsOnSelfFRT {
-// CHECK-NEXT:   init()
+// CHECK-NEXT:   convenience init()
 // CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
 // CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt

@@ -11,12 +11,6 @@ enum FakeOptional<T> {
   case none
 }
 
-struct NonTrivialStruct {
-  var val: Klass
-}
-
-sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-
 // CHECK-LABEL: sil [ossa] @test_simplify_args1 :
 // CHECK: bb2:
 // CHECK-LABEL: } // end sil function 'test_simplify_args1'
@@ -179,48 +173,6 @@ bb4:
   return %t : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_simplify_args8 :
-// CHECK-NOT: unchecked_enum_data
-// CHECK-LABEL: } // end sil function 'test_simplify_args8'
-sil [ossa] @test_simplify_args8 : $@convention(thin) (@guaranteed Klass) -> () {
-bb0(%0 : @guaranteed $Klass):
-  specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %2 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0
-  br bb1(%2)
-
-bb1(%4 : @guaranteed $FakeOptional<Klass>):
-  %5 = borrowed %4 from (%0)
-  %6 = unchecked_enum_data %5, #FakeOptional.some!enumelt
-  %7 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  %8 = apply %7(%6) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb2
-
-bb2:
-  %10 = tuple ()
-  return %10
-}
-
-// CHECK-LABEL: sil [ossa] @test_simplify_args9 : 
-// CHECK-NOT: unchecked_enum_date
-// CHECK-LABEL: } // end sil function 'test_simplify_args9'
-sil [ossa] @test_simplify_args9 : $@convention(thin) (@owned Klass) -> () {
-bb0(%0 : @owned $Klass):
-  specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
-  br bb1(%1 : $FakeOptional<Klass>)
-
-bb1(%3 : @owned $FakeOptional<Klass>):
-  %4 = unchecked_enum_data %3 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  %c = apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
-  destroy_value %4 : $Klass
-  br bb3
-
-bb3:
-  %7 = tuple ()
-  return %7 : $()
-}
-
 // CHECK-LABEL: test_dont_remove_mandatory_dead_args :
 // CHECK: checked_cast_br AnyKlass in {{%.*}} : $AnyKlass to Klass, bb1
 // CHECK: bb1([[VAR:%[0-9]+]] : @guaranteed $Klass)
@@ -242,83 +194,5 @@ bb2(%default : @guaranteed $AnyKlass):
 bb3(%4 : $Builtin.Int32):
   %5 = tuple ()
   return %5 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_owned : 
-// CHECK: bb1([[ARG:%.*]] : @owned $FakeOptional<Klass>)
-// CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_owned'
-sil [ossa] @test_simplify_enum_arg_owned : $@convention(thin) (@owned Klass) -> () {
-bb0(%0 : @owned $Klass):
-  specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
-  %c = copy_value %1 : $FakeOptional<Klass>
-  br bb1(%1 : $FakeOptional<Klass>)
-
-bb1(%3 : @owned $FakeOptional<Klass>):
-  %4 = unchecked_enum_data %3 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb2
-
-bb2:
-  destroy_value %4 : $Klass
-  br bb3
-
-bb3:
-  destroy_value %c : $FakeOptional<Klass>
-  %t = tuple ()
-  return %t : $()
-}
-
-// CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_guaranteed1 : 
-// CHECK: bb1([[ARG:%.*]] : @guaranteed $Klass)
-// CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_guaranteed1'
-sil [ossa] @test_simplify_enum_arg_guaranteed1 : $@convention(thin) (@owned Klass) -> () {
-bb0(%0 : @owned $Klass):
-  specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %2 = begin_borrow %0
-  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2
-  %4 = copy_value %3
-  br bb1(%3)
-
-bb1(%6 : @guaranteed $FakeOptional<Klass>):
-  %7 = borrowed %6 from (%2)
-  %8 = unchecked_enum_data %7, #FakeOptional.some!enumelt
-  %9 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb2
-
-bb2:
-  destroy_value %4
-  end_borrow %2
-  destroy_value %0
-  %15 = tuple ()
-  return %15
-}
-
-// CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_guaranteed2 : 
-// CHECK: bb1([[ARG:%.*]] : @guaranteed $Klass)
-// CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_guaranteed2'
-sil [ossa] @test_simplify_enum_arg_guaranteed2 : $@convention(thin) (@owned Klass) -> () {
-bb0(%0 : @owned $Klass):
-  specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %2 = begin_borrow %0
-  %3 = struct $NonTrivialStruct (%2)
-  %4 = copy_value %3
-  br bb1(%3)
-
-bb1(%6 : @guaranteed $NonTrivialStruct):
-  %7 = borrowed %6 from (%2)
-  %8 = struct_extract %7, #NonTrivialStruct.val
-  %9 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb2
-
-bb2:
-  destroy_value %4
-  end_borrow %2
-  destroy_value %0
-  %15 = tuple ()
-  return %15
 }
 

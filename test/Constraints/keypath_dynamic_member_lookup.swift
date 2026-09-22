@@ -715,3 +715,10 @@ func testMultipleArguments() {
     e.implementation("ultimate question", 42)
   }
 }
+
+#if DIAGS
+func testInvalidArgument(_ x: Lens<[Int]>, _ y: SingleLens<[Int]>) {
+  _ = x[undefined] // expected-error {{cannot find 'undefined' in scope}}
+  _ = y[undefined] // expected-error {{cannot find 'undefined' in scope}}
+}
+#endif

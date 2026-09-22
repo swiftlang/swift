@@ -209,6 +209,12 @@ namespace swift {
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;
 
+    /// Causes the compiler to use weak linkage for symbols belonging to
+    /// declarations that are back deployed by the Span compatibility library
+    /// when the deployment target predates the OS release that introduced
+    /// those declarations.
+    bool WeakLinkSpanCompatibilityLib = false;
+
     /// Should the editor placeholder error be downgraded to a warning?
     bool WarnOnEditorPlaceholder = false;
 
@@ -262,6 +268,9 @@ namespace swift {
 
     /// Emit remarks for unexpected conditions when serializing a module.
     bool EnableModuleSerializationRemarks = false;
+
+    /// Emit remarks about hidden type layout serialization.
+    bool EnableHiddenTypeLayoutSerializationRemarks = false;
 
     /// Emit remarks about the source of each element exposed by the module API.
     bool EnableModuleApiImportRemarks = false;
@@ -339,7 +348,7 @@ namespace swift {
     /// may override it. `ISwiftObject` is compiler-managed under every model.
     enum class COMInteropModel {
       Microsoft,      ///< Microsoft COM: `IUnknown` root.
-      CoreFoundation, ///< CoreFoundation CFPlugIn: `IUnknown` root.
+      CoreFoundation, ///< CoreFoundation CFPlugIn: no protocol root.
     };
     std::optional<COMInteropModel> COMModel = std::nullopt;
 
@@ -989,7 +998,7 @@ namespace swift {
 
     /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+    unsigned SolverMemoryThreshold = 516 * 1024 * 1024;
 
     /// The maximum number of scopes we explore before giving up.
     unsigned SolverScopeThreshold = 1024 * 1024;
@@ -1097,8 +1106,15 @@ namespace swift {
     bool SolverPruneDisjunctions = true;
 
     /// Enable an inefficient form of inference, which will sometimes prevent
-    /// exact binding promotion from taking place.
+    /// exact binding promotion from taking place. This will be off by default
+    /// eventually.
     bool SolverEnableEnumerateSupertypes = true;
+
+    /// Enable type variable joins. This will be on by default eventually.
+    bool SolverEnableTypeVariableJoins = false;
+
+    /// Enable type variable joins. This will be on by default eventually.
+    bool SolverEnablePromoteSupertypes = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1228,6 +1244,14 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-class-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendClassSelectorStubs = std::nullopt;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

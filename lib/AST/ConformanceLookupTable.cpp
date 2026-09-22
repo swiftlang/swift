@@ -28,7 +28,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -717,11 +716,23 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   if (lhsHasReqs != rhsHasReqs)
     return lhsHasReqs ? Ordering::After : Ordering::Before;
 
-  // If the two conformances come from the same file, pick the first context
-  // in the file.
+  auto isSPIImplier = [](ConformanceEntry *entry) {
+    if (auto *D = entry->getDeclContext()->getAsDecl())
+      return D->isSPI();
+
+    return false;
+  };
+
+  // Handle conformances that come from the same file.
   auto lhsSF = lhs->getDeclContext()->getParentSourceFile();
   auto rhsSF = rhs->getDeclContext()->getParentSourceFile();
   if (lhsSF && lhsSF == rhsSF) {
+    // Prefer the context that isn't SPI.
+    bool lhsIsSPI = isSPIImplier(lhs);
+    if (lhsIsSPI != isSPIImplier(rhs))
+      return lhsIsSPI ? Ordering::After : Ordering::Before;
+
+    // Otherwise, pick the context that was written first in the file.
     ASTContext &ctx = lhsSF->getASTContext();
     return ctx.SourceMgr.isBeforeInBuffer(lhs->getDeclaredLoc(),
                                           rhs->getDeclaredLoc())
@@ -740,6 +751,11 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     if (typeSF == rhsSF)
       return Ordering::After;
   }
+
+  // Prefer the context that isn't SPI.
+  bool lhsIsSPI = isSPIImplier(lhs);
+  if (lhsIsSPI != isSPIImplier(rhs))
+    return lhsIsSPI ? Ordering::After : Ordering::Before;
 
   // Otherwise, pick the earlier file unit.
   auto lhsFileUnit
@@ -1088,10 +1104,20 @@ bool ConformanceLookupTable::lookupConformance(
   // Update to record all explicit and inherited conformances.
   updateLookupTable(nominal, ConformanceStage::Inherited);
 
+  auto hasUnexpanded = [&](const ConformanceEntries &entries) {
+    return llvm::any_of(entries, [&](const ConformanceEntry *entry) {
+      return entry->getRankingKind() == ConformanceEntryKind::PreMacroExpansion;
+    });
+  };
+
   // Look for conformances to this protocol.
   auto known = Conformances.find(protocol);
-  if (known == Conformances.end()) {
-    // If we didn't find anything, expand implied conformances.
+  if (known == Conformances.end() || hasUnexpanded(known->second)) {
+    // If we didn't find anything, or have unexpanded macro conformances, expand
+    // implied conformances. We can run into the latter case when we expand a
+    // macro that introduces a conformance that implies another conformance --
+    // the implied conformance needs its source updating to account for the new
+    // explicit conformance.
     updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
     known = Conformances.find(protocol);
 

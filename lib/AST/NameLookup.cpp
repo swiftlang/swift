@@ -16,7 +16,6 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceAttributes.h"
@@ -31,14 +30,12 @@
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -848,9 +845,9 @@ static CanType removeThrownError(Type type) {
   return type.transformRec([](TypeBase *type) -> std::optional<Type> {
     if (auto funcTy = dyn_cast<FunctionType>(type)) {
       if (auto newExtInfo = extInfoRemovingThrownError(funcTy)) {
-        return FunctionType::get(
-                  funcTy->getParams(), funcTy->getResult(), *newExtInfo)
-          ->getCanonicalType();
+        return FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                                 funcTy->getResult(), *newExtInfo)
+            ->getCanonicalType();
       }
 
       return std::nullopt;
@@ -858,11 +855,11 @@ static CanType removeThrownError(Type type) {
 
     if (auto genericFuncTy = dyn_cast<GenericFunctionType>(type)) {
       if (auto newExtInfo = extInfoRemovingThrownError(genericFuncTy)) {
-        return GenericFunctionType::get(
-                  genericFuncTy->getGenericSignature(),
-                  genericFuncTy->getParams(), genericFuncTy->getResult(),
-                  *newExtInfo)
-          ->getCanonicalType();
+        return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
+                                        genericFuncTy->getParams(),
+                                        genericFuncTy->getYields(),
+                                        genericFuncTy->getResult(), *newExtInfo)
+            ->getCanonicalType();
       }
 
       return std::nullopt;
@@ -2254,8 +2251,7 @@ static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
     } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
       if (name.isSimpleName(ctx.Id_CLSID) &&
           CD->isCOMImplementation() && CD->isInSwiftSourceFile()) {
-        evaluateOrDefault(ctx.evaluator,
-                          SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+        evaluateOrDefault(ctx.evaluator, SynthesizeCOMCLSIDRequest{CD}, nullptr);
       }
     }
   }
@@ -3960,6 +3956,12 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
     /// Walk everything that's available.
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
+    }
+
+    /// An opaque type can sit inside a generic argument that was parsed as a
+    /// value expression, such as 'G<(Int, some P)>'.
+    bool shouldWalkIntoGenericArgumentExprTypeRepr() const override {
+      return true;
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {

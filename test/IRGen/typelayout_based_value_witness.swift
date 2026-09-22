@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
-// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
 // REQUIRES: PTRSIZE=64
 
@@ -81,7 +81,7 @@ public enum ForwardEnum<T> {
 // CHECK: }
 
 
-// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr readonly captures(none) %"A<T>")
+// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr {{(nofree )?}}readonly captures(none) %"A<T>")
 // OPT:   [[T_PARAM:%.*]] = getelementptr inbounds{{.*}} i8, ptr %"A<T>", i64 16
 // OPT:   [[T:%.*]] = load ptr, ptr [[T_PARAM]]
 // OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8, ptr [[T]], {{(i64|i32)}} -8
@@ -127,7 +127,7 @@ public enum ForwardEnum<T> {
 // OPT:   ret void
 // CHECK: }
 
-// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias writeonly captures(none) %value, i32 %tag, ptr readonly captures(none) %"E3<T>")
+// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias {{(nofree )?}}writeonly captures(none) %value, i32 %tag, ptr {{(nofree )?}}readonly captures(none) %"E3<T>")
 // OPT:  [[IS_EMPTY:%.*]] = icmp eq i32 {{%.*}}, 0
 // OPT:  br i1 [[IS_EMPTY]], label %empty-payload, label %non-empty-payload
 // OPT: }

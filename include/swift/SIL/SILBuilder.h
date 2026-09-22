@@ -378,7 +378,8 @@ public:
       SubstitutionMap subs, ParameterConvention calleeConvention,
       SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
-          PartialApplyInst::OnStackKind::NotOnStack);
+          PartialApplyInst::OnStackKind::NotOnStack,
+      bool isCalledOnce = false);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -591,6 +592,7 @@ public:
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
           SILFunctionTypeIsolation::forUnknown(),
+      bool IsCalledOnce = false,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
@@ -608,7 +610,8 @@ public:
            "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, ArgLocs));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested,
+        IsCalledOnce, ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(
@@ -633,7 +636,7 @@ public:
     return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
                                                  beginApply, ResultType));
   }
-  
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
@@ -824,7 +827,7 @@ public:
     return insert(new (getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
-  
+
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,
                              SubstitutionMap Subs,
@@ -1093,6 +1096,10 @@ public:
 
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false, bool overrideLoc = true);
+  DebugValueInst *createDebugValue(
+      SILLocation Loc, ArrayRef<SILValue> operands, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
@@ -1426,9 +1433,9 @@ public:
   }
 
   RawPointerToRefInst *createRawPointerToRef(SILLocation Loc, SILValue Op,
-                                             SILType Ty) {
-    return insert(new (getModule())
-                      RawPointerToRefInst(getSILDebugLocation(Loc), Op, Ty));
+                                             SILType Ty, bool isImmortal) {
+    return insert(new (getModule()) RawPointerToRefInst(
+        getSILDebugLocation(Loc), Op, Ty, isImmortal));
   }
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
@@ -1616,14 +1623,13 @@ public:
         destFormalTy, getFunction(), forwardingOwnershipKind));
   }
 
-  UnconditionalCheckedCastAddrInst *
-  createUnconditionalCheckedCastAddr(SILLocation Loc,
-                                     CheckedCastInstOptions options,
-                                     SILValue src, CanType sourceFormalType,
-                                     SILValue dest, CanType targetFormalType) {
+  UnconditionalCheckedCastAddrInst *createUnconditionalCheckedCastAddr(
+      SILLocation Loc, CheckedCastInstOptions options, SILValue src,
+      CanType sourceFormalType, SILValue dest, CanType targetFormalType,
+      bool isCopy = false) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), options, src, sourceFormalType,
-        dest, targetFormalType, getFunction()));
+        getSILDebugLocation(Loc), options, isCopy, src, sourceFormalType, dest,
+        targetFormalType, getFunction()));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
@@ -2155,6 +2161,12 @@ public:
                                          Member, MethodTy, &getFunction()));
   }
 
+  COMMethodInst *createCOMMethod(SILLocation Loc, SILValue Operand,
+                                 SILDeclRef Member, SILType MethodTy) {
+    return insert(COMMethodInst::create(getSILDebugLocation(Loc), Operand,
+                                        Member, MethodTy, &getFunction()));
+  }
+
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
                                              SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ObjCSuperMethodInst(
@@ -2208,6 +2220,20 @@ public:
                            ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) OpenExistentialRefInst(
         getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind));
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createOpenCOMExistential(Loc, Operand, Ty,
+                                    Operand->getOwnershipKind());
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
+    auto instruction = new (getModule()) OpenCOMExistentialInst(
+        getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind);
+    return insert(instruction);
   }
 
   OpenExistentialBoxInst *
@@ -2537,6 +2563,11 @@ public:
     return insert(new (getModule()) EndCOWMutationAddrInst(
         getSILDebugLocation(Loc), operand));
   }
+  EndFormalScopeInst *createEndFormalScope(SILLocation Loc,
+                                           SILValue operand) {
+    return insert(new (getModule()) EndFormalScopeInst(
+        getSILDebugLocation(Loc), operand));
+  }
   DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
@@ -2802,7 +2833,7 @@ public:
         YieldInst::create(getSILDebugLocation(loc), yieldedValues,
                           resumeBB, unwindBB, getFunction()));
   }
-  
+
   AwaitAsyncContinuationInst *createAwaitAsyncContinuation(SILLocation loc,
                                                            SILValue continuation,
                                                            SILBasicBlock *resumeBB,
@@ -2812,7 +2843,7 @@ public:
                                                      continuation,
                                                      resumeBB, errorBB));
   }
-  
+
   CondBranchInst *
   createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
                    SILBasicBlock *Target2,
@@ -2912,7 +2943,7 @@ public:
                           CheckedCastInstOptions options,
                           SILValue op,
                           CanType srcFormalTy, SILType destLoweredTy,
-                          CanType destFormalTy, SILBasicBlock *successBB, 
+                          CanType destFormalTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),

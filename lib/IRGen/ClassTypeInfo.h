@@ -20,7 +20,9 @@
 #include "ClassLayout.h"
 #include "HeapTypeInfo.h"
 
-#include "swift/ClangImporter/ClangImporterRequests.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
+#include "clang/AST/Decl.h"
 
 namespace swift {
 namespace irgen {
@@ -46,6 +48,12 @@ class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
                              bool forBackwardDeployment) const;
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
                 ReferenceCounting refcount, llvm::StructType *classLayoutType)
@@ -59,6 +67,21 @@ public:
 
   llvm::Type *getClassLayoutType() const { return classLayoutType; }
 
+  /// For a foreign reference type with custom reference counting, returns the
+  /// (retain, release) Clang functions to call. Returns {nullptr, nullptr} for
+  /// any type without custom reference counting.
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getCustomRefCountingOperations() const {
+    auto *record =
+        dyn_cast_or_null<clang::RecordDecl>(getClass()->getClangDecl());
+    if (!record)
+      return {nullptr, nullptr};
+    return getClass()
+        ->getASTContext()
+        .getClangModuleLoader()
+        ->getForeignReferenceTypeOperations(record);
+  }
+
   const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type,
                                     bool forBackwardDeployment) const;
 
@@ -68,13 +91,7 @@ public:
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      auto releaseFn =
-          evaluateOrDefault(
-              getClass()->getASTContext().evaluator,
-              CustomRefCountingOperation(
-                  {getClass(), CustomRefCountingOperationKind::release}),
-              {})
-              .operation;
+      auto releaseFn = getCustomRefCountingOperations().second;
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
       return;
     }
@@ -91,13 +108,7 @@ public:
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      auto retainFn =
-          evaluateOrDefault(
-              getClass()->getASTContext().evaluator,
-              CustomRefCountingOperation(
-                  {getClass(), CustomRefCountingOperationKind::retain}),
-              {})
-              .operation;
+      auto retainFn = getCustomRefCountingOperations().first;
       IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
       return;
     }
@@ -111,13 +122,7 @@ public:
            "only supported for custom ref-counting");
 
     llvm::Value *value = e.claimNext();
-    auto retainFn =
-        evaluateOrDefault(
-            getClass()->getASTContext().evaluator,
-            CustomRefCountingOperation(
-                {getClass(), CustomRefCountingOperationKind::retain}),
-            {})
-            .operation;
+    auto retainFn = getCustomRefCountingOperations().first;
     IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value,
                                                   needsNullCheck);
   }
@@ -140,13 +145,7 @@ public:
            "only supported for custom ref-counting");
 
     llvm::Value *value = e.claimNext();
-    auto releaseFn =
-        evaluateOrDefault(
-            getClass()->getASTContext().evaluator,
-            CustomRefCountingOperation(
-                {getClass(), CustomRefCountingOperationKind::release}),
-            {})
-            .operation;
+    auto releaseFn = getCustomRefCountingOperations().second;
     IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value,
                                                   needsNullCheck);
   }

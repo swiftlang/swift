@@ -4,6 +4,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s \
 // RUN:    -disable-objc-interop
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 #if hasAttribute(c)
 // good
 #else

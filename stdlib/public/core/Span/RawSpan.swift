@@ -400,6 +400,30 @@ extension RawSpan {
     _precondition(byteOffsets.contains(position), "Index out of bounds")
   }
 
+  // SILOptimizer looks for fixed_storage.check_range semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_range")
+  @export(implementation) @inline(__always)
+  internal func _checkRange(lowerBound: Int, upperBound: Int) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: upperBound) <= _assumeNonNegative(_count),
+      "Byte offset range out of bounds"
+    )
+  }
+
+  // SILOptimizer looks for fixed_storage.check_range_offset semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_range_offset")
+  @export(implementation) @inline(__always)
+  internal func _checkRange(offset: Int, length: Int) {
+    _precondition(
+      UInt(bitPattern: offset) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: offset &+ length) <= _assumeNonNegative(_count),
+      "Byte offset range out of bounds"
+    )
+  }
+
   /// Accesses the byte at the specified offset in the span.
   ///
   /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
@@ -432,24 +456,18 @@ extension RawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
   @_lifetime(copy self)
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe extracting(unchecked: bounds)
   }
 
@@ -463,15 +481,13 @@ extension RawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -495,13 +511,11 @@ extension RawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -521,15 +535,13 @@ extension RawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -555,9 +567,8 @@ extension RawSpan {
 
   /// Constructs a new span over all the bytes of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `RawSpan` over all the bytes of this span.
   ///
@@ -663,11 +674,7 @@ extension RawSpan {
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset: offset, length: MemoryLayout<T>.size)
     return unsafe unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -718,11 +725,7 @@ extension RawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset: offset, length: MemoryLayout<T>.size)
     return unsafe unsafeLoadUnaligned(
       fromUncheckedByteOffset: offset, as: T.self
     )
@@ -785,7 +788,7 @@ extension RawSpan {
   ///   - byteOrder: The order in which the bytes will be decoded.
   /// - Returns: A new value of type `T`, read from `offset`.
   @export(implementation)
-  @available(SwiftStdlib 6.4, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   public func load<T: ConvertibleFromBytes & FixedWidthInteger>(
     fromByteOffset offset: Int,
     as type: T.Type,
@@ -865,10 +868,6 @@ extension RawSpan {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the bytes.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` bytes.
@@ -890,18 +889,14 @@ extension RawSpan {
     extracting(first: maxLength)
   }
 
-  /// Returns a span over all but the given number of trailing bytes.
+  /// Returns a span over all but the specified number of trailing bytes.
   ///
   /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter k: The number of bytes to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of bytes at the end.
+  /// - Returns: A span leaving off the specified number of trailing bytes.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -921,15 +916,14 @@ extension RawSpan {
     extracting(droppingLast: k)
   }
 
-  /// Returns a span containing the trailing bytes of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing bytes of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the bytes.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -955,14 +949,13 @@ extension RawSpan {
     extracting(last: maxLength)
   }
 
-  /// Returns a span over all but the given number of initial bytes.
+  /// Returns a span over all but the specified number of initial bytes.
   ///
   /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of bytes to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.

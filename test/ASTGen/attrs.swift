@@ -136,6 +136,12 @@ class ExclusivityAttrClass {
 
 struct SectionStruct {
 	@section("__TEXT,__mysection") @used func foo() {}
+	@section(default) @used func bar() {}
+
+	func withClosures(_ body: () -> Void) {
+		withClosures { @section("__TEXT,__mysection") in }
+		withClosures { @section(default) in }
+	}
 }
 
 protocol ImplementsProto {
@@ -234,6 +240,10 @@ struct ReferenceOwnershipModifierTest<X: AnyObject> {
     unowned(safe) var unownedSafeValue: X
     unowned(unsafe) var unmanagedValue: X
 }
+
+@unsafe func unsafeTest() {}
+@unsafe(always) func alwaysUnsafeTest() {}
+@safe func safeTest() {}
 
 @_rawLayout(like: T) struct RawStorage<T>: ~Copyable {}
 @_rawLayout(like: T, movesAsLike) struct RawStorage2<T>: ~Copyable {}

@@ -52,7 +52,6 @@
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -193,8 +192,7 @@ public:
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
     auto members = ED->getAllMembers();
-    auto hasMembers = std::any_of(members.begin(), members.end(),
-                                  [this](const Decl *D) -> bool {
+    auto hasMembers = llvm::any_of(members, [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
         if (shouldInclude(VD))
           return true;
@@ -202,10 +200,9 @@ public:
     });
 
     auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
-                                    [this](const ProtocolDecl *PD) -> bool {
-      return shouldInclude(PD);
-    });
+    auto hasProtocols = llvm::any_of(
+        protocols,
+        [this](const ProtocolDecl *PD) -> bool { return shouldInclude(PD); });
 
     return (!hasMembers && !hasProtocols);
   }
@@ -1875,7 +1872,7 @@ public:
         continue;
       }
 
-      auto platKind = AvAttr.getPlatform();
+      auto platKind = *AvAttr.getPlatform();
       const char *plat;
       switch (platKind) {
       case PlatformKind::macOS:
@@ -1936,8 +1933,6 @@ public:
       case PlatformKind::Android:
         plat = "android";
         break;
-      case PlatformKind::none:
-        llvm_unreachable("handled above");
       }
 
       maybePrintLeadingSpace();
@@ -2051,26 +2046,6 @@ private:
     return true;
   }
 
-  /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
-  /// thereof.
-  bool isCFTypeRef(Type ty) {
-    if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
-      ty = existential->getConstraintType();
-
-    const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
-      TAD = aliasTy->getDecl();
-      ty = aliasTy->getSinglyDesugaredType();
-    }
-
-    if (!TAD || !TAD->hasClangNode())
-      return false;
-
-    if (owningPrinter.ID_CFTypeRef.empty())
-      owningPrinter.ID_CFTypeRef = getASTContext().getIdentifier("CFTypeRef");
-    return TAD->getName() == owningPrinter.ID_CFTypeRef;
-  }
-
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
@@ -2087,7 +2062,7 @@ private:
       }
     }
 
-    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !ty->isCFTypeRef())
       return true;
 
     return false;
@@ -3166,6 +3141,12 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   std::optional<ForeignLanguage> cdeclKind = std::nullopt;
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
     cdeclKind = FD->getCDeclKind();
+
+  // A @cxx function implements a C++ declaration that already exists in an
+  // imported C++ header; never redeclare it in a generated header.
+  if (cdeclKind == ForeignLanguage::Cxx)
+    return false;
+
   if (cdeclKind &&
       (*cdeclKind == ForeignLanguage::C) !=
        (outputLang == OutputLanguageMode::C))

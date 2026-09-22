@@ -121,6 +121,107 @@ private struct VTableSpecializer {
   }
 }
 
+/// Specializes the deinit of a non-copyable generic type for the concrete `type`.
+///
+/// This is required in Embedded Swift: IRGen emits a call to the deinit from the
+/// destroy value witness of `type`'s metadata, and an unspecialized deinit takes
+/// type metadata for its generic parameters, which doesn't exist in Embedded Swift.
+///
+/// Recurses into stored properties and enum payloads, because emitting a type's
+/// value witnesses also destroys those.
+///
+/// `handled` carries the types already dealt with, so that a caller can share it
+/// across many calls and avoid re-walking the same aggregates.
+func specializeDeinits(forType type: Type,
+                       in function: Function,
+                       handled: inout Set<Type>,
+                       _ context: ModulePassContext,
+                       notifyNewFunction: (Function) -> ())
+{
+  guard type.isMoveOnly, handled.insert(type).inserted else {
+    return
+  }
+
+  // A `Builtin.FixedArray` (`InlineArray`) is destroyed element by element, and
+  // a tuple has no deinit of its own but its elements may. Neither is nominal,
+  // so handle them before looking for a deinit. This mirrors the aggregates
+  // `devirtualize(destroy:)` decomposes.
+  if type.isBuiltinFixedArray {
+    specializeDeinits(forType: type.builtinFixedArrayElementType(in: function),
+                      in: function, handled: &handled, context,
+                      notifyNewFunction: notifyNewFunction)
+    return
+  }
+
+  if type.isTuple {
+    for element in type.tupleElements {
+      specializeDeinits(forType: element, in: function, handled: &handled, context,
+                        notifyNewFunction: notifyNewFunction)
+    }
+    return
+  }
+
+  if let nominal = type.nominal, nominal.valueTypeDestructor != nil {
+    specializeDeinit(forType: type, nominal: nominal, context, notifyNewFunction)
+  }
+
+  // The value witnesses of an aggregate destroy its members, so their deinits
+  // need to be specialized, too.
+  if type.isStruct {
+    if let fields = type.getNominalFields(in: function) {
+      for field in fields {
+        specializeDeinits(forType: field, in: function, handled: &handled, context,
+                          notifyNewFunction: notifyNewFunction)
+      }
+    }
+  } else if type.isEnum {
+    if let cases = type.getEnumCases(in: function) {
+      for enumCase in cases {
+        if let payload = enumCase.payload {
+          specializeDeinits(forType: payload, in: function, handled: &handled, context,
+                            notifyNewFunction: notifyNewFunction)
+        }
+      }
+    }
+  }
+}
+
+private func specializeDeinit(forType type: Type,
+                              nominal: NominalTypeDecl,
+                              _ context: ModulePassContext,
+                              _ notifyNewFunction: (Function) -> ())
+{
+  guard let origDeinit = context.lookupDeinit(ofNominal: nominal),
+        // A non-generic deinit needs no specialization.
+        origDeinit.isGeneric,
+        // Don't specialize twice.
+        context.lookupSpecializedDeinit(ofType: type) == nil
+  else {
+    return
+  }
+
+  let deinitSubs = type.canonicalType.contextSubstitutionMap.getMethodSubstitutions(for: origDeinit)
+
+  guard !deinitSubs.conformances.contains(where: { !$0.isValid }),
+        context.loadFunction(function: origDeinit, loadCalleesRecursively: true),
+        let specializedDeinit = context.specialize(function: origDeinit, for: deinitSubs,
+                                                   convertIndirectToDirect: false, isMandatory: true)
+  else {
+    return
+  }
+  notifyNewFunction(specializedDeinit)
+
+  context.deserializeAllCallees(of: specializedDeinit, mode: .allFunctions)
+  // Use `shared` rather than `public` linkage: the specialization is only ever
+  // referenced from the value witnesses of types in this module, and importing
+  // modules create their own. Shared linkage lets the linker merge duplicates
+  // and dead-strip the deinit when the metadata that referenced it is stripped.
+  specializedDeinit.set(linkage: .shared, context)
+  specializedDeinit.set(isSerialized: false, context)
+
+  context.addSpecializedDeinit(ofType: type, specializedDeinit)
+}
+
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
 func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassContext) {
   if let existingSpecialization = context.lookupWitnessTable(for: conformance),
@@ -181,8 +282,12 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       //       let concreteAssociateConf = assocConf.subst(with: conformance.specializedSubstitutions)
       let concreteAssociateConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType,
                                                                        to: assocConf.protocol)
-      if concreteAssociateConf.isSpecialized {
-        specializeWitnessTable(for: concreteAssociateConf, context)
+      // The associated conformance is abstract if the associated type is an opaque result
+      // type. Keep the abstract conformance in the entry - IRGen looks through the opaque
+      // type - but make sure the underlying type's witness table exists.
+      let underlyingConf = concreteAssociateConf.lookingThroughOpaqueTypes(context)
+      if underlyingConf.isConcrete, underlyingConf.isSpecialized {
+        specializeWitnessTable(for: underlyingConf, context)
       }
       return .associatedConformance(requirement: requirement,
                                     witness: concreteAssociateConf)
@@ -201,7 +306,8 @@ private func specializeDefaultMethods(for conformance: Conformance,
                                       _ context: ModulePassContext)
 {
   // Avoid infinite recursion, which may happen if an associated conformance is the conformance itself.
-  guard visited.insert(conformance).inserted,
+  guard conformance.isConcrete,
+        visited.insert(conformance).inserted,
         let witnessTable = context.lookupWitnessTable(for: conformance.rootConformance)
   else {
     return
@@ -235,13 +341,17 @@ private func specializeDefaultMethods(for conformance: Conformance,
       }
       specialized = true
       return .method(requirement: requirement, witness: specializedMethod)
-    case .baseProtocol(_, let witness):
-      specializeDefaultMethods(for: witness, visited: &visited, context)
+    case .baseProtocol(let requirement, _):
+      let baseConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.selfInterfaceType,
+                                                          to: requirement)
+      specializeNestedConformance(baseConf, visited: &visited, context)
       return origEntry
     case .associatedType:
       return origEntry
-    case .associatedConformance(_, let assocConf):
-      specializeDefaultMethods(for: assocConf, visited: &visited, context)
+    case .associatedConformance(let requirement, let assocConf):
+      let concreteAssocConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType,
+                                                                   to: assocConf.protocol)
+      specializeNestedConformance(concreteAssocConf, visited: &visited, context)
       return origEntry
     }
   }
@@ -250,6 +360,42 @@ private func specializeDefaultMethods(for conformance: Conformance,
   if specialized {
     context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
                                           linkage: .shared, serialized: false)
+  }
+}
+
+/// Handles a base-protocol or associated conformance of a non-generic witness table.
+///
+/// If the nested conformance is specialized it needs a specialized witness table: in Embedded
+/// Swift such a witness table entry directly points to the witness table of the nested
+/// conformance. Nothing else creates it, because the outer conformance is not specialized.
+private func specializeNestedConformance(_ conformance: Conformance,
+                                         visited: inout Set<Conformance>,
+                                         _ context: ModulePassContext)
+{
+  // If the associated type is an opaque result type the conformance is abstract. The witness
+  // table of the opaque type's underlying type is still needed, because IRGen looks through
+  // the opaque type when it emits the entry.
+  let conformance = conformance.lookingThroughOpaqueTypes(context)
+  guard conformance.isConcrete else {
+    return
+  }
+  let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
+  if baseConf.isSpecialized {
+    specializeWitnessTable(for: conformance, context)
+  } else {
+    specializeDefaultMethods(for: conformance, visited: &visited, context)
+  }
+}
+
+extension Conformance {
+  /// If an associated type is an opaque result type, the associated conformance is abstract.
+  /// In that case return the concrete conformance of the opaque type's underlying type, which
+  /// is always known in Embedded Swift.
+  func lookingThroughOpaqueTypes(_ context: ModulePassContext) -> Conformance {
+    if isConcrete {
+      return self
+    }
+    return context.substituteOpaqueTypes(in: self)
   }
 }
 

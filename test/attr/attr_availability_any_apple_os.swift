@@ -6,7 +6,7 @@ func availableIn26Short() { }
 @available(anyAppleOS 26.0, *)
 func availableIn26_0Short() { }
 
-@available(AnyAppleOS 26, *) // expected-warning {{unrecognized platform name 'AnyAppleOS'; did you mean 'anyAppleOS'}}
+@available(AnyAppleOS 26, *) // expected-warning {{cannot find availability domain 'AnyAppleOS'; did you mean 'anyAppleOS'}}
 func miscapitalized() { }
 
 @available(anyAppleOS 25, *) // expected-warning {{'25' is not a valid version number for any Apple OS}}

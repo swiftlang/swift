@@ -3,7 +3,7 @@
 // look-through and ABI-surface restrictions as a direct variable reference.
 
 // REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -typecheck -dump-ast %s -disable-availability-checking -enable-experimental-feature LiteralExpressions -verify | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s -target %target-swift-6.2-abi-triple -enable-experimental-feature LiteralExpressions -verify | %FileCheck %s
 
 // A `static let` whose initializer is itself a chain of static references folds
 // to its literal value.

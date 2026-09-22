@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
 // RUN:   -I %S%{fs-sep}Inputs %s \
-// RUN:   -disable-availability-checking \
 // RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inherit-frt.hpp
 
 import InheritFRT

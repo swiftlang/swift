@@ -202,6 +202,13 @@ OVERRIDE_TASK(task_addCancellationHandler,
                void *context),
               (handler, context))
 
+OVERRIDE_TASK(task_addCancellationHandlerWithReason,
+              CancellationNotificationStatusRecord *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (CancellationNotificationStatusRecord::FunctionTypeWithReason handler,
+               void *context),
+              (handler, context))
+
 OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (CancellationNotificationStatusRecord *record), (record))
@@ -335,6 +342,11 @@ OVERRIDE_TASK_GROUP(taskGroup_cancelAll, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))
 
+OVERRIDE_TASK_GROUP(taskGroup_cancelAllWithFlags, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (TaskGroup *group, size_t flags),
+                    (group, flags))
+
 OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, bool unconditionally),
@@ -402,6 +414,11 @@ OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))
 
+OVERRIDE_TASK_STATUS(task_cancelWithFlags, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (AsyncTask *task, size_t flags),
+                     (task, flags))
+
 OVERRIDE_TASK_GROUP(task_cancel_group_child_tasks, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))
@@ -424,6 +441,56 @@ OVERRIDE_TASK_STATUS(task_pushTaskExecutorPreference,
 OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (TaskExecutorPreferenceStatusRecord *record),
+                     (record))
+
+// Task deadlines are unavailable in Embedded Swift
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+OVERRIDE_TASK_STATUS(task_pushDeadline,
+                     void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::,
+                     (TaskDeadlineStatusRecord *record,
+                      OpaqueValue *clock,
+                      OpaqueValue *instant,
+                      const Metadata *clockType,
+                      const Metadata *instantType),
+                     (record, clock, instant, clockType, instantType))
+
+OVERRIDE_TASK_STATUS(task_popDeadline, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskDeadlineStatusRecord *record),
+                     (record))
+
+OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
+                     OpaqueValue *,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::,
+                     (OpaqueValue *queryClock,
+                      const Metadata *clockType,
+                      const WitnessTable *identifiableWT,
+                      const WitnessTable *clockWT),
+                     (queryClock, clockType, identifiableWT, clockWT))
+
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+OVERRIDE_TASK_STATUS(task_pushCancellationScope, TaskCancellationScopeRecord *,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, , )
+
+OVERRIDE_TASK_STATUS(task_popCancellationScope, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskCancellationScopeRecord *record),
+                     (record))
+
+OVERRIDE_TASK_STATUS(task_cancelCancellationScope, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskCancellationScopeRecord *record, size_t flags),
+                     (record, flags))
+
+OVERRIDE_TASK_STATUS(task_cancellationScopeIsCancelled, bool,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskCancellationScopeRecord *record),
                      (record))
 
 OVERRIDE_TASK(task_startOnMainActor, void,

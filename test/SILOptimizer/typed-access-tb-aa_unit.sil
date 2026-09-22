@@ -233,6 +233,88 @@ bb0:
   return %21 : $()
 }
 
+// CHECK-LABEL: @bridge_object_test
+
+// A BridgeObject may alias itself and all the types which are not eligible for TBAA,
+// i.e. RawPointer, NativeObject and AnyObject.
+
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+
+// But it does not alias other builtin scalar types, class references or
+// aggregates which don't contain a BridgeObject.
+
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int64
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*BOTest_C1
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*BOTest_S1
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+// CHECK-NEXT:     %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*BOTest_S2
+// CHECK-NEXT:   NoAlias
+
+class BOTest_C1 {
+  var x : Builtin.Int32
+  init()
+}
+
+// A struct which contains a BridgeObject.
+struct BOTest_S1 {
+  var b : Builtin.BridgeObject
+}
+
+// A struct which does not contain a BridgeObject.
+struct BOTest_S2 {
+  var i : Builtin.Int32
+}
+
+sil @bridge_object_test : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
+  %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.BridgeObject
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.AnyObject
+  %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*BOTest_C1
+  %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*BOTest_S1
+  %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*BOTest_S2
+
+  fix_lifetime %0 : $*Builtin.BridgeObject
+  fix_lifetime %1 : $*Builtin.RawPointer
+  fix_lifetime %2 : $*Builtin.NativeObject
+  fix_lifetime %3 : $*Builtin.AnyObject
+  fix_lifetime %4 : $*Builtin.Int64
+  fix_lifetime %5 : $*BOTest_C1
+  fix_lifetime %6 : $*BOTest_S1
+  fix_lifetime %7 : $*BOTest_S2
+
+  %r = tuple()
+  return %r : $()
+}
+
 
 // Make sure that struct addresses:
 //

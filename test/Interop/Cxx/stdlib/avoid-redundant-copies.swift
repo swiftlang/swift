@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
 
 // REQUIRES: executable_test
 

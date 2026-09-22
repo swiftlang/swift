@@ -147,8 +147,8 @@ infix operator ***~ : Starry
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
-@available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+@available(*, unavailable, message: "call the 'map()' method on the sequence") // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>(
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -607,8 +607,8 @@ func r22470302(_ c: r22470302Class) {
 
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
-  @available(*, unavailable, message: "calling this is unwise")
-  func unavail<T : Sequence> // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  @available(*, unavailable, message: "calling this is unwise") // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : Sequence>
     (_ a : T) -> String where T.Iterator.Element == String {}
 }
 extension Array {
@@ -617,7 +617,7 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+    return "foo".unavail([0])  // expected-error {{conflicting arguments to generic parameter 'Element' ('String' vs. 'Int')}}
   }
 }
 
@@ -1570,6 +1570,12 @@ func testNilCoalescingOperatorRemoveFix() {
 
   if ("" // This is a comment
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
+}
+
+func testInvalidMethodWithInvalidArg(_ x: Int) {
+  x.undefinedMethod(undefined)
+  // expected-error@-1 {{value of type 'Int' has no member 'undefinedMethod'}}
+  // expected-error@-2 {{cannot find 'undefined' in scope}}
 }
 
 // FIXME: https://github.com/swiftlang/swift/issues/89918

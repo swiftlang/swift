@@ -402,6 +402,8 @@ SWIFT_REQUEST(TypeChecker, ExplicitCaughtTypeRequest,
               Type(ASTContext *, CatchNode), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, YieldsTypeRequest,
+              Type(FuncDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
@@ -460,7 +462,7 @@ SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeCOMInterfaceIDRequest,
               VarDecl *(ProtocolDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeCOMImplementationIDRequest,
+SWIFT_REQUEST(TypeChecker, SynthesizeCOMCLSIDRequest,
               VarDecl *(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckPrimaryFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)
@@ -509,6 +511,9 @@ SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DeclRuntimeAvailabilityRequest,
               DeclRuntimeAvailability(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeLocalAvailableAttrsRequest,
+              evaluator::SideEffect(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
@@ -585,8 +590,8 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckCDeclFunctionRequest,
-              evaluator::SideEffect(FunctionDecl *, CDeclAttr *),
+SWIFT_REQUEST(TypeChecker, TypeCheckForeignFunctionRequest,
+              evaluator::SideEffect(FunctionDecl *, DeclAttribute *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckCDeclEnumRequest,
               evaluator::SideEffect(EnumDecl *, CDeclAttr *),
@@ -612,6 +617,11 @@ SWIFT_REQUEST(TypeChecker, IsCCompatibleDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SectionForDeclRequest,
+              std::optional<StringRef>(
+                  llvm::PointerUnion<const Decl *,
+                                     const AbstractClosureExpr *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               std::optional<SubstitutionMap>(const Decl *),

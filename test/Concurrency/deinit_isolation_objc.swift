@@ -369,7 +369,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 // MARK: - Part 2.3 - Base class with isolated deinit
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor @objc class ImplicitDeinitInheritIsolated1 : BaseWithDeinitIsolatedOnFirstActor {
-// CHECK: @objc deinit
+// CHECK: @objc @FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // ImplicitDeinitInheritIsolated1.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -471,7 +471,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 // MARK: - Part 2.4 - Base class with isolated deinit with different actor
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor @objc class ImplicitDeinitInheritIsolated2 : BaseWithDeinitIsolatedOnSecondActor {
-// CHECK: @objc deinit
+// CHECK: @objc @SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: // ImplicitDeinitInheritIsolated2.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor

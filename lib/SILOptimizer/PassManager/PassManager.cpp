@@ -14,7 +14,6 @@
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "../../IRGen/IRGenModule.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/MD5Stream.h"
@@ -34,7 +33,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -235,6 +233,12 @@ static llvm::cl::opt<bool> SILPrintEverySubpass(
     "sil-print-every-subpass", llvm::cl::init(false),
     llvm::cl::desc("Print the function before every subpass run of passes that "
                    "have multiple subpasses"));
+
+/// Attribute SILModuleStats to the subpass which produced them, instead of
+/// the pass. Passes which do not use subpasses are unaffected.
+static llvm::cl::opt<bool> SILStatsSubpass(
+    "sil-stats-subpass", llvm::cl::init(false),
+    llvm::cl::desc("Attribute stats to subpasses of the passes producing them"));
 
 static llvm::cl::opt<std::string> SILViewDom(
     "sil-view-dom", llvm::cl::init(""),
@@ -517,6 +521,33 @@ bool SILPassManager::continueTransforming() {
   return NumPassesRun < maxNumPassesToRun;
 }
 
+/// The name of the kind of value or instruction a subpass is transforming, used
+/// to identify the subpass in the optimizer statistics.
+static StringRef
+getTransformeeName(std::optional<SILPassManager::Transformee> transformee) {
+  if (!transformee)
+    return "<none>";
+  SILValue value = dyn_cast<SILValue>(*transformee);
+  if (!value)
+    return getSILInstructionName(
+        cast<SILInstruction *>(*transformee)->getKind());
+  if (SILInstruction *inst = value->getDefiningInstruction())
+    return getSILInstructionName(inst->getKind());
+  // The value is not defined by an instruction: name its kind instead.
+  switch (value->getKind()) {
+  case ValueKind::SILFunctionArgument:
+    return "function_argument";
+  case ValueKind::SILPhiArgument:
+    return "phi_argument";
+  case ValueKind::SILUndef:
+    return "undef";
+  case ValueKind::PlaceholderValue:
+    return "placeholder";
+  default:
+    return "<value>";
+  }
+}
+
 bool SILPassManager::continueWithNextSubpassRun(
     std::optional<Transformee> origTransformee, SILFunction *function,
     SILTransform *trans) {
@@ -532,6 +563,12 @@ bool SILPassManager::continueWithNextSubpassRun(
   }
 
   unsigned subPass = numSubpassesRun++;
+
+  if (SILStatsSubpass) {
+    StringRef subpassLabel = getTransformeeName(forTransformee);
+    updateSILModuleStatsBeforeSubpass(function, subpassLabel, trans, *this,
+                                      NumPassesRun, subPass);
+  }
 
   if (SILPrintEverySubpass && isFunctionSelectedForPrinting(function) &&
       doPrintBefore(trans, function)) {
@@ -1030,7 +1067,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   updateSILModuleStatsAfterTransform(*Mod, SMT, *this, NumPassesRun, duration.count());
 
   if (Options.VerifyAll &&
-      (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
+      (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
     Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
     runSwiftModuleVerification();
@@ -1650,6 +1687,8 @@ createEmptyFunction(StringRef name,
       IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
       fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
       fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
+
+  newF->setHasLoweredAddresses(fromFn->hasLoweredAddresses());
 
   return newF;
 }

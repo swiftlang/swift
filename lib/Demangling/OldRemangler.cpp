@@ -21,7 +21,6 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
@@ -796,6 +795,9 @@ ManglingError
 Remangler::mangleAsyncSuspendResumePartialFunction(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
+ManglingError Remangler::mangleAsyncMainEntryPoint(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
 
 ManglingError Remangler::mangleDirectness(Node *node, unsigned depth) {
   switch (node->getIndex()) {
@@ -1362,6 +1364,11 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx,
 ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
+}
+
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  Buffer << "<yields>";
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx,
@@ -3108,6 +3115,8 @@ Demangle::mangleNodeOld(NodePointer node) {
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.str();
 }
@@ -3120,6 +3129,8 @@ Demangle::mangleNodeOld(NodePointer node, NodeFactory &Factory) {
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.getBufferStr();
 }
@@ -3135,6 +3146,8 @@ Demangle::mangleNodeAsObjcCString(NodePointer node,
   if (!err.isSuccess())
     return err;
   remangler.append(StringRef("_", 2)); // Include the trailing 0 char.
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.getBufferStr().data();
 }

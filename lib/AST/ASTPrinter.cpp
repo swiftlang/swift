@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityContext.h"
@@ -45,18 +46,15 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -74,7 +72,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <queue>
 
 using namespace swift;
 
@@ -333,6 +330,19 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (options.printPublicInterface() && shouldSkipDeclInPublicInterface(D))
         return false;
 
+      // Skip the backing storage property of a wrapped property when the
+      // wrapped property itself is printed. The attached wrapper attribute is
+      // printed too, so the backing storage property is synthesized again when
+      // the interface is compiled. Printing it here as well would be an
+      // invalid redeclaration.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        if (auto *wrappedVar = VD->getOriginalWrappedProperty(
+                PropertyWrapperSynthesizedPropertyKind::Backing)) {
+          if (shouldPrint(wrappedVar, options))
+            return false;
+        }
+      }
+
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         // Skip anything that isn't 'public' or '@usableFromInline' or has a
         // _specialize attribute with a targetFunction parameter.
@@ -442,9 +452,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
-      // The `using` declarations are private to the file at the moment
+      // The `default` declarations are private to the file at the moment
       // and shouldn't appear in swift interfaces.
-      if (isa<UsingDecl>(D))
+      if (isa<FileDefaultDecl>(D))
         return false;
 
       return ShouldPrintChecker::shouldPrint(D, options);
@@ -1463,6 +1473,21 @@ bool canPrintSyntheticSILGenName(const Decl *D) {
   return true;
 }
 
+/// Whether the given declaration has an attached global actor attribute.
+///
+/// Unlike \c Decl::getGlobalActorAttr() this inspects the attribute list
+/// directly. Actor isolation inference attaches implicit global actor
+/// attributes, and it may do so after \c GlobalActorAttributeRequest has
+/// already been evaluated for the declaration, leaving a stale cached result.
+static bool hasGlobalActorAttr(const Decl *D) {
+  for (auto *attr : D->getAttrs().getAttributes<CustomAttr>()) {
+    auto *nominal = attr->getNominalDecl();
+    if (nominal && nominal->isGlobalActor())
+      return true;
+  }
+  return false;
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -1572,6 +1597,25 @@ void PrintAST::printAttributes(const Decl *D) {
       if (VD->isObjC() && !isa<EnumElementDecl>(VD) &&
           !attrs.hasAttribute<ObjCAttr>() && ABIRoleInfo(D).providesAPI()) {
         Printer.printAttrName("@objc");
+        Printer << " ";
+      }
+    }
+
+    // Implicit deinits get printed in interfaces, making them effectively
+    // explicit in the context of the interface. Implicit deinits in subclasses
+    // also have isolation that is inferred from their super deinits, but don't
+    // have attributes reflecting that inferred isolation in the AST. As a
+    // result, an inferred global actor isolation for such a deinit needs to be
+    // printed explicitly to ensure that the decl round-trips successfully.
+    if (auto *dtor = dyn_cast<DestructorDecl>(D); dtor && dtor->isImplicit()) {
+      auto inferred =
+          getInferredActorIsolation(const_cast<DestructorDecl *>(dtor));
+      if (inferred.source.kind == IsolationSource::Override &&
+          inferred.isolation.isGlobalActor() && !hasGlobalActorAttr(dtor)) {
+        Printer.callPrintNamePre(PrintNameContext::Attribute);
+        Printer << "@";
+        inferred.isolation.getGlobalActor().print(Printer, Options);
+        Printer.printNamePost(PrintNameContext::Attribute);
         Printer << " ";
       }
     }
@@ -3439,11 +3483,15 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
-void PrintAST::visitUsingDecl(UsingDecl *decl) {
-  Printer.printIntroducerKeyword("using", Options, " ");
+void PrintAST::visitFileDefaultDecl(FileDefaultDecl *decl) {
+  Printer.printIntroducerKeyword("default", Options, " ");
   for (auto attr : decl->getSpecifiedAttributes()) {
     attr->print(Printer, Options, decl);
   }
+}
+
+void PrintAST::visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *decl) {
+  Printer << "/* hidden type layout */";
 }
 
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
@@ -3686,6 +3734,13 @@ static void
 suppressingFeatureInlineAlways(PrintOptions &options,
                                llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressInlineAlways, true);
+  action();
+}
+
+static void
+suppressingFeatureAlwaysUnsafeAttribute(PrintOptions &options,
+                                        llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressUnsafeAlways, true);
   action();
 }
 
@@ -4758,6 +4813,37 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         printFunctionParameters(decl);
       });
 
+    if (decl->isCoroutine()) {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      decl->getYieldInterfaceTypes(yields);
+      auto *bodyYields = decl->getYields();
+
+      Printer.printStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
+      };
+      Printer << " " << tok::kw_yield << " (";
+
+      for (auto [idx, yield] : llvm::enumerate(yields)) {
+        if (idx > 0)
+          Printer << ", ";
+
+        Type interfaceTy = yield.getType();
+        TypeLoc TheTypeLoc;
+        if (bodyYields) {
+          TheTypeLoc = TypeLoc(bodyYields->get(idx).getTypeRepr(), interfaceTy);
+        } else {
+          TheTypeLoc = TypeLoc::withoutLoc(interfaceTy);
+        }
+
+        if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options))
+          printParameterFlags(Printer, Options, nullptr,
+                              yield.getFlags().asParamFlags(), false);
+
+        printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
+      }
+    }
+
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
       Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
@@ -4886,8 +4972,15 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
+  // Whether a raw value was written explicitly is determined from the original
+  // (pre-folded) expression: constant folding produces an implicit literal.
+  // The folded value is what gets printed (e.g. '2 + 3' prints as '5').
+  if (auto *original = elt->getOriginalRawValueExpr();
+      !original || original->isImplicit())
+    return;
+
   auto *raw = elt->getRawValueExpr();
-  if (!raw || raw->isImplicit())
+  if (!raw)
     return;
 
   // Print the explicit raw value expression.
@@ -6456,18 +6549,14 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
-  /// for that submodule; otherwise just return the parent module.
+  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
+  /// submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        // Explicit submodules are only visible if specifically imported;
-        // everything else has the visibility of its top-level module.
-        if (clangMod->isSubModule() && clangMod->IsExplicit) {
-          return importer->getWrapperForModule(clangMod);
-        }
+        return importer->getWrapperForModule(clangMod);
       }
     }
 
@@ -7189,6 +7278,10 @@ public:
         }
       }
     }
+    
+    if (!Options.excludeAttrKind(TypeAttrKind::YieldOnce) && info.isCoroutine()) {
+      Printer.printSimpleAttr("@yield_once") << " ";
+    }
 
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
@@ -7224,6 +7317,9 @@ public:
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
+        break;
+      case SILFunctionType::Representation::COMMethod:
+        Printer << "com_method";
         break;
       case SILFunctionType::Representation::CXXMethod:
         Printer << "cxx_method";
@@ -7317,6 +7413,9 @@ public:
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
+        break;
+      case SILFunctionType::Representation::COMMethod:
+        Printer << "com_method";
         break;
       case SILFunctionType::Representation::CXXMethod:
         Printer << "cxx_method";
@@ -7461,6 +7560,22 @@ public:
     // explicit lifetimes use them to describe their sources and targets.
     return T->hasExplicitLifetimeDependencies();
   }
+  
+  void visitAnyFunctionTypeYields(ArrayRef<AnyFunctionType::Yield> yields) {
+    Printer << "(";
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      if (index)
+        Printer << ", ";
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYield);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYield);
+      };
+      if (yield.isInOut())
+        Printer << "inout ";
+      visit(yield.getType());
+    }
+    Printer << ")";
+  }
 
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
@@ -7493,6 +7608,14 @@ public:
           Printer << ")";
         }
       }
+    }
+
+    if (T->hasExtInfo() && T->isCoroutine()) {
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      Printer << " ";
+      Printer.printKeyword("yields ", Options);
+      visitAnyFunctionTypeYields(T->getYields());
+      Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
     }
 
     Printer << " -> ";
@@ -7560,6 +7683,14 @@ public:
           Printer << ")";
         }
       }
+   }
+
+   if (T->hasExtInfo() && T->isCoroutine()) {
+     Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+     Printer << " ";
+     Printer.printKeyword("yields ", Options);
+     visitAnyFunctionTypeYields(T->getYields());
+     Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
    }
 
     Printer << " -> ";

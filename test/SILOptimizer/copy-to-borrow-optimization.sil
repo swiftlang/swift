@@ -108,6 +108,7 @@ sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOp
 sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
 sil @closure : $@convention(thin) (@inout_aliasable Klass) -> ()
 sil @lendC : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
+sil @lendClassLet : $@yield_once @convention(thin) () -> @yields @guaranteed ClassLet
 sil @useC : $@convention(thin) (@guaranteed C) -> () {
 [global:]
 }
@@ -132,6 +133,8 @@ class ClassLet {
   @_hasStorage var aVar: Klass
   @_hasStorage let aLetTuple: (Klass, Klass)
   @_hasStorage let anOptionalLet: FakeOptional<Klass>
+  @_hasStorage let aTupleWithOptional: (Klass, FakeOptional<Klass>)
+  @_hasStorage let aMultiPayloadTuple: (Klass, MultiPayload)
 
   @_hasStorage let anotherLet: ClassLet
 }
@@ -1735,8 +1738,15 @@ bb0(%0 : @guaranteed $C):
   return %retval : $()
 }
 
+// The borrow scope of the load's base is extended to cover the lifetime of the `load_borrow`.
+//
 // CHECK-LABEL: sil [ossa] @load_extends_borrow_scope :
-// CHECK:         load [copy]
+// CHECK:         [[OUTER:%.*]] = begin_borrow %0
+// CHECK-NEXT:    [[ADDR:%.*]] = ref_element_addr [[OUTER]]
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow [[ADDR]]
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    return %0
 // CHECK-LABEL: } // end sil function 'load_extends_borrow_scope'
 sil [ossa] @load_extends_borrow_scope : $@convention(thin) (@owned Klass) -> @owned Klass {
 bb0(%0 : @owned $Klass):
@@ -1746,6 +1756,137 @@ bb0(%0 : @owned $Klass):
   end_borrow %1 : $Klass
   destroy_value %3 : $Klass
   return %0 : $Klass
+}
+
+// The borrow scope of the base cannot be extended, because the enclosing owned value is destroyed
+// within the liverange of the load.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_borrow_scope_beyond_owned_lifetime :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_borrow_scope_beyond_owned_lifetime'
+sil [ossa] @dont_extend_borrow_scope_beyond_owned_lifetime : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  %2 = ref_element_addr [immutable] %1 : $Klass, #Klass.baseLet
+  %3 = load [copy] %2 : $*Klass
+  end_borrow %1 : $Klass
+  destroy_value %0 : $Klass
+  destroy_value %3 : $Klass
+  return undef : $()
+}
+
+// The borrow scope of the base cannot be extended, because it does not end with an `end_borrow`,
+// but with a reborrow.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_reborrowed_base :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_reborrowed_base'
+sil [ossa] @dont_extend_reborrowed_base : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = begin_borrow %0 : $ClassLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  br bb1(%1 : $ClassLet)
+
+bb1(%4 : @reborrow $ClassLet):
+  %5 = borrowed %4 : $ClassLet from (%0 : $ClassLet)
+  destroy_value %3 : $Klass
+  end_borrow %5 : $ClassLet
+  destroy_value %0 : $ClassLet
+  return undef : $()
+}
+
+// The base is a guaranteed phi with multiple enclosing values, i.e. not a borrow scope introducer.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_base_with_multiple_enclosing_values :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_base_with_multiple_enclosing_values'
+sil [ossa] @dont_extend_base_with_multiple_enclosing_values : $@convention(thin) (@owned ClassLet, @owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet, %1 : @owned $ClassLet):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = begin_borrow %0 : $ClassLet
+  br bb3(%2 : $ClassLet)
+
+bb2:
+  %3 = begin_borrow %1 : $ClassLet
+  br bb3(%3 : $ClassLet)
+
+bb3(%4 : @reborrow $ClassLet):
+  %5 = borrowed %4 : $ClassLet from (%0 : $ClassLet, %1 : $ClassLet)
+  %6 = ref_element_addr [immutable] %5 : $ClassLet, #ClassLet.aLet
+  %7 = load [copy] %6 : $*Klass
+  end_borrow %5 : $ClassLet
+  destroy_value %7 : $Klass
+  destroy_value %0 : $ClassLet
+  destroy_value %1 : $ClassLet
+  return undef : $()
+}
+
+// The base is yielded from a `begin_apply`, i.e. its scope does not end with an `end_borrow`.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_yielded_base :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_yielded_base'
+sil [ossa] @dont_extend_yielded_base : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @lendClassLet : $@yield_once @convention(thin) () -> @yields @guaranteed ClassLet
+  (%1, %2) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields @guaranteed ClassLet
+  %3 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
+  %4 = load [copy] %3 : $*Klass
+  end_apply %2 as $()
+  destroy_value %4 : $Klass
+  return undef : $()
+}
+
+// The base is an `unchecked_ownership_conversion`, which `extendBorrowScope` cannot handle.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_unchecked_conversion_base :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_unchecked_conversion_base'
+sil [ossa] @dont_extend_unchecked_conversion_base : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = unchecked_ownership_conversion %0 : $ClassLet, @owned to @guaranteed
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  end_borrow %1 : $ClassLet
+  destroy_value %3 : $Klass
+  destroy_value %0 : $ClassLet
+  return undef : $()
+}
+
+// The `end_borrow`s of the extended base scope are created at the exit block of the liverange.
+// The `end_borrow`s of the `load_borrow` must be inserted _before_ them.
+//
+// CHECK-LABEL: sil [ossa] @extend_borrow_scope_into_liverange_exit :
+// CHECK:         [[OUTER:%.*]] = begin_borrow %0
+// CHECK:         [[INNER:%.*]] = load_borrow
+// CHECK:       bb1({{.*}} : @guaranteed $Klass):
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-LABEL: } // end sil function 'extend_borrow_scope_into_liverange_exit'
+sil [ossa] @extend_borrow_scope_into_liverange_exit : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = begin_borrow %0 : $ClassLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.anOptionalLet
+  %3 = load [copy] %2 : $*FakeOptional<Klass>
+  end_borrow %1 : $ClassLet
+  switch_enum %3 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%4 : @owned $Klass):
+  destroy_value %4 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %0 : $ClassLet
+  return undef : $()
 }
 
 // CHECK-LABEL: sil [ossa] @write_in_unreachable_block :
@@ -2026,10 +2167,19 @@ bb5:
   return %r : $()
 }
 
-// CHECK-LABEL: sil [ossa] @blocked_by_end_borrow :
-// CHECK:         %7 = load [copy] %6
-// CHECK:       } // end sil function 'blocked_by_end_borrow'
-sil [ossa] @blocked_by_end_borrow : $@convention(thin) (@guaranteed Container) -> () {
+// The base of the load is derived from a `load_borrow` whose scope ends within the liverange of the
+// load. As the `load_borrow`'s address is immutable, its scope can be extended.
+//
+// CHECK-LABEL: sil [ossa] @extend_load_borrow_scope_of_base :
+// CHECK:         [[BASEADDR:%.*]] = ref_element_addr [immutable] %0
+// CHECK-NEXT:    [[OUTER:%.*]] = load_borrow [[BASEADDR]]
+// CHECK:         [[ADDR:%.*]] = ref_element_addr [immutable]
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow [[ADDR]]
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK:       } // end sil function 'extend_load_borrow_scope_of_base'
+sil [ossa] @extend_load_borrow_scope_of_base : $@convention(thin) (@guaranteed Container) -> () {
 bb0(%0 : @guaranteed $Container):
   %1 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
   %2 = ref_element_addr [immutable] %0 : $Container, #Container.b
@@ -2042,6 +2192,23 @@ bb0(%0 : @guaranteed $Container):
   %9 = apply %1(%7) : $@convention(thin) (@guaranteed C) -> ()
   destroy_value %7 : $C
   return %9 : $()
+}
+
+// Same as above, but the address of the base `load_borrow` is mutable. The `destroy_value` of the
+// loaded value may write to it, therefore its borrow scope cannot be extended.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_load_borrow_scope_over_may_write :
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'dont_extend_load_borrow_scope_over_may_write'
+sil [ossa] @dont_extend_load_borrow_scope_over_may_write : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : @guaranteed $Container):
+  %1 = ref_element_addr %0 : $Container, #Container.b
+  %2 = load_borrow %1 : $*Base
+  %3 = ref_element_addr [immutable] %2 : $Base, #Base.c
+  %4 = load [copy] %3 : $*C
+  end_borrow %2 : $Base
+  destroy_value %4 : $C
+  return undef : $()
 }
 
 // CHECK-LABEL: sil [ossa] @remove_copy_of_guaranteed_arg :
@@ -2570,5 +2737,57 @@ bb0(%0 : @owned $C):
   store %1 to [init] %2
   destroy_value [dead_end] %0
   unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @end_borrow_at_begin_of_non_destroying_liverange_exit :
+// CHECK:         [[OUTER:%.*]] = begin_borrow %0
+// CHECK:         [[INNER:%.*]] = load_borrow
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-LABEL: } // end sil function 'end_borrow_at_begin_of_non_destroying_liverange_exit'
+sil [ossa] @end_borrow_at_begin_of_non_destroying_liverange_exit : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = begin_borrow %0 : $ClassLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aTupleWithOptional
+  %3 = load [copy] %2 : $*(Klass, FakeOptional<Klass>)
+  (%4, %5) = destructure_tuple %3 : $(Klass, FakeOptional<Klass>)
+  switch_enum %5 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%6 : @owned $Klass):
+  destroy_value %6 : $Klass
+  destroy_value %4 : $Klass
+  end_borrow %1 : $ClassLet
+  br bb3
+
+bb2:
+  end_borrow %1 : $ClassLet
+  destroy_value %4 : $Klass
+  br bb3
+
+bb3:
+  destroy_value %0 : $ClassLet
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @end_borrow_after_non_destroying_forwarding_end :
+// CHECK:         [[OUTER:%.*]] = begin_borrow %0
+// CHECK:         [[INNER:%.*]] = load_borrow
+// CHECK:         end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-LABEL: } // end sil function 'end_borrow_after_non_destroying_forwarding_end'
+sil [ossa] @end_borrow_after_non_destroying_forwarding_end : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = begin_borrow %0 : $ClassLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aMultiPayloadTuple
+  %3 = load [copy] %2 : $*(Klass, MultiPayload)
+  (%4, %5) = destructure_tuple %3 : $(Klass, MultiPayload)
+  %6 = unchecked_enum_data %5 : $MultiPayload, #MultiPayload.b!enumelt
+  end_borrow %1 : $ClassLet
+  destroy_value %4 : $Klass
+  destroy_value %0 : $ClassLet
+  %r = tuple ()
+  return %r : $()
 }
 

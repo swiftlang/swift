@@ -18,6 +18,8 @@
 #ifndef SWIFT_SEMA_DERIVEDCONFORMANCE_DERIVEDCONFORMANCE_H
 #define SWIFT_SEMA_DERIVEDCONFORMANCE_DERIVEDCONFORMANCE_H
 
+#include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/Builtins.h"
 #include "swift/Basic/LLVM.h"
 #include <utility>
@@ -27,6 +29,7 @@ class AbstractFunctionDecl;
 class AccessorDecl;
 class AssociatedTypeDecl;
 class ASTContext;
+enum class BuiltinDerivedConformanceMacroKind : uint8_t;
 struct ASTNode;
 class CallExpr;
 class CaseStmt;
@@ -467,12 +470,22 @@ bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
 
 /// Returns the value decl expanded from the macro in `code` in the context of
 /// the \p derived derived conformance for the \p requirement requirement.
-ValueDecl *deriveRequirementViaMacro(DerivedConformance &derived,
-                                     ValueDecl *requirement, StringRef code);
-  
+ValueDecl *
+deriveRequirementViaMacro(DerivedConformance &derived, ValueDecl *requirement,
+                          StringRef code,
+                          BuiltinDerivedConformanceMacroKind macroKind);
+
 /// Get a string describing the nominal type we are deriving a conformance
 /// for by producing valid swift syntax.
 std::string getNominalTypeInfoString(DerivedConformance &derived);
+
+/// Checks whether the case may be reached at runtime. If it can never be
+/// reached, returns false. Otherwise, returns true and appends a query to
+/// \c availabilityQueries for each domain that the case must be checked in at
+/// runtime.
+bool checkAvailabilityForElement(
+    const EnumElementDecl *elt, AvailabilityContext availabilityContext,
+    SmallVectorImpl<AvailabilityQuery> &availabilityQueries);
 
 } // namespace swift
 

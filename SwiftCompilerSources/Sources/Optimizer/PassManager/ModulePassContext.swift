@@ -182,6 +182,18 @@ struct ModulePassContext : Context, CustomStringConvertible {
     notifyFunctionTablesChanged()
   }
 
+  /// The types of all non-copyable nominal types declared in this module for
+  /// which IRGen may emit type metadata.
+  var typesWithEmittedMetadata: [Type] {
+    var types: [Type] = []
+    withUnsafeMutablePointer(to: &types) { typesPtr in
+      bridgedPassContext.visitTypesWithEmittedMetadata(typesPtr) { (typesPtr, bridgedType) in
+        typesPtr.assumingMemoryBound(to: [Type].self).pointee.append(bridgedType.type)
+      }
+    }
+    return types
+  }
+
   func createEmptyFunction(
     name: String,
     parameters: [ParameterInfo],

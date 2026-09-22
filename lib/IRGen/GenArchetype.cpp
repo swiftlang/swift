@@ -23,12 +23,8 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -37,8 +33,10 @@
 
 #include "EnumPayload.h"
 #include "Explosion.h"
+#include "ClassTypeInfo.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
+#include "GenExistential.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
@@ -134,6 +132,12 @@ public:
     return new OpaqueArchetypeTypeInfo(type, abiAccessible);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     // We'll need formal type metadata for this archetype.
@@ -158,25 +162,76 @@ class ClassArchetypeTypeInfo
 {
   ReferenceCounting RefCount;
 
-  ClassArchetypeTypeInfo(llvm::PointerType *storageType,
-                         Size size, const SpareBitVector &spareBits,
-                         Alignment align,
-                         ReferenceCounting refCount)
-    : HeapTypeInfo(refCount, storageType, size, spareBits, align),
-      RefCount(refCount)
-  {}
+  // ClassTypeInfo whose retain/release functions this archetype forwards to
+  // when RefCount == ReferenceCounting::Custom
+  const ClassTypeInfo *CustomRefCountingTI;
+
+  ClassArchetypeTypeInfo(llvm::PointerType *storageType, Size size,
+                         const SpareBitVector &spareBits, Alignment align,
+                         ReferenceCounting refCount,
+                         const ClassTypeInfo *customRefCountingTI)
+      : HeapTypeInfo(refCount, storageType, size, spareBits, align),
+        RefCount(refCount), CustomRefCountingTI(customRefCountingTI) {
+    if (CONDITIONAL_ASSERT_enabled() && refCount == ReferenceCounting::Custom)
+      ASSERT(customRefCountingTI != nullptr &&
+             "custom-ref-counting archetype requires superclass TypeInfo");
+  }
 
 public:
-  static const ClassArchetypeTypeInfo *create(llvm::PointerType *storageType,
-                                         Size size, const SpareBitVector &spareBits,
-                                         Alignment align,
-                                         ReferenceCounting refCount) {
+  static const ClassArchetypeTypeInfo *
+  create(llvm::PointerType *storageType, Size size,
+         const SpareBitVector &spareBits, Alignment align,
+         ReferenceCounting refCount, const ClassTypeInfo *customRefCountingTI) {
     return new ClassArchetypeTypeInfo(storageType, size, spareBits, align,
-                                      refCount);
+                                      refCount, customRefCountingTI);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
   ReferenceCounting getReferenceCounting() const {
     return RefCount;
+  }
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom)
+      CustomRefCountingTI->emitScalarRelease(IGF, value, atomicity);
+    else
+      HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
+  }
+
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom)
+      CustomRefCountingTI->emitScalarRetain(IGF, value, atomicity);
+    else
+      HeapTypeInfo::emitScalarRetain(IGF, value, atomicity);
+  }
+
+  void strongRetain(IRGenFunction &IGF, Explosion &e,
+                    Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom) 
+      CustomRefCountingTI->strongRetain(IGF, e, atomicity);
+    else
+      HeapTypeInfo::strongRetain(IGF, e, atomicity);
+  }
+
+  void strongRelease(IRGenFunction &IGF, Explosion &e,
+                     Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom)
+      CustomRefCountingTI->strongRelease(IGF, e, atomicity);
+    else
+      HeapTypeInfo::strongRelease(IGF, e, atomicity);
+  }
+
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    // Custom refcounting functions might not support null pointers.
+    return index == 0 && getReferenceCounting() != ReferenceCounting::Custom;
   }
 };
 
@@ -192,6 +247,12 @@ public:
   create(llvm::Type *type, Size size, Alignment align,
          const SpareBitVector &spareBits) {
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 };
 } // end anonymous namespace
@@ -339,14 +400,23 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   assert(isExemplarArchetype(archetype) && "lowering non-exemplary archetype");
 
+  // An opened COM existential contains its interface pointer directly.
+  // Ordinary generic parameters constrained to a COM interface remain opaque
+  // and continue through the normal generic ABI below.
+  if (isa<ExistentialArchetypeType>(archetype) &&
+      llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
+        return protocol->isCOMInterface();
+      }))
+    return createCOMInterfaceTypeInfo(IGM);
+
   auto layout = archetype->getLayoutConstraint();
 
   // If the archetype is class-constrained, use a class pointer
   // representation.
   if (layout && layout->isRefCounted()) {
-    auto refcount = archetype->getReferenceCounting();
-
     llvm::PointerType *reprTy;
+    ReferenceCounting refcount = archetype->getReferenceCounting();
+    const ClassTypeInfo *customRefCountingTI = nullptr;
 
     // If the archetype has a superclass constraint, it has at least the
     // retain semantics of its superclass, and it can be represented with
@@ -354,6 +424,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     if (auto super = archetype->getSuperclass()) {
       auto &superTI = IGM.getTypeInfoForUnlowered(super);
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
+      customRefCountingTI = dyn_cast<const ClassTypeInfo>(&superTI);
     } else {
       if (refcount == ReferenceCounting::Native) {
         reprTy = IGM.RefCountedPtrTy;
@@ -368,11 +439,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     auto spareBits =
       SpareBitVector::getConstant(IGM.getPointerSize().getValueInBits(), false);
 
-    return ClassArchetypeTypeInfo::create(reprTy,
-                                      IGM.getPointerSize(),
-                                      spareBits,
-                                      IGM.getPointerAlignment(),
-                                      refcount);
+    return ClassArchetypeTypeInfo::create(reprTy, IGM.getPointerSize(),
+                                          spareBits, IGM.getPointerAlignment(),
+                                          refcount, customRefCountingTI);
   }
 
   // If the archetype is trivial fixed-size layout-constrained, use a fixed size

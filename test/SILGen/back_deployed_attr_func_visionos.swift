@@ -3,6 +3,10 @@
 
 // REQUIRES: OS=xros
 
+// The RUN lines override the target triple but keep the SDK that lit selected,
+// so the two can disagree. That mismatch is not relevant to what this test checks.
+// expected-warning@<unknown> * {{using sysroot for }}
+
 // -- Fallback definition of trivialFunc()
 // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy11trivialFuncyyFTwB : $@convention(thin) () -> ()
 // CHECK: bb0:

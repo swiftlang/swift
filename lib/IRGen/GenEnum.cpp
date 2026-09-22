@@ -107,9 +107,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/CFG.h"
@@ -135,7 +133,6 @@
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "SwitchBuilder.h"
-#include "ClassTypeInfo.h"
 #include "NativeConventionSchema.h"
 
 using namespace swift;
@@ -1992,16 +1989,15 @@ namespace {
     /// of its words typed as pointers (`ptr`) rather than as opaque integer
     /// words. On success `types` receives the payload's element types.
     ///
-    /// This holds when the payload holds a managed reference and stores the
-    /// enum's tag in that reference's extra inhabitants:
+    /// This holds when the payload contains a pointer and stores the enum's
+    /// tag in that pointer's extra inhabitants:
     ///   * the payload has at least as many extra inhabitants as the enum has
     ///     no-payload cases, so every empty case is one of the payload's low,
     ///     invalid-pointer extra inhabitants and no separate tag storage is
     ///     needed (the enum keeps the payload's own layout); and
-    ///   * the payload is non-trivial, i.e. it contains a managed reference
-    ///     (whose extra inhabitants the tag rides in) -- this also keeps
-    ///     unrelated pointer-shaped-but-trivial types (metatypes, unsafe
-    ///     pointers, ...) on their existing integer representation.
+    ///   * the payload's explosion contains at least one pointer word (a bare
+    ///     reference, or a raw/unsafe pointer such as `UnsafeMutablePointer`)
+    ///     whose extra inhabitants the tag rides in.
     /// Only genuine (valid) pointer values are ever loaded or dereferenced, so
     /// carrying the empty cases' sentinel bit patterns in a `ptr` is safe.
     ///
@@ -2041,12 +2037,6 @@ namespace {
       // no separate tag storage and keeps the payload's own layout.
       if (fixedTI->getFixedExtraInhabitantCount(IGM) < numNoPayloadCases)
         return false;
-      // The payload must hold a managed reference (whose extra inhabitants the
-      // tag rides in). Excluding trivially-destroyable payloads keeps unrelated
-      // pointer-shaped types (metatypes, unsafe pointers, ...) on their integer
-      // representation.
-      if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
-        return false;
 
       auto &DL = IGM.DataLayout;
       uint64_t ptrBytes = IGM.getPointerSize().getValue();
@@ -2073,7 +2063,7 @@ namespace {
           uint64_t word = offset / ptrBytes; // pointer-aligned, fills one word
           for (; nextWord < word; ++nextWord)
             types.push_back(IGM.SizeTy);
-          types.push_back(IGM.PtrTy);
+          types.push_back(ty);
           ++nextWord;
           hasPointer = true;
         }
@@ -6742,6 +6732,10 @@ namespace {
   template<typename BaseTypeInfo>
   class EnumTypeInfoBase : public BaseTypeInfo {
   public:
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override = 0;
+
     EnumImplStrategy &Strategy;
 
     template<typename...AA>
@@ -6882,6 +6876,12 @@ namespace {
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, isBT, copyable,
                               alwaysFixedSize, isABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// TypeInfo for loadable enum types.
@@ -6898,6 +6898,12 @@ namespace {
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, copyable,
                               alwaysFixedSize, isABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
@@ -6970,6 +6976,12 @@ namespace {
                          IsCopyable_t copy,
                          IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, align, pod, bt, copy, abiAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// TypeInfo for dynamically-sized enum types.
@@ -6982,6 +6994,12 @@ namespace {
                           IsCopyable_t copyable,
                           IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   class BitwiseCopyableEnumTypeInfo
@@ -6990,6 +7008,12 @@ namespace {
     BitwiseCopyableEnumTypeInfo(EnumImplStrategy &strategy, llvm::Type *irTy,
                                 IsABIAccessible_t abiAccessible)
         : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 } // end anonymous namespace
 

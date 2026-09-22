@@ -12,7 +12,6 @@
 
 #include "swift/ABI/Coro.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -918,7 +917,7 @@ llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
             auto *alloca =
                 IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int8Ty, size);
             alloca->setAlignment(llvm::Align(MaximumAlignment));
-            auto *retPopless = IGF.Builder.CreateIntrinsic(
+            auto *retPopless = IGF.Builder.CreateIntrinsicWithoutFolding(
                 IGF.IGM.VoidTy, llvm::Intrinsic::ret_popless, {});
             retPopless->setTailCallKind(
                 llvm::CallInst::TailCallKind::TCK_MustTail);

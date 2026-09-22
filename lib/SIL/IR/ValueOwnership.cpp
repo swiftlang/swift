@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
@@ -130,6 +129,7 @@ CONSTANT_OWNERSHIP_INST(None, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(None, ClassMethod)
 CONSTANT_OWNERSHIP_INST(None, ClassifyBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, ObjCMethod)
+CONSTANT_OWNERSHIP_INST(None, COMMethod)
 CONSTANT_OWNERSHIP_INST(None, ExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, FloatLiteral)
 CONSTANT_OWNERSHIP_INST(None, FunctionRef)
@@ -179,8 +179,7 @@ CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(Owned, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
-// TODO: It would be great to get rid of these.
-CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
+// TODO: It would be great to get rid of this.
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
@@ -202,6 +201,15 @@ CONSTANT_OWNERSHIP_INST(None, DereferenceAddrBorrow)
 CONSTANT_OWNERSHIP_INST(None, DereferenceBorrowAddr)
 
 #undef CONSTANT_OWNERSHIP_INST
+
+// An immortal object doesn't need to be released, so the result doesn't need
+// any ownership. Otherwise the result is a newly "created" +1 reference.
+ValueOwnershipKind ValueOwnershipKindClassifier::visitRawPointerToRefInst(
+    RawPointerToRefInst *i) {
+  if (i->isImmortal())
+    return OwnershipKind::None;
+  return OwnershipKind::Owned;
+}
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitStructExtractInst(StructExtractInst *sei) {
   if (sei->getType().isTrivial(*sei->getFunction()) ||
@@ -314,6 +322,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
+FORWARDING_OWNERSHIP_INST(OpenCOMExistential)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
@@ -400,6 +409,15 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   bool isTrivial = ResultType.isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
+    return OwnershipKind::None;
+
+  // If the result type is an address, avoid consulting SILFunctionConventions
+  // to determine its ownership; we know it's None.
+  //
+  // This short-cut is needed _during_ AddressLowering for a @guaranteed_address
+  // result, as a new ApplyInst it creates with an address result happens before
+  // the global lowered-addresses flag is changed to influence getOwnershipKind.
+  if (ResultType.isAddress())
     return OwnershipKind::None;
 
   // Per-function conventions (via getSubstCalleeConv): an already-lowered
@@ -590,6 +608,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(None, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(None, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(None, TypedAllocationID)
 CONSTANT_OWNERSHIP_BUILTIN(None, StringObjectOr)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsPOD)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsConcrete)
@@ -597,6 +616,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IsBitwiseTakable)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(None, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(None, AllocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(None, AllocRawTyped)
+CONSTANT_OWNERSHIP_BUILTIN(None, AllocErrorBoxTyped)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssertConf)
 CONSTANT_OWNERSHIP_BUILTIN(None, InfiniteLoopTrueCondition)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
@@ -638,6 +659,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AssignTakeArray)
 CONSTANT_OWNERSHIP_BUILTIN(None, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(None, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(None, DeallocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(None, DeallocRawTyped)
+CONSTANT_OWNERSHIP_BUILTIN(None, DeallocErrorBoxTyped)
 CONSTANT_OWNERSHIP_BUILTIN(None, Fence)
 CONSTANT_OWNERSHIP_BUILTIN(None, Ifdef)
 CONSTANT_OWNERSHIP_BUILTIN(None, AtomicStore)
@@ -685,6 +708,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandlerWithReason)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
@@ -694,6 +718,10 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AddTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, RemoveTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskPushDeadline)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskPopDeadline)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

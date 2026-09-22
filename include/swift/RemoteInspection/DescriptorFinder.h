@@ -87,19 +87,51 @@ struct FieldDescriptorBase {
       : Kind(Kind), HasSuperClass(HasSuperClass) {}
 
   bool isEnum() const {
-    return (Kind == FieldDescriptorKind::Enum ||
-            Kind == FieldDescriptorKind::MultiPayloadEnum);
+    switch (Kind) {
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+      return true;
+    case FieldDescriptorKind::Struct:
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::COMProtocol:
+      return false;
+    }
   }
 
   bool isClass() const {
-    return (Kind == FieldDescriptorKind::Class ||
-            Kind == FieldDescriptorKind::ObjCClass);
+    switch (Kind) {
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return true;
+    case FieldDescriptorKind::Struct:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::COMProtocol:
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+      return false;
+    }
   }
 
   bool isProtocol() const {
-    return (Kind == FieldDescriptorKind::Protocol ||
-            Kind == FieldDescriptorKind::ClassProtocol ||
-            Kind == FieldDescriptorKind::ObjCProtocol);
+    switch (Kind) {
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::COMProtocol:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+    case FieldDescriptorKind::Struct:
+      return false;
+    }
   }
 
   bool isStruct() const {

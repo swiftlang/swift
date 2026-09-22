@@ -79,8 +79,8 @@ bb0(%x : @guaranteed $NonSendableKlass):
   debug_value %x : $NonSendableKlass, let, name "x", argno 1
 
   %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
-  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
-  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{result of 'mergeOne()' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'y' is connected to result of 'mergeOne()'}}
   debug_value %y : $NonSendableKlass, let, name "y"
 
   %addr = alloc_stack $NonSendableKlass
@@ -105,9 +105,9 @@ bb0(%x : @guaranteed $NonSendableKlass):
   %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
 
   %f2 = function_ref @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
-  %r1 = apply %f2(%x, %fresh) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %r1 = apply %f2(%x, %fresh) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{result of 'mergeTwo()' is connected to 'x' which is accessible to code in the current isolation context}}
   destroy_value %fresh : $NonSendableKlass
-  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'y' is connected to result of 'mergeTwo()'}}
   debug_value %y : $NonSendableKlass, let, name "y"
 
   %addr = alloc_stack $NonSendableKlass
@@ -130,15 +130,16 @@ bb0(%x : @guaranteed $NonSendableKlass):
   %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
 
   // y = mergeOne(x)
-  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
-  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{result of 'mergeOne()' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'y' is connected to result of 'mergeOne()'}}
   debug_value %y : $NonSendableKlass, let, name "y"
 
   // z = mergeOne(y)
   %yb = begin_borrow %y : $NonSendableKlass
-  %r2 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'z' is connected to 'y'}}
+  // expected-note@+1{{'y' is connected to result of 'mergeOne()'}}
+  %r2 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
   end_borrow %yb : $NonSendableKlass
-  %z = move_value [lexical] [var_decl] %r2 : $NonSendableKlass
+  %z = move_value [lexical] [var_decl] %r2 : $NonSendableKlass // expected-note {{'z' is connected to result of 'mergeOne()'}}
   debug_value %z : $NonSendableKlass, let, name "z"
 
   // send z
@@ -163,22 +164,24 @@ bb0(%x : @guaranteed $NonSendableKlass):
   %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
 
   // y = mergeOne(x)
-  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
-  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{result of 'mergeOne()' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'y' is connected to result of 'mergeOne()'}}
   debug_value %y : $NonSendableKlass, let, name "y"
 
   // z = mergeOne(y)
   %yb = begin_borrow %y : $NonSendableKlass
-  %r2 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'z' is connected to 'y'}}
+  // expected-note@+1{{'y' is connected to result of 'mergeOne()'}}
+  %r2 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
   end_borrow %yb : $NonSendableKlass
-  %z = move_value [lexical] [var_decl] %r2 : $NonSendableKlass
+  %z = move_value [lexical] [var_decl] %r2 : $NonSendableKlass // expected-note {{'z' is connected to result of 'mergeOne()'}}
   debug_value %z : $NonSendableKlass, let, name "z"
 
   // w = mergeOne(z)
   %zb = begin_borrow %z : $NonSendableKlass
-  %r3 = apply %f1(%zb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'w' is connected to 'z'}}
+  // expected-note@+1{{'z' is connected to result of 'mergeOne()'}}
+  %r3 = apply %f1(%zb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
   end_borrow %zb : $NonSendableKlass
-  %w = move_value [lexical] [var_decl] %r3 : $NonSendableKlass
+  %w = move_value [lexical] [var_decl] %r3 : $NonSendableKlass // expected-note {{'w' is connected to result of 'mergeOne()'}}
   debug_value %w : $NonSendableKlass, let, name "w"
 
   // send w
@@ -235,14 +238,15 @@ bb0(%x : @guaranteed $NonSendableKlass, %cond : $Builtin.Int1):
 
   %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
   %r0 = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
-  %y = move_value [lexical] [var_decl] %r0 : $NonSendableKlass
+  // expected-note@+1 {{result of 'makeFresh()' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r0 : $NonSendableKlass // expected-note {{'y' is connected to result of 'makeFresh()'}}
   debug_value %y : $NonSendableKlass, let, name "y"
   cond_br %cond, bb_merge, bb_no_merge
 
 bb_merge:
   %yb = begin_borrow %y : $NonSendableKlass
   %f2 = function_ref @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
-  %rm = apply %f2(%x, %yb) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %rm = apply %f2(%x, %yb) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
   end_borrow %yb : $NonSendableKlass
   destroy_value %rm : $NonSendableKlass
   br bb_join
@@ -270,7 +274,7 @@ bb0(%x : @guaranteed $NonSendableKlass):
   debug_value %x : $NonSendableKlass, let, name "x", argno 1
   %xc = copy_value %x : $NonSendableKlass
   %y_addr = alloc_stack [lexical] [var_decl] $NonSendableKlass, var, name "y"
-  store %xc to [init] %y_addr : $*NonSendableKlass // expected-note {{value was merged into code in the current isolation context region here}}
+  store %xc to [init] %y_addr : $*NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
@@ -372,9 +376,10 @@ bb0(%x : @guaranteed $NonSendableKlass):
   // y.slot = x merges y's region with x's. Need a borrow for ref_element_addr.
   %xc = copy_value %x : $NonSendableKlass
   %yb = begin_borrow %y : $ContainerKlass
-  %slot_addr = ref_element_addr %yb : $ContainerKlass, #ContainerKlass.slot // expected-note {{'y.slot' is connected to 'y'}}
+  // expected-note@+1{{'y' is connected to 'y.slot'}}
+  %slot_addr = ref_element_addr %yb : $ContainerKlass, #ContainerKlass.slot
   %access = begin_access [modify] [dynamic] %slot_addr : $*NonSendableKlass
-  store %xc to [assign] %access : $*NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  store %xc to [assign] %access : $*NonSendableKlass // expected-note {{'y.slot' is connected to 'x' which is accessible to code in the current isolation context}}
   end_access %access : $*NonSendableKlass
   end_borrow %yb : $ContainerKlass
 
@@ -404,7 +409,7 @@ bb0(%x : @guaranteed $NonSendableKlass):
 
   %access = begin_access [modify] [static] %y_addr : $*NonSendableKlass
   %takeInout = function_ref @takeInout : $@convention(thin) (@inout NonSendableKlass, @guaranteed NonSendableKlass) -> ()
-  apply %takeInout(%access, %x) : $@convention(thin) (@inout NonSendableKlass, @guaranteed NonSendableKlass) -> () // expected-note {{'makeFresh' is connected to 'x' which is accessible to code in the current isolation context}}
+  apply %takeInout(%access, %x) : $@convention(thin) (@inout NonSendableKlass, @guaranteed NonSendableKlass) -> () // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   end_access %access : $*NonSendableKlass
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()

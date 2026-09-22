@@ -6,6 +6,7 @@
 // RUN: %FileCheck %s < %t/output.txt
 
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 
 enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)

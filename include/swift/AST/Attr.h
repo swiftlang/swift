@@ -735,15 +735,18 @@ public:
 /// Defines the @section attribute.
 class SectionAttr : public DeclAttribute {
 public:
-  SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+  SectionAttr(std::optional<StringRef> Name, SourceLoc AtLoc, SourceRange Range,
+              bool Implicit)
       : DeclAttribute(DeclAttrKind::Section, AtLoc, Range, Implicit),
         Name(Name) {}
 
-  SectionAttr(StringRef Name, bool Implicit)
+  SectionAttr(std::optional<StringRef> Name, bool Implicit)
     : SectionAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
-  /// The section name.
-  const StringRef Name;
+  /// The section name, or std::nullopt if this represents @section(default).
+  const std::optional<StringRef> Name;
+
+  bool isDefault() const { return !Name.has_value(); }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Section;
@@ -791,6 +794,35 @@ public:
   }
 };
 
+/// Defines the @cxx attribute.
+class CxxDeclAttr : public DeclAttribute {
+public:
+  CxxDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DeclAttrKind::CxxDecl, AtLoc, Range, Implicit),
+        Name(Name) {}
+
+  CxxDeclAttr(StringRef Name, bool Implicit)
+      : CxxDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The C++ function name to match against (empty means use the base
+  /// identifier). This is the C++ source name the importer looks up, it is not
+  /// a mangled symbol. The emitted symbol comes from the matched C++
+  /// declaration's mangling.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::CxxDecl;
+  }
+
+  CxxDeclAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CxxDeclAttr(Name, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const CxxDeclAttr *other, Decl *attachedTo) const {
+    return Name == other->Name;
+  }
+};
+
 /// Defines the @_semantics attribute.
 class SemanticsAttr : public DeclAttribute {
 public:
@@ -814,6 +846,32 @@ public:
   }
 
   bool isEquivalent(const SemanticsAttr *other, Decl *attachedTo) const {
+    return Value == other->Value;
+  }
+};
+
+/// The `@_target` attribute, overriding the target CPU/features for functions.
+class TargetAttr : public DeclAttribute {
+public:
+  TargetAttr(StringRef Value, SourceLoc AtLoc, SourceRange Range,
+             bool Implicit)
+      : DeclAttribute(DeclAttrKind::Target, AtLoc, Range, Implicit),
+        Value(Value) {}
+
+  TargetAttr(StringRef Value, bool Implicit)
+      : TargetAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
+
+  const StringRef Value;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Target;
+  }
+
+  TargetAttr *clone(ASTContext &ctx) const {
+    return new (ctx) TargetAttr(Value, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const TargetAttr *other, Decl *attachedTo) const {
     return Value == other->Value;
   }
 };
@@ -1612,6 +1670,37 @@ public:
 
   bool isEquivalent(const ExclusivityAttr *other, Decl *attachedTo) const {
     return getMode() == other->getMode();
+  }
+};
+
+/// Represents the '@unsafe' attribute, which indicates that an entity is
+/// not memory-safe.
+class UnsafeAttr : public DeclAttribute {
+  /// Whether uses must be acknowledged with 'unsafe' even when strict memory
+  /// safety checking is disabled, i.e. whether this is '@unsafe(always)'.
+  bool always;
+
+public:
+  UnsafeAttr(SourceLoc atLoc, SourceRange range, bool always,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Unsafe, atLoc, range, implicit),
+        always(always) {}
+
+  UnsafeAttr(bool implicit = false)
+      : UnsafeAttr(SourceLoc(), SourceRange(), /*always=*/false, implicit) {}
+
+  bool isAlways() const { return always; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Unsafe;
+  }
+
+  UnsafeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) UnsafeAttr(AtLoc, Range, isAlways(), isImplicit());
+  }
+
+  bool isEquivalent(const UnsafeAttr *other, Decl *attachedTo) const {
+    return isAlways() == other->isAlways();
   }
 };
 
@@ -4246,13 +4335,14 @@ public:
   /// Returns the `rename:` field of the attribute, or an empty string.
   StringRef getRename() const { return attr->Rename; }
 
-  /// Returns the platform kind that the attribute applies to, or
-  /// `PlatformKind::none` if the attribute is not platform specific.
+  /// Returns true if the attribute applies to a specific platform.
   bool isPlatformSpecific() const { return getDomain().isPlatform(); }
 
-  /// Returns the platform kind that the attribute applies to, or
-  /// `PlatformKind::none` if the attribute is not platform specific.
-  PlatformKind getPlatform() const { return getDomain().getPlatformKind(); }
+  /// Returns the platform that the attribute applies to, or `nullopt` if the
+  /// attribute is not platform specific.
+  std::optional<PlatformKind> getPlatform() const {
+    return getDomain().getPlatformKind();
+  }
 
   /// Whether this is attribute indicates unavailability in all versions.
   bool isUnconditionallyUnavailable() const {
