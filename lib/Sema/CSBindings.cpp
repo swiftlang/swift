@@ -2255,68 +2255,84 @@ void BindingSet::promoteBindings() {
     }
   };
 
-  // If this type variable represents a closure result, prefer the subtype
-  // binding, to push the conversion into the closure body. This avoids
-  // creating a function conversion thunk if possible.
-  if (TypeVar->getImpl().isClosureResultType()) {
-    if (subtypeCount == 1) {
-      LLVM_DEBUG(llvm::dbgs() << "Promote subtype to exact, closure result: ";
-                 dump(llvm::dbgs(), 0);
-                 llvm::dbgs() << "\n");
-      promoteBinding(*std::move(promotedSubtype));
+  auto promoteSupertypeBinding = [&](const char *reason) {
+    LLVM_DEBUG(llvm::dbgs() << "Promote supertype to exact, " << reason << "\n";
+               dump(llvm::dbgs(), 0);
+               llvm::dbgs() << "\n");
+    promoteBinding(*std::move(promotedSupertype));
+  };
+
+  auto promoteSubtypeBinding = [&](const char *reason) {
+    LLVM_DEBUG(llvm::dbgs() << "Promote subtype to exact, " << reason << "\n";
+               dump(llvm::dbgs(), 0);
+               llvm::dbgs() << "\n");
+    promoteBinding(*std::move(promotedSubtype));
+  };
+
+  if (subtypeCount == 1) {
+    // If this type variable represents a closure result, prefer the subtype
+    // binding, to push the conversion into the closure body. This avoids
+    // creating a function conversion thunk if possible.
+    if (TypeVar->getImpl().isClosureResultType()) {
+      promoteSubtypeBinding("closure result");
       return;
     }
   }
 
-  // FIXME: Figure out when it is safe to promote other subtype bindings as well.
-  if (supertypeCount != 1)
-    return;
+  if (supertypeCount == 1) {
+    // If we have both a subtype and a supertype binding, we usually prefer the
+    // supertype binding, except for a few cases.
+    if (subtypeCount == 1) {
+      // 1) If the subtype binding comes from a weaker form of conversion constraint,
+      // for example:
+      //
+      //   Array<T> arg conv $T1
+      //   $T1 conv UnsafePointer<T>
+      //
+      // We have to bind $T1 to UnsafePointer<T> and not Array<T>, because
+      // conv constraints do not allow array-to-pointer conversions.
+      //
+      // 2) If we have something like this:
+      //
+      //  S conv $T0
+      //  $T0 bind any Sendable
+      //
+      // There is some backward compatibility logic for @preconcurrency which delays
+      // the bind constraint, and it shows up for us as a Subtype binding. Since in
+      // fact this binding must be exact, we prefer it over the supertype binding.
+      //
+      // Note that for the other direction, any Sendable bind $T0, we already get a
+      // supertype binding, and that will be what's preferred anyway.
+      auto *first = promotedSupertype->getSource();
+      auto *second = promotedSubtype->getSource();
+      if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
+        auto type = promotedSubtype->BindingType;
+        bool isConversionToPointer =
+            !!type->lookThroughAllOptionalTypes()->getAnyPointerElementType();
 
-  // If we have both a subtype and a supertype binding, we usually prefer the
-  // supertype binding, except for a few cases.
-  if (subtypeCount == 1) {
-    // 1) If the subtype binding comes from a weaker form of conversion constraint,
-    // for example:
-    //
-    //   Array<T> arg conv $T1
-    //   $T1 conv UnsafePointer<T>
-    //
-    // We have to bind $T1 to UnsafePointer<T> and not Array<T>, because
-    // conv constraints do not allow array-to-pointer conversions.
-    //
-    // 2) If we have something like this:
-    //
-    //  S conv $T0
-    //  $T0 bind any Sendable
-    //
-    // There is some backward compatibility logic for @preconcurrency which delays
-    // the bind constraint, and it shows up for us as a Subtype binding. Since in
-    // fact this binding must be exact, we prefer it over the supertype binding.
-    //
-    // Note that for the other direction, any Sendable bind $T0, we already get a
-    // supertype binding, and that will be what's preferred anyway.
-    auto *first = promotedSupertype->getSource();
-    auto *second = promotedSubtype->getSource();
-    if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
-      auto type = promotedSubtype->BindingType;
-      bool isConversionToPointer =
-          !!type->lookThroughAllOptionalTypes()->getAnyPointerElementType();
-
-      if (isConversionToPointer ||  // Case 1
-          second->getKind() == ConstraintKind::Bind) {  // Case 2
-        LLVM_DEBUG(llvm::dbgs() << "Promote subtype to exact, pointer conversion: ";
-                   dump(llvm::dbgs(), 0);
-                   llvm::dbgs() << "\n");
-        promoteBinding(*std::move(promotedSubtype));
-        return;
+        if (isConversionToPointer ||  // Case 1
+            second->getKind() == ConstraintKind::Bind) {  // Case 2
+          promoteSubtypeBinding("pointer conversion");
+          return;
+        }
       }
     }
+
+    promoteSupertypeBinding("preferred");
+    return;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Promote supertype to exact: ";
-             dump(llvm::dbgs(), 0);
-             llvm::dbgs() << "\n");
-  promoteBinding(*std::move(promotedSupertype));
+  // There was no supertype binding to promote, but we might still have a
+  // subtype binding.
+  if (subtypeCount == 1) {
+    // For now, only do this for ternary results.
+    //
+    // FIXME: Figure out when it is safe to do it in general.
+    if (TypeVar->getImpl().isTernary()) {
+      promoteSubtypeBinding("ternary");
+      return;
+    }
+  }
 }
 
 void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
