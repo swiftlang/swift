@@ -566,6 +566,10 @@ private:
   void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
   void destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord);
   uint32_t taskFlagAsRunningWithoutDependency(InvokeFlags invokeFlags);
+
+  /// Remove the enqueued bit in the ActiveTaskStatus atomically. This must be
+  /// done when a Task's intrusive link is dequeued but after reading the local
+  /// stealer exclusion value. This should not be called from any other context.
   void taskRemoveEnqueued();
 
 public:
@@ -582,7 +586,7 @@ public:
   ///
   /// \param ignoreShield if cancellation shield should be ignored. 
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
-  bool isCancelled(bool ignoreShield) const;
+  bool isCancelled(bool ignoreShield = false) const;
 
   // ==== Task Naming ----------------------------------------------------------
 

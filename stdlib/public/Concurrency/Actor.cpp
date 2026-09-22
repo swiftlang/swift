@@ -295,7 +295,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 /// Runs the Task embedded in the stealer using the stealer's exclusion value.
 /// The stealer holds a reference to the Task which is released here. Stealers
 /// are not reference counted so the object is directly destroyed here.
-inline void AsyncTaskStealer::process(Job *_job) {
+void AsyncTaskStealer::process(Job *_job) {
   auto *stealer = cast<AsyncTaskStealer>(_job);
   SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
 
