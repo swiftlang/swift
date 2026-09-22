@@ -460,7 +460,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         embedded-concurrency-dispatch-executor
         swift_ConcurrencyDispatchExecutor
         PARTIAL_SOURCES_INTENDED
-        INSTALL_BINARY
         NON_EMPTY_OBJECT_FILE
 
         DispatchGlobalExecutor.cpp
