@@ -351,6 +351,8 @@ void _swift_typedDeallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t si
  * call print, and output writes may acquire the same stream lock internally.
  * Each acquisition must be paired with `_swift_unlockStandardOutput` in the
  * same execution context.
+ *
+ * Single-threaded platforms can implement both locking functions as no-ops.
  */
 void _swift_lockStandardOutput(void);
 
