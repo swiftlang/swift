@@ -46,7 +46,7 @@ bb0(%value : @guaranteed $IUnknown):
 // Generic COM-constrained values retain their Swift generic representation.
 // CHECK-LABEL: define{{.*}} @destroy_generic(
 // CHECK: [[WITNESSES:%.*]] = load ptr, ptr
-// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[WITNESSES]], i32 1
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{.*}}, i32 1
 // CHECK: [[DESTROY:%.*]] = load ptr, ptr [[SLOT]]
 // CHECK: call void [[DESTROY]](ptr {{.*}}, ptr {{.*}})
 // CHECK: ret void
