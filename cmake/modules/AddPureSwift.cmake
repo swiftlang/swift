@@ -298,6 +298,8 @@ function(add_pure_swift_host_library name)
 
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)
+  set_property(TARGET ${name}
+    PROPERTY PURE_SWIFT_LIB YES)
 
   if(APSHL_SHARED AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Allow install_name_tool to update paths (for rdar://109473564)
