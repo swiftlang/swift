@@ -95,15 +95,13 @@ getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   return tokenSpelling;
 }
 
-static bool applyCUnsignedIntegerCastExpr(llvm::APSInt &Value,
-                                          clang::QualType Ty,
-                                          const clang::ASTContext &C) {
-  if (Ty.isNull() || !Ty->isIntegerType() || Ty->isBooleanType() ||
-      !Ty->isUnsignedIntegerOrEnumerationType())
+static bool applyCIntegerCastExpr(llvm::APSInt &Value, clang::QualType Ty,
+                                  const clang::ASTContext &C) {
+  if (Ty.isNull() || !Ty->isIntegerType() || Ty->isBooleanType())
     return false;
 
   Value = Value.extOrTrunc(C.getIntWidth(Ty));
-  Value.setIsUnsigned(true);
+  Value.setIsUnsigned(Ty->isUnsignedIntegerOrEnumerationType());
   return true;
 }
 
@@ -199,13 +197,15 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
           value.flipAllBits();
         }
       }
-      // Only honor the C unsigned integer cast when the constant is actually
-      // imported as an unsigned Swift type. Several unsigned C types (e.g.
-      // NSUInteger, size_t) are imported as the signed 'Int', and forcing the
-      // value unsigned there would overflow the signed Swift type.
-      if (importedSwiftTypeIsUnsigned(constantType, ctx))
-        applyCUnsignedIntegerCastExpr(value, castType,
-                                      Impl.getClangASTContext());
+      // Unsigned C types such as NSUInteger and size_t can be imported as the
+      // signed Swift type Int. Preserve the existing signed value in that case
+      // instead of producing an unsigned value that overflows the Swift type.
+      // Signed C casts must still be applied so an unsigned literal with its
+      // high bit set is interpreted using the destination's signedness.
+      if (castType.isNull() ||
+          !castType->isUnsignedIntegerOrEnumerationType() ||
+          importedSwiftTypeIsUnsigned(constantType, ctx))
+        applyCIntegerCastExpr(value, castType, Impl.getClangASTContext());
 
       // Make sure the destination type actually conforms to the builtin literal
       // protocol or is Bool before attempting to import, otherwise we'll crash
@@ -932,21 +932,20 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       return nullptr;
     }
 
-    // Honor an unsigned cast only when the cast type is imported as an unsigned
-    // Swift type. Several unsigned C types (e.g. NSUInteger, size_t) are
-    // imported as signed Int, and forcing the value unsigned would overflow.
+    // Honor integer casts unless an unsigned C type is imported as a signed
+    // Swift type. In that case, preserve the signed value to avoid overflowing
+    // the Swift type (for example, (size_t)-1 imported as Int).
     if (!castType.isNull() && castType->isIntegerType() &&
-        !castType->isBooleanType() &&
-        castType->isUnsignedIntegerOrEnumerationType()) {
+        !castType->isBooleanType()) {
       Type castSwiftType = impl.importTypeIgnoreIUO(
           castType, ImportTypeKind::Value,
           ImportDiagnosticAdder(impl, macro, macro->getDefinitionLoc()),
           isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
       if (!castSwiftType)
         return nullptr;
-      if (importedSwiftTypeIsUnsigned(castSwiftType, impl.SwiftContext)) {
-        applyCUnsignedIntegerCastExpr(resultValue, castType,
-                                      impl.getClangASTContext());
+      if (!castType->isUnsignedIntegerOrEnumerationType() ||
+          importedSwiftTypeIsUnsigned(castSwiftType, impl.SwiftContext)) {
+        applyCIntegerCastExpr(resultValue, castType, impl.getClangASTContext());
         resultSwiftType = castSwiftType;
       }
     }
