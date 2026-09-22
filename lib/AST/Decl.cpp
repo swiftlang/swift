@@ -6328,6 +6328,11 @@ bool NominalTypeDecl::isFormallyResilient() const {
   if ((isa<EnumDecl>(this) || isa<ProtocolDecl>(this)) && isObjC())
     return false;
 
+  // A COM interface's IID fixes its requirements across module versions.
+  if (auto *protocol = dyn_cast<ProtocolDecl>(this);
+      protocol && protocol->isCOMInterface())
+    return false;
+
   // Otherwise, the declaration behaves as if it was accessed via indirect
   // "resilient" interfaces, even if the module is not built with resilience.
   return true;
