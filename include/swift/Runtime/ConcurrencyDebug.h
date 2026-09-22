@@ -33,6 +33,12 @@ enum swift_concurrency_current_task_storage_kind {
 
   /// The task pointer lives in a dynamically allocated pthread TLS key.
   SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_ALLOCATED_KEY = 4,
+
+  /// The task pointer lives in `_swift_concurrency_debug_global_tls_array`, an
+  /// array of pointer-sized slots indexed by `swift::tls_key` (see
+  /// swift/Threading/TLSKeys.h). The task is in slot
+  /// `tls_key::concurrency_task`.
+  SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_GLOBAL_TLS_ARRAY = 5,
 };
 
 /// Indicates that the concrete storage kind is published by the linked

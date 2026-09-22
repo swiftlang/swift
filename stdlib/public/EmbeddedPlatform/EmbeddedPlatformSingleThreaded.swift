@@ -117,8 +117,18 @@ public func _swift_mutexRecursive_unlock(_ mutex: UnsafeMutableRawPointer) {
 
 fileprivate struct SingleThreadedTLS {
   static let keyCount = Int(SWIFT_TLS_KEY_COUNT)
-  static var values = [8 of UnsafeMutableRawPointer?](repeating: nil)
+
+  // Debuggers inspect this variable to find the currently executing task.
+  @used
+  @_silgen_name("_swift_concurrency_debug_global_tls_array")
+  static var values: [8 of UnsafeMutableRawPointer?] = [nil, nil, nil, nil, nil, nil, nil, nil]
 }
+
+// SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_GLOBAL_TLS_ARRAY, see
+// ConcurrencyDebug.h.
+@used
+@_silgen_name("_swift_concurrency_debug_current_task_storage_kind")
+public let _swift_concurrency_debug_current_task_storage_kind: UInt32 = 5
 
 @implementation @c
 public func _swift_tls_init(
