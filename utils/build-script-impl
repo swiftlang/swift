@@ -1669,7 +1669,14 @@ for host in "${ALL_HOSTS[@]}"; do
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
         SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
-        if [[ ! -f "${SWIFTC_BIN}" ]] ; then
+        # Preflight runs before anything has been built or installed, and under
+        # the unified layout NATIVE_SWIFT_TOOLS_PATH points into the toolchain
+        # the install phase has yet to create, so this can never hold that
+        # early. SWIFTC_BIN is only needed as a value to bake into cmake
+        # options here (-DLLDB_SWIFTC), and the `else` branch below names a
+        # path that doesn't exist at this point either -- note it has no
+        # existence check for exactly that reason.
+        if [[ -z "${UNIFIED_CMAKE_PREFLIGHT}" ]] && [[ ! -f "${SWIFTC_BIN}" ]] ; then
             echo "error: swiftc does not exist at the specified native tools path: ${SWIFTC_BIN}"
             exit 1
         fi
