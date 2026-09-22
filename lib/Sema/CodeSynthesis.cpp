@@ -1394,6 +1394,10 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   auto superclassDecl = decl->getSuperclassDecl();
   assert(superclassDecl);
 
+  // An imported C++ class does not inherit the initializers of its base either.
+  if (decl->hasClangNode() && superclassDecl->isForeignReferenceType())
+    return false;
+
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   if ((superclassDecl->hasClangNode() ||
