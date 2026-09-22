@@ -230,7 +230,7 @@ func cast42(_ p: P) -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test0SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "a", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -242,7 +242,7 @@ func test0() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "a", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -253,11 +253,10 @@ func test1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "a", argno 1
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "ao"
-// CHECK-NEXT: %2 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %3 = struct $Bool
-// CHECK-NEXT: return %3
+// CHECK-NEXT: debug_value undef
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test2() -> Bool {
   return cast2(A())
@@ -265,10 +264,9 @@ func test2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test3SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "p", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test3() -> Bool {
   return cast3(A())
@@ -276,10 +274,9 @@ func test3() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test4SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "p", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test4() -> Bool {
   return cast4(A())
@@ -287,10 +284,9 @@ func test4() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding7test5_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test5_1() -> Bool {
     return cast5(B.self)
@@ -298,10 +294,9 @@ func test5_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding7test5_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test5_2() -> Bool {
     return cast5(AnyObject.self)
@@ -310,10 +305,9 @@ func test5_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding7test6_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test6_1() -> Bool {
     return cast6(B.self)
@@ -322,10 +316,9 @@ func test6_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding7test6_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test6_2() -> Bool {
     return cast6(AnyObject.self)
@@ -333,10 +326,9 @@ func test6_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding7test7_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test7_1() -> Bool {
     return cast7(B.self)
@@ -344,10 +336,9 @@ func test7_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding7test7_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test7_2() -> Bool {
     return cast7(AnyObject.self)
@@ -356,7 +347,7 @@ func test7_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test8SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "a", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -367,8 +358,7 @@ func test8() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test9SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "a", argno 1
-// FIXME: cast9's local variable "ao" is missing
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -379,7 +369,7 @@ func test9() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test10SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "p", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -390,7 +380,7 @@ func test10() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test11SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "p", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -401,10 +391,9 @@ func test11() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test12SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test12() -> Bool {
     return cast12(A.self)
@@ -413,10 +402,9 @@ func test12() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test13_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test13_1() -> Bool {
     return cast13(A.self)
@@ -424,10 +412,9 @@ func test13_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test13_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test13_2() -> Bool {
     return cast13(P.self)
@@ -435,7 +422,6 @@ func test13_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test13_3SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast13's parameter "t" is missing
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
 // CHECK-NEXT: return %1
@@ -447,10 +433,9 @@ func test13_3() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test14_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test14_1() -> Bool {
     return cast14(A.self)
@@ -458,10 +443,9 @@ func test14_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test14_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test14_2() -> Bool {
     return cast14(P.self)
@@ -469,7 +453,7 @@ func test14_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test15_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -480,7 +464,6 @@ func test15_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test15_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast15's parameter "t" is missing
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
 // CHECK-NEXT: return %1
@@ -491,7 +474,7 @@ func test15_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test16_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -502,7 +485,6 @@ func test16_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test16_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast16's parameter "t" is missing
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
 // CHECK-NEXT: return %1
@@ -514,7 +496,7 @@ func test16_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test17_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -525,7 +507,7 @@ func test17_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test17_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
+// CHECK-NEXT: debug_value undef
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -536,7 +518,7 @@ func test17_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test18_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
+// CHECK-NEXT: debug_value undef : $A, let, name "t", argno 1
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -547,7 +529,7 @@ func test18_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test18_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
+// CHECK-NEXT: debug_value undef : $AnyObject, let, name "t", argno 1
 // CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %2 = struct $Bool
 // CHECK-NEXT: return %2
@@ -558,7 +540,6 @@ func test18_2() -> Bool {
 
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test19SbyF : $@convention(thin) () -> Bool
-// CHECK:         debug_value undef {{.*}}, let, name "t"
 // CHECK:         [[I1:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:         [[B:%.*]] = struct $Bool ([[I1]]
 // CHECK:         return [[B]]
@@ -570,8 +551,6 @@ func test19() -> Bool {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test20_1SbyF : $@convention(thin) () -> Bool
-// CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
 @inline(never)
 func test20_1() -> Bool {
     return cast20(S.self)
@@ -579,10 +558,9 @@ func test20_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test20_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test20_2() -> Bool {
     return cast20(U())
@@ -591,10 +569,9 @@ func test20_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test21_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test21_1() -> Bool {
     return cast21(S.self)
@@ -602,7 +579,6 @@ func test21_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test21_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast21's parameter "t" is missing
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
 // CHECK-NEXT: return %1
@@ -613,10 +589,9 @@ func test21_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test22_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test22_1() -> Bool {
     return cast22(T.self)
@@ -624,17 +599,15 @@ func test22_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test22_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test22_2() -> Bool {
     return cast22(S.self)
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test23SbyF : $@convention(thin) () -> Bool
-// CHECK:         debug_value undef {{.*}}, let, name "concrete", argno 1
 // CHECK:         [[I0:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[B:%.*]] = struct $Bool ([[I0]]
 // CHECK:         return [[B]]
@@ -646,10 +619,9 @@ func test23() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test24_1SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test24_1() -> Bool {
     return cast24(T.self)
@@ -657,10 +629,9 @@ func test24_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test24_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test24_2() -> Bool {
     return cast24(S.self)
@@ -668,7 +639,6 @@ func test24_2() -> Bool {
 
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test25SbyF : $@convention(thin) () -> Bool
-// CHECK:         debug_value undef {{.*}}, let, name "concrete", argno 1
 // CHECK:         [[I0:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[B:%.*]] = struct $Bool ([[I0]]
 // CHECK:         return [[B]]
@@ -680,10 +650,9 @@ func test25() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test26SbyF
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test26() -> Bool {
     return cast26(T.self)
@@ -691,7 +660,6 @@ func test26() -> Bool {
 
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test27SbyF
-// CHECK:         debug_value undef {{.*}}, let, name "existential", argno 1
 // CHECK:         [[I0:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[B:%.*]] = struct $Bool ([[I0]]
 // CHECK:         return [[B]]
@@ -702,7 +670,6 @@ func test27() -> Bool {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test28_1SbyF
-// CHECK: debug_value undef {{.*}}, let, name "existential", argno 1
 // CHECK: checked_cast
 // CHECK: return
 @inline(never)
@@ -712,10 +679,9 @@ func test28_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test28_2SbyF
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test28_2() -> Bool {
     return cast28(E.self)
@@ -723,10 +689,9 @@ func test28_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test28_3SbyF
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "existential", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test28_3() -> Bool {
     return cast28(F.self)
@@ -888,10 +853,9 @@ public func test37<T>(ah: T) {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test38a{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test38a() -> Bool {
   return cast38((1, 2))
@@ -899,10 +863,9 @@ public func test38a() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test38b{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test38b() -> Bool {
   return cast38((x: 1, y: 2))
@@ -910,10 +873,9 @@ public func test38b() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test38c{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test38c() -> Bool {
   return cast38((z: 1, y: 2))
@@ -921,10 +883,9 @@ public func test38c() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test39a{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test39a() -> Bool {
   return cast39((1, 2))
@@ -932,10 +893,9 @@ public func test39a() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test39b{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test39b() -> Bool {
   return cast39((x: 1, y: 2))
@@ -943,10 +903,9 @@ public func test39b() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test39c{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test39c() -> Bool {
   return cast39((z: 1, y: 2))
@@ -954,10 +913,9 @@ public func test39c() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test39d{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test39d() -> Bool {
   return cast39((1, 2, 3))
@@ -985,10 +943,9 @@ public func test40b() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test40c{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test40c() -> Bool {
   return cast40((1, S()))
@@ -1089,10 +1046,8 @@ func cast<U, V>(_ u: U.Type) -> V? {
 }
 
 // CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectProtocolTo{{.*}}Type
-// CHECK: bb0
-// CHECK-NEXT: debug_value undef {{.*}}, let, name "u", argno 1
-// CHECK-NEXT: %1 = enum $Optional{{.*}}, #Optional.none!enumelt
-// CHECK-NEXT: return %1
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
 @inline(never)
 public func testCastAnyObjectProtocolToAnyObjectType() -> AnyObject.Type? {
   return cast(AnyObject.self)
@@ -1121,8 +1076,6 @@ func testCastToPForOptional<T>(_ t: T) -> Bool {
 }
 
 // CHECK-LABEL: // testCastToPForOptionalSuccess()
-// CHECK: debug_value {{.*}}, let, name "t"
-// CHECK: debug_value undef {{.*}}, let, name "t", argno 1
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: [[RET:%.*]] = struct $Bool ([[RES]] : $Builtin.Int1)
 // CHECK: return [[RET]] : $Bool
@@ -1133,8 +1086,6 @@ public func testCastToPForOptionalSuccess() -> Bool {
 }
 
 // CHECK-LABEL: // testCastToPForOptionalFailure()
-// CHECK: debug_value {{.*}}, let, name "t"
-// CHECK: debug_value undef {{.*}}, let, name "t", argno 1
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK: [[RET:%.*]] = struct $Bool ([[RES]] : $Builtin.Int1)
 // CHECK: return [[RET]] : $Bool
