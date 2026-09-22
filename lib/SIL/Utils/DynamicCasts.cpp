@@ -12,6 +12,7 @@
 
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
@@ -349,6 +350,13 @@ bool swift::doesCastPreserveOwnershipForTypes(SILModule &module,
                                               CanType sourceType,
                                               CanType targetType) {
   if (!canIRGenUseScalarCheckedCastInstructions(module, sourceType, targetType))
+    return false;
+
+  // QueryInterface returns an independently retained interface pointer. Even
+  // class-bound COM interfaces cannot forward guaranteed ownership through a
+  // cast, since retaining the result and releasing the source are observable.
+  auto targetObjectType = targetType->lookThroughAllOptionalTypes();
+  if (targetObjectType->isCOMExistentialType())
     return false;
 
   // (B2) unwrapping
