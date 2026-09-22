@@ -193,6 +193,7 @@ KNOWN_SETTINGS=(
     lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
     lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
+    lldb-test-disable-network                     "1"               "run the LLDB test suite in a sandbox that denies network access to anything other than localhost (Darwin only)"
     lldb-use-system-debugserver                   ""                "don't try to codesign debugserver, and use the system's debugserver instead"
     lldb-configure-tests                          "1"               "if set, will make sure we configure LLDB's test target without running the tests"
 
@@ -2774,9 +2775,29 @@ for host in "${ALL_HOSTS[@]}"; do
                     lldb_check_target="check-lldb"
                 fi
 
+                lldb_test_sandbox=()
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_TEST_DISABLE_NETWORK})" == "TRUE" ]]; then
+                    lldb_test_sandbox_profile='(version 1)
+                        (allow default)
+                        (deny network-outbound (remote ip))
+                        (allow network-outbound (remote ip "localhost:*"))'
+                    # Sandboxes don't nest, so this fails if build-script is
+                    # itself already running in one.
+                    if [[ ! ${DRY_RUN} ]] && ! sandbox-exec -p "${lldb_test_sandbox_profile}" /usr/bin/true; then
+                        echo "error: could not create the network sandbox for the LLDB tests; pass --lldb-test-disable-network=0 to run them without it" 1>&2
+                        exit 1
+                    fi
+                    # Swift sandboxes macro plugin servers, which fails inside
+                    # this sandbox, so ask LLDB not to.
+                    lldb_test_sandbox=(
+                        env LLDB_TEST_DISABLE_SWIFT_PLUGIN_SANDBOX=1
+                        sandbox-exec -p "${lldb_test_sandbox_profile}"
+                    )
+                fi
+
                 echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} ${lldb_check_target}
+                    call "${lldb_test_sandbox[@]}" ${NINJA_BIN} -j ${BUILD_JOBS} ${lldb_check_target}
                 continue
                 ;;
             llbuild)
