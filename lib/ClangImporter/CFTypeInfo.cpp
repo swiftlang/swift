@@ -71,10 +71,7 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
     quals.removeConst();
     if (quals.empty()) {
       if (auto record = pointee->getAs<clang::RecordType>()) {
-        // Check the canonical decl only for backwards compatibility.
-        // FIXME: Use getMostRecentDecl() here to pick up redeclaration attrs
-        //        (which would be source-breaking)
-        auto recordDecl = record->getDecl()->getCanonicalDecl();
+        auto recordDecl = record->getDecl();
         if (recordDecl->hasAttr<clang::ObjCBridgeAttr>() ||
             recordDecl->hasAttr<clang::ObjCBridgeMutableAttr>() ||
             recordDecl->hasAttr<clang::ObjCBridgeRelatedAttr>() ||
