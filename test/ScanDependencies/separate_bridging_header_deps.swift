@@ -23,8 +23,9 @@ import E
 // CHECK-NEXT:             "path": "{{.*}}Bridging.h",
 // CHECK-NEXT:            "sourceFiles": [
 // CHECK-NEXT:              "{{.*}}Bridging.h",
-// CHECK-NEXT:              "{{.*}}BridgingOther.h"
-// CHECK-NEXT:            ],
+// CHECK-NEXT:              "{{.*}}BridgingOther.h"{{,?}}
+// Windows also reports the standard library's VFS overlay here.
+// CHECK:            ],
 // CHECK-NEXT:            "moduleDependencies": [
 // CHECK-NEXT:              "F"
 
