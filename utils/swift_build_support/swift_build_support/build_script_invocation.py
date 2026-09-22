@@ -56,6 +56,57 @@ def _extract_impl_arg_value(impl_args, flag_name):
     return value
 
 
+def _impl_flag_is_set(impl_args, flag_name):
+    """Whether a boolean `--flag` (or `--flag=value`) build-script-impl
+    passthrough is enabled. A bare occurrence is True; an explicit value is
+    read the way build-script-impl's true_false() reads it. Later occurrences
+    win, matching build-script-impl's own last-wins parsing."""
+    result = False
+    prefix = flag_name + '='
+    for arg in impl_args or []:
+        if arg == flag_name:
+            result = True
+        elif arg.startswith(prefix):
+            result = arg[len(prefix):].lower() not in ('', '0', 'false')
+    return result
+
+
+def _unified_lldb_install_components(args):
+    """The LLDB install components to fold into --llvm-install-components under
+    the unified LLVM layout.
+
+    Mirrors LLVM_DISTRIBUTION_COMPONENTS from
+    lldb/cmake/caches/Apple-lldb-{macOS,Linux}.cmake, which build-script-impl
+    feeds the *standalone* lldb configure via `-C`. Under the unified layout
+    lldb is configured inside LLVM's cmake, that cache is never loaded, and the
+    `install-distribution` pass that consumes it is skipped -- so the list has
+    to be reproduced here.
+
+    LLDBConfig.cmake prunes entries from the cache list depending on how lldb
+    was configured; the same pruning is applied here, because naming a
+    component whose install target doesn't exist makes ninja fail.
+    """
+    if platform.system() == 'Darwin':
+        components = ['lldb', 'liblldb', 'lldb-argdumper', 'lldb-dap',
+                      'lldb-mcp', 'darwin-debug', 'debugserver', 'repl_swift']
+    else:
+        components = ['lldb', 'liblldb', 'lldb-argdumper', 'lldb-dap',
+                      'lldb-server', 'lldb-python-scripts', 'repl_swift']
+
+    # The system debugserver is a custom target with no install rule.
+    if _impl_flag_is_set(args.build_script_impl_args,
+                         '--lldb-use-system-debugserver'):
+        if 'debugserver' in components:
+            components.remove('debugserver')
+    # LLDB.framework embeds the Python scripts rather than installing them
+    # through their own component.
+    if platform.system() == 'Darwin' and 'lldb-python-scripts' in components:
+        components.remove('lldb-python-scripts')
+
+    return components
+
+
+
 class BuildScriptInvocation(object):
     """Represent a single build script invocation.
     """
@@ -454,6 +505,62 @@ class BuildScriptInvocation(object):
                 if not any(o.startswith('-D{}'.format(_flag))
                            for o in args.extra_llvm_cmake_options):
                     args.extra_llvm_cmake_options.append(_opt)
+            # Same story for LLDB. build-script-impl hands the standalone lldb
+            # configure `-C <lldb>/cmake/caches/Apple-lldb-<platform>.cmake`,
+            # which is what turns on the toolchain-shaped LLDB (framework
+            # layout, no default rpath, no strip) and what defines
+            # LLVM_DISTRIBUTION_COMPONENTS for the `install-distribution` pass.
+            # Under unified layout lldb is configured inside LLVM's cmake, so
+            # that cache never loads and that install pass is skipped: forward
+            # the settings to the unified configure and merge the components
+            # into --llvm-install-components, where llvm.py turns each into an
+            # `install-<component>` target.
+            if args.build_lldb:
+                _lldb_opts = [
+                    '-DLLDB_USE_STATIC_BINDINGS:BOOL=TRUE',
+                    '-DLLDB_ENABLE_CURSES:BOOL=TRUE',
+                    '-DLLDB_ENABLE_LIBEDIT:BOOL=TRUE',
+                    '-DLLDB_ENABLE_PYTHON:BOOL=TRUE',
+                    '-DLLDB_ENABLE_LZMA:BOOL=FALSE',
+                    '-DLLDB_ENABLE_LUA:BOOL=FALSE',
+                ]
+                if _impl_flag_is_set(args.build_script_impl_args,
+                                     '--lldb-use-system-debugserver'):
+                    _lldb_opts.append(
+                        '-DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL=TRUE')
+                if platform.system() == 'Darwin':
+                    # LLDB.framework goes beside the toolchain's usr/, the same
+                    # place the standalone build puts it. install_prefix is
+                    # right for every host here: build-script-impl's
+                    # get_host_install_prefix() only diverges from it when
+                    # --cross-compile-install-prefixes is passed, which no
+                    # unified preset does.
+                    _lldb_opts += [
+                        '-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE',
+                        '-DLLDB_NO_INSTALL_DEFAULT_RPATH:BOOL=TRUE',
+                        '-DLLDB_SKIP_STRIP:BOOL=TRUE',
+                        '-DLLDB_FRAMEWORK_INSTALL_DIR={}'.format(
+                            os.path.join(
+                                args.install_prefix,
+                                '../System/Library/PrivateFrameworks')),
+                    ]
+                for _opt in _lldb_opts:
+                    _name = _opt.split(':')[0].split('=')[0]
+                    if not any(o.startswith(_name)
+                               for o in args.extra_llvm_cmake_options):
+                        args.extra_llvm_cmake_options.append(_opt)
+
+                if _impl_flag_is_set(args.build_script_impl_args,
+                                     '--install-lldb') \
+                        and args.llvm_install_components \
+                        and args.llvm_install_components != 'all':
+                    _installed = args.llvm_install_components.split(';')
+                    _lldb_components = [
+                        c for c in _unified_lldb_install_components(args)
+                        if c not in _installed]
+                    if _lldb_components:
+                        args.llvm_install_components = ';'.join(
+                            [args.llvm_install_components] + _lldb_components)
         conditional_subproject_configs = [
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
