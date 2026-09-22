@@ -12,8 +12,21 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
-// FIXME: This test runs very slowly on watchOS.
-// UNSUPPORTED: OS=watchos
+// FIXME: This test needs to be redesigned from scratch.
+// REQUIRES: rdar://188085737
+
+// This test has some serious design problems that cause it
+// to use enormous amounts of CPU time when run as part of the
+// entire test suite.  Among other sins, the high-priority main
+// thread spins waiting for its low-priority children.  Not a problem
+// when this test is run by itself (the children run on otherwise idle
+// cores) but when run as part of the full test suite, the children
+// get completely starved until enough other tests finish.
+// During that time, the main thread just locks up a CPU core so
+// noone else can use it.  A few such tests could tie up all cores
+// more-or-less indefinitely.
+//
+// Disabled until someone has time to re-think the whole thing.
 
 import SwiftPrivate
 
