@@ -740,6 +740,10 @@ public:
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
+  /// Accessors and operator functions synthesized around an imported function,
+  /// mapped back to it.
+  llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -837,6 +841,18 @@ public:
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
+
+  void recordForwardingSource(const ValueDecl *decl, ValueDecl *source) {
+    forwardingSources[decl] = source;
+  }
+  /// The declaration \p decl was synthesized around, whether it is a clone of
+  /// a base class member or an accessor or operator built on an imported
+  /// function.
+  ValueDecl *getForwardingSource(const ValueDecl *decl) {
+    if (auto *source = forwardingSources.lookup(decl))
+      return source;
+    return getOriginalForClonedMember(decl);
+  }
 
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
@@ -2253,19 +2269,15 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail,
-                           ClangImporter::Implementation *importerImpl)
+                           const PlatformAvailability &avail)
       : // Update in response to D97702 landing.
         clang::ModuleFileExtension(), pchLookupTable(pchLookupTable),
         lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        importerImpl(importerImpl) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   void hashExtension(ExtensionHashBuilder &HBuilder) const override;
@@ -2384,6 +2396,19 @@ StringRef getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr);
 CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
                          ClangImporter::Implementation &Impl);
+
+/// Create the implicit 'newValue' parameter of a synthesized setter.
+ParamDecl *createNewValueParam(ASTContext &ctx, Type type, DeclContext *dc);
+
+/// Print the name of \p decl for a request's \c simple_display, falling back
+/// to a placeholder for an anonymous or otherwise unnamed record.
+void printRecordName(llvm::raw_ostream &out, const clang::RecordDecl *decl);
+
+/// Whether the type of any base class or field of \p decl satisfies \p pred.
+/// Bases are visited before fields; a non-C++ record has no bases.
+bool anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 

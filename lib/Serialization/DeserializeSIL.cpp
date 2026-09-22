@@ -1482,6 +1482,8 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
     return CastConsumptionKind::CopyOnSuccess;
   case SIL_CAST_CONSUMPTION_BORROW_ALWAYS:
     return CastConsumptionKind::BorrowAlways;
+  case SIL_CAST_CONSUMPTION_TEST_ONLY:
+    return CastConsumptionKind::TestOnly;
   default:
     llvm_unreachable("not a valid CastConsumptionKind for SIL");
   }
@@ -2179,7 +2181,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
-  ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
@@ -2199,6 +2200,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
             getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         /*needsStackProtection=*/Attr != 0);
+    break;
+  }
+  case SILInstructionKind::RawPointerToRefInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createRawPointerToRef(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        /*isImmortal=*/Attr != 0);
     break;
   }
   case SILInstructionKind::ProjectBoxInst: {
@@ -3917,8 +3930,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
-    // ignore attr.
-    CheckedCastInstOptions options(ListOfValues[6]);
+    unsigned flags = ListOfValues[6];
+    CheckedCastInstOptions options(flags & 0xFF);
+    bool isCopy = (flags >> 8) & 1;
     CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
                                        (SILValueCategory)ListOfValues[3], Fn);
@@ -3932,7 +3946,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                   targetLoweredType);
 
     ResultInst = Builder.createUnconditionalCheckedCastAddr(
-        Loc, options, src, srcFormalType, dest, targetFormalType);
+        Loc, options, src, srcFormalType, dest, targetFormalType, isCopy);
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -3950,8 +3964,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         MF->getType(ListOfValues[5])->getCanonicalType();
     SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    SILValue dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
-                                  targetLoweredType);
+    SILValue dest;
+    if (producesDestinationValue(consumption)) {
+      dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
+                           targetLoweredType);
+    }
 
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);

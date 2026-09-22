@@ -103,7 +103,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Actor.cpp
     TaskStatus.cpp)
 
-  add_swift_unittest(SwiftRuntimeTests IS_TARGET_TEST
+  # The reusable LLVMSupport PCH is the host's, built without
+  # SWIFT_INLINE_NAMESPACE, so its `::llvm` clashes with the runtime's own
+  # namespaced copy this target uses (see SWIFT_INLINE_NAMESPACE=__runtime
+  # below). Disable reuse rather than build against the wrong namespace.
+  add_swift_unittest(SwiftRuntimeTests IS_TARGET_TEST DISABLE_PCH_REUSE
     Array.cpp
     CompatibilityOverrideRuntime.cpp
     CompatibilityOverrideConcurrency.cpp
@@ -115,6 +119,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Enum.cpp
     ExtendedExistential.cpp
     Heap.cpp
+    InstancePrefix.cpp
     PrebuiltStringMap.cpp
     Refcounting.cpp
     Stdlib.cpp
@@ -136,7 +141,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   target_compile_definitions(SwiftRuntimeTests
                              PRIVATE
                                swiftCore_EXPORTS
-                               SWIFT_INLINE_NAMESPACE=__runtime)
+                               SWIFT_INLINE_NAMESPACE=__runtime
+                               $<$<BOOL:${SWIFT_STDLIB_ASSERTIONS}>:SWIFT_RUNTIME_TESTS_ENABLE_ASSERTIONS>)
 
   if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     target_compile_definitions(SwiftRuntimeTests

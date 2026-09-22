@@ -2248,7 +2248,8 @@ SILCloner<ImplClass>::visitRawPointerToRefInst(RawPointerToRefInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createRawPointerToRef(getOpLocation(Inst->getLoc()),
                                                getOpValue(Inst->getOperand()),
-                                               getOpType(Inst->getType())));
+                                               getOpType(Inst->getType()),
+                                               Inst->isImmortal()));
 }
 
 template<typename ImplClass>
@@ -2317,8 +2318,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
-                              OpLoc, Inst->getCheckedCastOptions(),
-                              SrcValue, SrcType, DestValue, TargetType));
+                              OpLoc, Inst->getCheckedCastOptions(), SrcValue,
+                              SrcType, DestValue, TargetType, Inst->isCopy()));
 }
 
 template <typename ImplClass>
@@ -3958,7 +3959,8 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
   SILValue SrcValue = getOpValue(Inst->getSrc());
-  SILValue DestValue = getOpValue(Inst->getDest());
+  SILValue DestValue =
+      Inst->hasDest() ? getOpValue(Inst->getDest()) : SILValue();
   CanType SrcType = getOpASTType(Inst->getSourceFormalType());
   CanType TargetType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

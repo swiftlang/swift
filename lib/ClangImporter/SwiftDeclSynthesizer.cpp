@@ -48,6 +48,16 @@
 using namespace swift;
 using namespace importer;
 
+ParamDecl *importer::createNewValueParam(ASTContext &ctx, Type type,
+                                         DeclContext *dc) {
+  auto *param =
+      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                          ctx.getIdentifier("newValue"), dc);
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(type);
+  return param;
+}
+
 /// Build forwarding argument expressions for a set of clang parameters.
 /// Parameters with rvalue reference types or move-only value types are wrapped
 /// in a static_cast to preserve move semantics.
@@ -1857,6 +1867,10 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                                      ? synthesizeUnwrappingAddressGetterBody
                                      : synthesizeUnwrappingGetterBody,
                                  getterImpl);
+  // Only the getter is recorded: a synthesized setter takes 'newValue' ahead of
+  // the source's parameters, and inference already gives it a dependency at
+  // least as wide as the source's.
+  ImporterImpl.recordForwardingSource(getterDecl, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1865,11 +1879,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
   AccessorDecl *setterDecl = nullptr;
   if (setterImpl) {
-    auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(elementTy);
+    auto paramVarDecl = createNewValueParam(ctx, elementTy, dc);
 
     SmallVector<ParamDecl *> setterParams;
     if (!useAddress)
@@ -1973,6 +1983,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                                      ? synthesizeUnwrappingAddressGetterBody
                                      : synthesizeUnwrappingGetterBody,
                                  getterImpl);
+  ImporterImpl.recordForwardingSource(getterDecl, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1984,11 +1995,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
 
   AccessorDecl *setterDecl = nullptr;
   if (setterImpl) {
-    auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(elementTy);
+    auto paramVarDecl = createNewValueParam(ctx, elementTy, dc);
 
     auto setterParamList = useAddress
                                ? ParameterList::create(ctx, {})
@@ -2331,11 +2338,26 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (auto *param : method->parameters()) {
-    params.push_back(clang::ParmVarDecl::Create(
+    auto *newParam = clang::ParmVarDecl::Create(
         clangCtx, newMethod, param->getSourceRange().getBegin(),
         param->getLocation(), param->getIdentifier(), param->getType(),
         param->getTypeSourceInfo(), param->getStorageClass(),
-        /*DefExpr=*/nullptr));
+        /*DefExpr=*/nullptr);
+    // The forwarding method is imported in its own right, so carry over the
+    // annotations that tell Swift what a parameter's lifetime means, alongside
+    // the method-level ones copied above. Without them the importer infers a
+    // dependency for the forwarding method instead of using the one written in
+    // C++, which need not be the same. Annotations on the implicit object
+    // parameter need no copying: they are part of 'methodType'.
+    if (auto *attr = param->getAttr<clang::LifetimeBoundAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::NoEscapeAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    params.push_back(newParam);
   }
   newMethod->setParams(params);
 
@@ -2460,6 +2482,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   topLevelStaticFuncDecl->setStatic();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody,
                                              operatorMethod);
+  ImporterImpl.recordForwardingSource(topLevelStaticFuncDecl, operatorMethod);
 
   // If this is a unary prefix operator (e.g. `!`), add a `prefix` attribute.
   size_t numParams = operatorMethod->getParameters()->size();
@@ -2603,6 +2626,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
   getterDecl->setBodySynthesizer(synthesizeComputedGetterFromCXXMethod, getter);
+  ImporterImpl.recordForwardingSource(getterDecl, getter);
   if (getter->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
     result->setIsGetterMutating(true);
@@ -2611,10 +2635,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   AccessorDecl *setterDecl = nullptr;
   if (setter) {
     auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(getter->getResultInterfaceType());
+        createNewValueParam(ctx, getter->getResultInterfaceType(), dc);
 
     auto setterParamList = ParameterList::create(ctx, {paramVarDecl});
 
@@ -3404,33 +3425,23 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
        !decl->getDestructor()->isDefaulted()))
     return false;
 
-  auto checkType = [](clang::QualType t) {
+  // Whether a base or field of this type makes the record non-trivial.
+  auto isNonTrivial = [](clang::QualType t) {
     // N.B. Use Type::getAsCXXRecordDecl() rather than reaching for
     // RecordType::getDecl(): the latter can be any declaration of the record,
     // and Swift attributes are not propagated across redeclarations.
     if (auto *cxxRecord = t->getAsCXXRecordDecl()) {
       if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
           hasUnsafeAPIAttr(cxxRecord))
-        return true;
-
-      if (!isSufficientlyTrivial(cxxRecord))
         return false;
+
+      return !isSufficientlyTrivial(cxxRecord);
     }
 
-    return true;
+    return false;
   };
 
-  for (auto field : decl->fields()) {
-    if (!checkType(field->getType()))
-      return false;
-  }
-
-  for (auto base : decl->bases()) {
-    if (!checkType(base.getType()))
-      return false;
-  }
-
-  return true;
+  return !anySubobjectTypeSatisfies(decl, isNonTrivial);
 }
 
 /// Find an explicitly-provided "destroy" operation specified for the

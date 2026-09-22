@@ -77,7 +77,7 @@ sil [ossa] @retain_only : $@convention(thin) () -> @owned XX {
 bb0:
   %g = global_addr @ggs : $*Storage
   %a = address_to_pointer %g : $*Storage to $Builtin.RawPointer
-  %r = raw_pointer_to_ref %a : $Builtin.RawPointer to $XX
+  %r = raw_pointer_to_ref [immortal] %a : $Builtin.RawPointer to $XX
   %copy = copy_value %r : $XX
   return %copy : $XX
 }

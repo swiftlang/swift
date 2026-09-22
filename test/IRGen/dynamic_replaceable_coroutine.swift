@@ -18,10 +18,13 @@ extension Int {
     // CHECK: call ptr @swift_getFunctionReplacement
     // CHECK: br
     // CHECK: AllocaSpillBB:
+    //
     // The coroutine frame is an opaque byte buffer after coro splitting, so
-    // `thing` is addressed by byte offset; its name comes from the alloca.
-    // CHECK: %thing = getelementptr inbounds i8, ptr %0
-    // CHECK: call void @llvm.memset{{.*}}(ptr {{.*}} %thing,
+    // `THING` is addressed by byte offset; its name comes from the alloca.
+    // NB: `THING` must not match `%self.debug`.
+    //
+    // CHECK: [[THING:%[^.]+]] = getelementptr inbounds i8, ptr %0
+    // CHECK: call void @llvm.memset{{.*}}(ptr align {{[0-9]+}} [[THING]]
     // CHECK: ret
     _modify {
       var thing = Thing(self)

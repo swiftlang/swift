@@ -182,6 +182,24 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   return %28 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK:   [[IMMORTAL:%.*]] = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $Builtin.NativeObject
+// CHECK:   fix_lifetime [[IMMORTAL]] : $Builtin.NativeObject
+// CHECK:   [[OWNED:%.*]] = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Builtin.NativeObject
+// CHECK:   destroy_value [[OWNED]] : $Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'test_raw_pointer_to_ref'
+sil [ossa] @test_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  // An immortal result has "none" ownership, so it must not be destroyed.
+  %1 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $Builtin.NativeObject
+  fix_lifetime %1 : $Builtin.NativeObject
+  // A non-immortal result is "owned", so it has to be destroyed.
+  %3 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %5 = tuple ()
+  return %5 : $()
+}
+
 // CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () for <Builtin.Int32, Builtin.Int64>) -> ()
 sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <A, B> (@in A, @in B) -> () for <Builtin.Int32, Builtin.Int64>) -> () {
 entry(%0 : @guaranteed $@callee_guaranteed @substituted <C, D> (@in C, @in D) -> () for <Builtin.Int32, Builtin.Int64>):

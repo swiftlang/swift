@@ -90,6 +90,8 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
     return SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS;
   case CastConsumptionKind::BorrowAlways:
     return SIL_CAST_CONSUMPTION_BORROW_ALWAYS;
+  case CastConsumptionKind::TestOnly:
+    return SIL_CAST_CONSUMPTION_TEST_ONLY;
   }
   llvm_unreachable("bad cast consumption kind");
 }
@@ -2363,6 +2365,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       attrs = encodeValueOwnership(opening->getForwardingOwnershipKind());
     } else if (auto *atp = dyn_cast<AddressToPointerInst>(&SI)) {
       attrs = atp->needsStackProtection() ? 1 : 0;
+    } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(&SI)) {
+      attrs = rptr->isImmortal() ? 1 : 0;
     }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;
@@ -2414,7 +2418,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
-    unsigned flags = CI->getCheckedCastOptions().getStorage();
+    unsigned flags = CI->getCheckedCastOptions().getStorage() |
+                     (unsigned(CI->isCopy()) << 8);
     ValueID listOfValues[] = {
       S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
