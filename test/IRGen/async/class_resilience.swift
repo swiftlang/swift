@@ -44,9 +44,9 @@ open class MyBaseClass<T> {
 // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYalF"(ptr noalias %0, ptr swiftasync %1{{.*}})
 // CHECK-DIRECT: ptr @"$s15resilient_class9BaseClassC4waitxyYaFTjTu"
 
-// CHECK-INDIRECT:[[T0:%.*]] = and i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), 1
+// CHECK-INDIRECT:[[T0:%.*]] = and i64 ptrtoint (ptr inttoptr (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1) to ptr) to i64), 1
 // CHECK-INDIRECT:[[T1:%.*]] = icmp eq i64 [[T0]], 0
-// CHECK-INDIRECT:[[T2:%.*]] = and i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), -2
+// CHECK-INDIRECT:[[T2:%.*]] = and i64 ptrtoint (ptr inttoptr (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1) to ptr) to i64), -2
 // CHECK-INDIRECT:[[T3:%.*]] = inttoptr i64 [[T2]] to ptr
 // CHECK-INDIRECT:[[T4:%.*]] = load ptr, ptr [[T3]]
 // CHECK-INDIRECT:[[T5:%.*]] = select i1 [[T1]], ptr inttoptr (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1) to ptr), ptr [[T4]]
