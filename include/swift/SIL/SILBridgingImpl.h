@@ -1108,6 +1108,15 @@ void BridgedFunction::setIsPerformanceConstraint(bool isPerfConstraint) const {
   getFunction()->setIsPerformanceConstraint(isPerfConstraint);
 }
 
+bool BridgedFunction::hasOwnershipForTrivialValues() const {
+  return getFunction()->hasOwnershipForTrivialValues();
+}
+
+void BridgedFunction::setOwnershipForTrivialValues(bool hotv) const {
+  getFunction()->setOwnershipForTrivialValues(hotv);
+}
+  
+
 BridgedLinkage BridgedFunction::getLinkage() const {
   return (BridgedLinkage)getFunction()->getLinkage();
 }
@@ -1855,6 +1864,10 @@ BridgedInstruction::SwitchEnumAddrInst_getSuccessorForDefault() const {
 
 SwiftInt BridgedInstruction::StoreInst_getStoreOwnership() const {
   return (SwiftInt)getAs<swift::StoreInst>()->getOwnershipQualifier();
+}
+
+void BridgedInstruction::StoreInst_setStoreOwnership(SwiftInt rawOwnership) const {
+  getAs<swift::StoreInst>()->setOwnershipQualifier((swift::StoreOwnershipQualifier)rawOwnership);
 }
 
 SwiftInt BridgedInstruction::AssignInst_getAssignOwnership() const {
