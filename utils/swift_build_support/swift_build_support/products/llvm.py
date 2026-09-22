@@ -448,6 +448,27 @@ class LLVM(cmake_product.CMakeProduct):
 
         host_config = HostSpecificConfiguration(host_target, self.args)
 
+        # build-script-impl passes a large set of -DSWIFT_* options to the
+        # *standalone* swift configure. Under LLVM_EXTERNAL_PROJECTS=swift that
+        # configure never runs -- swift's cmake runs inside this one instead --
+        # so anything it needs has to arrive here. Most of what
+        # build-script-impl passes only re-states swift's own cmake defaults;
+        # these are the ones whose absence changes the build.
+        #
+        # Imported here rather than at module scope because swift.py imports
+        # this module.
+        from . import swift
+        if swift.Swift.is_unified_llvm_build(self.args):
+            # SWIFT_SDKS defaults to "" (CMakeLists.txt), which leaves swift
+            # configuring the stdlib and overlays for the host SDK alone -- a
+            # toolchain with no iOS/tvOS/watchOS/visionOS stdlibs at all.
+            llvm_cmake_options.define('SWIFT_SDKS', ';'.join(
+                sorted(host_config.sdks_to_configure)))
+            # Defaults to XcodeDefault, which is not what build-script resolves
+            # the host toolchain to.
+            llvm_cmake_options.define('SWIFT_DARWIN_XCRUN_TOOLCHAIN',
+                                      self.args.darwin_xcrun_toolchain)
+
         self.cmake_options.extend(host_config.cmake_options)
         self.cmake_options.extend(llvm_cmake_options)
         self.cmake_options.extend_raw(self.args.extra_llvm_cmake_options)
