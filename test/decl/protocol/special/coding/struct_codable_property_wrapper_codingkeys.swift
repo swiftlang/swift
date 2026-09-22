@@ -71,3 +71,20 @@ struct EncodableOnly: Encodable { // no error
     @Wrapper(key: CodingKeys.value)
     var value: String = "test"
 }
+
+// Referencing CodingKeys from the wrapper argument makes member lookup ask
+// for CodingKeys synthesis while stored properties are being computed. Since
+// an explicit CodingKeys already exists, SynthesizeCodingKeysRequest is a
+// no-op and does not trigger conformance derivation (which would re-enter
+// StoredPropertiesRequest and cycle). The no-op must not prevent the type
+// from still getting a usable derived Codable conformance through the normal
+// conformance-checking path.
+struct UsableAfterEarlyReturn: Codable { // no error
+    enum CodingKeys: String, CodingKey {
+        case value
+    }
+    @Wrapper(key: CodingKeys.value)
+    var value: String = "test"
+}
+let _ = UsableAfterEarlyReturn.init(from:)
+let _ = UsableAfterEarlyReturn.encode(to:)
