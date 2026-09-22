@@ -7,6 +7,9 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // The opaque type descriptor of a dynamic replacement is referenced by the
 // dynamic replacement records, which are emitted after lazy emission has
 // finished. Make sure the descriptor and its accessor are emitted as
