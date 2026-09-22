@@ -116,11 +116,10 @@ extension Singleton {
 }
 
 
-// A virtual method of a foreign reference type is not supported yet; a
-// non-virtual method of the same type is.
+// A virtual method of a foreign reference type.
 
 extension Polymorphic {
-  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ function 'virtualMethod' because virtual methods are not yet supported}}
+  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ method 'virtualMethod' because it is the first non-inline virtual method of C++ class 'Polymorphic'}}
   @cxx @implementation
   func virtualMethod() -> Int32 { return 0 }
 
