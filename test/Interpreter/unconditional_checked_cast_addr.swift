@@ -5,6 +5,7 @@
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=SUCCESS
 // RUN: not --crash %target-run %t/main fail 2>&1 | %FileCheck %s --check-prefix=FAILURE
 // REQUIRES: executable_test
+// REQUIRES: rdar188040378
 
 @_silgen_name("copyCast")
 func copyCast<T, U>(_ source: borrowing T, _: U.Type) -> U
