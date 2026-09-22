@@ -1028,11 +1028,29 @@ class BuildScriptInvocation(object):
             for host_name in [self.args.host_target]
             + list(self.args.cross_compile_hosts)
             for kind in ('swift', 'lldb'))
+        # Flags naming a tool directory that does not exist while the unified
+        # build is running. --native-swift-tools-path is set under this layout
+        # to `<install_destdir><install_prefix>/bin`, which is right for
+        # downstream products -- swiftpm's Toolchain.toolchainDir walks up
+        # looking for a `usr/bin` component and rejects a raw `llvm-<host>/bin`
+        # -- but wrong for swift's own cmake, which runs these tools *during*
+        # the build. On a preset that never installs (any of the
+        # buildbot_incremental* test presets) nothing is ever written there, so
+        # e.g. the share/swift/compatibility-symbols target dies with
+        # "swift-compatibility-symbols: No such file or directory". The
+        # standalone swift configure passes this empty, so dropping it here
+        # restores swift's in-tree default.
+        dropped_names = ('SWIFT_NATIVE_SWIFT_TOOLS_PATH',)
+        dropped = tuple(
+            p for name in dropped_names
+            for p in ('-D{}:'.format(name), '-D{}='.format(name)))
         for line in result.stdout.decode('utf-8', 'replace').splitlines():
             for prefix in prefixes:
                 if line.startswith(prefix):
                     flag = line[len(prefix):]
                     if any(sp in flag for sp in stale_prefixes):
+                        continue
+                    if flag.startswith(dropped):
                         continue
                     flags.append(flag)
                     break
