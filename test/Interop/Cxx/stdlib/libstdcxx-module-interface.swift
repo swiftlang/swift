@@ -9,7 +9,6 @@
 
 // This test is specific to libstdc++ and only runs on platforms where libstdc++ is used.
 // REQUIRES: OS=linux-gnu
-// REQUIRES: rdar187794084
 
 // The RHS of basic_string's typealias value_type depends on how eagerly/lazily
 // we import type members
