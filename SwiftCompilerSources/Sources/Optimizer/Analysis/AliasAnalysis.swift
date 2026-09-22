@@ -822,6 +822,9 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
     return .continueWalk
   }
 
+  // A value derived from a scoped borrow of an `@in_guaranteed` argument cannot write through
+  // that address, so the memory-effects query need not follow the capture. `isAddress` is false
+  // for the ownership query, which has no such guarantee and stays conservative.
   var followBorrowedAddressableCaptures: Bool { !isAddress }
   var followTrivialTypes: Bool { isAddress }
   var followLoads: Bool { !isAddress }
