@@ -29,7 +29,7 @@ public func sum_u8(_ span: RawSpan) -> Int {
 // CHECK-LABEL: } // end sil function '$s17check_range_tests7sum_u32ySis7RawSpanVF'
 
 // CHECK-IR-LABEL: define {{.*}} @"$s17check_range_tests7sum_u32ySis7RawSpanVF"
-// CHECK-IR: @llvm.vector.reduce.add
+// CHECK-IR: vector.body
 public func sum_u32(_ span: RawSpan) -> Int {
     precondition(span.byteCount >= MemoryLayout<UInt32>.size)
     var total = 0
