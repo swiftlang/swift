@@ -822,6 +822,7 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
     return .continueWalk
   }
 
+  var followBorrowedAddressableCaptures: Bool { !isAddress }
   var followTrivialTypes: Bool { isAddress }
   var followLoads: Bool { !isAddress }
 }
