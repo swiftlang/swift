@@ -2698,7 +2698,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                        layout);
         auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
         auto metadata = layout.getPrivateMetadata(
-            IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields);
+            IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields,
+            /*isStackAllocated=*/true);
         auto object = IGF.Builder.CreateBitCast(data, IGF.IGM.RefCountedPtrTy);
         object = IGF.emitInitStackObjectCall(metadata, object, "closure");
         data = IGF.Builder.CreateBitCast(object, IGF.IGM.OpaquePtrTy);

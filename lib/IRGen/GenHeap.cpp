@@ -492,7 +492,7 @@ void irgen::emitDeallocatePartialClassInstanceTyped(
 static llvm::Function *createDtorFn(
     IRGenModule &IGM, const HeapLayout &layout,
     std::optional<uint64_t> mallocTypeId, const llvm::Twine &layoutName,
-    const llvm::BitVector &unownedFields) {
+    const llvm::BitVector &unownedFields, bool isStackAllocated) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
       "__swift_" + layoutName + "_destructor", &IGM.Module);
@@ -534,8 +534,12 @@ static llvm::Function *createDtorFn(
         true /*Called from metadata constructors: must be outlined*/);
   }
 
-  emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
-                           offsets.getAlignMask(), mallocTypeId);
+  // The caller is responsible for deallocating the stack slot, destruction in
+  // such cases is decoupled from deallocation.
+  if (!isStackAllocated)
+    emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
+                             offsets.getAlignMask(), mallocTypeId);
+
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -629,10 +633,13 @@ HeapLayout::getPrivateMetadata(IRGenModule &IGM,
                                llvm::Constant *captureDescriptor,
                                std::optional<uint64_t> mallocTypeId,
                                const llvm::Twine &name,
-                               const llvm::BitVector &unownedFields) const {
+                               const llvm::BitVector &unownedFields,
+                               bool isStackAllocated) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(
-        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name, unownedFields),
+        IGM, *this,
+        createDtorFn(IGM, *this, mallocTypeId, name, unownedFields,
+                     isStackAllocated),
         captureDescriptor, MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }

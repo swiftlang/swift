@@ -80,10 +80,14 @@ public:
   /// \param unownedFields Indices of fields that the generated destructor must
   /// never destroy because they aren't owned. For example, a `@called(once)`
   /// on-stack closure with a borrowed ~Copyable capture.
+  ///
+  /// \param isStackAllocated True if the object this metadata describes lives
+  /// on the stack. Its destructor must not try to free the object's memory.
   llvm::Constant *getPrivateMetadata(
       IRGenModule &IGM, llvm::Constant *captureDescriptor,
       std::optional<uint64_t> mallocTypeId, const llvm::Twine &name,
-      const llvm::BitVector &unownedFields) const;
+      const llvm::BitVector &unownedFields,
+      bool isStackAllocated = false) const;
 
   std::optional<uint64_t>
   computeTypedMallocTypeDescriptor(IRGenModule &IGM) const;
