@@ -148,6 +148,7 @@ KNOWN_SETTINGS=(
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
     skip-build-lld                                ""                "set to skip building lld as part of llvm (linux only)"
     unified-llvm-swift-lldb                       ""                "set when the LLVM cmake was configured with LLVM_EXTERNAL_PROJECTS=swift and LLVM_ENABLE_PROJECTS=lldb; skips swift/lldb standalone build+install and routes their test phase through the LLVM ninja graph"
+    unified-cmake-preflight                       ""                "compute the -DSWIFT_*/-DLLDB_* args the swift/lldb standalone cmake would receive and print them as UNIFIED_SWIFT_CMAKE_ARG=/UNIFIED_LLDB_CMAKE_ARG= lines, then exit. Used by build-script to forward those args to the unified LLVM cmake configure."
 
     ## Skip Test ...
     skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
@@ -1679,11 +1680,21 @@ for host in "${ALL_HOSTS[@]}"; do
     for product in "${PRODUCTS[@]}"; do
         [[ $(should_execute_action "${host}-${product%%_*}-build") ]] || continue
 
-        # Under the unified LLVM+Swift+LLDB layout, swift and lldb are built as
-        # part of the LLVM ninja graph (LLVM_EXTERNAL_PROJECTS=swift,
-        # LLVM_ENABLE_PROJECTS=lldb). Their standalone build dirs don't exist,
-        # so skip the standalone build step here.
-        if [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]]; then
+        # Preflight mode: only swift and lldb are of interest -- we're just
+        # accumulating what their standalone cmake configure would receive so
+        # build-script can forward it into the unified LLVM cmake. Skip every
+        # other product outright.
+        if [[ "${UNIFIED_CMAKE_PREFLIGHT}" ]]; then
+            case ${product} in
+                swift|lldb) ;;
+                *) continue ;;
+            esac
+        elif [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]]; then
+            # Under the unified LLVM+Swift+LLDB layout, swift and lldb are
+            # built as part of the LLVM ninja graph
+            # (LLVM_EXTERNAL_PROJECTS=swift, LLVM_ENABLE_PROJECTS=lldb).
+            # Their standalone build dirs don't exist, so skip the standalone
+            # build step here.
             case ${product} in
                 swift|lldb)
                     echo "--- Skipping ${product} build: covered by the unified LLVM ninja graph ---"
@@ -1706,6 +1717,13 @@ for host in "${ALL_HOSTS[@]}"; do
         product_cmake_options_name=$(to_varname "${product%%_*}")_CMAKE_OPTIONS
         product_cmake_options=(${!product_cmake_options_name}) # convert to array
         cmake_options+=("${product_cmake_options[@]}")
+
+        # Preflight baseline: everything past this point in cmake_options is
+        # what the product's `case` body adds -- exactly the delta build-script
+        # needs to forward to the unified LLVM configure.
+        if [[ "${UNIFIED_CMAKE_PREFLIGHT}" ]]; then
+            cmake_options_preflight_baseline_len=${#cmake_options[@]}
+        fi
 
         case ${product} in
             libcxx)
@@ -2659,6 +2677,19 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
         esac
 
+        # Preflight: emit the cmake args the swift/lldb standalone configure
+        # would have received (i.e. everything the case body appended past the
+        # baseline) so build-script can splice them into the unified LLVM
+        # configure. Skip the actual cmake+ninja invocations below.
+        if [[ "${UNIFIED_CMAKE_PREFLIGHT}" ]]; then
+            unified_preflight_tag="$(toupper ${product})"
+            for (( _pf_i = cmake_options_preflight_baseline_len; \
+                   _pf_i < ${#cmake_options[@]}; _pf_i++ )); do
+                echo "UNIFIED_${unified_preflight_tag}_CMAKE_ARG=${cmake_options[$_pf_i]}"
+            done
+            continue
+        fi
+
         # Compute the generator output file to check for, to determine if we
         # must reconfigure. We only handle Ninja for now.
         #
@@ -2693,6 +2724,12 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 # END OF BUILD PHASE
+
+# Preflight is a probe: we only ran the swift/lldb cmake accumulation to
+# capture their args on stdout. Nothing else should run.
+if [[ "${UNIFIED_CMAKE_PREFLIGHT}" ]]; then
+    exit 0
+fi
 
 # Trap function to print the current test configuration when tests fail.
 # This is a function so the text is not unnecessarily displayed when running -x.

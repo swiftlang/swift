@@ -454,113 +454,33 @@ class BuildScriptInvocation(object):
             # `--swift-cmake-options` and reached swift's cmake through
             # build-script-impl; under unified layout swift's cmake runs
             # inside LLVM's cmake, so they need to be applied at the LLVM
-            # level instead. Without this the `LLVM_EXTERNAL_PROJECTS=swift`
-            # build silently defaults SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY,
-            # SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING, etc. to OFF, so
-            # the built stdlib omits the autolink/link-library metadata that
-            # the driver's ExplicitModuleBuildTests expect (missing
-            # `-possible-lswift_Concurrency`, `-possible-lswift_StringProcessing`).
+            # level instead.
             for opt in swift_product_cmake_options:
                 if opt not in args.extra_llvm_cmake_options:
                     args.extra_llvm_cmake_options.append(opt)
-            # STRING_PROCESSING isn't in swift.py's cmake_options (that flag
-            # is set only by build-script-impl's shell code when swift's own
-            # cmake configure runs, which is skipped under unified). Forward
-            # it explicitly to match the driver-test expectations for
-            # `-possible-lswift_StringProcessing`.
-            if getattr(args, 'enable_experimental_string_processing', True):
-                sp_opt = '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE'
-                if sp_opt not in args.extra_llvm_cmake_options:
-                    args.extra_llvm_cmake_options.append(sp_opt)
-            # build-script-impl injects a large fan-out of `-DSWIFT_*` flags
-            # into swift's cmake configure line based on CLI args. Under
-            # unified layout that swift cmake configure step is skipped, so
-            # add-subdirectory(libexec) / add-subdirectory(swift-backtrace)
-            # etc. degrade to the CMake default (falsy) and skip the build.
-            # Forward the flags whose absence causes test breakage:
-            # SWIFT_BUILD_LIBEXEC (swift-backtrace binary — Backtracing/*
-            # tests fail with "unable to locate swift-backtrace"),
-            # SWIFT_BUILD_DYNAMIC_STDLIB / SWIFT_BUILD_STATIC_STDLIB,
-            # SWIFT_BUILD_CLANG_OVERLAYS, SWIFT_BUILD_REMOTE_MIRROR,
-            # SWIFT_BUILD_DYNAMIC_SDK_OVERLAY / SWIFT_BUILD_STATIC_SDK_OVERLAY.
-            _swift_extra_flags = [
-                ('SWIFT_BUILD_LIBEXEC',
-                 getattr(args, 'build_swift_libexec', True)),
-                ('SWIFT_BUILD_DYNAMIC_STDLIB',
-                 getattr(args, 'build_swift_dynamic_stdlib', True)),
-                ('SWIFT_BUILD_STATIC_STDLIB',
-                 getattr(args, 'build_swift_static_stdlib', False)),
-                ('SWIFT_BUILD_DYNAMIC_SDK_OVERLAY',
-                 getattr(args, 'build_swift_dynamic_sdk_overlay', True)),
-                ('SWIFT_BUILD_STATIC_SDK_OVERLAY',
-                 getattr(args, 'build_swift_static_sdk_overlay', False)),
-                ('SWIFT_BUILD_CLANG_OVERLAYS',
-                 getattr(args, 'build_swift_clang_overlays', True)),
-                ('SWIFT_BUILD_REMOTE_MIRROR',
-                 getattr(args, 'build_swift_remote_mirror', True)),
-            ]
-            for _flag, _val in _swift_extra_flags:
-                _opt = '-D{}:BOOL={}'.format(
-                    _flag, 'TRUE' if _val else 'FALSE')
-                if not any(o.startswith('-D{}'.format(_flag))
-                           for o in args.extra_llvm_cmake_options):
-                    args.extra_llvm_cmake_options.append(_opt)
-            # Same story for LLDB. build-script-impl hands the standalone lldb
-            # configure `-C <lldb>/cmake/caches/Apple-lldb-<platform>.cmake`,
-            # which is what turns on the toolchain-shaped LLDB (framework
-            # layout, no default rpath, no strip) and what defines
-            # LLVM_DISTRIBUTION_COMPONENTS for the `install-distribution` pass.
-            # Under unified layout lldb is configured inside LLVM's cmake, so
-            # that cache never loads and that install pass is skipped: forward
-            # the settings to the unified configure and merge the components
-            # into --llvm-install-components, where llvm.py turns each into an
-            # `install-<component>` target.
-            if args.build_lldb:
-                _lldb_opts = [
-                    '-DLLDB_USE_STATIC_BINDINGS:BOOL=TRUE',
-                    '-DLLDB_ENABLE_CURSES:BOOL=TRUE',
-                    '-DLLDB_ENABLE_LIBEDIT:BOOL=TRUE',
-                    '-DLLDB_ENABLE_PYTHON:BOOL=TRUE',
-                    '-DLLDB_ENABLE_LZMA:BOOL=FALSE',
-                    '-DLLDB_ENABLE_LUA:BOOL=FALSE',
-                ]
-                if _impl_flag_is_set(args.build_script_impl_args,
-                                     '--lldb-use-system-debugserver'):
-                    _lldb_opts.append(
-                        '-DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL=TRUE')
-                if platform.system() == 'Darwin':
-                    # LLDB.framework goes beside the toolchain's usr/, the same
-                    # place the standalone build puts it. install_prefix is
-                    # right for every host here: build-script-impl's
-                    # get_host_install_prefix() only diverges from it when
-                    # --cross-compile-install-prefixes is passed, which no
-                    # unified preset does.
-                    _lldb_opts += [
-                        '-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE',
-                        '-DLLDB_NO_INSTALL_DEFAULT_RPATH:BOOL=TRUE',
-                        '-DLLDB_SKIP_STRIP:BOOL=TRUE',
-                        '-DLLDB_FRAMEWORK_INSTALL_DIR={}'.format(
-                            os.path.join(
-                                args.install_prefix,
-                                '../System/Library/PrivateFrameworks')),
-                    ]
-                for _opt in _lldb_opts:
-                    _name = _opt.split(':')[0].split('=')[0]
-                    if not any(o.startswith(_name)
-                               for o in args.extra_llvm_cmake_options):
-                        args.extra_llvm_cmake_options.append(_opt)
-
-                if _impl_flag_is_set(args.build_script_impl_args,
-                                     '--install-lldb') \
-                        and args.llvm_install_components \
-                        and args.llvm_install_components != 'all':
-                    _installed = args.llvm_install_components.split(';')
-                    _lldb_components = [
-                        c for c in _unified_lldb_install_components(args)
-                        if c not in _installed]
-                    if _lldb_components:
-                        args.llvm_install_components = ';'.join(
-                            [args.llvm_install_components] + _lldb_components)
+            # The rest of the -DSWIFT_*/-DLLDB_* flags the standalone swift
+            # and lldb configures receive come from build-script-impl's shell
+            # code (per-host setup + the `swift)` and `lldb)` case bodies in
+            # the build phase). Under unified layout those configures are
+            # skipped, so those flags never reach the swift/lldb subprojects
+            # inside LLVM's cmake. Instead of duplicating build-script-impl's
+            # flag list here in Python (whack-a-mole every time a new
+            # -DSWIFT_*/-DLLDB_* is added upstream), we invoke build-script-
+            # impl in preflight mode: it computes the swift/lldb cmake args
+            # exactly as it normally would, prints them, and exits. The
+            # results are spliced into extra_llvm_cmake_options below in
+            # execute(), after the impl args are finalized.
+            if _impl_flag_is_set(args.build_script_impl_args,
+                                 '--install-lldb') \
+                    and args.llvm_install_components \
+                    and args.llvm_install_components != 'all':
+                _installed = args.llvm_install_components.split(';')
+                _lldb_components = [
+                    c for c in _unified_lldb_install_components(args)
+                    if c not in _installed]
+                if _lldb_components:
+                    args.llvm_install_components = ';'.join(
+                        [args.llvm_install_components] + _lldb_components)
         conditional_subproject_configs = [
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
@@ -1049,11 +969,92 @@ class BuildScriptInvocation(object):
         # the final schedule and finalize the builder.
         return builder.finalize(shouldInfer=self.args.infer_dependencies)
 
+    def _unified_cmake_preflight(self):
+        """Run build-script-impl in preflight mode to capture the -D... flags
+        the standalone swift and lldb cmake configures would receive.
+
+        build-script-impl's `--unified-cmake-preflight` runs the per-host
+        build-phase setup, walks swift's and lldb's `case` bodies to
+        accumulate their cmake_options exactly as it normally would, prints
+        each accumulated arg with a `UNIFIED_<PRODUCT>_CMAKE_ARG=` prefix on
+        stdout, and exits before any cmake or ninja is invoked. Keeping the
+        computation on the shell side means build-script-impl stays the
+        single source of truth for these flags; we just redirect the list
+        from the (skipped) standalone configures into LLVM's cmake instead
+        of hand-mirroring each new -DSWIFT_*/-DLLDB_* flag in Python.
+        """
+        preflight_args = [a for a in self.impl_args
+                          if not a.startswith('--only-execute')]
+        # Drop the paired `--only-execute VALUE` form too.
+        _cleaned = []
+        _skip_next = False
+        for arg in preflight_args:
+            if _skip_next:
+                _skip_next = False
+                continue
+            if arg == '--only-execute':
+                _skip_next = True
+                continue
+            _cleaned.append(arg)
+        preflight_args = _cleaned + ['--unified-cmake-preflight']
+        print("--- Running unified cmake preflight ---", flush=True)
+        result = subprocess.run(
+            [BUILD_SCRIPT_IMPL_PATH] + preflight_args,
+            env=self.impl_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise SystemExit(
+                "unified cmake preflight failed with exit {}:\n"
+                "stdout:\n{}\nstderr:\n{}".format(
+                    result.returncode,
+                    result.stdout.decode('utf-8', 'replace'),
+                    result.stderr.decode('utf-8', 'replace')))
+        flags = []
+        prefixes = ('UNIFIED_SWIFT_CMAKE_ARG=', 'UNIFIED_LLDB_CMAKE_ARG=')
+        # Filter out flags whose values point into standalone build-tree
+        # directories that don't exist under the unified layout (e.g.
+        # `-DSwift_DIR:PATH=<build>/swift-<host>/lib/cmake/swift` from the
+        # LLDB case body). Under unified those swift/lldb subprojects are
+        # part of LLVM's cmake tree; the correct paths flow in through
+        # add_subdirectory rather than an explicit path, and passing a
+        # stale one either makes find_package fail or wires up a
+        # nonexistent output tree.
+        stale_prefixes = tuple(
+            os.path.join(self.workspace.build_root,
+                         '{}-{}'.format(kind, host_name))
+            for host_name in [self.args.host_target]
+            + list(self.args.cross_compile_hosts)
+            for kind in ('swift', 'lldb'))
+        for line in result.stdout.decode('utf-8', 'replace').splitlines():
+            for prefix in prefixes:
+                if line.startswith(prefix):
+                    flag = line[len(prefix):]
+                    if any(sp in flag for sp in stale_prefixes):
+                        continue
+                    flags.append(flag)
+                    break
+        print("--- Unified cmake preflight captured {} flags ---".format(
+            len(flags)), flush=True)
+        return flags
+
     def execute(self):
         """Execute the invocation with the configured arguments."""
 
         # Convert to a build-script-impl invocation.
         (self.impl_env, self.impl_args) = self.convert_to_impl_arguments()
+
+        # Under the unified LLVM+Swift+LLDB layout, splice the -DSWIFT_*
+        # / -DLLDB_* flags that build-script-impl would normally hand to
+        # the standalone swift and lldb cmake configures into
+        # extra_llvm_cmake_options so LLVM's cmake picks them up when
+        # configuring the swift/lldb subprojects.
+        if products.swift.Swift.is_unified_llvm_build(self.args):
+            for flag in self._unified_cmake_preflight():
+                if flag not in self.args.extra_llvm_cmake_options:
+                    self.args.extra_llvm_cmake_options.append(flag)
 
         # If using the legacy implementation, delegate all behavior to
         # `build-script-impl`.
