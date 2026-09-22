@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200 -solver-enable-promote-supertypes -solver-enable-type-var-joins
 
 protocol P {
     associatedtype A: FixedWidthInteger
@@ -6,7 +6,7 @@ protocol P {
 }
 
 func test<F: P, T: BinaryFloatingPoint>(_: F.Type, _: T.Type) {
-    for elt: (x: T, y: Int, z: F.A) in [  // expected-error {{reasonable time}}
+    for elt: (x: T, y: Int, z: F.A) in [ // expected-warning {{immutable value 'elt' was never used; consider replacing with '_' or removing it}}
         (T.zero, 0, 0),
         (-T.zero, 0, 0),
         (T(0.0), 0, 0),

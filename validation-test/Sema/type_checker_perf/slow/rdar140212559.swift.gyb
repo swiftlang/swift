@@ -1,5 +1,8 @@
-// RUN: %scale-test --invert-result --begin 1 --end 8 --step 1 --select NumSolverScopes %s
+// RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumSolverScopes -Xfrontend=-solver-enable-promote-supertypes %s
 // REQUIRES: asserts,no_asan
+
+// -solver-enable-promote-supertypes brings it down from O(4.2^n) to O(n^2.8)
+// according to scale-test, but that's still not a "pass".
 
 func localType(s: String) -> Any.Type? {
   return _typeByName(s)
