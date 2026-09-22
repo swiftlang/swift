@@ -3507,8 +3507,11 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
-  if (!(IsTagDecl || isa<clang::FunctionDecl, clang::VarDecl,
-                         clang::TypedefNameDecl, clang::NamespaceDecl>(D))) {
+  bool IsObjCInterfaceDecl = isa<clang::ObjCInterfaceDecl>(D);
+  bool IsObjCProtocolDecl = isa<clang::ObjCProtocolDecl>(D);
+  if (!(IsTagDecl || IsObjCInterfaceDecl || IsObjCProtocolDecl ||
+        isa<clang::FunctionDecl, clang::VarDecl, clang::TypedefNameDecl,
+            clang::NamespaceDecl>(D))) {
     return false;
   }
 
@@ -3522,6 +3525,16 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
       auto TD = cast<clang::TagDecl>(Redeclaration);
       if (!TD->isCompleteDefinition() &&
           !TD->isThisDeclarationADemotedDefinition())
+        continue;
+    } else if (IsObjCInterfaceDecl) {
+      auto ID = cast<clang::ObjCInterfaceDecl>(Redeclaration);
+      if (!ID->isThisDeclarationADefinition() &&
+          !ID->isThisDeclarationADemotedDefinition())
+        continue;
+    } else if (IsObjCProtocolDecl) {
+      auto PD = cast<clang::ObjCProtocolDecl>(Redeclaration);
+      if (!PD->isThisDeclarationADefinition() &&
+          !PD->isThisDeclarationADemotedDefinition())
         continue;
     }
 
