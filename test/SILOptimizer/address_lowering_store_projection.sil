@@ -1,0 +1,38 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values \
+// RUN:   -emit-sorted-sil -sil-verify-all %s | %FileCheck %s
+
+// XFAIL: *
+
+// Missed optimization, not a correctness bug. `store %value to [init] %dest` lets %dest serve as
+// %value's storage, but AddressLowering gives %value its own temporary and copies it into %dest.
+// TempLValueElimination removes the copy today. It would not if AddressLowering moved after it in
+// the pipeline.
+//
+// Only covers a %dest computed before %value.
+
+sil_stage raw
+
+import Builtin
+
+struct Wrapper<T> {
+  var field: T
+}
+
+// CHECK-LABEL: sil [ossa] @store_destination_donates_storage : {{.*}} {
+// CHECK-NOT:     alloc_stack $T
+// CHECK:         [[BOX:%[^,]+]] = alloc_stack $Wrapper<T>
+// CHECK:         [[DEST:%[^,]+]] = struct_element_addr [[BOX]] : $*Wrapper<T>, #Wrapper.field
+// CHECK:         apply undef<T>([[DEST]])
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'store_destination_donates_storage'
+sil [ossa] @store_destination_donates_storage : $@convention(thin) <T> () -> () {
+bb0:
+  %box = alloc_stack $Wrapper<T>
+  %dest = struct_element_addr %box : $*Wrapper<T>, #Wrapper.field
+  %value = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  store %value to [init] %dest : $*T
+  destroy_addr %box : $*Wrapper<T>
+  dealloc_stack %box : $*Wrapper<T>
+  %r = tuple ()
+  return %r : $()
+}
