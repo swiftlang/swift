@@ -1,0 +1,30 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// RUN: sed 's/any ISource/Optional<any ISource>/g' %s > %t/optional.sil
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %t/optional.sil 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol ISource: AnyObject {}
+public class NativeTarget {}
+
+// A guaranteed scalar cast cannot release its source or retain its result.
+// Recovering native identity does not preserve the interface reference count.
+// CHECK: Non directly forwarding instructions can not forward guaranteed
+sil [ossa] @invalid_borrow : $@convention(thin) (@guaranteed any ISource) -> @owned Optional<NativeTarget> {
+bb0(%source : @guaranteed $any ISource):
+  checked_cast_br any ISource in %source : $any ISource to NativeTarget, bb1, bb2
+bb1(%target : @guaranteed $NativeTarget):
+  %copy = copy_value %target : $NativeTarget
+  %some = enum $Optional<NativeTarget>, #Optional.some!enumelt, %copy : $NativeTarget
+  br bb3(%some : $Optional<NativeTarget>)
+bb2(%failed : @guaranteed $any ISource):
+  %none = enum $Optional<NativeTarget>, #Optional.none!enumelt
+  br bb3(%none : $Optional<NativeTarget>)
+bb3(%result : @owned $Optional<NativeTarget>):
+  return %result : $Optional<NativeTarget>
+}

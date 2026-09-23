@@ -352,11 +352,13 @@ bool swift::doesCastPreserveOwnershipForTypes(SILModule &module,
   if (!canIRGenUseScalarCheckedCastInstructions(module, sourceType, targetType))
     return false;
 
-  // QueryInterface returns an independently retained interface pointer. Even
-  // class-bound COM interfaces cannot forward guaranteed ownership through a
-  // cast, since retaining the result and releasing the source are observable.
+  // COM casts can recover a different interface or native object with its own
+  // reference count. Even class-bound interfaces cannot forward guaranteed
+  // ownership through the cast.
+  auto sourceObjectType = sourceType->lookThroughAllOptionalTypes();
   auto targetObjectType = targetType->lookThroughAllOptionalTypes();
-  if (targetObjectType->isCOMExistentialType())
+  if (sourceObjectType->isCOMExistentialType() ||
+      targetObjectType->isCOMExistentialType())
     return false;
 
   // (B2) unwrapping
