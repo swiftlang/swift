@@ -579,6 +579,10 @@ void importer::getNormalInvocationArguments(
 
       languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
+      // Lets <swift/bridging> distinguish support for SWIFT_THROWS from older
+      // importers that accept swift_attr but ignore this particular spelling.
+      "-D__swift_cxx_throws__=1",
+
       "-fretain-comments-from-system-headers",
 
       "-isystem", searchPathOpts.RuntimeResourcePath
@@ -8722,6 +8726,26 @@ bool importer::hasSwiftAttribute(const clang::Decl *decl,
   }
 
   return false;
+}
+
+bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
+  return llvm::any_of(decl->redecls(), [](const clang::FunctionDecl *redecl) {
+    return hasSwiftAttribute(redecl, {"import_throws"});
+  });
+}
+
+bool ClangImporter::isCxxExceptionBridge(const FuncDecl *decl) const {
+  return Impl.cxxExceptionBridges.contains(decl);
+}
+
+FuncDecl *ClangImporter::getCxxExceptionBridgeAdapter(
+    const FuncDecl *facade) const {
+  return Impl.cxxExceptionBridges.lookup(facade);
+}
+
+FuncDecl *ClangImporter::getCxxExceptionBridgeFacade(
+    const FuncDecl *adapter) const {
+  return Impl.cxxExceptionBridgeFacades.lookup(adapter);
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {
