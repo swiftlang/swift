@@ -100,6 +100,8 @@ FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 FEATURE(CoroutineAccessors,                             FUTURE)
 FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
 FEATURE(CoroutineFunctions,                             FUTURE)
+// TODO: DynamicCastTest: Change to correct version number.
+FEATURE(DynamicCastTest,                                FUTURE)
 
 #undef FEATURE
 #undef FUTURE

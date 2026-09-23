@@ -11,8 +11,8 @@
 // CHECK:  [[CALL_ALLOCA:%.*]] = alloca <{ %Ts6UInt64V, %Ts6UInt64V, %Ts6UInt64V
 // CHECK:  [[TMP_ALLOCA:%.*]] = alloca %TSo11large_thinga, align 8
 // CHECK:  [[TMP_ALLOCA2:%.*]] = alloca %TSo11large_thinga, align 8
-// CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr {{.*}} [[TMP_ALLOCA2]], ptr {{.*}} %0, i64 128, i1 false)
 // CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr {{.*}} [[TMP_ALLOCA]], ptr {{.*}} %0, i64 128, i1 false)
+// CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr {{.*}} [[TMP_ALLOCA2]], ptr {{.*}} %0, i64 128, i1 false)
 // CHECK:  call void @pass_and_return(ptr {{.*}} [[CALL_ALLOCA]], ptr nonnull [[TMP_ALLOCA]], ptr nonnull [[TMP_ALLOCA2]])
 // CHECK:  call {{.*}} @swift_allocObject
 // CHECK:  [[BOX:%.*]] = call noalias ptr @swift_allocObject(
