@@ -15,6 +15,7 @@ class NonObjCClass {}
 @_silgen_name("use")
 func use(_: Builtin.RawPointer)
 
+@available(anyAppleOS 26.0, *)
 func getObjCTypeEncoding<T>(_: T) {
   // CHECK: call swiftcc void @use(ptr @.str.1.i)
   use(Builtin.getObjCTypeEncoding(Int32.self))
@@ -32,5 +33,19 @@ func getObjCTypeEncoding<T>(_: T) {
   use(Builtin.getObjCTypeEncoding(ObjCClass.self))
   // CHECK: call swiftcc void @use(ptr @".str.1.@")
   use(Builtin.getObjCTypeEncoding(NonObjCClass.self))
+  // CHECK: call swiftcc void @use(ptr @".str.4.[4i]")
+  use(Builtin.getObjCTypeEncoding(InlineArray<4, Int32>.self))
+  // CHECK: call swiftcc void @use(ptr @".str.4.[8d]")
+  use(Builtin.getObjCTypeEncoding(InlineArray<8, Double>.self))
+  // CHECK: call swiftcc void @use(ptr @".str.5.[16c]")
+  use(Builtin.getObjCTypeEncoding(InlineArray<16, CChar>.self))
+  // CHECK: call swiftcc void @use(ptr @".str.7.[2[3i]]")
+  use(Builtin.getObjCTypeEncoding(InlineArray<2, InlineArray<3, Int32>>.self))
+  // CHECK: call swiftcc void @use(ptr @".str.4.[1f]")
+  use(Builtin.getObjCTypeEncoding(InlineArray<1, Float>.self))
+  // CHECK: call swiftcc void @use(ptr [[ZERO_INT:@".str.[0-9]+.\[0i\]"]])
+  use(Builtin.getObjCTypeEncoding(InlineArray<0, Int32>.self))
+  // CHECK: call swiftcc void @use(ptr [[ZERO_DOUBLE:@".str.[0-9]+.\[0d\]"]])
+  use(Builtin.getObjCTypeEncoding(InlineArray<0, Double>.self))
 }
 

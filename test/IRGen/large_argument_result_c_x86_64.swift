@@ -11,7 +11,7 @@
 // REQUIRES: CPU=x86_64
 
 // CHECK: define {{.*}}swiftcc void @"$s23large_argument_result_c7runTestyySo0A6_thingaF"(ptr {{.*}} %0)
-// CHECK:  [[CALL_ALLOCA:%.*]] = alloca <{ %Ts6UInt64V, %Ts6UInt64V, %Ts6UInt64V
+// CHECK:  [[CALL_ALLOCA:%.*]] = alloca [16 x %Ts6UInt64V]
 // CHECK:  call void @pass_and_return(ptr {{.*}} [[CALL_ALLOCA]], ptr nonnull byval{{.*}} %0, ptr nonnull byval{{.*}} %0)
 // CHECK:  call {{.*}} @swift_allocObject
 // CHECK:  [[BOX:%.*]] = {{.*}}call noalias ptr @swift_allocObject(

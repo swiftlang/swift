@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t/cache)
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-cache-path %t/cache
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-cache-path %t/cache -enable-experimental-feature ModernImportedCArrays -DMODERN_C_ARRAYS -target %target-has-inline-array-triple
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 import SceneKit
 import Foundation

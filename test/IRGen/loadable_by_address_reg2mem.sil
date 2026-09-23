@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o >%t.sil 2>&1
+// RUN: %FileCheck --input-file %t.sil %s
 
 // wasm currently disables aggressive reg2mem
 // UNSUPPORTED: CPU=wasm32
@@ -268,14 +269,11 @@ sil @test9 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $_ContainerType
   %1 = load %0 : $*_ContainerType
-  %2 = alloc_stack $(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
-                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  %2 = alloc_stack $InlineArray<10, _ContainedType>
 
   %3 = struct_extract %1 : $_ContainerType, #_ContainerType.l
-  store %3 to %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
-                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
-  dealloc_stack %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
-                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  store %3 to %2 : $*InlineArray<10, _ContainedType>
+  dealloc_stack %2 : $*InlineArray<10, _ContainedType>
   dealloc_stack %0 : $*_ContainerType
   %t = tuple ()
   return %t : $()

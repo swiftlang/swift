@@ -956,9 +956,32 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
 }
 
 void SwiftDeclSynthesizer::makeStructRawValued(
-    StructDecl *structDecl, Type underlyingType,
+    StructDecl *structDecl, Type underlyingType, Type legacyUnderlyingType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     MakeStructRawValuedOptions options) {
+  bool needsCArrayProjections = legacyUnderlyingType.isNull()
+        || !underlyingType->isEqual(legacyUnderlyingType);
+
+  // `getMaxAccessLevel()` only returns a cap (and may be `Open`, which a
+  // struct member can never actually have), so clamp it against the
+  // struct's own formal access, same as `getAccessLevel()` does for
+  // ordinary members.
+  auto memberAccessLevel = std::min(
+      structDecl->getFormalAccess(),
+      ImporterImpl.getMaxAccessLevel(CArrayProjection::Modern,
+                                     needsCArrayProjections));
+
+  // We cannot dual-project RawValue, so use whichever type matches the current
+  // projection. If there's no legacy type at all (the array is too big to
+  // represent as a tuple), the modern type is all we have, regardless of
+  // which projection is visible -- the struct itself is marked Internal by
+  // the caller in that case, but RawValue still needs a real type.
+  Type visibleRawValueType = underlyingType;
+  if (needsCArrayProjections && !legacyUnderlyingType.isNull()
+        && ImporterImpl.VisibleCArrayProjection == CArrayProjection::Legacy)
+    visibleRawValueType = legacyUnderlyingType;
+
+  // Create the modern projections.
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
@@ -972,8 +995,7 @@ void SwiftDeclSynthesizer::makeStructRawValued(
       structDecl, ctx.Id_rawValue, underlyingType,
       isReadOnly ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
-      structDecl->getFormalAccess(),
-      isReadOnly ? AccessLevel::Private : structDecl->getFormalAccess());
+      memberAccessLevel, isReadOnly ? AccessLevel::Private : memberAccessLevel);
 
   assert(var->hasStorage());
 
@@ -982,12 +1004,13 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   ConstructorDecl *unlabeledInit = nullptr;
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
     unlabeledInit = createValueConstructor(
-        structDecl, var, ValueConstructorFlags::WantBody);
+        structDecl, var, ValueConstructorFlags::WantBody, memberAccessLevel);
   }
 
   auto *initRawValue = createValueConstructor(
       structDecl, var,
-      {ValueConstructorFlags::WantParamNames, ValueConstructorFlags::WantBody});
+      {ValueConstructorFlags::WantParamNames, ValueConstructorFlags::WantBody},
+      memberAccessLevel);
 
   if (unlabeledInit)
     structDecl->addMember(unlabeledInit);
@@ -996,8 +1019,56 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   structDecl->addMember(var);
 
   ClangImporter::Implementation::addSynthesizedTypealias(
-      structDecl, ctx.Id_RawValue, underlyingType);
-  ImporterImpl.RawTypes[structDecl] = underlyingType;
+      structDecl, ctx.Id_RawValue, visibleRawValueType);
+  ImporterImpl.RawTypes[structDecl] = visibleRawValueType;
+
+  // Create the legacy projections, if needed
+  if (!needsCArrayProjections)
+    return;
+
+  VarDecl *legacyVar = nullptr;
+  ConstructorDecl *legacyInitRawValue = nullptr;
+  ConstructorDecl *legacyUnlabeledInit = nullptr;
+
+  // If we got here but `legacyUnderlyingType` is null, the legacy type is
+  // un-importable, so we don't need to create legacy projections but we do need
+  // to register the modern projections.
+  if (!legacyUnderlyingType.isNull()) {
+    auto legacyMemberAccessLevel = std::min(
+        structDecl->getFormalAccess(),
+        ImporterImpl.getMaxAccessLevel(CArrayProjection::Legacy,
+                                       needsCArrayProjections));
+
+    PatternBindingDecl *legacyPatternBinding;
+    std::tie(legacyVar, legacyPatternBinding) = createVarWithPattern(
+        structDecl, ctx.Id_rawValue, legacyUnderlyingType,
+        VarDecl::Introducer::Var, /*isImplicit=*/true, legacyMemberAccessLevel,
+        isReadOnly ? AccessLevel::Private : legacyMemberAccessLevel);
+
+    if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
+      legacyUnlabeledInit = createValueConstructor(structDecl, legacyVar, {},
+                                                   legacyMemberAccessLevel);
+      legacyUnlabeledInit->setIsMemberwiseInitializer(
+                                              MemberwiseInitKind::Regular);
+    }
+
+    legacyInitRawValue = createValueConstructor(
+        structDecl, legacyVar,
+        ValueConstructorFlags::WantParamNames, legacyMemberAccessLevel);
+    legacyInitRawValue->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+
+    if (legacyUnlabeledInit)
+      structDecl->addMember(legacyUnlabeledInit);
+    structDecl->addMember(legacyInitRawValue);
+    structDecl->addMember(legacyPatternBinding);
+    structDecl->addMember(legacyVar);
+  }
+
+  if (unlabeledInit)
+    registerCArrayProjections(unlabeledInit, legacyUnlabeledInit);
+  registerCArrayProjections(var, legacyVar);
+  // PBDs don't have their own attributes
+  registerCArrayProjections(initRawValue, legacyInitRawValue);
 }
 
 // MARK: Unions
@@ -1430,17 +1501,72 @@ SwiftDeclSynthesizer::makeLegacyCArrayAccessors(DeclContext *dc,
 
   auto getterDecl = makeFieldGetterDecl(ImporterImpl, dc, legacyDecl);
   getterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+  getterDecl->setBodySynthesizer(synthesizeLegacyCArrayGetterBody, modernDecl);
 
-  auto setterDecl = makeFieldSetterDecl(ImporterImpl, dc, legacyDecl);
-  setterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+  // If the modern projection is read-only, don't install a setter on the
+  // legacy projection either.
+  AccessorDecl *setterDecl = nullptr;
+  if (!modernDecl->isLet()) {
+    setterDecl = makeFieldSetterDecl(ImporterImpl, dc, legacyDecl);
+    setterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+    setterDecl->setBodySynthesizer(synthesizeLegacyCArraySetterBody,
+                                   modernDecl);
+  }
 
   ClangImporter::Implementation::makeComputed(legacyDecl, getterDecl,
                                               setterDecl);
 
-  getterDecl->setBodySynthesizer(synthesizeLegacyCArrayGetterBody, modernDecl);
-  setterDecl->setBodySynthesizer(synthesizeLegacyCArraySetterBody, modernDecl);
-
   return {getterDecl, setterDecl};
+}
+
+void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
+                                                     Decl *legacy) {
+  auto &ctx = ImporterImpl.SwiftContext;
+  auto addAttrs = [&](ValueDecl *current, CArrayProjection projection,
+                      ValueDecl *counterpart) {
+    current->addAttribute(new (ctx)
+                            CArrayProjectionAttr(projection, counterpart));
+
+    if (ImporterImpl.VisibleCArrayProjection != projection
+            && !isa<AccessorDecl>(current))
+      current->addAttribute(new (ctx)
+                              UsableFromInlineAttr(/*implicit=*/true));
+  };
+
+  // In practice, we should only have dual projections for ValueDecls.
+  auto modernVD = cast<ValueDecl>(modern);
+  auto legacyVD = cast_or_null<ValueDecl>(legacy);
+
+  // Mark the modern projection even if there's no legacy projection so we give
+  // it the right availability.
+  addAttrs(modernVD, CArrayProjection::Modern, legacyVD);
+
+  if (!legacyVD)
+    return;
+
+  addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
+
+  ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+
+  // If we imported a stored property or global, we need to create
+  // accessors for the legacy decl to forward to the modern decl.
+  if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
+    auto legacyVar = cast<VarDecl>(legacyVD);
+    if (modernVar->hasStorage()) {
+      makeLegacyCArrayAccessors(legacyVar->getDeclContext(), legacyVar,
+                                modernVar);
+    }
+  }
+
+  // If we're using (computed) storage decls, register the accessors too.
+  if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
+    auto legacyASD = cast<AbstractStorageDecl>(legacyVD);
+
+    for (auto modernAD : modernASD->getAllAccessors()) {
+      auto legacyAD = legacyASD->getAccessor(modernAD->getAccessorKind());
+      registerCArrayProjections(modernAD, legacyAD);
+    }
+  }
 }
 
 // MARK: Enum RawValue initializers
