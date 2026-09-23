@@ -57,6 +57,23 @@ void salvageStoreDebugInfo(SILInstruction *SI,
 /// optimizations.
 void salvageLoadDebugInfo(LoadOperation load);
 
+/// Canonicalizes the operand list of \p debugValue, minimizing the amount of
+/// live operands. Merges duplicates, and kills dead or undef operands.
+void canonicalizeDebugValue(DebugValueInst *debugValue);
+
+/// Returns the operand of \p debugValue holding \p value, or nullptr if it has
+/// none.
+const Operand *findDebugValueOperand(DebugValueInst *debugValue,
+                                     SILValue value);
+
+/// Appends the values of \p newOperands that \p debugValue does not already
+/// have as an operand, creating a reconstruction block argument for each.
+/// Operands whose argument is dead are dropped.
+/// \p debugValue is replaced with a fresh DebugValueInst if needed.
+/// Precondition: \p debugValue has a debug reconstruction block.
+void addOperandsToDebugValue(DebugValueInst *&debugValue,
+                             ArrayRef<SILValue> newOperands);
+
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.

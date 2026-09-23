@@ -26,6 +26,8 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -66,6 +68,9 @@ private:
                      ArrayRef<SILValue> Elements);
   unsigned getEltNoForProjection(SILInstruction *Inst);
   void createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations);
+  void reconstructInDebugBlock(DebugValueInst *DVI,
+                               ArrayRef<SILValue> Elements);
+  void splitDebugValues(ArrayRef<SILValue> Elements);
 };
 
 } // end anonymous namespace
@@ -203,39 +208,108 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
   if (TT) {
     for (unsigned EltNo : indices(TT->getElementTypes())) {
       SILType EltTy = Type.getTupleElementType(EltNo);
-      // Create new alloc_stacks without VarInfo: the VarInfo is moved to
-      // debug_values with fragments.
-      auto *NewAI = B.createAllocStack(
+      // Create new alloc_stacks without VarInfo: the variables of AI are
+      // described by debug values referring to the new allocations.
+      NewAllocations.push_back(B.createAllocStack(
           Loc, EltTy, std::nullopt, AI->hasDynamicLifetime(),
-          AI->isLexical());
-      NewAllocations.push_back(NewAI);
-      if (AIDebugVarInfo) {
-        SILDebugVariable NewDebugVarInfo = *AIDebugVarInfo;
-        NewDebugVarInfo.DIExpr.append(
-            SILDebugInfoExpression::createTupleFragment(TT, EltNo));
-        B.createDebugValue(Loc, NewAI, NewDebugVarInfo);
-      }
+          AI->isLexical()));
     }
   } else {
     assert(SD && "SD should not be null since either it or TT must be set at "
            "this point.");
     SILModule &M = AI->getModule();
     for (VarDecl *VD : SD->getStoredProperties()) {
-      auto *NewAI = B.createAllocStack(
+      NewAllocations.push_back(B.createAllocStack(
           Loc, Type.getFieldType(VD, M, TypeExpansionContext(B.getFunction())),
-          std::nullopt, AI->hasDynamicLifetime(), AI->isLexical());
-      NewAllocations.push_back(NewAI);
-      if (AIDebugVarInfo) {
-        SILDebugVariable NewDebugVarInfo = *AIDebugVarInfo;
-        NewDebugVarInfo.DIExpr.append(
-            SILDebugInfoExpression::createFragment(VD));
-        B.createDebugValue(Loc, NewAI, NewDebugVarInfo);
-      }
+          std::nullopt, AI->hasDynamicLifetime(), AI->isLexical()));
     }
   }
-  if (AIDebugVarInfo && NewAllocations.empty()) {
-    // Don't eliminate empty structs, we can use undef as there is no data
-    B.createDebugValue(Loc, SILUndef::get(AI), *AIDebugVarInfo);
+
+  // Give AI's own variable a debug value, so that it is salvaged along with the
+  // other debug uses of AI. It goes after AI, which the new allocations precede.
+  if (AIDebugVarInfo) {
+    B.setInsertionPoint(std::next(AI->getIterator()));
+    B.createDebugValue(Loc, AI, *AIDebugVarInfo);
+  }
+}
+
+/// Rebuilds the aggregate loaded from AI inside the debug reconstruction block
+/// of \p DVI, in place of the operand referring to AI: the block loads every
+/// element of \p Elements and forms the aggregate value from them.
+///
+/// The use of AI in \p DVI is always replaced, leaving AI with one less use.
+void SROAMemoryUseAnalyzer::reconstructInDebugBlock(
+    DebugValueInst *DVI, ArrayRef<SILValue> Elements) {
+  // Canonicalizing leaves a single operand referring to AI, so that the
+  // aggregate is only rebuilt once.
+  canonicalizeDebugValue(DVI);
+
+  // Nothing to do if the operand was dead.
+  const Operand *use = findDebugValueOperand(DVI, AI);
+  if (!use)
+    return;
+  unsigned operandIdx = use->getOperandNumber();
+
+  // Every element takes the place of the aggregate operand. Overestimated, as
+  // the elements are not de-duplicated against the other operands yet.
+  unsigned operandCount = DVI->getAllOperands().size() - 1 + Elements.size();
+  if (operandCount > DebugValueInst::MaxOperands)
+    return DVI->killOperand(operandIdx);
+
+  SILBasicBlock *debugBB = DVI->getOrCreateDebugReconstructionBlock();
+
+  // Loads of the aggregate within the debug reconstruction block are replaced
+  // with the reconstructed aggregate. Non-load uses of the aggregate cannot
+  // be salvaged.
+  // TODO: A load of a projection could be supported.
+  SILArgument *aggArg = debugBB->getArgument(operandIdx);
+  SILValue undefAgg = SILUndef::get(aggArg);
+  SmallVector<LoadInst *> aggLoads;
+  while (!aggArg->use_empty()) {
+    Operand *argUse = *aggArg->use_begin();
+    SILInstruction *user = argUse->getUser();
+    argUse->set(undefAgg);
+    if (auto *load = dyn_cast<LoadInst>(user))
+      aggLoads.push_back(load);
+  }
+  // No loads of the aggregate, cannot salvage anything.
+  if (aggLoads.empty())
+    return DVI->killOperand(operandIdx);
+
+  // Load each element and create the aggregate from them.
+  SILBuilder B(&*debugBB->begin());
+  SILLocation loc = DVI->getLoc();
+  SmallVector<SILValue, 4> elementLoads;
+  for (SILValue element : Elements) {
+    // Start with undef and wire later.
+    elementLoads.push_back(B.createLoad(loc, SILUndef::get(element),
+                                        LoadOwnershipQualifier::Unqualified));
+  }
+  SILValue agg = createAgg(B, loc, AI->getType().getObjectType(),
+                           elementLoads);
+  for (LoadInst *aggLoad : aggLoads) {
+    aggLoad->replaceAllUsesWith(agg);
+    aggLoad->eraseFromParent();
+  }
+
+  // Add the elements to the debug_value and wire them in.
+  // The original aggregate is dead and cleaned up.
+  addOperandsToDebugValue(DVI, Elements);
+  for (auto [element, load] : llvm::zip(Elements, elementLoads)) {
+    const Operand *elementUse = findDebugValueOperand(DVI, element);
+    ASSERT(elementUse && "Lost an operand?");
+    cast<LoadInst>(load)->setOperand(
+        debugBB->getArgument(elementUse->getOperandNumber()));
+  }
+}
+
+/// Transfers every debug value of AI to the element allocations \p Elements,
+/// which hold the storage of AI from now on.
+void SROAMemoryUseAnalyzer::splitDebugValues(ArrayRef<SILValue> Elements) {
+  while (Operand *use = getAnyDebugUse(AI)) {
+    auto *DVI = dyn_cast<DebugValueInst>(use->getUser());
+    assert(DVI && "debug uses of an alloc_stack are debug_value only");
+    reconstructInDebugBlock(DVI, Elements);
   }
 }
 
@@ -302,42 +376,11 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     }
   }
 
-  SmallVector<Operand *, 4> debugUses(getDebugUses(SILValue(AI)));
-  for (auto *Operand : debugUses) {
-    SILInstruction *User = Operand->getUser();
-    auto *DVI = dyn_cast<DebugValueInst>(User);
-    assert(DVI && "getDebugUses should only return DebugValueInst");
-    SILBuilder B(DVI, DVI->getDebugScope());
-    SILDebugVariable DVIVarInfo = DVI->getCompleteVarInfo();
+  SmallVector<SILValue, 4> Elements(NewAllocations.begin(),
+                                    NewAllocations.end());
+  splitDebugValues(Elements);
 
-    // Cannot add a fragment to a value that has a debug reconstruction block.
-    // Instead, a debug reconstruction block could be created to reconstruct the
-    // variable from the different allocations, but a debug_value can only have
-    // one operand.
-    if (DVI->getDebugReconstructionBlock()) {
-      DVI->killOperand(Operand->getOperandNumber());
-      continue;
-    }
-    for (size_t i : indices(NewAllocations)) {
-      auto *NewAI = NewAllocations[i];
-      SILDebugVariable VarInfo = DVIVarInfo;
-      if (TT) {
-        VarInfo.DIExpr.append(
-          SILDebugInfoExpression::createTupleFragment(TT, i));
-      } else {
-        VarInfo.DIExpr.append(
-          SILDebugInfoExpression::createFragment(SD->getStoredProperties()[i]));
-      }
-      B.createDebugValue(DVI->getLoc(), NewAI, VarInfo);
-    }
-    if (NewAllocations.empty()) {
-      // Don't eliminate empty structs, we can use undef as there is no data
-      B.createDebugValue(DVI->getLoc(), SILUndef::get(AI), DVIVarInfo);
-    }
-    ToRemove.push_back(DVI);
-  }
-
-  // Remove the old DeallocStackInst/DebugValueInst instructions.
+  // Remove the old DeallocStackInst instructions.
   for (auto *DSI : ToRemove) {
       DSI->eraseFromParent();
   }
