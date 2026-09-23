@@ -1044,10 +1044,30 @@ class BuildScriptInvocation(object):
         dropped = tuple(
             p for name in dropped_names
             for p in ('-D{}:'.format(name), '-D{}='.format(name)))
+        # Not every stale path should be dropped: some have a real unified
+        # equivalent. The stdlib is written to `<llvm build>/lib/swift` here
+        # (SWIFTLIB_DIR uses CMAKE_BINARY_DIR, the LLVM root -- see the symlink
+        # block in swift's CMakeLists.txt), so
+        # `-DLLDB_SWIFT_LIBS:PATH=<build>/swift-<host>/lib/swift` from the LLDB
+        # case body points at something that does exist, just elsewhere. Losing
+        # it to the stale filter left LLDB_SWIFT_LIBS empty and LLDB linking
+        # with `ld: warning: search path '/macosx' not found`. Redirect those to
+        # the LLVM build tree, and keep dropping the rest -- `lib/cmake/swift`
+        # and friends really are supplied in-tree by add_subdirectory.
+        rewrites = tuple(
+            (os.path.join(self.workspace.build_root,
+                          'swift-{}'.format(host_name), 'lib', 'swift'),
+             os.path.join(self.workspace.build_root,
+                          'llvm-{}'.format(host_name), 'lib', 'swift'))
+            for host_name in [self.args.host_target]
+            + list(self.args.cross_compile_hosts))
         for line in result.stdout.decode('utf-8', 'replace').splitlines():
             for prefix in prefixes:
                 if line.startswith(prefix):
                     flag = line[len(prefix):]
+                    for stale, unified in rewrites:
+                        if stale in flag:
+                            flag = flag.replace(stale, unified)
                     if any(sp in flag for sp in stale_prefixes):
                         continue
                     if flag.startswith(dropped):
