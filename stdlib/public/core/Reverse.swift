@@ -63,6 +63,8 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
   }
 }
 
+extension ReversedCollection: BitwiseCopyable where Base: BitwiseCopyable {}
+
 extension ReversedCollection: Sendable where Base: Sendable {}
 
 extension ReversedCollection {
@@ -84,6 +86,9 @@ extension ReversedCollection {
     }
   }
 }
+
+extension ReversedCollection.Iterator: BitwiseCopyable
+  where Base: BitwiseCopyable, Base.Index: BitwiseCopyable {}
 
 extension ReversedCollection.Iterator: Sendable
   where Base: Sendable, Base.Index: Sendable {}
@@ -174,6 +179,9 @@ extension ReversedCollection {
     }
   }
 }
+
+extension ReversedCollection.Index: BitwiseCopyable
+  where Base.Index: BitwiseCopyable {}
 
 extension ReversedCollection.Index: Sendable where Base.Index: Sendable {}
 
