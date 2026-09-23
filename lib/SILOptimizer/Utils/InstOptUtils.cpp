@@ -1899,11 +1899,7 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
-/// Turns \p debugValue into a variable of empty tuple type.
-/// Used when the type of the variable can no longer be described, when it uses
-/// an archetype that will be removed.
-/// \p debugValue is erased as a new instruction is created.
-static void replaceWithVoidVariable(DebugValueInst *debugValue) {
+void swift::replaceWithVoidVariable(DebugValueInst *debugValue) {
   SILFunction *function = debugValue->getFunction();
   SILType voidTy = SILType::getEmptyTupleType(function->getASTContext());
 
