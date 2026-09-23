@@ -4278,9 +4278,24 @@ namespace {
           unavailableReason =
               "SWIFT_THROWS is not supported on this kind of declaration";
         } else if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
-                   method && !method->isStatic()) {
+                   method && method->isExplicitObjectMemberFunction()) {
           unavailableReason =
-              "SWIFT_THROWS on instance methods is not yet supported";
+              "SWIFT_THROWS on explicit object member functions is not yet "
+              "supported";
+        } else if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
+                   method && !method->isStatic() &&
+                   cast<FuncDecl>(result)->getSelfAccessKind() ==
+                       SelfAccessKind::Consuming &&
+                   !result->getDeclContext()
+                        ->getDeclaredInterfaceType()
+                        ->hasReferenceSemantics() &&
+                   !synthesizer.canTransferCxxValueWithoutThrowing(
+                       Impl.getClangASTContext().getRecordType(
+                           method->getParent()),
+                       method)) {
+          unavailableReason =
+              "SWIFT_THROWS on consuming methods requires nonthrowing "
+              "receiver transfer and destruction";
         } else if ((!decl->getReturnType()->isVoidType() &&
                     !decl->getReturnType()->isIntegerType() &&
                     !decl->getReturnType()->isRealFloatingType()) ||
@@ -4940,6 +4955,9 @@ namespace {
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
         if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
+          // A throwing method cannot implement a nonthrowing property accessor.
+          if (funcDecl->hasThrows() || funcDecl->isUnavailable())
+            return method;
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {

@@ -43,11 +43,25 @@ then throws the copied error through its normal error-handling path. C++ stack
 cleanup completes inside the adapter, and Swift `defer` blocks run when the Swift
 error propagates. The original C++ function keeps its ABI and symbol.
 
-The current slice supports free functions, namespace functions, and static
-methods with arithmetic or enum parameters and arithmetic or `void` results.
-Other annotated declarations are unavailable. In particular, instance methods,
-constructors, operators, default arguments, variadic functions, and functions
-with aggregate or pointer parameters or results need additional support.
+The current slice supports free functions, namespace functions, and static and
+ordinary instance methods with arithmetic or enum parameters and arithmetic or
+`void` results. Instance methods preserve their const and reference qualifiers,
+mutating behavior, and existing C++ virtual dispatch rules, including calls to
+`super` on foreign reference types. Mutations made before an exception remain
+visible to Swift. Captured method values also throw. Throwing getter and setter
+methods do not become nonthrowing computed properties.
+
+Consuming methods require a receiver whose move construction and destruction
+cannot throw, and whose copy construction also cannot throw when it is
+`Copyable`. These operations may run in Swift-generated code around the adapter.
+This permits consuming methods on nontrivial and noncopyable receivers while
+keeping throwing implicit lifetime operations outside the supported scope.
+Inherited rvalue-qualified methods retain the importer's existing limitations.
+
+Other annotated declarations are unavailable. Constructors, operators, default
+arguments, variadic functions, and functions with aggregate or pointer
+parameters or results need additional support. Explicit object member functions
+are also unsupported.
 
 The annotation takes precedence over `noexcept` for the imported Swift function
 type. A C++ violation of `noexcept` still terminates according to C++ rules.
