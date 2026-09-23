@@ -2389,6 +2389,24 @@ function Build-CMakeProject {
             "-Xclang-linker", "--sysroot", "-Xclang-linker", $AndroidSysroot,
             "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
           )
+
+          # The Android NDK injects `-Wl,<arg>` flags into
+          # `CMAKE_*_LINKER_FLAGS` via `CMAKE_*_LINKER_FLAGS_INIT` variables.
+          # CMake 3.30+ passes these to the Swift driver, which doesn't
+          # understand the `-Wl,` syntax. Pre-set the flags in a portable form
+          # (`-Xlinker <arg>`) from the command line as this takes precedence
+          # over the NDK's `*_INIT` mechanism.
+          $AndroidLinkerFlags = @(
+            "-Xlinker", "--build-id=sha1",
+            "-Xlinker", "--no-rosegment",
+            "-Xlinker", "--no-undefined-version",
+            "-Xlinker", "--fatal-warnings",
+            "-Xlinker", "--gc-sections",
+            "-Xlinker", "--no-undefined"
+          )
+          Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $AndroidLinkerFlags
+          Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS ($AndroidLinkerFlags + @("-Xlinker", "--gc-sections"))
+          Add-FlagsDefine $Defines CMAKE_MODULE_LINKER_FLAGS $AndroidLinkerFlags
         }
 
         if (($UseASM -and $Assembler.AssumeFunctional) -or ($UseC -and $CCompiler.AssumeFunctional) -or ($UseCXX -and $CXXCompiler.AssumeFunctional)) {
@@ -2404,27 +2422,9 @@ function Build-CMakeProject {
           }
           $ld = Join-Path -Path (Split-Path $Executable) -ChildPath "ld.lld"
           if ($UseSwift) {
-            # The Android NDK injects `-Wl,<arg>` flags into
-            # `CMAKE_*_LINKER_FLAGS` via `CMAKE_*_LINKER_FLAGS_INIT` variables.
-            # CMake 3.30+ passes these to the Swift driver, which doesn't
-            # understand the `-Wl,` syntax. Pre-set the flags in a portable form
-            # (`-Xlinker <arg>`) from the command line as this takes precedence
-            # over the NDK's `*_INIT` mechanism.
-            #
             # `--ld-path` and `-Qunused-arguments` are Clang driver flags,
             # handled via `CMAKE_PROJECT_INCLUDE` with a `LINK_LANGUAGE` guard,
             # so they do not affect Swift linking.
-            $AndroidLinkerFlags = @(
-              "-Xlinker", "--build-id=sha1",
-              "-Xlinker", "--no-rosegment",
-              "-Xlinker", "--no-undefined-version",
-              "-Xlinker", "--fatal-warnings",
-              "-Xlinker", "--gc-sections",
-              "-Xlinker", "--no-undefined"
-            )
-            Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $AndroidLinkerFlags
-            Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS ($AndroidLinkerFlags + @("-Xlinker", "--gc-sections"))
-            Add-FlagsDefine $Defines CMAKE_MODULE_LINKER_FLAGS $AndroidLinkerFlags
             Add-KeyValueIfNew $Defines SWIFT_ANDROID_LD_PATH $ld
             Add-KeyValueIfNew $Defines CMAKE_PROJECT_INCLUDE "$SourceCache\swift\utils\android-overrides.cmake"
           } else {
