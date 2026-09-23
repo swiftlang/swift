@@ -127,6 +127,11 @@ Build the MSI installers and packaging.
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
 
+.PARAMETER ContinueOnTestFailure
+Keep running the remaining test suites/targets after a test failure instead of
+stopping immediately. Failures are accumulated and reported in a summary at
+the end, and the script still exits with an error if any test failed.
+
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
 This component is currently only supported in Android builds.
@@ -223,6 +228,7 @@ param
   # Incremental Build Support
   [switch] $Clean,
   [string[]] $Test = @(),
+  [switch] $ContinueOnTestFailure = $true,
 
   [switch] $IncludeDS2 = $false,
   [ValidateSet("none", "full", "thin")]
@@ -256,6 +262,10 @@ $CustomWinSDKRoot = $null # Overwritten if we download a Windows SDK from nuget
 
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
+
+# Accumulates the names of test targets/suites that failed when
+# -ContinueOnTestFailure is set, so a summary can be reported at the end.
+$Script:TestFailures = [System.Collections.Generic.List[string]]::new()
 
 ## Cleanup build arguments.
 
@@ -882,6 +892,30 @@ function Invoke-BuildStep {
 
   Record-OperationTime $Platform $Name {
     & $Name $Platform @SplatArgs
+  }
+}
+
+function Invoke-TestStep {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position=0, Mandatory)]
+    [string] $Name,
+    [Parameter(Position=1, Mandatory)]
+    [Hashtable] $Platform,
+    [Parameter(ValueFromRemainingArguments)]
+    [Object[]] $RemainingArgs
+  )
+
+  try {
+    Invoke-BuildStep $Name $Platform @RemainingArgs
+  } catch {
+    if ($ContinueOnTestFailure) {
+      Write-Warning "Test suite '$Name' failed; continuing due to -ContinueOnTestFailure.`n$_"
+      $Script:TestFailures.Add($Name)
+    } else {
+      throw
+    }
   }
 }
 
@@ -2533,10 +2567,20 @@ function Build-CMakeProject {
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
+      $IsTestTarget = $Target -match '^(check-|test-)' -or $Target -eq "ExperimentalTest"
+      try {
+        if ($Target -eq "default") {
+          Invoke-Program $CMakeBin --build $Bin
+        } else {
+          Invoke-Program $CMakeBin --build $Bin --target $Target
+        }
+      } catch {
+        if ($ContinueOnTestFailure -and $IsTestTarget) {
+          Write-Warning "Test target '$Target' failed in '$Bin'; continuing due to -ContinueOnTestFailure.`n$_"
+          $Script:TestFailures.Add("$Target ($Bin)")
+        } else {
+          throw
+        }
       }
     }
 
@@ -6218,19 +6262,19 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+    Invoke-TestStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
   # functions hardcode their platform needs.
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
-  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
-  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
-  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
-  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
-  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
-  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
+  if ($Test -contains "dispatch") { Invoke-TestStep Test-Dispatch $BuildPlatform }
+  if ($Test -contains "foundation") { Invoke-TestStep Test-Foundation $BuildPlatform }
+  if ($Test -contains "xctest") { Invoke-TestStep Test-XCTest $BuildPlatform }
+  if ($Test -contains "testing") { Invoke-TestStep Test-Testing $BuildPlatform }
+  if ($Test -contains "llbuild") { Invoke-TestStep Test-LLBuild $BuildPlatform }
+  if ($Test -contains "swiftpm") { Invoke-TestStep Test-PackageManager $BuildPlatform }
+  if ($Test -contains "swift-format") { Invoke-TestStep Test-Format $BuildPlatform }
+  if ($Test -contains "sourcekit-lsp") { Invoke-TestStep Test-SourceKitLSP $BuildPlatform}
 
   # TODO: restore Android Swift runtime tests against the new Runtimes/* layout.
   # The previous `Test-Runtime` reconfigured the in-tree stdlib build (built by
@@ -6243,6 +6287,14 @@ if (-not $IsCrossCompiling) {
   # for Android is silently a no-op here.
   if ($Test -contains "swift" -and $Android) {
     Write-Warning "Android Swift runtime tests are not currently wired up to the new SDK layout; skipping."
+  }
+
+  if ($Script:TestFailures.Count -gt 0) {
+    Write-Host -ForegroundColor Red "`nERROR: The following test suite(s)/target(s) failed:"
+    foreach ($Failure in $Script:TestFailures) {
+      Write-Host -ForegroundColor Red "  - $Failure"
+    }
+    throw "$($Script:TestFailures.Count) test suite(s)/target(s) failed."
   }
 }
 
