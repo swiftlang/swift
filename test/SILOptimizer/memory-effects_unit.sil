@@ -1749,7 +1749,7 @@ bb0(%0 : @guaranteed $X):
 // CHECK:      PAIR #4.
 // CHECK-NEXT:     end_borrow %1 : $X
 // CHECK-NEXT:   %0 = argument of bb0 : $*X
-// CHECK-NEXT:   r=1,w=1
+// CHECK-NEXT:   r=1,w=0
 // CHECK:      PAIR #5.
 // CHECK-NEXT:     end_borrow %1 : $X
 // CHECK-NEXT:     %2 = alloc_stack $X
