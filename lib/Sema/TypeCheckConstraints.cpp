@@ -1712,6 +1712,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     }
   }
 
+  // ISwiftObject can recover a native object that does not itself conform to
+  // the source interface. Its class, including a final class, is determined
+  // by the runtime query rather than by a Swift protocol conformance.
+  if (fromType->isCOMExistentialType() && toType->getClassOrBoundGenericClass())
+    return CheckedCastKind::ValueCast;
+
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
     switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
