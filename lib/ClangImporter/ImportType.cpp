@@ -58,6 +58,42 @@
 using namespace swift;
 using namespace importer;
 
+bool importer::hasPotentiallyThrowingCxxCallableType(clang::QualType type) {
+  if (type.isNull())
+    return false;
+  type = type.getCanonicalType();
+
+  if (const auto *function = type->getAs<clang::FunctionProtoType>()) {
+    // Do not query canThrow() on an unresolved specification. Only an
+    // explicitly resolved nonthrowing specification can be represented by a
+    // Swift C function pointer without losing the exception effect.
+    switch (function->getExceptionSpecType()) {
+    case clang::EST_DynamicNone:
+    case clang::EST_BasicNoexcept:
+    case clang::EST_NoexceptTrue:
+    case clang::EST_NoThrow:
+      break;
+    default:
+      return true;
+    }
+    if (hasPotentiallyThrowingCxxCallableType(function->getReturnType()))
+      return true;
+    return llvm::any_of(function->param_types(), [](clang::QualType parameter) {
+      return hasPotentiallyThrowingCxxCallableType(parameter);
+    });
+  }
+  if (type->isFunctionNoProtoType())
+    return true;
+  if (type->isPointerType() || type->isReferenceType() ||
+      type->isBlockPointerType())
+    return hasPotentiallyThrowingCxxCallableType(type->getPointeeType());
+  if (const auto *member = type->getAs<clang::MemberPointerType>())
+    return hasPotentiallyThrowingCxxCallableType(member->getPointeeType());
+  if (const auto *array = dyn_cast<clang::ArrayType>(type.getTypePtr()))
+    return hasPotentiallyThrowingCxxCallableType(array->getElementType());
+  return false;
+}
+
 // XXX: This is to resolve the build dependency with Clang. Remove it once these
 // types actually land in Clang.
 namespace clang {
@@ -2322,6 +2358,18 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
 
+  bool isCLinkage = clangDecl->isExternC() ||
+                    (!isa<clang::CXXMethodDecl>(clangDecl) &&
+                     clangDecl->getCanonicalDecl()->isInExternCContext());
+  if (SwiftContext.LangOpts.CxxExceptionMode == CxxExceptionMode::Strict &&
+      !isCLinkage &&
+      hasPotentiallyThrowingCxxCallableType(clangDecl->getReturnType())) {
+    addImportDiagnostic(clangDecl,
+                        Diagnostic(diag::cxx_exception_mode_callable_type),
+                        clangDecl->getLocation());
+    return {Type(), false};
+  }
+
   // Hardcode handling of certain result types for builtins.
   if (auto builtinID = clangDecl->getBuiltinID()) {
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
@@ -2605,6 +2653,31 @@ static bool isSendableInferenceOnCompletionHandlerParameterAllowed(
   return !isParameterContextGlobalActorIsolated(dc, parent);
 }
 
+/// The exception adapter borrows a Swift callback that cannot throw or escape.
+/// Preserve this compiler-owned boundary without exempting user callbacks or
+/// other synthesized C++ functions from strict exception checking.
+static bool
+isCompilerCxxExceptionCallback(ClangImporter::Implementation &impl,
+                               const clang::FunctionDecl *function,
+                               const clang::ParmVarDecl *parameter) {
+  // Only the final callback parameter belongs to the bridge; any source
+  // function parameters must pass the ordinary strict-mode checks.
+  if (function->parameters().empty() ||
+      function->parameters().back() != parameter || !function->getIdentifier())
+    return false;
+  auto name = function->getName();
+  if (function->isImplicit() &&
+      impl.synthesizedAndAlwaysVisibleDecls.contains(function) &&
+      name.starts_with("__swift_cxx_exception_"))
+    return true;
+  if (name != "__swift_cxx_report_current_exception")
+    return false;
+  const auto *module =
+      getClangOwningModule(function, impl.getClangASTContext());
+  return module &&
+         module->getTopLevelModuleName() == "_SwiftCxxExceptionSupport";
+}
+
 std::optional<ClangImporter::Implementation::ImportParameterTypeResult>
 ClangImporter::Implementation::importParameterType(
     DeclContext *dc, const clang::Decl *parent, const clang::ParmVarDecl *param,
@@ -2614,6 +2687,18 @@ ClangImporter::Implementation::importParameterType(
     std::optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
+  if (auto *function = dyn_cast<clang::FunctionDecl>(parent);
+      function &&
+      SwiftContext.LangOpts.CxxExceptionMode == CxxExceptionMode::Strict &&
+      !function->isExternC() &&
+      (isa<clang::CXXMethodDecl>(function) ||
+       !function->getCanonicalDecl()->isInExternCContext()) &&
+      hasPotentiallyThrowingCxxCallableType(param->getType()) &&
+      !isCompilerCxxExceptionCallback(*this, function, param)) {
+    addImportDiagnosticFn(Diagnostic(diag::cxx_exception_mode_callable_type));
+    return std::nullopt;
+  }
+
   auto paramTy = desugarIfElaborated(param->getType());
   paramTy = desugarIfBoundsAttributed(paramTy);
 
@@ -2934,9 +3019,12 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // TODO: support default arguments of constructors
   // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
-  if (param->hasDefaultArg() && !isInOut &&
-      impl->isDefaultArgSafeToImport(param) &&
-      !param->isTemplated()) {
+  // A noexcept callee may still have a throwing default expression. Until
+  // default argument generators can report that error, strict mode requires
+  // callers to supply every argument explicitly.
+  if (ASTContext.LangOpts.CxxExceptionMode != CxxExceptionMode::Strict &&
+      param->hasDefaultArg() && !isInOut &&
+      impl->isDefaultArgSafeToImport(param) && !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {

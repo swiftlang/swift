@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1032; // C++ synthesized method references
+    1033; // C++ exception import policy
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1022,6 +1022,7 @@ namespace options_block {
     AGGRESSIVE_CMO,
     LIBRARY_LEVEL,
     REQUIRES_CXX_EXCEPTION_BRIDGING,
+    CXX_EXCEPTION_MODE,
     // Internal sentinel. MUST remain the last enumerator in this block.
     // Equal to one past the last real record kind. Used by
     // Serialization.cpp to statically assert that OPTIONS_BLOCK's
@@ -1113,6 +1114,11 @@ namespace options_block {
 
   using RequiresCxxExceptionBridgingLayout = BCRecordLayout<
     REQUIRES_CXX_EXCEPTION_BRIDGING
+  >;
+
+  using CxxExceptionModeLayout = BCRecordLayout<
+    CXX_EXCEPTION_MODE,
+    BCFixed<1>
   >;
 
   using CXXStdlibKindLayout = BCRecordLayout<

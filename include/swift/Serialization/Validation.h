@@ -15,16 +15,17 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/CXXStdlibKind.h"
+#include "swift/Basic/CxxExceptionMode.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 
@@ -151,6 +152,8 @@ class ExtendedValidationInfo {
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
     unsigned RequiresCxxExceptionBridging : 1;
+    unsigned HasCxxExceptionMode : 1;
+    unsigned CxxExceptionMode : 1;
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
@@ -298,6 +301,16 @@ public:
   }
   void setRequiresCxxExceptionBridging(bool val) {
     Bits.RequiresCxxExceptionBridging = val;
+  }
+
+  bool hasCxxExceptionMode() const { return Bits.HasCxxExceptionMode; }
+
+  CxxExceptionMode getCxxExceptionMode() const {
+    return static_cast<CxxExceptionMode>(Bits.CxxExceptionMode);
+  }
+  void setCxxExceptionMode(CxxExceptionMode mode) {
+    Bits.HasCxxExceptionMode = true;
+    Bits.CxxExceptionMode = static_cast<unsigned>(mode);
   }
 
   CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }

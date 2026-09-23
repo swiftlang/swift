@@ -877,6 +877,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
   BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
   BLOCK_RECORD(options_block, REQUIRES_CXX_EXCEPTION_BRIDGING);
+  BLOCK_RECORD(options_block, CXX_EXCEPTION_MODE);
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
@@ -1225,6 +1226,13 @@ void Serializer::writeHeader() {
         codeGenModel.emit(ScratchRecord, static_cast<unsigned>(M->codeGenerationModel()));
       }
 
+      // Exception policy is part of imported function types even when the
+      // producer opts out of requiring C++ interop in its consumers.
+      if (M->hasCxxExceptionMode()) {
+        options_block::CxxExceptionModeLayout ExceptionMode(Out);
+        ExceptionMode.emit(ScratchRecord, unsigned(M->getCxxExceptionMode()));
+      }
+
       if (M->hasCxxInteroperability()) {
         options_block::HasCxxInteroperabilityEnabledLayout
             CxxInteroperabilityEnabled(Out);
@@ -1239,7 +1247,7 @@ void Serializer::writeHeader() {
       // changes imported function types and serialized adapter references.
       // Preserve it even when the producer disables the C++ import requirement.
       const auto &LangOpts = M->getASTContext().LangOpts;
-      if (LangOpts.EnableCXXInterop &&
+      if (M->hasCxxExceptionMode() &&
           LangOpts.hasFeature(Feature::CxxExceptionBridging)) {
         options_block::RequiresCxxExceptionBridgingLayout
             RequiresCxxExceptionBridging(Out);

@@ -2998,6 +2998,9 @@ static std::string getContextHash(const CompilerInvocation &CI,
       // Is the C++ interop enabled?
       unsigned(CI.getLangOptions().EnableCXXInterop),
 
+      // Imported C++ function types depend on the exception policy.
+      unsigned(CI.getLangOptions().CxxExceptionMode),
+
       // Is Embedded Swift enabled?
       unsigned(CI.getLangOptions().hasFeature(Feature::Embedded)),
 

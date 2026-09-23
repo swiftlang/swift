@@ -2448,6 +2448,9 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
   auto topModule = modulePath.front();
   auto realModuleName =
       Impl.SwiftContext.getRealModuleName(topModule.Item).str();
+  // Match loadModule's public spelling for the raw C++ standard library.
+  if (realModuleName == Impl.SwiftContext.Id_CxxStdlib.str())
+    realModuleName = "std";
   clang::Module *clangModule = Impl.lookupModule(realModuleName);
   if (!clangModule) {
     return false;
@@ -4807,6 +4810,10 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     return nullptr;
 
   if (owner.DisableOverlayModules)
+    return nullptr;
+
+  if (importer::isCxxStdModule(clangModule) &&
+      !getParentModule()->getASTContext().LangOpts.useCxxStdlibOverlay())
     return nullptr;
 
   if (!isTopLevel()) {
@@ -8810,6 +8817,22 @@ FuncDecl *ClangImporter::getCxxExceptionBridgeAdapter(
 AbstractFunctionDecl *
 ClangImporter::getCxxExceptionBridgeFacade(const FuncDecl *adapter) const {
   return Impl.cxxExceptionBridgeFacades.lookup(adapter);
+}
+
+bool ClangImporter::Implementation::shouldImportCxxFunctionAsThrowing(
+    const clang::FunctionDecl *decl) {
+  if (importer::hasCxxThrowsAttr(decl))
+    return true;
+  if (SwiftContext.LangOpts.CxxExceptionMode != CxxExceptionMode::Strict ||
+      decl->isExternC() ||
+      (!isa<clang::CXXMethodDecl>(decl) &&
+       decl->getCanonicalDecl()->isInExternCContext()))
+    return false;
+
+  // Resolve dependent and implicitly computed exception specifications using
+  // Clang's call semantics. Only a proven nonthrowing specification opts out.
+  return clang::Sema::canCalleeThrow(getClangSema(), nullptr, decl,
+                                     decl->getLocation()) != clang::CT_Cannot;
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {

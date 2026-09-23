@@ -90,3 +90,47 @@ when the producer or consumer opts out of the usual C++ interoperability import
 requirement. The importer needs C++ interoperability to reconstruct the
 exception adapters and their throwing function types from serialized bodies,
 including when a module exposes only Swift types in its public API.
+
+## Strict import policy
+
+`-cxx-exception-mode=strict` opts a compilation into importing supported C++
+functions as throwing whenever their exception specification permits exceptions.
+It requires C++ interoperability and `CxxExceptionBridging`. The default,
+`-cxx-exception-mode=annotated`, keeps the annotation-based behavior above.
+`SWIFT_THROWS` continues to take precedence over a nonthrowing exception
+specification in either mode.
+
+The importer asks Clang to resolve exception specifications, including
+conditional `noexcept` and implicitly computed specifications. A proven
+nonthrowing function retains a nonthrowing Swift type. Other functions either
+receive a throwing facade or become unavailable if their declaration or
+signature is not supported. Declarations with C language linkage retain their
+existing import rules.
+
+This prototype omits all imported default arguments in strict mode. A default
+argument is evaluated by the caller, so even a `noexcept` function can have a
+throwing default expression. Supply the argument explicitly. Potentially
+throwing C++ callable values in function signatures, globals, and fields are
+also unavailable, because Swift C function pointers cannot carry an error
+result. Function pointers with a resolved nonthrowing specification remain
+usable. Synthesized zero, memberwise, and union-field initializers are unavailable
+unless their generated argument and result transfers are nonthrowing. This
+check covers both the enclosing value and the supplied fields; a union's own
+copy constructor does not determine whether copying a particular field can
+throw. Other implicit copies, moves, destructors, and retain/release operations
+still have the limits described above.
+
+Strict mode imports the raw Clang standard library through the existing
+`import CxxStdlib` spelling. It omits the Swift `CxxStdlib` overlay, whose APIs
+and conformances currently assume nonthrowing C++ calls. The `Cxx` support
+module remains available. Synthesized properties and protocol conformances
+that require nonthrowing operations are omitted when their C++ implementation
+can throw. The `std::function` initializer that accepts a Swift closure is also
+unavailable until its internal C++ construction can propagate errors.
+
+Exception policy is recorded in binary modules and textual interfaces and
+participates in dependency scanning and interface cache keys. Swift modules
+built with different C++ exception policies cannot be mixed. Modules compiled
+without C++ interoperability and the policy-independent `Cxx` support module
+can be used in either mode. Disabling the usual C++ import requirement does
+not remove the exception policy from a module.

@@ -370,6 +370,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
+  inputArgs.AddLastArg(arguments, options::OPT_cxx_exception_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
   inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
   inputArgs.AddLastArg(arguments, options::OPT_load_pass_plugin_EQ);

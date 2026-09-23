@@ -31,6 +31,7 @@
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/CxxExceptionMode.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
@@ -250,6 +251,9 @@ class ModuleDecl
   /// Indicates a version of the Swift compiler used to generate 
   /// .swiftinterface file that this module was produced from (if any).
   mutable version::Version InterfaceCompilerVersion;
+
+  /// Absent for modules compiled without C++ interoperability.
+  std::optional<CxxExceptionMode> CxxExceptionPolicy;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -757,6 +761,13 @@ public:
   void setHasCxxInteroperability(bool enabled = true) {
     Bits.ModuleDecl.HasCxxInteroperability = enabled;
   }
+
+  bool hasCxxExceptionMode() const { return CxxExceptionPolicy.has_value(); }
+
+  CxxExceptionMode getCxxExceptionMode() const {
+    return CxxExceptionPolicy.value_or(CxxExceptionMode::Annotated);
+  }
+  void setCxxExceptionMode(CxxExceptionMode mode) { CxxExceptionPolicy = mode; }
 
   CXXStdlibKind getCXXStdlibKind() const {
     return static_cast<CXXStdlibKind>(Bits.ModuleDecl.CXXStdlibKind);

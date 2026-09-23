@@ -577,6 +577,11 @@ ERROR(dont_enable_interop_and_compat,none,
 
 NOTE(valid_cxx_interop_modes,none,
       "valid arguments to '%0' are %1", (StringRef, StringRef))
+ERROR(cxx_exception_mode_requires_interop,none,
+      "'-cxx-exception-mode=strict' requires C++ interoperability", ())
+ERROR(cxx_exception_mode_requires_feature,none,
+      "'-cxx-exception-mode=strict' requires "
+      "'-enable-experimental-feature CxxExceptionBridging'", ())
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
      "selected compatibility mode, so updating the Swift compiler will not "

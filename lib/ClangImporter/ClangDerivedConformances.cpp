@@ -1644,6 +1644,9 @@ void swift::deriveAutomaticCxxConformances(
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxConvertibleToBoolIfNeeded(Impl, result);
 
+  if (!Impl.SwiftContext.LangOpts.useCxxStdlibOverlay())
+    return;
+
   // CxxStdlib conformances: these should only apply to known C++ stdlib types,
   // which we determine by name and membership in the std namespace.
   if (!clangDecl->getIdentifier() || !clangDecl->isInStdNamespace())

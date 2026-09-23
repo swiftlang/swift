@@ -146,7 +146,7 @@ bool SwiftDeclSynthesizer::canTransferCxxValueWithoutThrowing(
     clang::QualType type, const clang::Decl *diagnosticDecl) {
   auto &clangCtx = ImporterImpl.getClangASTContext();
   auto &clangSema = ImporterImpl.getClangSema();
-  if (type->isDependentType())
+  if (type->isDependentType() || type->isIncompleteType())
     return false;
   auto semantics = getCxxValueSemanticsKind(type.getTypePtr(), ImporterImpl);
   if (semantics == CxxValueSemanticsKind::Unknown)
@@ -1001,6 +1001,59 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   return {body, /*isTypeChecked*/ true};
 }
 
+bool SwiftDeclSynthesizer::checkSynthesizedCxxConstructor(
+    ConstructorDecl *constructor, NominalTypeDecl *record,
+    ArrayRef<VarDecl *> members) {
+  if (ImporterImpl.SwiftContext.LangOpts.CxxExceptionMode !=
+      CxxExceptionMode::Strict)
+    return true;
+  auto *clangRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(record->getClangDecl());
+  if (!clangRecord || clangRecord->getDeclContext()->isExternCContext())
+    return true;
+
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  bool canTransfer = canTransferCxxValueWithoutThrowing(
+      clangCtx.getRecordType(clangRecord), clangRecord);
+  StringRef reason =
+      "synthesized C++ initializers require nonthrowing argument and result "
+      "transfers in strict C++ exception mode";
+
+  // These initializers write Swift storage rather than calling a C++
+  // constructor. Their argument and result transfers must still be safe:
+  // a union's noexcept copy constructor says nothing about copying the member
+  // supplied to one of its synthesized field initializers.
+  auto canTransferMember = [&](auto &&self, clang::QualType type,
+                               const clang::Decl *decl) -> bool {
+    if (hasPotentiallyThrowingCxxCallableType(type)) {
+      reason = "potentially throwing C++ callable types are not supported in "
+               "strict C++ exception mode";
+      return false;
+    }
+    if (const auto *array = clangCtx.getAsArrayType(type))
+      return self(self, array->getElementType(), decl);
+    if (type->isScalarType())
+      return true;
+    return type->getAsCXXRecordDecl() &&
+           canTransferCxxValueWithoutThrowing(type, decl);
+  };
+  for (auto *member : members) {
+    // Match the fields used to build the initializer's parameter list.
+    if (member->isStatic() ||
+        isa_and_nonnull<clang::IndirectFieldDecl>(member->getClangDecl()))
+      continue;
+    auto *field = dyn_cast_or_null<clang::FieldDecl>(member->getClangDecl());
+    if (!field ||
+        !canTransferMember(canTransferMember, field->getType(), field)) {
+      canTransfer = false;
+      break;
+    }
+  }
+  if (!canTransfer)
+    ImporterImpl.markUnavailable(constructor, reason);
+  return canTransfer;
+}
+
 ConstructorDecl *
 SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   auto &context = ImporterImpl.SwiftContext;
@@ -1018,6 +1071,9 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+
+  if (!checkSynthesizedCxxConstructor(constructor, structDecl, {}))
+    return constructor;
 
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
@@ -1144,6 +1200,9 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+
+  if (!checkSynthesizedCxxConstructor(constructor, structDecl, members))
+    return constructor;
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
@@ -3412,7 +3471,7 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
   PrettyStackTraceDecl trace("creating a closure constructor", decl);
   assert(decl);
   ASTContext &ctx = decl->getASTContext();
-  
+
   auto callAsFunctionOverloads = decl->lookupDirect(ctx.Id_callAsFunction);
   if (callAsFunctionOverloads.size() != 1)
     return nullptr;
@@ -3440,6 +3499,15 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
       /*ThrownType*/ TypeLoc(), paramList, /*GenericParams*/ nullptr, decl);
   constructorDecl->setAccess(AccessLevel::Public);
   constructorDecl->setSynthesized();
+  // This convenience invokes a templated C++ constructor that can allocate.
+  // Keep its signature for diagnostics, but do not synthesize a body that
+  // could call that constructor without propagating its exception.
+  if (ctx.LangOpts.CxxExceptionMode == CxxExceptionMode::Strict) {
+    constructorDecl->addAttribute(AvailableAttr::createUniversallyUnavailable(
+        ctx, "constructing C++ function objects from Swift closures is not "
+             "supported in strict C++ exception mode"));
+    return constructorDecl;
+  }
   constructorDecl->setBodySynthesizer(synthesizeFunctionConstructorBody,
                                       callAsFunctionDecl);
   return constructorDecl;
@@ -3700,8 +3768,10 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
           /*OverrideExisting=*/true))
     return nullptr;
 
-  clang::QualType funcTy = clangCtx.getFunctionType(
-      basePtrTy, {derivedPtrTy}, clang::FunctionProtoType::ExtProtoInfo());
+  clang::FunctionProtoType::ExtProtoInfo prototypeInfo;
+  prototypeInfo.ExceptionSpec.Type = clang::EST_BasicNoexcept;
+  clang::QualType funcTy =
+      clangCtx.getFunctionType(basePtrTy, {derivedPtrTy}, prototypeInfo);
 
   // Build a deterministic, unique name from the mangled canonical types of the
   // derived and base classes, to avoid collisions in the SwiftLookupTable.

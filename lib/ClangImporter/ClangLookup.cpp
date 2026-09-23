@@ -700,7 +700,7 @@ static FuncDecl *importUnderlyingFunction(ClangImporter::Implementation &Impl,
                                           NominalTypeDecl *Struct) {
   // These synthesized properties and iterator conveniences cannot propagate
   // errors through their nonthrowing accessors or protocol requirements.
-  if (importer::hasCxxThrowsAttr(overload.method))
+  if (Impl.shouldImportCxxFunctionAsThrowing(overload.method))
     return nullptr;
 
   Decl *imported;
@@ -988,7 +988,6 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
     auto importSubscriptOverload = [&](CXXOverload overload) -> FuncDecl * {
       if (!overload)
         return nullptr;
-
       auto *swiftFunc = importUnderlyingFunction(*this, overload, Struct);
       if (!swiftFunc)
         return nullptr;
@@ -1089,7 +1088,7 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
     }
   }
 
-  if (!OpBool || importer::hasCxxThrowsAttr(OpBool))
+  if (!OpBool || shouldImportCxxFunctionAsThrowing(OpBool))
     return nullptr; // No conversion usable by the nonthrowing Bool initializer.
 
   // N.B. At this point it is still possible to have an ambiguous OpBool due to

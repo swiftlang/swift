@@ -741,6 +741,9 @@ bool SerializedModuleLoaderBase::findModule(
   // and a source file has 'import Foo', a module called Bar (real name)
   // should be searched.
   StringRef moduleNameRef = Ctx.getRealModuleName(moduleID.Item).str();
+  if (!Ctx.LangOpts.useCxxStdlibOverlay() &&
+      moduleNameRef == Ctx.Id_CxxStdlib.str())
+    return false;
   SmallString<32> moduleName(moduleNameRef);
   SerializedModuleBaseName genericBaseName(moduleName);
 
@@ -933,6 +936,14 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     bool isFramework) {
   assert(moduleInputBuffer);
 
+  // A source import of CxxStdlib resolves to the raw Clang module in strict
+  // mode. An explicitly supplied Swift overlay still must not be loaded.
+  if (!Ctx.LangOpts.useCxxStdlibOverlay() && M.getName() == Ctx.Id_CxxStdlib) {
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::cxx_exception_mode_stdlib_overlay);
+    return nullptr;
+  }
+
   // The buffers are moved into the shared core, so grab their IDs now in case
   // they're needed for diagnostics later.
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -986,6 +997,22 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
 
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
+
+    // Exception mode changes imported function types, including references in
+    // serialized bodies. Reject incompatible modules before loading their
+    // declarations. Cxx contains policy-independent compiler support APIs.
+    if ((loadedModuleFile->hasCxxExceptionMode() ||
+         loadedModuleFile->hasCxxInteroperability()) &&
+        Ctx.LangOpts.EnableCXXInterop && M.getName() != Ctx.Id_Cxx &&
+        loadedModuleFile->getCxxExceptionMode() !=
+            Ctx.LangOpts.CxxExceptionMode) {
+      if (diagLoc)
+        Ctx.Diags.diagnose(
+            *diagLoc, diag::cxx_exception_mode_mismatch, M.getName(),
+            getCxxExceptionModeName(loadedModuleFile->getCxxExceptionMode()),
+            getCxxExceptionModeName(Ctx.LangOpts.CxxExceptionMode));
+      return nullptr;
+    }
     M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
@@ -1025,6 +1052,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
     }
+    if (loadedModuleFile->hasCxxExceptionMode())
+      M.setCxxExceptionMode(loadedModuleFile->getCxxExceptionMode());
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }

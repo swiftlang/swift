@@ -20,6 +20,7 @@
 
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/CodeGenerationModel.h"
+#include "swift/Basic/CxxExceptionMode.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
@@ -366,6 +367,15 @@ namespace swift {
     /// language mode of clang on a per-header or even per-module basis. Also
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
+
+    /// Whether C++ calls throw only when annotated, or whenever their exception
+    /// specification permits exceptions.
+    swift::CxxExceptionMode CxxExceptionMode = CxxExceptionMode::Annotated;
+
+    /// The current CxxStdlib overlay has nonthrowing APIs and conformances.
+    bool useCxxStdlibOverlay() const {
+      return CxxExceptionMode == CxxExceptionMode::Annotated;
+    }
 
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
@@ -872,7 +882,8 @@ namespace swift {
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Dependency Scanning hash.
     llvm::hash_code getModuleScanningHashComponents() const {
-      auto hashValue = getPCHHashComponents();
+      auto hashValue = llvm::hash_combine(getPCHHashComponents(),
+                                          unsigned(CxxExceptionMode));
       if (TargetVariant.has_value())
         hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
       if (ClangTarget.has_value())

@@ -1050,6 +1050,13 @@ ERROR(cxx_stdlib_kind_mismatch,none,
       "module %0 was built with %1, but current compilation uses %2",
       (Identifier, StringRef, StringRef))
 
+ERROR(cxx_exception_mode_mismatch,none,
+      "module %0 was built with C++ exception mode '%1', but current "
+      "compilation uses '%2'", (Identifier, StringRef, StringRef))
+ERROR(cxx_exception_mode_stdlib_overlay,none,
+      "the CxxStdlib Swift overlay is unavailable in strict C++ exception mode",
+      ())
+
 ERROR(modularization_issue_decl_moved,Fatal,
       "reference to %select{declaration|type}0 '%1' broken by a context change; "
       "'%1' was expected to be in %2, but now a candidate is found only in %3",

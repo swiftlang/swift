@@ -438,6 +438,8 @@ private:
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
+  std::optional<CxxExceptionMode> CxxExceptionPolicy;
+
   bool hasError() const {
     return Bits.HasError;
   }

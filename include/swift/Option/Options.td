@@ -949,6 +949,12 @@ def cxx_interoperability_mode :
          SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
+def cxx_exception_mode :
+  Joined<["-"], "cxx-exception-mode=">,
+  Flags<[FrontendOption, ModuleInterfaceOption, HelpHidden,
+         SwiftSymbolGraphExtractOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"C++ exception import policy: 'annotated' (default) or 'strict'">;
+
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,

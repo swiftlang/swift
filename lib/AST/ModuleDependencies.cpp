@@ -579,6 +579,7 @@ swift::dependencies::checkImportNotTautological(const ImportPath::Module moduleP
 void swift::dependencies::registerCxxInteropLibraries(
     const llvm::Triple &Target, StringRef mainModuleName, bool hasStaticCxx,
     bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
+    bool useCxxStdlibOverlay,
     std::function<void(const LinkLibrary &)> RegistrationCallback) {
 
   switch (cxxStdlibKind) {
@@ -606,10 +607,12 @@ void swift::dependencies::registerCxxInteropLibraries(
 
   // Do not try to link CxxStdlib with the C++ standard library, Cxx or
   // itself.
-  if (llvm::none_of(llvm::ArrayRef<StringRef>{CXX_MODULE_NAME, "CxxStdlib", "std"},
-                    [mainModuleName](StringRef Name) {
-                      return mainModuleName == Name;
-                    })) {
+  if (useCxxStdlibOverlay &&
+      llvm::none_of(
+          llvm::ArrayRef<StringRef>{CXX_MODULE_NAME, "CxxStdlib", "std"},
+          [mainModuleName](StringRef Name) {
+            return mainModuleName == Name;
+          })) {
     // Only link with CxxStdlib on platforms where the overlay is available.
     if (Target.isOSDarwin() || Target.isOSLinux() || Target.isOSWindows() ||
         Target.isOSFreeBSD())
