@@ -6798,12 +6798,11 @@ void Serializer::writeSerializableFixedTypeInfo(
   using namespace decls_block;
 
   writeSerializableTypeInfoBase(representation);
+  auto spareBits = representation.spareBits.asAPInt();
   ArrayRef<uint64_t> spareBitWords;
   unsigned abbrCode = DeclTypeAbbrCodes[SerializableFixedTypeInfoLayout::Code];
-  if (!representation.spareBits.empty()) {
-    auto spareBits = representation.spareBits.asAPInt();
+  if (!representation.spareBits.empty())
     spareBitWords = ArrayRef(spareBits.getRawData(), spareBits.getNumWords());
-  }
   SerializableFixedTypeInfoLayout::emitRecord(
       Out, ScratchRecord, abbrCode, representation.spareBits.size(),
       spareBitWords);
