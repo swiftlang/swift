@@ -56,11 +56,12 @@ struct CxxThrowingFunctionInfo {
   FuncDecl *withCapture;
 };
 
-/// The facade is a native Swift function. In particular, its error result must
+/// The facade is a native Swift function or initializer. Its error result must
 /// never be added to the signature of the original C++ declaration.
 static std::pair<BraceStmt *, bool>
-synthesizeCxxThrowingFunctionBody(AbstractFunctionDecl *afd, void *context) {
-  auto *function = cast<FuncDecl>(afd);
+synthesizeCxxThrowingFunctionBody(AbstractFunctionDecl *function,
+                                  void *context) {
+  auto *constructor = dyn_cast<ConstructorDecl>(function);
   auto &info = *static_cast<CxxThrowingFunctionInfo *>(context);
   auto &ctx = function->getASTContext();
 
@@ -71,8 +72,12 @@ synthesizeCxxThrowingFunctionBody(AbstractFunctionDecl *afd, void *context) {
 
   // The scoped helper owns the error storage. Its nonescaping closure borrows
   // a context pointer only while the C++ adapter is running.
-  SmallVector<ParamDecl *, 2> captureParameters;
-  for (StringRef name : {"context", "callback"}) {
+  SmallVector<ParamDecl *, 3> captureParameters;
+  SmallVector<StringRef, 3> captureNames;
+  if (constructor)
+    captureNames.push_back("output");
+  captureNames.append({"context", "callback"});
+  for (StringRef name : captureNames) {
     auto *parameter =
         new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                             ctx.getIdentifier(name), function);
@@ -106,12 +111,29 @@ synthesizeCxxThrowingFunctionBody(AbstractFunctionDecl *afd, void *context) {
   closure->setBody(BraceStmt::create(ctx, SourceLoc(), ASTNode(closureReturn),
                                      SourceLoc(), /*implicit=*/true));
 
+  SmallVector<Expr *, 2> captureArguments;
+  if (constructor) {
+    auto *type =
+        TypeExpr::createImplicit(constructor->getResultInterfaceType(), ctx);
+    auto *metatype = new (ctx) DotSelfExpr(type, SourceLoc(), SourceLoc());
+    metatype->setImplicit();
+    captureArguments.push_back(metatype);
+  }
+  captureArguments.push_back(closure);
   auto *captureCall = CallExpr::createImplicit(
       ctx, makeReference(info.withCapture),
-      ArgumentList::forImplicitUnlabeled(ctx, {closure}));
+      ArgumentList::forImplicitUnlabeled(ctx, captureArguments));
   auto *tryCall = new (ctx) TryExpr(
       SourceLoc(), UnsafeExpr::createImplicit(ctx, SourceLoc(), captureCall),
       Type(), /*Implicit=*/true);
+  if (constructor) {
+    auto *assign = new (ctx) AssignExpr(
+        makeReference(constructor->getImplicitSelfDecl()), SourceLoc(), tryCall,
+        /*Implicit=*/true);
+    return {BraceStmt::create(ctx, SourceLoc(), ASTNode(assign), SourceLoc(),
+                              /*implicit=*/true),
+            /*isTypeChecked=*/false};
+  }
   auto *result = ReturnStmt::createImplicit(ctx, tryCall);
   return {BraceStmt::create(ctx, SourceLoc(), ASTNode(result), SourceLoc(),
                             /*implicit=*/true),
@@ -157,9 +179,29 @@ bool SwiftDeclSynthesizer::canTransferCxxValueWithoutThrowing(
 
 FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
     const clang::FunctionDecl *clangDecl, FuncDecl *importedDecl) {
+  return cast_or_null<FuncDecl>(
+      makeCxxExceptionBridge(clangDecl, importedDecl));
+}
+
+ConstructorDecl *SwiftDeclSynthesizer::makeCxxThrowingConstructor(
+    const clang::CXXConstructorDecl *clangDecl, ConstructorDecl *importedDecl) {
+  return cast_or_null<ConstructorDecl>(
+      makeCxxExceptionBridge(clangDecl, importedDecl));
+}
+
+bool SwiftDeclSynthesizer::canBridgeCxxConstructor(
+    const clang::CXXConstructorDecl *clangDecl) {
+  auto type =
+      ImporterImpl.getClangASTContext().getRecordType(clangDecl->getParent());
+  return canTransferCxxValueWithoutThrowing(type, clangDecl);
+}
+
+AbstractFunctionDecl *SwiftDeclSynthesizer::makeCxxExceptionBridge(
+    const clang::FunctionDecl *clangDecl, AbstractFunctionDecl *importedDecl) {
   auto &ctx = ImporterImpl.SwiftContext;
   auto &clangCtx = ImporterImpl.getClangASTContext();
   auto &clangSema = ImporterImpl.getClangSema();
+  auto *constructor = dyn_cast<clang::CXXConstructorDecl>(clangDecl);
 
   auto findValue = [&](ModuleDecl *module, StringRef name) -> ValueDecl * {
     if (!module)
@@ -170,7 +212,8 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
   };
   auto *cxxModule = ctx.getModuleByName("Cxx");
   auto *withCapture = dyn_cast_or_null<FuncDecl>(
-      findValue(cxxModule, "_withCxxExceptionCapture"));
+      findValue(cxxModule, constructor ? "_withCxxExceptionResult"
+                                       : "_withCxxExceptionCapture"));
   auto *supportModule = ctx.getModuleByName("_SwiftCxxExceptionSupport");
   auto *report = dyn_cast_or_null<FuncDecl>(
       findValue(supportModule, "__swift_cxx_report_current_exception"));
@@ -185,6 +228,8 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
   SmallVector<clang::QualType, 8> parameterTypes;
   for (auto *parameter : clangDecl->parameters())
     parameterTypes.push_back(parameter->getType());
+  if (constructor)
+    parameterTypes.push_back(clangCtx.VoidPtrTy);
   for (auto *parameter : clangReport->parameters())
     parameterTypes.push_back(parameter->getType());
   auto prototypeInfo = clangDecl->getType()
@@ -199,7 +244,7 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
   if (prototypeInfo.RefQualifier == clang::RQ_RValue)
     prototypeInfo.RefQualifier = clang::RQ_LValue;
   // Parameter ABI annotations belong to the original signature. The adapter
-  // has two additional parameters and is imported independently.
+  // has additional capture parameters and is imported independently.
   prototypeInfo.ExtParameterInfos = nullptr;
   auto adapterType = clangCtx.getFunctionType(clangDecl->getReturnType(),
                                               parameterTypes, prototypeInfo);
@@ -210,7 +255,7 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
       ->getMangledName(nameStream, clangDecl);
   auto adapterName = "__swift_cxx_exception_" + llvm::toHex(mangledName);
   auto *method = dyn_cast<clang::CXXMethodDecl>(clangDecl);
-  bool isInstanceMethod = method && !method->isStatic();
+  bool isInstanceMethod = method && !constructor && !method->isStatic();
   // importName skips functions with an explicit object parameter.
   ASSERT(!isInstanceMethod || !method->isExplicitObjectMemberFunction());
   clang::FunctionDecl *adapter;
@@ -295,12 +340,49 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
     return clangSema.BuildCallExpr(nullptr, reference, clang::SourceLocation(),
                                    expressions, clang::SourceLocation());
   };
-  auto originalCall =
-      makeClangCall(const_cast<clang::FunctionDecl *>(clangDecl),
-                    ArrayRef(parameters).take_front(clangDecl->getNumParams()));
-  auto reportCall =
-      makeClangCall(const_cast<clang::FunctionDecl *>(clangReport),
-                    ArrayRef(parameters).drop_front(clangDecl->getNumParams()));
+  clang::ExprResult originalCall;
+  if (constructor) {
+    auto resultType = clangCtx.getRecordType(constructor->getParent());
+    SmallVector<clang::Expr *, 8> arguments;
+    for (auto *parameter :
+         ArrayRef(parameters).take_front(clangDecl->getNumParams()))
+      arguments.push_back(createClangDeclRefExpr(
+          clangCtx, parameter, parameter->getType(), clang::VK_LValue));
+    SmallVector<clang::Expr *, 8> convertedArguments;
+    auto *mutableConstructor =
+        const_cast<clang::CXXConstructorDecl *>(constructor);
+    if (clangSema.CompleteConstructorCall(mutableConstructor, resultType,
+                                          arguments, constructor->getLocation(),
+                                          convertedArguments))
+      return nullptr;
+    auto construction = clangSema.BuildCXXConstructExpr(
+        constructor->getLocation(), resultType, mutableConstructor,
+        /*Elidable=*/false, convertedArguments,
+        /*HadMultipleCandidates=*/false, /*IsListInitialization=*/false,
+        /*IsStdInitListInitialization=*/false,
+        /*RequiresZeroInit=*/constructor->isDefaultConstructor() &&
+            !constructor->isUserProvided(),
+        clang::CXXConstructionKind::Complete, clang::SourceRange());
+    if (!construction.isUsable())
+      return nullptr;
+    auto *output = parameters[clangDecl->getNumParams()];
+    clang::Expr *placement = createClangDeclRefExpr(
+        clangCtx, output, output->getType(), clang::VK_LValue);
+    // Global placement new initializes the caller's uninitialized storage. It
+    // neither allocates a dummy result nor invokes class-specific allocation.
+    originalCall = clangSema.BuildCXXNew(
+        clang::SourceRange(), /*UseGlobal=*/true, clang::SourceLocation(),
+        {placement}, clang::SourceLocation(), clang::SourceRange(), resultType,
+        clangCtx.getTrivialTypeSourceInfo(resultType), std::nullopt,
+        constructor->getLocation(), construction.get());
+  } else {
+    originalCall = makeClangCall(
+        const_cast<clang::FunctionDecl *>(clangDecl),
+        ArrayRef(parameters).take_front(clangDecl->getNumParams()));
+  }
+  auto reportCall = makeClangCall(
+      const_cast<clang::FunctionDecl *>(clangReport),
+      ArrayRef(parameters).take_back(clangReport->getNumParams()));
   if (!originalCall.isUsable() || !reportCall.isUsable())
     return nullptr;
 
@@ -310,7 +392,9 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
         clang::SourceLocation(), clang::SourceLocation());
   };
   auto *tryBody =
-      makeBlock({createClangReturnStmt(clangCtx, originalCall.get())});
+      constructor
+          ? makeBlock({originalCall.get()})
+          : makeBlock({createClangReturnStmt(clangCtx, originalCall.get())});
   // Only scalar and void results are currently admitted. Value initialization
   // supplies a placeholder on failure, which the Swift facade never returns.
   clang::Expr *failedResult =
@@ -340,20 +424,40 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
       clone->setName(ctx.getIdentifier("__cxx_arg" + std::to_string(index)));
     swiftParameters.push_back(clone);
   }
-  auto *facade = FuncDecl::createImplicit(
-      ctx, importedDecl->getStaticSpelling(), importedDecl->getName(),
-      importedDecl->getLoc(), /*Async=*/false, /*Throws=*/true,
-      /*ThrownType=*/Type(), /*GenericParams=*/nullptr,
-      ParameterList::create(ctx, swiftParameters),
-      importedDecl->getResultInterfaceType(), importedDecl->getDeclContext(),
-      /*isSynthesized=*/true);
+  AbstractFunctionDecl *facade;
+  if (constructor) {
+    facade = new (ctx) ConstructorDecl(
+        importedDecl->getName(), importedDecl->getLoc(), /*Failable=*/false,
+        SourceLoc(), /*Async=*/false, SourceLoc(), /*Throws=*/true, SourceLoc(),
+        TypeLoc(), ParameterList::create(ctx, swiftParameters),
+        /*GenericParams=*/nullptr, importedDecl->getDeclContext());
+    facade->setImplicit();
+    // The adapter initializes all of self at once, including C++ base-class
+    // storage and empty types without Swift stored properties. Definite
+    // initialization must track self as one value, as it does for a
+    // delegating initializer, or it could consider self initialized before
+    // the adapter returns and destroy it after a failed construction.
+    ctx.evaluator.cacheOutput(
+        BodyInitKindRequest{cast<ConstructorDecl>(facade)},
+        BodyInitKindAndExpr(BodyInitKind::Delegating, /*initExpr=*/nullptr));
+  } else {
+    auto *function = cast<FuncDecl>(importedDecl);
+    auto *functionFacade = FuncDecl::createImplicit(
+        ctx, function->getStaticSpelling(), function->getName(),
+        function->getLoc(), /*Async=*/false, /*Throws=*/true,
+        /*ThrownType=*/Type(), /*GenericParams=*/nullptr,
+        ParameterList::create(ctx, swiftParameters),
+        function->getResultInterfaceType(), function->getDeclContext(),
+        /*isSynthesized=*/true);
+    functionFacade->setStatic(function->isStatic());
+    functionFacade->setSelfAccessKind(function->getSelfAccessKind());
+    // Preserve the importer's C++ override relationships. Recomputing these as
+    // native Swift overrides would reject the final entry points used for C++
+    // virtual dispatch.
+    functionFacade->setOverriddenDecls(function->getOverriddenDecls());
+    facade = functionFacade;
+  }
   facade->copyFormalAccessFrom(importedDecl);
-  facade->setStatic(importedDecl->isStatic());
-  facade->setSelfAccessKind(importedDecl->getSelfAccessKind());
-  // Preserve the importer's C++ override relationships. Recomputing these as
-  // native Swift overrides would reject the final entry points used for C++
-  // virtual dispatch.
-  facade->setOverriddenDecls(importedDecl->getOverriddenDecls());
   facade->setIsObjC(false);
   facade->setIsDynamic(false);
   facade->addAttribute(new (ctx) TransparentAttr(/*Implicit=*/true));
@@ -362,8 +466,9 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
       continue;
     // A consuming native facade owns self and lends its local storage to the
     // adapter. It does not borrow the caller's addressable C++ receiver.
-    if (isa<AddressableSelfAttr>(attribute) &&
-        importedDecl->getSelfAccessKind() == SelfAccessKind::Consuming)
+    if (!constructor && isa<AddressableSelfAttr>(attribute) &&
+        cast<FuncDecl>(importedDecl)->getSelfAccessKind() ==
+            SelfAccessKind::Consuming)
       continue;
     facade->addAttribute(attribute->clone(ctx));
   }
@@ -3479,6 +3584,16 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
       synthParams.push_back(param);
     }
     synthCxxMethodDecl->setParams(synthParams);
+
+    // The generated factory must not hide the source constructor's exception
+    // annotation. Reference-type construction is not supported by the bridge
+    // yet, so importing this annotated factory will make the initializer
+    // unavailable instead of exposing a nonthrowing route to the constructor.
+    if (ImporterImpl.SwiftContext.LangOpts.hasFeature(
+            Feature::CxxExceptionBridging) &&
+        hasCxxThrowsAttr(selectedCtorDecl))
+      synthCxxMethodDecl->addAttr(
+          clang::SwiftAttrAttr::Create(clangCtx, "import_throws"));
 
     if (selectedCtorDecl->hasAttrs()) {
       auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);

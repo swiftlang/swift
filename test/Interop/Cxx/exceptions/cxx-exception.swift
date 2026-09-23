@@ -20,6 +20,38 @@ CxxExceptionTests.test("NoException") {
   }
 }
 
+CxxExceptionTests.test("UninitializedResultStorage") {
+  final class Tracker {}
+  struct Result: ~Copyable {
+    let tracker: Tracker
+  }
+  weak var weakTracker: Tracker?
+  do throws(CxxException) {
+    let result = try unsafe _withCxxExceptionResult(Result.self) { output, _, _ in
+      let tracker = Tracker()
+      weakTracker = tracker
+      output!.assumingMemoryBound(to: Result.self)
+        .initialize(to: Result(tracker: tracker))
+    }
+    expectTrue(result.tracker === weakTracker)
+  } catch {
+    expectUnreachable("unexpected exception: \(error.message)")
+  }
+  expectNil(weakTracker)
+}
+
+CxxExceptionTests.test("DoesNotConsumeUninitializedResultAfterException") {
+  final class Result {}
+  do throws(CxxException) {
+    let _ = try unsafe _withCxxExceptionResult(Result.self) { _, context, callback in
+      "construction failed".withCString { callback(context, $0) }
+    }
+    expectUnreachable("expected the captured exception")
+  } catch {
+    expectEqual("construction failed", error.message)
+  }
+}
+
 CxxExceptionTests.test("CopiesMessageBeforeCallbackReturns") {
   do throws(CxxException) {
     try _withCxxExceptionCapture { context, callback in

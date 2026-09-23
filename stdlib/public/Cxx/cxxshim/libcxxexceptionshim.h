@@ -25,6 +25,7 @@
 
 #include <cxxabi.h>
 #include <exception>
+#include <new>
 
 // The foreign exception check below depends on how the C++ runtime treats
 // foreign exceptions, not on the platform. It has been verified for libc++abi

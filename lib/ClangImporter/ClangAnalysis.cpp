@@ -29,7 +29,15 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
 }
 
 bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
-  return hasSwiftAttributeOnAnyRedecl(decl, {"import_throws"});
+  if (hasSwiftAttributeOnAnyRedecl(decl, {"import_throws"}))
+    return true;
+  // Clang models an inherited constructor with a new implicit declaration.
+  // Preserve the base constructor's annotation on this route to calling it.
+  if (auto *constructor = dyn_cast<clang::CXXConstructorDecl>(decl);
+      constructor && constructor->isInheritingConstructor())
+    return hasCxxThrowsAttr(
+        constructor->getInheritedConstructor().getConstructor());
+  return false;
 }
 
 bool importer::hasSwiftAttributeOnAnyRedecl(const clang::Decl *decl,

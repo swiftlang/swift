@@ -8810,16 +8810,17 @@ StringRef importer::getCxxExceptionBridgingUnavailableReason(
   return {};
 }
 
-bool ClangImporter::isCxxExceptionBridge(const FuncDecl *decl) const {
+bool ClangImporter::isCxxExceptionBridge(
+    const AbstractFunctionDecl *decl) const {
   return Impl.cxxExceptionBridges.contains(decl);
 }
 
-FuncDecl *
-ClangImporter::getCxxExceptionBridgeAdapter(const FuncDecl *facade) const {
+FuncDecl *ClangImporter::getCxxExceptionBridgeAdapter(
+    const AbstractFunctionDecl *facade) const {
   return Impl.cxxExceptionBridges.lookup(facade);
 }
 
-FuncDecl *
+AbstractFunctionDecl *
 ClangImporter::getCxxExceptionBridgeFacade(const FuncDecl *adapter) const {
   return Impl.cxxExceptionBridgeFacades.lookup(adapter);
 }

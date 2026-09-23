@@ -2910,8 +2910,9 @@ giveUpFastPath:
     case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE: {
       auto *importer =
           static_cast<ClangImporter *>(getContext().getClangModuleLoader());
-      auto *facade =
-          values.size() == 1 ? dyn_cast<FuncDecl>(values.front()) : nullptr;
+      auto *facade = values.size() == 1
+                         ? dyn_cast<AbstractFunctionDecl>(values.front())
+                         : nullptr;
       auto *adapter = importer && facade
                           ? importer->getCxxExceptionBridgeAdapter(facade)
                           : nullptr;
