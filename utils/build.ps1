@@ -204,7 +204,7 @@ param
   [switch] $DebugInfo,
 
   # Android SDK Options
-  [switch] $Android = $false,
+  [switch] $Android = $true,
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?(-beta[1-9])?$")]
   [string] $AndroidNDKVersion = "r30",
   [ValidateRange(21, 36)]
@@ -214,10 +214,10 @@ param
   [string[]] $AndroidSDKLinkModes = @("dynamic", "static"),
 
   # Windows SDK Options
-  [switch] $Windows = $false,
+  [switch] $Windows = $true,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
-  [string[]] $WindowsSDKArchitectures = @("X64"),
+  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
   [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
@@ -227,7 +227,7 @@ param
 
   # Incremental Build Support
   [switch] $Clean,
-  [string[]] $Test = @(),
+  [string[]] $Test = @("*"),
   [switch] $ContinueOnTestFailure = $true,
 
   [switch] $IncludeDS2 = $false,
