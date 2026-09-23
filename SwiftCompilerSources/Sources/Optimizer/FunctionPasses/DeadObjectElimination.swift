@@ -161,6 +161,7 @@ private func processAllocStack(_ allocStack: AllocStackInst, _ context: Function
 private struct UseCollector : AddressDefUseWalker {
 
   let context: FunctionPassContext
+  let allocation: SingleValueInstruction
   var objectLiverange: BasicBlockRange
 
   typealias SSAUpdater = InstructionBasedSSAUpdater<FunctionPassContext>
@@ -173,16 +174,19 @@ private struct UseCollector : AddressDefUseWalker {
   private enum Access {
     case destroy(Instruction)
     case store(StoreLikeInstruction)
-    case load(LoadLikeInstruction, addressOperand: Operand)
+    case load(LoadLikeInstruction)
     // A hybrid between "destroy" and "load"
     case loadTake(LoadInst)
+    // A hybrid between "store" and "load"
+    case markDependenceAddr(MarkDependenceAddrInst)
 
     var instruction: Instruction {
       switch self {
         case .destroy(let destroy): return destroy
         case .store(let store):     return store
         case .loadTake(let load):   return load
-        case .load(let load, _):       return load
+        case .load(let load):       return load
+        case .markDependenceAddr(let markDep): return markDep
       }
     }
 
@@ -191,7 +195,8 @@ private struct UseCollector : AddressDefUseWalker {
       case .destroy(let destroy): return destroy.operands[0].value.type.objectType
       case .store(let store):     return store.valueType
       case .loadTake(let load):   return load.type
-      case .load(_, let operand): return operand.value.type.objectType
+      case .load(let load):       return load.valueType
+      case .markDependenceAddr(let markDep): return markDep.address.type.objectType
       }
     }
 
@@ -208,11 +213,11 @@ private struct UseCollector : AddressDefUseWalker {
     // Unconditional destroys at this level (including parent-level destroys passed down from the caller).
     var destroys: [Instruction]
 
-    // Pairs each store / projected-destroy / load-take with its placeholder.
+    // Pairs each store / projected-destroy / load-take / `mark_dependence_addr` with its placeholder.
     var mutatingAccesses = [(subPath: SmallProjectionPath, access: Access, placeholder: PlaceholderInst)]()
 
     // Non-consuming reads processed after all mutations.
-    var loads = [(subPath: SmallProjectionPath, load: LoadLikeInstruction, operand: Operand)]()
+    var loads = [(subPath: SmallProjectionPath, load: LoadLikeInstruction)]()
 
     let valueType: Type
 
@@ -241,10 +246,12 @@ private struct UseCollector : AddressDefUseWalker {
         }
       case .store(let store):
         addMutatingAccess(access, at: store, path: subPath, &ssaUpdater, context)
-      case .load(let load, let operand):
-        loads.append((subPath: subPath, load: load, operand: operand))
+      case .load(let load):
+        loads.append((subPath: subPath, load: load))
       case .loadTake(let load):
         addMutatingAccess(access, at: load, path: subPath, &ssaUpdater, context)
+      case .markDependenceAddr(let markDep):
+        addMutatingAccess(access, at: markDep, path: subPath, &ssaUpdater, context)
       }
     }
 
@@ -279,6 +286,7 @@ private struct UseCollector : AddressDefUseWalker {
 
   init(of startInstruction: SingleValueInstruction, _ context: FunctionPassContext) {
     self.context = context
+    self.allocation = startInstruction
     self.objectLiverange = BasicBlockRange(begin: startInstruction.parentBlock, context)
   }
 
@@ -380,7 +388,7 @@ private struct UseCollector : AddressDefUseWalker {
 
     case let fixLifetime as FixLifetimeInst:
       if fixLifetime.operand.value is AllocStackInst {
-        accessTree.append((SmallProjectionPath(), .load(fixLifetime, addressOperand: fixLifetime.operand)))
+        accessTree.append((SmallProjectionPath(), .load(fixLifetime)))
       }
       return .continueWalk
 
@@ -429,7 +437,7 @@ private struct UseCollector : AddressDefUseWalker {
       if load.loadOwnership == .take {
         accessTree.append((projectionPath, .loadTake(load)))
       } else {
-        accessTree.append((projectionPath, .load(load, addressOperand: load.operand)))
+        accessTree.append((projectionPath, .load(load)))
       }
       return .continueWalk
 
@@ -440,7 +448,7 @@ private struct UseCollector : AddressDefUseWalker {
       guard loadBorrow.uses.endingLifetime.users.allSatisfy({ $0 is EndBorrowInst}) else {
         return .abortWalk
       }
-      accessTree.append((projectionPath, .load(loadBorrow, addressOperand: loadBorrow.operand)))
+      accessTree.append((projectionPath, .load(loadBorrow)))
       return .continueWalk
 
     case let destroy as DestroyAddrInst:
@@ -478,12 +486,12 @@ private struct UseCollector : AddressDefUseWalker {
       }
       return .abortWalk
 
-    case let mda as MarkDependenceAddrInst:
-      assert(address == mda.addressOperand, "uses of `base` should not be handled by the walker")
+    case let markDep as MarkDependenceAddrInst:
+      assert(address == markDep.addressOperand, "uses of `base` should not be handled by the walker")
       guard address.value is AllocStackInst else {
         return .abortWalk
       }
-      accessTree.append((SmallProjectionPath(), .load(mda, addressOperand: address)))
+      accessTree.append((SmallProjectionPath(), .markDependenceAddr(markDep)))
       return .continueWalk
 
     default:
@@ -498,7 +506,7 @@ private struct UseCollector : AddressDefUseWalker {
       guard address.value is AllocStackInst else {
         return .abortWalk
       }
-      accessTree.append((SmallProjectionPath(), .load(md as! LoadLikeInstruction, addressOperand: address)))
+      accessTree.append((SmallProjectionPath(), .load(md as! LoadLikeInstruction)))
       return .continueWalk
     default:
       return .abortWalk
@@ -558,7 +566,7 @@ private struct UseCollector : AddressDefUseWalker {
           if !subPath.isEmpty {
             projectedMutations.append(store)
           }
-        case .load(let load, _):
+        case .load(let load):
           hasLoad = true
           if let loadBorrow = load as? LoadBorrowInst {
             projectedLoadBorrows.append(loadBorrow)
@@ -568,6 +576,10 @@ private struct UseCollector : AddressDefUseWalker {
           if !subPath.isEmpty {
             projectedMutations.append(load)
           }
+        case .markDependenceAddr(let markDep):
+          hasLoad = true
+          hasStore = true
+          projectedMutations.append(markDep)
         }
         index += 1
 
@@ -639,8 +651,8 @@ private struct UseCollector : AddressDefUseWalker {
     let firstPath = accessTree[index].path
 
     // Threads the current stored value through the control flow during rewriting. After each
-    // mutating access (store, `load [take]`, projected destroy) a `mark_dependence` placeholder
-    // anchors the updated aggregate in SSA form.
+    // mutating access (store, `load [take]`, projected destroy, `mark_dependence_addr`) a
+    // `mark_dependence` placeholder anchors the updated aggregate in SSA form.
     //
     var ssaUpdater = SSAUpdater(type: accesses.valueType,
                                 ownership: isTrivial ? .none : .owned,
@@ -758,7 +770,7 @@ private struct UseCollector : AddressDefUseWalker {
     //   destroy_addr %2
     // ```
 
-    eraseStores(of: accesses.mutatingAccesses.lazy.map(\.access))
+    eraseRewrittenMutations(of: accesses.mutatingAccesses.lazy.map(\.access))
     // ```
     //   %2 = alloc_stack $Pair
     //                                              <- store removed
@@ -799,10 +811,15 @@ private struct UseCollector : AddressDefUseWalker {
     // ```
   }
 
-  private func eraseStores(of accesses: some Sequence<Access>) {
+  private func eraseRewrittenMutations(of accesses: some Sequence<Access>) {
     for access in accesses {
-      if case .store(let store) = access {
+      switch access {
+      case .store(let store):
         context.erase(instruction: store)
+      case .markDependenceAddr(let markDep):
+        context.erase(instruction: markDep)
+      case .destroy, .load, .loadTake:
+        break
       }
     }
   }
@@ -842,6 +859,16 @@ private struct UseCollector : AddressDefUseWalker {
         load.replace(with: projected, context)
         updatedValue = updated
 
+      case .markDependenceAddr(let markDep):
+        assert(path.isEmpty, "mark_dependence_addr is always recorded at the root path")
+        if value is Undef || markDep.base == allocation {
+          // Drop dependences on nothing or self.
+          updatedValue = value
+        } else {
+          updatedValue = builder.createMarkDependence(value: value, base: markDep.base,
+                                                      kind: markDep.dependenceKind)
+        }
+
       case .load:
         fatalError()
       }
@@ -857,15 +884,15 @@ private struct UseCollector : AddressDefUseWalker {
     }
   }
 
-  private func rewrite(loads: [(subPath: SmallProjectionPath, load: LoadLikeInstruction, operand: Operand)],
+  private func rewrite(loads: [(subPath: SmallProjectionPath, load: LoadLikeInstruction)],
                        _ ssaUpdater: inout SSAUpdater)
   {
-    for (subPath, load, operand) in loads {
+    for (subPath, load) in loads {
       let value = ssaUpdater.getValue(before: load)
       if let loadInst = load as? LoadInstruction {
         insertMarkDependencies(for: loadInst, context)
       }
-      load.rewrite(operand: operand, with: value, projection: subPath, context)
+      load.rewrite(with: value, projection: subPath, context)
     }
   }
 
@@ -1144,11 +1171,14 @@ extension InjectEnumAddrInst: StoreLikeInstruction {
 }
 
 private protocol LoadLikeInstruction: Instruction {
-  func rewrite(operand: Operand, with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext)
+  var valueType: Type { get }
+  func rewrite(with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext)
 }
 
 extension LoadInst : LoadLikeInstruction {
-  func rewrite(operand: Operand, with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
+  var valueType: Type { type }
+
+  func rewrite(with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
     let builder = Builder(before: self, context)
     switch loadOwnership {
     case .unqualified:
@@ -1163,7 +1193,9 @@ extension LoadInst : LoadLikeInstruction {
 }
 
 extension LoadBorrowInst: LoadLikeInstruction {
-  func rewrite(operand: Operand, with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
+  var valueType: Type { type }
+
+  func rewrite(with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
     let builder = Builder(before: self, context)
     let beginBorrow = builder.createBeginBorrow(of: value)
     let projectedValue = beginBorrow.createProjection(path: projection, builder: builder)
@@ -1174,43 +1206,20 @@ extension LoadBorrowInst: LoadLikeInstruction {
 
 // `mark_dependence/_addr` where the `base` uses the object/stack is treated as "load".
 private extension MarkDependenceInstruction {
-  func rewriteBase(with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
+  var valueType: Type { base.type.objectType }
+
+  func rewrite(with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
     baseOperand.set(to: value, context)
   }
 }
 
-extension MarkDependenceInst: LoadLikeInstruction {
-  func rewrite(operand: Operand, with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
-    rewriteBase(with: value, projection: projection, context)
-  }
-}
-extension MarkDependenceAddrInst: LoadLikeInstruction {
-  func rewrite(operand: Operand, with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
-    switch operand {
-    case baseOperand:
-      rewriteBase(with: value, projection: projection, context)
-    case addressOperand:
-      // The value and base operands of a mark_dependence cannot be equal, and
-      // marking a value as depending on itself would be meaningless, so only
-      // create a mark_dependence if the two operands are different.
-      if value != base {
-        let builder = Builder(before: self, context)
-        let newMD = builder.createMarkDependence(value: value, base: base, kind: self.dependenceKind)
-        // Replace uses of the replacement value with newMD to forward the dependence.
-        // mark_dependence_addr produces no value so this is sufficient to replace it.
-        for use in value.uses where use.instruction != newMD {
-          use.set(to: newMD, context)
-        }
-      }
-      context.erase(instruction: self)
-    default:
-      fatalError("Attempted to rewrite non-operand of a mark_dependence_addr instruction: \(operand)")
-    }
-  }
-}
+extension MarkDependenceInst: LoadLikeInstruction {}
+extension MarkDependenceAddrInst: LoadLikeInstruction {}
 
 extension FixLifetimeInst: LoadLikeInstruction {
-  func rewrite(operand: Operand, with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
-    self.operand.set(to: value, context)
+  var valueType: Type { operand.value.type.objectType }
+
+  func rewrite(with value: Value, projection: SmallProjectionPath, _ context: FunctionPassContext) {
+    operand.set(to: value, context)
   }
 }

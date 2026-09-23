@@ -256,7 +256,7 @@ public var irm: Int {
 // CHECK-LABEL:     define{{.*}} { ptr, ptr } @"$s19coroutine_accessors1SV3irmSivx"(
 // CHECK-SAME:          ptr noalias [[FRAME:%[^,]+]],
 // CHECK-SAME:          ptr swiftcoro [[ALLOCATOR:%[^,]+]],
-// CHECK-SAME:          ptr noalias swiftself captures(none) dereferenceable({{8|16}}) [[SELF:%[^)]+]]
+// CHECK-SAME:          ptr noalias swiftself align {{4|8}} captures(none) dereferenceable({{8|16}}) [[SELF:%[^)]+]]
 // CHECK-SAME:      )
 // CHECK-SAME:      {
 // CHECK:               [[ID:%[^,]+]] = call token @llvm.coro.id.retcon.once.dynamic(

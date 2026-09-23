@@ -8153,11 +8153,8 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
 
 void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                                           swift::CheckedCastAddrBranchInst *i) {
-  // test_only has no destination to write a result into, and needs a runtime
-  // entry point that only answers the question. Not wired up yet.
-  ASSERT(i->hasDest() &&
-         "IRGen support for checked_cast_addr_br test_only is not implemented");
-  Address dest = getLoweredAddress(i->getDest());
+  // A test_only cast has no destination to lower or write.
+  Address dest = i->hasDest() ? getLoweredAddress(i->getDest()) : Address();
   Address src = getLoweredAddress(i->getSrc());
   llvm::Value *castSucceeded =
     emitCheckedCast(*this,
