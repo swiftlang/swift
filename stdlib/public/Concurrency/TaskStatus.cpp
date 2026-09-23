@@ -1685,9 +1685,14 @@ void TaskDependencyStatusRecord::performEscalationAction(
   }
 }
 
-AsyncTask *&TaskDependencyStatusRecord::getNextWaitingTask() {
+AsyncTask *TaskDependencyStatusRecord::getNextWaitingTask() {
   assert(this->DependencyKind == WaitingOnTask);
   return this->NextWaitingTask;
+}
+
+void TaskDependencyStatusRecord::setNextWaitingTask(AsyncTask *task) {
+  assert(this->DependencyKind == WaitingOnTask);
+  this->NextWaitingTask = task;
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
