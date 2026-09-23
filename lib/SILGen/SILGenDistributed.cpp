@@ -539,11 +539,6 @@ void SILGenFunction::emitDistributedActorSystemResignIDCall(
     break;
   }
 
-  if (kind == DistributedResignIDKind::ResignRemoteID &&
-      !ctx.LangOpts.hasFeature(Feature::DistributedActorResignRemoteID)) {
-    return;
-  }
-
   ProtocolDecl *DAS = ctx.getDistributedActorSystemDecl();
   if (DAS && !DAS->getSingleRequirement(methodName)) {
     assert(kind == DistributedResignIDKind::ResignRemoteID &&
