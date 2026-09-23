@@ -48,10 +48,18 @@ SILValue emitIsa(SILGenFunction &SGF, SILLocation loc,
                  Expr *operand, Type targetType,
                  CheckedCastKind castKind);
 
-/// True if a cast from \p sourceType to \p targetType can be answered by a
-/// non-consuming type test rather than by extracting the payload.
-bool canUseNoncopyableTypeTest(CanType sourceType, CanType targetType,
-                               CheckedCastKind castKind);
+/// True if an `is` check from \p sourceType to \p targetType should lower to a
+/// non-consuming type test rather than to the value-producing machinery `as?`
+/// uses.
+///
+/// `is` never needs the payload, so a test is always the right *meaning*. This
+/// asks only about representation: `test_only` rides on checked_cast_addr_br, so
+/// it applies exactly where IRGen performs the cast indirectly. A scalar cast
+/// carries no consumption kind and yields its result as a block argument, and
+/// COM has its own lowering and consumption kind, so both keep the ordinary
+/// lowering.
+bool canUseTypeTestForIsa(SILGenFunction &SGF, CanType sourceType,
+                          CanType targetType, CheckedCastKind castKind);
 
 /// Borrow the storage \p operand names so a type test can read it without
 /// copying or consuming it.
@@ -60,20 +68,21 @@ bool canUseNoncopyableTypeTest(CanType sourceType, CanType targetType,
 /// of the returned value.
 ManagedValue emitTypeTestOperand(SILGenFunction &SGF, Expr *operand);
 
-/// Emit a non-consuming test of whether the existential at \p existentialAddr
+/// Emit a non-consuming test of whether the value at \p subjectAddr
 /// can be cast to \p targetType.  This implements certain `is` casting tests.
 ///
-/// The source existential is only read. No value is produced on either edge.
-/// The caller must keep \p existentialAddr borrowed across the emitted
+/// The source is only read. No value is produced on either edge.
+/// The caller must keep \p subjectAddr borrowed across the emitted
 /// terminator.
 ///
-/// Only valid when canUseNoncopyableTypeTest() returns true.
-void emitNoncopyableTypeTest(SILGenFunction &SGF, SILLocation loc,
-                             ManagedValue existentialAddr, CanType sourceType,
-                             CanType targetType, SILBasicBlock *trueBB,
-                             SILBasicBlock *falseBB,
-                             ProfileCounter trueCount = ProfileCounter(),
-                             ProfileCounter falseCount = ProfileCounter());
+/// Not limited to existentials: every address-path `is` lowers to this. Only
+/// valid when canUseTypeTestForIsa() returns true.
+void emitTypeTestForIsa(SILGenFunction &SGF, SILLocation loc,
+                        ManagedValue subjectAddr, CanType sourceType,
+                        CanType targetType, SILBasicBlock *trueBB,
+                        SILBasicBlock *falseBB,
+                        ProfileCounter trueCount = ProfileCounter(),
+                        ProfileCounter falseCount = ProfileCounter());
 
 }
 }
