@@ -468,9 +468,16 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  VarDecl *targetVar = VarDeclBuilder(thunk, C.Id_target)
-                           .introducer(VarDecl::Introducer::Let)
-                           .type(remoteCallTargetTy);
+  // 'oneway' is a trailing modifier on the function itself (never on an
+  // accessor / computed property), so read it straight off 'func'. When set it
+  // flags the freshly constructed 'RemoteCallTarget', which requires the target
+  // to be introduced as a 'var'.
+  bool isOneway = func->isOneway();
+  VarDecl *targetVar =
+      VarDeclBuilder(thunk, C.Id_target)
+          .introducer(isOneway ? VarDecl::Introducer::Var
+                               : VarDecl::Introducer::Let)
+          .type(remoteCallTargetTy);
 
   {
     // --- Mangle the thunk name
@@ -481,7 +488,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         new (C) StringLiteralExpr(mangledAccessorRecordName,
                                   SourceRange(), implicit);
 
-    // --- let target = RemoteCallTarget(<mangled name>)
+    // --- let/var target = RemoteCallTarget(<mangled name>)
     Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
 
     auto remoteCallTargetInitDecl =
@@ -503,6 +510,18 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     remoteBranchStmts.push_back(targetPB);
     remoteBranchStmts.push_back(targetVar);
+
+    // --- Mark the target as a 'oneway' (fire-and-forget) remote call
+    if (isOneway) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      auto *flagRef = UnresolvedDotExpr::createImplicit(
+          C, targetRef, C.Id_isOnewayRemoteCall);
+      auto *trueExpr = new (C) BooleanLiteralExpr(true, sloc, implicit);
+      auto *assign = new (C) AssignExpr(flagRef, sloc, trueExpr, implicit);
+      remoteBranchStmts.push_back(assign);
+    }
   }
 
   // === Make the 'remoteCall(Void)(...)'

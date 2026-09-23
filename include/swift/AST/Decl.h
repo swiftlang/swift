@@ -318,6 +318,11 @@ struct OverloadSignature {
   /// Whether this is an distributed function.
   unsigned IsDistributed : 1;
 
+  /// Whether this is a 'oneway' function (trailing 'oneway' modifier). A
+  /// 'oneway' function is a distinct overload from an otherwise-identical
+  /// non-'oneway' one, mirroring how 'async' distinguishes overloads.
+  unsigned IsOneway : 1;
+
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
@@ -346,10 +351,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), IsEnumElement(false), IsNominal(false),
-        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
-        InProtocolExtension(false), InExtensionOfGenericType(false),
-        HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsOneway(false), IsEnumElement(false),
+        IsNominal(false), IsTypeAlias(false), IsMacro(false),
+        IsGenericArg(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -8879,6 +8884,18 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
+  /// Whether this FuncDecl carries the trailing 'oneway' modifier.
+  ///
+  /// 'oneway' is a distributed-actor remote-call modifier spelled after the
+  /// effect specifiers, e.g. 'distributed func ping() oneway'. It is only
+  /// meaningful on 'distributed' functions (where it flows into the synthesized
+  /// thunk); it is permitted but inert on other actor instance methods. Stored
+  /// as a standalone member rather than in the shared inline bitfield, which is
+  /// full. It participates in the function's type via the ExtInfo 'oneway'
+  /// flavor, so it must round-trip through serialization for cross-module
+  /// mangling and printing
+  unsigned IsOneway : 1;
+
   TypeLoc FnRetType;
 
 protected:
@@ -8909,6 +8926,7 @@ protected:
     Bits.FuncDecl.IsStatic = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
     Bits.FuncDecl.HasSendingResult = false;
+    IsOneway = false;
   }
 
   void setResultInterfaceType(Type type);
@@ -8972,6 +8990,15 @@ public:
                                   DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;
+
+  /// Whether this function carries the trailing 'oneway' remote-call modifier.
+  bool isOneway() const { return IsOneway; }
+
+  /// Record whether this function was written with a trailing 'oneway'
+  /// modifier.
+  void setOneway(bool value) {
+    IsOneway = value;
+  }
 
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {

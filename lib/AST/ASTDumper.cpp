@@ -2977,6 +2977,7 @@ namespace {
 
     void visitFuncDecl(FuncDecl *FD, Label label) {
       printCommonFD(FD, "func_decl", label);
+      printFlag(FD->isOneway(), "oneway", DeclModifierColor);
       printAbstractFunctionDecl(FD);
       printFoot();
     }

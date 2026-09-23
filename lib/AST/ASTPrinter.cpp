@@ -4684,6 +4684,15 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
       }
     }
   }
+
+  // The trailing 'oneway' distributed remote-call modifier prints after the
+  // effect specifiers, e.g. 'distributed func ping() oneway'.
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    if (FD->isOneway()) {
+      Printer << " ";
+      Printer.printKeyword("oneway", Options);
+    }
+  }
 }
 
 bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
@@ -7608,6 +7617,11 @@ public:
           Printer << ")";
         }
       }
+
+      if (T->isOneway()) {
+        Printer << " ";
+        Printer.printKeyword("oneway", Options);
+      }
     }
 
     if (T->hasExtInfo() && T->isCoroutine()) {
@@ -7682,6 +7696,11 @@ public:
           thrownError->print(Printer, Options);
           Printer << ")";
         }
+      }
+
+      if (T->isOneway()) {
+        Printer << " ";
+        Printer.printKeyword("oneway", Options);
       }
    }
 

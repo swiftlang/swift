@@ -600,6 +600,13 @@ static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
+static bool usesFeatureOnewayMethods(Decl *decl) {
+  // The trailing 'oneway' modifier is gated on this feature.
+  if (auto *FD = dyn_cast<FuncDecl>(decl))
+    return FD->isOneway();
+  return false;
+}
+
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   auto *VD = dyn_cast<ValueDecl>(decl);
   if (!VD)

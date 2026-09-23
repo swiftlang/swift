@@ -3437,6 +3437,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
 
   if (fn->isAsync())
     appendOperator("Ya");
+  if (fn->isOneway())
+    appendOperator("Yo");
   if (fn->isSendable())
     appendOperator("Yb");
   if (auto thrownError = fn->getEffectiveThrownErrorType()) {

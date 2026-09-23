@@ -3768,6 +3768,26 @@ public:
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
 
+    // Validate the trailing 'oneway' distributed remote-call modifier. It is
+    // only meaningful on a 'distributed' function (where it flows into the
+    // synthesized thunk); it is permitted but inert on other actor instance
+    // methods, and rejected everywhere else. A 'oneway' function must return
+    // 'Void', since the caller never observes a reply.
+    if (FD->isOneway()) {
+      bool isActorInstanceMethod = false;
+      if (auto *nominal = FD->getDeclContext()->getSelfNominalTypeDecl())
+        isActorInstanceMethod = nominal->isActor() && !FD->isStatic();
+
+      if (!FD->isDistributed() && !isActorInstanceMethod) {
+        FD->diagnose(diag::oneway_requires_distributed_or_actor, FD);
+        FD->setOneway(false);
+      } else if (auto resultTy = FD->getResultInterfaceType();
+                 !resultTy || !resultTy->isVoid()) {
+        FD->diagnose(diag::oneway_requires_void_result, FD);
+        FD->setOneway(false);
+      }
+    }
+
     // Untyped throws might need to be diagnosed.
     SourceLoc throwsLoc = FD->getThrowsLoc();
     if (throwsLoc.isValid() && !FD->getThrownTypeRepr() &&

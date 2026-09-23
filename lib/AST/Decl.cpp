@@ -4478,6 +4478,12 @@ bool swift::conflicting(const OverloadSignature& sig1,
       return false;
   } // else, if any of the methods was distributed, continue checking
 
+  // 'oneway' distinguishes overloads: 'func x() async' and
+  // 'func x() async oneway' are distinct declarations, mirroring the way
+  // 'async' distinguishes overloads above.
+  if (sig1.IsOneway != sig2.IsOneway)
+    return false;
+
   // If one is a macro and the other is not, they can't conflict.
   if (sig1.IsMacro != sig2.IsMacro)
     return false;
@@ -4757,6 +4763,9 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       signature.IsAsyncFunction = true;
     if (func->isDistributed())
       signature.IsDistributed = true;
+    if (auto *FD = dyn_cast<FuncDecl>(func))
+      if (FD->isOneway())
+        signature.IsOneway = true;
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))

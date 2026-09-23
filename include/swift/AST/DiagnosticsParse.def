@@ -2205,6 +2205,15 @@ ERROR(requires_experimental_feature, none,
       "%2 is enabled",
       (StringRef, bool, StringRef))
 
+ERROR(oneway_requires_experimental_feature, none,
+      "'oneway' modifier is only valid when experimental feature "
+      "%0 is enabled",
+      (StringRef))
+
+ERROR(oneway_repeated, none,
+      "'oneway' modifier cannot be applied more than once",
+      ())
+
 //------------------------------------------------------------------------------
 // MARK: Lifetime dependence
 //------------------------------------------------------------------------------

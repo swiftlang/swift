@@ -800,7 +800,7 @@ ParserStatus Parser::parseFunctionSignature(
     DeclBaseName SimpleName, DeclName &FullName, ParameterList *&bodyParams,
     DefaultArgumentInfo &defaultArgs, SourceLoc &asyncLoc, bool &reasync,
     SourceLoc &throwsLoc, bool &rethrows, TypeRepr *&thrownType,
-    YieldList *&bodyYields, TypeRepr *&retType) {
+    SourceLoc &onewayLoc, YieldList *&bodyYields, TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
@@ -820,6 +820,29 @@ ParserStatus Parser::parseFunctionSignature(
   Status |= parseEffectsSpecifiers(SourceLoc(),
                                    asyncLoc, &reasync,
                                    throwsLoc, &rethrows, thrownType);
+
+  // Check for the trailing 'oneway' distributed remote-call modifier, spelled
+  // after the effect specifiers, e.g. 'func ping() async oneway'. It is only
+  // accepted on ordinary function declarations (not operators or 'init').
+  if (paramContext == ParameterContextKind::Function) {
+    while (Tok.isContextualKeyword("oneway")) {
+      if (!Context.LangOpts.hasFeature(
+              Feature::OnewayMethods)) {
+        diagnose(Tok, diag::oneway_requires_experimental_feature,
+                 Feature::OnewayMethods.getName());
+        // Consume for recovery; leave 'onewayLoc' invalid so downstream treats
+        // the function as not 'oneway'.
+        consumeToken();
+        continue;
+      }
+      if (onewayLoc.isValid())
+        diagnose(Tok, diag::oneway_repeated).fixItRemove(Tok.getLoc());
+      Tok.setKind(tok::contextual_keyword);
+      SourceLoc loc = consumeToken();
+      if (onewayLoc.isInvalid())
+        onewayLoc = loc;
+    }
+  }
 
   // Check for `yields`
   if (paramContext == ParameterContextKind::Function) {

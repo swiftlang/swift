@@ -1555,6 +1555,10 @@ void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
 SWIFT_NAME("BridgedFuncDecl.setParsedBody(self:_:)")
 void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl, BridgedBraceStmt body);
 
+SWIFT_NAME("BridgedFuncDecl.setOnewaySpecifierLoc(self:_:)")
+void BridgedFuncDecl_setOnewaySpecifierLoc(BridgedFuncDecl decl,
+                                           swift::SourceLoc onewayLoc);
+
 SWIFT_NAME("BridgedDestructorDecl.setParsedBody(self:_:)")
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
                                          BridgedBraceStmt body);

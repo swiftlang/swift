@@ -4495,6 +4495,7 @@ public:
     bool isUserAccessible;
     bool isDistributedThunk;
     bool hasSendingResult = false;
+    bool isOneway = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -4515,6 +4516,7 @@ public:
                                           isUserAccessible,
                                           isDistributedThunk,
                                           hasSendingResult,
+                                          isOneway,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -4757,6 +4759,9 @@ public:
 
     if (hasSendingResult)
       fn->setSendingResult();
+
+    if (isOneway)
+      fn->setOneway(true);
 
     return fn;
   }
@@ -8048,6 +8053,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
   bool noescape = false, sendable, async, throws, hasSendingResult, calledOnce, coro;
+  bool oneway = false;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -8057,13 +8063,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult, calledOnce, coro);
+        hasSendingResult, calledOnce, coro, oneway);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
         thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, calledOnce,
-        coro,
+        coro, oneway,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -8120,6 +8126,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                   .withSendable(sendable)
                   .withAsync(async)
                   .withCoroutine(coro)
+                  .withOneway(oneway)
                   .build();
 
   auto resultTy = MF.getTypeChecked(resultID);

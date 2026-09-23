@@ -696,6 +696,10 @@ EXPERIMENTAL_FEATURE(TargetAttribute, true)
 /// Enable distributed actors in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 
+/// Allow the trailing 'oneway' modifier on 'distributed' methods, marking a
+/// remote call as fire-and-forget (no peer reply is awaited).
+EXPERIMENTAL_FEATURE(OnewayMethods, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

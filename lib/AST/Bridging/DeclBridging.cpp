@@ -222,6 +222,15 @@ void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl,
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);
 }
 
+void BridgedFuncDecl_setOnewaySpecifierLoc(BridgedFuncDecl decl,
+                                           swift::SourceLoc onewayLoc) {
+  // The source location is not retained; 'oneway' is tracked as a flag that
+  // flows into the function's type. The presence of a valid loc is what ASTGen
+  // uses to signal the modifier was written
+  (void)onewayLoc;
+  decl.unbridged()->setOneway(/*value=*/true);
+}
+
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
                                          BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);

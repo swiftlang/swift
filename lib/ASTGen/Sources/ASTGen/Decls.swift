@@ -729,10 +729,11 @@ extension ASTGenVisitor {
     var throwsLoc: SourceLoc
     var isRethrows: Bool
     var thrownType: BridgedTypeRepr?
+    var onewayLoc: SourceLoc
     var yieldList: BridgedYieldList?
     var returnType: BridgedTypeRepr?
   }
-  
+
   func generate(
     functionSignature node: FunctionSignatureSyntax,
     for context: ParameterContext
@@ -743,6 +744,7 @@ extension ASTGenVisitor {
     let throwsLoc = self.generateSourceLoc(node.effectSpecifiers?.throwsClause?.throwsSpecifier)
     let isRethrows = node.effectSpecifiers?.throwsClause?.throwsSpecifier.rawText == "rethrows"
     let thrownType = (node.effectSpecifiers?.thrownError).map(self.generate(type:))
+    let onewayLoc = self.generateSourceLoc(node.effectSpecifiers?.onewaySpecifier)
     let returnType = (node.returnClause?.type).map(self.generate(type:))
     let yieldList = self.generate(functionYieldClause: node.yieldClause)
     return GeneratedFunctionSignature(
@@ -752,6 +754,7 @@ extension ASTGenVisitor {
       throwsLoc: throwsLoc,
       isRethrows: isRethrows,
       thrownType: thrownType,
+      onewayLoc: onewayLoc,
       yieldList: yieldList,
       returnType: returnType
     )
@@ -784,6 +787,10 @@ extension ASTGenVisitor {
       returnType: signature.returnType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    // Record the trailing 'oneway' distributed remote-call modifier, if present.
+    if signature.onewayLoc.isValid {
+      decl.setOnewaySpecifierLoc(signature.onewayLoc)
+    }
     if signature.isReasync {
       attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Reasync, atLoc: nil, nameLoc: signature.asyncLoc))
     }

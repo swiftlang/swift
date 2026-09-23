@@ -3649,6 +3649,11 @@ ManglingError Remangler::mangleAsyncAnnotation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleOnewayFunctionType(Node *node, unsigned depth) {
+  Buffer << "Yo";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDifferentiableFunctionType(Node *node,
                                                           unsigned depth) {
   Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
