@@ -158,7 +158,14 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   SILValue resultSelfValue;
   SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
   SILType classTy = selfValue->getType();
-  if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
+  // A Swift class that subclasses a C++ foreign reference type does not call
+  // the base's destructor: the imported FRT has no Swift deinit body, and it is
+  // released through the release operation of the FRT.
+  bool superclassIsForeignReference =
+      cd->getSuperclassDecl() &&
+      cd->getSuperclassDecl()->isForeignReferenceType();
+  if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass() &&
+      !superclassIsForeignReference) {
     Type superclassTy =
       dd->mapTypeIntoEnvironment(cd->getSuperclass());
     ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();

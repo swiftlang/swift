@@ -1058,6 +1058,27 @@ OperandOwnershipBuiltinClassifier
 }
 
 OperandOwnership
+OperandOwnershipBuiltinClassifier::visitInitializeForeignReferenceSubclass(
+    BuiltinInst *bi, StringRef attr) {
+  // `self` is borrowed: the builtin constructs its base subobject in place, so
+  // the arguments may borrow from `self` across it.
+  if (&op == &bi->getOperandRef(0))
+    return OperandOwnership::InstantaneousUse;
+
+  // No ownership for trivial operands. This includes the reference to the base
+  // constructor (argument #1).
+  if (op.get()->getOwnershipKind() == OwnershipKind::None)
+    return OperandOwnership::TrivialUse;
+
+  // The remaining operands are the base constructor's arguments. Each is
+  // consumed only if its convention transfers ownership to the callee.
+  auto ctorType = bi->getOperand(1)->getType().castTo<SILFunctionType>();
+  auto param = ctorType->getParameters()[op.getOperandNumber() - 2];
+  return param.isConsumedInCallee() ? OperandOwnership::DestroyingConsume
+                                    : OperandOwnership::InstantaneousUse;
+}
+
+OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
                                                         StringRef attr) {
   if (&op == &bi->getOperandRef(4)) {

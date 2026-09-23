@@ -5070,6 +5070,13 @@ NOTE(delegation_here,none, "delegation occurs here", ())
 ERROR(chain_convenience_init,none,
       "must call a designated initializer of the superclass %0",
       (Type))
+ERROR(chain_foreign_reference_factory_init,none,
+      "cannot %select{call|implicitly call}0 %1 with 'super.init' because it is "
+      "a C++ static factory method, not a constructor of %2",
+      (bool, const ConstructorDecl *, Type))
+NOTE(foreign_reference_factory_init_here,none,
+     "%0 is imported from a C++ static factory method here",
+     (const ConstructorDecl *))
 ERROR(delegate_chain_nonoptional_to_optional,none,
       "a non-failable initializer cannot %select{delegate|chain}0 to "
       "failable initializer %1 written with 'init?'",
