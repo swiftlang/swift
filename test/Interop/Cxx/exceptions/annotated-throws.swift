@@ -318,10 +318,10 @@ func checkDeclarationVariants() throws {
   let _: (Double) throws -> Double = overloaded
   let _: (Sign) throws -> CInt = checkedSign
   _ = cxxThrowsMacroIsDefined()
+  _ = AnnotatedConstructor(1) // expected-error {{call can throw but is not marked with 'try'}} expected-note {{did you mean to use 'try'?}} expected-note {{did you mean to handle error as optional value?}} expected-note {{did you mean to disable error propagation?}}
 }
 
 func checkUnsupportedSignatures() {
-  _ = AnnotatedConstructor(1) // expected-error {{'init(_:)' is unavailable: SWIFT_THROWS is not supported on this kind of declaration}}
   var value: CInt = 0
   referenceParameter(&value) // expected-error {{'referenceParameter' is unavailable: SWIFT_THROWS currently requires arithmetic or enum parameters and an arithmetic or void result}}
   constReferenceParameter(value) // expected-error {{'constReferenceParameter' is unavailable: SWIFT_THROWS currently requires arithmetic or enum parameters and an arithmetic or void result}}

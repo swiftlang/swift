@@ -758,12 +758,13 @@ public:
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
 
-  /// Maps the throwing Swift facade of a SWIFT_THROWS function to the
-  /// imported C++ adapter that it calls.
-  llvm::DenseMap<const FuncDecl *, FuncDecl *> cxxExceptionBridges;
+  /// Maps the throwing Swift facade of a SWIFT_THROWS function or constructor
+  /// to the imported C++ adapter that it calls.
+  llvm::DenseMap<const AbstractFunctionDecl *, FuncDecl *> cxxExceptionBridges;
 
   /// The inverse of \c cxxExceptionBridges.
-  llvm::DenseMap<const FuncDecl *, FuncDecl *> cxxExceptionBridgeFacades;
+  llvm::DenseMap<const FuncDecl *, AbstractFunctionDecl *>
+      cxxExceptionBridgeFacades;
 
 private:
   // Keep track of the decls that were already cloned for this specific class.

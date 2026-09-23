@@ -71,21 +71,37 @@ This permits consuming methods on nontrivial and noncopyable receivers while
 keeping throwing implicit lifetime operations outside the supported scope.
 Inherited rvalue-qualified methods retain the importer's existing limitations.
 
-Other annotated declarations are unavailable. In particular, constructors,
-operators, function templates, Objective-C methods, default arguments, variadic
-functions, functions with aggregate, pointer or reference parameters, and
-functions with enum, aggregate or pointer results need additional support. Enum
-results are not bridged yet because the adapter returns a zero placeholder after
-an exception, and zero need not be a valid value of the enum. Explicit object
-member functions (C++23 "deducing this") are not imported at all. Annotated
-members are never used to derive conformances such as `CxxSequence` or
-`UnsafeCxxInputIterator`, because those protocol requirements cannot throw.
+It also supports constructors of escapable C++ value types with arithmetic or
+enum parameters. Their Swift initializers are throwing, including captured
+references such as `let makeValue: (CInt) throws -> MyCppType = MyCppType.init`.
+Constructors inherited through `using Base::Base` preserve the annotation.
+
+Constructors initialize temporary storage inside the C++ adapter. If construction
+fails, C++ destroys the initialized subobjects and Swift leaves the result
+storage uninitialized. A successful result is transferred into Swift storage, so
+the type's move construction and destruction must not throw, and neither may
+the copy construction of a copyable type. Clang checks the operations that
+overload resolution selects, including a copy constructor used for a move
+expression. Noncopyable types do not require a copy constructor.
+
+Other annotated declarations are unavailable. In particular, constructors of
+foreign reference types and non-escapable types, operators, function templates,
+Objective-C methods, default arguments, variadic functions, functions with
+aggregate, pointer or reference parameters, and functions with enum, aggregate
+or pointer results need additional support. Enum results are not bridged yet
+because the adapter returns a zero placeholder after an exception, and zero
+need not be a valid value of the enum. Explicit object member functions (C++23
+"deducing this") are not imported at all. Annotated members are never used to
+derive conformances such as `CxxSequence` or `UnsafeCxxInputIterator`, because
+those protocol requirements cannot throw.
 
 The annotation takes precedence over `noexcept` for the imported Swift function
 type. A C++ violation of `noexcept` still terminates according to C++ rules.
 Implicit copies, moves, destructors, and retain/release operations are outside
-the recovery boundary. Raw function-pointer calls do not acquire throwing
-semantics from this annotation.
+the recovery boundary. The constructor restrictions above prevent exceptions
+from the transfers required by this implementation; they do not add recovery
+to implicit operations elsewhere in Swift. Raw function-pointer calls do not
+acquire throwing semantics from this annotation.
 
 The prototype supports Darwin and Linux with C++ exceptions enabled, using the
 libc++abi or libstdc++ runtime. Darwin also requires Objective-C
