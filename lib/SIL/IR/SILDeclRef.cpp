@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Assertions.h"
@@ -1301,6 +1302,22 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   return false;
 }
 
+bool SILDeclRef::isForeignReferenceInitializer() const {
+  if (!isForeign || kind != Kind::Initializer || !hasDecl())
+    return false;
+  auto ctor = dyn_cast<ConstructorDecl>(getDecl());
+  if (!ctor || !ctor->hasClangNode())
+    return false;
+  auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->isForeignReferenceType())
+    return false;
+  // Only an initializer imported from a C++ constructor has an initializing
+  // entry point.
+  return ctor->getASTContext()
+             .getClangModuleLoader()
+             ->getOriginalForeignReferenceConstructor(ctor) != nullptr;
+}
+
 bool SILDeclRef::isNativeToForeignThunk() const {
   // If this isn't a foreign entry-point, it's not a native-to-foreign thunk.
   if (!isForeign)
@@ -1562,6 +1579,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
 std::optional<std::string> SILDeclRef::getAsmName() const {
   if (isAutoDiffDerivativeFunction())
+    return std::nullopt;
+
+  // The Clang decl of a C++ foreign reference type's initializer is the static
+  // factory it was imported from, which is not the initializing entry point.
+  if (isForeignReferenceInitializer())
     return std::nullopt;
 
   if (hasDecl() && !isDefaultArgGenerator() &&

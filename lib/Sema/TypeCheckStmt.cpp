@@ -26,6 +26,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -2597,6 +2598,18 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
 /// \returns true if an error occurred.
 static bool checkSuperInit(ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
+  // The chained initializer call may have been found before the body was
+  // type-checked, as the call of the initializer rather than its application
+  // to `super`. Look through it for a C++ foreign reference type.
+  if (auto selfApply = dyn_cast<SelfApplyExpr>(apply->getSemanticFn())) {
+    if (auto ref = dyn_cast<OtherConstructorDeclRefExpr>(
+            selfApply->getSemanticFn())) {
+      auto classDecl = ref->getDecl()->getDeclContext()->getSelfClassDecl();
+      if (classDecl && classDecl->isForeignReferenceType())
+        apply = selfApply;
+    }
+  }
+
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
                         apply->getSemanticFn());
@@ -2610,8 +2623,22 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
       auto &ctx = fromCtor->getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
-          classDecl->isForeignReferenceType())
-        return false;
+          classDecl->isForeignReferenceType()) {
+        // Only a C++ constructor can construct the base subobject of this
+        // object.
+        if (ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(
+                ctor))
+          return false;
+
+        auto loc = implicitlyGenerated ? fromCtor->getLoc()
+                                       : apply->getArgs()->getLoc();
+        ctx.Diags.diagnose(loc,
+                           diag::chain_foreign_reference_non_constructor_init,
+                           implicitlyGenerated, ctor,
+                           classDecl->getDeclaredInterfaceType());
+        ctor->diagnose(diag::decl_declared_here, ctor);
+        return true;
+      }
     }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();

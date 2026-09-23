@@ -527,6 +527,10 @@ struct SILDeclRef {
   /// True if the decl ref references a thunk handling potentially distributed actor functions
   bool isDistributedThunk() const;
 
+  /// True if the decl ref references a C++ constructor of an already allocated
+  /// instance of C++ foreign reference type.
+  bool isForeignReferenceInitializer() const;
+
   /// If this is a distributed-thunk decl ref, return its distributed thunk.
   FuncDecl *getDistributedThunk() const;
 

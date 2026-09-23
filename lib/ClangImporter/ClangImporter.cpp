@@ -8771,6 +8771,14 @@ ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
   return Impl.getOriginalForVirtualThunk(decl);
 }
 
+const clang::CXXConstructorDecl *
+ClangImporter::getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) {
+  auto factory = dyn_cast_or_null<clang::CXXMethodDecl>(ctor->getClangDecl());
+  if (!factory)
+    return nullptr;
+  return Impl.foreignReferenceFactoryToOriginalConstructor.lookup(factory);
+}
+
 ValueDecl *ClangImporter::getOverriddenSuperclassMember(const ValueDecl *decl) {
   const auto *classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl || !classDecl->getSuperclassDecl())

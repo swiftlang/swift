@@ -21,6 +21,7 @@
 namespace clang {
 class ASTContext;
 class CompilerInstance;
+class CXXConstructorDecl;
 class Decl;
 class FunctionDecl;
 class Module;
@@ -37,6 +38,7 @@ namespace swift {
 class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
+class ConstructorDecl;
 class Decl;
 class FuncDecl;
 class VarDecl;
@@ -248,6 +250,12 @@ public:
   /// If \param decl is a synthesized thunk for a virtual method of a foreign
   /// reference type, returns the originally-imported (un-thunked) method.
   virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
+
+  /// If \param ctor is an initializer of a C++ foreign reference type that
+  /// was synthesized as a static factory for a C++ constructor, returns that
+  /// constructor.
+  virtual const clang::CXXConstructorDecl *
+  getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) = 0;
 
   /// If \param decl is an imported C++ method that overrides a method of a C++
   /// class imported as one of its Swift superclasses, returns the imported
