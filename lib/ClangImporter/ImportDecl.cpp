@@ -4267,11 +4267,14 @@ namespace {
           unavailableReason =
               "SWIFT_THROWS on functions with default arguments is not yet "
               "supported";
+        } else if (decl->isImmediateFunction()) {
+          unavailableReason =
+              "SWIFT_THROWS is not supported on consteval functions";
         } else if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
                        clang::CXXConversionDecl>(decl) ||
-                   decl->isOverloadedOperator() || funcTemplate || accessorInfo ||
-                   importedName.importAsMember() || decl->isVariadic() ||
-                   decl->isNoReturn()) {
+                   decl->isOverloadedOperator() || funcTemplate ||
+                   accessorInfo || importedName.importAsMember() ||
+                   decl->isVariadic() || decl->isNoReturn()) {
           unavailableReason =
               "SWIFT_THROWS is not supported on this kind of declaration";
         } else if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
