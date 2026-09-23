@@ -15,8 +15,10 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <new>
 #include <stdexcept>
 #include <string>
+#include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <unwind.h>
@@ -127,6 +129,28 @@ static void raiseForeignException() {
   }
 }
 
+// Put the unwind header immediately after inaccessible memory. A foreign
+// exception has no C++ fields before this header, even if a runtime represents
+// it internally using a pointer to a fabricated __cxa_exception header.
+static void raiseGuardedForeignException() {
+  long pageSize = sysconf(_SC_PAGESIZE);
+  assert(pageSize > 0);
+  void *pages = mmap(nullptr, 2 * pageSize, PROT_NONE,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  assert(pages != MAP_FAILED);
+  void *storage = static_cast<char *>(pages) + pageSize;
+  assert(mprotect(storage, pageSize, PROT_READ | PROT_WRITE) == 0);
+  auto *exception = new (storage) _Unwind_Exception{};
+  exception->exception_class = 0x5357494654544553ULL;
+  exception->exception_cleanup = [](_Unwind_Reason_Code, _Unwind_Exception *) {};
+  try {
+    _Unwind_RaiseException(exception);
+    std::_Exit(45);
+  } catch (...) {
+    __swift_cxx_report_current_exception(nullptr, forbiddenCallback);
+  }
+}
+
 static void reportWithoutException() {
   __swift_cxx_report_current_exception(nullptr, forbiddenCallback);
 }
@@ -173,6 +197,7 @@ static void cancelThread() {
 int main() {
   testMessages();
   expectTermination(raiseForeignException);
+  expectTermination(raiseGuardedForeignException);
   expectTermination(raiseForeignExceptionInsideNativeHandler);
   expectTermination(reportWithoutException);
 #if defined(__OBJC__)

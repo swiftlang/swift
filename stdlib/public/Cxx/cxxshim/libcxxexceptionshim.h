@@ -52,14 +52,16 @@ inline void reportNativeException(void *context, Callback callback) noexcept {
 /// unwinding for thread cancellation, cannot unwind through Swift frames.
 inline void __swift_cxx_report_current_exception(
     void *context, __swift_cxx_exception_support::Callback callback) noexcept {
-  // On the supported Itanium runtimes, a foreign exception has no C++ type.
-  // This also rejects calls outside an active exception handler.
-  if (!__cxxabiv1::__cxa_current_exception_type())
+  // On libc++abi and libstdc++, current_exception rejects foreign exceptions
+  // before accessing native exception fields. The ABI type query does not
+  // provide that guarantee on both runtimes. This also rejects calls outside
+  // an active exception handler.
+  if (!std::current_exception())
     std::terminate();
 
 #if defined(__OBJC__)
   // Darwin represents Objective-C exceptions using the C++ exception ABI, so
-  // a non-null C++ type alone cannot distinguish them. Let the Objective-C
+  // capturing the exception alone cannot distinguish them. Let the Objective-C
   // runtime identify its exception objects before reporting a C++ exception.
   @try {
     __cxxabiv1::__cxa_rethrow();
