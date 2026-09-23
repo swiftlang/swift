@@ -206,6 +206,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringSplitting
     single-source/StringSwitch
     single-source/StringTests
+    single-source/StringValidating
     single-source/StringWalk
     single-source/SubstringTest
     single-source/Suffix

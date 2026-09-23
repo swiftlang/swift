@@ -211,6 +211,7 @@ import StringReplaceSubrange
 import StringSplitting
 import StringSwitch
 import StringTests
+import StringValidating
 import StringWalk
 import SubstringTest
 import Suffix
@@ -429,6 +430,7 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 
 register(StringSwitch.benchmarks)
 register(StringTests.benchmarks)
+register(StringValidating.benchmarks)
 register(StringWalk.benchmarks)
 register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
