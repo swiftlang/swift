@@ -7898,6 +7898,13 @@ Type ClangImporter::importVarDeclType(
   if (!importedType)
     return ErrorType::get(Impl.SwiftContext);
 
+  if (auto attr = swiftDecl->getAttrs().getAttribute<CArrayProjectionAttr>();
+      attr && attr->getProjection() == CArrayProjection::Legacy) {
+    importedType = importer::computeLegacyCArrayType(importedType);
+    if (!importedType)
+      return ErrorType::get(Impl.SwiftContext);
+  }
+
   if (importedType.isImplicitlyUnwrapped())
     swiftDecl->setImplicitlyUnwrappedOptional(true);
 

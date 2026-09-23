@@ -1269,3 +1269,17 @@ void takeNullableId(_Nullable id);
 @interface NSCouldConformToIndexable : NSObject
 - (id)objectAtIndex:(NSInteger)index;
 @end
+
+// A class with two designated initializers taking C-array parameters -- one
+// small enough that a legacy (tuple) projection is possible, one too large
+// for one. Neither is overridden by `InheritsNestedArrayInit`, so per
+// Objective-C's initializer-inheritance rule both are inherited by it,
+// forcing ClangImporter to re-import each into that class's own context.
+@interface HasNestedArrayInit : NSObject
+- (instancetype)initWithGrid:(int [][4])grid NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithHugeGrid:(int [][5000])hugeGrid NS_DESIGNATED_INITIALIZER;
+@end
+
+@interface InheritsNestedArrayInit : HasNestedArrayInit
+@end
+

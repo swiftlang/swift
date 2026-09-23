@@ -319,10 +319,76 @@ void staticBoundsArray(const char x[static 4]);
 void useBigArray(char max_size[4096], char max_size_plus_one[4097]);
 void useBigArray2d(char max_size[][4096], char max_size_plus_one[][4097]);
 
+typedef int SmallArrayTypedef[4];
+typedef int HugeArrayTypedef[5000];
+typedef int SmallArrayNewtype[4] __attribute__((swift_newtype(struct)));
+typedef int HugeArrayNewtype[9000] __attribute__((swift_newtype(struct)));
+
 struct StructWithBigArray {
   char max_size[4096];
   char max_size_plus_one[4097];
 };
+
+struct StructWithPlainAndArrayFields {
+  int plain;
+  int small[4];
+};
+
+struct StructWithSmallAndHugeArrayFields {
+  int small[4];
+  int huge[5000];
+};
+
+struct StructWithAllHugeArrayFields {
+  int huge1[5000];
+  int huge2[6000];
+};
+
+union UnionWithSmallAndHugeArrayFields {
+  int small[4];
+  int huge[5000];
+};
+
+struct StructWithNestedArrayField {
+  int elems[2][2];
+};
+
+struct StructWithNestedHugeArrayField {
+  int elems[2][5000];
+};
+
+struct StructWithArrayTypedefField {
+  SmallArrayTypedef small;
+};
+
+struct StructWithHugeArrayTypedefField {
+  HugeArrayTypedef huge;
+};
+
+struct StructWithSmallArrayNewtypeField {
+  SmallArrayNewtype small;
+};
+
+struct StructWithHugeArrayNewtypeField {
+  HugeArrayNewtype huge;
+};
+
+struct StructWithStructArrayFields {
+  struct FooStruct1 small[4];
+  struct FooStruct1 huge[5000];
+};
+
+extern int hugeGlobalArray[5000];
+extern int smallGlobalArray[4];
+extern int smallNestedGlobalArray[2][2];
+extern int hugeNestedGlobalArray[2][5000];
+extern int hugeOuterNestedGlobalArray[5000][2];
+extern int (*globalPointerToHugeArray)[5000];
+extern void (*globalFunctionPointerWithHugeArrayParam)(int x[][5000]);
+extern HugeArrayTypedef hugeTypedefGlobalArray;
+extern SmallArrayTypedef smallTypedefGlobalArray;
+extern SmallArrayNewtype smallNewtypeGlobalArray;
+extern HugeArrayNewtype hugeNewtypeGlobalArray;
 
 typedef const int FourConstInts[4];
 void nonnullArrayParameters(const char x[_Nonnull], void * const _Nullable y[_Nonnull], _Nonnull FourConstInts z);

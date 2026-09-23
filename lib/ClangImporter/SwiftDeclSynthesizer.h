@@ -182,6 +182,9 @@ public:
   ///
   /// \param structDecl the struct to make a raw value for
   /// \param underlyingType the type of the raw value
+  /// \param legacyUnderlyingType the type of the raw value after converting
+  ///        to a legacy C array projection. If there is no possibility of a C
+  ///        array, just pass \p underlyingType again.
   /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
   ///
   /// This will perform most of the work involved in making a new Swift struct
@@ -189,6 +192,7 @@ public:
   /// synthesized protocols, add the new variable and pattern bindings, and
   /// create the inits parameterized over a raw value
   void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
+                           Type legacyUnderlyingType,
                            ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
                            MakeStructRawValuedOptions options =
                                getDefaultMakeStructRawValuedOptions());
@@ -259,6 +263,12 @@ public:
   makeLegacyCArrayAccessors(DeclContext *dc,
                             VarDecl *legacyDecl,
                             VarDecl *modernDecl);
+
+  /// Mark \p modern and \p legacy (if non-null) as alternate projections of
+  /// the same declaration for the purposes of
+  /// \c Feature::ModernImportedCArrays , synthesizing forwarding accessors
+  /// between them if needed.
+  void registerCArrayProjections(Decl *modern, Decl *legacy);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///

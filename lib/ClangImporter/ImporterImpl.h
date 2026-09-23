@@ -982,6 +982,15 @@ public:
     vec.push_back(altDecl);
   }
 
+  /// The maximum access level a declaration can have while still being
+  /// usable from the given C array projection, given whether it needs a
+  /// counterpart in the other projection to be fully available.
+  AccessLevel getMaxAccessLevel(CArrayProjection projection, bool needsBoth) {
+    if (needsBoth && VisibleCArrayProjection != projection)
+      return AccessLevel::Internal;
+    return AccessLevel::Open;
+  }
+
 private:
   /// NSObject, imported into Swift.
   Type NSObjectTy;
@@ -2197,6 +2206,22 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
+
+/// Returns \c true if \p type will be imported as a different type when
+/// \c Feature::ModernImportedCArrays is enabled.
+bool hasLegacyCArrayType(clang::QualType type);
+
+/// Returns \c true if \p type will be imported as a different type when
+/// \c Feature::ModernImportedCArrays is enabled \em and that type is actually
+/// importable (not too large). Usually \c computeLegacyCArrayType() detects
+/// this condition, but there's an edge case where we need to compute it from
+/// the clang type.
+bool hasImportableLegacyCArrayType(clang::QualType type);
+
+/// If \p modernType is the modern type of an imported fixed-size C array
+/// ( \c InlineArray ), compute the legacy tuple type that would be used
+/// when \c Feature::ModernImportedCArrays is not enabled.
+ImportedType computeLegacyCArrayType(ImportedType modernType);
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
