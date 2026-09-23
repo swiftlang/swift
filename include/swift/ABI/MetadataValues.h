@@ -1794,6 +1794,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
+  /// Result type metadata stored in a future task or task group.
+  const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
+
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
 
