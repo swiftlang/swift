@@ -1150,7 +1150,7 @@ public:
         vjpFnTy->getDirectFormalResultsType(getModule(),
                                             TypeExpansionContext::minimal(),
                                             vjp->hasLoweredAddresses()),
-        tai->getNormalBB()->getArgument(0)->getOwnershipKind());
+        OwnershipKind::Owned);
 
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
