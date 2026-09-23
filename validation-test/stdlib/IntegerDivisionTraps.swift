@@ -56,7 +56,7 @@ struct WyRand: RandomNumberGenerator {
 }
 
 suite.test("Int32 division lower bound")
-  .forEach(in: [-128, -2, -1, 1, 2, 127]) { bhi in
+  .forEach(in: [-128 as Int32, -2, -1, 1, 2, 127]) { bhi in
     var g = WyRand(state: UInt64(truncatingIfNeeded: bhi))
     let b = bhi << 24 | Int32.random(in: 0 ..< 0x100_0000, using: &g)
     let boundary = (b < 0 ? 0x1_0000_0000 : -0x1_0000_0001) * Int64(b)
@@ -70,7 +70,7 @@ suite.test("Int32 division lower bound")
   }
 
 suite.test("Int32 division upper bound")
-  .forEach(in: [-128, -2, -1, 1, 2, 127]) { bhi in
+  .forEach(in: [-128 as Int32, -2, -1, 1, 2, 127]) { bhi in
     var g = WyRand(state: UInt64(truncatingIfNeeded: bhi))
     let b = bhi << 24 | Int32.random(in: 0 ..< 0x100_0000, using: &g)
     let boundary = (b < 0 ? -0x1_0000_0001 : -0x1_0000_0000) * Int64(b)
