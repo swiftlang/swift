@@ -42,7 +42,7 @@ func optional_any_is_optional_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
   return x is T?
   //   Because the levels of optional are the same, 'is' doesn't transform into an 'as?',
   //   so we just cast directly without digging into the optional operand.
-  // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to Optional<T> in {{%.*}} : $*Optional<T>
+  // CHECK: checked_cast_addr_br test_only Optional<Any> in {{%.*}} : $*Optional<Any> to Optional<T>
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts31optional_any_to_class_archetype{{[_0-9a-zA-Z]*}}F
