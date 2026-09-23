@@ -295,6 +295,7 @@ void BindingSet::computeJoinsAndMeets() {
   bool foundCommonSubtype = false;
   bool uninhabited = false;
 
+  Type commonSupertype;
   if (supertypes.types.size() > 1) {
     // Put the existentials first, to work around the fact that our join
     // operation is not actually associative.
@@ -308,7 +309,6 @@ void BindingSet::computeJoinsAndMeets() {
     if (!supertypes.allTransitive)
       supertypes.originator = nullptr;
 
-    Type commonSupertype;
     for (auto ty : supertypes.types) {
       if (!commonSupertype) {
         commonSupertype = ty;
@@ -318,12 +318,18 @@ void BindingSet::computeJoinsAndMeets() {
       // FIXME: Remove isAcceptableJoin() and check existentialUpperBound
       // instead.
       bool existentialUpperBound = false;
-      commonSupertype = subtypeJoin(commonSupertype, ty, &existentialUpperBound);
+      auto newSupertype = subtypeJoin(commonSupertype, ty,
+                                      &existentialUpperBound);
+      LLVM_DEBUG(llvm::dbgs() << "Join(" << commonSupertype << ", "
+                              << ty << ") = " << newSupertype << "\n");
+      commonSupertype = newSupertype;
     }
 
     if (commonSupertype->is<JoinType>()) {
       // This indicates we had parameter packs or something else the join
       // code doesn't understand yet.
+      LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
+                              << commonSupertype << "\n");
       return;
     }
 
@@ -331,8 +337,11 @@ void BindingSet::computeJoinsAndMeets() {
     // in constraint simplification. Once optional conversions are no
     // longer presented as a disjunction, this case be removed.
     if (auto objectType = commonSupertype->getOptionalObjectType()) {
-      if (objectType->is<JoinType>())
+      if (objectType->is<JoinType>()) {
+        LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
+                                << commonSupertype << "\n");
         return;
+      }
     }
 
     // If the result was 'Any' or 'Any?' but none of the inputs were, don't
@@ -347,6 +356,11 @@ void BindingSet::computeJoinsAndMeets() {
       if (found == Defaults.end())
         return;
 
+      LLVM_DEBUG(llvm::dbgs() << "Using default type "
+                              << (*found)->getSecondType()
+                              << " instead of join type "
+                              << commonSupertype << "\n");
+
       // Use the default type instead of the common supertype binding.
       commonSupertype = (*found)->getSecondType();
       supertypes.bindingSource = *found;
@@ -360,20 +374,25 @@ void BindingSet::computeJoinsAndMeets() {
     foundCommonSupertype = true;
   }
 
+  Type commonSubtype;
   if (subtypes.types.size() > 1) {
-    Type commonSubtype;
     for (auto ty : subtypes.types) {
       if (!commonSubtype) {
         commonSubtype = ty;
         continue;
       }
 
-      commonSubtype = subtypeMeet(commonSubtype, ty, &uninhabited);
+      auto newSubtype = subtypeMeet(commonSubtype, ty, &uninhabited);
+      LLVM_DEBUG(llvm::dbgs() << "Meet(" << commonSubtype << ", "
+                              << ty << ") = " << newSubtype << "\n");
+      commonSubtype = newSubtype;
     }
 
     if (commonSubtype->is<MeetType>()) {
       // This indicates we had parameter packs or something else the meet
       // code doesn't understand yet.
+      LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
+                              << commonSubtype << "\n");
       return;
     }
 
@@ -381,8 +400,11 @@ void BindingSet::computeJoinsAndMeets() {
     // in constraint simplification. Once optional conversions are no
     // longer presented as a disjunction, this case be removed.
     if (auto objectType = commonSubtype->getOptionalObjectType()) {
-      if (objectType->is<MeetType>())
+      if (objectType->is<MeetType>()) {
+        LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
+                                << commonSubtype << "\n");
         return;
+      }
     }
 
     auto newKind = uninhabited ? AllowedBindingKind::Exact
@@ -412,8 +434,21 @@ void BindingSet::computeJoinsAndMeets() {
     return;
   }
 
-  if (uninhabited)
+  if (uninhabited) {
+    LLVM_DEBUG(llvm::dbgs() << "Uninhabited meet: "
+                            << commonSubtype << "\n");
     markConflicting();
+  }
+
+  if (foundCommonSupertype) {
+    LLVM_DEBUG(llvm::dbgs() << "Accepted join type: "
+                            << commonSupertype << "\n");
+  }
+
+  if (foundCommonSubtype) {
+    LLVM_DEBUG(llvm::dbgs() << "Accepted meet type: "
+                            << commonSubtype << "\n");
+  }
 
   // Remove bindings that participated in the join and meet.
   for (const auto &binding : Bindings) {
@@ -2388,8 +2423,12 @@ void BindingSet::possiblyDropDefaults() {
                 (constraint->getSecondType()->isAny() ||
                  constraint->getSecondType()->isAnyHashable()));
       });
-  if (found != Defaults.end())
+  if (found != Defaults.end()) {
+    LLVM_DEBUG(
+      llvm::dbgs() << "Dropping default constraint: ";
+      (*found)->print(llvm::dbgs(), &TypeVar->getASTContext().SourceMgr, 0));
     Defaults.erase(found);
+  }
 }
 
 void PotentialBindings::inferFromLiteral(Constraint *constraint,
