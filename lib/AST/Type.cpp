@@ -4936,12 +4936,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
 
-  if (isForeignReferenceType())
-    return lookThroughAllOptionalTypes()
-                   ->getClassOrBoundGenericClass()
-                   ->hasRefCountingAnnotations()
-               ? ReferenceCounting::Custom
-               : ReferenceCounting::None;
+  if (auto classDecl =
+          lookThroughAllOptionalTypes()->getClassOrBoundGenericClass()) {
+    if (auto frtBase = classDecl->getForeignReferenceSuperclassOrSelf())
+      return frtBase->hasRefCountingAnnotations() ? ReferenceCounting::Custom
+                                                  : ReferenceCounting::None;
+  }
 
   ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
 

@@ -1426,9 +1426,21 @@ public:
       fn = fnConv->getSubExpr();
     SubstitutionMap substitutions;
     SILDeclRef constant;
+    bool isForeignReferenceBaseInit = false;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer)
-        .asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
+      // A C++ foreign reference type has constructors are factories that
+      // allocate a new object. Call the factory's foreign entry point instead,
+      // so that the arguments are lowered exactly as for a direct call to it.
+      auto baseClass = ctorRef->getDecl()->getDeclContext()->getSelfClassDecl();
+      if (baseClass && baseClass->isForeignReferenceType()) {
+        constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Allocator)
+                       .asForeign();
+        isForeignReferenceBaseInit = true;
+      } else {
+        constant =
+            SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer)
+                .asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
+      }
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
@@ -1490,6 +1502,19 @@ public:
 
     assert(super.isComplete() && "At this point super should be a complete "
                                  "rvalue that is not in any special states");
+
+    if (isForeignReferenceBaseInit) {
+      assert(SGF.SuperInitDelegationSelf &&
+             "taking `super` for a subclass should have upcast it");
+      auto metatypeType = CanMetatypeType::get(superFormalType);
+      auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
+          SGF.B.createMetatype(apply, SGF.getLoweredType(metatypeType)));
+      setCallee(Callee::forDirect(SGF, constant, substitutions, fn));
+      setSelfParam(
+          ArgumentSource(arg, RValue(SGF, apply, metatypeType, metatype)));
+      return;
+    }
+
     ArgumentSource superArgSource(arg, std::move(super));
     if (!canUseStaticDispatch(SGF, constant)) {
       // ObjC super calls require dynamic dispatch.
@@ -5528,6 +5553,10 @@ private:
   RValue
   applySpecializedEmitter(SpecializedEmitter &specializedEmitter, SGFContext C);
 
+  RValue applyForeignReferenceSubclassSuperInit(
+      AbstractionPattern origFormalType, const CalleeTypeInfo &calleeTypeInfo,
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies);
+
   RValue applyEnumElementConstructor(SGFContext C);
 
   RValue applyNormalCall(SGFContext C);
@@ -5809,6 +5838,33 @@ RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
   return applyNormalCall(C);
 }
 
+/// Whether \p callSite, calling \p callee, is the `super.init` call of a Swift
+/// subclass a C++ foreign reference type.
+static bool isForeignReferenceSubclassSuperInit(SILGenFunction &SGF,
+                                                Callee &callee,
+                                                const CallSite &callSite) {
+  if (!SGF.InitDelegationLoc)
+    return false;
+  auto rebind =
+      SGF.InitDelegationLoc->getAsASTNode<RebindSelfInConstructorExpr>();
+  if (!rebind ||
+      callSite.Loc.getAsASTNode<ApplyExpr>() != rebind->getConstructorCall())
+    return false;
+
+  // A `self.init` delegation, e.g. from a convenience initializer declared in a
+  // Swift extension of the foreign reference type, calls the factory normally.
+  bool isChainToSuper = false;
+  (void)rebind->getCalledConstructor(isChainToSuper);
+  if (!isChainToSuper)
+    return false;
+
+  auto ctor = dyn_cast_or_null<ConstructorDecl>(callee.getDecl());
+  if (!ctor)
+    return false;
+  auto baseClass = ctor->getDeclContext()->getSelfClassDecl();
+  return baseClass && baseClass->isForeignReferenceType();
+}
+
 RValue CallEmission::applyNormalCall(SGFContext C) {
   // We use the context emit-into initialization only for the
   // outermost call.
@@ -5855,6 +5911,10 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
     }
   }
 
+  if (isForeignReferenceSubclassSuperInit(SGF, callee, *callSite))
+    return applyForeignReferenceSubclassSuperInit(
+        origFormalType, calleeTypeInfo, lifetimeDependencies);
+
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
       SGF, calleeTypeInfo, callSite->Loc, uncurriedContext);
 
@@ -5886,6 +5946,107 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
       std::move(resultPlan), std::move(argScope), uncurriedLoc.value(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
       uncurriedContext, implicitActorHopTarget);
+}
+
+RValue CallEmission::applyForeignReferenceSubclassSuperInit(
+    AbstractionPattern origFormalType, const CalleeTypeInfo &calleeTypeInfo,
+    ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
+  // Lower the arguments exactly as for a call to the base constructor's
+  // factory. Unlike a call, though, the builtin consumes `self`.
+  auto argFnType = calleeTypeInfo.substFnType;
+  if (auto call = callSite->Loc.getAsASTNode<ApplyExpr>()) {
+    auto ctor = cast<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
+    auto args = call->getArgs();
+    auto params = argFnType->getParameters();
+    assert(args->size() == params.size());
+    SmallVector<SILParameterInfo, 4> argParams(params.begin(), params.end());
+    bool changed = false;
+    for (auto i : indices(argParams)) {
+      bool readsSelf = false;
+      args->getExpr(i)->forEachChildExpr([&](Expr *e) -> Expr * {
+        readsSelf = e->isSelfExprOf(ctor) || isa<SuperRefExpr>(e);
+        return readsSelf ? nullptr : e;
+      });
+      if (!readsSelf)
+        continue;
+      switch (argParams[i].getConvention()) {
+      case ParameterConvention::Indirect_In_Guaranteed:
+        argParams[i] =
+            argParams[i].getWithConvention(ParameterConvention::Indirect_In);
+        changed = true;
+        break;
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Unowned:
+        argParams[i] =
+            argParams[i].getWithConvention(ParameterConvention::Direct_Owned);
+        changed = true;
+        break;
+      default:
+        break;
+      }
+    }
+    if (changed)
+      argFnType = SILFunctionType::get(
+          argFnType->getInvocationGenericSignature(), argFnType->getExtInfo(),
+          argFnType->getCoroutineKind(), argFnType->getCalleeConvention(),
+          argParams, argFnType->getYields(), argFnType->getResults(),
+          argFnType->getOptionalErrorResult(),
+          argFnType->getPatternSubstitutions(),
+          argFnType->getInvocationSubstitutions(), SGF.getASTContext());
+  }
+
+  ArgumentScope argScope(SGF, callSite->Loc);
+  SmallVector<ManagedValue, 4> uncurriedArgs;
+  std::optional<SILLocation> uncurriedLoc;
+  (void)emitArgumentsForNormalApply(origFormalType, argFnType,
+                                    lifetimeDependencies,
+                                    calleeTypeInfo.foreign, uncurriedArgs,
+                                    uncurriedLoc);
+  SILLocation loc = uncurriedLoc.value();
+
+  // The builtin names the factory so that IRGen can construct the base with the
+  // same C++ constructor. The factory itself is never called.
+  ManagedValue factory = callee.getFnValue(SGF, std::nullopt);
+
+  // Consume `super`, as the call to an initializing entry point would, and
+  // construct the base subobject of that same object.
+  SILValue superValue = SGF.SuperInitDelegationSelf.forward(SGF);
+  SILType selfType = SGF.InitDelegationSelf.getType();
+  SILValue selfValue = SGF.B.createUncheckedRefCast(loc, superValue, selfType);
+  SmallVector<SILValue, 4> builtinArgs = {selfValue, factory.getValue()};
+
+  // Pass each argument as the factory would receive it. The C++ callee takes
+  // ownership of an argument only if the factory's convention says it does;
+  // anything else, including an `@in_cxx` temporary, which the caller destroys
+  // after the call, stays owned by its cleanup here.
+  auto params = calleeTypeInfo.substFnType->getParameters();
+  assert(params.size() == uncurriedArgs.size());
+  builtinArgs.reserve(builtinArgs.size() + uncurriedArgs.size());
+  for (auto i : indices(uncurriedArgs)) {
+    if (params[i].isConsumedInCallee())
+      builtinArgs.push_back(uncurriedArgs[i].forward(SGF));
+    else
+      builtinArgs.push_back(uncurriedArgs[i].getValue());
+  }
+
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::InitializeForeignReferenceSubclass));
+  auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
+  auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                   {selfType.getASTType()},
+                                   ArrayRef<ProtocolConformanceRef>{});
+  SILValue newSelf =
+      SGF.B.createBuiltin(loc, builtinName, selfType, subs, builtinArgs);
+
+  // Destroy the argument temporaries now that the base is constructed.
+  argScope.pop();
+
+  auto resultType = calleeTypeInfo.substResultType;
+  SILValue result =
+      SGF.B.createUpcast(loc, newSelf, SGF.getLoweredType(resultType));
+  return RValue(SGF, loc, resultType,
+                SGF.emitManagedRValueWithCleanup(result));
 }
 
 static void emitPseudoFunctionArguments(SILGenFunction &SGF,

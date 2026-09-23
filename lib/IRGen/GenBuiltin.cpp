@@ -1775,6 +1775,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::DistributedActorAsAnyActor:
   case BuiltinValueKind::TypeJoin:
   case BuiltinValueKind::TriggerFallbackDiagnostic:
+  case BuiltinValueKind::InitializeForeignReferenceSubclass:
     llvm_unreachable("IRGen unimplemented for this builtin!");
   }
 }

@@ -295,6 +295,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::TaskPushDeadline:
         case BuiltinValueKind::TaskCancellationShieldPush:
         case BuiltinValueKind::TaskCancellationShieldPop:
+        case BuiltinValueKind::InitializeForeignReferenceSubclass:
           callVisitUse(op);
           continue;
         default:
