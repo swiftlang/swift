@@ -237,6 +237,11 @@ private struct CollectedEffects {
       // releases moving above the fix_lifetime.
       addEffects(.read, to: fl.operand.value)
 
+    case let cast as UnconditionalCheckedCastInst:
+      if !cast.preservesReferenceCounts {
+        globalEffects = .worstEffects
+      }
+
       // Instructions which have effects defined in SILNodes.def, but those effects are
       // not relevant for our purpose.
       // In most cases these conservative effects are there to prevent code re-scheduling within
@@ -246,7 +251,7 @@ private struct CollectedEffects {
       is BeginBorrowInst, is EndBorrowInst,
       is DebugValueInst, is KeyPathInst, is FixLifetimeInst,
       is EndApplyInst, is AbortApplyInst,
-      is EndCOWMutationInst, is UnconditionalCheckedCastInst,
+      is EndCOWMutationInst,
       is CondFailInst:
       break
 
@@ -537,9 +542,12 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
     case is CopyValueInst, is RetainValueInst, is StrongRetainInst,
          is DestroyValueInst, is ReleaseValueInst, is StrongReleaseInst,
-         is DebugValueInst, is UnconditionalCheckedCastInst,
+         is DebugValueInst,
          is ReturnInstruction:
       return .continueWalk
+
+    case let cast as UnconditionalCheckedCastInst:
+      return cast.preservesReferenceCounts ? .continueWalk : .abortWalk
 
     case let apply as ApplySite:
       if let pa = apply as? PartialApplyInst, !pa.isOnStack {

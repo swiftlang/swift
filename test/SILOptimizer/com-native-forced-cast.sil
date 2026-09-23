@@ -1,0 +1,63 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all -copy-propagation -simplification -simplify-instruction=destroy_value %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -compute-side-effects %s | %FileCheck %s --check-prefix=EFFECTS
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol ISource: AnyObject {}
+public class NativeBase {}
+public class NativeDerived: NativeBase {}
+
+// The cast consumes an interface reference and returns an independent native
+// reference. Destroying the result must not destroy the borrowed source.
+// CHECK-LABEL: sil {{.*}}@recover
+// CHECK: [[COPY:%.*]] = copy_value %0
+// CHECK: [[NATIVE:%.*]] = unconditional_checked_cast [[COPY]]
+// CHECK: destroy_value [[NATIVE]]
+// CHECK: return
+// EFFECTS-LABEL: sil {{.*}}@recover
+// EFFECTS: [global: read,write,copy,destroy,allocate,deinit_barrier]
+sil [ossa] @recover : $@convention(thin) (@guaranteed any ISource) -> () {
+bb0(%source : @guaranteed $any ISource):
+  %copy = copy_value %source : $any ISource
+  %native = unconditional_checked_cast %copy : $any ISource to NativeBase
+  destroy_value %native : $NativeBase
+  %unit = tuple ()
+  return %unit : $()
+}
+
+// Native class casts can continue forwarding a guaranteed reference.
+// CHECK-LABEL: sil {{.*}}@native
+// CHECK-NOT: copy_value
+// CHECK: unconditional_checked_cast
+// CHECK-NOT: destroy_value
+// CHECK: return
+sil [ossa] @native : $@convention(thin) (@guaranteed NativeBase) -> () {
+bb0(%source : @guaranteed $NativeBase):
+  %copy = copy_value %source : $NativeBase
+  %derived = unconditional_checked_cast %copy : $NativeBase to NativeDerived
+  destroy_value %derived : $NativeDerived
+  %unit = tuple ()
+  return %unit : $()
+}
+
+// AnyObject can hide a boxed value. Like COM identity recovery, unwrapping it
+// cannot assume the result shares the source's reference count.
+// CHECK-LABEL: sil {{.*}}@unwrap_anyobject
+// CHECK: [[COPY:%.*]] = copy_value %0
+// CHECK: [[NATIVE:%.*]] = unconditional_checked_cast [[COPY]]
+// CHECK: destroy_value [[NATIVE]]
+// CHECK: return
+// EFFECTS-LABEL: sil {{.*}}@unwrap_anyobject
+// EFFECTS: [global: read,write,copy,destroy,allocate,deinit_barrier]
+sil [ossa] @unwrap_anyobject : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%source : @guaranteed $AnyObject):
+  %copy = copy_value %source : $AnyObject
+  %native = unconditional_checked_cast %copy : $AnyObject to NativeBase
+  destroy_value %native : $NativeBase
+  %unit = tuple ()
+  return %unit : $()
+}
