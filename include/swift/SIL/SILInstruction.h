@@ -1389,9 +1389,10 @@ protected:
   OwnershipForwardingSingleValueInstruction(SILInstructionKind kind,
                                             SILDebugLocation debugLoc,
                                             SILType ty,
-                                            ValueOwnershipKind ownershipKind)
+                                            ValueOwnershipKind ownershipKind,
+                                            bool preservesOwnership = true)
       : SingleValueInstruction(kind, debugLoc, ty),
-        ForwardingInstruction(kind, ownershipKind) {
+        ForwardingInstruction(kind, ownershipKind, preservesOwnership) {
     assert(classof(kind) && "classof missing new subclass?!");
   }
 
@@ -6837,16 +6838,15 @@ class UnconditionalCheckedCastInst final
   friend SILBuilder;
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc,
-                               CheckedCastInstOptions Options,
-                               SILValue Operand,
+                               CheckedCastInstOptions Options, SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestLoweredTy, CanType DestFormalTy,
-                               ValueOwnershipKind forwardingOwnershipKind)
+                               ValueOwnershipKind forwardingOwnershipKind,
+                               bool preservesOwnership)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestLoweredTy,
-            forwardingOwnershipKind),
-        DestFormalTy(DestFormalTy),
-        Options(Options) {}
+            forwardingOwnershipKind, preservesOwnership),
+        DestFormalTy(DestFormalTy), Options(Options) {}
 
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, CheckedCastInstOptions options,
