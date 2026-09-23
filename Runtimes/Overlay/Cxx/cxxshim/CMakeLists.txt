@@ -11,6 +11,7 @@ install(TARGETS cxxshim
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES
+  libcxxexceptionshim.h
   libcxxshim.h
   libcxxshim.modulemap
   libcxxstdlibshim.h
