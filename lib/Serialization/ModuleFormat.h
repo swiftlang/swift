@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1031; // C++ exception bridge adapter references and required feature
+    1032; // C++ synthesized method references
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2325,6 +2325,17 @@ namespace decls_block {
   // Select the native C++ adapter belonging to the preceding Swift facade.
   using XRefCxxExceptionAdapterPathPieceLayout = BCRecordLayout<
     XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE
+  >;
+
+  enum class CxxSynthesizedMethodKind : uint8_t {
+    StaticVirtualCall = 0,
+    InheritedCall = 1,
+  };
+
+  // Select an internal entry point belonging to the preceding source method.
+  using XRefCxxSynthesizedMethodPathPieceLayout = BCRecordLayout<
+    XREF_CXX_SYNTHESIZED_METHOD_PATH_PIECE,
+    BCFixed<1> // CxxSynthesizedMethodKind
   >;
 
   using XRefGenericParamPathPieceLayout = BCRecordLayout<

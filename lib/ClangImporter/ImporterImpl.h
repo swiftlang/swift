@@ -739,6 +739,8 @@ public:
   /// For virtual methods of foreign reference types, whenever a virtual thunk
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualOriginalToThunk;
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> inheritedMethodForForwarder;
 
   /// Accessors and operator functions synthesized around an imported function,
   /// mapped back to it.

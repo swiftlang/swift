@@ -6172,6 +6172,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
                                   /*implicit=*/true);
     return {body, /*isTypeChecked=*/true};
   }
+  static_cast<ClangImporter *>(ctx.getClangModuleLoader())
+      ->recordInheritedMethodForwarder(funcDecl, forwardedFunc);
 
   SmallVector<Expr *, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
@@ -8549,9 +8551,24 @@ ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
   return Impl.getOriginalForVirtualThunk(decl);
 }
 
+FuncDecl *
+ClangImporter::getVirtualThunkForOriginal(const FuncDecl *decl) const {
+  return Impl.virtualOriginalToThunk.lookup(decl);
+}
+
+void ClangImporter::recordInheritedMethodForwarder(FuncDecl *method,
+                                                   FuncDecl *forwarder) {
+  Impl.inheritedMethodForForwarder[forwarder] = method;
+}
+
+FuncDecl *
+ClangImporter::getInheritedMethodForForwarder(const FuncDecl *decl) const {
+  return Impl.inheritedMethodForForwarder.lookup(decl);
+}
+
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {
-  return cast<ValueDecl>(
-      importDeclDirectly(::getCalledBaseCxxMethod(cast<FuncDecl>(decl))));
+  auto *method = ::getCalledBaseCxxMethod(cast<FuncDecl>(decl));
+  return method ? cast_or_null<ValueDecl>(importDeclDirectly(method)) : nullptr;
 }
 
 bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {

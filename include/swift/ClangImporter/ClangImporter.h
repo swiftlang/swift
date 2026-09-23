@@ -753,6 +753,10 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  /// Return the source-visible virtual thunk for a static-dispatch entry point.
+  FuncDecl *getVirtualThunkForOriginal(const FuncDecl *decl) const;
+  void recordInheritedMethodForwarder(FuncDecl *method, FuncDecl *forwarder);
+  FuncDecl *getInheritedMethodForForwarder(const FuncDecl *decl) const;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
 
   /// Whether this is the native throwing facade of a C++ exception adapter.
