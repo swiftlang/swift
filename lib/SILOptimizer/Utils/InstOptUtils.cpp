@@ -1148,13 +1148,29 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
         return false;
       }
     }
+
+    // Regular on-stack closures only borrow their captures, so their
+    // lifetime is managed outside of the closure and there's nothing to do
+    // here.
+
+    // A `@called(once)` on-stack closure can also own (consume) its captures,
+    // and is responsible for releasing them via its destructor. Release such
+    // captures here to make up for that.
+    if (pa->isCalledOnce()) {
+      SILBuilderContext builderCtxt(pa->getModule());
+      for (Operand &argOp : pa->getArgumentOperands()) {
+        if (!argOp.isConsuming())
+          continue;
+
+        SILBuilderWithScope builder(pa, builderCtxt);
+        emitDestroyOperation(builder, pa->getLoc(), argOp.get(), callbacks);
+      }
+    }
+
     for (auto *inst : reverse(deleteInsts))
       callbacks.deleteInst(inst);
     callbacks.deleteInst(pa);
 
-    // Note: the lifetime of the captured arguments is managed outside of the
-    // trivial closure value i.e: there will already be releases for the
-    // captured arguments. Releasing captured arguments is not necessary.
     return true;
   }
 
