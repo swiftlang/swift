@@ -13,7 +13,7 @@
 // REQUIRES: executable_test
 
 // FIXME: This test needs to be redesigned from scratch.
-// REQUIRES: rdar://188085737
+// REQUIRES: rdar188085737
 
 // This test has some serious design problems that cause it
 // to use enormous amounts of CPU time when run as part of the
