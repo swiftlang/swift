@@ -895,14 +895,14 @@ suite.test("MutableRawSpan storeBytes repeating with ByteOrder")
   }
 }
 
-suite.test("init(_:) from value")
+suite.test("init(bytesOf:) from value")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var inline: [5 of UInt8] = [0, 1, 2, 3, 4]
   let count = inline.count
 
-  var bytes = MutableRawSpan(&inline)
+  var bytes = MutableRawSpan(bytesOf: &inline)
   expectEqual(bytes.byteCount, count)
   for o in bytes.byteOffsets {
     bytes[o] += 1
@@ -914,11 +914,11 @@ suite.test("init(_:) from value")
   }
 }
 
-suite.test("init(_:) from value: round-trip")
+suite.test("init(bytesOf:) from value: round-trip")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   var value = UInt64.zero
 
-  var bytes = MutableRawSpan(&value)
+  var bytes = MutableRawSpan(bytesOf: &value)
   expectEqual(bytes.byteCount, MemoryLayout<UInt64>.size)
   bytes.storeBytes(of: UInt64.max, toByteOffset: 0, as: UInt64.self)
   _ = consume bytes
@@ -926,19 +926,19 @@ suite.test("init(_:) from value: round-trip")
   expectEqual(value, .max)
 }
 
-suite.test("init(_:) from value: compare with indirect approach")
+suite.test("init(bytesOf:) from value: compare with indirect approach")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a: [5 of UInt8] = [0, 1, 2, 3, 4]
   var b = a
 
-  var directBytes = MutableRawSpan(&a)
+  var directBytes = MutableRawSpan(bytesOf: &a)
   let directByteCount = directBytes.byteCount
   directBytes.storeBytes(of: UInt16.max, toByteOffset: 2, as: UInt16.self)
   _ = consume directBytes
 
-  var span = MutableSpan<InlineArray>(&b)
+  var span = MutableSpan<InlineArray>(ofOne: &b)
   var spanBytes = span.mutableBytes
   expectEqual(directByteCount, spanBytes.byteCount)
   spanBytes.storeBytes(of: UInt16.max, toByteOffset: 2, as: UInt16.self)

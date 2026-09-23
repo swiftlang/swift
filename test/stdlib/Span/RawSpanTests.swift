@@ -496,13 +496,13 @@ suite.test("RawSpan init(elements:)")
   expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
 }
 
-suite.test("init(_:) from value")
+suite.test("init(bytesOf:) from value")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let inline: [5 of UInt8] = [0, 1, 2, 3, 4]
 
-  let bytes = RawSpan(inline)
+  let bytes = RawSpan(bytesOf: inline)
   expectEqual(bytes.byteCount, MemoryLayout<InlineArray<5, UInt8>>.size)
   expectEqual(bytes.byteCount, inline.count)
   for o in bytes.byteOffsets {
@@ -510,23 +510,23 @@ suite.test("init(_:) from value")
   }
 }
 
-suite.test("init(_:) from value: round trip")
+suite.test("init(bytesOf:) from value: round trip")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   let value = UInt64.random(in: .max/2 ... .max)
 
-  let bytes = RawSpan(value)
+  let bytes = RawSpan(bytesOf: value)
   expectEqual(bytes.byteCount, MemoryLayout<UInt64>.size)
   expectEqual(
     bytes.load(fromByteOffset: 0, as: Int64.self), Int64(bitPattern: value)
   )
 }
 
-suite.test("init(_:) from value: compare with indirect approach")
+suite.test("init(bytesOf:) from value: compare with indirect approach")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   let value = Duration.seconds(3) + .nanoseconds(14)
 
-  let direct = RawSpan(value)
-  let viaSpan = Span(value).bytes
+  let direct = RawSpan(bytesOf: value)
+  let viaSpan = Span(ofOne: value).bytes
   expectTrue(direct.isIdentical(to: viaSpan))
 }
 

@@ -183,17 +183,19 @@ extension MutableRawSpan {
     self = unsafe Self.init(unsafeElements: elements)
   }
 
-  /// Create a mutable span over the bytes of the value passed as a parameter.
+  /// Create a mutable span over the bytes of the single value
+  /// passed as a parameter.
   ///
   /// The `MutableRawSpan` created by this initializer will represent a
-  /// mutation of `value`.
+  /// mutation of `value`. It will have a `byteCount` of
+  /// `MemoryLayout<Element>.size` bytes.
   ///
   /// - Parameters:
   ///   - value: a value to be mutated through the span
   @export(implementation)
   @_lifetime(&value)
   public init<Element: ConvertibleToBytes & ConvertibleFromBytes>(
-    _ value: inout Element
+    bytesOf value: inout Element
   ) {
     let buffer = unsafe UnsafeMutableRawBufferPointer(
       start: .init(Builtin.unprotectedAddressOfBorrow(value)),
