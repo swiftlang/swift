@@ -17,10 +17,13 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -71,6 +74,35 @@ void SILPassManager::runSwiftModuleVerification() {
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                     SIL bridging implemented in SILOptimizer
+//===----------------------------------------------------------------------===//
+
+void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
+  swift::salvageDebugInfo(inst.unbridged());
+}
+
+BridgedConstExprFunctionState BridgedConstExprFunctionState::create() {
+  auto allocator = new swift::SymbolicValueBumpAllocator();
+  auto evaluator = new swift::ConstExprEvaluator(*allocator, 0);
+  auto numEvaluatedSILInstructions = new unsigned int(0);
+  auto state = new swift::ConstExprFunctionState(*evaluator, nullptr, {},
+                                                 *numEvaluatedSILInstructions, true);
+  return {state, allocator, evaluator, numEvaluatedSILInstructions};
+}
+
+bool BridgedConstExprFunctionState::isConstantValue(BridgedValue bridgedValue) {
+  auto value = bridgedValue.getSILValue();
+  auto symbolicValue = state->getConstantValue(value);
+  return symbolicValue.isConstant();
+}
+
+void BridgedConstExprFunctionState::deinitialize() {
+  delete state;
+  delete numEvaluatedSILInstructions;
+  delete constantEvaluator;
+  delete allocator;
+}
 
 //===----------------------------------------------------------------------===//
 //                           BridgedPassContext
