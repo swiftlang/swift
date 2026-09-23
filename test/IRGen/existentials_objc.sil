@@ -37,7 +37,7 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias captures(none) dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias align 8 captures(none) dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: call ptr @"$sypWOb"(ptr %1, ptr %0)
 // CHECK-NEXT:    ret void
 
