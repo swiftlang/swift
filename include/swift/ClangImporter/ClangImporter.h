@@ -826,6 +826,8 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  const clang::CXXConstructorDecl *
+  getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) override;
   ValueDecl *getOverriddenSuperclassMember(const ValueDecl *decl) override;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
