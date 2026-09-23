@@ -95,36 +95,11 @@ set_property(
   TARGET swift-ide-test
   APPEND PROPERTY BUILD_RPATH "@executable_path/../lib/swift/host/compiler"
 )
-set_property(
-  TARGET swift-ide-test
-  APPEND PROPERTY BUILD_RPATH "${driver_package_dir}/lib/"
-)
-set_property(
-  TARGET swift-ide-test
-  APPEND PROPERTY BUILD_RPATH "${driver_package_dir}/dependencies/swift-tools-support-core/lib/"
-)
-
-target_link_directories(swift-ide-test PRIVATE
-  "${driver_package_dir}/lib"
-  "${driver_package_dir}/dependencies/swift-tools-support-core/lib"
-)
-
-if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
-  target_link_directories(swift-ide-test PRIVATE
-    "${driver_package_dir}/bin"
-    "${driver_package_dir}/dependencies/swift-tools-support-core/bin"
-    "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
-    "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}"
-    "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift_static/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
-    "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift_static/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}"
-  )
-endif()
 
 target_link_libraries(swift-ide-test
                       PRIVATE
                         swiftAST
                         swiftDriver
-                        SwiftDriver
                         swiftFrontend
                         swiftIDE
                         swiftIDETool
