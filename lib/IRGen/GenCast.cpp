@@ -1153,13 +1153,11 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(!targetLoweredType.is<AnyMetatypeType>() &&
          "scalar cast of class reference to metatype is unimplemented");
 
-  // A cast to a COM existential is not a representation-preserving conformance
-  // check. `QueryInterface` can return a distinct interface pointer, and the
-  // COM existential representation does not carry witness tables. Use the
-  // general dynamic-cast entry point so that the runtime can perform the
-  // identity query and return exactly the single-word COM existential
-  // representation.
-  if (targetFormalType.isCOMExistentialType()) {
+  // COM casts can change both the pointer and its reference-counting identity.
+  // QueryInterface obtains a destination interface, while ISwiftObject recovers
+  // a native object from a source interface. Use the runtime for both cases.
+  if (sourceFormalType.isCOMExistentialType() ||
+      targetFormalType.isCOMExistentialType()) {
     auto &sourceTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(sourceLoweredType));
     auto source =
         sourceTI.allocateStack(IGF, sourceLoweredType, "com.cast.source");
@@ -1169,9 +1167,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     auto target =
         targetTI.allocateStack(IGF, targetLoweredType, "com.cast.target");
 
-    auto storage = cast<llvm::PointerType>(targetTI.getStorageType());
-    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(storage),
-                            target.getAddress());
+    IGF.Builder.CreateStore(
+        llvm::Constant::getNullValue(targetTI.getStorageType()),
+        target.getAddress());
 
     emitCheckedCast(IGF, source.getAddress(), sourceFormalType,
                     target.getAddress(), targetFormalType,
