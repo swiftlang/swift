@@ -1760,6 +1760,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                        A->getOption().getPrefixedName(), A->getValue());
     }
+
+    // Preserve the stdcall convention of imported Win32 COM function types.
+    if (Opts.COMModel == LangOptions::COMInteropModel::Microsoft &&
+        Target.isOSWindows() && Target.getArch() == llvm::Triple::x86)
+      Opts.UseClangFunctionTypes = true;
   }
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
