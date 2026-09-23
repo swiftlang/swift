@@ -198,7 +198,7 @@ extension MutableRawSpan {
     bytesOf value: inout Element
   ) {
     let buffer = unsafe UnsafeMutableRawBufferPointer(
-      start: .init(Builtin.unprotectedAddressOfBorrow(value)),
+      start: .init(Builtin.unprotectedAddressOf(&value)),
       count: MemoryLayout<Element>.size
     )
     let span = unsafe MutableRawSpan(_unsafeBytes: buffer)

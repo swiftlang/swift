@@ -125,7 +125,7 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&value)
   public init(ofOne value: inout Element) {
-    let address = Builtin.unprotectedAddressOfBorrow(value)
+    let address = Builtin.unprotectedAddressOf(&value)
     let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
     self = unsafe _overrideLifetime(span, mutating: &value)
   }
