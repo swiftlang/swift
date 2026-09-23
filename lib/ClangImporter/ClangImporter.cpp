@@ -9929,6 +9929,12 @@ importer::getCxxOperatorKind(StringRef name) {
   return std::nullopt;
 }
 
+bool importer::isUserProvidedForeignReferenceFactory(
+    const ConstructorDecl *ctor) {
+  auto method = dyn_cast_or_null<clang::CXXMethodDecl>(ctor->getClangDecl());
+  return method && method->isStatic() && !method->isImplicit();
+}
+
 bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,
                                       const clang::RecordDecl *base) {
   auto *classTemplate = symbolicClass->getDescribedClassTemplate();

@@ -1021,6 +1021,11 @@ StringRef getCxxOperatorName(clang::OverloadedOperatorKind op);
 /// The overloaded operator named \p name, e.g. "operator==", if any.
 std::optional<clang::OverloadedOperatorKind> getCxxOperatorKind(StringRef name);
 
+/// Whether this initializer of a C++ foreign reference type is a static factory
+/// method written in C++ and renamed into an initializer with `swift_name`, as
+/// opposed to one that ClangImporter synthesized for a C++ constructor.
+bool isUserProvidedForeignReferenceFactory(const ConstructorDecl *ctor);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///
