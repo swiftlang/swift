@@ -18,6 +18,17 @@ let directResult = try checkedDivide(12, 3)
 precondition(directResult == 4)
 let noexceptResult = try checkedNoexcept(8)
 precondition(noexceptResult == 8)
+let unnamedResult = try checkedUnnamed(1, 11)
+precondition(unnamedResult == 11)
+let unnamedReference: (CInt, CInt) throws -> CInt = checkedUnnamed
+let capturedUnnamedResult = try unnamedReference(2, 13)
+precondition(capturedUnnamedResult == 13)
+do {
+  try failUnnamed(1, 2)
+  fatalError("expected a function with unnamed parameters to throw")
+} catch let error as CxxException {
+  precondition(error.message == "unnamed parameters")
+}
 let floatingResult = try Numbers.checked(1.5)
 precondition(floatingResult == 1.5)
 do {

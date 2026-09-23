@@ -216,8 +216,14 @@ FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
     return nullptr;
 
   SmallVector<ParamDecl *, 8> swiftParameters;
-  for (auto *parameter : *importedDecl->getParameters())
-    swiftParameters.push_back(ParamDecl::clone(ctx, parameter));
+  for (auto [index, parameter] :
+       llvm::enumerate(*importedDecl->getParameters())) {
+    auto *clone = ParamDecl::clone(ctx, parameter);
+    // The closure must capture a local even when the C++ parameter is unnamed.
+    if (clone->getName().empty())
+      clone->setName(ctx.getIdentifier("__cxx_arg" + std::to_string(index)));
+    swiftParameters.push_back(clone);
+  }
   auto *facade = FuncDecl::createImplicit(
       ctx, importedDecl->getStaticSpelling(), importedDecl->getName(),
       importedDecl->getLoc(), /*Async=*/false, /*Throws=*/true,

@@ -44,6 +44,10 @@ inline double checked(double value) SWIFT_THROWS {
 }
 }
 inline int checkedNoexcept(int value) noexcept SWIFT_THROWS { return value; }
+inline int checkedUnnamed(int, int value) SWIFT_THROWS { return value; }
+inline void failUnnamed(int, int) SWIFT_THROWS {
+  throw std::runtime_error("unnamed parameters");
+}
 inline void violateNoexcept() noexcept SWIFT_THROWS {
   checkedVoid(true);
 }
