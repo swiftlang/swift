@@ -200,7 +200,7 @@ extension Span where Element: ~Copyable {
   ///   - value: a value to be borrowed by the span
   @export(implementation)
   @_lifetime(borrow value)
-  public init(_ value: borrowing @_addressable Element) {
+  public init(ofOne value: borrowing @_addressable Element) {
     let address = Builtin.unprotectedAddressOfBorrow(value)
     let span = unsafe Span(_unchecked: .init(address), count: 1)
     self = unsafe _overrideLifetime(span, borrowing: value)

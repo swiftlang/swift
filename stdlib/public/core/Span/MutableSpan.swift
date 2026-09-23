@@ -117,14 +117,14 @@ extension MutableSpan where Element: ~Copyable {
 
   /// Create a mutable span over the single value passed as a parameter.
   ///
-  /// The created `MutableSpan` by this initializer will represent a
+  /// The `MutableSpan` created by this initializer will represent a
   /// mutation of `value`.
   ///
   /// - Parameters:
   ///   - value: a value to be mutated through the span
   @export(implementation)
   @_lifetime(&value)
-  public init(_ value: inout Element) {
+  public init(ofOne value: inout Element) {
     let address = Builtin.unprotectedAddressOfBorrow(value)
     let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
     self = unsafe _overrideLifetime(span, mutating: &value)

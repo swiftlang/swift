@@ -678,13 +678,13 @@ suite.test("initialize from raw memory")
   expectEqual(first, 0x07060504)
 }
 
-suite.test("SpanInitFromValue")
+suite.test("Span init(ofOne:)")
 .require(.stdlib_6_5).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let inline: InlineArray<5, UInt8> = [UInt8.zero, 1, 2, 3, 4]
 
-  let span = Span(inline)
+  let span = Span(ofOne: inline)
   let bytes = span.bytes
   for o in bytes.byteOffsets {
     let b = bytes.unsafeLoad(fromByteOffset: o, as: UInt8.self)
@@ -693,8 +693,21 @@ suite.test("SpanInitFromValue")
   }
 
   let s = "A very long string, indeed not a smol one."
-  let strSpan = Span(s)
+  let strSpan = Span(ofOne: s)
   expectEqual(strSpan.count, 1)
+}
+
+private struct NCInt: ~Copyable {
+  var value: Int
+  init(_ value: Int) { self.value = value }
+}
+
+suite.test("Span init(ofOne:) with noncopyable Element")
+.require(.stdlib_6_5).code {
+  let nc = NCInt(42)
+  let span = Span(ofOne: nc)
+  expectEqual(span.count, 1)
+  expectEqual(span[0].value, 42)
 }
 
 private func send(_: some Sendable & ~Escapable) {}
