@@ -1,0 +1,116 @@
+// RUN: %target-swift-frontend -emit-ir %s -target %target-future-triple | %FileCheck %s
+//
+// Deploying to a runtime without swift_dynamicCastTest, IRGen answers with the
+// general cast into a scratch buffer instead.
+// RUN: %target-swift-frontend -emit-ir %s -target %target-cpu-apple-macosx13.0 \
+// RUN:   | %FileCheck %s --check-prefix=OLD
+
+// REQUIRES: PTRSIZE=64
+// REQUIRES: OS=macosx
+
+// IRGen for `checked_cast_addr_br test_only`: it must call
+// swift_dynamicCastTest, not swift_dynamicCast, and must not materialise a
+// destination: the instruction has no destination operand at all, so there is
+// nothing to write through.
+//
+// Written as SIL rather than Swift so the lowering is exercised directly,
+// without depending on SILGen choosing to emit this kind.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P: ~Copyable {}
+
+struct NC: ~Copyable, P {
+  var value: Builtin.Int64
+}
+
+// The trailing flags argument is DynamicCastFlags::Default (0): a test neither
+// takes on success nor destroys on failure, so shouldDestroyOnFailure() and
+// shouldTakeOnSuccess() both contribute nothing. Compare take_always_lowering
+// below, which passes 6 (TakeOnSuccess | DestroyOnFailure).
+//
+// CHECK-LABEL: define{{.*}} @test_only_lowering
+// CHECK:         [[RES:%.*]] = call zeroext i1 @swift_dynamicCastTest(ptr %0, ptr {{.*}}, ptr {{.*}}, i64 0)
+// CHECK:         br i1 [[RES]]
+// CHECK-NOT:     @swift_dynamicCast(
+// CHECK:       {{^}}}
+//
+// The fallback passes the same Default flags, so the source is still untouched;
+// the difference is that it needs somewhere to put the value it then discards.
+// OLD-LABEL:   define{{.*}} @test_only_lowering
+// OLD:           [[SCRATCH:%.*]] = alloca
+// OLD:           call zeroext i1 @swift_dynamicCast(ptr [[SCRATCH]], ptr %0, ptr {{.*}}, ptr {{.*}}, i64 0)
+// OLD-NOT:       @swift_dynamicCastTest(
+// OLD:         {{^}}}
+sil @test_only_lowering : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> Builtin.Int1 {
+bb0(%0 : $*any P & ~Copyable):
+  checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, bb1, bb2
+
+bb1:
+  %t = integer_literal $Builtin.Int1, -1
+  br bb3(%t : $Builtin.Int1)
+
+bb2:
+  %f = integer_literal $Builtin.Int1, 0
+  br bb3(%f : $Builtin.Int1)
+
+bb3(%r : $Builtin.Int1):
+  return %r : $Builtin.Int1
+}
+
+// No stack slot is allocated for the destination, because there is no
+// destination: the whole point is that nothing is materialised.
+//
+// CHECK-LABEL: define{{.*}} @test_only_allocates_nothing
+// CHECK-NOT:     alloca
+// CHECK:         call zeroext i1 @swift_dynamicCastTest(
+// CHECK:       {{^}}}
+//
+// The fallback does allocate -- that is the cost of not having the entry point.
+// OLD-LABEL:   define{{.*}} @test_only_allocates_nothing
+// OLD:           alloca
+// OLD:         {{^}}}
+sil @test_only_allocates_nothing : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> () {
+bb0(%0 : $*any P & ~Copyable):
+  checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// For contrast: the consuming form still goes to swift_dynamicCast, and passes a
+// real destination plus non-zero flags (TakeOnSuccess | DestroyOnFailure = 6).
+//
+// CHECK-LABEL: define{{.*}} @take_always_lowering
+// CHECK:         alloca
+// CHECK:         call zeroext i1 @swift_dynamicCast(ptr {{.*}}, ptr %0, ptr {{.*}}, ptr {{.*}}, i64 6)
+// CHECK-NOT:     @swift_dynamicCastTest(
+// CHECK:       {{^}}}
+sil @take_always_lowering : $@convention(thin) (@in any P & ~Copyable) -> Builtin.Int1 {
+bb0(%0 : $*any P & ~Copyable):
+  %d = alloc_stack $NC
+  checked_cast_addr_br take_always any P & ~Copyable in %0 : $*any P & ~Copyable to NC in %d : $*NC, bb1, bb2
+
+bb1:
+  destroy_addr %d : $*NC
+  %t = integer_literal $Builtin.Int1, -1
+  br bb3(%t : $Builtin.Int1)
+
+bb2:
+  %f = integer_literal $Builtin.Int1, 0
+  br bb3(%f : $Builtin.Int1)
+
+bb3(%r : $Builtin.Int1):
+  dealloc_stack %d : $*NC
+  return %r : $Builtin.Int1
+}
