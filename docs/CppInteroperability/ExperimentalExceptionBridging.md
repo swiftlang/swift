@@ -51,23 +51,33 @@ mutating behavior, and existing C++ virtual dispatch rules, including calls to
 visible to Swift. Captured method values also throw. Throwing getter and setter
 methods do not become nonthrowing computed properties.
 
-Consuming methods require a receiver whose move construction and destruction
-cannot throw, and whose copy construction also cannot throw when it is
-`Copyable`. These operations may run in Swift-generated code around the adapter.
-This permits consuming methods on nontrivial and noncopyable receivers while
-keeping throwing implicit lifetime operations outside the supported scope.
-Inherited rvalue-qualified methods retain the importer's existing limitations.
+It also supports constructors of escapable C++ value types with arithmetic or
+enum parameters. Their Swift initializers are throwing, including captured
+references such as `let makeValue: (CInt) throws -> MyCppType = MyCppType.init`.
+Constructors inherited through `using Base::Base` preserve the annotation.
 
-Other annotated declarations are unavailable. Constructors, operators, default
-arguments, variadic functions, and functions with aggregate or pointer
-parameters or results need additional support. Explicit object member functions
-are also unsupported.
+Constructors initialize temporary storage inside the C++ adapter. If construction
+fails, C++ destroys the initialized subobjects and Swift leaves the result
+storage uninitialized. Successful results are transferred into Swift storage.
+These transfers and consuming method receivers require nonthrowing move
+construction and destruction; copyable types also require nonthrowing copy
+construction. Clang checks the operations that overload resolution selects,
+including a copy constructor used for a move expression. Noncopyable values do
+not require a copy constructor. Inherited rvalue-qualified methods retain the
+importer's existing limitations.
+
+Other annotated declarations are unavailable. Constructors of foreign reference
+types, operators, default arguments, variadic functions, and functions with
+aggregate or pointer parameters or results need additional support. Explicit
+object member functions are also unsupported.
 
 The annotation takes precedence over `noexcept` for the imported Swift function
 type. A C++ violation of `noexcept` still terminates according to C++ rules.
 Implicit copies, moves, destructors, and retain/release operations are outside
-the recovery boundary. Raw function-pointer calls do not acquire throwing
-semantics from this annotation.
+the recovery boundary. The constructor restrictions above prevent exceptions
+from the transfers required by this implementation; they do not add recovery
+to implicit operations elsewhere in Swift. Raw function-pointer calls do not
+acquire throwing semantics from this annotation.
 
 The prototype supports Darwin and Linux with C++ exceptions enabled. Darwin
 also requires Objective-C interoperability and Objective-C exception handling.

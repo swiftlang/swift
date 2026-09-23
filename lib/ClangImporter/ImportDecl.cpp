@@ -4270,8 +4270,8 @@ namespace {
         } else if (decl->isImmediateFunction()) {
           unavailableReason =
               "SWIFT_THROWS is not supported on consteval functions";
-        } else if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
-                       clang::CXXConversionDecl>(decl) ||
+        } else if (isa<clang::CXXDestructorDecl, clang::CXXConversionDecl>(
+                       decl) ||
                    decl->isOverloadedOperator() || funcTemplate ||
                    accessorInfo || importedName.importAsMember() ||
                    decl->isVariadic() || decl->isNoReturn()) {
@@ -4284,6 +4284,7 @@ namespace {
               "supported";
         } else if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
                    method && !method->isStatic() &&
+                   !isa<clang::CXXConstructorDecl>(method) &&
                    cast<FuncDecl>(result)->getSelfAccessKind() ==
                        SelfAccessKind::Consuming &&
                    !result->getDeclContext()
@@ -4307,18 +4308,40 @@ namespace {
           unavailableReason =
               "SWIFT_THROWS currently requires arithmetic or enum parameters "
               "and an arithmetic or void result";
+        } else if (auto *constructor =
+                       dyn_cast<clang::CXXConstructorDecl>(decl)) {
+          auto resultType =
+              cast<ConstructorDecl>(result)->getResultInterfaceType();
+          if (result->getDeclContext()->getSelfClassDecl() ||
+              !resultType->isEscapable() || resultType->hasTypeParameter()) {
+            unavailableReason =
+                "SWIFT_THROWS constructors currently require an escapable "
+                "C++ value type";
+          } else if (!synthesizer.canBridgeCxxConstructor(constructor)) {
+            unavailableReason =
+                "SWIFT_THROWS constructors require nonthrowing destruction "
+                "and move construction, and nonthrowing copy construction "
+                "for copyable types";
+          }
         }
 
         if (!unavailableReason.empty()) {
           Impl.markUnavailable(result, unavailableReason);
           if (auto *accessor = dyn_cast<AccessorDecl>(result))
             Impl.markUnavailable(accessor->getStorage(), unavailableReason);
-        } else if (auto *facade = synthesizer.makeCxxThrowingFunction(
-                       decl, cast<FuncDecl>(result))) {
-          result = facade;
         } else {
-          Impl.markUnavailable(result,
-                               "unable to generate C++ exception bridge");
+          AbstractFunctionDecl *facade;
+          if (auto *constructor = dyn_cast<clang::CXXConstructorDecl>(decl))
+            facade = synthesizer.makeCxxThrowingConstructor(
+                constructor, cast<ConstructorDecl>(result));
+          else
+            facade = synthesizer.makeCxxThrowingFunction(
+                decl, cast<FuncDecl>(result));
+          if (facade)
+            result = facade;
+          else
+            Impl.markUnavailable(result,
+                                 "unable to generate C++ exception bridge");
         }
       }
 
@@ -10241,7 +10264,7 @@ void ClangImporter::Implementation::importAttributes(
   }
   // Exception translation may allocate and copy an error message, even when
   // the original C++ function is annotated as having no observable effects.
-  if (auto *function = dyn_cast<FuncDecl>(MappedDecl);
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(MappedDecl);
       function && cxxExceptionBridges.contains(function))
     return;
 
@@ -10419,8 +10442,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
         clangFunction && importer::hasCxxThrowsAttr(clangFunction)) {
       if (auto *function = dyn_cast<AbstractFunctionDecl>(result);
           function && !function->isUnavailable() &&
-          (!isa<FuncDecl>(function) ||
-           !cxxExceptionBridges.contains(cast<FuncDecl>(function)))) {
+          !cxxExceptionBridges.contains(function)) {
         markUnavailable(function,
                         "SWIFT_THROWS is not supported on this kind of "
                         "declaration");
@@ -10494,8 +10516,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
       assert(ImportedCorrectly);
     }
     bool isCxxExceptionBridge =
-        isa<FuncDecl>(Result) &&
-        cxxExceptionBridges.contains(cast<FuncDecl>(Result));
+        isa<AbstractFunctionDecl>(Result) &&
+        cxxExceptionBridges.contains(cast<AbstractFunctionDecl>(Result));
     assert(Result->hasClangNode() || hasSynthesizedClangNode ||
            isCxxExceptionBridge);
   }
@@ -11250,7 +11272,15 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     // Skip adding these here to avoid double-adding the same member.
     if (isa<SubscriptDecl, ConstructorDecl>(member)) {
       const auto &LangOpts = Impl.SwiftContext.LangOpts;
-      if (auto *nd = dyn_cast_or_null<clang::NamedDecl>(member->getClangDecl());
+      auto *clangMember = member->getClangDecl();
+      if (auto *constructor = dyn_cast<ConstructorDecl>(member);
+          constructor && Impl.cxxExceptionBridges.contains(constructor)) {
+        // A native exception facade has no Clang node, but follows the eager
+        // loading policy of the source constructor it replaces.
+        clangMember =
+            Impl.forwardingSources.lookup(constructor)->getClangDecl();
+      }
+      if (auto *nd = dyn_cast_or_null<clang::NamedDecl>(clangMember);
           nd && shouldEagerlyImportClangRecordMember(nd, LangOpts))
         continue;
     }

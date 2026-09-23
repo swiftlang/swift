@@ -2912,23 +2912,23 @@ giveUpFastPath:
       auto *importer = static_cast<ClangImporter *>(
           getContext().getClangModuleLoader());
       auto *facade = values.size() == 1
-                         ? dyn_cast<FuncDecl>(values.front())
+                         ? dyn_cast<AbstractFunctionDecl>(values.front())
                          : nullptr;
       FuncDecl *projected = nullptr;
       if (importer && facade) {
         if (recordID == XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE) {
           projected = importer->getCxxExceptionBridgeAdapter(facade);
-        } else {
+        } else if (auto *method = dyn_cast<FuncDecl>(facade)) {
           uint8_t rawKind;
           XRefCxxSynthesizedMethodPathPieceLayout::readRecord(scratch, rawKind);
           switch (static_cast<CxxSynthesizedMethodKind>(rawKind)) {
           case CxxSynthesizedMethodKind::StaticVirtualCall:
-            projected = importer->getOriginalForVirtualThunk(facade);
+            projected = importer->getOriginalForVirtualThunk(method);
             break;
           case CxxSynthesizedMethodKind::InheritedCall:
-            if (importer->getOriginalForClonedMember(facade))
+            if (importer->getOriginalForClonedMember(method))
               projected = dyn_cast_or_null<FuncDecl>(
-                  importer->getCalledBaseCxxMethod(facade));
+                  importer->getCalledBaseCxxMethod(method));
             break;
           }
         }

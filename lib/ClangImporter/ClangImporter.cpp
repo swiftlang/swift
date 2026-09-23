@@ -8784,22 +8784,31 @@ bool importer::hasSwiftAttribute(const clang::Decl *decl,
 }
 
 bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
-  return llvm::any_of(decl->redecls(), [](const clang::FunctionDecl *redecl) {
-    return hasSwiftAttribute(redecl, {"import_throws"});
-  });
+  if (llvm::any_of(decl->redecls(), [](const clang::FunctionDecl *redecl) {
+        return hasSwiftAttribute(redecl, {"import_throws"});
+      }))
+    return true;
+  // Clang models an inherited constructor with a new implicit declaration.
+  // Preserve the base constructor's annotation on this route to calling it.
+  if (auto *constructor = dyn_cast<clang::CXXConstructorDecl>(decl);
+      constructor && constructor->isInheritingConstructor())
+    return hasCxxThrowsAttr(
+        constructor->getInheritedConstructor().getConstructor());
+  return false;
 }
 
-bool ClangImporter::isCxxExceptionBridge(const FuncDecl *decl) const {
+bool ClangImporter::isCxxExceptionBridge(
+    const AbstractFunctionDecl *decl) const {
   return Impl.cxxExceptionBridges.contains(decl);
 }
 
 FuncDecl *ClangImporter::getCxxExceptionBridgeAdapter(
-    const FuncDecl *facade) const {
+    const AbstractFunctionDecl *facade) const {
   return Impl.cxxExceptionBridges.lookup(facade);
 }
 
-FuncDecl *ClangImporter::getCxxExceptionBridgeFacade(
-    const FuncDecl *adapter) const {
+AbstractFunctionDecl *
+ClangImporter::getCxxExceptionBridgeFacade(const FuncDecl *adapter) const {
   return Impl.cxxExceptionBridgeFacades.lookup(adapter);
 }
 

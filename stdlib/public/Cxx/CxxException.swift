@@ -44,6 +44,32 @@ public func _withCxxExceptionCapture<Result>(
   return result
 }
 
+/// Runs a compiler-generated constructor adapter with uninitialized storage.
+///
+/// The body initializes exactly one result on success, or calls its exception
+/// callback on failure. It must not escape any pointer or leave a live result
+/// after reporting an exception. This function is an implementation detail of
+/// C++ interoperability.
+@unsafe
+@_alwaysEmitIntoClient
+public func _withCxxExceptionResult<Result: ~Copyable>(
+  _ type: Result.Type,
+  _ body: (
+    UnsafeMutableRawPointer?, UnsafeMutableRawPointer?,
+    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
+  ) -> Void
+) throws -> Result {
+  try withUnsafeTemporaryAllocation(of: Result.self, capacity: 1) {
+    output in
+    try unsafe _withCxxExceptionCapture { context, callback in
+      unsafe body(UnsafeMutableRawPointer(output.baseAddress!), context, callback)
+    }
+    // A failed C++ constructor already destroyed its initialized subobjects.
+    // Only move from storage after the adapter reports successful construction.
+    return unsafe output.baseAddress!.move()
+  }
+}
+
 /// Copies a message while the C++ exception that owns it is still alive.
 ///
 /// The compiler passes this function as a C function pointer. `context` must

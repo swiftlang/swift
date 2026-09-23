@@ -746,8 +746,9 @@ public:
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
 
-  llvm::DenseMap<const FuncDecl *, FuncDecl *> cxxExceptionBridges;
-  llvm::DenseMap<const FuncDecl *, FuncDecl *> cxxExceptionBridgeFacades;
+  llvm::DenseMap<const AbstractFunctionDecl *, FuncDecl *> cxxExceptionBridges;
+  llvm::DenseMap<const FuncDecl *, AbstractFunctionDecl *>
+      cxxExceptionBridgeFacades;
 
 private:
   // Keep track of the decls that were already cloned for this specific class.

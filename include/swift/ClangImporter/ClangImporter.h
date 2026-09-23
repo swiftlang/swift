@@ -74,6 +74,7 @@ namespace dependencies {
 namespace swift {
 enum class ResultConvention : uint8_t;
 class ASTContext;
+class AbstractFunctionDecl;
 class CASOptions;
 class CompilerInvocation;
 class ClangImporterOptions;
@@ -760,11 +761,13 @@ public:
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
 
   /// Whether this is the native throwing facade of a C++ exception adapter.
-  bool isCxxExceptionBridge(const FuncDecl *decl) const;
+  bool isCxxExceptionBridge(const AbstractFunctionDecl *decl) const;
 
   /// Recover either half of a generated exception bridge for serialization.
-  FuncDecl *getCxxExceptionBridgeAdapter(const FuncDecl *facade) const;
-  FuncDecl *getCxxExceptionBridgeFacade(const FuncDecl *adapter) const;
+  FuncDecl *
+  getCxxExceptionBridgeAdapter(const AbstractFunctionDecl *facade) const;
+  AbstractFunctionDecl *
+  getCxxExceptionBridgeFacade(const FuncDecl *adapter) const;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 

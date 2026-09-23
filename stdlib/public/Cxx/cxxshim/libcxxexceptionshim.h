@@ -27,6 +27,7 @@
 
 #include <cxxabi.h>
 #include <exception>
+#include <new>
 
 namespace __swift_cxx_exception_support {
 
