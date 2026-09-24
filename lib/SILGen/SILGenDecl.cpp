@@ -1664,10 +1664,14 @@ public:
       bindValue = bindValue.copy(SGF, loc);
     }
 
-    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        pattern, bindValue,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
-        MarkUnresolvedNonCopyableValueInst::IsStrict);
+    // mark_unresolved_non_copyable_value drives the move-only checker, but it
+    // has to own the value it checks.
+    if (bindValue.getType().isAddress() || bindValue.isPlusOne(SGF)) {
+      bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          pattern, bindValue,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+          MarkUnresolvedNonCopyableValueInst::IsStrict);
+    }
 
     SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                               SILAccessEnforcement::Unknown);
