@@ -1,0 +1,652 @@
+// RUN: %target-sil-opt %s -test-runner -sil-print-types -sil-disable-input-verify | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+struct C { var k: K }
+struct NC: ~Copyable { var k: K }
+
+struct B { var c: C }
+struct A { var b: B }
+struct Two { var a: K; var b: K }
+struct NCTwo: ~Copyable { var a: K; var b: K }
+struct Nested { var p: Two; var k: K }
+
+sil @getK : $@convention(thin) () -> @owned K
+sil @useK : $@convention(thin) (@guaranteed K) -> ()
+sil @consumeK : $@convention(thin) (@owned K) -> ()
+sil @consumeTwo : $@convention(thin) (@owned Two) -> ()
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @useNC : $@convention(thin) (@guaranteed NC) -> ()
+sil @consumeNC : $@convention(thin) (@owned NC) -> ()
+sil @barrier : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [ossa] @basic_take_of_uninit_box :
+// CHECK:          [[ROOT:%.*]] = project_box {{.*}} : ${ var K }, 0
+// CHECK:          assign undef to [init] [[ROOT]]
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown] [[ROOT]]
+// CHECK-NEXT:     [[LD:%.*]] = load [copy] [[BA]]
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LD]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @basic_take_of_uninit_box : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var K }, var, name "a"
+  %1 = mark_uninitialized [var] %0 : ${ var K }
+  %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
+  %root = project_box %2 : ${ var K }, 0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %l1 = load [take] %d1 : $*K
+  end_access %d1 : $*K
+  ignored_use %l1
+  destroy_value %l1
+
+  end_borrow %2
+  destroy_value %1
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @basic_take_of_uninit :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          assign undef to [init] [[ROOT]]
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown] [[ROOT]]
+// CHECK-NEXT:     load [take] [[BA]]
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @basic_take_of_uninit : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $K, var, name "x", type $K
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %l1 = load [take] %d1 : $*K
+  end_access %d1 : $*K
+  ignored_use %l1
+  destroy_value %l1
+
+  destroy_addr %root
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// FIXME: the `begin_access [deinit]`` should be corrected by LifetimeResolution into a `[read]`
+// CHECK-LABEL: sil [ossa] @basic_double_take :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown] [[ROOT]] : $*K
+// CHECK-NEXT:     [[LD:%.*]] = load [copy] [[BA]] : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LD]]
+// CHECK-NEXT:     end_access [[BA]] : $*K
+// CHECK-NEXT:     ignored_use [[LD]]
+// CHECK:          load [take]
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @basic_double_take : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, var, name "a", type $K
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %val = apply %getFn() : $@convention(thin) () -> @owned K
+  assign %val to %root
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %l1 = load [take] %d1 : $*K
+  end_access %d1 : $*K
+  ignored_use %l1
+  destroy_value %l1
+
+  %r1 = begin_access [deinit] [unknown] %root : $*K
+  %l2 = load [take] %r1 : $*K
+  destroy_value %l2 : $K
+  end_access %r1 : $*K
+
+  destroy_addr %root : $*K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+
+// FIXME: the `begin_access [read]` should be corrected by LifetimeResolution into a `[deinit]` or `[modify]`
+// CHECK-LABEL: sil [ossa] @basic_last_use_is_copy :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[BA:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*K
+// CHECK-NEXT:     [[LD:%.*]] = load [take] [[BA]] : $*K
+// CHECK-NEXT:     end_access [[BA]] : $*K
+// CHECK-NEXT:     ignored_use [[LD]]
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @basic_last_use_is_copy : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, var, name "a", type $K
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %val = apply %getFn() : $@convention(thin) () -> @owned K
+  assign %val to %root
+
+  %d1 = begin_access [read] [unknown] %root : $*K
+  %l1 = load [copy] %d1 : $*K
+  end_access %d1 : $*K
+  ignored_use %l1
+  destroy_value %l1
+
+  destroy_addr %root : $*K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @nc_borrow_within_access_before_consume :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+
+// CHECK:          [[BA:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*NC
+// CHECK-NEXT:     [[LD:%.*]] = load_borrow [[BA]] : $*NC
+// CHECK-NEXT:     apply {{.*}}([[LD]]) : $@convention(thin) (@guaranteed NC) -> ()
+// CHECK-NEXT:     end_borrow [[LD]]
+// CHECK-NEXT:     end_access [[BA]]
+
+// CHECK-NOT:      load_borrow
+
+// CHECK:          [[BA2:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*NC
+// CHECK-NEXT:     [[LD2:%.*]] = load_borrow [[BA]] : $*NC
+// CHECK-NEXT:     apply {{.*}}([[LD2]]) : $@convention(thin) (@guaranteed NC) -> ()
+// CHECK-NEXT:     apply {{.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT:     end_borrow [[LD2]]
+// CHECK-NEXT:     end_access [[BA2]]
+
+// CHECK-NOT:      load_borrow
+// CHECK:          load [take]
+// CHECK-NOT:      destroy_addr
+
+// CHECK-LABEL: } // end sil function
+sil [ossa] @nc_borrow_within_access_before_consume : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $NC, var, name "a", type $NC
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %val = apply %getFn() : $@convention(thin) () -> @owned NC
+  assign %val to %root
+
+// Basic load-and-use within access
+
+  %useFn = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %r1 = begin_access [read] [unknown] %root : $*NC
+  %l1 = load [copy] %r1 : $*NC
+  apply %useFn(%l1) : $@convention(thin) (@guaranteed NC) -> ()
+  destroy_value %l1
+  end_access %r1 : $*NC
+
+// Same as above, but with a deinit barrier after the apply.
+
+  %barrierFn = function_ref @barrier : $@convention(thin) () -> ()
+  %r2 = begin_access [read] [unknown] %root : $*NC
+  %l2 = load [copy] %r1 : $*NC
+  apply %useFn(%l2) : $@convention(thin) (@guaranteed NC) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %l2
+  end_access %r2 : $*NC
+
+  %consumeFn = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %c1 = begin_access [deinit] [unknown] %root : $*NC
+  %c2 = load [take] %c1 : $*NC
+  end_access %c1 : $*NC
+  apply %consumeFn(%c2) : $@convention(thin) (@owned NC) -> ()
+
+  destroy_addr %root : $*NC
+  dealloc_stack %0 : $*NC
+  %t = tuple ()
+  return %t
+}
+
+//===----------------------------------------------------------------------===//
+// Field sensitivity: demand is tracked per leaf subelement, so consumes and uses
+// of distinct fields are independent.
+//===----------------------------------------------------------------------===//
+
+// Two independent leaves. Taking `a` and then `b` are each the last use of their
+// own field, so both remain `load [take]`.
+// CHECK-LABEL: sil [ossa] @fs_independent_field_takes :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          store {{%.*}} to [init] [[ROOT]] : $*Two
+// CHECK:          [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:     load [take] [[AA]] : $*K
+// CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:     load [take] [[AB]] : $*K
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_independent_field_takes : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = struct $Two (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*Two
+
+  %aa = struct_element_addr %root : $*Two, #Two.a
+  %la = load [take] %aa : $*K
+  apply %consFn(%la) : $@convention(thin) (@owned K) -> ()
+
+  %ab = struct_element_addr %root : $*Two, #Two.b
+  %lb = load [take] %ab : $*K
+  apply %consFn(%lb) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// take-then-copy --> copy-then-take + diagnostic
+// CHECK-LABEL: sil [ossa] @fs_use_after_consume_same_field :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[A1:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:     [[L1:%.*]] = load [copy] [[A1]] : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[L1]] : $K
+// CHECK:          [[A2:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:     load [take] [[A2]] : $*K
+// CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:     load [take] [[AB]] : $*K
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_use_after_consume_same_field : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = struct $Two (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*Two
+
+  %aa1 = struct_element_addr %root : $*Two, #Two.a
+  %la1 = load [take] %aa1 : $*K
+  apply %consFn(%la1) : $@convention(thin) (@owned K) -> ()
+
+  %aa2 = struct_element_addr %root : $*Two, #Two.a
+  %la2 = load [copy] %aa2 : $*K
+  apply %consFn(%la2) : $@convention(thin) (@owned K) -> ()
+
+  %ab = struct_element_addr %root : $*Two, #Two.b
+  %lb = load [copy] %ab : $*K
+  apply %consFn(%lb) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// Consuming the whole aggregate, and then a field `b`.
+// Since the whole take is interior it is legalized as a copy, leaving leaf `a`
+// live, so the trailing destroy_addr is retained.
+// CHECK-LABEL: sil [ossa] @fs_take_whole_then_field :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[LW:%.*]] = load [copy] [[ROOT]] : $*Two
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LW]] : $Two
+// CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:     load [take] [[AB]] : $*K
+// CHECK:          destroy_addr [[ROOT]] : $*Two
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_take_whole_then_field : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = struct $Two (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*Two
+
+  %lw = load [take] %root : $*Two
+  destroy_value %lw : $Two
+
+  %ab = struct_element_addr %root : $*Two, #Two.b
+  %lb = load [take] %ab : $*K
+  apply %consFn(%lb) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// The dual of the above: consuming field `a` and then the whole aggregate. The
+// whole take demands leaf `a` below, so the field-`a` take is interior and
+// legalized as a copy.
+// CHECK-LABEL: sil [ossa] @fs_take_field_then_whole :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:     [[LA:%.*]] = load [copy] [[AA]] : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LA]] : $K
+// CHECK:          load [take] [[ROOT]] : $*Two
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_take_field_then_whole : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %consTwoFn = function_ref @consumeTwo : $@convention(thin) (@owned Two) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = struct $Two (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*Two
+
+  %aa = struct_element_addr %root : $*Two, #Two.a
+  %la = load [take] %aa : $*K
+  apply %consFn(%la) : $@convention(thin) (@owned K) -> ()
+
+  %lw = load [take] %root : $*Two
+  apply %consTwoFn(%lw) : $@convention(thin) (@owned Two) -> ()
+
+  destroy_addr %root : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// Tuple elements are leaves too: taking `.0` and `.1` are independent last uses,
+// so both stay takes.
+// CHECK-LABEL: sil [ossa] @fs_tuple_independent_takes :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[E0:%.*]] = tuple_element_addr [[ROOT]] : $*(K, K), 0
+// CHECK-NEXT:     load [take] [[E0]] : $*K
+// CHECK:          [[E1:%.*]] = tuple_element_addr [[ROOT]] : $*(K, K), 1
+// CHECK-NEXT:     load [take] [[E1]] : $*K
+// CHECK-NOT:      load [copy]
+// CHECK-NOT:      diagnose
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_tuple_independent_takes : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $(K, K), var, name "t", type $(K, K)
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = tuple (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*(K, K)
+
+  %e0 = tuple_element_addr %root : $*(K, K), 0
+  %l0 = load [take] %e0 : $*K
+  apply %consFn(%l0) : $@convention(thin) (@owned K) -> ()
+
+  %e1 = tuple_element_addr %root : $*(K, K), 1
+  %l1 = load [take] %e1 : $*K
+  apply %consFn(%l1) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*(K, K)
+  dealloc_stack %0 : $*(K, K)
+  %t = tuple ()
+  return %t
+}
+
+// Nested aggregate: `Nested` linearizes to three leaves [p.a, p.b, k]. Consuming
+// each once through a chained projection is three independent last uses that are
+// converted to [take]'s
+// CHECK-LABEL: sil [ossa] @fs_nested_leaves :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          struct_element_addr [[ROOT]] : $*Nested, #Nested.p
+// CHECK-NEXT:     struct_element_addr {{.*}} : $*Two, #Two.a
+// CHECK-NEXT:     load [take]
+// CHECK:          struct_element_addr [[ROOT]] : $*Nested, #Nested.p
+// CHECK-NEXT:     struct_element_addr {{.*}} : $*Two, #Two.b
+// CHECK-NEXT:     load [take]
+// CHECK:          struct_element_addr [[ROOT]] : $*Nested, #Nested.k
+// CHECK-NEXT:     load [take]
+// CHECK-NOT:      load [copy]
+// CHECK-NOT:      diagnose
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_nested_leaves : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Nested, var, name "n", type $Nested
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %vk = apply %getFn() : $@convention(thin) () -> @owned K
+  %two = struct $Two (%va : $K, %vb : $K)
+  %n = struct $Nested (%two : $Two, %vk : $K)
+  store %n to [init] %root : $*Nested
+
+  %pa = struct_element_addr %root : $*Nested, #Nested.p
+  %aa = struct_element_addr %pa : $*Two, #Two.a
+  %la = load [copy] %aa : $*K
+  apply %consFn(%la) : $@convention(thin) (@owned K) -> ()
+
+  %pb = struct_element_addr %root : $*Nested, #Nested.p
+  %ab = struct_element_addr %pb : $*Two, #Two.b
+  %lb = load [copy] %ab : $*K
+  apply %consFn(%lb) : $@convention(thin) (@owned K) -> ()
+
+  %ka = struct_element_addr %root : $*Nested, #Nested.k
+  %lk = load [copy] %ka : $*K
+  apply %consFn(%lk) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*Nested
+  dealloc_stack %0 : $*Nested
+  %t = tuple ()
+  return %t
+}
+
+// Noncopyable field sensitivity: consuming field `a` (last use) stays a take.
+// Field `b` is read while still demanded below, so it becomes a `load_borrow`.
+// CHECK-LABEL: sil [ossa] @fs_nc_take_field_borrow_other :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[AA:%.*]] = struct_element_addr [[ROOT]] : $*NCTwo, #NCTwo.a
+// CHECK-NEXT:     load [take] [[AA]] : $*K
+// CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*NCTwo, #NCTwo.b
+// CHECK-NEXT:     [[LB:%.*]] = load_borrow [[AB]] : $*K
+// CHECK:          end_borrow [[LB]] : $K
+// CHECK:          [[AB2:%.*]] = struct_element_addr [[ROOT]] : $*NCTwo, #NCTwo.b
+// CHECK-NEXT:     load [take] [[AB2]] : $*K
+// CHECK-NOT:      diagnose
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_nc_take_field_borrow_other : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $NCTwo, var, name "t", type $NCTwo
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = struct $NCTwo (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*NCTwo
+
+  %aa = struct_element_addr %root : $*NCTwo, #NCTwo.a
+  %la = load [take] %aa : $*K
+  apply %consFn(%la) : $@convention(thin) (@owned K) -> ()
+
+  %ab = struct_element_addr %root : $*NCTwo, #NCTwo.b
+  %lb = load [copy] %ab : $*K
+  apply %useFn(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %lb : $K
+
+  %ab2 = struct_element_addr %root : $*NCTwo, #NCTwo.b
+  %lb2 = load [take] %ab2 : $*K
+  apply %consFn(%lb2) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*NCTwo
+  dealloc_stack %0 : $*NCTwo
+  %t = tuple ()
+  return %t
+}
+
+// Field sensitivity is preserved through a `begin_access` scope: the field-`a`
+// take within the access is the last use of `a` and stays a take; the field-`b`
+// take is independent.
+// CHECK-LABEL: sil [ossa] @fs_field_access_scope :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[ACC:%.*]] = begin_access [deinit] [unknown] [[ROOT]] : $*Two
+// CHECK-NEXT:     [[AA:%.*]] = struct_element_addr [[ACC]] : $*Two, #Two.a
+// CHECK-NEXT:     load [take] [[AA]] : $*K
+// CHECK-NEXT:     end_access [[ACC]] : $*Two
+// CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:     load [take] [[AB]] : $*K
+// CHECK-NOT:      load [copy]
+// CHECK-NOT:      diagnose
+// CHECK-NOT:      destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_field_access_scope : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %vb = apply %getFn() : $@convention(thin) () -> @owned K
+  %whole = struct $Two (%va : $K, %vb : $K)
+  store %whole to [init] %root : $*Two
+
+  %acc = begin_access [deinit] [unknown] %root : $*Two
+  %aa = struct_element_addr %acc : $*Two, #Two.a
+  %la = load [copy] %aa : $*K
+  end_access %acc : $*Two
+  apply %consFn(%la) : $@convention(thin) (@owned K) -> ()
+
+  %ab = struct_element_addr %root : $*Two, #Two.b
+  %lb = load [copy] %ab : $*K
+  apply %consFn(%lb) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %root : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// A field used before being initialized still triggers the use-before-init repair for that field.
+// Field `a` is stored but never consumed, so the trailing destroy_addr is retained.
+// CHECK-LABEL: sil [ossa] @fs_partial_use_before_init :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK-NEXT:     assign undef to [init] [[ROOT]]
+// CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:     load [take] [[AB]] : $*K
+// CHECK:          destroy_addr [[ROOT]] : $*Two
+// CHECK-LABEL: } // end sil function
+sil [ossa] @fs_partial_use_before_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %aa = struct_element_addr %root : $*Two, #Two.a
+  store %va to [init] %aa : $*K
+
+  %ab = struct_element_addr %root : $*Two, #Two.b
+  %lb = load [copy] %ab : $*K
+  apply %useFn(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %lb : $K
+
+  destroy_addr %root : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+
+//===----------------------------------------------------------------------===//
+// destroy_addr removal: a `load [take]` that consumes the storage leaves a
+// dominated `destroy_addr` as a redundant, so it is deleted.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @stack_final_take_deletes_destroy_addr :
+// CHECK:         load [take] {{.*}} : $*C
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @stack_final_take_deletes_destroy_addr : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  %1 = mark_uninitialized [var] %0 : $*C
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %vk = apply %getFn() : $@convention(thin) () -> @owned K
+  %c = struct $C (%vk : $K)
+  assign %c to %1 : $*C
+
+  %ld = load [copy] %1 : $*C     // gets turned into a [take]
+  ignored_use %ld
+  destroy_value %ld
+
+  destroy_addr %1 : $*C          // gets deleted
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @stack_take_dominates_branch_destroys :
+// CHECK:         load [take] {{.*}} : $*C
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function
+sil [ossa] @stack_take_dominates_branch_destroys : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  %1 = mark_uninitialized [var] %0 : $*C
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %vk = apply %getFn() : $@convention(thin) () -> @owned K
+  %c = struct $C (%vk : $K)
+  assign %c to %1 : $*C
+
+  %ld = load [copy] %1 : $*C     // gets turned into a [take]; dominates both destroys
+  ignored_use %ld
+  destroy_value %ld
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_addr %1 : $*C          // gets deleted
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*C          // gets deleted
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}

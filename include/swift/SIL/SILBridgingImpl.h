@@ -1596,6 +1596,10 @@ bool BridgedInstruction::MoveValue_isFromVarDecl() const {
   return getAs<swift::MoveValueInst>()->isFromVarDecl();
 }
 
+bool BridgedInstruction::MoveValue_getAllowDiagnostics() const {
+  return getAs<swift::MoveValueInst>()->getAllowDiagnostics();
+}
+
 SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {
   return getAs<swift::ProjectBoxInst>()->getFieldIndex();
 }
@@ -1972,6 +1976,10 @@ bool BridgedInstruction::MarkUnresolvedNonCopyableValue_isStrict() const {
   return getAs<swift::MarkUnresolvedNonCopyableValueInst>()->isStrict();
 }
 
+SwiftInt BridgedInstruction::Diagnose_getKind() const {
+  return (SwiftInt)getAs<swift::DiagnoseInst>()->getKind();
+}
+
 void BridgedInstruction::RefCountingInst_setIsAtomic(bool isAtomic) const {
   getAs<swift::RefCountingInst>()->setAtomicity(
       isAtomic ? swift::RefCountingInst::Atomicity::Atomic
@@ -2250,6 +2258,10 @@ swift::SILDebugVariable BridgedSILDebugVariable::unbridge() const {
 
 OptionalBridgedDebugScope BridgedSILDebugVariable::getScope() const {
   return {unbridge().Scope};
+}
+
+bool BridgedSILDebugVariable::isLet() const {
+  return unbridge().isLet();
 }
 
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
@@ -3303,6 +3315,13 @@ BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue ds
                                   (swift::StoreOwnershipQualifier)ownership)};
 }
 
+BridgedInstruction BridgedBuilder::createAssign(BridgedValue src, BridgedValue dst,
+                               SwiftInt ownership) const {
+  return {unbridged().createAssign(regularLoc(), src.getSILValue(),
+                                   dst.getSILValue(),
+                                   (swift::AssignOwnershipQualifier)ownership)};
+}
+
 BridgedInstruction BridgedBuilder::createStoreBorrow(BridgedValue src, BridgedValue dst) const {
   return {unbridged().createStoreBorrow(regularLoc(), src.getSILValue(),
                                         dst.getSILValue())};
@@ -3404,6 +3423,13 @@ BridgedInstruction BridgedBuilder::createMarkUnresolvedNonCopyableValue(BridgedV
   return {unbridged().createMarkUnresolvedNonCopyableValueInst(
       regularLoc(), value.getSILValue(), (swift::MarkUnresolvedNonCopyableValueInst::CheckKind)checkKind,
       (swift::MarkUnresolvedNonCopyableValueInst::IsStrict_t)isStrict)};
+}
+
+BridgedInstruction BridgedBuilder::createDiagnose(BridgedValue operand,
+                                                  SwiftInt kind) const {
+  return {unbridged().createDiagnose(
+      regularLoc(), operand.getSILValue(),
+      (swift::DiagnoseInst::DiagnoseKind)kind)};
 }
 
 
