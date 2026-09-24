@@ -972,6 +972,17 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
                           M.getName());
       return nullptr;
     }
+    // Reconstructing a serialized bridge also needs C++ import support,
+    // regardless of the ordinary advisory interoperability requirement.
+    if (loadedModuleFileCore->requiresCxxExceptionBridging() &&
+        !Ctx.LangOpts.EnableCXXInterop) {
+      if (diagLoc) {
+        Ctx.Diags.diagnose(*diagLoc, diag::need_cxx_interop_to_import_module,
+                           M.getName());
+        Ctx.Diags.diagnose(*diagLoc, diag::enable_cxx_interop_docs);
+      }
+      return nullptr;
+    }
 
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));

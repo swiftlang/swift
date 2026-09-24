@@ -61,7 +61,8 @@ Objective-C exceptions and foreign unwind exceptions terminate instead of
 becoming Swift errors. Windows and Embedded Swift are not supported.
 
 A Swift module built with both C++ interoperability and this experimental
-feature requires the feature in its consumers, including when the producer
-opts out of the usual C++ interoperability import requirement. This prevents
-serialized function references from being interpreted with different throwing
-types.
+feature requires both settings in its consumers. This requirement applies even
+when the producer or consumer opts out of the usual C++ interoperability import
+requirement. The importer needs C++ interoperability to reconstruct the
+exception adapters and their throwing function types from serialized bodies,
+including when a module exposes only Swift types in its public API.
