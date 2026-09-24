@@ -272,12 +272,15 @@ void BindingSet::computeJoinsAndMeets() {
   bool allowUpperBound = false;
   MergedBinding supertypes;
   MergedBinding subtypes;
+  std::optional<unsigned> firstSubtype;
 
   // FIXME: Remove this.
   bool allowTypeVariableJoins =
       CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
 
-  for (const auto &binding : Bindings) {
+  for (unsigned i : indices(Bindings)) {
+    auto binding = Bindings[i];
+
     if (binding.Kind == AllowedBindingKind::Supertypes &&
         binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
       if (!isAcceptableJoin(binding.BindingType))
@@ -287,6 +290,7 @@ void BindingSet::computeJoinsAndMeets() {
     } else if (binding.Kind == AllowedBindingKind::Subtypes &&
                binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
       subtypes.add(binding);
+      firstSubtype = i;
     }
   }
 
@@ -366,11 +370,10 @@ void BindingSet::computeJoinsAndMeets() {
       supertypes.bindingSource = *found;
     }
 
-    PotentialBinding supertypeBinding(commonSupertype,
-                                      AllowedBindingKind::Supertypes,
-                                      supertypes.bindingSource,
-                                      supertypes.originator);
-    newBindings.push_back(supertypeBinding);
+    newBindings.emplace_back(commonSupertype,
+                             AllowedBindingKind::Supertypes,
+                             supertypes.bindingSource,
+                             supertypes.originator);
     foundCommonSupertype = true;
   }
 
@@ -386,6 +389,30 @@ void BindingSet::computeJoinsAndMeets() {
       LLVM_DEBUG(llvm::dbgs() << "Meet(" << commonSubtype << ", "
                               << ty << ") = " << newSubtype << "\n");
       commonSubtype = newSubtype;
+    }
+
+    if (uninhabited) {
+      // We found an unsatisfiable set of subtype constraints, eg:
+      //
+      // $T0 conv Int
+      // $T0 conv String
+      LLVM_DEBUG(llvm::dbgs() << "Uninhabited meet: "
+                              << commonSubtype << "\n");
+
+      // Drop the joined supertype binding, if we recorded one above.
+      newBindings.clear();
+
+      // Add an exact binding. It should always fail when attempted.
+      newBindings.emplace_back(commonSubtype, AllowedBindingKind::Exact,
+                               subtypes.bindingSource,
+                               subtypes.originator);
+
+      // Drop all other bindings.
+      std::swap(newBindings, Bindings);
+
+      // Mark the binding set in conflict so that it can be attempted next.
+      markConflicting();
+      return;
     }
 
     if (commonSubtype->is<MeetType>()) {
@@ -407,38 +434,16 @@ void BindingSet::computeJoinsAndMeets() {
       }
     }
 
-    auto newKind = uninhabited ? AllowedBindingKind::Exact
-                               : AllowedBindingKind::Subtypes;
-    PotentialBinding subtypeBinding(commonSubtype, newKind,
-                                    subtypes.bindingSource,
-                                    subtypes.originator);
-
-    newBindings.push_back(subtypeBinding);
+    newBindings.emplace_back(commonSubtype,
+                             AllowedBindingKind::Subtypes,
+                             subtypes.bindingSource,
+                             subtypes.originator);
     foundCommonSubtype = true;
   }
 
-  // Check if there's nothing to do.
+  // Check if we discovered anything new above.
   if (!foundCommonSupertype && !foundCommonSubtype)
     return;
-
-  // If the joined binding is in conflict with an existing subtype binding,
-  // we have a situation where we picked a more general supertype than what
-  // was expected. Bail out.
-  //
-  // FIXME: Eventually, we should drop the supertype bindings.
-  if (!uninhabited &&
-      foundCommonSubtype &&
-      foundCommonSupertype &&
-      subsumeBinding(newBindings[1], newBindings[0])
-          == SubsumeBindingResult::Conflict) {
-    return;
-  }
-
-  if (uninhabited) {
-    LLVM_DEBUG(llvm::dbgs() << "Uninhabited meet: "
-                            << commonSubtype << "\n");
-    markConflicting();
-  }
 
   if (foundCommonSupertype) {
     LLVM_DEBUG(llvm::dbgs() << "Accepted join type: "
@@ -448,6 +453,35 @@ void BindingSet::computeJoinsAndMeets() {
   if (foundCommonSubtype) {
     LLVM_DEBUG(llvm::dbgs() << "Accepted meet type: "
                             << commonSubtype << "\n");
+  }
+
+  // If the joined binding is in conflict with an existing subtype binding,
+  // we have a situation where we picked a more general supertype than what
+  // was expected. Drop the joined supertype binding. Don't clear
+  // foundCommonSupertype, because we *also* want to drop all other
+  // supertype bindings.
+  if (foundCommonSupertype) {
+    // Case 1: We did not compute a meet, but we have at least one subtype
+    // binding. Check if the joined supertype is in conflict with the
+    // first subtype binding.
+    if (!foundCommonSubtype && firstSubtype.has_value()) {
+      if (subsumeBinding(newBindings[0], Bindings[*firstSubtype])
+            == SubsumeBindingResult::Conflict) {
+        LLVM_DEBUG(llvm::dbgs() << "Join is too general: "
+                                << commonSupertype << "\n");
+        newBindings.erase(newBindings.begin());
+      }
+
+    // Case 2: We computed a meet. Check if the join type is in conflict
+    // with the meet.
+    } else if (foundCommonSubtype) {
+      if (subsumeBinding(newBindings[0], newBindings[1])
+            == SubsumeBindingResult::Conflict) {
+        LLVM_DEBUG(llvm::dbgs() << "Join is too general: "
+                                << commonSupertype << "\n");
+        newBindings.erase(newBindings.begin());
+      }
+    }
   }
 
   // Remove bindings that participated in the join and meet.
@@ -472,7 +506,7 @@ void BindingSet::computeJoinsAndMeets() {
     newBindings.push_back(binding);
   }
 
-  // All good.
+  // All done.
   std::swap(Bindings, newBindings);
 }
 
