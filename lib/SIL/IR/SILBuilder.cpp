@@ -672,6 +672,17 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc,
                                        moved, trace));
 }
 
+DebugValueInst *SILBuilder::createVoidVariableDebugValue(
+    SILLocation Loc, SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
+  SILType voidTy = SILType::getEmptyTupleType(getASTContext());
+  Var.Type = voidTy;
+  Var.DIExpr.clear();
+
+  return createDebugValue(Loc, SILUndef::get(&getFunction(), voidTy), Var,
+                          wasMoved, trace);
+}
+
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
                                            function_ref<void(SILValue)> &&fun) {
   SILValue value = original;

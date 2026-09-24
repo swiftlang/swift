@@ -1920,18 +1920,10 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
 /// an archetype that will be removed.
 /// \p debugValue is erased as a new instruction is created.
 static void replaceWithVoidVariable(DebugValueInst *debugValue) {
-  SILFunction *function = debugValue->getFunction();
-  SILType voidTy = SILType::getEmptyTupleType(function->getASTContext());
-
-  SILDebugVariable var = *debugValue->getVarInfo();
-  var.Type = voidTy;
-  var.DIExpr.clear();
-
   SILBuilder builder(debugValue, debugValue->getDebugScope());
-  builder.createDebugValue(debugValue->getLoc(),
-                           SILUndef::get(function, voidTy), var,
-                           debugValue->usesMoveableValueDebugInfo(),
-                           debugValue->hasTrace());
+  builder.createVoidVariableDebugValue(
+      debugValue->getLoc(), *debugValue->getVarInfo(),
+      debugValue->usesMoveableValueDebugInfo(), debugValue->hasTrace());
   debugValue->eraseFromParent();
 }
 
