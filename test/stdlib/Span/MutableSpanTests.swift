@@ -770,6 +770,18 @@ suite.test("MutableSpan init(ofOne:)")
   }
 }
 
+suite.test("MutableSpan init(ofOne:) integer")
+.xfail(.always("https://github.com/swiftlang/swift/issues/92562"))
+.require(.stdlib_6_5).code {
+  var value = 42
+
+  var span = MutableSpan(ofOne: &value)
+  expectEqual(span.count, 1)
+  span[0] += 1
+
+  expectEqual(value, 43)
+}
+
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
