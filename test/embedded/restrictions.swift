@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -verify-additional-prefix nonembedded-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -verify-additional-prefix embedded-
-// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK -DSUPPRESS_CASTS
+// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_CASTS
 // REQUIRES: swift_feature_Embedded
 
 // ---------------------------------------------------------------------------
@@ -34,28 +34,6 @@ struct SomeStruct {
       0
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// weak/unowned references
-// ---------------------------------------------------------------------------
-
-// Note: this have always been an error in Embedded Swift. Make sure they stay
-// that way, but are emitted as warnings when the restrictions are enabled.
-
-public class MyClass { }
-
-public struct MyStruct {
-  #if !SUPPRESS_WEAK
-  var normalVar: MyClass
-  weak var weakVar: MyClass? // expected-nonembedded-warning {{attribute 'weak' cannot be used in Embedded Swift}}
-  // expected-embedded-error@-1 {{attribute 'weak' cannot be used in Embedded Swift}}
-
-  unowned var unownedVar: MyClass // expected-nonembedded-warning {{attribute 'unowned' cannot be used in Embedded Swift}}
-  // expected-embedded-error @-1{{attribute 'unowned' cannot be used in Embedded Swift}}
-  #endif
-
-  unowned(unsafe) var unownedUnsafe: MyClass
 }
 
 // ---------------------------------------------------------------------------

@@ -282,6 +282,17 @@ protected:
   }
 
   void destroySource() { SourceMetadata->vw_destroy(SourceLocation); }
+
+  void checkDynamicType(const Metadata *expected, bool queried = true,
+                        bool acquired = true) {
+    EXPECT_EQ(expected, swift_getCOMDynamicType(Source, SourceType));
+    EXPECT_EQ(queried ? 1U : 0U, Object.Queries);
+    EXPECT_EQ(acquired ? 1U : 0U, Object.AddRefs);
+    EXPECT_EQ(acquired ? 1U : 0U, Object.Releases);
+    EXPECT_EQ(1U, Object.References);
+    EXPECT_FALSE(Object.Destroyed);
+    EXPECT_EQ(1U, swift_retainCount(Object.OwnedObject));
+  }
 };
 
 class COMSwiftCastOwnershipTest
@@ -503,6 +514,51 @@ TEST_F(COMSwiftCastTest, NonnegativeStatus) {
   destroySource();
   EXPECT_FALSE(Object.Destroyed);
   swift_release(result);
+}
+
+TEST_F(COMSwiftCastTest, NativeDynamicType) {
+  // The object is a subclass and the incoming interface has a distinct address.
+  EXPECT_NE(Source, Object.OwnedObject);
+  checkDynamicType(&NativeMetadata);
+  EXPECT_EQ(1U, Object.ObjectReads);
+  EXPECT_EQ(1U, Object.MetadataReads);
+}
+
+TEST_F(COMSwiftCastTest, ForeignDynamicType) {
+  Object.Status = NoInterface;
+  checkDynamicType(SourceType, true, false);
+  EXPECT_EQ(0U, Object.ObjectReads);
+  EXPECT_EQ(0U, Object.MetadataReads);
+}
+
+TEST_F(COMSwiftCastTest, NullDynamicTypeSource) {
+  Source = nullptr;
+  checkDynamicType(SourceType, false, false);
+}
+
+TEST_F(COMSwiftCastTest, NullDynamicTypeInterface) {
+  Object.NullInterface = true;
+  checkDynamicType(SourceType, true, false);
+}
+
+TEST_F(COMSwiftCastTest, NullDynamicTypeObject) {
+  Object.ReportedObject = nullptr;
+  checkDynamicType(SourceType);
+}
+
+TEST_F(COMSwiftCastTest, NullDynamicTypeMetadata) {
+  Object.ReportedMetadata = nullptr;
+  checkDynamicType(SourceType);
+}
+
+TEST_F(COMSwiftCastTest, MismatchedDynamicTypeMetadata) {
+  Object.ReportedMetadata = &OtherMetadata;
+  checkDynamicType(SourceType);
+}
+
+TEST_F(COMSwiftCastTest, NonClassDynamicTypeMetadata) {
+  Object.ReportedMetadata = &METADATA_SYM(Bi64_).base;
+  checkDynamicType(SourceType);
 }
 
 TEST_F(COMSwiftCastTest, NullSource) {

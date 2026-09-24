@@ -33,13 +33,20 @@ public struct ClassMetadata {
   Embedded Swift Refcounting Scheme
   =================================
 
-  The scheme for storing and maintaining a refcount on heap objects is very simple in Embedded Swift, and is much
-  simpler than regular Swift's. This is mainly due to the fact that we currently only maintain the regular ("strong")
-  refcount and we don't allow weak references, unowned references and we don't track refcount during deinit of the
-  object.
+  The scheme for storing and maintaining a refcount on heap objects is simpler than regular Swift's. There's no side
+  table, we don't track the refcount during deinit, and 16/32-bit don't support weak/unowned references. On 64-bit,
+  a single count handles both weak and unowned.
 
   The refcount is always stored directly inline in the heap object, in the `refcount` field (see HeapObject struct
-  below). This field has the following structure (on 32-bit, and similar on other bitwidths):
+  below). On 64-bit, where weak and unowned references are supported, the field has the following structure:
+
+  ┌──────────────┬─────────────────────┬─────────────────────────┐
+  │     b63      │       b62:b32       │          b31:b0         │
+  ├──────────────┼─────────────────────┼─────────────────────────┤
+  │ doNotFreeBit │   weak refcount     │  number of references   │
+  └──────────────┴─────────────────────┴─────────────────────────┘
+
+  On 32-bit and 16-bit there is no weak refcount and the whole field below doNotFreeBit is the reference count:
 
   ┌──────────────┬──────────────────────────────────────────────┐
   │     b31      │                  b30:b0                      │
@@ -53,19 +60,18 @@ public struct ClassMetadata {
   (see swift_initStackObject).
 
   To retrieve the actual number of references from the `refcount` field, refcountMask needs to be applied, which masks
-  off the doNotFreeBit.
+  off the doNotFreeBit and (if applicable) the weak refcount.
 
-  The actual number of references has one possible value that has a special meaning, immortalRefCount (all bits set,
-  i.e. 0x7fff_ffff on 32-bit systems). When used, retain and release operations do nothing, references are not counted,
-  and the object can never be deinit'd / free'd. This is used for class instances that are promoted by the compiler to
-  be allocated statically in global memory (see swift_initStaticObject). Note that there are two different scenarios for
-  this currently:
+  When the number of references is set to all 1s i.e. immortalRefCount, the object is immortal, and retain/release on it
+  do nothing. This is used for class instances that are promoted by the compiler to be allocated statically in global
+  memory (see swift_initStaticObject and irgen::emitConstantObject).
 
-  - In most cases, a class instance that is promoted to a global, is still dynamically initialized with a runtime call
-    to swift_initStaticObject. This function will set the refcount field to immortalRefCount | doNotFreeBit.
+  - In most cases, a class instance that is promoted to a global is still dynamically initialized with a runtime call
+    to swift_initStaticObject, which writes the metadata pointer and sets the refcount field to staticRefCount.
   - As a special case to allow arrays be fully statically initialized without runtime overhead, instances of
     _ContiguousArrayStorage can be promoted to __StaticArrayStorage with the HeapObject header emitted directly by the
-    compiler and refcount field directly set to immortalRefCount | doNotFreeBit (see irgen::emitConstantObject).
+    compiler, refcount field included (see irgen::emitConstantObject). This also lets the object live in a read-only
+    section.
 
   The immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
   when they're currently inside their deinit(). This is done to prevent further retains and releases inside deinit from
@@ -73,46 +79,115 @@ public struct ClassMetadata {
   deinit() are allowed, as long as they are balanced at the end, i.e. the object is not escaped (user's responsibility)
   and not over-released (this can only be caused by unsafe code).
 
-  The following table summarizes the meaning of the possible combinations of doNotFreeBit and have immortal refcount
-  value:
+  Weak references need to distinguish between a statically allocated object and a stack object that's in the process of
+  deiniting. A weak reference can be formed to a statically allocated object, but not to a deiniting stack object. Both
+  have doNotFree set, and the deiniting stack object may have the immortal refcount set. We tell them apart by having
+  statically allocated objects set their weak reference count to all 1s, which is a reserved value to indicate that the
+  object is statically allocated.
 
-  ┌───────────╥──────────╥─────────────────────────────────────────────────┐
-  │ doNotFree ║ immortal ║                                                 │
-  ╞═══════════╬══════════╬═════════════════════════════════════════════════╡
-  │ 0         ║ no       ║ regular class instance                          │
-  ├───────────╫──────────╫─────────────────────────────────────────────────┤
-  │ 0         ║ yes      ║ regular class instance during deinit()          │
-  ├───────────╫──────────╫─────────────────────────────────────────────────┤
-  │ 1         ║ no       ║ stack-allocated                                 │
-  ├───────────╫──────────╫─────────────────────────────────────────────────┤
-  │ 1         ║ yes      ║ global-allocated, no need to track references,  │
-  │           ║          ║ or stack-allocated instance during deinit()     │
-  └───────────╨──────────╨─────────────────────────────────────────────────┘
+  The following table summarizes the meaning of the possible combinations of doNotFreeBit, a saturated weak refcount,
+  and having the immortal refcount value:
+
+  ┌───────────╥──────────╥──────────╥───────────────────────────────────────────┐
+  │ doNotFree ║ weak sat ║ immortal ║                                           │
+  ╞═══════════╬══════════╬══════════╬═══════════════════════════════════════════╡
+  │ 0         ║ no       ║ no       ║ regular class instance                    │
+  ├───────────╫──────────╫──────────╫───────────────────────────────────────────┤
+  │ 0         ║ no       ║ yes      ║ regular class instance during deinit()    │
+  ├───────────╫──────────╫──────────╫───────────────────────────────────────────┤
+  │ 0         ║ yes      ║ *        ║ impossible                                │
+  ├───────────╫──────────╫──────────╫───────────────────────────────────────────┤
+  │ 1         ║ no       ║ no       ║ stack-allocated, alive or maybe in deinit │
+  ├───────────╫──────────╫──────────╫───────────────────────────────────────────┤
+  │ 1         ║ no       ║ yes      ║ stack-allocated, definitely in deinit     │
+  ├───────────╫──────────╫──────────╫───────────────────────────────────────────┤
+  │ 1         ║ yes      ║ yes      ║ global-allocated                          │
+  ├───────────╫──────────╫──────────╫───────────────────────────────────────────┤
+  │ 1         ║ yes      ║ no       ║ impossible                                │
+  └───────────╨──────────╨──────────╨───────────────────────────────────────────┘
+
+  The last release on a stack-promoted object will set the refcount to the immortal value. However, the optimizer may
+  elide the last release and directly call the deinit, in which case the refcount never gets set to immortal. Hence a
+  stack object with a non-immortal refcount may or may not be in deinit. That means there's no way to reliably
+  distinguish between a live stack object and a deiniting one. For our purposes, there's no need to: a weak reference to
+  an object while it's still live will block stack promotion, so the only way the weak reference machinery can see one
+  is if it's in deinit.
+
+
+  Weak Reference Design
+  =====================
+
+  A weak reference to an object becomes logically `nil` when the object begins deinit. Loading a weak reference to a
+  live object will retain that object to prevent it from being destroyed, and return the retained object. This must be
+  done atomically. A concurrent release of the object must result in either an intact, retained object being returned,
+  or `nil`. It must not be possible for a concurrent release to happen between a check and a retain such that the weak
+  load returns a reference to an object being destroyed.
+
+  In the Embedded runtime, weak references are implemented as pointers to the object they reference. When the object's
+  strong refcount drops to zero, the object begins deinitialization. However, the object's memory is not deallocated
+  until all outstanding weak references to it are gone. The outstanding weak references continue to directly point to
+  this object husk, which no longer has valid storied properties, but still has a valid refcount field. When the last
+  outstanding weak reference is dropped, then the object's memory is freed.
+
+  This is implemented by having separate strong and weak reference counts. They share space within the reference count
+  field. Weak references are only available on 64-bit, as the maximum counts would be too small with a smaller reference
+  count field.
+
+  Conceptually, an object holds a weak reference to itself while it's live, and that self-weak-reference is dropped
+  after deinit completes. The reference counts each take action when they transition from 1 -> 0 and this framing allows
+  us to consider those actions independently:
+
+  ┌───────────────┬───────────────────┐
+  │  transition   │      effect       │
+  ├───────────────┼───────────────────┤
+  │ strong 1 -> 0 │    begin deinit   │
+  ├───────────────┼───────────────────┤
+  │   weak 1 -> 0 │ deallocate object │
+  └───────────────┴───────────────────┘
+
+  This self-weak-reference is NOT actually stored in the reference count field. The field thus has an implicit +1 bias:
+  a count of 0 really means 1 self-weak-reference, a count of 5 means 1 self-weak-reference plus 5 external weak
+  references, etc.
+
+
+  Overflow Detection
+  ==================
+
+  The Embedded runtime detects and traps when a reference count value overflows its field. However, this has
+  limitations, as many reference count operations are implemented with unconditional atomic add/subtract. This means
+  that the reference count manipulation is performed first, and then overflow is detected afterwards. Concurrent
+  reference count manipulation can see an overflowed refcount field, and if timing is bad they may misbehave before the
+  thread that hit the overflow traps.
 */
 @unsafe
 public struct HeapObject {
   // There is no way to express the custom ptrauth signature on the metadata
   // field, so let's use UnsafeRawPointer and a helper function in C instead
   // (_swift_embedded_set_heap_object_metadata_pointer).
-  var metadata: UnsafeRawPointer
+  var metadata: UnsafeRawPointer?
 
-  // TODO: This is just an initial support for strong refcounting only. We need
-  // to think about supporting (or banning) weak and/or unowned references.
+  // The strong reference count, and on 64-bit the weak reference count.
   var refcount: Int
 
   // Note: The immortalRefCount value is also hard-coded in IRGen in `irgen::emitConstantObject`, and in HeapObject.h.
 #if _pointerBitWidth(_64)
   static let doNotFreeBit     = Int(bitPattern: 0x8000_0000_0000_0000)
-  static let refcountMask     = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
-  static let immortalRefCount = Int(bitPattern: 0x7fff_ffff_ffff_ffff) // Make sure we don't have doNotFreeBit set
+  static let weakRefcountMask = Int(bitPattern: 0x7fff_ffff_0000_0000)
+  static let weakRefcountMax  = Int(bitPattern: 0x7fff_fffe_0000_0000) // The all-ones pattern is reserved for staticRefCount
+  static let weakRefcountOne  = Int(bitPattern: 0x0000_0001_0000_0000)
+  static let refcountMask     = Int(bitPattern: 0x0000_0000_ffff_ffff) // This MUST be at the bottom of the word
+  static let immortalRefCount = Int(bitPattern: 0x0000_0000_ffff_ffff) // Make sure we don't have doNotFreeBit set
+  static let staticRefCount   = Int(bitPattern: 0xffff_ffff_ffff_ffff) // Matches IRGen's swiftImmortalRefCount for global objects
 #elseif _pointerBitWidth(_32)
   static let doNotFreeBit     = Int(bitPattern: 0x8000_0000)
   static let refcountMask     = Int(bitPattern: 0x7fff_ffff)
   static let immortalRefCount = Int(bitPattern: 0x7fff_ffff) // Make sure we don't have doNotFreeBit set
+  static let staticRefCount   = Int(bitPattern: 0xffff_ffff) // Matches IRGen's swiftImmortalRefCount for global objects
 #elseif _pointerBitWidth(_16)
   static let doNotFreeBit     = Int(bitPattern: 0x8000)
   static let refcountMask     = Int(bitPattern: 0x7fff)
   static let immortalRefCount = Int(bitPattern: 0x7fff) // Make sure we don't have doNotFreeBit set
+  static let staticRefCount   = Int(bitPattern: 0xffff) // Matches IRGen's swiftImmortalRefCount for global objects
 #endif
 
 #if _pointerBitWidth(_64)
@@ -388,19 +463,31 @@ func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, alloca
     return
   }
 
+#if _pointerBitWidth(_64)
+  // Release the weak refcount implicitly held by the live object on itself. If
+  // there are no outstanding weak refs, this deallocates the object.
+  unsafe weakRelease(object: object, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+#else
+  // Weak references aren't supported. Directly destroy the object.
   unsafe swift_slowDealloc(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask)
+#endif
 }
 
 @c
 public func swift_deallocClassInstanceTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
-#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
   let p = unsafe UnsafeMutablePointer<HeapObject>(object)
   if (unsafe p.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
     return
   }
+
+#if _pointerBitWidth(_64)
+  // Release the weak refcount implicitly held by the live object on itself. If
+  // there are no outstanding weak refs, this deallocates the object.
+  unsafe weakRelease(object: p, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask, typeId: typeId)
+#elseif SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
   unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(p), allocatedSize, allocatedAlignMask, 0, typeId)
 #else
-  unsafe swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+  unsafe swift_deallocClassInstance(object: p, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 #endif
 }
 
@@ -430,7 +517,7 @@ public func swift_initStaticObject(metadata: Builtin.RawPointer, object: Builtin
 
 func swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
-  unsafe object.pointee.refcount = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+  unsafe object.pointee.refcount = HeapObject.staticRefCount
   return unsafe object
 }
 
@@ -446,7 +533,7 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
 }
 
 @unsafe
-public var _emptyBoxStorage: (Int, Int) = (/*isa*/0, /*refcount*/-1)
+public var _emptyBoxStorage: (Int, Int) = (/*isa*/0, /*refcount*/HeapObject.staticRefCount)
 
 @c
 public func swift_allocEmptyBox() -> Builtin.RawPointer {
@@ -795,7 +882,7 @@ public func swift_isUniquelyReferenced_nonNull_native(object: Builtin.RawPointer
 
 func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>) -> Bool {
   let refcount = unsafe refcountPointer(for: object)
-  return unsafe loadAcquire(refcount) == 1
+  return unsafe loadAcquire(refcount) & HeapObject.refcountMask == 1
 }
 
 @c
@@ -822,10 +909,46 @@ func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> Uns
     return unsafe object
   }
 
-  unsafe addRelaxed(refcount, n: Int(n))
+  let oldValue = unsafe addRelaxed(refcount, n: Int(n))
+
+  if (oldValue & HeapObject.refcountMask) >= HeapObject.immortalRefCount - Int(n) {
+    fatalError("reference count overflow")
+  }
 
   return unsafe object
 }
+
+#if _pointerBitWidth(_64)
+// Retain `object` unless its refcount holds the immortal value, and return the
+// refcount value that the decision was made on. The caller passes that value to
+// refcountValueIsLiveForWeakReference to find out whether the object was live,
+// and therefore whether it now holds a strong reference.
+//
+// This is almost the same operation as swift_retain_n_(1), but it avoids a race
+// between checking for immortalRefCount and doing the increment.
+func tryRetain(object: UnsafeMutablePointer<HeapObject>) -> Int {
+  let refcount = unsafe refcountPointer(for: object)
+  var refcountValue = unsafe loadRelaxed(refcount)
+
+  // If we see immortalRefCount then there's nothing to do, the retain operation
+  // is a no-op.
+  while refcountValue & HeapObject.refcountMask != HeapObject.immortalRefCount {
+    // Compare-and-swap the incremented value. Use &+ to avoid an overflow
+    // check. Overflow is impossible by construction since it would require
+    // refcount == immortalRefCount, but the compiler doesn't realize this.
+    let newValue = refcountValue &+ 1
+    let (seenValue, won) = unsafe compareExchangeRelaxed(refcount, expectedOldValue: refcountValue, desiredNewValue: newValue)
+    if won {
+      return refcountValue
+    }
+
+    // Compare-and-swap operation failed, try again.
+    refcountValue = seenValue
+  }
+
+  return refcountValue
+}
+#endif
 
 @c
 @discardableResult
@@ -890,19 +1013,52 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBo
     return
   }
 
-  let resultingRefcount = unsafe subFetchAcquireRelease(refcount, n: Int(n)) & HeapObject.refcountMask
-  if resultingRefcount == 0 {
+  let resultingRefcountValue = unsafe subFetchAcquireRelease(refcount, n: Int(n))
+  if resultingRefcountValue & HeapObject.refcountMask == 0 {
     // Set the refcount to immortalRefCount before calling the object destroyer
     // to prevent future retains/releases from having any effect. Unlike the
     // full Swift runtime, we don't track the refcount inside deinit, so we
     // won't be able to detect escapes or over-releases of `self` in deinit. We
     // might want to reconsider that in the future.
-    //
-    // There can only be one thread with a reference at this point (because
-    // we're releasing the last existing reference), so a relaxed store is
-    // enough.
+
     let doNotFree = (loadedRefcount & HeapObject.doNotFreeBit) != 0
-    unsafe storeRelaxed(refcount, newValue: HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0))
+    let deallocatingRefcountAndFlag = HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0)
+
+#if _pointerBitWidth(_64)
+    // When weak references are supported, we have to check the weak refcount
+    // and handle things differently when there are still outstanding weak refs.
+    if (resultingRefcountValue & HeapObject.weakRefcountMask) == 0 {
+      // There can only be one thread with a reference at this point because
+      // we're releasing the last strong reference and there are no weak
+      // references, so a relaxed store is enough.
+      unsafe storeRelaxed(refcount, newValue: deallocatingRefcountAndFlag)
+    } else {
+      // There are one or more weak references to this object, which may
+      // concurrently take us from strong refcount 0 -> 1. Do a compare and swap
+      // to ensure we only transition to deallocating if nobody else incremented
+      // our strong refcount.
+      var oldValue = resultingRefcountValue
+      var done = false
+      while !done {
+        if (oldValue & HeapObject.refcountMask) != 0 {
+          // Something retained this object before we could move to the
+          // deallocating state, so we're no longer doing that here. We already
+          // did the refcount decrement, so we're all done.
+          return
+        }
+
+        // Still at (or retained but came back to) refcount 0, try to emplace
+        // the deallocating state.
+        let newValue = (oldValue & HeapObject.weakRefcountMask) | deallocatingRefcountAndFlag
+        (oldValue, done) = unsafe compareExchangeRelaxed(refcount, expectedOldValue: oldValue, desiredNewValue: newValue)
+      }
+    }
+#else
+    // There can only be one thread with a reference at this point because we're
+    // releasing the last existing reference and weak references aren't
+    // supported, so a relaxed store is enough.
+    unsafe storeRelaxed(refcount, newValue: deallocatingRefcountAndFlag)
+#endif
 
     if isBoxRelease {
         // _swift_embedded_invoke_box_destroy only runs the boxed payload's
@@ -924,8 +1080,6 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBo
     } else {
         unsafe _swift_embedded_invoke_heap_object_destroy(object)
     }
-  } else if resultingRefcount < 0 {
-    fatalError("negative refcount")
   }
 }
 
@@ -986,16 +1140,27 @@ fileprivate func loadAcquire(_ atomic: UnsafeMutablePointer<Int>) -> Int {
 
 fileprivate func subFetchAcquireRelease(_ atomic: UnsafeMutablePointer<Int>, n: Int) -> Int {
   let oldValue = Int(Builtin.atomicrmw_sub_acqrel_Word(atomic._rawValue, n._builtinWordValue))
-  return oldValue - n
+  // The atomicrmw operation wraps on overflow, so do the same when deriving the
+  // new value to return.
+  return oldValue &- n
 }
 
-fileprivate func addRelaxed(_ atomic: UnsafeMutablePointer<Int>, n: Int) {
-  _ = Builtin.atomicrmw_add_monotonic_Word(atomic._rawValue, n._builtinWordValue)
+// Relaxed atomic add. Returns the old value.
+@discardableResult
+fileprivate func addRelaxed(_ atomic: UnsafeMutablePointer<Int>, n: Int) -> Int {
+  return Int(Builtin.atomicrmw_add_monotonic_Word(atomic._rawValue, n._builtinWordValue))
 }
 
-fileprivate func compareExchangeRelaxed(_ atomic: UnsafeMutablePointer<Int>, expectedOldValue: Int, desiredNewValue: Int) -> Bool {
-  let (_, won) = Builtin.cmpxchg_monotonic_monotonic_Word(atomic._rawValue, expectedOldValue._builtinWordValue, desiredNewValue._builtinWordValue)
-  return Bool(won)
+// Atomic add with release ordering. Returns the old value.
+@discardableResult
+fileprivate func addRelease(_ atomic: UnsafeMutablePointer<Int>, n: Int) -> Int {
+  return Int(Builtin.atomicrmw_add_release_Word(atomic._rawValue, n._builtinWordValue))
+}
+
+// Compare-and-swap with relaxed ordering. Returns a tuple containing the old value, and whether the operation succeeded.
+fileprivate func compareExchangeRelaxed(_ atomic: UnsafeMutablePointer<Int>, expectedOldValue: Int, desiredNewValue: Int) -> (oldValue: Int, won: Bool) {
+  let (oldValue, won) = Builtin.cmpxchg_monotonic_monotonic_Word(atomic._rawValue, expectedOldValue._builtinWordValue, desiredNewValue._builtinWordValue)
+  return (Int(oldValue), Bool(won))
 }
 
 fileprivate func storeRelease(_ atomic: UnsafeMutablePointer<Int>, newValue: Int) {
@@ -1005,6 +1170,454 @@ fileprivate func storeRelease(_ atomic: UnsafeMutablePointer<Int>, newValue: Int
 fileprivate func storeRelaxed(_ atomic: UnsafeMutablePointer<Int>, newValue: Int) {
   Builtin.atomicstore_monotonic_Word(atomic._rawValue, newValue._builtinWordValue)
 }
+
+#if _pointerBitWidth(_64)
+
+/// Weak and unowned references
+///
+/// See Weak Reference Design at the top of the file for details on this implementation.
+
+// The type for the implementation of a weak reference value. It's still a
+// pointer to the weakly-referenced object, but managed differently.
+typealias WeakReference = UnsafeMutablePointer<HeapObject>
+
+// A weak reference slot is a pointer to the actual in-memory representation of
+// a weak reference, which may be nil. The weak entrypoints operate on slots
+// rather than the values directly.
+typealias WeakSlot = UnsafeMutablePointer<WeakReference?>
+
+// Form an optional object pointer from raw pointer bits.
+func optionalObject(_ bits: Builtin.RawPointer) -> UnsafeMutablePointer<HeapObject>? {
+  if UInt(Builtin.ptrtoint_Word(bits)) == 0 {
+    return nil
+  }
+  return unsafe UnsafeMutablePointer<HeapObject>(bits)
+}
+
+// Initialize the uninitialized slot `ref` to `value`, which may be nil, and
+// return `ref`. `value` is passed at +0 and gains a weak reference.
+@c
+public func swift_weakInit(ref: Builtin.RawPointer, value: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe swift_weakInit(ref: WeakSlot(ref), value: optionalObject(value))._rawValue
+}
+
+func swift_weakInit(ref: WeakSlot, value: UnsafeMutablePointer<HeapObject>?) -> WeakSlot {
+  if unsafe objectIsLiveForWeakReference(object: value) {
+    unsafe weakRetain(object: value)
+    unsafe ref.pointee = value
+  } else {
+    unsafe ref.pointee = nil
+  }
+  return unsafe ref
+}
+
+// Assign `value`, which may be nil, to the initialized slot `ref`, and return
+// `ref`. `value` is passed at +0 and gains a weak reference. The slot's old
+// value loses a weak reference.
+@c
+public func swift_weakAssign(ref: Builtin.RawPointer, value: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe swift_weakAssign(ref: WeakSlot(ref), value: optionalObject(value))._rawValue
+}
+
+func swift_weakAssign(ref: WeakSlot, value: UnsafeMutablePointer<HeapObject>?) -> WeakSlot {
+  var newValue: UnsafeMutablePointer<HeapObject>? = nil
+  if unsafe objectIsLiveForWeakReference(object: value) {
+    unsafe weakRetain(object: value)
+    unsafe newValue = value
+  }
+  unsafe weakRelease(object: ref.pointee)
+  unsafe ref.pointee = newValue
+  return unsafe ref
+}
+
+// Return the object referenced by the initialized slot `ref` at +1, or nil if
+// it has been deallocated or the slot contains nil.
+@c
+public func swift_weakLoadStrong(ref: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe Builtin.reinterpretCast(swift_weakLoadStrong(ref: WeakSlot(ref)))
+}
+
+func swift_weakLoadStrong(ref: WeakSlot) -> UnsafeMutablePointer<HeapObject>? {
+  guard let object = unsafe ref.pointee else { return nil }
+  return unsafe weakLoad(object: object)
+}
+
+// Return the object referenced by the initialized slot `ref` at +1, or nil if
+// it has been deallocated or the slot contains nil. `ref` is left
+// uninitialized, consuming the weak reference it held.
+@c
+public func swift_weakTakeStrong(ref: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe Builtin.reinterpretCast(swift_weakTakeStrong(ref: WeakSlot(ref)))
+}
+
+func swift_weakTakeStrong(ref: WeakSlot) -> UnsafeMutablePointer<HeapObject>? {
+  let object = unsafe swift_weakLoadStrong(ref: ref)
+  unsafe weakRelease(object: ref.pointee)
+  return unsafe object
+}
+
+// Consume the weak reference in `ref`, leaving it uninitialized.
+@c
+public func swift_weakDestroy(ref: Builtin.RawPointer) {
+  unsafe swift_weakDestroy(ref: WeakSlot(ref))
+}
+
+func swift_weakDestroy(ref: WeakSlot) {
+  unsafe weakRelease(object: ref.pointee)
+}
+
+// Initialize the uninitialized slot `dest` from `src`, and return `dest`. The
+// referenced object gains a weak reference.
+@c
+public func swift_weakCopyInit(dest: Builtin.RawPointer, src: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe swift_weakCopyInit(dest: WeakSlot(dest), src: WeakSlot(src))._rawValue
+}
+
+func swift_weakCopyInit(dest: WeakSlot, src: WeakSlot) -> WeakSlot {
+  let object = unsafe src.pointee
+
+  // If the object is dead then store nil into dest as an optimization.
+  if unsafe !objectIsLiveForWeakReference(object: object) {
+    unsafe dest.pointee = nil
+  } else {
+    unsafe weakRetain(object: object)
+    unsafe dest.pointee = object
+  }
+  return unsafe dest
+}
+
+// Initialize the uninitialized slot `dest` by moving the weak reference out of
+// the initialized slot `src`, leaving `src` uninitialized, and return `dest`.
+// No refcounts change.
+@c
+public func swift_weakTakeInit(dest: Builtin.RawPointer, src: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe swift_weakTakeInit(dest: WeakSlot(dest), src: WeakSlot(src))._rawValue
+}
+
+func swift_weakTakeInit(dest: WeakSlot, src: WeakSlot) -> WeakSlot {
+  unsafe dest.pointee = src.pointee
+  return unsafe dest
+}
+
+// Assign into the initialized slot `dest` from the initialized slot `src`, and
+// return `dest`. The object `src` references gains a weak reference, `dest`'s
+// old value loses one, and `src` keeps the one it held.
+@c
+public func swift_weakCopyAssign(dest: Builtin.RawPointer, src: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe swift_weakCopyAssign(dest: WeakSlot(dest), src: WeakSlot(src))._rawValue
+}
+
+func swift_weakCopyAssign(dest: WeakSlot, src: WeakSlot) -> WeakSlot {
+  return unsafe swift_weakAssign(ref: dest, value: src.pointee)
+}
+
+// Assign into the initialized slot `dest` by moving the weak reference out of
+// the initialized slot `src`, leaving `src` uninitialized, and return `dest`.
+// `dest`'s old value loses a weak reference.
+@c
+public func swift_weakTakeAssign(dest: Builtin.RawPointer, src: Builtin.RawPointer) -> Builtin.RawPointer {
+  return unsafe swift_weakTakeAssign(dest: WeakSlot(dest), src: WeakSlot(src))._rawValue
+}
+
+func swift_weakTakeAssign(dest: WeakSlot, src: WeakSlot) -> WeakSlot {
+  if unsafe dest != src {
+    unsafe weakRelease(object: dest.pointee)
+    unsafe dest.pointee = src.pointee
+  }
+  return unsafe dest
+}
+
+// Unowned references are loadable under native refcounting, so IRGen emits
+// these value operations rather than the address operations weak references
+// use. The swift_unownedInit / Assign / LoadStrong / Destroy / CopyInit / ...
+// names in the C++ runtime are inline wrappers around these four and are never
+// emitted as calls.
+
+// Add an unowned reference to `object`, which may be nil, and return it.
+// Unowned references share the weak refcount here, so this is a weak retain.
+@c
+@discardableResult
+public func swift_unownedRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  unsafe swift_unownedRetain(object: optionalObject(object))
+  return object
+}
+
+// IRGen emits unowned_retain on the payload of an `unowned var x: T?`, which is
+// nil when the reference is, so nil is not an error here.
+func swift_unownedRetain(object: UnsafeMutablePointer<HeapObject>?) {
+  guard let object = unsafe object else { return }
+  if unsafe !objectIsLiveForWeakReference(object: object) {
+    fatalError("unowned retain of a dead object")
+  }
+  unsafe weakRetain(object: object)
+}
+
+// Remove an unowned reference from `object`, which may be nil,
+// deallocating it if that was the last reference of any kind.
+@c
+public func swift_unownedRelease(object: Builtin.RawPointer) {
+  unsafe swift_unownedRelease(object: optionalObject(object))
+}
+
+func swift_unownedRelease(object: UnsafeMutablePointer<HeapObject>?) {
+  unsafe weakRelease(object: object)
+}
+
+// Return `object`, which may be nil, at +1 strong, raising a fatal error if
+// it has already been deallocated. The unowned reference the caller holds is
+// unchanged.
+@c
+@discardableResult
+public func swift_unownedRetainStrong(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  unsafe swift_unownedRetainStrong(object: optionalObject(object))
+  return object
+}
+
+func swift_unownedRetainStrong(object: UnsafeMutablePointer<HeapObject>?) {
+  guard let object = unsafe object else { return }
+  if unsafe weakLoad(object: object) == nil {
+    fatalError("load of an unowned reference to a dead object")
+  }
+}
+
+// Add a strong reference to `object`, if non-nil, and remove the caller's
+// unowned reference, raising a fatal error if `object` has already been
+// deallocated.
+@c
+public func swift_unownedRetainStrongAndRelease(object: Builtin.RawPointer) {
+  unsafe swift_unownedRetainStrongAndRelease(object: optionalObject(object))
+}
+
+func swift_unownedRetainStrongAndRelease(object: UnsafeMutablePointer<HeapObject>?) {
+  unsafe swift_unownedRetainStrong(object: object)
+  // Use the special nonZero variant to avoid pulling the deallocation path into
+  // this function. That path is unreachable here (barring unsafe code) but the
+  // compiler doesn't know that.
+  unsafe weakReleaseNonZero(object: object)
+}
+
+// Raise a fatal error if `object`, if non-nil, has already been deallocated. No
+// refcounts change.
+@c
+public func swift_unownedCheck(object: Builtin.RawPointer) {
+  unsafe swift_unownedCheck(object: optionalObject(object))
+}
+
+func swift_unownedCheck(object: UnsafeMutablePointer<HeapObject>?) {
+  guard let object = unsafe object else { return }
+  if unsafe !objectIsLiveForWeakReference(object: object) {
+    fatalError("load of an unowned reference to a dead object")
+  }
+}
+
+// swift_unownedRetain, without atomicity.
+@c
+@discardableResult
+public func swift_nonatomic_unownedRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_unownedRetain(object: object)
+}
+
+// swift_unownedRelease, without atomicity.
+@c
+public func swift_nonatomic_unownedRelease(object: Builtin.RawPointer) {
+  swift_unownedRelease(object: object)
+}
+
+// swift_unownedRetainStrong, without atomicity.
+@c
+@discardableResult
+public func swift_nonatomic_unownedRetainStrong(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_unownedRetainStrong(object: object)
+}
+
+// swift_unownedRetainStrongAndRelease, without atomicity.
+@c
+public func swift_nonatomic_unownedRetainStrongAndRelease(object: Builtin.RawPointer) {
+  swift_unownedRetainStrongAndRelease(object: object)
+}
+
+// Decrement the weak reference count of an object that is known to have a weak
+// refcount greater than zero. That means this release can't be the one that
+// frees the object. Use in place of weakRetain to avoid pulling in all of the
+// deallocation logic in a path where a dealloc is impossible.
+//
+// If this weak release would result in deallocating the object (i.e this is the
+// last weak reference to the object) then raise a fatal error.
+func weakReleaseNonZero(object: WeakReference?) {
+  guard let object = unsafe object else { return }
+
+  let refcount = unsafe refcountPointer(for: object)
+
+  // The weak refcount exists to track when an object can be freed. If it's
+  // never freed, there's no need to track it.
+  if unsafe loadRelaxed(refcount) & HeapObject.doNotFreeBit != 0 {
+    return
+  }
+
+  // If we decremented from zero then we'd be deallocating the object, which
+  // must not happen in this NonZero case.
+  let oldValue = unsafe addRelaxed(refcount, n: -HeapObject.weakRefcountOne)
+  if (oldValue & HeapObject.weakRefcountMask) == 0 {
+    fatalError("weakReleaseNonZero reached zero weak refcount")
+  }
+}
+
+// Increment the weak reference count of the target of a weak reference.
+func weakRetain(object: WeakReference?) {
+  guard let object = unsafe object else { return }
+
+  let refcount = unsafe refcountPointer(for: object)
+
+  // The weak refcount exists to track when an object can be freed. If it's
+  // never freed, there's no need to track it.
+  if unsafe loadRelaxed(refcount) & HeapObject.doNotFreeBit != 0 {
+    return
+  }
+
+  let oldValue = unsafe addRelaxed(refcount, n: HeapObject.weakRefcountOne)
+  if (oldValue & HeapObject.weakRefcountMask) == HeapObject.weakRefcountMax {
+    fatalError("weak reference count overflow")
+  }
+}
+
+// Load a weak reference. Atomically retain the object and return it, or return
+// nil if the target has started deinit.
+func weakLoad(object: WeakReference) -> UnsafeMutablePointer<HeapObject>? {
+  // The liveness test and the retain must be a single atomic operation.
+  // tryRetain does this, and returns the refcount value which we can check for
+  // liveness.
+  let refcountValue = unsafe tryRetain(object: object)
+  return unsafe refcountValueIsLiveForWeakReference(refcountValue) ? object : nil
+}
+
+// Decrement the weak reference count of the target of a weak reference. If this
+// is the last weak reference on the object, deallocate it.
+//
+// When called from swift_deallocClassInstance, the object's size and alignment
+// are provided. Other callers don't have those values. Deallocation requires
+// them, so the call from swift_deallocClassInstance stashes them in the
+// now-unused metadata field of the HeapObject. That call is guaranteed to take
+// place before the object is deallocated, so the values are always available.
+//
+// The malloc type id is not currently preserved that way, and is only passed
+// through when the dealloc happens in the call from
+// swift_deallocClassInstanceTyped. Platforms that need the type id to be
+// provided to dealloc must not use weak references.
+func weakRelease(object: WeakReference?, allocatedSize: Int? = nil, allocatedAlignMask: Int = 0, typeId: UInt64 = 0) {
+  guard let object = unsafe object else { return }
+
+  let refcount = unsafe refcountPointer(for: object)
+  let refcountValue = unsafe loadRelaxed(refcount)
+
+  // The weak refcount exists to track when an object can be freed. If it's
+  // never freed, there's no need to track that.
+  if refcountValue & HeapObject.doNotFreeBit != 0 {
+    return
+  }
+
+  // Perform the actual decrement.
+  let oldValue: Int
+  if let allocatedSize {
+    if refcountValue & HeapObject.weakRefcountMask == 0 {
+      // Common case fast path: this is the call from swift_deallocClassInstance
+      // and this is the last/only weak reference. We have the size and
+      // alignment mask available. Deallocate and return.
+      if typeId != 0 {
+        swift_deallocObjectTyped(object: object._rawValue, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask, typeId: typeId)
+      } else {
+        unsafe swift_deallocObject(object: object, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+      }
+      return
+    } else {
+      // This is the call from swift_deallocClassInstance, which provides the size
+      // and alignment. This was not the last weak reference (although it may
+      // become the last one by the time we do the atomic subtract below), so we
+      // need to store this size/alignment in the now-unused metadata field for
+      // the last weakRelease to use. Size and alignment are both less than 32
+      // bits, so they'll fit in the 64-bit metadata field.
+      let sizeAndAlignment = (allocatedSize << 32) | allocatedAlignMask
+      unsafe object.pointee.metadata = UnsafeRawPointer(bitPattern: sizeAndAlignment)
+
+      // Ensure that this is visible by decrementing the weak refcount with
+      // release ordering. This pairs with the acquire below.
+      oldValue = unsafe addRelease(refcount, n: -HeapObject.weakRefcountOne)
+    }
+  } else {
+    oldValue = unsafe addRelaxed(refcount, n: -HeapObject.weakRefcountOne)
+  }
+
+  // If the old weak refcount was 0, then this is the last weak reference and
+  // it's time to free the object. The subtraction above underflowed and
+  // wrapped, potentially damaging other parts of the refcount field, but
+  // nothing else can have a reference to this object at this point without
+  // unsafe code.
+  if (oldValue & HeapObject.weakRefcountMask) == 0 {
+    if let allocatedSize {
+      // If the caller passed in a size/alignment, we can pass those through.
+      // This only happens if we didn't take the common case fast path above,
+      // but ended up doing the last weak release anyway.
+      if typeId != 0 {
+        swift_deallocObjectTyped(object: object._rawValue, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask, typeId: typeId)
+      } else {
+        unsafe swift_deallocObject(object: object, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+      }
+    } else {
+      // Extract the size/alignment that the call from
+      // swift_deallocClassInstance stashed in the metadata pointer refcount,
+      // and use it. swift_deallocClassInstance always does this, and if we're
+      // at refcount 0 then swift_deallocClassInstance must have been called
+      // previously, and stashed the values.
+
+      // Ensure that the write to the metadata field is visible to us by doing a
+      // load acquire on the refcount field. This pairs with the addRelease
+      // above.
+      _ = unsafe loadAcquire(refcount)
+      let sizeAndAlignment = Int(bitPattern: unsafe object.pointee.metadata)
+      let size = (sizeAndAlignment >> 32) & ((1 << 32) - 1)
+      let alignMask = sizeAndAlignment & ((1 << 32) - 1)
+      unsafe swift_deallocObject(object: object, allocatedSize: size, allocatedAlignMask: alignMask)
+    }
+  }
+}
+
+// Return whether an object is live and able to be the target of a weak
+// reference. If false, the object has already begun deinit. When true, the
+// result is inherently racy, since another thread could start deinit. A true
+// result must handle this gracefully.
+func objectIsLiveForWeakReference(object: UnsafeMutablePointer<HeapObject>?) -> Bool {
+  guard let object = unsafe object else { return false }
+
+  let refcount = unsafe refcountPointer(for: object)
+  let refcountValue = unsafe loadRelaxed(refcount)
+  return refcountValueIsLiveForWeakReference(refcountValue)
+}
+
+// The refcount-value half of objectIsLiveForWeakReference, for callers that
+// already have the value in hand. Pairs with tryRetain, which returns the
+// refcount value it acted on.
+func refcountValueIsLiveForWeakReference(_ refcountValue: Int) -> Bool {
+  // Static objects are always live.
+  if refcountValue == HeapObject.staticRefCount {
+    return true
+  }
+
+  // Non-static objects with doNotFreeBit set are stack objects. These can never
+  // be the target of a weak reference while live. If a weak reference could be
+  // created while an object is live, the compiler won't stack-promote it. A
+  // weak reference can be created in deinit without blocking stack promotion,
+  // but then the object is no longer live. Note that immortalRefCount is not
+  // reliably set for stack objects, so this can't be rolled into the check
+  // below.
+  if (refcountValue & HeapObject.doNotFreeBit) != 0 {
+    return false
+  }
+
+  // A heap object is live until its deinit runs, which swift_release_n_ marks
+  // by storing immortalRefCount.
+  return (refcountValue & HeapObject.refcountMask) != HeapObject.immortalRefCount
+}
+
+#endif // _pointerBitWidth(_64)
 
 // Once
 
@@ -1018,7 +1631,7 @@ public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c)
 
   if unsafe checkedLoadAcquire(predicate) < 0 { return }
 
-  let won = unsafe compareExchangeRelaxed(predicate, expectedOldValue: 0, desiredNewValue: 1)
+  let won = unsafe compareExchangeRelaxed(predicate, expectedOldValue: 0, desiredNewValue: 1).1
   if won {
     unsafe fn(context)
     unsafe storeRelease(predicate, newValue: -1)
