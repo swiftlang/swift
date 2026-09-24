@@ -88,6 +88,11 @@ struct WrapperStruct {
   var cls : Klass
 }
 
+struct TwoFields {
+  var cls : Klass
+  var i : Builtin.Int64
+}
+
 struct NonTrivialStruct {
   var val:Klass
 }
@@ -5452,9 +5457,9 @@ bb0(%0 : $SP2):
   %1 = alloc_stack [lexical] $any P2
   %3 = init_existential_addr %1, $SP2
   store %0 to [trivial] %3
-  %6 = open_existential_addr immutable_access %1 to $*@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self
-  %19 = witness_method $@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self, #P2.bar : <Self where Self : P2> (Self) -> () -> (), %6 : $*@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self : $@convention(witness_method: P2) (@in_guaranteed @opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self) -> ()
-  %20 = apply %19(undef) : $@convention(witness_method: P2) (@in_guaranteed @opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self) -> ()
+  %6 = open_existential_addr immutable_access %1 to $*@opened(1, any P2) Self
+  %19 = witness_method $@opened(1, any P2) Self, #P2.bar : <Self where Self : P2> (Self) -> () -> (), %6 : $*@opened(1, any P2) Self : $@convention(witness_method: P2) (@in_guaranteed @opened(1, any P2) Self) -> ()
+  %20 = apply %19(undef) : $@convention(witness_method: P2) (@in_guaranteed @opened(1, any P2) Self) -> ()
   destroy_addr %1
   dealloc_stack %1
   %25 = tuple ()
@@ -5499,7 +5504,7 @@ bb0(%0 : @owned $D):
   %1 = alloc_stack [lexical] $any P
   %2 = init_existential_addr %1, $D
   store %0 to [init] %2
-  %4 = open_existential_addr immutable_access %1 to $*@opened("592F4C30-5E4F-11F1-B22D-0EA13E3AABB3", any P) Self
+  %4 = open_existential_addr immutable_access %1 to $*@opened(2, any P) Self
   %5 = unchecked_addr_cast %4 to $*C
   %6 = load_borrow %5
   %7 = apply undef(%6) : $@convention(method) (@guaranteed C) -> ()
@@ -5779,3 +5784,328 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @cleanup_inserted_phis :
+// CHECK:         %1 = begin_borrow %0
+// CHECK:       bb9:
+// CHECK:         end_borrow %1
+// CHECK:         destroy_value %0
+// CHECK-LABEL: } // end sil function 'cleanup_inserted_phis'
+sil [ossa] @cleanup_inserted_phis : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : @owned $Kl):
+  %1 = alloc_stack $Kl
+  store %0 to [init] %1
+  %3 = load_borrow %1
+  fix_lifetime %3
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  cond_br undef, bb5, bb6
+
+bb3:
+  br bb4
+
+bb4:
+  br bb9
+
+bb5:
+  br bb9
+
+bb6:
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb3
+
+bb8:
+  br bb4
+
+bb9:
+  end_borrow %3
+  %15 = load [take] %1
+  destroy_value %15
+  dealloc_stack %1
+  %18 = tuple ()
+  return %18
+}
+
+// CHECK-LABEL: sil [ossa] @mda_load_take :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         mark_dependence [nonescaping] [[C]] on %0
+// CHECK-LABEL: } // end sil function 'mda_load_take'
+sil [ossa] @mda_load_take : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %0
+  %3 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  destroy_value %3 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mda_load_copy :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         mark_dependence [nonescaping]
+// CHECK-LABEL: } // end sil function 'mda_load_copy'
+sil [ossa] @mda_load_copy : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %0
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  destroy_value %3 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mda_multiple :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         mark_dependence [nonescaping]
+// CHECK:         mark_dependence [nonescaping]
+// CHECK-LABEL: } // end sil function 'mda_multiple'
+sil [ossa] @mda_multiple : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %2 = copy_value %0 : $Klass
+  %3 = alloc_stack $Klass
+  store %2 to [init] %3 : $*Klass
+  mark_dependence_addr [nonescaping] %3 on %0
+  mark_dependence_addr [nonescaping] %3 on %1
+  %4 = load [take] %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  destroy_value %4 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mda_cross_bb :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         mark_dependence
+// CHECK-LABEL: } // end sil function 'mda_cross_bb'
+sil [ossa] @mda_cross_bb : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %0
+  br bb1
+bb1:
+  %3 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  destroy_value %3 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mda_load_borrow :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         mark_dependence
+// CHECK-LABEL: } // end sil function 'mda_load_borrow'
+sil [ossa] @mda_load_borrow : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %0
+  %3 = load_borrow %2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// A `mark_dependence_addr` combined with a value-form `mark_dependence` on the
+// load's address chain. Both dependences should lift to SSA-form
+// `mark_dependence`s on the forwarded value.
+//
+// TODO: Eliminate the dead alloc_stack here.
+//
+// CHECK-LABEL: sil [ossa] @mda_and_value_md :
+// CHECK:         alloc_stack
+// CHECK:         mark_dependence [nonescaping]
+// CHECK:         mark_dependence_addr [nonescaping]
+// CHECK-LABEL: } // end sil function 'mda_and_value_md'
+sil [ossa] @mda_and_value_md : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %2 = copy_value %0 : $Klass
+  %3 = alloc_stack $Klass
+  store %2 to [init] %3 : $*Klass
+  %4 = mark_dependence [nonescaping] %3 on %1
+  mark_dependence_addr [nonescaping] %4 on %0
+  %5 = load [take] %4 : $*Klass
+  dealloc_stack %3 : $*Klass
+  destroy_value %5 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mda_after_load :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         mark_dependence
+// CHECK-LABEL: } // end sil function 'mda_after_load'
+sil [ossa] @mda_after_load : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %0
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  destroy_value %3 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mda_partial_dominance :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         mark_dependence
+// CHECK-LABEL: } // end sil function 'mda_partial_dominance'
+sil [ossa] @mda_partial_dominance : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %0
+  %4 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  destroy_value %3 : $Klass
+  destroy_value %4 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// A mark_dependence_addr with identical address and base operands is
+// meaningless; a mark_dependence with identical address and base is invalid.
+// Drop the mark_dependence_addr without generating a mark_dependence.
+//
+// CHECK-LABEL: sil [ossa] @mda_depend_on_self :
+// CHECK:         [[VAL:%[0-9]+]] = copy_value %0
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK-NOT:     mark_dependence [nonescaping] [[VAL]] on [[VAL]]
+// CHECK:         destroy_value [[VAL]]
+// CHECK-LABEL: } // end sil function 'mda_depend_on_self'
+sil [ossa] @mda_depend_on_self : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2 : $*Klass
+  mark_dependence_addr [nonescaping] %2 on %2
+  %3 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  destroy_value %3 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// rdar://187806150, https://github.com/swiftlang/swift/issues/92448
+//
+// A `mark_dependence_addr` does not just read the memory, it replaces the forwarded value
+// with a `mark_dependence` on its base. Loads which follow it must read that new value.
+//
+// CHECK-LABEL: sil [ossa] @mda_then_field_load :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         [[VAL:%[0-9]+]] = struct $WrapperStruct
+// CHECK:         [[MD:%[0-9]+]] = mark_dependence [nonescaping] [[VAL]] on %0
+// CHECK:         [[BORROW:%[0-9]+]] = begin_borrow [[MD]]
+// CHECK:         struct_extract [[BORROW]], #WrapperStruct.cls
+// CHECK-LABEL: } // end sil function 'mda_then_field_load'
+sil [ossa] @mda_then_field_load : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = struct $WrapperStruct (%1 : $Klass)
+  %3 = alloc_stack $WrapperStruct
+  store %2 to [init] %3 : $*WrapperStruct
+  mark_dependence_addr [nonescaping] %3 on %0
+  %4 = struct_element_addr %3 : $*WrapperStruct, #WrapperStruct.cls
+  %5 = load [copy] %4 : $*Klass
+  destroy_addr %3 : $*WrapperStruct
+  dealloc_stack %3 : $*WrapperStruct
+  destroy_value %5 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// The value produced by the `mark_dependence` has to be threaded through the loop phi
+// created for the field mutation.
+//
+// CHECK-LABEL: sil [ossa] @mda_then_loop :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         [[MD:%[0-9]+]] = mark_dependence [nonescaping] {{%[0-9]+}} on %0
+// CHECK:         br bb1([[MD]])
+// CHECK:       bb1([[PHI:%[0-9]+]] : @owned $TwoFields):
+// CHECK:         begin_borrow [[PHI]]
+// CHECK-LABEL: } // end sil function 'mda_then_loop'
+sil [ossa] @mda_then_loop : $@convention(thin) (@guaranteed Klass, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $Klass, %cond : $Builtin.Int1):
+  %1 = copy_value %0 : $Klass
+  %z = integer_literal $Builtin.Int64, 0
+  %2 = struct $TwoFields (%1 : $Klass, %z : $Builtin.Int64)
+  %3 = alloc_stack $TwoFields
+  store %2 to [init] %3 : $*TwoFields
+  mark_dependence_addr [nonescaping] %3 on %0
+  br bb1
+
+bb1:
+  %ia = struct_element_addr %3 : $*TwoFields, #TwoFields.i
+  %iv = load [trivial] %ia : $*Builtin.Int64
+  %ca = struct_element_addr %3 : $*TwoFields, #TwoFields.cls
+  %cv = load [copy] %ca : $*Klass
+  destroy_value %cv : $Klass
+  %one = integer_literal $Builtin.Int64, 1
+  store %one to [trivial] %ia : $*Builtin.Int64
+  cond_br %cond, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_addr %3 : $*TwoFields
+  dealloc_stack %3 : $*TwoFields
+  %r = tuple ()
+  return %r : $()
+}
+
+// Unlike a `store`, a `mark_dependence_addr` may legally appear inside a `load_borrow`
+// scope of a projected field. Promoting it would end the lifetime of the borrowed value
+// inside its own borrow scope, so bail.
+//
+// CHECK-LABEL: sil [ossa] @mda_in_load_borrow_scope :
+// CHECK:         alloc_stack
+// CHECK:         mark_dependence_addr [nonescaping]
+// CHECK-LABEL: } // end sil function 'mda_in_load_borrow_scope'
+sil [ossa] @mda_in_load_borrow_scope : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = struct $WrapperStruct (%1 : $Klass)
+  %3 = alloc_stack $WrapperStruct
+  store %2 to [init] %3 : $*WrapperStruct
+  %4 = struct_element_addr %3 : $*WrapperStruct, #WrapperStruct.cls
+  %5 = load_borrow %4 : $*Klass
+  mark_dependence_addr [nonescaping] %3 on %0
+  end_borrow %5 : $Klass
+  destroy_addr %3 : $*WrapperStruct
+  dealloc_stack %3 : $*WrapperStruct
+  %r = tuple ()
+  return %r : $()
+}

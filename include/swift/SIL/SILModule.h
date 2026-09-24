@@ -299,8 +299,19 @@ private:
   llvm::DenseMap<const NominalTypeDecl *, SILMoveOnlyDeinit *>
       MoveOnlyDeinitMap;
 
+  /// Lookup table for specialized move only deinits from types.
+  /// Currently only used in embedded mode.
+  llvm::DenseMap<SILType, SILMoveOnlyDeinit *> SpecializedMoveOnlyDeinitMap;
+
   /// The list of move only deinits in the module.
   std::vector<SILMoveOnlyDeinit *> moveOnlyDeinits;
+
+  /// Non-copyable types declared in this module for which IRGen may emit type
+  /// metadata, recorded by SILGen as it visits them. Only used in embedded
+  /// mode: emitting a type's metadata also emits its value witnesses, whose
+  /// destroy witness calls the deinits of the type and its members, so those
+  /// deinits must be specialized before IRGen runs.
+  std::vector<SILType> noncopyableTypesWithEmittedMetadata;
 
   /// Declarations which are externally visible.
   ///
@@ -340,12 +351,6 @@ private:
 
   /// The stage of processing this module is at.
   SILStage Stage;
-
-  /// True if SIL conventions force address-only to be passed by address.
-  ///
-  /// Used for bootstrapping the AddressLowering pass. This should eventually
-  /// be inferred from the SIL stage to be true only when Stage == Lowered.
-  bool loweredAddresses;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -689,6 +694,17 @@ public:
   ArrayRef<SILMoveOnlyDeinit *> getMoveOnlyDeinits() const {
     return ArrayRef<SILMoveOnlyDeinit *>(moveOnlyDeinits);
   }
+
+  /// Non-copyable types declared in this module for which IRGen may emit type
+  /// metadata. Recorded by SILGen; only populated in embedded mode.
+  ArrayRef<SILType> getNonCopyableTypesWithEmittedMetadata() const {
+    return noncopyableTypesWithEmittedMetadata;
+  }
+
+  void addNonCopyableTypeWithEmittedMetadata(SILType type) {
+    noncopyableTypesWithEmittedMetadata.push_back(type);
+  }
+
   using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;
   using moveonlydeinit_const_iterator =
       SILMoveOnlyDeinitListType::const_iterator;
@@ -938,6 +954,16 @@ public:
   SILMoveOnlyDeinit *lookUpMoveOnlyDeinit(const NominalTypeDecl *nomDecl,
                                           bool deserializeLazily = true);
 
+  /// Look up a specialized move only deinit for the given type.
+  /// Returns null on failure.
+  SILMoveOnlyDeinit *lookUpSpecializedMoveOnlyDeinit(SILType nominalType);
+
+  /// Look up the deinit to use when destroying a value of the given type,
+  /// preferring a specialized deinit if one is available.
+  /// Returns null on failure.
+  SILMoveOnlyDeinit *lookUpMoveOnlyDeinitForType(SILType nominalType,
+                                                 bool deserializeLazily = true);
+
   /// Look up the function mapped to the given move only nominal type decl.
   /// Returns null on failure.
   SILFunction *lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl);
@@ -956,6 +982,8 @@ public:
   /// Attempt to deserialize the SILDifferentiabilityWitness. Returns true if
   /// deserialization succeeded, false otherwise.
   bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+  SILDifferentiabilityWitness *
+  loadDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
@@ -981,15 +1009,11 @@ public:
     Stage = s;
   }
 
-  /// True if SIL conventions force address-only to be passed by address.
-  bool useLoweredAddresses() const { return loweredAddresses; }
-
-  void setLoweredAddresses(bool val) {
-    loweredAddresses = val;
-    if (val) {
-      Types.setLoweredAddresses();
-    }
-  }
+  /// True if -enable-sil-opaque-values was passed. Address-only types are
+  /// represented as opaque SSA values in Raw SIL rather than as raw addresses.
+  /// This is an immutable build-mode flag; use it when asking "what mode is
+  /// this compilation?" rather than "is this function in lowered form?".
+  bool usesOpaqueValues() const { return Options.EnableSILOpaqueValues; }
 
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 
@@ -1121,6 +1145,12 @@ public:
 
   bool hasInstructionsScheduledForDeletion() const {
     return !scheduledForDeletion.empty();
+  }
+
+  /// The number of instructions which are removed from their basic blocks, but
+  /// not deleted for real yet. See scheduledForDeletion for details.
+  size_t getNumInstructionsScheduledForDeletion() const {
+    return scheduledForDeletion.size();
   }
 
   /// Looks up the llvm intrinsic ID and type for the builtin function.

@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
@@ -47,9 +46,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -423,6 +419,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   }
 
   ASTNode node;
+  ArgumentList *args = nullptr;
   ParameterList *params = nullptr;
   ParamDecl *selfParam = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
@@ -473,12 +470,17 @@ unsigned LocalDiscriminatorsRequest::evaluate(
       node = initInfo.getInitFromProjectedValue();
       break;
     }
+  } else if (auto customAttrInit = dyn_cast<CustomAttributeInitializer>(dc)) {
+    args = customAttrInit->getAttribute()->getArgs();
+    // Custom attribute initializer contexts are omitted when mangling, so
+    // number their closures in the enclosing context.
+    dc = customAttrInit->getParent();
   } else {
     params = getParameterList(dc);
   }
 
   auto startDiscriminator = ctx.getNextDiscriminator(dc);
-  if (!node && !params && !selfParam)
+  if (!node && !args && !params && !selfParam)
     return startDiscriminator;
 
   SetLocalDiscriminators visitor(startDiscriminator);
@@ -496,6 +498,9 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 
   if (node)
     node.walk(visitor);
+
+  if (args)
+    args->walk(visitor);
 
   unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
   ctx.setMaxAssignedDiscriminator(dc, nextDiscriminator);
@@ -783,6 +788,17 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   if (auto CE = dyn_cast<CoerceExpr>(E))
     return getDeclRefProvidingExpressionForHasSymbol(CE->getSubExpr());
 
+  // Strip implicit function conversions, which may be inserted to adjust the
+  // type or isolation of the reference:
+  //
+  //   if #_hasSymbol(foo as () throws -> ()) { ... }
+  //
+  if (isa<FunctionConversionExpr>(E) ||
+      isa<CovariantFunctionConversionExpr>(E) ||
+      isa<ActorIsolationErasureExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(
+        cast<ImplicitConversionExpr>(E)->getSubExpr());
+
   // Unwrap curry thunks which are injected into the AST to wrap some forms of
   // unapplied method references, e.g.
   //
@@ -799,6 +815,14 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   //
   if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(E))
     return getDeclRefProvidingExpressionForHasSymbol(DSCE->getFn());
+
+  // Drill into the right hand side of a DotSyntaxBaseIgnoredExpr, which wraps
+  // an uncurried reference to an instance member, e.g.
+  //
+  //   if #_hasSymbol(SomeStruct.foo) { ... }
+  //
+  if (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(DSBIE->getRHS());
 
   return E;
 }
@@ -1403,8 +1427,14 @@ public:
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
-    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
+    // Checking yields requires proper interface type. If decl is invalid, then
+    // we already emitted diagnostics elsewhere.
+    if (auto *AFD = TheFunc->getAbstractFunctionDecl()) {
+      if (AFD->isInvalid())
+        return YS;
+    }
 
+    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
     auto yieldExprs = YS->getMutableYields();
     if (yieldExprs.size() != yieldResults.size()) {
       getASTContext().Diags.diagnose(YS->getYieldLoc(), diag::bad_yield_count,
@@ -1567,7 +1597,7 @@ public:
         diagnosed = true;
 
       // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->getValueTypeDestructor()) {
+      } else if (!nominalDecl->hasValueTypeDestructor()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -1575,9 +1605,16 @@ public:
         diagnosed = true;
       // if the type is public and not frozen, then the method must not be
       // inlinable.
+      //
+      // `discard self` has to know the type's stored properties in order
+      // to destroy them individually, so a body emitted
+      // into a client must not bake in a layout the defining library could
+      // change.
       } else if (auto fragileKind = fn->getFragileFunctionKind();
                  !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
-                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}
+                 && fn->getResilienceExpansion() ==
+                        ResilienceExpansion::Minimal) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            // Code in ABI stable SDKs has already used the `@inlinable`
                            // attribute on functions using `discard self`.
@@ -2370,12 +2407,12 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // Diagnose unused constructor calls.
     if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
-               callee->getDeclContext()->getDeclaredInterfaceType())
-        .highlight(call->getArgs()->getSourceRange());
+                  callee->getDeclContext()->getDeclaredInterfaceType())
+          .highlight(call->getSourceRange());
       return;
     }
-    
-    SourceRange SR1 = call->getArgs()->getSourceRange(), SR2;
+
+    SourceRange SR1 = call->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
       SR1 = BO->getLHS()->getSourceRange();
       SR2 = BO->getRHS()->getSourceRange();
@@ -2566,6 +2603,14 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
+    // A Swift subclass of a C++ FRT calls the base's imported constructor.
+    // There is no designated initializer to chain to.
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      auto &ctx = fromCtor->getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          classDecl->isForeignReferenceType())
+        return false;
+    }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
       if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
@@ -3739,6 +3784,7 @@ class DesugarForEachStmt {
   bool isAsync;
   bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
+  VarDecl *sequenceVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
   WhileStmt *innerLoop = nullptr;
@@ -3775,16 +3821,28 @@ public:
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     if (!ctx.LangOpts.DisableAvailabilityChecking) {
-      if (auto restriction = seqConformanceRef.getAvailabilityRestriction(
-              dc, stmt->getForLoc())) {
-        emitDiagnosticsForUnavailableConformance(seqType, restriction.value());
+      auto availability =
+          AvailabilityContext::forLocation(stmt->getForLoc(), dc);
+      bool hadError = false;
+      availability.enumerateUnsatisfiedRestrictionsForConformance(
+          seqConformanceRef,
+          [&](const Decl *decl, const ProtocolDecl *proto,
+              AvailabilityRestriction restriction) {
+            hadError =
+                emitDiagnosticForUnavailableConformance(seqType, proto,
+                                                        restriction);
+            return true;
+          });
+      if (hadError)
         return nullptr;
-      }
     }
 
     buildMakeIteratorVar();
+    buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 2> stmts;
+    SmallVector<ASTNode, 3> stmts;
+    if (auto *sequenceBinding = buildSequenceBinding())
+      stmts.push_back(sequenceBinding);
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
 
@@ -3799,25 +3857,36 @@ public:
   }
 
 private:
-  void emitDiagnosticsForUnavailableConformance(
-      Type seqType, AvailabilityRestriction restriction) {
+  bool emitDiagnosticForUnavailableConformance(
+      Type seqType, const ProtocolDecl *unavailableProto,
+      AvailabilityRestriction restriction) {
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = restriction.getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
-    auto range = domainAndRange.getRange();
-    if (domain.isVersioned() && range.hasMinimumVersion()) {
-      ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                         seqType, protoDecl,
-                         domain.getNameForAttributePrinting(),
-                         range.getVersionString());
+    llvm::SmallString<64> scratch;
+    auto diag =
+        ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                           seqType, protoDecl,
+                           restriction.getDiagnosticDescription(scratch, ctx));
+
+    // An unavailable conformance to 'Sendable' must be downgraded to a warning
+    // since previously there may have been code silently working with this violation,
+    // and we don't want to source-break those sites.
+    bool isSendableConformance =
+        unavailableProto &&
+        unavailableProto->isSpecificProtocol(KnownProtocolKind::Sendable);
+
+    if (isSendableConformance)
+      diag.warnUntilLanguageMode(LanguageMode::v6);
+
+    // A restriction that is unavailable cannot be satisfied with a runtime
+    // availability query, so only offer a fix-it for the other restrictions.
+    if (!restriction.isUnavailable())
       fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
-    } else {
-      ctx.Diags.diagnose(
-          loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
-          seqType, protoDecl);
-    }
+
+    // Only return true if we truly emitted an error diagnostic.
+    return !isSendableConformance ||
+           ctx.LangOpts.isLanguageModeAtLeast(LanguageMode::v6);
   }
 
   void buildMakeIteratorVar() {
@@ -3933,12 +4002,65 @@ private:
     return nextCall;
   }
 
-  PatternBindingDecl *buildMakeIterator() {
+  void buildOpaqueSequenceExpr() {
     auto *sequence = stmt->getSequence();
-    auto seqType = sequence->getType();
-    auto *opaqueSeqExpr =
-        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    auto *opaqueSeqExpr = new (ctx)
+        OpaqueValueExpr(sequence->getSourceRange(), sequence->getType());
     stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+  }
+
+  /// Whether the sequence expression reads a parameter directly.
+  bool sequenceReadsNoImplicitCopyBinding() const {
+    auto *expr = stmt->getSequence()->getSemanticsProvidingExpr();
+    // A mutable binding is loaded before it is used as an rvalue.
+    if (auto *load = dyn_cast<LoadExpr>(expr))
+      expr = load->getSubExpr()->getSemanticsProvidingExpr();
+
+    auto *declRef = dyn_cast<DeclRefExpr>(expr);
+    if (!declRef)
+      return false;
+
+    auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl());
+    return paramDecl;
+  }
+
+  /// Bind the sequence to an implicit local whose scope encloses the loop.
+  ///
+  /// Returns `nullptr` if no binding is needed.
+  PatternBindingDecl *buildSequenceBinding() {
+    // Only a borrowing iterator holds onto the sequence for the duration of
+    // the loop.
+    if (!isBorrowing)
+      return nullptr;
+
+    // A sequence read directly from a parameter needs no binding of its own:
+    // the parameter's scope already covers the loop.
+    if (sequenceReadsNoImplicitCopyBinding())
+      return nullptr;
+
+    std::string name;
+    {
+      if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+        name = "$" + np->getBoundName().str().str();
+      name += "$sequence";
+    }
+
+    auto introducer = stmt->getSequence()->getType()->isNoncopyable()
+                          ? VarDecl::Introducer::Borrowing
+                          : VarDecl::Introducer::Let;
+    sequenceVar = new (ctx) VarDecl(/*isStatic=*/false, introducer,
+                                    stmt->getSequence()->getStartLoc(),
+                                    ctx.getIdentifier(name), dc);
+    sequenceVar->setImplicit();
+
+    Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
+    return PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, stmt->getOpaqueSequenceExpr(),
+        dc);
+  }
+
+  PatternBindingDecl *buildMakeIterator() {
+    auto seqType = stmt->getSequence()->getType();
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
@@ -3954,8 +4076,18 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
+    // Call `makeIterator()` on the sequence binding when there is one, so that
+    // the iterator depends on that binding's scope rather than on a temporary.
+    Expr *base;
+    if (sequenceVar) {
+      base = new (ctx) DeclRefExpr(sequenceVar, DeclNameLoc(stmt->getForLoc()),
+                                   /*Implicit=*/true);
+    } else {
+      base = stmt->getOpaqueSequenceExpr();
+    }
+
     auto *makeIteratorRef = new (ctx)
-        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+        MemberRefExpr(base, stmt->getForLoc(), witness,
                       DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
 
     Expr *makeIteratorCall =

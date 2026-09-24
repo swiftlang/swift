@@ -158,13 +158,6 @@ inline SILBasicBlock *splitBasicBlockAndBranch(SILBuilderContext &builderCtx,
 /// Return true if the function has a critical edge, false otherwise.
 bool hasCriticalEdges(SILFunction &f, bool onlyNonCondBr);
 
-/// Split all critical edges in the given function, updating the
-/// dominator tree and loop information if they are provided.
-///
-/// FIXME: This should never be called! Fix passes that create critical edges.
-bool splitAllCriticalEdges(SILFunction &F, DominanceInfo *domInfo,
-                           SILLoopInfo *loopInfo);
-
 /// Split all cond_br critical edges with non-trivial arguments in the
 /// function updating the dominator tree and loop information (if they are not
 /// set to null).

@@ -52,10 +52,10 @@ bb0(%0 : @owned $C):
 }
 
 // CHECK-LABEL: sil [ossa] @replace_with_single_forward :
-// CHECK:         debug_value %0 : $C, let, name "x"
-// CHECK:         %2 = struct $S1 (%0 : $C)
-// CHECK:         apply %3(%2)
-// CHECK-NEXT:    destroy_value %2
+// CHECK:         %1 = struct $S1 (%0 : $C)
+// CHECK:         apply %2(%1)
+// CHECK-NEXT:    debug_value %0 : $C, let, name "x"
+// CHECK-NEXT:    destroy_value %1
 // CHECK:       } // end sil function 'replace_with_single_forward'
 sil [ossa] @replace_with_single_forward : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -71,13 +71,13 @@ bb0(%0 : @owned $C):
 }
 
 // CHECK-LABEL: sil [ossa] @replace_with_double_forward :
-// CHECK:         debug_value %0 : $C, let, name "x"
-// CHECK:         %2 = struct $S1 (%0 : $C)
-// CHECK:         debug_value %2 : $S1, let, name "y"
-// CHECK:         %4 = destructure_struct %2
-// CHECK:         debug_value %4 : $C, let, name "z"
-// CHECK:         apply %6(%4)
-// CHECK-NEXT:    destroy_value %4
+// CHECK:         %1 = struct $S1 (%0 : $C)
+// CHECK:         %2 = destructure_struct %1
+// CHECK:         apply %3(%2)
+// CHECK-NEXT:    debug_value %0 : $C, let, name "x"
+// CHECK-NEXT:    debug_value %1 : $S1, let, name "y"
+// CHECK-NEXT:    debug_value %2 : $C, let, name "z"
+// CHECK-NEXT:    destroy_value %2
 // CHECK:       } // end sil function 'replace_with_double_forward'
 sil [ossa] @replace_with_double_forward : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -512,8 +512,8 @@ bb0:
 sil [ossa] @convert_to_owned_ignoring_type_dependent_operands : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
   %1 = begin_borrow %0
-  %2 = open_existential_ref %1 to $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
-  %3 = metatype $@thick (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self).Type
+  %2 = open_existential_ref %1 to $@opened(1, AnyObject) Self
+  %3 = metatype $@thick (@opened(1, AnyObject) Self).Type
   fix_lifetime %3
   %4 = unchecked_ref_cast %2 to $B
   %5 = apply undef(%4) : $@convention(thin) (@guaranteed B) -> ()
@@ -536,4 +536,34 @@ bb0:
   end_borrow %2
   %6 = tuple ()
   return %6
+}
+
+// A debug_value must not be hoisted to the begin_borrow it is replacing:
+// its other operands may be defined in between and would no longer dominate it.
+//
+// CHECK-LABEL: sil [ossa] @multi_operand_debug_value_use :
+// CHECK:       bb0([[C:%[0-9]+]] : @owned $C, [[S:%[0-9]+]] : @owned $S1):
+// CHECK-NEXT:    [[COPY:%[0-9]+]] = copy_value [[S]]
+// CHECK-NEXT:    debug_value ([[C]] : $C, [[COPY]] : $S1), let, name "pair", transform {
+// CHECK:         bb0(%0 : $C, %1 : $S1):
+// CHECK-NEXT:      %2 = tuple (%0 : $C, %1 : $S1)
+// CHECK-NEXT:      return %2 : $(C, S1)
+// CHECK-NEXT:    }
+// CHECK-NEXT:    destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function 'multi_operand_debug_value_use'
+sil [ossa] @multi_operand_debug_value_use : $@convention(thin) (@owned C, @owned S1) -> () {
+bb0(%0 : @owned $C, %1 : @owned $S1):
+  %2 = begin_borrow %0
+  %3 = copy_value %1
+  debug_value (%2, %3), let, name "pair", transform {
+  bb0(%a : $C, %b : $S1):
+    %t = tuple (%a, %b)
+    return %t
+  }
+  end_borrow %2
+  destroy_value %3
+  destroy_value %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
 }

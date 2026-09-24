@@ -88,6 +88,19 @@ public class GenericTypeDecl: TypeDecl, GenericContext {
 public class NominalTypeDecl: GenericTypeDecl {
   final public var isGlobalActor: Bool { bridged.NominalType_isGlobalActor() }
 
+  /// True if this type should have a non-unique definition under the Embedded
+  /// Swift linkage model — i.e. its type metadata may be emitted redundantly
+  /// (as a `linkonce_odr`/`shared` copy) in every module that references it,
+  /// rather than there being a single unique definition. When true, an
+  /// identity-sensitive use across a module boundary (a class `as?`/`as!`
+  /// downcast, which compares metadata pointers) is unsound because the
+  /// allocating module and the casting module may see different metadata
+  /// records. Marking the type `@export(interface)` makes the definition
+  /// unique and flips this to false. Always false outside Embedded Swift.
+  final public var hasNonUniqueDefinition: Bool {
+    bridged.NominalType_hasNonUniqueDefinition()
+  }
+
   final public var valueTypeDestructor: DestructorDecl? {
     bridged.NominalType_getValueTypeDestructor().getAs(DestructorDecl.self)
   }
@@ -120,6 +133,12 @@ public class NominalTypeDecl: GenericTypeDecl {
 
 final public class EnumDecl: NominalTypeDecl {
   public var rawType: Type? { Type(bridgedOrNil: bridged.Enum_getRawType()) }
+
+  /// True if this enum has cases which cannot be referenced in canonical SIL, but which can still
+  /// exist at runtime. Such an enum must not be treated as exhaustive.
+  public var hasCasesUnavailableDuringLowering: Bool {
+    bridged.Enum_hasCasesUnavailableDuringLowering()
+  }
 
   public static func create(
     declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
@@ -252,6 +271,14 @@ final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 
 public class AbstractFunctionDecl: ValueDecl, GenericContext {
   final public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
+
+  /// True if this function is a witness to a distributed protocol requirement
+  /// with an ad-hoc `SerializationRequirement` conformance (e.g. `remoteCall` or
+  /// `recordArgument`). Such witnesses have generic parameters that cannot be class-bound,
+  /// so the SIL-level embedded validity checks need to be relaxed for them.
+  final public var isDistributedWitnessWithAdHocSerializationRequirement: Bool {
+    bridged.AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement()
+  }
 }
 
 final public class ConstructorDecl: AbstractFunctionDecl {
@@ -297,7 +324,7 @@ final public class TopLevelCodeDecl: Decl, DeclContext {
 
 final public class ImportDecl: Decl {}
 
-final public class UsingDecl: Decl {}
+final public class FileDefaultDecl: Decl {}
 
 final public class PrecedenceGroupDecl: Decl {}
 
@@ -318,6 +345,8 @@ final public class PrefixOperatorDecl: OperatorDecl {}
 final public class PostfixOperatorDecl: OperatorDecl {}
 
 final public class MacroExpansionDecl: Decl {}
+
+final public class HiddenTypeLayoutInfoDecl: TypeDecl {}
 
 // Bridging utilities
 

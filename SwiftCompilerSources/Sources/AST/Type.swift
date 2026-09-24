@@ -125,6 +125,11 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return rawType.subst(with: substitutionMap).canonical
   }
+
+  /// True if this type involves a local archetype defined in `environment`.
+  public func hasLocalArchetype(from environment: GenericEnvironment) -> Bool {
+    bridged.hasLocalArchetypeFromEnvironment(environment.bridged)
+  }
 }
 
 /// Implements the common members of `AST.Type`, `AST.CanonicalType` and `SIL.Type`.
@@ -148,6 +153,7 @@ extension TypeProperties {
   public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
   public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
   public var isBuiltinFixedArray: Bool { rawType.bridged.isBuiltinFixedArray() }
+  public var isBuiltinBridgeObject: Bool { rawType.bridged.isBuiltinBridgeObject() }
 
   public var isClass: Bool {
     if let nominal = nominal, nominal is ClassDecl {
@@ -181,6 +187,7 @@ extension TypeProperties {
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
   public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }
   public var isUnownedStorageType: Bool { return rawType.bridged.isUnownedStorageType() }
+  public var isReferenceStorageType: Bool { rawType.bridged.isReferenceStorageType() }
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
@@ -208,6 +215,11 @@ extension TypeProperties {
 
   /// True if this the nominal type `Swift.Optional`.
   public var isOptional: Bool { rawType.bridged.isOptional() }
+
+  /// True if no value of this type can exist, e.g. `Never`, a case-less enum, or a tuple which
+  /// contains such a type. Note that this doesn't take resilience into account: a case-less enum
+  /// from another module can gain cases in a future version of that module.
+  public var isStructurallyUninhabited: Bool { rawType.bridged.isStructurallyUninhabited() }
 
   /// A non-nil result type implies isUnsafe[Raw][Mutable]Pointer. A raw
   /// pointer has a `void` element type.
@@ -250,6 +262,7 @@ extension TypeProperties {
       case .ObjCMethod:            return .objCMethod
       case .WitnessMethod:         return .witnessMethod
       case .Closure:               return .closure
+      case .COMMethod:             return .comMethod
       case .CXXMethod:             return .cxxMethod
       case .KeyPathAccessorGetter: return .keyPathAccessorGetter
       case .KeyPathAccessorSetter: return .keyPathAccessorSetter
@@ -267,6 +280,8 @@ extension TypeProperties {
   public var hasArchetype: Bool { rawType.bridged.hasArchetype() }
   public var hasTypeParameter: Bool { rawType.bridged.hasTypeParameter() }
   public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
+  /// True if this type mentions an existential (opened existential) archetype.
+  public var hasExistentialArchetype: Bool { rawType.bridged.hasExistentialArchetype() }
   public var hasDynamicSelf: Bool { rawType.bridged.hasDynamicSelf() }
   public var isEscapable: Bool { rawType.bridged.isEscapable() }
   public var isNoEscape: Bool { rawType.bridged.isNoEscape() }
@@ -368,6 +383,9 @@ public enum FunctionTypeRepresentation {
   /// A closure invocation function that has not been bound to a context.
   case closure
 
+  /// A COM interface method with a foreign self-first calling convention.
+  case comMethod
+
   /// A C++ method that takes a "this" argument (not a static C++ method or constructor).
   /// Except for handling the "this" argument, has the same behavior as "CFunctionPointer".
   case cxxMethod
@@ -387,6 +405,7 @@ public enum FunctionTypeRepresentation {
       case .objCMethod:            return .ObjCMethod
       case .witnessMethod:         return .WitnessMethod
       case .closure:               return .Closure
+      case .comMethod:             return .COMMethod
       case .cxxMethod:             return .CXXMethod
       case .keyPathAccessorGetter: return .KeyPathAccessorGetter
       case .keyPathAccessorSetter: return .KeyPathAccessorSetter

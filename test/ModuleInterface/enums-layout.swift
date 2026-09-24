@@ -61,7 +61,7 @@ func testFutureproofIndirectEnum() -> FutureproofIndirectEnum {
 func testFrozenIndirectEnum() -> FrozenIndirectEnum {
   // Whether this is "1" or "2" depends on whether the reserved ObjC tagged
   // pointer bit is the top or bottom bit on this platform.
-  // CHECK: ret i{{32|64}} {{1|2}}
+  // CHECK: ret ptr inttoptr (i{{32|64}} {{1|2}} to ptr)
   return .c
 }
 
@@ -79,6 +79,6 @@ func testFutureproofIndirectCaseEnum() -> FutureproofIndirectCaseEnum {
 func testFrozenIndirectCaseEnum() -> FrozenIndirectCaseEnum {
   // Whether this is "1" or "2" depends on whether the reserved ObjC tagged
   // pointer bit is the top or bottom bit on this platform.
-  // CHECK: ret i{{32|64}} {{1|2}}
+  // CHECK: ret ptr inttoptr (i{{32|64}} {{1|2}} to ptr)
   return .c
 }

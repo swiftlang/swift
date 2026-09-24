@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-differentiability-witness"
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILModule.h"
 
@@ -23,11 +22,11 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     DifferentiabilityKind kind, IndexSubset *parameterIndices,
     IndexSubset *resultIndices, GenericSignature derivativeGenSig,
-    const DeclAttribute *attribute) {
+    bool isDefault, const DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, kind, parameterIndices, resultIndices,
       derivativeGenSig, /*jvp*/ nullptr, /*vjp*/ nullptr,
-      /*isDeclaration*/ true, /*isSerialized*/ false, attribute);
+      /*isDeclaration*/ true, /*isSerialized*/ false, isDefault, attribute);
   // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler(module.getASTContext());
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
@@ -46,12 +45,12 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     DifferentiabilityKind kind, IndexSubset *parameterIndices,
     IndexSubset *resultIndices, GenericSignature derivativeGenSig,
-    SILFunction *jvp, SILFunction *vjp, bool isSerialized,
+    SILFunction *jvp, SILFunction *vjp, bool isSerialized, bool isDefault,
     const DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, kind, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
-      attribute);
+      isDefault, attribute);
   // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler(module.getASTContext());
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(

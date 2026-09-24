@@ -101,3 +101,43 @@ public enum PublicEnum {
 
 @_spi(HelperSPI) public func -(_ s1: PublicType, _ s2: PublicType) -> PublicType { s1 }
 @_spi(HelperSPI) public func +(_ s1: PublicType, _ s2: PublicType) -> PublicType { s1 }
+
+public protocol ProtoWithSPIRequirement {
+  func publicReq()
+
+  @_spi(HelperSPI) func spiReq()
+}
+
+extension ProtoWithSPIRequirement {
+  @_spi(HelperSPI) public func spiReq() { }
+}
+
+public protocol ProtoWithSPIRequirementInOtherGroup {
+  func publicReq()
+
+  @_spi(OtherSPI) func spiReq()
+}
+
+extension ProtoWithSPIRequirementInOtherGroup {
+  @_spi(OtherSPI) public func spiReq() { }
+}
+
+public protocol ProtoWithFutureSPIRequirement {
+  func publicReq()
+
+  @available(macOS 99, *)
+  @available(iOS 99, *)
+  @available(tvOS 99, *)
+  @available(watchOS 99, *)
+  @available(visionOS 99, *)
+  @_spi(HelperSPI) func spiReq()
+}
+
+extension ProtoWithFutureSPIRequirement {
+  @available(macOS 99, *)
+  @available(iOS 99, *)
+  @available(tvOS 99, *)
+  @available(watchOS 99, *)
+  @available(visionOS 99, *)
+  @_spi(HelperSPI) public func spiReq() { }
+}

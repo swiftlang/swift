@@ -251,6 +251,60 @@ inline size_t getInstanceAddressPoint(const HeapMetadata *metadata) {
        : 0;
 }
 
+struct InstancePrefix {
+  const void *Template;
+  size_t TemplateSize;
+  size_t AddressPoint;
+};
+
+/// Validate and retrieve the metadata-driven prefix for a heap allocation.
+///
+/// The zero-address-point path intentionally avoids touching the class
+/// descriptor. Ordinary zero-address-point allocations therefore retain their
+/// existing metadata traffic.
+inline InstancePrefix getInstancePrefix(const HeapMetadata *metadata,
+                                        size_t requiredSize,
+                                        size_t requiredAlignmentMask) {
+  size_t offset = getInstanceAddressPoint(metadata);
+  if (offset == 0)
+    return {nullptr, 0, 0};
+
+  if (requiredSize < offset || requiredSize - offset < sizeof(HeapObject))
+    swift::fatalError(0,
+                      "invalid class instance prefix: address point %zu "
+                      "does not fit in allocation size %zu",
+                      offset, requiredSize);
+
+  // The allocation base has the requested alignment. The address point must
+  // preserve it so placement-new constructs a correctly aligned HeapObject.
+  if (offset & requiredAlignmentMask)
+    swift::fatalError(0,
+                      "invalid class instance prefix: address point %zu "
+                      "does not preserve alignment mask %zu",
+                      offset, requiredAlignmentMask);
+
+  auto *classMetadata = static_cast<const ClassMetadata *>(metadata);
+  auto *description = classMetadata->getDescription();
+  if (description == nullptr || !description->hasInstancePrefix())
+    return {nullptr, 0, offset};
+
+  auto *prefix = description->getInstancePrefixDescriptor();
+  if (prefix->Version != ClassInstancePrefixDescriptor::CurrentVersion)
+    swift::fatalError(0,
+                      "unsupported class instance prefix descriptor "
+                      "version %u",
+                      unsigned(prefix->Version));
+
+  size_t size = prefix->PrefixSizeInWords * sizeof(void *);
+  if (size == 0 || size > offset)
+    swift::fatalError(0,
+                      "class instance prefix size %zu does not fit "
+                      "metadata address point %zu",
+                      size, offset);
+
+  return {prefix->PrefixTemplate.get(), size, offset};
+}
+
 // Return a heap object's backing allocation to the allocator.
 //
 // A class instance's pointer may be interior, where the class metadata records
@@ -268,6 +322,8 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
+  auto prefix =
+      getInstancePrefix(metadata, requiredSize, requiredAlignmentMask);
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   auto allocation = swift_slowAllocTyped(requiredSize, requiredAlignmentMask,
                                           getMallocTypeId(metadata));
@@ -275,7 +331,13 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   auto allocation = swift_slowAlloc(requiredSize, requiredAlignmentMask);
 #endif
 
-  size_t offset = getInstanceAddressPoint(metadata);
+  if (prefix.TemplateSize) {
+    auto *prefixAddress = reinterpret_cast<char *>(allocation) +
+                          prefix.AddressPoint - prefix.TemplateSize;
+    memcpy(prefixAddress, prefix.Template, prefix.TemplateSize);
+  }
+
+  size_t offset = prefix.AddressPoint;
   HeapObject *object =
       reinterpret_cast<HeapObject *>(reinterpret_cast<char *>(allocation) + offset);
 
@@ -301,6 +363,11 @@ HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
                              HeapObject *object) {
+  // Stack promotion currently has no storage representation for native
+  // instance prefixes. IRGen must keep such objects on the common heap path.
+  assert(getInstanceAddressPoint(metadata) == 0 &&
+         "cannot initialize a prefixed class object on the stack");
+
   object->metadata = metadata;
   object->refCounts.initForNotFreeing();
 
@@ -318,6 +385,11 @@ struct InitStaticObjectContext {
 HeapObject *
 swift::swift_initStaticObject(HeapMetadata const *metadata,
                               HeapObject *object) {
+  // Object outlining currently has no way to place the prefix template and
+  // its once token ahead of the native address point.
+  assert(getInstanceAddressPoint(metadata) == 0 &&
+         "cannot initialize a prefixed static class object");
+
   SWIFT_RT_TRACK_INVOCATION(object, swift_initStaticObject);
   // The token is located at a negative offset from the object header.
   swift_once_t *token = ((swift_once_t *)object) - 1;
@@ -361,6 +433,19 @@ HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
   return swift::swift_allocObject(bufferType, size, alignMask);
+}
+
+/// Get a box's allocation size, raising a fatal error if it is not
+/// representable.
+static size_t getBoxAllocSizeOrTrap(const GenericBoxHeapMetadata *metadata) {
+  size_t allocSize;
+  if (SWIFT_UNLIKELY(!metadata->getAllocSizeCheckingOverflow(allocSize))) {
+    swift::fatalError(0,
+                      "box of type %s has an allocation size that is too large "
+                      "to be representable\n",
+                      swift_getTypeName(metadata->BoxedType, true).data);
+  }
+  return allocSize;
 }
 
 namespace {
@@ -440,7 +525,7 @@ BoxPair swift::swift_allocBox(const Metadata *type) {
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 
   // Allocate and project the box.
-  auto allocation = swift_allocObject(metadata, metadata->getAllocSize(),
+  auto allocation = swift_allocObject(metadata, getBoxAllocSizeOrTrap(metadata),
                                       metadata->getAllocAlignMask());
   auto projection = metadata->project(allocation);
 
@@ -517,7 +602,17 @@ SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
 }
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+// We play a game with the function's asm name to hide the function body from
+// the compiler. A direct tail call to this function from swift_retain somehow
+// causes swift_retain to have a stack frame. By defining the function under a
+// different name at the C++ level, the compiler doesn't see where the call to
+// _swift_retain_adapter goes, and this prevents it from adding a stack frame.
+// The `used` attribute keeps the definition alive, otherwise the compiler would
+// see this as an unused static and eliminate it entirely.
 SWIFT_REFCOUNT_CC
+static HeapObject *_swift_retain_adapterImpl(HeapObject *object)
+    SWIFT_ASM_LABEL_WITH_PREFIX("_swift_retain_adapter");
+SWIFT_REFCOUNT_CC __attribute__((used))
 static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   HeapObject *masked =
       (HeapObject *)((uintptr_t)object & ~heap_object_abi::UntaggedNonNativeBridgeObjectBits);
@@ -525,11 +620,8 @@ static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   return object;
 }
 
-// This strange construct prevents the compiler from creating an unnecessary
-// stack frame in swift_retain. A direct tail call to _swift_retain_adapterImpl
-// somehow causes clang to emit a stack frame.
-static HeapObject *(*SWIFT_REFCOUNT_CC volatile _swift_retain_adapter)(
-    HeapObject *object) = _swift_retain_adapterImpl;
+extern "C" SWIFT_REFCOUNT_CC HeapObject *_swift_retain_adapter(
+    HeapObject *object);
 #endif
 
 HeapObject *swift::swift_retain(HeapObject *object) {
@@ -1022,9 +1114,16 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
 #if SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  // `allocatedSize` measures the whole allocation from its base, `addressPoint`
+  // measures the prefix of the object. Clobbering
+  // `allocatedSize - sizeof(HeapObject)` bytes starting at the header would run
+  // `addressPoint` bytes past the end of the allocation and corrupt the
+  // adjacent block's allocator metadata. Only poison the stored properties that
+  // actually fit between the header and the end of the allocation.
+  size_t addressPoint = getInstanceAddressPoint(object->metadata);
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xF0\xEF\xBE\xAD\xDE\xED\xFE\x0F", // 0x0ffeeddeadbeeff0
-                  allocatedSize - sizeof(HeapObject));
+                  allocatedSize - addressPoint - sizeof(HeapObject));
 #endif
 
   // If we are tracking leaks, stop tracking this object.

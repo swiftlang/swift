@@ -405,7 +405,7 @@ func test_memberwise_ordering() {
 
   _ = Test1(_b: 42, a: 0) // Ok
 
-  struct Test2 { // expected-error {{cannot synthesize memberwise initializer}}
+  struct Test2 { // expected-error {{cannot automatically synthesize memberwise initializer for 'Test2'}}
     var _a: Int
 
     var a: Int {

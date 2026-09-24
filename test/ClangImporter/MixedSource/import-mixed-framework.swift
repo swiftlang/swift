@@ -7,6 +7,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t/Mixed.framework/Modules/Mixed.swiftmodule/%target-swiftmodule-name %S/Inputs/mixed-framework/Mixed.swift -import-underlying-module -F %t -module-name Mixed -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -F %t -typecheck %s -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Mixed
 
 let instance = SwiftClass(x: 42)
@@ -16,6 +18,11 @@ let clangStruct = PureClangType(x: 1, y: 2)
 instance.categoryMethod(clangStruct)
 
 let x: BogusClass? = nil // expected-error {{'BogusClass' is unavailable: cannot find Swift declaration for this class}}
+
+// A generated_declaration marker whose defined_in names a module other than the one
+// that owns the decl has leaked in (clang merges the attribute from another module's
+// forward-declaration); it must not make the type unavailable.
+let _: LeakedMarkerClass? = nil
 
 _ = PureSwiftClass.verify()
 _ = Mixed.PureSwiftClass.verify()

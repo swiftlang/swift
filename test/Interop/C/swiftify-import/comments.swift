@@ -7,8 +7,13 @@
 // SYNTH:public func begin()
 
 // SYNTH-EMPTY:
-// IDE-NEXT:func lineComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-// SYNTH-NEXT:public func lineComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
+// IDE-NEXT:func lineComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+// SYNTH-NEXT:public func lineComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+
+// SYNTH-EMPTY:
+// BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
+// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// SYNTH-NEXT:public func lineComment(_ p: UnsafeMutableBufferPointer<CInt>)
 
 // SYNTH-EMPTY:
 // BOTH-NEXT:/// line doc comment
@@ -17,45 +22,8 @@
 // BOTH-NEXT:///
 // BOTH-NEXT:/// @param len the buffer length
 // BOTH-NEXT:/// @param p the buffer
-// IDE-NEXT:func lineDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-// SYNTH-NEXT:public func lineDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-
-// SYNTH-EMPTY:
-// IDE-NEXT:func blockComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-// SYNTH-NEXT:public func blockComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-
-// SYNTH-EMPTY:
-// BOTH-NEXT:/**
-// BOTH-NEXT: * block doc comment
-// BOTH-NEXT: * 
-// BOTH-NEXT: * NB: it's very important to pass the correct length to this function
-// BOTH-NEXT: * @param len don't mess this one up
-// BOTH-NEXT: * @param p   some integers to play with
-// BOTH-NEXT: */
-// IDE-NEXT:func blockDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-// SYNTH-NEXT:public func blockDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-
-// SYNTH-EMPTY:
-// BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockComment(_ p: UnsafeMutableBufferPointer<Int32>)
-// SYNTH-NEXT:public func blockComment(_ p: UnsafeMutableBufferPointer<Int32>)
-
-// SYNTH-EMPTY:
-// BOTH-NEXT:/**
-// BOTH-NEXT: * block doc comment
-// BOTH-NEXT: * 
-// BOTH-NEXT: * NB: it's very important to pass the correct length to this function
-// BOTH-NEXT: * @param len don't mess this one up
-// BOTH-NEXT: * @param p   some integers to play with
-// BOTH-NEXT: */
-// BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
-// SYNTH-NEXT:public func blockDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
-
-// SYNTH-EMPTY:
-// BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineComment(_ p: UnsafeMutableBufferPointer<Int32>)
-// SYNTH-NEXT:public func lineComment(_ p: UnsafeMutableBufferPointer<Int32>)
+// IDE-NEXT:func lineDocComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+// SYNTH-NEXT:public func lineDocComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
 
 // SYNTH-EMPTY:
 // BOTH-NEXT:/// line doc comment
@@ -65,5 +33,37 @@
 // BOTH-NEXT:/// @param len the buffer length
 // BOTH-NEXT:/// @param p the buffer
 // BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
-// SYNTH-NEXT:public func lineDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
+// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// SYNTH-NEXT:public func lineDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
+
+// SYNTH-EMPTY:
+// IDE-NEXT:func blockComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+// SYNTH-NEXT:public func blockComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+
+// SYNTH-EMPTY:
+// BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
+// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// SYNTH-NEXT:public func blockComment(_ p: UnsafeMutableBufferPointer<CInt>)
+
+// SYNTH-EMPTY:
+// BOTH-NEXT:/**
+// BOTH-NEXT: * block doc comment
+// BOTH-NEXT: * 
+// BOTH-NEXT: * NB: it's very important to pass the correct length to this function
+// BOTH-NEXT: * @param len don't mess this one up
+// BOTH-NEXT: * @param p   some integers to play with
+// BOTH-NEXT: */
+// IDE-NEXT:func blockDocComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+// SYNTH-NEXT:public func blockDocComment(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
+
+// SYNTH-EMPTY:
+// BOTH-NEXT:/**
+// BOTH-NEXT: * block doc comment
+// BOTH-NEXT: * 
+// BOTH-NEXT: * NB: it's very important to pass the correct length to this function
+// BOTH-NEXT: * @param len don't mess this one up
+// BOTH-NEXT: * @param p   some integers to play with
+// BOTH-NEXT: */
+// BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
+// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// SYNTH-NEXT:public func blockDocComment(_ p: UnsafeMutableBufferPointer<CInt>)

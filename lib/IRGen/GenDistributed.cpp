@@ -50,11 +50,39 @@ using namespace irgen;
 
 llvm::Value *irgen::emitDistributedActorInitializeRemote(
     IRGenFunction &IGF, SILType selfType, llvm::Value *actorMetatype, Explosion &out) {
-  auto fn = IGF.IGM.getDistributedActorInitializeRemoteFunctionPointer();
   actorMetatype =
       IGF.Builder.CreateBitCast(actorMetatype, IGF.IGM.TypeMetadataPtrTy);
 
-  auto call = IGF.Builder.CreateCall(fn, {actorMetatype});
+  llvm::CallInst *call;
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // In Embedded Swift the runtime cannot derive the remote-proxy trim size
+    // or alignment mask from class metadata at runtime. Compute both at
+    // IRGen and pass them to an embedded-only entry point.
+    auto &classTI = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+    auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                               /*forBackwardDeployment=*/false);
+
+    // Distributed actor field layout is:
+    //   [0] id,
+    //   [1] actorSystem,
+    //   [2] DefaultActorStorage,
+    //   [3+] user props
+    // A remote proxy instance never has user props.
+    Size trimSize = classLayout.getSize();
+    auto elements = classLayout.getElements();
+    if (elements.size() > 3 && elements[3].hasByteOffset())
+      trimSize = elements[3].getByteOffset();
+
+    llvm::Value *allocSize = IGF.IGM.getSize(trimSize);
+    llvm::Value *alignMask = IGF.IGM.getSize(classLayout.getAlignMask());
+
+    auto fn =
+        IGF.IGM.getDistributedActorInitializeRemoteEmbeddedFunctionPointer();
+    call = IGF.Builder.CreateCall(fn, {actorMetatype, allocSize, alignMask});
+  } else {
+    auto fn = IGF.IGM.getDistributedActorInitializeRemoteFunctionPointer();
+    call = IGF.Builder.CreateCall(fn, {actorMetatype});
+  }
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotThrow();
 
@@ -400,7 +428,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   }
 
   auto accessorTy = GenericFunctionType::get(
-      signature, parameters, Context.TheEmptyTupleType,
+      signature, parameters, /* yields */ {}, Context.TheEmptyTupleType,
       ASTExtInfoBuilder()
           .withRepresentation(FunctionTypeRepresentation::Thin)
           .withAsync()
@@ -427,6 +455,10 @@ IRGenModule::getAddrOfDistributedTargetAccessor(LinkEntity accessor,
 }
 
 void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
+  // Embedded Swift, dispatch is handled without accessible records, skip emitting them.
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   LinkEntity accessorRef = getAccessorLinking(target);
   auto *f = getAddrOfDistributedTargetAccessor(accessorRef,
                                                ForDefinition);
@@ -610,7 +642,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
 
     // Load error from the slot to emit an early return if necessary.
     {
-      SILFunctionConventions conv(decoder.getMethodType(), IGM.getSILModule());
+      SILFunctionConventions conv(decoder.getMethodType(), IGM.silConv);
       SILType errorType =
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 
@@ -828,7 +860,9 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 
 void DistributedAccessor::emit() {
   auto targetTy = Target.getType();
-  SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
+  SILFunctionConventions targetConv(
+      targetTy,
+      IGF.IGM.silConv);
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
   auto params = IGF.collectParameters();
@@ -1041,9 +1075,9 @@ WitnessMetadata *AccessorTarget::getWitnessMetadata(llvm::Value *actorSelf) {
     auto *protocol = requirement->getDeclContext()->getSelfProtocolDecl();
     assert(protocol);
 
-    witness.SelfMetadata = actorSelf;
-    witness.SelfWitnessTable =
-        lookupWitnessTable(IGF, emitMetadataRef(actorSelf), protocol);
+    auto *selfMetadata = emitMetadataRef(actorSelf);
+    witness.SelfMetadata = selfMetadata;
+    witness.SelfWitnessTable = lookupWitnessTable(IGF, selfMetadata, protocol);
 
     Witness = witness;
   }
@@ -1144,12 +1178,16 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
 }
 
 SILType DistributedAccessor::getResultType() const {
-  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  SILFunctionConventions conv(
+      AccessorType,
+      IGF.IGM.silConv);
   return conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
 }
 
 SILType DistributedAccessor::getErrorType() const {
-  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  SILFunctionConventions conv(
+      AccessorType,
+      IGF.IGM.silConv);
   return conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 }
 

@@ -61,6 +61,7 @@ template<typename T>
 struct DenseMapInfo<swift::Located<T>> {
   using SourceLoc = swift::SourceLoc;
 
+#if LLVM_VERSION_MAJOR <= 21
   static inline swift::Located<T> getEmptyKey() {
     return swift::Located<T>(DenseMapInfo<T>::getEmptyKey(),
                              DenseMapInfo<SourceLoc>::getEmptyKey());
@@ -70,6 +71,7 @@ struct DenseMapInfo<swift::Located<T>> {
     return swift::Located<T>(DenseMapInfo<T>::getTombstoneKey(),
                              DenseMapInfo<SourceLoc>::getTombstoneKey());
   }
+#endif
 
   static unsigned getHashValue(const swift::Located<T> &LocatedVal) {
     return detail::combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),

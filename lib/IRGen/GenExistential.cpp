@@ -19,11 +19,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -32,9 +29,11 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "BitPatternBuilder.h"
+#include "Callee.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "GenCall.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -43,18 +42,60 @@
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
-#include "IndirectTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "IndirectTypeInfo.h"
 #include "MetadataRequest.h"
-#include "NonFixedTypeInfo.h"
 #include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
+
+// For typed allocation, we store the type descriptor of the
+// heap-allocated box in the second word of the opaque existential's
+// 3-word inline buffer (which is unused when the first word holds the
+// heap-allocated box reference) at allocation sites and retrieve it
+// at deallocation sites.
+static bool shouldUseMallocTypeDescriptor(IRGenModule &IGM) {
+  bool available = IGM.isTypedAllocationAvailable();
+  assert((!available || IGM.getPointerSize() == Size(8)) &&
+         "Assume typed allocation is 64-bit-only");
+  return available;
+}
+
+static Address projectMallocTypeDescriptorSlot(IRGenFunction &IGF,
+                                               Address buffer) {
+  return IGF.Builder.CreateElementBitCast(
+      IGF.Builder.CreateConstByteArrayGEP(
+          IGF.Builder.CreateElementBitCast(buffer, IGF.IGM.Int8Ty),
+          IGF.IGM.getPointerSize()),
+      IGF.IGM.Int64Ty);
+}
+
+static void
+storeMallocTypeDescriptor(IRGenFunction &IGF, Address buffer,
+                          std::optional<uint64_t> descriptor) {
+  IGF.Builder.CreateStore(
+      llvm::ConstantInt::get(IGF.IGM.Int64Ty, descriptor.value_or(0)),
+      projectMallocTypeDescriptorSlot(IGF, buffer));
+}
+
+static llvm::Value *loadMallocTypeDescriptor(IRGenFunction &IGF,
+                                             Address buffer) {
+  return IGF.Builder.CreateLoad(
+      projectMallocTypeDescriptorSlot(IGF, buffer));
+}
+
+static void copyMallocTypeDescriptor(IRGenFunction &IGF,
+                                     Address destBuffer,
+                                     Address srcBuffer) {
+  IGF.Builder.CreateStore(
+      loadMallocTypeDescriptor(IGF, srcBuffer),
+      projectMallocTypeDescriptorSlot(IGF, destBuffer));
+}
 
 namespace {
   /// The layout of an existential buffer.  This is intended to be a
@@ -733,6 +774,11 @@ namespace {
       IGF.emit##Name##Destroy(addr, Refcounting); \
     } \
     StringRef getStructNameSuffix() const { return "." #name "ref"; } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
     REF_STORAGE_HELPER(Name, FixedTypeInfo) \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -802,6 +848,11 @@ namespace {
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
       llvm_unreachable("should have overridden all actual uses of this"); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
     REF_STORAGE_HELPER(Name, LoadableTypeInfo) \
   };
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -868,6 +919,11 @@ namespace {
     void emitValueRelease(IRGenFunction &IGF, llvm::Value *value, \
                           Atomicity atomicity) const {} \
     void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {} \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 #include "swift/AST/ReferenceStorage.def"
 #undef REF_STORAGE_HELPER
@@ -920,6 +976,12 @@ class OpaqueExistentialTypeInfo final :
             IsFixedSize, IsABIAccessible) {}
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   OpaqueExistentialLayout getLayout() const {
     return OpaqueExistentialLayout(getNumStoredProtocols());
   }
@@ -981,6 +1043,14 @@ public:
       Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
       emitInitializeBufferWithCopyOfBufferCall(IGF, metadata, destBuffer,
                                                srcBuffer);
+      // The buffer-copy call above via VMT either copies word 0 only
+      // when it's not inlined or full buffer when it's
+      // inlined. Unconditionally copy the type descriptor here, which
+      // is likely cheaper than doing a conditional branch and is
+      // harmless when it's inlined.
+      if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+        copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+      }
     } else {
       // Create an outlined function to avoid explosion
       OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
@@ -1080,6 +1150,12 @@ class ClassExistentialTypeInfo final
            refcounting == ReferenceCounting::ObjC);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
                         SILType T,
@@ -1115,23 +1191,20 @@ class ClassExistentialTypeInfo final
 
   /// Given an explosion with multiple pointer elements in them, pack them
   /// into an enum payload explosion.
-  /// FIXME: Assumes the explosion is broken into word-sized integer chunks.
-  /// Should use EnumPayload.
   void mergeExplosion(Explosion &In, Explosion &Out, IRGenFunction &IGF)
   const {
-    // We always have at least one entry.
-    auto *part = In.claimNext();
-    Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
-
-    for (unsigned i = 0; i != getNumStoredProtocols(); ++i) {
-      part = In.claimNext();
-      Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
-    }
+    // A loadable optional class existential is lowered with its concrete
+    // pointer element types (the reference word and each witness table are
+    // `ptr`), just like the non-optional existential. Forward the words into
+    // the enum payload explosion unchanged, rather than round-tripping them
+    // through pointer-width integers.
+    Out.add(In.claimNext());
+    for (unsigned i = 0; i != getNumStoredProtocols(); ++i)
+      Out.add(In.claimNext());
   }
 
-  // Given an exploded enum payload consisting of consecutive word-sized
-  // chunks, cast them to their underlying component types.
-  // FIXME: Assumes the payload is word-chunked. Should use
+  // Given an exploded enum payload consisting of consecutive pointer-typed
+  // words, cast them to their underlying component types.
   void decomposeExplosion(Explosion &InE, Explosion &OutE,
                           IRGenFunction &IGF) const {
     // The first entry is always the weak*.
@@ -1417,6 +1490,12 @@ class ExistentialMetatypeTypeInfo final
       MetatypeTI(metatypeTI) {}
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   const LoadableTypeInfo &
   getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
     return MetatypeTI;
@@ -1456,6 +1535,12 @@ class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
   ReferenceCounting Refcounting;
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   ErrorExistentialTypeInfo(llvm::PointerType *storage,
                            Size size, SpareBitVector spareBits,
                            Alignment align,
@@ -1494,7 +1579,137 @@ public:
     return ErrorProto;
   }
 };
-  
+
+/// A COM existential is the interface pointer itself. Unlike a class
+/// existential, this pointer is not a Swift heap-object address point and
+/// therefore must never be passed to Swift ARC.
+class COMExistentialTypeInfo final
+    : public SingleScalarTypeInfo<COMExistentialTypeInfo, LoadableTypeInfo> {
+  enum class Operation : unsigned {
+    AddRef = 1,
+    Release = 2,
+  };
+
+  void emit(IRGenFunction &IGF, llvm::Value *interface,
+            Operation operation) const {
+    auto *head = IGF.createBasicBlock(operation == Operation::AddRef
+                                          ? "com.addref"
+                                          : "com.release");
+    auto *tail = IGF.createBasicBlock("com.refcount.done");
+
+    IGF.Builder.CreateCondBr(IGF.Builder.CreateIsNotNull(interface), head, tail);
+    IGF.Builder.emitBlock(head);
+
+    // A COM interface pointer points at its vtable pointer. Slots 1 and 2 are
+    // AddRef and Release respectively, both with the foreign scalar ABI
+    // UInt32(void *)
+    Address instance(interface, IGF.IGM.Int8PtrTy, IGF.IGM.getPointerAlignment());
+    auto *load = IGF.Builder.CreateLoad(instance, "com.vtable");
+    Address vtable(load, IGF.IGM.Int8PtrTy, IGF.IGM.getPointerAlignment());
+    auto slot = IGF.Builder.CreateConstArrayGEP(vtable,
+                                                static_cast<unsigned>(operation),
+                                                IGF.IGM.getPointerSize(),
+                                                operation == Operation::AddRef
+                                                    ? "com.addref.slot"
+                                                    : "com.release.slot");
+    auto *method = IGF.Builder.CreateLoad(slot, "com.refcount.method");
+    auto *type = llvm::FunctionType::get(IGF.IGM.Int32Ty, {IGF.IGM.Int8PtrTy},
+                                         /*isVarArg=*/false);
+    Signature signature(
+        type, llvm::AttributeList(),
+        expandCallingConv(IGF.IGM, SILFunctionTypeRepresentation::COMMethod,
+                          /*isAsync=*/false, /*isCalleeAllocatedCoro=*/false));
+    auto function =
+        FunctionPointer::createUnsigned(FunctionPointer::Kind::Function,
+                                        method, signature);
+    auto *call = IGF.Builder.CreateCall(function, {interface});
+    call->setDoesNotThrow();
+    IGF.Builder.CreateBr(tail);
+
+    IGF.Builder.emitBlock(tail);
+  }
+
+public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
+  COMExistentialTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
+      : SingleScalarTypeInfo(storage, size,
+                             SpareBitVector::getConstant(size.getValueInBits(),
+                                                         false),
+                             align, IsNotTriviallyDestroyable, IsCopyable,
+                             IsFixedSize, IsABIAccessible) {
+  }
+
+  static constexpr bool IsScalarTriviallyDestroyable = false;
+
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
+    emit(IGF, value, Operation::AddRef);
+  }
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const {
+    emit(IGF, value, Operation::Release);
+  }
+
+  void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+    IGF.emitFixLifetime(value);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayout) const override {
+    // No existing scalar kind has COM's vtable-dispatch ownership semantics.
+    // Keep layout-driven value operations tied to this TypeInfo.
+    return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+  }
+
+  bool mayHaveExtraInhabitants(IRGenModule &) const override {
+    return true;
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
+    return 1;
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &, unsigned bits,
+                                     unsigned index) const override {
+    assert(index == 0);
+    return APInt(bits, 0);
+  }
+
+  llvm::Value *
+  getExtraInhabitantIndex(IRGenFunction &IGF, Address source, SILType T,
+                          bool) const override {
+    source = IGF.Builder.CreateElementBitCast(source, IGF.IGM.IntPtrTy);
+    auto *value = IGF.Builder.CreateLoad(source);
+    auto *valid =
+        IGF.Builder.CreateICmpNE(value,
+                                 llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
+    // Null is extra inhabitant zero; valid pointers are reported as -1.
+    return IGF.Builder.CreateSExt(valid, IGF.IGM.Int32Ty);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address destination, SILType T,
+                            bool) const override {
+    destination =
+        IGF.Builder.CreateElementBitCast(destination, IGF.IGM.IntPtrTy);
+    IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0),
+                            destination);
+  }
+
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &,
+                                           unsigned index) const override {
+    // Refcount operations branch around null, allowing Optional to use it as
+    // the payload's first extra inhabitant.
+    return index == 0;
+  }
+};
+
 } // end anonymous namespace
 
 static const TypeInfo *
@@ -1547,6 +1762,11 @@ llvm::Type *IRGenModule::getExistentialType(unsigned numTables) {
   return Types.getExistentialType(numTables);
 }
 
+const TypeInfo *irgen::createCOMInterfaceTypeInfo(IRGenModule &IGM) {
+  return new COMExistentialTypeInfo(IGM.Int8PtrTy, IGM.getPointerSize(),
+                                    IGM.getPointerAlignment());
+}
+
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   auto layout = T.getExistentialLayout();
 
@@ -1558,6 +1778,9 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     // Error has a special runtime representation.
     return createErrorExistentialTypeInfo(IGM, layout);
   }
+
+  if (layout.getCOMInterface())
+    return createCOMInterfaceTypeInfo(IGM);
 
   llvm::StructType *type;
 
@@ -1987,6 +2210,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   llvm::Value *metadata = IGF.emitTypeMetadataRef(formalSrcType);
   IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
 
+  if (IGF.IGM.isEmbeddedWithExistentials() && IGF.IGM.DebugInfo)
+    IGF.IGM.DebugInfo->emitExistentialPayloadType(formalSrcType);
 
   // Next, write the protocol witness tables.
   forEachProtocolWitnessTable(IGF, formalSrcType, &metadata,
@@ -2276,7 +2501,21 @@ static llvm::Function *getAllocateBoxedOpaqueExistentialBufferFunction(
           IGF.Builder.emitBlock(allocateBB);
           ConditionalDominanceScope allocateCondition(IGF);
           llvm::Value *box, *address;
-          IGF.emitAllocBoxCall(metadata, box, address);
+          // For typed allocation, compute the type descriptor of the
+          // heap box but just the header part because this code is
+          // reachable under Embedded Swift but the payload type isn't
+          // concrete at compile time.
+          std::optional<uint64_t> maybeDescriptor;
+          bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
+          if (useMallocTypeDescriptor) {
+            auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+            llvm::SmallVector<SILType> fieldTypes;
+            fieldTypes.push_back(rawPointerType); // metadata pointer
+            fieldTypes.push_back(rawPointerType); // refcount word
+            maybeDescriptor =
+                computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+          }
+          IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
           addressInBox =
               IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
           IGF.Builder.CreateStore(
@@ -2284,6 +2523,9 @@ static llvm::Function *getAllocateBoxedOpaqueExistentialBufferFunction(
                                existentialBuffer.getAddress(), IGM.PtrTy),
                            IGF.IGM.RefCountedPtrTy,
                            existLayout.getAlignment(IGF.IGM)));
+          if (useMallocTypeDescriptor) {
+            storeMallocTypeDescriptor(IGF, existentialBuffer, maybeDescriptor);
+          }
           IGF.Builder.CreateRet(addressInBox);
         }
       },
@@ -2314,7 +2556,19 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
     } else if (IGF.IGM.isEmbeddedWithExistentials()) {
       llvm::Value *box, *address;
       auto *metadata = existLayout.loadMetadataRef(IGF, existentialContainer);
-      IGF.emitAllocBoxCall(metadata, box, address);
+
+      // For typed allocation, compute the type descriptor of the heap box.
+      bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
+      std::optional<uint64_t> maybeDescriptor;
+      if (useMallocTypeDescriptor) {
+        auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+        llvm::SmallVector<SILType> fieldTypes;
+        fieldTypes.push_back(rawPointerType); // metadata pointer
+        fieldTypes.push_back(rawPointerType); // refcount word
+        fieldTypes.push_back(valueType);
+        maybeDescriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+      }
+      IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
       llvm::Value *addressInBox =
         IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
       IGF.Builder.CreateStore(
@@ -2322,6 +2576,9 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
                                existentialBuffer.getAddress(), IGF.IGM.PtrTy),
                            IGF.IGM.RefCountedPtrTy,
                            existLayout.getAlignment(IGF.IGM)));
+      if (useMallocTypeDescriptor) {
+        storeMallocTypeDescriptor(IGF, existentialBuffer, maybeDescriptor);
+      }
 
       return valueTI.getAddressForPointer(addressInBox);
     }
@@ -2411,9 +2668,17 @@ static llvm::Function *getDeallocateBoxedOpaqueExistentialBufferFunction(
         llvm::Value *pointerAlignMask = llvm::ConstantInt::get(
             IGF.IGM.SizeTy, IGF.IGM.getPointerAlignment().getValue() - 1);
         alignmentMask = Builder.CreateOr(alignmentMask, pointerAlignMask);
-        IGF.emitDeallocRawCall(
-            Builder.CreateBitCast(boxReference, IGF.IGM.Int8PtrTy), size,
-            alignmentMask);
+        auto *boxReferenceI8Ptr =
+            Builder.CreateBitCast(boxReference, IGF.IGM.Int8PtrTy);
+        if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+          // Get the type descriptor from the second word and use it
+          // for typed deallocation.
+          auto *descriptor = loadMallocTypeDescriptor(IGF, existentialBuffer);
+          IGF.emitDeallocRawTypedCall(boxReferenceI8Ptr, size, alignmentMask,
+                                      descriptor);
+        } else {
+          IGF.emitDeallocRawCall(boxReferenceI8Ptr, size, alignmentMask);
+        }
         // We are done. Return.
         Builder.CreateRetVoid();
       },
@@ -2533,10 +2798,19 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
         auto *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
 
         llvm::Value *box, *objectAddr;
-        IGF.emitMakeBoxUniqueCall(
-            Builder.CreateBitCast(existentialBuffer.getAddress(),
-                                  IGM.OpaquePtrTy),
-            metadata, alignmentMask, box, objectAddr);
+        if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+          auto *descriptor =
+              loadMallocTypeDescriptor(IGF, existentialBuffer);
+          IGF.emitMakeBoxUniqueTypedCall(
+              Builder.CreateBitCast(existentialBuffer.getAddress(),
+                                    IGM.OpaquePtrTy),
+              metadata, alignmentMask, descriptor, box, objectAddr);
+        } else {
+          IGF.emitMakeBoxUniqueCall(
+              Builder.CreateBitCast(existentialBuffer.getAddress(),
+                                    IGM.OpaquePtrTy),
+              metadata, alignmentMask, box, objectAddr);
+        }
 
         IGF.Builder.CreateRet(objectAddr);
       },
@@ -2706,13 +2980,25 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
                         srcBuffer.getAlignment()));
             IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
             if (IGF.IGM.isEmbeddedWithExistentials()) {
-              IGF.emitReleaseBox(destReference);
+              if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                // Get the type descriptor from the old box and use it
+                // for its typed deallocation.
+                llvm::Value *descriptor =
+                    loadMallocTypeDescriptor(IGF, destBuffer);
+                IGF.emitReleaseBoxTyped(destReference, descriptor);
+              } else {
+                IGF.emitReleaseBox(destReference);
+              }
             } else
               IGF.emitNativeStrongRelease(destReference,
                                         IGF.getDefaultAtomicity());
             IGF.Builder.CreateStore(
                 srcReference, Address(destReferenceAddr, IGM.RefCountedPtrTy,
                                       existLayout.getAlignment(IGF.IGM)));
+            if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+              // Copy the type descriptor from the source to the dest.
+              copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+            }
             Builder.CreateBr(doneBB);
           }
         }
@@ -2783,6 +3069,11 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
               ConditionalDominanceScope domScope(IGF);
               initBufferWithCopyOfReference(IGF, existLayout, destBuffer,
                                             srcBuffer);
+              // dest is transitioning from inline to boxed here. give
+              // it src's descriptor for the box it now shares.
+              if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+              }
               Builder.CreateBr(contBB2);
             }
 
@@ -2804,6 +3095,14 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
             auto *destReference = Builder.CreateLoad(
                 Address(destReferenceAddr, IGM.RefCountedPtrTy,
                         srcBuffer.getAlignment()));
+            // Capture destBuffer's type descriptor now before the
+            // src-inline path below overwrites destBuffer's full
+            // width via the source type's own
+            // initializeWithCopy. This is used when releasing the old
+            // box below.
+            llvm::Value *destDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM)
+                ? loadMallocTypeDescriptor(IGF, destBuffer)
+                : nullptr;
             auto *srcInlineBB = IGF.createBasicBlock("dest-outline-src-inline");
             auto *srcOutlineBB =
                 IGF.createBasicBlock("dest-outline-src-outline");
@@ -2829,6 +3128,10 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
               ConditionalDominanceScope domScope(IGF);
               initBufferWithCopyOfReference(IGF, existLayout, destBuffer,
                                             srcBuffer);
+              // Copy the type descriptor from the source to the dest.
+              if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+              }
               Builder.CreateBr(contBB2);
             }
             Builder.emitBlock(contBB2);
@@ -2836,7 +3139,11 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
               ConditionalDominanceScope domScope(IGF);
               // swift_release(tmpRef)
               if (IGF.IGM.isEmbeddedWithExistentials()) {
-                IGF.emitReleaseBox(destReference);
+                if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                  IGF.emitReleaseBoxTyped(destReference, destDescriptor);
+                } else {
+                  IGF.emitReleaseBox(destReference);
+                }
               } else
                 IGF.emitNativeStrongRelease(destReference,
                                           IGF.getDefaultAtomicity());
@@ -2901,7 +3208,12 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
           auto *reference = Builder.CreateLoad(Address(
               referenceAddr, IGM.RefCountedPtrTy, buffer.getAlignment()));
           if (IGF.IGM.isEmbeddedWithExistentials()) {
-            IGF.emitReleaseBox(reference);
+            if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+              llvm::Value *descriptor = loadMallocTypeDescriptor(IGF, buffer);
+              IGF.emitReleaseBoxTyped(reference, descriptor);
+            } else {
+              IGF.emitReleaseBox(reference);
+            }
           } else
             IGF.emitNativeStrongRelease(reference, IGF.getDefaultAtomicity());
 

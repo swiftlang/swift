@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -371,10 +370,6 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
         // (conditional) branch instruction or a switch_enum.
         if (auto *bi = dyn_cast<BranchInst>(predBB->getTerminator())) {
           val = bi->getArg(phiArg->getIndex());
-          continue;
-        } else if (auto *cbi =
-                       dyn_cast<CondBranchInst>(predBB->getTerminator())) {
-          val = cbi->getArgForDestBB(phiArg->getParent(), phiArg->getIndex());
           continue;
         } else if (auto *sei =
                        dyn_cast<SwitchEnumInst>(predBB->getTerminator())) {
@@ -1616,11 +1611,6 @@ public:
 
 };
 } // end anonymous namespace
-
-SILTransform *swift::createAlwaysInlineInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::OnlyInlineAlways,
-                                       "InlineAlways Performance Inliner");
-}
 
 /// Create an inliner pass that does not inline functions that are marked with
 /// the @_semantics or @_effects attributes.

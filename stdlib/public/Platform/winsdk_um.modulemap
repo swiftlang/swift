@@ -429,6 +429,8 @@ module WinSDK [system] {
   module OLE {
     header "ole2.h"
     export *
+
+    link "Ole32.Lib"
   }
 
   module OLE32 {

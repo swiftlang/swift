@@ -28,7 +28,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -735,6 +734,10 @@ public:
     auto Name = getDeclRefStr(E);
     if (Name.empty())
       return false;
+
+    if (LangOptions::isCOMInteropModelConditionalCompilationFlag(Name))
+      return Name ==
+             Ctx.LangOpts.getCOMInteropModelConditionalCompilationFlag();
 
     if (Name.starts_with("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;

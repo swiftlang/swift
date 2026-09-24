@@ -68,7 +68,7 @@ private struct TupleSchema<each ElementSchema: Schema>: Schema {
 // CHECK-NEXT:    cond_br [[DONE]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat (each τ_0_0).Value}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0 where repeat each τ_0_0 : Schema> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0 where repeat each τ_0_0 : Schema> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ELT_ADDR:%.*]] = tuple_pack_element_addr [[PACK_INDEX]] of %0 as $*@pack_element([[UUID]]) (each τ_0_0).Value
 // CHECK-NEXT:    pack_element_set [[ELT_ADDR]] into [[PACK_INDEX]] of [[PACK]]
 // CHECK-NEXT:    [[NEXT_INDEX:%.*]] = builtin "add_Word"([[INDEX]], [[ONE]])
@@ -96,7 +96,7 @@ struct AccepterImpl: PackAccepter {
 // CHECK-NEXT:    cond_br [[DONE]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat EmptyGeneric<each τ_0_0>}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of %0 as $*EmptyGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    pack_element_set [[ARG_ADDR]] into [[PACK_INDEX]] of [[PACK]]
 // CHECK-NEXT:    [[NEXT_INDEX:%.*]] = builtin "add_Word"([[INDEX]], [[ONE]])
@@ -123,7 +123,7 @@ struct ConsumingConsumingAccepterImpl: ConsumingAccepter {
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = builtin "sub_Word"([[PREV_INDEX]], [[ONE]])
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat NonTrivialGeneric<each T>}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of %0 as $*NonTrivialGeneric<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    destroy_addr [[ARG_ADDR]]
 // CHECK-NEXT:    br bb1([[INDEX]])
@@ -144,7 +144,7 @@ struct ConsumingConsumingAccepterImpl: ConsumingAccepter {
 // CHECK-NEXT:    cond_br [[DONE]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat NonTrivialGeneric<each τ_0_0>}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of %0 as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    pack_element_set [[ARG_ADDR]] into [[PACK_INDEX]] of [[PACK]]
 // CHECK-NEXT:    [[NEXT_INDEX:%.*]] = builtin "add_Word"([[INDEX]], [[ONE]])
@@ -176,7 +176,7 @@ struct BorrowingConsumingAccepterImpl: ConsumingAccepter {
 // CHECK-NEXT:    cond_br [[DONE]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat NonTrivialGeneric<each τ_0_0>}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of %0 as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    pack_element_set [[ARG_ADDR]] into [[PACK_INDEX]] of [[PACK]]
 // CHECK-NEXT:    [[NEXT_INDEX:%.*]] = builtin "add_Word"([[INDEX]], [[ONE]])
@@ -197,7 +197,7 @@ struct BorrowingConsumingAccepterImpl: ConsumingAccepter {
 // CHECK:       bb5:
 // CHECK-NEXT:    [[INDEX:%.*]] = builtin "sub_Word"([[PREV_INDEX]], [[ONE]])
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat NonTrivialGeneric<each τ_0_0>}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of [[PACK]] as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    destroy_addr [[ARG_ADDR]]
 // CHECK-NEXT:    br bb4([[INDEX]])
@@ -227,7 +227,7 @@ struct ConsumingBorrowingAccepterImpl: BorrowingAccepter {
 // CHECK-NEXT:    cond_br [[DONE]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat NonTrivialGeneric<each τ_0_0>}
-// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of %0 as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    [[TEMP_ELT_ADDR:%.*]] = tuple_pack_element_addr [[PACK_INDEX]] of [[TEMP_TUPLE]] as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    [[BORROW:%.*]] = load_borrow [[ARG_ADDR]]

@@ -360,6 +360,12 @@ extension ValueDefUseWalker {
       } else {
         return unmatchedPath(value: operand, path: path)
       }
+    case let oce as OpenCOMExistentialInst:
+      if let path = path.popIfMatches(.existential, index: 0) {
+        return walkDownUses(ofValue: oce, path: path)
+      } else {
+        return unmatchedPath(value: operand, path: path)
+      }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
@@ -403,16 +409,6 @@ extension ValueDefUseWalker {
         return walkDownUses(ofValue: val, path: path)
       } else {
         return .continueWalk
-      }
-    case let cbr as CondBranchInst:
-      if let val = cbr.getArgument(for: operand) {
-        if let path = walkDownCache.needWalk(for: val, path: path) {
-          return walkDownUses(ofValue: val, path: path)
-        } else {
-          return .continueWalk
-        }
-      } else {
-        return leafUse(value: operand, path: path)
       }
     case let se as SwitchEnumInst:
       if let (caseIdx, path) = path.pop(kind: .enumCase),
@@ -743,6 +739,8 @@ extension ValueUseDefWalker {
       }
     case let oer as OpenExistentialRefInst:
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
+    case let oce as OpenCOMExistentialInst:
+      return walkUp(value: oce.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
          is BeginDeallocRefInst, is MarkDependenceInst, is UncheckedOwnershipConversionInst,

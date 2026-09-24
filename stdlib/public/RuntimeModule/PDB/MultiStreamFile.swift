@@ -140,6 +140,12 @@ class MultiStreamFile {
         }
 
         pageSize = Int(hdr.cbPg)
+
+        // Page size must be at least 512, and must be a power of two
+        guard pageSize >= 512 && (pageSize & (pageSize - 1)) == 0 else {
+          return nil
+        }
+
         freePageMapPage = Int(hdr.pnFpm)
         pageCount = Int(hdr.pnMac)
 
@@ -187,6 +193,12 @@ class MultiStreamFile {
         }
 
         pageSize = Int(hdr.cbPg)
+
+        // Page size must be at least 512, and must be a power of two
+        guard pageSize >= 512 && (pageSize & (pageSize - 1)) == 0 else {
+          return nil
+        }
+
         freePageMapPage = Int(hdr.pnFpm)
         pageCount = Int(hdr.pnMac)
 
@@ -474,7 +486,10 @@ class MultiStreamFile {
     var offsetInPage = offset - pageNdx * pageSize
     var theCount = count
 
-    if offset > streamInfo.size {
+    if offset < 0 || offset > streamInfo.size {
+      if mustRead && count != 0 {
+        throw MultiStreamFileError.readOffEndOfStream
+      }
       theCount = 0
     } else {
       let remaining = streamInfo.size - offset

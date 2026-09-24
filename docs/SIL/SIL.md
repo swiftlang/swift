@@ -350,10 +350,12 @@ There are three kind of arguments:
 ```
 
 - Phi arguments: If a block has multiple predecessor blocks, the terminators of
-  the predecessor blocks must be `br` or `cond_br` instructions and the
-  operand values of those branch instructions are passed to the block's
-  arguments. This corresponds to LLVM's phi nodes. Basic block arguments are
-  bound by the branch from the predecessor block:
+  the predecessor blocks must be `br` instructions and the operand values of
+  those branch instructions are passed to the block's arguments. This
+  corresponds to LLVM's phi nodes. Because SIL does not contain critical edges,
+  a block with multiple predecessors is only ever reached through unconditional
+  `br` instructions. Basic block arguments are bound by the branch from the
+  predecessor block:
 
 ```
       cond_br %cond, bb1, bb2
@@ -389,10 +391,16 @@ might branch to `bb2` or `bb3`.
 
 ## Control Flow Graph Invariants
 
-In OSSA following rules apply to the CFG of a function:
+The following rules apply to the CFG of a function:
 
 - No critical edges: every edge in the CFG must have either a single
-  predecessor or a single successor block.
+  predecessor or a single successor block. Equivalently, if a terminator has
+  more than one successor, none of those successors may have more than one
+  predecessor. This holds throughout SIL -- in both raw and canonical SIL and
+  regardless of whether the function is in Ownership SSA.
+  Only `br` instructions can branch to blocks with multiple predecessors.
+
+In OSSA following additional rules apply to the CFG of a function:
 
 - No unreachable blocks: All blocks must be reachable from the entry block
   of the function.
@@ -400,10 +408,11 @@ In OSSA following rules apply to the CFG of a function:
 - No infinite loops: all cyclic strongly connected components (SCC) in the
   CFG must have at least one edge which is exiting the cyclic SCC.
 
-Optimization passes must make sure to leave the CFG of an OSSA function in a
+Optimization passes must make sure to leave the CFG of a function in a
 valid state by:
 
-- inserting blocks at critical edges
+- splitting critical edges (inserting a block with a single predecessor and a
+  single successor along the edge)
 
 - removing unreachable blocks
 
@@ -1792,9 +1801,13 @@ by the type system as follows:
     including a Swift class instance, a box allocated by `alloc_box`, or
     a thick function's closure context. It may not alias natively
     Objective-C class instances.
--   An `AnyObject` or `Builtin.BridgeObject` may alias any class
-    instance, whether Swift or Objective-C, but may not alias
-    non-class-instance heap objects.
+-   An `AnyObject` may alias any class instance, whether Swift or Objective-C,
+    but may not alias non-class-instance heap objects.
+-   A `Builtin.BridgeObject` may alias any class instance, whether Swift or
+    Objective-C, but may not alias non-class-instance heap objects. Here,
+    "aliasing" refers to accessing the memory pointed-to by the bridge object
+    value. As explained in [Typed Access TBAA](#typed-access-tbaa), a pointer
+    to a `Builtin.BridgeObject` cannot alias another type.
 -   Two values of the same class type `$C` may alias. Two values of
     related class type `$B` and `$D`, where there is a subclass
     relationship between `$B` and `$D`, may alias. Two values of
@@ -1907,6 +1920,10 @@ Similarly, the LLVM builtins `Builtin.bitcast` and
 pointer values must be converted to an address via `pointer_to_address`
 before typed access can occur. Whether the `pointer_to_address` is
 strict determines whether aliasing may occur.
+
+A pointer to a `Builtin.BridgeObject` cannot alias another type. Although a
+`Builtin.BridgeObject` may be cast to and from a class reference or a
+`Builtin.Word`, such casts are always value casts, not in-place address casts.
 
 Memory may be rebound to an unrelated type. Addresses to unrelated types
 may alias as long as typed access only occurs while memory is bound to

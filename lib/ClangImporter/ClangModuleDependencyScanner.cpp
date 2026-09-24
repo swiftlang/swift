@@ -14,23 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ImporterImpl.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CASOptions.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CAS/CASOptions.h"
-#include "clang/DependencyScanning/DependencyScanningService.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendOptions.h"
-#include "clang/Tooling/DependencyScanningTool.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/StringSaver.h"
 
@@ -120,6 +113,23 @@ void ClangImporter::getBridgingHeaderOptions(
   case OptimizationMode::ForSize:
     swiftArgs.push_back("-Osize");
     break;
+  }
+
+  // If the main compilation specifies '-clang-target', forward it so the
+  // bridging header PCH is emitted through the same `ClangImporter::create`
+  // configuration path (and therefore the same `clang::CodeGenOptions`) as the
+  // compilations that later consume the PCH.
+  if (ctx.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-target");
+    swiftArgs.push_back(ctx.LangOpts.Target.str());
+    swiftArgs.push_back("-clang-target");
+    swiftArgs.push_back(ctx.LangOpts.ClangTarget->str());
+  }
+
+  // Inherit Embedded Swift.
+  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    swiftArgs.push_back("-enable-experimental-feature");
+    swiftArgs.push_back("Embedded");
   }
 
   // Add args reported by the scanner.

@@ -9,7 +9,7 @@ import Swift
 
 sil @testit : $@convention(thin) () -> () {
 bb0:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb1:
   br bb1
@@ -17,5 +17,8 @@ bb1:
 bb2:
   %r = tuple ()
   return %r : $()
+
+bb3:
+  br bb1
 }
 

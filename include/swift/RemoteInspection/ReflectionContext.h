@@ -214,6 +214,7 @@ public:
     std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
+    StoredPointer RegistryNext;
 
     std::string Name;
   };
@@ -233,8 +234,10 @@ public:
   explicit ReflectionContext(
       std::shared_ptr<MemoryReader> reader,
       remote::ExternalTypeRefCache *externalCache = nullptr,
-      reflection::DescriptorFinder *descriptorFinder = nullptr)
-      : super(std::move(reader), *this, externalCache, descriptorFinder) {}
+      reflection::DescriptorFinder *descriptorFinder = nullptr,
+      Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : super(std::move(reader), *this, externalCache, descriptorFinder,
+              flavor) {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
@@ -457,10 +460,16 @@ public:
         savedBuffers.push_back(std::move(Buf));
 
         auto Begin = RemoteRef<void>(Addr, BufStart);
-        auto Size = COFFSec->VirtualSize;
+        uint64_t Size = COFFSec->VirtualSize;
 
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
+        //
+        // The section is bracketed by 8-byte sentinel words at each end, so we
+        // skip the leading sentinel and drop both. If VirtualSize is too small
+        // to contain the sentinels, skip the section.
+        if (Size < 16)
+          return {nullptr, 0};
         Begin = Begin.atByteOffset(8);
         Size -= 16;
 
@@ -1584,9 +1593,14 @@ public:
   StoredPointer allocationMetadataPointer(
     MetadataAllocation<Runtime> Allocation) {
     if (Allocation.Tag == GenericMetadataCacheTag) {
+      // Allocation.Size comes from the inspected process and may be smaller
+      // than the entry we're about to overlay. Reject undersized allocations
+      // and read exactly the entry size rather than the reported size.
+      if (Allocation.Size < sizeof(GenericMetadataCacheEntry<StoredPointer>))
+        return 0;
       auto AllocationBytes = getReader().readBytes(
           RemoteAddress(Allocation.Ptr, RemoteAddress::DefaultAddressSpace),
-          Allocation.Size);
+          sizeof(GenericMetadataCacheEntry<StoredPointer>));
       if (!AllocationBytes)
         return 0;
       auto Entry =
@@ -1645,6 +1659,60 @@ public:
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
+  std::optional<std::string> iterateTaskRegistry(
+      std::function<void(StoredPointer)> Call) {
+    auto RegistryAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry");
+    if (!RegistryAddr) {
+      return "could not find _swift_concurrency_task_registry symbol";
+    }
+
+    auto EnabledAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry_enabled");
+    if (EnabledAddr) {
+      uint8_t Enabled = 0;
+      if (getReader().readInteger(EnabledAddr, 1, &Enabled) && !Enabled) {
+        return "task registry disabled by environment variable";
+      }
+    }
+
+    auto ShardSizeAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry_shard_size");
+    if (!ShardSizeAddr) {
+      return "could not find _swift_concurrency_task_registry_shard_size symbol";
+    }
+    
+    uint8_t PointerSize = getReader().getPointerSize().value_or(sizeof(void*));
+    uint32_t ShardSize = 0;
+    if (!getReader().readInteger(ShardSizeAddr, PointerSize, &ShardSize)) {
+      return "could not read _swift_concurrency_task_registry_shard_size";
+    }
+
+    for (uint32_t i = 0; i < 64; ++i) {
+      // Each shard head is a pointer to the head of a linked list.
+      auto ShardAddr = RegistryAddr + (i * ShardSize);
+      
+      uint64_t TaskAddr = 0;
+      if (!getReader().readInteger(ShardAddr, PointerSize, &TaskAddr)) {
+         return "could not read TaskRegistryShard head";
+      }
+
+      int32_t nodes = 0;
+      int32_t max_registry_nodes = 10000;
+      while (TaskAddr && nodes++ < max_registry_nodes) {
+        Call(TaskAddr);
+        
+        // Find the next task using ReflectionContext's AsyncTaskObj out of process.
+        auto [Error, TaskInfo] = asyncTaskInfo(RemoteAddress(TaskAddr, RegistryAddr.getAddressSpace()), 0, 0);
+        if (Error) {
+          // If we can't read the task info (e.g. memory is corrupted), stop traversing this shard.
+          break;
+        }
+        
+        TaskAddr = TaskInfo.RegistryNext;
+      }
+    }
+
+    return std::nullopt;
+  }
+
   std::optional<std::string> iterateMetadataAllocations(
       std::function<void(MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
@@ -1714,7 +1782,7 @@ public:
       auto PoolPtr = (const char *)PoolBytes.get();
 
       uintptr_t Offset = 0;
-      while (Offset < Trailer->PoolSize) {
+      while (Offset + sizeof(AllocationHeader) <= Trailer->PoolSize) {
         auto AllocationPtr = PoolPtr + Offset;
         auto Header = (const AllocationHeader *)AllocationPtr;
         if (Header->Size == 0)
@@ -1778,12 +1846,24 @@ public:
       auto BacktraceAddrPtr =
           BacktraceListNext +
           sizeof(MetadataAllocationBacktraceHeader<Runtime>);
-      auto BacktraceBytes = getReader().readBytes(
-          BacktraceAddrPtr, HeaderPtr->Count * sizeof(StoredPointer));
+
+      // Limit how many frames we'll read from one backtrace, to avoid an
+      // enormous read when the count is bad data.
+      uint32_t FrameLimit = 1024;
+
+      uint32_t Count = HeaderPtr->Count;
+      MemoryReader::ReadBytesResult BacktraceBytes;
+      if (Count > 0 && Count <= FrameLimit)
+        BacktraceBytes = getReader().readBytes(BacktraceAddrPtr,
+                                               Count * sizeof(StoredPointer));
       auto BacktracePtr =
           reinterpret_cast<const StoredPointer *>(BacktraceBytes.get());
 
-      Call(HeaderPtr->Allocation, HeaderPtr->Count, BacktracePtr);
+      // Don't hand the callback a count that the pointer doesn't back.
+      if (!BacktracePtr)
+        Count = 0;
+
+      Call(HeaderPtr->Allocation, Count, BacktracePtr);
 
       BacktraceListNext =
           RemoteAddress(HeaderPtr->Next, RemoteAddress::DefaultAddressSpace);
@@ -2022,6 +2102,7 @@ private:
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
+    Info.RegistryNext = AsyncTaskObj->PrivateStorage.RegistryNext;
 
     Info.ParentTask = 0;
     if (Info.IsChildTask && asyncTaskSize != 0) {

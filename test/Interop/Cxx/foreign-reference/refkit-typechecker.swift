@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:     -cxx-interoperability-mode=default -disable-availability-checking \
+// RUN:     -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple \
 // RUN:     -I %S%{fs-sep}Inputs -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}refkit.hpp
 
 import RefKit

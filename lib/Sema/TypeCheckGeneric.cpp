@@ -28,8 +28,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
@@ -947,8 +947,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
+        bool isCoroutine = func ? func->isCoroutine() : false;
+        TypeResolutionOptions resultOptions(TypeResolverContext::FunctionResult);
+        if (isCoroutine)
+          resultOptions |= TypeResolutionFlags::Coroutine;
         const auto resultType =
-            resolution.withOptions(TypeResolverContext::FunctionResult)
+            resolution.withOptions(resultOptions)
                 .resolveType(resultTypeRepr);
 
         inferenceSources.push_back(resultType.getPointer());
@@ -956,6 +960,13 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
+
+    // A protocol metatype extension has no generic signature — its members are
+    // static members of the protocol metatype and cannot reference Self.  Bail
+    // before inspecting the extended type, which is the metatype `(any P).Type`
+    // rather than a nominal that requirements could be collected from.
+    if (ext->isMetatypeExtension())
+      return nullptr;
 
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
@@ -969,11 +980,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // Self or its associated types will infer default requirements in
     // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      // Metatype extensions have no generic signature.  Their members are
-      // statically dispatched and cannot reference Self.
-      if (ext->isMetatypeExtension())
-        return nullptr;
-
       if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
           proto->getInverseRequirements().empty()) {
         return extendedNominal->getGenericSignatureOfContext();
@@ -1201,9 +1207,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
-                                      &isolatedConformances)) {
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1234,22 +1238,6 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
       break;
-    }
-
-    if (!isolatedConformances.empty() && signature) {
-      // Dig out the original type parameter for the requirement.
-      // FIXME: req might not be the right pre-substituted requirement,
-      // if this came from a conditional requirement.
-      for (const auto &isolatedConformance : isolatedConformances) {
-        (void)isolatedConformance;
-        if (auto failed =
-                signature->prohibitsIsolatedConformance(req.getFirstType())) {
-            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-              req, substReq,
-              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-              failed->second);
-        }
-      }
     }
   }
 

@@ -21,9 +21,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
@@ -255,7 +253,6 @@ public:
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
@@ -263,7 +260,6 @@ public:
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
-  SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *TEDAI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
@@ -276,7 +272,6 @@ public:
   SILInstruction *visitAllocExistentialBoxInst(AllocExistentialBoxInst *S);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
-  SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
@@ -384,7 +379,7 @@ private:
 
   SILInstruction *createApplyWithConcreteType(
       FullApplySite Apply,
-      const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
+      llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
       SILBuilderContext &BuilderCtx);
 
   // Common utility function to replace the WitnessMethodInst using a

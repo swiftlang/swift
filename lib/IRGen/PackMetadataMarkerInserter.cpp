@@ -28,9 +28,7 @@
 
 #define DEBUG_TYPE "pack-metadata-dealloc-inserter"
 
-#include "swift/AST/TypeWalker.h"
 #include "swift/IRGen/IRGenSILPasses.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -42,7 +40,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
@@ -177,17 +174,12 @@ class PackMetadataMarkerInserter : public SILFunctionTransform {
 
     auto *dominance = getAnalysis<DominanceAnalysis>();
     auto *tree = dominance->get(function);
-    auto split = splitAllCriticalEdges(*function, /*domInfo=*/tree,
-                                       /*loopInfo=*/nullptr);
     auto *deadEnds = getAnalysis<DeadEndBlocksAnalysis>();
-    if (split) {
-      deadEnds->invalidateFunction(function);
-    }
     auto *deBlocks = deadEnds->get(function);
     inserter.insert(tree, deBlocks);
     auto changes = StackNesting::fixNesting(function);
     invalidateAnalysis(
-        (split || changes == StackNesting::Changes::CFG)
+        (changes == StackNesting::Changes::CFG)
             ? SILAnalysis::InvalidationKind::BranchesAndInstructions
             : SILAnalysis::InvalidationKind::Instructions);
   }

@@ -30,9 +30,9 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -80,6 +80,69 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   // TODO: attempt to specialize this based on the known types.
 
   DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode, options);
+
+  // test_only cast (`is`)
+  //
+  // If the custom endpoint isn't available, we allocate a temporary buffer and
+  // do a full conditional cast into it in order to test.
+  if (consumptionKind == CastConsumptionKind::TestOnly) {
+    // Sanity: flags cannot require destroying the source
+    // and there's no such thing as an "uncoditional" test.
+    assert(!(flags & DynamicCastFlags::TakeOnSuccess) &&
+	   !(flags & DynamicCastFlags::DestroyOnFailure) &&
+	   !(flags & DynamicCastFlags::Unconditional) &&
+	   "a test_only cast must not transfer ownership");
+
+    auto opaqueSrc = IGF.Builder.CreateElementBitCast(src, IGF.IGM.OpaqueTy);
+    llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
+    llvm::Value *targetMetadata = IGF.emitTypeMetadataRef(targetType);
+    auto flagsVal = IGF.IGM.getSize(Size(unsigned(flags)));
+
+    // Prefer the dedicated entry point, which answers without having
+    // to construct a converted result.
+    auto featureAvailability = IGF.IGM.Context.getDynamicCastTestAvailability();
+    if (AvailabilityRange::forDeploymentTarget(IGF.IGM.Context)
+            .isContainedIn(featureAvailability)) {
+      llvm::Value *args[] = {opaqueSrc.getAddress(), srcMetadata,
+                             targetMetadata, flagsVal};
+      auto call = IGF.Builder.CreateCall(
+          IGF.IGM.getDynamicCastTestFunctionPointer(), args);
+      call->setDoesNotThrow();
+      return call;
+    }
+
+    // The `DynamicCastTest()` runtime was added in Swift 6.5.
+    // For older runtimes, we have to make do with the regular casting
+    // endpoint, which requires a temporary buffer to put the result into.
+    auto targetSILType =
+        IGF.IGM.getLoweredType(AbstractionPattern::getOpaque(), targetType);
+    auto &targetTI = IGF.getTypeInfo(targetSILType);
+    auto scratch = targetTI.allocateStack(IGF, targetSILType, "dynamic-cast-test");
+    auto opaqueScratch =
+        IGF.Builder.CreateElementBitCast(scratch.getAddress(), IGF.IGM.OpaqueTy);
+
+    llvm::Value *args[] = {opaqueScratch.getAddress(), opaqueSrc.getAddress(),
+                           srcMetadata, targetMetadata, flagsVal};
+    auto call =
+        IGF.Builder.CreateCall(IGF.IGM.getDynamicCastFunctionPointer(), args);
+    call->setDoesNotThrow();
+
+    // On success the scratch buffer contents need to be destroyed
+    if (!targetTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+      auto *destroyBB = IGF.createBasicBlock("dynamic-cast-test.discard");
+      auto *contBB = IGF.createBasicBlock("dynamic-cast-test.cont");
+      IGF.Builder.CreateCondBr(call, destroyBB, contBB);
+
+      IGF.Builder.emitBlock(destroyBB);
+      targetTI.destroy(IGF, scratch.getAddress(), targetSILType,
+                       /*isOutlined=*/false);
+      IGF.Builder.CreateBr(contBB);
+
+      IGF.Builder.emitBlock(contBB);
+    }
+    targetTI.deallocateStack(IGF, scratch, targetSILType);
+    return call;
+  }
 
   // Cast both addresses to opaque pointer type.
   dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.OpaqueTy);
@@ -811,8 +874,9 @@ void irgen::emitScalarExistentialDowncast(
     fastLookupIndex  = getFastLookupIndex(IGF.IGM, srcInstanceType, layout.getProtocols()[0]);
   }
   if (fastLookupIndex.has_value()) {
-    llvm::Value *indices[] = {
-         llvm::ConstantInt::get(IGF.IGM.Int32Ty, -(int)fastLookupIndex.value() - MetadataAdjustmentIndex::Class - 1)};
+    llvm::Value *indices[] = {llvm::ConstantInt::getSigned(
+        IGF.IGM.Int32Ty, -(int)fastLookupIndex.value() -
+                             int(MetadataAdjustmentIndex::Class) - 1)};
     auto addr = IGF.Builder.CreateGEP(IGF.IGM.WitnessTablePtrTy, metadataValue, indices);
     auto wt = IGF.Builder.CreateLoad(Address(
         addr, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
@@ -1084,6 +1148,39 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   assert(!targetLoweredType.is<AnyMetatypeType>() &&
          "scalar cast of class reference to metatype is unimplemented");
+
+  // A cast to a COM existential is not a representation-preserving conformance
+  // check. `QueryInterface` can return a distinct interface pointer, and the
+  // COM existential representation does not carry witness tables. Use the
+  // general dynamic-cast entry point so that the runtime can perform the
+  // identity query and return exactly the single-word COM existential
+  // representation.
+  if (targetFormalType.isCOMExistentialType()) {
+    auto &sourceTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(sourceLoweredType));
+    auto source =
+        sourceTI.allocateStack(IGF, sourceLoweredType, "com.cast.source");
+    sourceTI.initialize(IGF, value, source.getAddress(), /*isOutlined=*/false);
+
+    auto &targetTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(targetLoweredType));
+    auto target =
+        targetTI.allocateStack(IGF, targetLoweredType, "com.cast.target");
+
+    auto storage = cast<llvm::PointerType>(targetTI.getStorageType());
+    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(storage),
+                            target.getAddress());
+
+    emitCheckedCast(IGF, source.getAddress(), sourceFormalType,
+                    target.getAddress(), targetFormalType,
+                    CastConsumptionKind::TakeOnSuccess, mode, options);
+
+    Explosion result;
+    targetTI.loadAsTake(IGF, target.getAddress(), result);
+    targetTI.deallocateStack(IGF, target, targetLoweredType);
+    sourceTI.deallocateStack(IGF, source, sourceLoweredType);
+    returnNilCheckedResult(IGF.Builder, result);
+
+    return;
+  }
 
   // If the source type is existential, project out the class pointer.
   //

@@ -720,7 +720,7 @@ bb0:
 sil [transparent] @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () {
 bb0(%0 : $CP):
   strong_retain %0 : $CP                          // id: %2
-  %3 = open_existential_ref %0 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000", CP) Self // user: %5
+  %3 = open_existential_ref %0 : $CP to $@opened(1, CP) Self // user: %5
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
@@ -730,11 +730,11 @@ sil @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin
 bb0(%0 : $CP, %1 : $CP):
   %4 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () // user: %6
   strong_retain %0 : $CP                          // id: %5
-  // CHECK: open_existential_ref %0 : $any CP to $@opened([[N1:".*"]], any CP) Self
+  // CHECK: open_existential_ref %0 : $any CP to $@opened([[N1:.*]], any CP) Self
   %6 = apply %4(%0) : $@convention(thin) (@owned CP) -> ()
   %7 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () // user: %9
   strong_retain %1 : $CP                          // id: %8
-  // CHECK: open_existential_ref %1 : $any CP to $@opened([[N2:".*"]], any CP) Self
+  // CHECK: open_existential_ref %1 : $any CP to $@opened([[N2:.*]], any CP) Self
   %9 = apply %7(%1) : $@convention(thin) (@owned CP) -> ()
   strong_release %1 : $CP                         // id: %10
   strong_release %0 : $CP                         // id: %11
@@ -992,7 +992,7 @@ bb0(%0 : $*Self):
 // Check that P2_s call can be properly inlined and the resulting witness_method instruction
 // uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden @L_start
-// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+", any P2\) Self]]
+// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\([0-9]+, any P2\) Self]]
 // CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
 // CHECK: return
 sil hidden @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
@@ -1000,9 +1000,9 @@ bb0(%0 : $*L):
   %2 = struct_element_addr %0 : $*L, #L.o
   %3 = alloc_stack $P2
   copy_addr %2 to [init] %3 : $*P2
-  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self
+  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened(2, P2) Self
   %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
-  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %7 = apply %6<@opened(2, P2) Self>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %3 : $*P2
   dealloc_stack %3 : $*P2
   return %7 : $Int32
@@ -1250,7 +1250,7 @@ bb3:
 // CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   strong_retain [[ARG]]
-// CHECK-NEXT:   cond_br undef, bb1, bb4
+// CHECK-NEXT:   cond_br undef, bb5, bb4
 //
 // CHECK: bb1:
 // CHECK-NEXT: function_ref use_c
@@ -1275,13 +1275,16 @@ bb3:
 // CHECK-NEXT: strong_release [[ARG]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
+//
+// CHECK: bb5:
+// CHECK-NEXT: br bb1
 // CHECK-NEXT: } // end sil function 'test_apply_pai_in_loop_with_diamond'
 sil @test_apply_pai_in_loop_with_diamond : $@convention(thin) (@guaranteed C) ->  () {
 bb0(%0: $C):
   strong_retain %0 : $C
   %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
   %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
-  cond_br undef, bb2, bb5
+  cond_br undef, bb6, bb5
 
 bb2:
   apply %closure() : $@callee_guaranteed () -> ()
@@ -1298,6 +1301,9 @@ bb5:
   strong_release %0: $C
   %tuple = tuple()
   return %tuple : $()
+
+bb6:
+  br bb2
 }
 
 // CHECK-LABEL: sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {

@@ -15,6 +15,7 @@ filename =
     ./test/Driver/Inputs/fake-toolchain/ld,
 
     ./utils/80+-check,
+    ./utils/add-worktree,
     ./utils/backtrace-check,
     ./utils/build-script,
     ./utils/check-incremental,
@@ -26,8 +27,10 @@ filename =
     ./utils/dev-scripts/split-cmdline,
     ./utils/gyb,
     ./utils/line-directive,
+    ./utils/PathSanitizingDiff,
     ./utils/PathSanitizingFileCheck,
     ./utils/recursive-lipo,
+    ./utils/remove-worktree,
     ./utils/round-trip-syntax-test,
     ./utils/rth,
     ./utils/run-test,

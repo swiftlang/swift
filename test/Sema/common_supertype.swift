@@ -139,6 +139,21 @@ func testFunction6(x: @escaping () -> Int, y: @escaping @Sendable () -> Int) -> 
   return result
 }
 
+func testFunction7(x: @escaping () async -> Int, y: @escaping () throws -> Any) -> Exactly<() async throws -> Any> {
+  let result = test(x, y)
+  return result
+}
+
+func testFunction8(x: @escaping () throws -> Int, y: @escaping () async -> Any) -> Exactly<() async throws -> Any> {
+  let result = test(x, y)
+  return result
+}
+
+func testFunction9(x: @escaping (Int...) throws -> (), y: @escaping (Int...) async -> ()) -> Exactly<(Int...) async throws -> ()> {
+  let result = test(x, y)
+  return result
+}
+
 func testExistential1(x: any Q, y: any R) -> Exactly<any P> {
   let result = test(x, y)
   return result
@@ -254,4 +269,34 @@ func testFunctionJoin3() -> [(String) -> Any?] {
 
 func testFunctionJoin4(s: String) -> Bool {
     return [f3, f4].contains { $0(s) != nil }
+}
+
+// Join of two class types that contain type variables was incorrectly computed
+// as 'Any'. This was reduced from a larger expression that appears in
+// stdlib/AnyHashable.swift.gyb.
+extension Sequence {
+  func xmap<R>(_: (Element) -> R) -> [R] {
+    return []
+  }
+}
+
+do {
+  protocol P {}
+
+  class C<T>: P {
+    init(_: T) {}
+  }
+
+  struct S {
+    init<T: P>(_: T) {}
+  }
+
+  func test(x: [Int]) -> [[S]] {
+    return x.xmap {
+      [
+        C($0 as Int),
+        C($0 as Int)
+      ].xmap(S.init)
+    }
+  }
 }

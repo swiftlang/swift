@@ -13,8 +13,6 @@
 #include "CodeCompletionSwiftInterop.h"
 #include "SourceKit/Core/Context.h"
 #include "sourcekitd/sourcekitdInProc-Internal.h"
-#include "swift/AST/ASTPrinter.h"
-#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -491,8 +489,8 @@ swiftide_completion_result_get_kind(swiftide_completion_response_t _response) {
     return SWIFTIDE_COMPLETION_KIND_NONE;
   case CompletionKind::Import:
     return SWIFTIDE_COMPLETION_KIND_IMPORT;
-  case CompletionKind::Using:
-    return SWIFTIDE_COMPLETION_KIND_USING;
+  case CompletionKind::FileDefault:
+    return SWIFTIDE_COMPLETION_KIND_FILEDEFAULT;
   case CompletionKind::UnresolvedMember:
     return SWIFTIDE_COMPLETION_KIND_UNRESOLVEDMEMBER;
   case CompletionKind::DotExpr:

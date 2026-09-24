@@ -12,26 +12,12 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/FrozenMultiMap.h"
-#include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockData.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -40,23 +26,13 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
 
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyUtils.h"
@@ -208,6 +184,12 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InitBorrowAddrInst:
     return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
 
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+    // The instruction traps on failure, so if we're still executing, Dest
+    // was successfully initialized with the cast result.
+    return cast<UnconditionalCheckedCastAddrInst>(memInst)->getDest() ==
+           address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
@@ -329,6 +311,19 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     return true;
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+    auto *cast = swift::cast<UnconditionalCheckedCastAddrInst>(memInst);
+    return cast->getSrc() == address && !cast->isCopy();
+  }
+  case SILInstructionKind::CheckedCastAddrBranchInst: {
+    auto *ccabi = cast<CheckedCastAddrBranchInst>(memInst);
+    // Only a source operand consumed under TakeAlways is unconditionally
+    // consumed by this instruction, regardless of which successor is
+    // taken. TakeOnSuccess/CopyOnSuccess/BorrowAlways all leave Src valid
+    // on at least one path, so they aren't a *must*-consume here.
+    return ccabi->getSrc() == address &&
+           ccabi->getConsumptionKind() == CastConsumptionKind::TakeAlways;
+  }
   }
 }
 

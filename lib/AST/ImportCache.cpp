@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/Basic/Module.h"
 
 using namespace swift;
 using namespace namelookup;
@@ -403,6 +404,85 @@ ArrayRef<ModuleDecl *> ImportCache::allocateArray(
     return ctx.AllocateCopy(results.getArrayRef());
 }
 
+/// Returns true if \p module wraps a Clang submodule of the Clang module that
+/// \p other is, or is an overlay of.
+static bool isClangSubmoduleOf(const ModuleDecl *module,
+                               const ModuleDecl *other) {
+  auto *clangModule = module->findUnderlyingClangModule();
+  if (!clangModule || !clangModule->isSubModule())
+    return false;
+
+  auto *otherClangModule = other->findUnderlyingClangModule();
+  if (!otherClangModule)
+    return false;
+
+  return clangModule->getTopLevelModule() ==
+         otherClangModule->getTopLevelModule();
+}
+
+/// Returns true if \p module declares that clients should see it as part of the
+/// module named \p name, by way of the Clang `export_as` declaration.
+static bool isExportedAs(const ModuleDecl *module, StringRef name) {
+  if (module->getExportAsName().str() == name)
+    return true;
+
+  // `export_as` is declared on a top-level Clang module, but a re-export can
+  // name one of its submodules.
+  if (auto *clangModule = module->findUnderlyingClangModule())
+    return clangModule->getTopLevelModule()->ExportAsModule == name;
+
+  return false;
+}
+
+/// Adds \p module to \p result, along with the Clang module that \p module is
+/// an overlay of, if there is one.
+static void
+addModuleAndUnderlyingClangModule(ModuleDecl *module,
+                                  llvm::SetVector<ModuleDecl *> &result) {
+  result.insert(module);
+  if (auto *underlyingModule = module->getUnderlyingModuleIfOverlay())
+    result.insert(underlyingModule);
+}
+
+/// Adds every module that makes up \p module to \p result: \p module itself,
+/// the Clang module that it overlays, and the modules that declare themselves
+/// to be part of it with `export_as`.
+static void addWeakImportModule(ModuleDecl *module,
+                                llvm::SetVector<ModuleDecl *> &result) {
+  addModuleAndUnderlyingClangModule(module, result);
+
+  auto name = module->getRealName().str();
+
+  auto *underlyingModule = module->getUnderlyingModuleIfOverlay();
+  if (!underlyingModule && module->isNonSwiftModule())
+    underlyingModule = module;
+
+  if (!underlyingModule)
+    return;
+
+  // A Clang submodule is part of the module that contains it, so walk the
+  // submodules to reach the modules that they re-export.
+  llvm::SetVector<ModuleDecl *> clangModules;
+  clangModules.insert(underlyingModule);
+
+  for (unsigned i = 0; i < clangModules.size(); ++i) {
+    auto *clangModule = clangModules[i];
+
+    SmallVector<ImportedModule, 4> reexportedModules;
+    clangModule->getImportedModules(reexportedModules,
+                                    ModuleDecl::ImportFilterKind::Exported);
+
+    for (auto reexported : reexportedModules) {
+      auto *reexportedModule = reexported.importedModule;
+
+      if (isClangSubmoduleOf(reexportedModule, clangModule))
+        clangModules.insert(reexportedModule);
+      else if (isExportedAs(reexportedModule, name))
+        addModuleAndUnderlyingClangModule(reexportedModule, result);
+    }
+  }
+}
+
 ArrayRef<ModuleDecl *>
 ImportCache::getWeakImports(const ModuleDecl *mod) {
   auto found = WeakCache.find(mod);
@@ -426,7 +506,7 @@ ImportCache::getWeakImports(const ModuleDecl *mod) {
         continue;
 
       ModuleDecl *importedModule = import.module.importedModule;
-      result.insert(importedModule);
+      addWeakImportModule(importedModule, result);
 
       // Only explicit re-exports of a weak-linked module are themselves
       // weak-linked.
@@ -440,7 +520,7 @@ ImportCache::getWeakImports(const ModuleDecl *mod) {
       importedModule->getImportedModules(
           reexportedModules, ModuleDecl::ImportFilterKind::Exported);
       for (auto reexportedModule : reexportedModules) {
-        result.insert(reexportedModule.importedModule);
+        addWeakImportModule(reexportedModule.importedModule, result);
       }
     }
   }

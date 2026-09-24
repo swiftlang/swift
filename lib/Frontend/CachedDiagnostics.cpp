@@ -16,12 +16,10 @@
 
 #include "swift/Frontend/CachedDiagnostics.h"
 
-#include "swift/AST/DiagnosticBridge.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
@@ -142,7 +140,7 @@ struct DiagnosticSerializer {
     // has references to input files to find subconsumer.
     auto addInputToSourceMgr = [&](const InputFile &Input) {
       auto Path = remapFilePath(Input.getFileName());
-      SrcMgr.getExternalSourceBufferID(Path);
+      SrcMgr.getExternalSourceBufferID(Input.getFileName());
 
       // Fetch the source buffer from original SourceManager and create a
       // serialized file from it.

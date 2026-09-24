@@ -342,8 +342,8 @@ public:
                                        Address src, SILType T,
                                        bool isOutlined) const override {
     if (ArraySize == 0)
-      return llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
-      
+      return llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
+
     auto firstElementAddr
       = IGF.Builder.CreateElementBitCast(src, Element.getStorageType());
 
@@ -381,6 +381,12 @@ public:
                        elementTI.isFixedSize(ResilienceExpansion::Minimal),
                        elementTI.isABIAccessible())
   {
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
   
   unsigned getExplosionSize() const override {
@@ -510,6 +516,13 @@ public:
                        elementTI.isABIAccessible())
   {
   }
+
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 };
 
 // NOTE: This does not simply use WitnessSizedTypeInfo in order to avoid
@@ -521,6 +534,15 @@ class NonFixedArrayTypeInfo final
                              TypeInfo> {
   using super = ArrayTypeInfoBase<IndirectTypeInfo<NonFixedArrayTypeInfo, TypeInfo>,
                                   TypeInfo>;
+
+public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
+private:
   
   llvm::Value *getArraySize(IRGenFunction &IGF, SILType T) const override {
     if (auto fixedSize = getFixedArraySize(T)) {

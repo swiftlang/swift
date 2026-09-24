@@ -58,7 +58,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "${CMAKE_COMMAND}" -E env "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
+          "${CMAKE_COMMAND}" -E env -- "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
           "${CMAKE_COMMAND}" -E copy_if_different "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
       COMMAND
@@ -120,6 +120,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
   set(gyb_extra_sources
       "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftIntTypes.py"
+      "${SWIFT_SOURCE_DIR}/utils/SwiftAtomics.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftFloatingPointTypes.py"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"

@@ -2351,6 +2351,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
+  if (fn->isCalledOnce())
+    OpArgs.push_back('O');
+
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
   if (diffKind != DifferentiabilityKind::NonDifferentiable) {
@@ -2406,6 +2409,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
       break;
     case SILFunctionTypeRepresentation::WitnessMethod:
       OpArgs.push_back('W');
+      break;
+    case SILFunctionTypeRepresentation::COMMethod:
+      OpArgs.push_back('V');
       break;
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -2904,6 +2910,12 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
     return;
   }
 
+  // As we're mangling a plain (non-symbolic) name for this protocol,
+  // the enclosing context mangled below must not use a symbolic
+  // reference either so that it will be resolvable at
+  // runtime. Temporarily disable symbolic references.
+  llvm::SaveAndRestore<bool> X(AllowSymbolicReferences, false);
+
   BaseEntitySignature base(protocol);
   appendContextOf(protocol, base);
   auto *clangDecl = protocol->getClangDecl();
@@ -3377,6 +3389,8 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
+    } else if (fn->isCalledOnce()) {
+      return appendOperator("XO");
     }
     return appendOperator("c");
 
@@ -3415,7 +3429,12 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
+  if (fn->isCoroutine()) {
+    appendFunctionYieldTypes(fn, fn->getYields(), sig, forDecl, isRecursedInto);
+    appendOperator("Xy");
+  }
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
+
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3593,6 +3612,48 @@ void ASTMangler::appendFunctionInputType(
           sig, nullptr);
       appendListSeparator(isFirstParam);
       paramIndex++;
+    }
+    appendOperator("t");
+    break;
+  }
+}
+
+void ASTMangler::appendFunctionYieldTypes(
+    AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Yield> yields,
+    GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
+
+  switch (yields.size()) {
+  case 0:
+    appendOperator("y");
+    break;
+
+  case 1: {
+    const auto &yield = yields.front();
+    auto type = yield.getType();
+
+    // TODO: decide on lifetime dependencies for yields
+    if (!type->is<TupleType>()) {
+      appendParameterTypeListElement(
+          Identifier(), type,
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
+  default:
+    bool isFirstYield = true;
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      appendParameterTypeListElement(
+          Identifier(), yield.getType(),
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      appendListSeparator(isFirstYield);
     }
     appendOperator("t");
     break;
@@ -4254,7 +4315,7 @@ CanType ASTMangler::getDeclTypeForMangling(
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, info);
+                                  /* yields */ {}, C.TheErrorType, info);
     }
     return C.TheErrorType;
   }
@@ -4278,8 +4339,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
 
-    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getYields(),
+                                 gft.getResult(), gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {
@@ -5539,7 +5600,8 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
+    case DeclKind::HiddenTypeLayoutInfo:
       break;
     };
   }

@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/ConcurrencyDebug.h"
 
 namespace swift {
 
@@ -67,6 +68,8 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 /// 1 - The initial version number when this variable was added, in swift 6.1.
 /// 2 - Task names moved from a record to a dedicated fragment,
 ///     tail allocated just after the AsyncTask itself.
+/// 3 - The top 8 bits of this value have been reserved to expose how runtimes
+///     store the current task (swift_concurrency_current_task_storage_kind).
 SWIFT_EXPORT_FROM(swift_Concurrency)
 uint32_t _swift_concurrency_debug_internal_layout_version;
 

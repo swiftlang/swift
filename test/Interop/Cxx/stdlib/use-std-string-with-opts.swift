@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -O)
 //
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Tests optimizations related to CxxStdlib.
 

@@ -109,7 +109,7 @@ func test4<each T>(function: @escaping (_: Any) -> (), type: (repeat each T).Typ
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[EXPANSION_INDEX]] of [[PAYLOAD_ADDR]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DEST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T

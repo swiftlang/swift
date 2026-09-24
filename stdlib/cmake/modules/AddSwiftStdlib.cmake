@@ -470,6 +470,9 @@ function(_add_target_variant_c_compile_flags)
 
   string(TOUPPER "${SWIFT_SDK_${CFLAGS_SDK}_THREADING_PACKAGE}" _threading_package)
   list(APPEND result "-DSWIFT_THREADING_${_threading_package}")
+  if(CFLAGS_SDK STREQUAL "embedded" AND _threading_package STREQUAL "EMBEDDED")
+    list(APPEND result "-I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform")
+  endif()
 
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-DSWIFT_RUNTIME_OS_VERSIONING")
@@ -725,7 +728,7 @@ function(_add_swift_lipo_target)
 
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} -- "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
         ${codesign_command}
         CUSTOM_TARGET_NAME "${LIPO_TARGET}"
         OUTPUT "${LIPO_OUTPUT}"
@@ -738,6 +741,21 @@ function(_add_swift_lipo_target)
         OUTPUT "${LIPO_OUTPUT}"
         DEPENDS ${source_targets})
   endif()
+endfunction()
+
+# Determine whether the embedded Swift libraries for ${triple} are built under
+# CodeGenerationModel=interface, storing TRUE/FALSE into ${result_var_name} in
+# the caller's scope.
+function(embedded_triple_uses_interface_cgm triple result_var_name)
+  set(result FALSE)
+
+  if(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
+     AND triple
+     AND "${triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX}")
+    set(result TRUE)
+  endif()
+
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
 # Add a single variant of a new Swift library.
@@ -965,7 +983,22 @@ function(add_swift_target_library_single target name)
     # SWIFT_USE_EMBEDDED_SWIFT_PLATFORM for every embedded library build so
     # that the platform-conditional code paths in the embedded stdlib and
     # related libraries pick up the platform implementations.
+    #
+    # The abstraction layer is on for a given triple when either the
+    # global SWIFT_USE_SWIFT_EMBEDDED_PLATFORM is TRUE, or the triple
+    # matches SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX.
+    set(_emblib_pal_triple
+      "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+    set(_emblib_use_pal FALSE)
     if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      set(_emblib_use_pal TRUE)
+    elseif(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX
+           AND _emblib_pal_triple
+           AND "${_emblib_pal_triple}" MATCHES
+               "${SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX}")
+      set(_emblib_use_pal TRUE)
+    endif()
+    if(_emblib_use_pal)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
         "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
     endif()
@@ -1082,26 +1115,75 @@ function(add_swift_target_library_single target name)
       # Flags required to build embedded libraries
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
 
-      # Embedded Swift libraries default to producing an empty object file:
-      # they only serve as a swiftmodule for client compilation, and the
-      # client emits the actual code. Libraries that are meant to be linked
-      # in without their swiftmodule ever being imported (e.g. the
-      # EmbeddedPlatform shim archives) must opt out with
-      # NON_EMPTY_OBJECT_FILE so their .a files actually contain code.
-      if(NOT SWIFTLIB_SINGLE_NON_EMPTY_OBJECT_FILE)
-        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+      # Two orthogonal per-triple opt-ins gate the departures from the
+      # default embedded stdlib build:
+      #
+      #   SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
+      #     Build under CodeGenerationModel=interface. The library's
+      #     object files contain real code (not empty stubs) and clients
+      #     reference its strong external symbols. Without this, we stay
+      #     on the default Inlinable model, emit an empty object file,
+      #     and drive `CodeGenerationModel=implementation` — unless the
+      #     caller opts out with NON_EMPTY_OBJECT_FILE.
+      #
+      #   SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX
+      #     Compile Swift and C/C++ sources with LLVM LTO
+      #     (`-lto=<type>` / `-flto=<type>`). Applying LTO on top of the
+      #     default empty-object-file build is harmless but produces no
+      #     meaningful bitcode; you almost always want the same triple
+      #     set for both regexes.
+      set(_emblib_triple
+        "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+
+      embedded_triple_uses_interface_cgm("${_emblib_triple}"
+                                         _emblib_interface_cgm)
+
+      set(_emblib_lto FALSE)
+      if(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX
+         AND _emblib_triple
+         AND "${_emblib_triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX}")
+        set(_emblib_lto TRUE)
       endif()
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
+
+      if(_emblib_interface_cgm)
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+          -enable-experimental-feature;CodeGenerationModel=interface)
+      else()
+        # Embedded Swift libraries default to producing an empty object
+        # file: they only serve as a swiftmodule for client compilation,
+        # and the client emits the actual code. Libraries that are meant
+        # to be linked in without their swiftmodule ever being imported
+        # (e.g. the EmbeddedPlatform shim archives) must opt out with
+        # NON_EMPTY_OBJECT_FILE so their .a files actually contain code.
+        if(NOT SWIFTLIB_SINGLE_NON_EMPTY_OBJECT_FILE)
+          list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+        endif()
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
+      endif()
+
+      if(_emblib_lto)
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+          "-lto=${SWIFT_EMBEDDED_LTO_TYPE}")
+        if("${SWIFT_EMBEDDED_LTO_TYPE}" STREQUAL "llvm-thin")
+          list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-flto=thin")
+        elseif("${SWIFT_EMBEDDED_LTO_TYPE}" STREQUAL "llvm-full")
+          list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-flto=full")
+        else()
+          message(FATAL_ERROR
+            "SWIFT_EMBEDDED_LTO_TYPE must be 'llvm-thin' or 'llvm-full' "
+            "(got '${SWIFT_EMBEDDED_LTO_TYPE}')")
+        endif()
+      endif()
   endif()
 
   # Define availability macros.
-  deployment_version(DEPLOYMENT_VERSION
-    SDK "${SWIFTLIB_SINGLE_SDK}"
-    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
-    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
+  deployment_version(STDLIB_DEPLOYMENT_VERSION SDK "${SWIFTLIB_SINGLE_SDK}")
+  set(STDLIB_DEPLOYMENT_VERSION_MACCATALYST
+    "$CACHE{SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
+  if(NOT STDLIB_DEPLOYMENT_VERSION_MACCATALYST)
+    set(STDLIB_DEPLOYMENT_VERSION_MACCATALYST
+      "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
+  endif()
 
   # Compute the availability definitions to use for this library. Under
   # Embedded Swift, all stdlib APIs should be available always, so replace
@@ -1137,8 +1219,8 @@ function(add_swift_target_library_single target name)
             string(REGEX MATCH "anyAppleOS ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
             string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
           endif()
-          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
-            string(REGEX REPLACE ":.*" ":iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}")
+            string(REGEX REPLACE ":.*" ":iOS ${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
           endif()
         elseif(SWIFTLIB_SINGLE_SDK STREQUAL "OSX" AND SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR STREQUAL "zippered")
           string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" ios_platform_version "${def}")
@@ -1151,8 +1233,8 @@ function(add_swift_target_library_single target name)
             set(macos_version "${any_version}")
             set(ios_version "${any_version}")
           endif()
-          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
-            string(REGEX REPLACE ":.*" ": macOS ${DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}"))
+            string(REGEX REPLACE ":.*" ": macOS ${STDLIB_DEPLOYMENT_VERSION}, iOS ${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
           endif()
         else()
           string(REGEX MATCH "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
@@ -1161,8 +1243,8 @@ function(add_swift_target_library_single target name)
             string(REGEX MATCH "anyAppleOS ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
             string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
           endif()
-          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${DEPLOYMENT_VERSION}")
-            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${DEPLOYMENT_VERSION}" current "${current}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION}")
+            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${STDLIB_DEPLOYMENT_VERSION}" current "${current}")
           endif()
         endif()
       endif()
@@ -2111,6 +2193,7 @@ function(add_swift_target_library name)
         C_COMPILE_FLAGS_WATCHOS
         C_COMPILE_FLAGS_LINUX
         C_COMPILE_FLAGS_WINDOWS
+        C_COMPILE_FLAGS_WASI
         DEPENDS
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
@@ -2617,6 +2700,9 @@ function(add_swift_target_library name)
       elseif(sdk STREQUAL "WINDOWS")
         list(APPEND swiftlib_c_compile_flags_all
              ${SWIFTLIB_C_COMPILE_FLAGS_WINDOWS})
+      elseif(sdk STREQUAL "WASI")
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_WASI})
       endif()
 
       # Add flags to prepend framework search paths for the parallel framework
@@ -2662,11 +2748,6 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
         # Ensure compatibility with Android 15+ devices using 16KB memory pages.
         list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
-      endif()
-
-      # This is a Android-specific hack till we transition the stdlib fully to versioned triples.
-      if(sdk STREQUAL "ANDROID" AND name STREQUAL "swiftSwiftReflectionTest")
-        list(APPEND swiftlib_swift_compile_flags_all "-target" "${SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE}${SWIFT_ANDROID_API_LEVEL}")
       endif()
 
       if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
@@ -3676,9 +3757,9 @@ endfunction()
 #   add_embedded_swift_target_library(<prefix> <library_name>
 #     [IS_STDLIB] [IS_STDLIB_CORE] [IS_SDK_OVERLAY]
 #     [PARTIAL_SOURCES_INTENDED]
-#     [INSTALL_BINARY]
 #     [NO_FREESTANDING_CXX]
 #     [NON_EMPTY_OBJECT_FILE]
+#     [DETECT_MALLOC_TYPE]
 #     <sources>...
 #     [GYB_SOURCES <sources>...]
 #     [SWIFT_COMPILE_FLAGS <flags>...]
@@ -3708,15 +3789,35 @@ endfunction()
 # whose swiftmodule is never imported by clients but whose object code must
 # be linked in (e.g. the EmbeddedPlatform shim archives).
 #
+# When DETECT_MALLOC_TYPE is set, each per-target build checks (via
+# check_c_source_compiles against swift/Runtime/Config.h, using that
+# target's own triple/sysroot) whether SWIFT_STDLIB_HAS_MALLOC_TYPE is
+# defined for it, and if so appends "-D SWIFT_STDLIB_HAS_MALLOC_TYPE" to
+# that target's SWIFT_COMPILE_FLAGS. This has to happen per target triple
+# (inside this function's loop) rather than in the caller, since the
+# result depends on ${mod}/${triple}.
+#
+# DETECT_ARC4RANDOM works the same way for SWIFT_STDLIB_HAS_ARC4RANDOM, which
+# reports whether the target's C library declares arc4random_buf(). Only Linux
+# triples are probed, since glibc did not gain arc4random_buf() until 2.36 and
+# every other supported target either has it or is bare metal.
+#
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
 # only when *every* ONLY_*_REGEX category that has at least one pattern has
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;DETECT_ARC4RANDOM"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
+
+  if(EMBLIB_DETECT_MALLOC_TYPE)
+    include(CheckCSourceCompiles)
+  endif()
+  if(EMBLIB_DETECT_ARC4RANDOM)
+    include(CheckSymbolExists)
+  endif()
 
   translate_flag(${EMBLIB_IS_STDLIB}              "IS_STDLIB"
                  EMBLIB_IS_STDLIB_keyword)
@@ -3824,6 +3925,67 @@ function(add_embedded_swift_target_library prefix library_name)
       list(PREPEND per_target_depends "embedded-stdlib-${mod}")
     endif()
 
+    # Propagate the value of SWIFT_STDLIB_HAS_MALLOC_TYPE defined in
+    # include/swift/Runtime/Config.h to a Swift conditional compilation
+    # flag, per target triple. This must live inside this loop (rather than
+    # in the caller) because it depends on ${mod}/${triple}, which only
+    # exist as loop variables here.
+    set(per_target_swift_compile_flags ${EMBLIB_SWIFT_COMPILE_FLAGS})
+    if(EMBLIB_DETECT_MALLOC_TYPE)
+      string(MAKE_C_IDENTIFIER "${mod}" _malloc_type_mod_id)
+      set(_malloc_type_saved_flags "${CMAKE_REQUIRED_FLAGS}")
+      set(_malloc_type_saved_includes "${CMAKE_REQUIRED_INCLUDES}")
+      set(_malloc_type_saved_defs "${CMAKE_REQUIRED_DEFINITIONS}")
+      set(CMAKE_REQUIRED_FLAGS "-target ${triple}")
+      if(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH)
+        list(APPEND CMAKE_REQUIRED_FLAGS "-isysroot" "${SWIFT_SDK_embedded_ARCH_${arch_key}_PATH}")
+      endif()
+      set(CMAKE_REQUIRED_INCLUDES
+        "${SWIFT_MAIN_INCLUDE_DIR}"
+        "${SWIFT_INCLUDE_DIR}"
+        "${SWIFT_SHIMS_INCLUDE_DIR}")
+      if(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC)
+        set(CMAKE_REQUIRED_DEFINITIONS "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=1")
+      else()
+        set(CMAKE_REQUIRED_DEFINITIONS "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
+      endif()
+      check_c_source_compiles("
+        #include \"${SWIFT_MAIN_INCLUDE_DIR}/swift/Runtime/Config.h\"
+        #if !SWIFT_STDLIB_HAS_MALLOC_TYPE
+        #error excluded target
+        #endif
+        int main(void) { return 0; }
+      " "SWIFT_STDLIB_HAS_MALLOC_TYPE_${_malloc_type_mod_id}")
+      set(CMAKE_REQUIRED_FLAGS "${_malloc_type_saved_flags}")
+      set(CMAKE_REQUIRED_INCLUDES "${_malloc_type_saved_includes}")
+      set(CMAKE_REQUIRED_DEFINITIONS "${_malloc_type_saved_defs}")
+      if(SWIFT_STDLIB_HAS_MALLOC_TYPE_${_malloc_type_mod_id})
+        list(APPEND per_target_swift_compile_flags "-D" "SWIFT_STDLIB_HAS_MALLOC_TYPE")
+      endif()
+    endif()
+
+    # Likewise for arc4random_buf(). The embedded sources only consult this on
+    # Linux (see the DETECT_ARC4RANDOM note above), so don't spend configure
+    # time probing the bare-metal triples.
+    if(EMBLIB_DETECT_ARC4RANDOM AND "${triple}" MATCHES "-linux")
+      string(MAKE_C_IDENTIFIER "${mod}" _arc4random_mod_id)
+      set(CMAKE_REQUIRED_FLAGS "-target ${triple}")
+      if(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH)
+        string(APPEND CMAKE_REQUIRED_FLAGS
+          " --sysroot ${SWIFT_SDK_embedded_ARCH_${arch_key}_PATH}")
+      endif()
+      # The answer must depend only on the target's libc.
+      set(CMAKE_REQUIRED_INCLUDES)
+      set(CMAKE_REQUIRED_DEFINITIONS)
+      set(CMAKE_REQUIRED_LIBRARIES)
+      check_symbol_exists(arc4random_buf "stdlib.h"
+        "SWIFT_STDLIB_HAS_ARC4RANDOM_${_arc4random_mod_id}")
+      if(SWIFT_STDLIB_HAS_ARC4RANDOM_${_arc4random_mod_id})
+        list(APPEND per_target_swift_compile_flags
+          "-D" "SWIFT_STDLIB_HAS_ARC4RANDOM")
+      endif()
+    endif()
+
     add_swift_target_library_single(
       ${prefix}-${mod}
       ${library_name}
@@ -3836,7 +3998,7 @@ function(add_embedded_swift_target_library prefix library_name)
       ${EMBLIB_NON_EMPTY_OBJECT_FILE_keyword}
       ${EMBLIB_UNPARSED_ARGUMENTS}
       GYB_SOURCES ${EMBLIB_GYB_SOURCES}
-      SWIFT_COMPILE_FLAGS ${EMBLIB_SWIFT_COMPILE_FLAGS}
+      SWIFT_COMPILE_FLAGS ${per_target_swift_compile_flags}
       C_COMPILE_FLAGS ${EMBLIB_C_COMPILE_FLAGS}
       SDK "embedded"
       ARCHITECTURE "${arch_key}"
@@ -3845,25 +4007,22 @@ function(add_embedded_swift_target_library prefix library_name)
       INSTALL_IN_COMPONENT ${EMBLIB_INSTALL_IN_COMPONENT}
     )
 
-    # Install the produced archive into lib/swift/embedded/${mod}/. Used by
-    # embedded libraries that produce a static archive consumed by clients
-    # at link time (e.g. swiftEmbeddedPlatformPOSIX, swiftUnicodeDataTables,
-    # swift_Concurrency).
-    if(EMBLIB_INSTALL_BINARY)
-      swift_install_in_component(
-        TARGETS ${prefix}-${mod}
-        DESTINATION "lib/swift/embedded/${mod}"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-      )
-      swift_install_in_component(
-        FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
-        DESTINATION "lib/swift/embedded/${mod}/"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                    GROUP_READ GROUP_EXECUTE
-                    WORLD_READ WORLD_EXECUTE
-      )
-    endif()
+    # Install the produced archive into lib/swift/embedded/${mod}/. Depending
+    # on the compilation model, it might be empty (and can be ignored), but it
+    # will always be there.
+    swift_install_in_component(
+      TARGETS ${prefix}-${mod}
+      DESTINATION "lib/swift/embedded/${mod}"
+      COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+    )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                  GROUP_READ GROUP_EXECUTE
+                  WORLD_READ WORLD_EXECUTE
+    )
 
     # When building the per-target archive on macOS, point CMake at the
     # specific architecture so it doesn't try to build a fat archive.

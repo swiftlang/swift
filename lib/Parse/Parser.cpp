@@ -22,20 +22,13 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/ParseDeclName.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/Basic/DarwinSDKInfo.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -1024,7 +1017,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
 }
 
 bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                                  DiagRef D) {
+                                  DiagRef D, bool justChecking) {
   auto IntTok = Tok;
   if (parseToken(tok::integer_literal, Loc, D))
     return true;

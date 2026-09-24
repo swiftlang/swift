@@ -35,10 +35,10 @@ public let someProtoCompositionValue: (AProto & SomeProto)? = nil
 public let someProtoCompositionValue2: (SomeProto & ZProto)? = nil
 
 // CHECK-DAG: let someTypedefValue: SomeTypedef
-// CHECK-RECOVERY-DAG: let someTypedefValue: Int64
+// CHECK-RECOVERY-DAG: let someTypedefValue: CLongLong
 public let someTypedefValue: SomeTypedef = 0
 // CHECK-DAG: let someTypedefOptValue: SomeTypedef?
-// CHECK-RECOVERY-DAG: let someTypedefOptValue: Int64?
+// CHECK-RECOVERY-DAG: let someTypedefOptValue: CLongLong?
 public let someTypedefOptValue: SomeTypedef? = nil
 
 // CHECK-DAG: unowned var someUnownedObject: @sil_unowned Base

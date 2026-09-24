@@ -36,6 +36,18 @@ func _swift_mutex_unlock(_: UnsafeMutableRawPointer)
 @_extern(c, "_swift_mutex_tryLock")
 func _swift_mutex_tryLock(_: UnsafeMutableRawPointer) -> Int
 
+@_extern(c, "_swift_mutexRecursive_init")
+func _swift_mutexRecursive_init(_: UnsafeMutableRawPointer, _: CUnsignedLongLong)
+
+@_extern(c, "_swift_mutexRecursive_destroy")
+func _swift_mutexRecursive_destroy(_: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_mutexRecursive_lock")
+func _swift_mutexRecursive_lock(_: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_mutexRecursive_unlock")
+func _swift_mutexRecursive_unlock(_: UnsafeMutableRawPointer)
+
 func check(_ condition: Bool) {
   if !condition {
     fatalError("unexpected single-threaded mutex behavior")
@@ -50,7 +62,6 @@ func withMutexStorage(_ body: (UnsafeMutableRawPointer) -> Void) {
 }
 
 let checked: CUnsignedLongLong = 0x01
-let recursive: CUnsignedLongLong = 0x02
 
 @main
 struct Main {
@@ -101,14 +112,12 @@ struct Main {
     }
 
     withMutexStorage { mutex in
-      _swift_mutex_init(mutex, checked | recursive)
-      _swift_mutex_lock(mutex)
-      _swift_mutex_lock(mutex)
-      check(_swift_mutex_tryLock(mutex) != 0)
-      _swift_mutex_unlock(mutex)
-      _swift_mutex_unlock(mutex)
-      _swift_mutex_unlock(mutex)
-      _swift_mutex_destroy(mutex)
+      _swift_mutexRecursive_init(mutex, checked)
+      _swift_mutexRecursive_lock(mutex)
+      _swift_mutexRecursive_lock(mutex)
+      _swift_mutexRecursive_unlock(mutex)
+      _swift_mutexRecursive_unlock(mutex)
+      _swift_mutexRecursive_destroy(mutex)
     }
 #endif
   }

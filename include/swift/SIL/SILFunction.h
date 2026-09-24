@@ -333,6 +333,9 @@ private:
   /// Name of a section if @section attribute was used, otherwise empty.
   StringRef Section;
 
+  /// The target string from @_target.
+  StringRef TargetFeatures;
+
   /// Name of a Wasm export if @_expose(wasm) attribute was used, otherwise
   /// empty.
   StringRef WasmExportName;
@@ -491,6 +494,13 @@ private:
   unsigned NeedBreakInfiniteLoops : 1;
   unsigned NeedCompleteLifetimes : 1;
 
+  /// Set when this function's arguments and instructions have been lowered to
+  /// address form by the AddressLowering function pass.
+  unsigned HasLoweredAddresses : 1;
+  
+  /// Set when this function gives trivial values explicit ownership.
+  unsigned HasOwnershipForTrivialValues : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -608,12 +618,14 @@ public:
   }
 
   SILFunctionConventions getConventions() const {
-    return SILFunctionConventions(LoweredType, getModule());
+    return SILFunctionConventions(
+        LoweredType, SILAddressConventions::forFunction(*this));
   }
 
   SILFunctionConventions getConventionsInContext() const {
     auto fnType = getLoweredFunctionTypeInContext(getTypeExpansionContext());
-    return SILFunctionConventions(fnType, getModule());
+    return SILFunctionConventions(
+        fnType, SILAddressConventions::forFunction(*this));
   }
 
   unsigned getIndex() const { return index; }
@@ -760,6 +772,26 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
+  }
+
+  /// Returns true if this function is in lowered-address form, i.e. its
+  /// address-only values are represented as raw addresses rather than opaque
+  /// SSA values.
+  ///
+  /// True if:
+  /// - AddressLowering has individually lowered this function
+  /// - The function arrived already canonical via deserialization
+  /// - In a non-opaque-values build,
+  /// - Once the module has committed past SILStage::Raw.
+  bool hasLoweredAddresses() const;
+
+  void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
+  
+  bool hasOwnershipForTrivialValues() const {
+    return HasOwnershipForTrivialValues; 
+  }
+  void setOwnershipForTrivialValues(bool val = true) {
+    HasOwnershipForTrivialValues = val; 
   }
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
@@ -1289,11 +1321,19 @@ public:
   }
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
+
+  /// True if the side effects of this function have been computed by the
+  /// ComputeSideEffects pass (as opposed to only having defined effects, like
+  /// escape effects, which can be copied from a generic function when
+  /// specializing it).
+  bool hasComputedSideEffects() const;
+
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
   MemoryBehavior getMemoryBehavior(bool observeRetains);
 
   // Used by the MemoryLifetimeVerifier
   bool argumentMayRead(Operand *argOp, SILValue addr);
+  bool argumentMayWrite(Operand *argOp, SILValue addr);
 
   bool isDeinitBarrier();
 
@@ -1479,6 +1519,9 @@ public:
   /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
+
+  StringRef targetFeatures() const { return TargetFeatures; }
+  void setTargetFeatures(StringRef value) { TargetFeatures = value; }
 
   /// Return Wasm export name if @_expose(wasm) was used, otherwise empty
   StringRef wasmExportName() const { return WasmExportName; }
@@ -1836,6 +1879,11 @@ public:
   /// Like ViewCFG, but the graph does not show the contents of basic blocks.
   void viewCFGOnly() const;
 
+  /// View the dominator tree of this function.
+  void viewDomTree() const;
+  /// Like viewDomTree, but the graph does not show the contents of basic
+  /// blocks.
+  void viewDomTreeOnly() const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

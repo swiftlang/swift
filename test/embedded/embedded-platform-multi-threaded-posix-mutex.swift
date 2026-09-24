@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -wmo %s -c -o %t/main.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-multi-threaded-posix-shim -o %t/a.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-multi-threaded-posix-shim %target-embedded-synchronization -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test

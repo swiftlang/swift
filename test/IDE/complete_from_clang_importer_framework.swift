@@ -19,7 +19,7 @@ import Darwin
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem:    FooStruct6[#FooStruct6#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]/IsSystem: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
 
-// CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{; name=.+$}}
+// CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: USES_MACRO_FROM_OTHER_MODULE_1[#CInt#]{{; name=.+$}}
 
 // CLANG_DARWIN-DAG: Decl[TypeAlias]/OtherModule[Darwin.MacTypes]/IsSystem: FourCharCode[#UInt32#]{{; name=.+$}}
 // CLANG_DARWIN_NEG-NOT: FixedPtr
@@ -34,8 +34,8 @@ func testCompleteModuleQualifiedMacros1() {
 // CLANG_QUAL_MACROS_1: Begin completions, 16 items
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: A_PI[#CDouble#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: CF_STRING[#CString#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: EOF[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_FALSE[#Int32#]{{$}`}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: EOF[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_FALSE[#CInt#]{{$}`}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_RGBA[#CInt#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_RGB[#CInt#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: INT64_MAX[#CLongLong#]{{; name=.+$}}
@@ -53,7 +53,7 @@ func testClangMember1() {
 	var FS = FooStruct1()
 	FS.#^CLANG_MEMBER1^#
 // CLANG_MEMBERS1: Begin completions, 3 items
-// CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: x[#Int32#]{{; name=.+$}}
-// CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: y[#Double#]{{; name=.+$}}
+// CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: x[#CInt#]{{; name=.+$}}
+// CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: y[#CDouble#]{{; name=.+$}}
 // CLANG_MEMBERS1-DAG: Keyword[self]/CurrNominal: self[#FooStruct1#]; name=self
 }

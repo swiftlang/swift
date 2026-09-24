@@ -84,14 +84,14 @@ public final class ExposedClass {
 // CHECK: class SWIFT_SYMBOL("{{.*}}") ExposedStruct2 final {
 // CHECK: SWIFT_INLINE_THUNK ExposedStruct2 &operator =(const ExposedStruct2 &other) noexcept {
 // CHECK: }
-// CHECK-NEXT: swift::Int getY() const SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: void setY(swift::Int value) SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 init() SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 initWithValue(swift::Int x) SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: swift::Int getRenamedProp() const SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: void setRenamedProp(swift::Int value) SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: swift::Int getProp3() const SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: void renamedMethod() const SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: swift::Int getY() const noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: void setY(swift::Int value) noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 init() noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 initWithValue(swift::Int x) noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: swift::Int getRenamedProp() const noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: void setRenamedProp(swift::Int value) noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: swift::Int getProp3() const noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: void renamedMethod() const noexcept SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: private:
 
 // CHECK: SWIFT_INLINE_THUNK void exposed1() noexcept SWIFT_SYMBOL("{{.*}}") {
@@ -107,17 +107,17 @@ public final class ExposedClass {
 // CHECK-NEXT: }
 
 // CHECK: void ExposedClass::method()
-// CHECK: swift::Int ExposedStruct::getX() const {
-// CHECK: void ExposedStruct::setX(swift::Int value) {
-// CHECK: void ExposedStruct::method() const {
-// CHECK: swift::Int ExposedStruct2::getY() const {
-// CHECK: void ExposedStruct2::setY(swift::Int value) {
-// CHECK: ExposedStruct2 ExposedStruct2::init() {
-// CHECK: ExposedStruct2 ExposedStruct2::initWithValue(swift::Int x) {
-// CHECK: swift::Int ExposedStruct2::getRenamedProp() const {
-// CHECK: void ExposedStruct2::setRenamedProp(swift::Int value) {
-// CHECK: swift::Int ExposedStruct2::getProp3() const {
-// CHECK: void ExposedStruct2::renamedMethod() const {
+// CHECK: swift::Int ExposedStruct::getX() const noexcept {
+// CHECK: void ExposedStruct::setX(swift::Int value) noexcept {
+// CHECK: void ExposedStruct::method() const noexcept {
+// CHECK: swift::Int ExposedStruct2::getY() const noexcept {
+// CHECK: void ExposedStruct2::setY(swift::Int value) noexcept {
+// CHECK: ExposedStruct2 ExposedStruct2::init() noexcept {
+// CHECK: ExposedStruct2 ExposedStruct2::initWithValue(swift::Int x) noexcept {
+// CHECK: swift::Int ExposedStruct2::getRenamedProp() const noexcept {
+// CHECK: void ExposedStruct2::setRenamedProp(swift::Int value) noexcept {
+// CHECK: swift::Int ExposedStruct2::getProp3() const noexcept {
+// CHECK: void ExposedStruct2::renamedMethod() const noexcept {
 
 // CHECK-NOT: NonExposedStruct
 

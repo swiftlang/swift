@@ -676,7 +676,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::
     auto remark = RemarkMissed("memory", *ccabi)
                   << "conditional runtime cast of value with type '"
                   << NV("ValueType", ccabi->getSrc()->getType()) << "' to '"
-                  << NV("CastType", ccabi->getDest()->getType()) << "'";
+                  << NV("CastType", ccabi->getTargetLoweredType()) << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }

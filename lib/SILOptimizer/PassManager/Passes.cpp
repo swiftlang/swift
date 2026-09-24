@@ -30,14 +30,9 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorOr.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
 
@@ -54,6 +49,16 @@ void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
   // TODO: would be nice if we had a "SILGen stage".
   if (Module.getStage() != SILStage::Raw)
     return;
+
+  // SILGen sets needBreakInfiniteLoops / needCompleteLifetimes on functions
+  // whose blocks it erases (e.g. via eraseBlock under ownership). SILGenCleanup,
+  // the first function pass below, breaks infinite loops and completes lifetimes
+  // unconditionally, so reset these flags up front to satisfy the function pass
+  // manager's pre-condition that they are clear before any function pass runs.
+  for (auto &function : Module) {
+    function.setNeedBreakInfiniteLoops(false);
+    function.setNeedCompleteLifetimes(false);
+  }
 
   executePassPipelinePlan(&Module,
                           SILPassPipelinePlan::getSILGenPassPipeline(opts),

@@ -22,7 +22,6 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -36,7 +35,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
@@ -250,16 +248,15 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
         varInterfaceType->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
     if (!isStructuralFunctionType) {
       auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-      varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
+      varInterfaceType = FunctionType::get({}, {}, varInterfaceType, extInfo);
     }
   }
 
   // Create the parameter.
-  auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
-                                  paramLoc, var->getName(), DC);
-  arg->setSpecifier(ParamSpecifier::Default);
-  arg->setInterfaceType(varInterfaceType);
-  arg->setImplicit();
+  ParamDecl *arg =
+      ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), paramLoc,
+                                var->getName(), paramLoc, var->getName(),
+                                varInterfaceType, DC, ParamSpecifier::Default);
   arg->setAutoClosure(isAutoClosure);
 
   // Don't allow the parameter to accept temporary pointer conversions.
@@ -276,6 +273,20 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
   maybeAddMemberwiseDefaultArg(arg, var, ctx);
 
   return arg;
+}
+
+/// Whether this is a Swift class that subclasses a C++ foreign reference type.
+///
+/// Such a class does not inherit the constructors of its superclass.
+static bool isSwiftSubclassOfForeignReferenceType(const ClassDecl *decl) {
+  if (decl->hasClangNode())
+    return false;
+
+  if (!decl->getASTContext().LangOpts.hasFeature(
+      Feature::ForeignReferenceTypeSubclassing))
+    return false;
+
+  return decl->getForeignReferenceSuperclassOrSelf() != nullptr;
 }
 
 /// Create an implicit struct or class constructor.
@@ -317,11 +328,10 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
       auto systemTy = getDistributedActorSystemType(classDecl);
 
       // Create the parameter. API name is actorSystem, local name is system
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
-                                      ctx.Id_system, decl);
-      arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(systemTy);
-      arg->setImplicit();
+      ParamDecl *arg =
+          ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), Loc,
+                                    ctx.Id_actorSystem, Loc, ctx.Id_system,
+                                    systemTy, decl, ParamSpecifier::Default);
 
       params.push_back(arg);
     }
@@ -458,8 +468,11 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
   // If we are defining a default initializer for a class that has a superclass,
   // it overrides the default initializer of its superclass. Add an implicit
   // 'override' attribute.
+  // A C++ foreign reference type has no initializer to override. Its subclass
+  // chains to one of the imported constructors instead.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    if (classDecl->getSuperclass())
+    if (classDecl->getSuperclass() &&
+        !isSwiftSubclassOfForeignReferenceType(classDecl))
       ctor->addAttribute(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   }
 
@@ -584,6 +597,22 @@ static bool hasClangImplementation(const NominalTypeDecl *decl) {
 static bool isInMainBody(ValueDecl *member, NominalTypeDecl *ty) {
   return member->getDeclContext() ==
               ty->getImplementationContext()->getAsGenericContext();
+}
+
+static bool hasNoArgumentConstructor(ClassDecl *decl) {
+  for (auto member : decl->lookupDirect(DeclBaseName::createConstructor())) {
+    if (!isInMainBody(member, decl))
+      continue;
+
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor || ctor->isInvalid() || ctor->isUnavailable())
+      continue;
+
+    if (ctor->getParameters()->size() == 0)
+      return true;
+  }
+
+  return false;
 }
 
 static void
@@ -1288,17 +1317,27 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       continue;
 
     bool alreadyDeclared = false;
+    bool interfaceMarksInitUnavailable = false;
+    auto superSelector = superclassCtor->getObjCRuntimeName();
 
     auto results = decl->lookupDirect(DeclBaseName::createConstructor());
     for (auto *member : results) {
-      if (!isInMainBody(member, decl))
-        continue;
-
       auto *ctor = cast<ConstructorDecl>(member);
 
       // Skip any invalid constructors.
       if (ctor->isInvalid())
         continue;
+
+      // Detect an init from the imported Objective-C interface (not the
+      // extension's main body) that marks the superclass selector unavailable,
+      // e.g. 'NS_UNAVAILABLE'.
+      if (!isInMainBody(member, decl)) {
+        if (ctor->hasClangNode() && superSelector &&
+            ctor->getObjCRuntimeName() == superSelector &&
+            ctor->isUnavailable())
+          interfaceMarksInitUnavailable = true;
+        continue;
+      }
 
       auto type = swift::getMemberTypeForComparison(ctor, nullptr);
       if (isOverrideBasedOnType(ctor, type, superclassCtor)) {
@@ -1325,9 +1364,12 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       // reachable from Objective-C (e.g. '[Class new]') and traps at runtime if
       // it's invoked, so warn the author to implement it. (Non-required
       // designated inits; required ones are handled by
-      // diagnoseMissingRequiredInitializer above.)
+      // diagnoseMissingRequiredInitializer above.) Skip the warning when the
+      // interface marks that initializer unavailable (e.g. 'NS_UNAVAILABLE'):
+      // its stub is unreachable from Objective-C.
       if (kind == DesignatedInitKind::Stub &&
-          implCtx->getDecl()->isObjCImplementation())
+          implCtx->getDecl()->isObjCImplementation() &&
+          !interfaceMarksInitUnavailable)
         ctx.Diags.diagnose(implCtx->getDecl(),
                            diag::objc_implementation_missing_inherited_init,
                            superclassCtor);
@@ -1344,8 +1386,17 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
     return true;
 
+  // A Swift class that subclasses a C++ foreign reference type does not inherit
+  // the base's constructors.
+  if (isSwiftSubclassOfForeignReferenceType(decl))
+    return false;
+
   auto superclassDecl = decl->getSuperclassDecl();
   assert(superclassDecl);
+
+  // An imported C++ class does not inherit the initializers of its base either.
+  if (decl->hasClangNode() && superclassDecl->isForeignReferenceType())
+    return false;
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
@@ -1531,6 +1582,17 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
   llvm::SmallPtrSet<VarDecl *, 4> initializedProperties;
   llvm::SmallVector<std::pair<VarDecl *, Identifier>> invalidOrderings;
 
+  llvm::SmallVector<std::pair<VarDecl *, AvailabilityRestriction>>
+      availabilityRestrictions;
+
+  // Synthesized memberwise intializers are available at the intersection of the
+  // availability of the struct containing the initializer and the deployment
+  // target (since they have at most 'internal' accessibility and therefore
+  // cannot be invoked by module clients).
+  auto structAvailability = AvailabilityContext::forDeclSignature(decl);
+  structAvailability.constrainWithContext(
+      AvailabilityContext::forDeploymentTarget(ctx), ctx);
+
   if (enumerateCurrentPropertiesAndAuxiliaryVars(decl, [&](VarDecl *var) {
         if (var->isStatic())
           return true;
@@ -1541,9 +1603,15 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
         if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
           return true;
 
-        // Check whether use of init accessors results in access to
-        // uninitialized properties.
         if (auto *initAccessor = var->getAccessor(AccessorKind::Init)) {
+          // Check whether the property has stronger availability restrictions
+          // than the initializer.
+          if (auto restriction =
+              structAvailability.unsatisfiedRestrictionForDecl(var)) {
+            availabilityRestrictions.push_back({var, *restriction});
+            return true;
+          }
+
           // Make sure that all properties accessed by init accessor
           // are previously initialized.
           for (auto *property : initAccessor->getAccessedProperties()) {
@@ -1578,12 +1646,8 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
       }))
     return false;
 
-  if (invalidOrderings.empty())
-    return !initializedProperties.empty();
-
-  {
-    ctx.Diags.diagnose(
-        decl, diag::cannot_synthesize_memberwise_due_to_property_init_order);
+  if (!invalidOrderings.empty()) {
+    ctx.Diags.diagnose(decl, diag::cannot_synthesize_memberwise_init, decl);
 
     for (const auto &invalid : invalidOrderings) {
       auto *accessor = invalid.first->getAccessor(AccessorKind::Init);
@@ -1591,9 +1655,24 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
                          diag::out_of_order_access_in_init_accessor,
                          invalid.first->getName(), invalid.second);
     }
+
+    return false;
   }
 
-  return false;
+  if (!availabilityRestrictions.empty()) {
+    ctx.Diags.diagnose(decl, diag::cannot_synthesize_memberwise_init, decl);
+
+    for (const auto &[var, restriction] : availabilityRestrictions) {
+      ctx.Diags.diagnose(
+          var->getLoc(),
+          diag::unavailable_init_accessor_prevent_memberwise_init_synthesis,
+          restriction.isUnavailable(), var);
+    }
+
+    return false;
+  }
+
+  return !initializedProperties.empty();
 }
 
 ConstructorDecl *
@@ -1743,9 +1822,14 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
 
   // Don't synthesize a default for a subclass, it will attempt to inherit its
   // initializers from its superclass.
+  // A subclass of a C++ foreign reference type doesn't inherit any
+  // initializers, so it does need a default one, as long as it can call the
+  // base's no-argument constructor.
   if (auto *cd = dyn_cast<ClassDecl>(decl))
     if (cd->getSuperclassDecl())
-      return false;
+      if (!isSwiftSubclassOfForeignReferenceType(cd) ||
+          !hasNoArgumentConstructor(cd->getSuperclassDecl()))
+        return false;
 
   // If the user has already defined a designated initializer, then don't
   // synthesize a default init.
@@ -1774,6 +1858,15 @@ synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
            /*isTypeChecked=*/true };
 }
 
+/// Synthesizer callback for an empty function body that still needs to be
+/// type-checked.
+static std::pair<BraceStmt *, bool>
+synthesizeUncheckedEmptyFunctionBody(AbstractFunctionDecl *afd, void *) {
+  ASTContext &ctx = afd->getASTContext();
+  return { BraceStmt::create(ctx, afd->getLoc(), {}, afd->getLoc(), true),
+           /*isTypeChecked=*/false };
+}
+
 ConstructorDecl *
 SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
@@ -1789,7 +1882,17 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
     decl->addMember(ctor);
 
     // Lazily synthesize an empty body for the default constructor.
-    ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
+    auto classDecl = dyn_cast<ClassDecl>(decl);
+    if (classDecl && isSwiftSubclassOfForeignReferenceType(classDecl)) {
+      // A synthesized default initializer of an FRT-derived class still needs
+      // the implicit 'super.init()' that constructs the C++ base subobject.
+      //
+      // Return an *unchecked* body so it reaches checkClassConstructorBody,
+      // which inserts that call.
+      ctor->setBodySynthesizer(synthesizeUncheckedEmptyFunctionBody);
+    } else {
+      ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
+    }
     return ctor;
   }
 

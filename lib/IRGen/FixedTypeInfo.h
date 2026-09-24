@@ -21,8 +21,8 @@
 
 #include "Address.h"
 #include "TypeInfo.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/SIL/SILType.h"
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class ConstantInt;
@@ -40,6 +40,13 @@ private:
   SpareBitVector SpareBits;
   
 protected:
+  FixedTypeInfo(IRGenModule &IGM,
+                const SerializableFixedTypeInfoRepresentation &representation);
+
+  void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
+      SerializableFixedTypeInfoRepresentation &representation) const;
+
   FixedTypeInfo(llvm::Type *type, Size size,
                 const SpareBitVector &spareBits,
                 Alignment align, IsTriviallyDestroyable_t pod,

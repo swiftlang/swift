@@ -3,7 +3,7 @@
 // CHECK: struct HasMemberTemplates {
 // CHECK:   mutating func addSameTypeParams<T>(_ a: T, _ b: T) -> T
 // CHECK:   mutating func addMixedTypeParams<T, U>(_ a: T, _ b: U) -> T
-// CHECK:   mutating func addAll<T, U>(_ a: Int32, _ b: T, _ c: U) -> Int32
+// CHECK:   mutating func addAll<T, U>(_ a: CInt, _ b: T, _ c: U) -> CInt
 // CHECK:   mutating func passThrough<T>(_ val: T) -> T
 // CHECK:   mutating func passThroughConst<T>(_ val: T) -> T
 // CHECK:   func passThroughOnConst<T>(_ val: T) -> T
@@ -13,8 +13,8 @@
 // CHECK: }
 
 // CHECK: struct TemplateClassWithMemberTemplates<CInt> {
-// CHECK:   init(_ val: Int32)
-// CHECK:   var value: Int32
+// CHECK:   init(_ val: CInt)
+// CHECK:   var value: CInt
 // CHECK:   mutating func setValue<U>(_ val: U)
 // CHECK: }
 

@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values %s -o /dev/null
 
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 

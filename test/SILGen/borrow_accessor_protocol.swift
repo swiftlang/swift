@@ -328,20 +328,20 @@ public class K4 : S {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2K1CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K1) -> @guaranteed NonTrivial {
-// CHECK-SIL: bb0([[REG0:%.*]] : $*K1):
-// CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
-// CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
-// CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
-// CHECK-SIL: }
-
 // CHECK-SIL: sil shared [serialized] [ossa] @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial {
 // CHECK-SIL: bb0([[REG0:%.*]] : @guaranteed $K1):
 // CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1
 // CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #K1.id
 // CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
 // CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SIL: }
+
+// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2K1CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K1) -> @guaranteed NonTrivial {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*K1):
+// CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
+// CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
 // CHECK-SIL: }
 
 // CHECK-SIL: sil [ossa] @$s24borrow_accessor_protocol2K2C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial {
@@ -360,20 +360,20 @@ public class K4 : S {
 // CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
 // CHECK-SIL: }
 
-// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2K3CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K3) -> @guaranteed NonTrivial {
-// CHECK-SIL: bb0([[REG0:%.*]] : $*K3):
-// CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
-// CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
-// CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
-// CHECK-SIL: }
-
 // CHECK-SIL: sil [ossa] @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial {
 // CHECK-SIL: bb0([[REG0:%.*]] : @guaranteed $K3):
 // CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1
 // CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #K3._id
 // CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
 // CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SIL: }
+
+// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2K3CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K3) -> @guaranteed NonTrivial {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*K3):
+// CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
+// CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
 // CHECK-SIL: }
 
 // CHECK-SIL: sil [ossa] @$s24borrow_accessor_protocol2K4C2idAA16FrozenNonTrivialVvb : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial {

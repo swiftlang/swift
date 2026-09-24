@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.24)
 
 
 #  set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
@@ -86,6 +86,8 @@ endif()
 set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
+
+define_property(TARGET PROPERTY PURE_SWIFT_LIB)
 
 # First include general CMake utilities.
 include(SwiftUtils)
@@ -251,6 +253,14 @@ option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
+
+option(SWIFT_BUILD_COMPILER_DYLIB
+  "Builds a swift compiler dylib for tools to link against"
+  FALSE)
+
+if (SWIFT_BUILD_COMPILER_DYLIB AND NOT APPLE)
+  message(FATAL_ERROR "SWIFT_BUILD_COMPILER_DYLIB is only supported on Darwin platforms currently.")
+endif()
 
 # The SDK overlay is provided by the SDK itself on Darwin platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -824,8 +834,8 @@ cmake_dependent_option(SWIFT_ENABLE_SOURCEKIT_TESTS
 option(SWIFT_THREADING_PACKAGE
   "Override the threading package used for the build.  This can either be a
    single package name, or a semicolon separated sequence of sdk:package pairs.
-   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
-   or the empty string for the SDK default.")
+   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none',
+   'embedded', or the empty string for the SDK default.")
 
 option(SWIFT_THREADING_HAS_DLSYM
   "Enable the use of the dlsym() function.  This gets used to provide TSan
@@ -881,6 +891,22 @@ endif()
 option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
+
+# Whether the compiler's own Swift sources are built.
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED TRUE)
+else()
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
+endif()
+
+option(SWIFT_BUILD_SARIF
+  "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
+  FALSE)
+# SARIF serialization runs through DiagnosticBridge, so it needs those sources.
+if(SWIFT_BUILD_SARIF AND NOT SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
+  message(WARNING "Force setting SWIFT_BUILD_SARIF=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_SARIF OFF)
+endif()
 
 option(SWIFT_BUILD_IMMEDIATE_MODE
   "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
@@ -1064,7 +1090,7 @@ if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
   endif()
 endif()
 
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+if(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -1078,6 +1104,10 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
+endif()
+
+if(SWIFT_BUILD_SARIF)
+  add_definitions(-DSWIFT_BUILD_SARIF)
 endif()
 
 if(SWIFT_BUILD_IMMEDIATE_MODE)
@@ -1122,9 +1152,7 @@ set(SWIFT_MODULE_CACHE_PATH
 
 # Check what linux distribution is being used.
 # This can be used to determine the default linker to use.
-if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
-  cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
-endif()
+cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
 
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
@@ -1484,6 +1512,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
+  message(STATUS "  SARIF support:  ${SWIFT_BUILD_SARIF}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")

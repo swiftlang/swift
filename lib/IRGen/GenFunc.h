@@ -69,6 +69,7 @@ namespace irgen {
   /// function. This is required for back-deployment.
   llvm::Constant *getCoroFrameAllocStubFn(IRGenModule &IGM);
   FunctionPointer getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM);
+  llvm::Constant *getCoroFrameDeallocTypedStubFn(IRGenFunction &IGF);
 } // end namespace irgen
 } // end namespace swift
 

@@ -427,6 +427,7 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 // CHECK:           [[FN:%.*]] = copy_value [[ARG]]
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @$sS3iIegydd_S2i_SitSgIegyd_TR
 // CHECK-NEXT:      [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[FN]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:      return [[THUNK]]
 // CHECK-NEXT: } // end sil function '$s19function_conversion25convTupleToOptionalDirectySi_SitSgSicSi_SitSicF'
 
@@ -450,6 +451,7 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 // CHECK:          [[THUNK_FN:%.*]] = function_ref @$sxxxIegnrr_xx_xtSgIegnr_lTR
 // CHECK-NEXT:     [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T>([[FN_CONV]])
 // CHECK-NEXT:     [[THUNK_CONV:%.*]] = convert_function [[THUNK]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:     return [[THUNK_CONV]]
 // CHECK-NEXT: } // end sil function '$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF'
 
@@ -664,26 +666,13 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
 }
 
 
-//   TODO: we really ought to be able to fully peephole this into the
-//   emission of the closure.
-// CHECK-LABEL: sil {{.*}} [ossa] @$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR
-// CHECK: bb0(%0 : $*(AnyHashable, Any), %1 : $*Never, %2 : $*(key: String, value: String), %3 : @guaranteed $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)):
-// CHECK:  [[KEY_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 0
-// CHECK:  [[KEY:%.*]] = load_borrow [[KEY_ADDR]] :
-// CHECK:  [[VALUE_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 1
-// CHECK:  [[VALUE:%.*]] = load_borrow [[VALUE_ADDR]] :
-// CHECK:  [[OUT_KEY_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 0
-// CHECK:  [[OUT_VALUE_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 1
-// CHECK:  [[TUPLE:%.*]] = apply %3([[KEY]], [[VALUE]]) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
-// CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
-// CHECK:  [[ADDR:%.*]] = alloc_stack $String
-// CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
-// CHECK:  [[CVT:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
-// CHECK:  apply [[CVT]]<String>([[OUT_KEY_ADDR]], [[ADDR]])
-// CHECK:  [[OUT_VALUE_BUF:%.*]] = init_existential_addr [[OUT_VALUE_ADDR]] : $*Any, $String
-// CHECK:  store [[RHS]] to [init] [[OUT_VALUE_BUF]]
-// CHECK: } // end sil function '$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR'
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion9dontCrashyyF : $@convention(thin) () -> () {
+// CHECK: function_ref @$s19function_conversion9dontCrashyyFs11AnyHashableV_yptSS3key_SS5valuet_tXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)>
+// CHECK: return
 
+// CHECK-LABEL: sil private [ossa] @$s19function_conversion9dontCrashyyFs11AnyHashableV_yptSS3key_SS5valuet_tXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)> {
+// CHECK: function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK: return
 func dontCrash() {
   let userInfo = ["hello": "world"]
   let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })

@@ -28,8 +28,6 @@ using namespace swift;
 
 StringRef swift::platformString(PlatformKind platform) {
   switch (platform) {
-  case PlatformKind::none:
-    return "*";
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
   case PlatformKind::X:                                                        \
     return #X;
@@ -40,8 +38,6 @@ StringRef swift::platformString(PlatformKind platform) {
 
 StringRef swift::prettyPlatformString(PlatformKind platform) {
   switch (platform) {
-  case PlatformKind::none:
-    return "*";
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
   case PlatformKind::X:                                                        \
     return PrettyName;
@@ -51,8 +47,6 @@ StringRef swift::prettyPlatformString(PlatformKind platform) {
 }
 
 std::optional<PlatformKind> swift::platformFromString(StringRef Name) {
-  if (Name == "*")
-    return PlatformKind::none;
   return llvm::StringSwitch<std::optional<PlatformKind>>(Name)
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
@@ -64,7 +58,6 @@ std::optional<PlatformKind> swift::platformFromString(StringRef Name) {
 std::optional<PlatformKind> swift::platformFromUnsigned(unsigned value) {
   PlatformKind platform = PlatformKind(value);
   switch (platform) {
-  case PlatformKind::none:
 #define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X:
 #include "swift/AST/PlatformKinds.def"
     return platform;
@@ -125,7 +118,6 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::Android:
-  case PlatformKind::none:
     return std::nullopt;
   }
   llvm_unreachable("bad PlatformKind");
@@ -135,9 +127,6 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
                                       const llvm::Triple &Target,
                                       const LangOptions &LangOpts,
                                       bool ForRuntimeQuery) {
-  if (Platform == PlatformKind::none)
-    return true;
-
   if (!LangOpts.EnableAppExtensionRestrictions &&
       isApplicationExtensionPlatform(Platform))
     return false;
@@ -179,8 +168,6 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isOSWindows();
     case PlatformKind::Android:
       return Target.isAndroid();
-    case PlatformKind::none:
-      llvm_unreachable("handled above");
   }
   llvm_unreachable("bad PlatformKind");
 }
@@ -197,8 +184,9 @@ bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                                    ForRuntimeQuery);
 }
 
-PlatformKind swift::platformForTriple(const llvm::Triple &triple,
-                                      bool enableAppExtensionRestrictions) {
+std::optional<PlatformKind>
+swift::platformForTriple(const llvm::Triple &triple,
+                         bool enableAppExtensionRestrictions) {
   if (triple.isMacOSX()) {
     return (enableAppExtensionRestrictions
                 ? PlatformKind::macOSApplicationExtension
@@ -237,20 +225,21 @@ PlatformKind swift::platformForTriple(const llvm::Triple &triple,
     return PlatformKind::Android;
   }
 
-  return PlatformKind::none;
+  return std::nullopt;
 }
 
-PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
+std::optional<PlatformKind> swift::targetPlatform(const LangOptions &LangOpts) {
   return platformForTriple(LangOpts.Target,
                            LangOpts.EnableAppExtensionRestrictions);
 }
 
-PlatformKind swift::targetVariantPlatform(const LangOptions &LangOpts) {
-  if (auto variant = LangOpts.TargetVariant)
+std::optional<PlatformKind>
+swift::targetVariantPlatform(const LangOptions &LangOpts) {
+  if (LangOpts.TargetVariant)
     return platformForTriple(*LangOpts.TargetVariant,
                              LangOpts.EnableAppExtensionRestrictions);
 
-  return PlatformKind::none;
+  return std::nullopt;
 }
 
 static bool inheritsAvailabilityFromAnyAppleOS(PlatformKind platform) {
@@ -275,7 +264,6 @@ static bool inheritsAvailabilityFromAnyAppleOS(PlatformKind platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::Android:
-  case PlatformKind::none:
     return false;
   }
 }
@@ -417,8 +405,6 @@ swift::tripleOSTypeForPlatform(PlatformKind platform) {
     return llvm::Triple::Win32;
   case PlatformKind::Android:
     return llvm::Triple::Linux;
-  case PlatformKind::none:
-    return std::nullopt;
   }
   llvm_unreachable("bad PlatformKind");
 }
@@ -433,6 +419,15 @@ swift::canonicalizePlatformVersion(PlatformKind platform,
   }
 
   return version;
+}
+
+llvm::VersionTuple
+swift::canonicalizePlatformVersion(std::optional<PlatformKind> platform,
+                                   const llvm::VersionTuple &version) {
+  if (!platform)
+    return version;
+
+  return canonicalizePlatformVersion(*platform, version);
 }
 
 bool swift::isPlatformSPI(PlatformKind Platform) {
@@ -456,7 +451,6 @@ bool swift::isPlatformSPI(PlatformKind Platform) {
   case PlatformKind::FreeBSD:
   case PlatformKind::Windows:
   case PlatformKind::Android:
-  case PlatformKind::none:
     return false;
   }
   llvm_unreachable("bad PlatformKind");

@@ -134,14 +134,12 @@ func drainOil() {}
 
 struct DonutShop {
   let fryer: DonutFryer
-  func openForBusiness() {
-    self.fryer.fry {
-      (drainOil(), nil)
-    }
+  func openForBusiness(_ fn: () -> (donut: (), glaze: String?)) {
+    self.fryer.fry(perform: fn)
   }
 }
 
-// CHECK-LABEL: sil shared {{.*}}[reabstraction_thunk] {{.*}}@$sSSSgIgo_ytAAs5Error_pIegrozo_TR
-// CHECK: bb0([[OUT:%.*]] : $*(), [[INNER:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> @owned Optional<String>):
-// CHECK-NEXT: [[RES:%.*]] = apply [[INNER]]()
-// CHECK-NEXT: return [[RES]]
+// CHECK-LABEL: sil shared {{.*}}[reabstraction_thunk] {{.*}}@$sSSSgs5Error_pIgozo_ytAAsAB_pIegrozo_TR
+// CHECK: bb0([[OUT:%.*]] : $*(), [[INNER:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> (@owned Optional<String>, @error any Error)):
+// CHECK-NEXT: try_apply [[INNER]]()
+

@@ -28,7 +28,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <system_error>
 
 using namespace swift;
@@ -73,7 +72,8 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
 
 bool SourceLoader::canImportModule(ImportPath::Module path, SourceLoc loc,
                                    ModuleVersionInfo *versionInfo,
-                                   bool isTestableDependencyLookup) {
+                                   bool isTestableDependencyLookup,
+                                   bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;

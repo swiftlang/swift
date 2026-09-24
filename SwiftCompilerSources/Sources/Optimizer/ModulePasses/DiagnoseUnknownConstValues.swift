@@ -73,7 +73,7 @@ private func verifyLocal(debugValueInst: DebugValueInst,
     return
   }
   
-  if !constExprState.isConstantValue(debugValueInst.operand.value) {
+  if debugValueInst.operands.contains(where: { !constExprState.isConstantValue($0.value) }) {
     context.diagnosticEngine.diagnose(.require_const_initializer_for_const,
                                       at: debugValueInst.location)
   }

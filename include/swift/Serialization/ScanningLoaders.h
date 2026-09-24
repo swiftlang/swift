@@ -14,7 +14,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ModuleDependencies.h"
-#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace swift {
@@ -73,7 +72,8 @@ private:
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
-                       bool isTestableImport) override;
+                       bool isTestableImport,
+                       bool isSourceCanImport) override;
 
   bool handlePossibleTargetMismatch(
       SourceLoc sourceLocation,

@@ -387,6 +387,7 @@ macro(configure_sdk_unix name architectures)
     if("${prefix}" STREQUAL "ANDROID")
       swift_android_sysroot(android_sysroot)
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${android_sysroot}")
+      set(SWIFT_SDK_ANDROID_TEST_DEPLOYMENT_VERSION "${SWIFT_ANDROID_API_LEVEL}")
 
       if("${arch}" STREQUAL "armv7")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")

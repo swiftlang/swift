@@ -6,6 +6,7 @@
 //
 // RUN: %target-codesign %t/Set && %line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
+// REQUIRES: rdar183486577
 
 import StdlibUnittest
 import StdlibCollectionUnittest

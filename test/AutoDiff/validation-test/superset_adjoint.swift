@@ -34,21 +34,9 @@ SupersetVJPTests.testWithLeakChecking("SupersetNested") {
   expectEqual(2, gradient(at: 3) { y in calls_mulxy(2, y) })
 }
 
-#if false
 SupersetVJPTests.testWithLeakChecking("CrossModuleClosure") {
-  // FIXME: When type checking with binding optimizations enabled,
-  // we propagate types into the closure better, but this has
-  // the side effect that this expression now trips an
-  // inconsistency / bug with solver-perf. We favor
-  // AdditiveArithmetic.+ over Tracked<T>.+, and we don't
-  // attempt the concrete overload at all. The resulting
-  // solution is correct because Tracked conforms to
-  // AdditiveArithmetic, but AutoDiff doesn't like the
-  // resulting AST and complains that + is not differentiable.
-  // Will be solved by https://github.com/swiftlang/swift/pull/87692
   expectEqual(1, gradient(at: Tracked<Float>(1)) { x in x + 2 })
 }
-#endif
 
 SupersetVJPTests.testWithLeakChecking("SubsetOfSubset") {
   @differentiable(reverse, wrt: (x, z))

@@ -19,13 +19,14 @@ func copyOrThrow<T>(value: T) throws -> T { return value }
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[OUT]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[IN]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DEST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
@@ -45,7 +46,7 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb4, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[OUT]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[IN]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 //   FIXME: make this a borrow
@@ -60,6 +61,7 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb4:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK:       bb5([[ERROR:%.*]] : @owned $any Error):
@@ -75,11 +77,12 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK:       bb7:
 // CHECK-NEXT:    [[DESTROY_IDX:%.*]] = builtin "sub_Word"([[LAST_IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    [[DESTROY_INDEX:%.*]] = dynamic_pack_index [[DESTROY_IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[DESTROY_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[DESTROY_UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[DESTROY_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[DESTROY_UUID:[0-9]+]]
 // CHECK-NEXT:    [[DESTROY_ELT_ADDR:%.*]] = pack_element_get [[DESTROY_INDEX]] of [[OUT]] : $*Pack{repeat each T} as $*@pack_element([[DESTROY_UUID]]) each T
 // CHECK-NEXT:    destroy_addr [[DESTROY_ELT_ADDR]] : $*@pack_element([[DESTROY_UUID]]) each T
 // CHECK-NEXT:    br bb6([[DESTROY_IDX]] : $Builtin.Word)
 // CHECK:       bb8:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    throw [[ERROR]] : $any Error
 func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each T) {
   return (repeat try copyOrThrow(value: each args))
@@ -144,8 +147,13 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value [[C_LIFETIME]] : $String
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    extend_lifetime [[MV]] : $Int
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndDestructure(a: Int, b: String, c: String) {
@@ -167,7 +175,7 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    pack_element_set [[ELT_ADDR]] : $*@pack_element([[UUID]]) each T into [[INDEX]] of [[RESULT_PACK]] : $*Pack{repeat each T}
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
@@ -185,7 +193,7 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb6, bb5
 // CHECK:       bb5:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[DEST_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[ARG_TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[SRC_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    copy_addr [[SRC_ADDR]] to [init] [[DEST_ADDR]] : $*@pack_element([[UUID]]) each T
@@ -207,8 +215,10 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_addr [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndBind<each T>(args: repeat each T) {
@@ -233,7 +243,7 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Wrapper<each T>}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[VALUES]] : $*(repeat Wrapper<each T>) as $*Wrapper<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin Wrapper<@pack_element([[UUID]]) each T>.Type
 // CHECK-NEXT:    [[ARG_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
@@ -259,7 +269,7 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb6, bb5
 // CHECK:       bb5:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Wrapper<each T>}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[OUT_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[VALUES_COPY_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[VALUES_COPY]] : $*(repeat Wrapper<each T>) as $*Wrapper<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:   copy_addr [take] [[VALUES_COPY_ELT_ADDR]] to [init] [[OUT_ELT_ADDR]] : $*Wrapper<@pack_element([[UUID]]) each T>
@@ -267,8 +277,10 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 // CHECK-NEXT:    br bb4([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb6:
 // CHECK-NEXT:    dealloc_stack [[VALUES_COPY]] :
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_addr [[VALUES]] :
 // CHECK-NEXT:    dealloc_stack [[VALUES]] :
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   return values
@@ -293,7 +305,7 @@ func makePairs<each First, each Second>(
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Pair<each First, each Second>}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each First, each Second where (repeat (each First, each Second)) : Any> at <Pack{repeat each First}, Pack{repeat each Second}>, shape $each First, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each First, each Second where (repeat (each First, each Second)) : Any> at <Pack{repeat each First}, Pack{repeat each Second}>, shape $each First, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[OUT_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat Pair<each First, each Second>} as $*Pair<@pack_element([[UUID]]) each First, @pack_element([[UUID]]) each Second>
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin Pair<@pack_element([[UUID]]) each First, @pack_element([[UUID]]) each Second>.Type
 // CHECK-NEXT:    [[FIRST_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat each First} as $*@pack_element([[UUID]]) each First
@@ -311,6 +323,8 @@ func makePairs<each First, each Second>(
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   return (repeat Pair(each first, each second))

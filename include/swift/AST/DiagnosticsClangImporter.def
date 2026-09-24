@@ -178,10 +178,10 @@ NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
 NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy or destroy", (StringRef))
 NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
-NOTE(reference_passed_by_value, none, "function uses foreign reference type "
-                                      "'%0' as a value in %1 types which breaks "
-                                      "'swift_shared_reference' contract",
-     (StringRef, StringRef))
+NOTE(foreign_reference_type_by_value, none,
+    "%select{parameter takes|function returns}0 foreign reference type %1 by value "
+    "which violates reference type contract",
+     (bool, const clang::NamedDecl *))
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "automatically available: %1; "
                                                 "does this type have reference "
@@ -210,6 +210,82 @@ NOTE(mark_self_contained, none, "annotate type '%0' with SWIFT_SELF_CONTAINED in
 NOTE(mark_safe_to_import, none, "annotate method '%0' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to "
                                 "make it available in Swift",
      (StringRef))
+
+// Why the importer judged a C++ entity unsafe, emitted at the declaration
+// responsible. The unsafe-use diagnostic already names the declaration or type,
+// so these notes do not repeat it.
+NOTE(cxx_unsafe_iterator_from_begin_end, none,
+     "'begin' and 'end' are assumed to return iterators, which do not keep the "
+     "underlying storage alive", ())
+NOTE(cxx_unsafe_pointer_projection, none,
+     "this returns a pointer or reference into a type that owns its storage",
+     ())
+NOTE(cxx_unsafe_known_std_method, none,
+     "this standard library method is known to be hard to use correctly from "
+     "Swift", ())
+NOTE(cxx_unsafe_returns_iterator, none,
+     "this returns an iterator, which does not keep the underlying storage "
+     "alive", ())
+NOTE(cxx_unsafe_view_projection, none,
+     "this returns a view into a type that owns its storage", ())
+
+NOTE(cxx_unsafe_field, none,
+     "this type has an unsafe field%select{| '%1'}0", (bool, StringRef))
+NOTE(cxx_unsafe_template_argument, none,
+     "this type has an unsafe template argument%select{| '%1'}0",
+     (bool, StringRef))
+NOTE(cxx_unsafe_explicit_annotation, none,
+     "%select{this type is|'%1' is}0 annotated unsafe in C++",
+     (bool, StringRef))
+NOTE(cxx_unsafe_indirect_view, none,
+     "this is a non-escapable view whose lifetime dependency Swift cannot "
+     "track", ())
+
+NOTE(cxx_unsafe_inferred_result_dependence, none,
+     "this returns a non-escapable value whose lifetime Swift had to infer; "
+     "annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the "
+     "result depends on", ())
+NOTE(cxx_unsafe_unannotated_nonescapable_param, none,
+     "%select{this takes a non-escapable parameter with no lifetime annotation|"
+     "non-escapable parameter '%1' has no lifetime annotation}0",
+     (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_escapable_result, none,
+     "this lifetime annotation is not enforced: the result is Escapable, so "
+     "Swift drops the dependency", ())
+// The annotation sits either on a parameter or on 'self', which has no
+// declaration to name.
+NOTE(cxx_unsafe_skipped_lifetime_imported_as_class, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, which is imported as a class",
+     (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_rvalue_reference, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, an rvalue reference that is not "
+     "guaranteed to outlive the call", (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_no_borrowable_storage, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, which has no borrowable storage",
+     (bool, StringRef))
+
+// Why a type's escapability could not be determined. Also emitted at the type,
+// which is why these do not name it either.
+NOTE(cxx_unknown_escapability_conditional_argument, none,
+     "this type has unknown escapability: it depends on "
+     "%select{a type whose|'%1', whose}0 escapability is unknown",
+     (bool, StringRef))
+NOTE(cxx_unknown_escapability_cannot_derive, none,
+     "this type has unknown escapability: Swift cannot infer it from the type's "
+     "members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE",
+     ())
+NOTE(cxx_unknown_escapability_nonescapable_member, none,
+     "this type has unknown escapability: %select{it holds a non-escapable "
+     "type|its member '%1' is non-escapable}0, but it provides its own copy, "
+     "move or destruction, so Swift cannot tell whether it is a view; annotate "
+     "it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE", (bool, StringRef))
+NOTE(cxx_unknown_escapability_pointer, none,
+     "this type has unknown escapability: %select{it holds|its member '%1' is}0 "
+     "a pointer or reference, and Swift cannot tell whether it owns what it "
+     "points to", (bool, StringRef))
 
 NOTE(at_to_subscript, none, "do you want to replace it with a call "
                             "to the subscript operator?",
@@ -240,7 +316,7 @@ ERROR(private_fileid_attr_repeated, none,
  GROUPED_WARNING(private_fileid_attr_format_invalid, ClangDeclarationImport, none,
      "SWIFT_PRIVATE_FILEID annotation on '%0' does not have a valid file ID",
      (StringRef))
- REMARK(private_fileid_attr_format_specification, none,
+ NOTE(private_fileid_attr_format_specification, none,
      "file IDs have the following format: 'ModuleName/FileName.swift'", ())
  NOTE(private_fileid_attr_format_suggestion, none,
      "did you mean '%0'?", (StringRef))
@@ -254,37 +330,37 @@ GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
         "transitive base types is marked as SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
 
-ERROR(reference_type_must_have_retain_release_attr, none,
-      "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
-      "attribute",
-      (bool, StringRef))
-ERROR(too_many_reference_type_retain_release_attr, none,
-      "reference type '%1' must have only one %select{'retain:'|'release:'}0 "
-      "Swift "
-      "attribute",
-      (bool, StringRef))
+ERROR(reference_type_mixed_immortal_marker, none,
+      "reference type %0 must mark both or neither of its retain and release "
+      "operations as immortal",
+      (const clang::NamedDecl *))
+ERROR(reference_type_exactly_one_retain_release_attr, none,
+      "reference type %1 must have exactly one '%select{retain|release}0:' "
+      "Swift attribute",
+      (bool, const clang::NamedDecl *))
+ERROR(reference_type_empty_retain_release_name, none,
+      "reference type %1 has an empty %select{retain|release}0 operation name",
+      (bool, const clang::NamedDecl *))
+NOTE(retain_release_function_origin, none,
+     "%select{retain function|release function|retain and release functions}0 "
+     "%select{specified on|inherited from}1 %2",
+     (unsigned, bool, const clang::NamedDecl *))
+
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
-      "cannot find %select{retain|release}0 function '%1' for reference type "
-      "'%2'",
-      (bool, StringRef, StringRef))
+      "cannot find %select{retain|release}0 function '%1' for reference type %2",
+      (bool, StringRef, const clang::NamedDecl *))
 ERROR(too_many_reference_type_retain_release_operations, none,
       "multiple functions '%1' found; there must be exactly one "
-      "%select{retain|release}0 function for reference type '%2'",
-      (bool, StringRef, StringRef))
-ERROR(foreign_reference_types_invalid_retain_release, none,
-      "specified %select{retain|release}0 function '%1' is invalid; "
-      "%select{retain|release}0 function must have exactly one argument of "
+      "%select{retain|release}0 function for reference type %2",
+      (bool, StringRef, const clang::NamedDecl *))
+ERROR(foreign_reference_retain_release_param_type, none,
+      "%select{retain|release}0 function '%1' must have exactly one argument of "
       "type '%2'",
       (bool, StringRef, StringRef))
-
-ERROR(foreign_reference_types_retain_non_void_or_self_return_type, none,
-      "specified retain function '%0' is invalid; "
-      "retain function must either return have 'void', the reference count as an integer, or the parameter type",
-      (StringRef))
-ERROR(foreign_reference_types_release_non_void_return_type, none,
-      "specified release function '%0' is invalid; "
-      "release function must either return 'void' or the reference count as an integer",
-      (StringRef))
+ERROR(foreign_reference_retain_release_return_type, none,
+      "%select{retain|release}0 function '%1' "
+      "must return an integer%select{, its parameter type,|}0 or 'void'",
+      (bool, StringRef))
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",
       (bool, StringRef))
@@ -294,6 +370,17 @@ ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
 ERROR(foreign_reference_type_unreachable, none,
       "foreign reference type '%0' has unreachable definition",
       (StringRef))
+
+ERROR(nonescapable_foreign_reference_type, none,
+      "%0 cannot be both a foreign reference type and non-escapable; foreign "
+      "reference types are imported as Swift classes, which are always "
+      "escapable",
+      (const clang::NamedDecl *))
+
+GROUPED_WARNING(escapable_foreign_reference_type, ForeignReferenceType, none,
+      "%0 has no effect on %1; foreign reference types are imported as Swift "
+      "classes, which are always escapable",
+      (StringRef, const clang::NamedDecl *))
 
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",
@@ -383,6 +470,8 @@ ERROR(unknown_template_parameter,none,
   "template parameter '%0' does not exist", (StringRef))
 ERROR(type_template_parameter_expected,none,
   "template parameter '%0' expected to be a type parameter", (StringRef))
+WARNING(empty_conditional_params, none,
+        "empty %0 annotations are ignored", (StringRef))
 
 NOTE(bridged_type_not_found_in_module,none,
      "could not find type '%0' for bridging; module '%1' may be broken",

@@ -97,7 +97,7 @@ public:
 
       struct {
         TypeVariableType *TypeVar;
-        TypeVariableType *OtherTypeVar;
+        Type OtherType;
         Constraint *Constraint;
       } BindingRelation;
 
@@ -153,6 +153,7 @@ public:
       struct {
         Constraint *Disjunction;
         FunctionType *ArgFuncType;
+        unsigned ResultGenerationNumber;
       } Disjunction;
 
       ConstraintFix *TheFix;
@@ -183,9 +184,12 @@ public:
 #define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
 #define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
                                                    Constraint *constraint);
-#define BINDING_RELATION_CHANGE(Name)                                          \
+#define BINDING_VAR_RELATION_CHANGE(Name)                                      \
   static Change Name(TypeVariableType *typeVar,                                \
                      TypeVariableType *otherTypeVar, Constraint *constraint);
+#define BINDING_TYPE_RELATION_CHANGE(Name)                                     \
+  static Change Name(TypeVariableType *typeVar,                                \
+                     Type otherType, Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -273,7 +277,8 @@ public:
 
     /// Create a change that disjunction pruning was performed.
     static Change PrunedDisjunction(Constraint *disjunction,
-                                    FunctionType *argFuncType);
+                                    FunctionType *argFuncType,
+                                    unsigned resultGenerationNumber);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

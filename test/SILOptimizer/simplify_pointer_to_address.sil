@@ -9,6 +9,10 @@ import SwiftShims
 
 class C {}
 
+class D {
+  @_hasStorage var x: Int { get set }
+}
+
 // CHECK-LABEL: sil @remove_conversion :
 // CHECK-NOT:     address_to_pointer
 // CHECK-NOT:     pointer_to_address
@@ -114,6 +118,78 @@ bb0(%0 : @guaranteed $C):
   %6 = load [trivial] %5 : $*Int
   end_borrow %1 : $C
   return %6 : $Int
+}
+
+// The loaded value %5 opens a borrow scope whose use (%6) and end_borrow extend past the
+// outer end_borrow. Removing the address_to_pointer/pointer_to_address pair would turn %4
+// into a real interior pointer, making %5 outlive its object's borrow -> invalid OSSA.
+// Must NOT be folded.
+// CHECK-LABEL: sil [ossa] @borrow_load_borrow_escape :
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:       } // end sil function 'borrow_load_borrow_escape'
+sil [ossa] @borrow_load_borrow_escape : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  %2 = ref_tail_addr %1 : $C, $D
+  %3 = address_to_pointer %2 : $*D to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*D
+  %5 = load_borrow %4 : $*D
+  end_borrow %1 : $C
+  %6 = ref_element_addr %5 : $D, #D.x
+  %7 = begin_access [read] [dynamic] %6 : $*Int
+  %8 = load [trivial] %7 : $*Int
+  end_access %7 : $*Int
+  end_borrow %5 : $D
+  return %8 : $Int
+}
+
+// Here the load_borrow's scope ends before the outer end_borrow, so the pair is safe to
+// remove.
+// CHECK-LABEL: sil [ossa] @borrow_load_borrow_no_escape :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:       } // end sil function 'borrow_load_borrow_no_escape'
+sil [ossa] @borrow_load_borrow_no_escape : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  %2 = ref_tail_addr %1 : $C, $D
+  %3 = address_to_pointer %2 : $*D to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*D
+  %5 = load_borrow %4 : $*D
+  %6 = ref_element_addr %5 : $D, #D.x
+  %7 = begin_access [read] [dynamic] %6 : $*Int
+  %8 = load [trivial] %7 : $*Int
+  end_access %7 : $*Int
+  end_borrow %5 : $D
+  end_borrow %1 : $C
+  return %8 : $Int
+}
+
+// A reborrowed load_borrow: its scope is ended by a `br`, not an `end_borrow`. We cannot track
+// the reborrowed value's uses, so we bail conservatively and do not fold.
+// CHECK-LABEL: sil [ossa] @borrow_load_borrow_reborrow :
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:       } // end sil function 'borrow_load_borrow_reborrow'
+sil [ossa] @borrow_load_borrow_reborrow : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  %2 = ref_tail_addr %1 : $C, $D
+  %3 = address_to_pointer %2 : $*D to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*D
+  %5 = load_borrow %4 : $*D
+  br bb1(%5 : $D)
+
+bb1(%6 : @guaranteed $D):
+  %7 = borrowed %6 : $D from ()
+  end_borrow %1 : $C
+  %8 = ref_element_addr %7 : $D, #D.x
+  %9 = begin_access [read] [dynamic] %8 : $*Int
+  %10 = load [trivial] %9 : $*Int
+  end_access %9 : $*Int
+  end_borrow %7 : $D
+  return %10 : $Int
 }
 
 // CHECK-LABEL: sil [ossa] @stack_escape :

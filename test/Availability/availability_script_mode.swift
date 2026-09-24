@@ -10,11 +10,11 @@ struct Available50 {}
 @available(macOS, introduced: 51)
 struct Available51 {}
 
-@available(macOS, unavailable)
-struct UnavailableOnMacOS {} // expected-note {{'UnavailableOnMacOS' has been explicitly marked unavailable here}}
+@available(macOS, unavailable) // expected-note {{'UnavailableOnMacOS' has been explicitly marked unavailable here}}
+struct UnavailableOnMacOS {}
 
-@available(*, unavailable)
-struct UnavailableUnconditionally {} // expected-note {{'UnavailableUnconditionally' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{'UnavailableUnconditionally' has been explicitly marked unavailable here}}
+struct UnavailableUnconditionally {}
 
 var alwaysAvailableVar: AlwaysAvailable = .init() // Ok
 

@@ -14,10 +14,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <vector>
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -32,10 +29,14 @@ const StringRef Symbol::Kinds[] = {
   "generic",
   "name",
   "shape",
+  "pack_element",
   "layout",
   "super",
   "concrete"
 };
+
+static_assert(static_cast<unsigned>(Symbol::Kind::ConcreteType) + 1 == Symbol::NumKinds);
+static_assert(sizeof(Symbol::Kinds) / sizeof(Symbol::Kinds[0]) == Symbol::NumKinds);
 
 /// Symbols are uniqued and immutable, stored as a single pointer;
 /// the Storage type is the allocated backing storage.

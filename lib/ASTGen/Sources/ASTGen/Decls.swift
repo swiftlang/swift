@@ -38,6 +38,8 @@ extension ASTGenVisitor {
       return self.generate(enumDecl: node)?.asDecl
     case .extensionDecl(let node):
       return self.generate(extensionDecl: node).asDecl
+    case .fileDefaultDecl(let node):
+      return self.generate(fileDefaultDecl: node)?.asDecl
     case .functionDecl(let node):
       return self.generate(functionDecl: node)?.asDecl
     case .ifConfigDecl:
@@ -72,8 +74,6 @@ extension ASTGenVisitor {
       return nil
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
-    case .usingDecl(let node):
-      return self.generate(usingDecl: node)?.asDecl
     }
   }
 
@@ -310,18 +310,14 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   func generate(extensionDecl node: ExtensionDeclSyntax) -> BridgedExtensionDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
-    // Detect `extension P.Protocol { }` — a protocol metatype extension.
-    // Strip the `.Protocol` so the extension binds to the protocol `P`.
-    let protoMeta = node.extendedType.as(MetatypeTypeSyntax.self)
-        .flatMap { $0.metatypeSpecifier.keywordKind == .Protocol ? $0 : nil }
-    let extendedType = protoMeta.map { self.generate(type: $0.baseType) }
-                    ?? self.generate(type: node.extendedType)
-
+    // `extension P.Protocol { }` (a protocol metatype extension) is recognized
+    // in the `ExtensionDecl` constructor, which strips the `.Protocol` and
+    // marks the extension; ASTGen just forwards the written type.
     let decl = BridgedExtensionDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       extensionKeywordLoc: self.generateSourceLoc(node.extensionKeyword),
-      extendedType: extendedType,
+      extendedType: self.generate(type: node.extendedType),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
@@ -330,10 +326,6 @@ extension ASTGenVisitor {
       )
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
-
-    if protoMeta != nil {
-      decl.setIsMetatypeExtension()
-    }
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -470,6 +462,10 @@ extension ASTGenVisitor {
       throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
     )
+    // With the CoroutineAccessors feature enabled, `_read`/`_modify` are just a
+    // spelling of the yielding accessors; rewrite them to match the C++ parser
+    // (ParsedAccessors::record).  ASTGen only parses surface source.
+    accessor.remapLegacyCoroutineAccessorIfEnabled()
     accessor.asDecl.attachParsedAttrs(attrs)
     if let body = node.body {
       self.withDeclContext(accessor.asDeclContext) {
@@ -733,6 +729,7 @@ extension ASTGenVisitor {
     var throwsLoc: SourceLoc
     var isRethrows: Bool
     var thrownType: BridgedTypeRepr?
+    var yieldList: BridgedYieldList?
     var returnType: BridgedTypeRepr?
   }
   
@@ -747,6 +744,7 @@ extension ASTGenVisitor {
     let isRethrows = node.effectSpecifiers?.throwsClause?.throwsSpecifier.rawText == "rethrows"
     let thrownType = (node.effectSpecifiers?.thrownError).map(self.generate(type:))
     let returnType = (node.returnClause?.type).map(self.generate(type:))
+    let yieldList = self.generate(functionYieldClause: node.yieldClause)
     return GeneratedFunctionSignature(
       parameterList: parameterList,
       asyncLoc: asyncLoc,
@@ -754,6 +752,7 @@ extension ASTGenVisitor {
       throwsLoc: throwsLoc,
       isRethrows: isRethrows,
       thrownType: thrownType,
+      yieldList: yieldList,
       returnType: returnType
     )
   } 
@@ -781,6 +780,7 @@ extension ASTGenVisitor {
       asyncSpecifierLoc: signature.asyncLoc,
       throwsSpecifierLoc: signature.throwsLoc,
       thrownType: signature.thrownType.asNullable,
+      yieldList: signature.yieldList.asNullable,
       returnType: signature.returnType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
@@ -1145,7 +1145,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(usingDecl node: UsingDeclSyntax) -> BridgedUsingDecl? {
+  func generate(fileDefaultDecl node: FileDefaultDeclSyntax) -> BridgedFileDefaultDecl? {
     var attrs = BridgedDeclAttributes()
     var addedAny = false
 
@@ -1157,7 +1157,7 @@ extension ASTGenVisitor {
       }
     case .modifier(let modifier):
       guard case .identifier("nonisolated") = modifier.tokenKind else {
-        self.diagnose(.invalidDefaultSpecifier(node.specifier))
+        self.diagnose(.invalidFileDefaultSpecifier(node.specifier))
         return nil
       }
       let nonisolatedAttr = BridgedNonisolatedAttr.createParsed(
@@ -1170,14 +1170,14 @@ extension ASTGenVisitor {
       addedAny = true
     }
     guard addedAny else {
-      self.diagnose(.invalidDefaultSpecifier(node.specifier))
+      self.diagnose(.invalidFileDefaultSpecifier(node.specifier))
       return nil
     }
 
-    return BridgedUsingDecl.createParsed(
+    return BridgedFileDefaultDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
-      usingKeywordLoc: self.generateSourceLoc(node.usingKeyword),
+      defaultKeywordLoc: self.generateSourceLoc(node.defaultKeyword),
       specifiedAttributes: attrs
     )
   }

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
@@ -131,9 +130,7 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
                           operand, order);
       break;
     case SILInstructionKind::DebugValueInst:
-      if (DebugValueInst::hasAddrVal(user))
-        break;
-      LLVM_FALLTHROUGH;
+      break;
     default:
       // FIXME: These likely represent scenarios in which we're not generating
       // begin access markers. Ignore these for now. But we really should
@@ -275,7 +272,7 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
 
   // The argument index in the called function.
   ApplySite site(apply);
-  unsigned calleeArgumentIndex = site.getCalleeArgIndex(*applyArgumentOperand);
+  unsigned calleeArgumentIndex = site.getSubstCalleeArgIndex(*applyArgumentOperand);
 
   processCall(callerInfo, callerArgumentIndex, calleeFunction,
               calleeArgumentIndex, order);

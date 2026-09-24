@@ -1,0 +1,26 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all -disable-llvm-optzns %S/../Inputs/COMCasts.sil | %FileCheck %s
+// Success transfers the owned source into the independently retained result.
+// On failure the scalar branch leaves the source for its caller to destroy.
+// CHECK-LABEL: define{{.*}} @com_cast_conditional(
+// CHECK: store ptr null, ptr [[DEST:%.*]], align
+// CHECK: call zeroext i1 @swift_dynamicCast(ptr [[DEST]], ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, i{{32|64}} 2)
+// CHECK: [[RESULT:%.*]] = load ptr, ptr [[DEST]]
+// CHECK: icmp ne ptr [[RESULT]], null
+// CHECK-LABEL: define{{.*}} @com_cast_forced(
+// CHECK: call zeroext i1 @swift_dynamicCast(ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, i{{32|64}} 3)
+// CHECK: load ptr, ptr
+// An absent source bypasses the runtime and joins with a null result.
+// CHECK-LABEL: define{{.*}} @com_cast_optional(
+// CHECK: icmp ne ptr {{.*}}, null
+// CHECK: br i1
+// CHECK: call zeroext i1 @swift_dynamicCast(
+// CHECK: phi ptr [ null,
+
+// Failed queries leave the initialized null destination available to load.
+// CHECK-LABEL: define{{.*}} @com_cast_missing(
+// CHECK: store ptr null, ptr [[DEST:%.*]], align
+// CHECK: call zeroext i1 @swift_dynamicCast(ptr [[DEST]], ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, i{{32|64}} 2)
+// CHECK: [[RESULT:%.*]] = load ptr, ptr [[DEST]]
+// CHECK: icmp ne ptr [[RESULT]], null

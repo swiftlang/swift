@@ -268,7 +268,8 @@ ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(expected_getreadborrowsetmutate_in_protocol,none,
-      "expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property", ())
+      "expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or "
+      "'yielding mutate' in a protocol property", ())
 
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
@@ -332,6 +333,8 @@ WARNING(old_coroutine_accessor,none,
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
+ERROR(yields_requires_coroutine_functions,none,
+      "`yields` requires '-enable-experimental-feature CoroutineFunctions'", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -648,6 +651,10 @@ ERROR(sil_witness_method_type_does_not_conform,none,
 ERROR(sil_member_decl_not_found,none, "member not found", ())
 ERROR(sil_named_member_decl_not_found,none,
       "member %0 not found in type %1", (DeclName, Type))
+ERROR(sil_no_named_decl_matching_predicate,none,
+      "no declaration %0 found that is a %select{%error|property or subscript|"
+      "property|stored property}1",
+      (DeclName, unsigned))
 ERROR(sil_member_lookup_bad_type,none,
       "cannot lookup member %0 in non-nominal, non-module type %1",
       (DeclName, Type))
@@ -698,6 +705,10 @@ ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
       "mark_unresolved_non_copyable_value requires an attribute like 'noImplicitCopy'", ())
+ERROR(sil_diagnose_invalid_attribute,none,
+      "Attribute '[%0]' is not known to the diagnose instruction", (StringRef))
+ERROR(sil_diagnose_requires_attribute,none,
+      "diagnose requires an attribute like '[unpermitted_copy]'", ())
 ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
@@ -705,7 +716,7 @@ ERROR(sil_moveonlytocopyable_requires_attribute,none,
 ERROR(expected_generic_signature,none,
       "expected a generic signature", ())
 ERROR(sil_expected_uuid,none,
-      "expected a UUID string literal", ())
+      "expected an unsigned integer", ())
 NOTE(sil_previous_instruction,none, "previous instruction", ())
 
 // SIL Basic Blocks
@@ -1582,6 +1593,13 @@ ERROR(attr_com_unknown_label, none,
 ERROR(attr_com_unknown_threading_model, none,
       "unknown threading model '%0'; expected 'single', 'apartment', 'free', 'both', or 'neutral'", (StringRef))
 
+// @cxx
+ERROR(attr_expected_cxx_name,none,
+      "expected C++ function name in '%0' attribute", (StringRef))
+ERROR(attr_cxx_operator_name_backticks,none,
+      "C++ operator name in '%0' attribute must be enclosed in backticks",
+      (StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
@@ -1731,6 +1749,9 @@ ERROR(expected_rparen_after_thrown_error_type,none,
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
 
+ERROR(expected_yield_type,none,
+      "expected yield type after 'yields('", ())
+
 ERROR(attr_isolated_expected_lparen,none,
       "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
       ())
@@ -1752,7 +1773,7 @@ ERROR(attr_private_import_expected_colon,none,
 ERROR(opened_attribute_expected_lparen,none,
       "expected '(' after 'opened' attribute", ())
 ERROR(opened_attribute_id_value,none,
-      "known id for 'opened' attribute must be a UUID string", ())
+      "known id for 'opened' attribute must be an unsigned integer", ())
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
@@ -1760,7 +1781,7 @@ ERROR(opened_attribute_expected_rparen,none,
 ERROR(pack_element_attribute_expected_lparen,none,
       "expected '(' after 'pack_element' attribute", ())
 ERROR(multiple_open_pack_element,none,
-      "multiple 'open_pack_element' instructions with same UUID", ())
+      "multiple 'open_pack_element' instructions with same ID", ())
 ERROR(opened_shape_class_not_pack_param,none,
       "shape class type must be a pack type parameter", ())
 
@@ -1843,6 +1864,12 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 // Automatic differentiation attributes
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
+
+// called
+ERROR(attr_called_expected_rparen,none,
+      "expected ')' after execution semantics", ())
+ERROR(attr_called_expected_semantics,none,
+      "expected 'once' as the `@called` execution semantics", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -2246,15 +2273,16 @@ ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
 //------------------------------------------------------------------------------
-// MARK: using @<attribute> or using <identifier>
+// MARK: default @<attribute> or default <identifier>
 //------------------------------------------------------------------------------
-ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
-      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'",
+ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
+      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
-ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
-      "'using' is an experimental feature that is currently disabled", ())
-ERROR(using_decl_rejects_attributes,PointsToFirstBadToken,
-      "attribute cannot be attached to a 'using' declaration", ())
+ERROR(experimental_file_default_disabled,PointsToFirstBadToken,
+      "file-level defaults are an experimental feature that is currently "
+      "disabled", ())
+ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
+      "attribute cannot be attached to a file-level default", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

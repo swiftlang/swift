@@ -56,7 +56,10 @@ foo1.bar = 2
 // CHECK-NEXT:  [[DIDSET:%.*]] = function_ref @$s28lazy_property_with_observers4Foo1V3barSivW : $@convention(method) (Int, @inout Foo1) -> ()
 // CHECK-NEXT:  [[DIDSET_RESULT:%.*]] = apply [[DIDSET]]([[MV]], [[BEGIN_ACCESS]]) : $@convention(method) (Int, @inout Foo1) -> ()
 // CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Foo1
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  extend_lifetime [[MV]] : $Int
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
@@ -82,7 +85,10 @@ foo1.bar = 2
 // CHECK-NEXT:  // function_ref Foo.bar.didset
 // CHECK-NEXT:  [[DIDSET:%.*]] = function_ref @$s28lazy_property_with_observers3FooC3barSivW : $@convention(method) (Int, @guaranteed Foo) -> ()
 // CHECK-NEXT:  [[DIDSET_RESULT:%.*]] = apply [[DIDSET]]([[MV]], [[FOO]]) : $@convention(method) (Int, @guaranteed Foo) -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  extend_lifetime [[MV]] : $Int
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
@@ -104,6 +110,8 @@ foo1.bar = 2
 // CHECK-NEXT:  // function_ref Foo.baz.didset
 // CHECK-NEXT:  [[DIDSET:%.*]] = function_ref @$s28lazy_property_with_observers3FooC3bazSivW : $@convention(method) (@guaranteed Foo) -> ()
 // CHECK-NEXT:  [[DIDSET_RESULT:%.*]] = apply [[DIDSET]]([[FOO]]) : $@convention(method) (@guaranteed Foo) -> ()
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
@@ -125,7 +133,10 @@ foo1.bar = 2
 // CHECK-NEXT:  // function_ref Foo.observable1.didset
 // CHECK-NEXT:  [[DIDSET:%.*]] = function_ref @$s28lazy_property_with_observers3FooC11observable1SivW : $@convention(method) (Int, @guaranteed Foo) -> ()
 // CHECK-NEXT:  [[DIDSET_RESULT:%.*]] = apply [[DIDSET]]([[MV]], [[FOO]]) : $@convention(method) (Int, @guaranteed Foo) -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  extend_lifetime [[MV]] : $Int
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
@@ -144,6 +155,8 @@ foo1.bar = 2
 // CHECK-NEXT:  // function_ref Foo.observable2.didset
 // CHECK-NEXT:  [[DIDSET:%.*]] = function_ref @$s28lazy_property_with_observers3FooC11observable2SivW : $@convention(method) (@guaranteed Foo) -> ()
 // CHECK-NEXT:  [[DIDSET_RESULT:%.*]] = apply [[DIDSET]]([[FOO]]) : $@convention(method) (@guaranteed Foo) -> ()
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
@@ -162,6 +175,8 @@ foo1.bar = 2
 // CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ELEM]] : $*Optional<Int>
 // CHECK-NEXT:  assign [[ENUM]] to [[BEGIN_ACCESS]] : $*Optional<Int>
 // CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Optional<Int>
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }

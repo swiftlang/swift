@@ -540,15 +540,15 @@ public:
 
     for (const auto *derivativeAttr :
          AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
-        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
-        derivativeAttr->getParameterIndices());
-      addDerivativeConfiguration(
-          DifferentiabilityKind::Reverse,
-          derivativeAttr->getOriginalFunction(AFD->getASTContext()),
-          AutoDiffConfig(derivativeAttr->getParameterIndices(),
-                         resultIndices,
-                         AFD->getGenericSignature()));
+      for (auto *originaAFD :
+           derivativeAttr->getOriginalFunctions(AFD->getASTContext())) {
+        auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+            originaAFD, derivativeAttr->getParameterIndices());
+        addDerivativeConfiguration(
+            DifferentiabilityKind::Reverse, originaAFD,
+            AutoDiffConfig(derivativeAttr->getParameterIndices(), resultIndices,
+                           AFD->getGenericSignature()));
+      }
     }
 
     visitDefaultArguments(AFD, AFD->getParameters());
@@ -832,7 +832,8 @@ public:
     case DeclKind::PostfixOperator:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
+    case DeclKind::HiddenTypeLayoutInfo:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");
@@ -859,7 +860,8 @@ public:
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
             : Visitor{V.Visitor}, PD{PD},
-              Resilient{PD->getParentModule()->isResilient()},
+              Resilient{PD->getParentModule()->isResilient() &&
+                        !PD->isCOMInterface()},
               WitnessMethodElimination{
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
@@ -945,7 +947,7 @@ public:
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
-  UNINTERESTING_DECL(Using)
+  UNINTERESTING_DECL(FileDefault)
 
 #undef UNINTERESTING_DECL
 };

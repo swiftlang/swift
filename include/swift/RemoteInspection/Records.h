@@ -34,7 +34,7 @@ class FieldRecordFlags {
   enum : int_type {
     // Is this an indirect enum case?
     IsIndirectCase = 0x1,
-    
+
     // Is this a mutable `var` property?
     IsVar = 0x2,
 
@@ -131,7 +131,7 @@ struct TargetFieldRecordIterator {
 
   const TargetFieldRecord<Runtime> *operator->() const { return Cur; }
 
-  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, size_t bytes) {
+  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, uint64_t bytes) {
     return reinterpret_cast<const TargetFieldRecord<Runtime> *>(reinterpret_cast<const char *>(Ptr) + bytes);
   }
 
@@ -178,7 +178,10 @@ enum class FieldDescriptorKind : uint16_t {
   // An Objective-C class, which may be imported or defined in Swift.
   // In the former case, field type metadata is not emitted, and
   // must be obtained from the Objective-C runtime.
-  ObjCClass
+  ObjCClass,
+
+  // A COM interface protocol. Its existential is a single interface pointer.
+  COMProtocol,
 };
 
 // Field descriptors contain a collection of field records for a single
@@ -187,6 +190,16 @@ template <typename Runtime>
 class TargetFieldDescriptor {
   const TargetFieldRecord<Runtime> *getFieldRecordBuffer() const {
     return reinterpret_cast<const TargetFieldRecord<Runtime> *>(this + 1);
+  }
+
+  const TargetFieldRecord<Runtime> *getFieldRecordBufferEnd() const {
+    // We only ever emit FieldRecordSize equal to sizeof(FieldRecord). If it's
+    // anything else, consider it to be bad data and walk no records.
+    if (FieldRecordSize != sizeof(TargetFieldRecord<Runtime>))
+      return getFieldRecordBuffer();
+    return FieldRecordIterator::advanceRecordPointer(
+        getFieldRecordBuffer(),
+        (uint64_t)NumFields * (uint64_t)FieldRecordSize);
   }
 
 public:
@@ -202,19 +215,46 @@ public:
   using const_iterator = FieldRecordIterator;
 
   bool isEnum() const {
-    return (Kind == FieldDescriptorKind::Enum ||
-            Kind == FieldDescriptorKind::MultiPayloadEnum);
+    switch (Kind) {
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+      return true;
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return false;
+    }
   }
 
   bool isClass() const {
-    return (Kind == FieldDescriptorKind::Class ||
-            Kind == FieldDescriptorKind::ObjCClass);
+    switch (Kind) {
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return false;
+    }
   }
 
   bool isProtocol() const {
-    return (Kind == FieldDescriptorKind::Protocol ||
-            Kind == FieldDescriptorKind::ClassProtocol ||
-            Kind == FieldDescriptorKind::ObjCProtocol);
+    switch (Kind) {
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::COMProtocol:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return false;
+    }
   }
 
   bool isStruct() const {
@@ -222,14 +262,12 @@ public:
   }
 
   const_iterator begin() const {
-    auto Begin = getFieldRecordBuffer();
-    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
-    return const_iterator { FieldRecordSize, Begin, End };
+    return const_iterator { FieldRecordSize, getFieldRecordBuffer(),
+                            getFieldRecordBufferEnd() };
   }
 
   const_iterator end() const {
-    auto Begin = getFieldRecordBuffer();
-    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
+    auto End = getFieldRecordBufferEnd();
     return const_iterator { FieldRecordSize, End, End };
   }
 
@@ -404,14 +442,14 @@ private:
   //  descriptor isn't large enough to have that field.)
   // Lower 16 bits are flag bits
 
-  int getSizeFlagsIndex() const { return 0; }
+  size_t getSizeFlagsIndex() const { return 0; }
 
   // uint32_t PayloadSpareBitMaskByteOffsetCount;
   // Number of bytes in "payload spare bits", and
   // offset of them within the payload area
   // Only present if `usePayloadSpareBits()`
 
-  int getPayloadSpareBitMaskByteCountIndex() const {
+  size_t getPayloadSpareBitMaskByteCountIndex() const {
     return getSizeFlagsIndex() + 1;
   }
 
@@ -419,8 +457,9 @@ private:
   // Variably-sized bitmask field (padded to a multiple of 4 bytes)
   // Only present if `usePayloadSpareBits()`
 
-  int getPayloadSpareBitsIndex() const {
-    int PayloadSpareBitMaskByteCountFieldSize = usesPayloadSpareBits() ? 1 : 0;
+  size_t getPayloadSpareBitsIndex() const {
+    size_t PayloadSpareBitMaskByteCountFieldSize =
+        usesPayloadSpareBits() ? 1 : 0;
     return getPayloadSpareBitMaskByteCountIndex() + PayloadSpareBitMaskByteCountFieldSize;
   }
 
@@ -464,7 +503,8 @@ public:
   }
 
   uint32_t getPayloadSpareBitMaskByteOffset() const {
-    if (usesPayloadSpareBits()) {
+    if (usesPayloadSpareBits() &&
+        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
       return contents[getPayloadSpareBitMaskByteCountIndex()] >> 16;
     } else {
       return 0;
@@ -472,18 +512,23 @@ public:
   }
 
   uint32_t getPayloadSpareBitMaskByteCount() const {
-    if (usesPayloadSpareBits()) {
+    if (usesPayloadSpareBits() &&
+        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
       auto byteCount = contents[getPayloadSpareBitMaskByteCountIndex()] & 0xffff;
-      assert(getContentsSizeInWords() >= 2 + (byteCount + 3) / 4
-            && "Malformed MPEnum reflection record: mask bigger than record");
-      return byteCount;
+      uint32_t maxBytes = (getContentsSizeInWords() - 2) * 4;
+      assert(byteCount <= maxBytes &&
+             "Malformed MPEnum reflection record: mask bigger than record");
+      return byteCount <= maxBytes ? byteCount : maxBytes;
     } else {
       return 0;
     }
   }
 
   const uint8_t *getPayloadSpareBits() const {
-    if (usesPayloadSpareBits()) {
+    // The mask bytes live in contents[2...], only present when the record
+    // declares at least two content words.
+    if (usesPayloadSpareBits() &&
+        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
       return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
     } else {
       return nullptr;

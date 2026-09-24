@@ -3,14 +3,14 @@
 //
 // Build the library as a separate, library-evolution-enabled module.
 // RUN: %target-swift-frontend -emit-module -parse-as-library -O \
-// RUN:   -enable-library-evolution -disable-availability-checking \
+// RUN:   -enable-library-evolution -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -module-name IterableLib %t/library.swift \
 // RUN:   -emit-module-path %t/IterableLib.swiftmodule
 //
 // Compile the client, dumping the specialized witness thunk across the pipeline.
 // RUN: %target-swift-frontend -emit-sil -O -I %t \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -module-name main %t/client.swift \
 // RUN:   -Xllvm '-sil-print-function=$ss11InlineArrayVyxq_G11IterableLib04TestC0ADRi__rlAdEP21makeBorrowingIterator0egH0QzyFTW$3__SiTg5' \

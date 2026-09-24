@@ -1,8 +1,8 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t | %FileCheck %s
 
 // CHECK: struct SimpleArrayWrapper : CxxRandomAccessCollection, CxxIterable {
-// CHECK:   typealias Element = UnsafePointer<Int32>.Pointee
-// CHECK:   typealias RawIterator = UnsafePointer<Int32>
+// CHECK:   typealias Element = UnsafePointer<CInt>.Pointee
+// CHECK:   typealias RawIterator = UnsafePointer<CInt>
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleArrayWrapper>
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapper>
 // CHECK: }

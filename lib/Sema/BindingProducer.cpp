@@ -548,7 +548,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   }
 
   if (auto pattern = dstLocator->getPatternMatch()) {
-    if (dstLocator->isLastElement<LocatorPathElt::PatternDecl>()) {
+    if (dstLocator->isForPatternDecl()) {
       // If this is the pattern in a for loop, and we have a mismatch of the
       // element type, then we don't have any useful contextual information
       // for the pattern, and can just bind to a hole without needing to penalize

@@ -11,7 +11,7 @@
 // CHECK:   @available(*, unavailable, message: "Variadic function is unavailable")
 // CHECK:   mutating func test1(_ varargs: Any...)
 // CHECK:   @available(*, unavailable, message: "Variadic function is unavailable")
-// CHECK:   mutating func test2(_: Int32, _ varargs: Any...)
+// CHECK:   mutating func test2(_: CInt, _ varargs: Any...)
 // CHECK: }
 
 // TODO: import functions that take a pointer to a dependent type (rdar://90587703).
@@ -21,9 +21,9 @@
 // CHECK: func lvalueReference<T>(_ ref: inout T)
 // CHECK: func constLvalueReference<T>(_: T)
 
-// CHECK: func pointerTemplateParameter<T>(_ t: UnsafeMutablePointer<T>!) -> Bool
-// CHECK: func pointerTemplateParameterNonnull<T>(_ t: UnsafeMutablePointer<T>) -> Bool
-// CHECK: func pointerTemplateParameterNullable<T>(_ t: UnsafeMutablePointer<T>?) -> Bool
+// CHECK: func pointerTemplateParameter<T>(_ t: UnsafeMutablePointer<T>!) -> CBool
+// CHECK: func pointerTemplateParameterNonnull<T>(_ t: UnsafeMutablePointer<T>) -> CBool
+// CHECK: func pointerTemplateParameterNullable<T>(_ t: UnsafeMutablePointer<T>?) -> CBool
 
 // CHECK: enum Orbiters {
 // CHECK:   static func galileo<T>(_: T)

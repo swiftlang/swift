@@ -171,7 +171,8 @@ public:
   UNREACHABLE(MissingMember);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
-  UNREACHABLE(Using);
+  UNREACHABLE(FileDefault);
+  UNREACHABLE(HiddenTypeLayoutInfo);
 
 #undef UNREACHABLE
 

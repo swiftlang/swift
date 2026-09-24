@@ -23,13 +23,9 @@
 #define DEBUG_TYPE "copy-propagation"
 
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Test.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -117,6 +113,17 @@ bool OSSACanonicalizeGuaranteed::isRewritableOSSAForward(SILInstruction *inst) {
   // cannot be converted to forward owned value (struct_extract).
   if (!canOpcodeForwardOwnedValues(forwardedOper))
     return false;
+
+  // Don't rewrite the forwarding of a non-copyable value with a deinit.
+  // Converting such a value to a guaranteed value would drop the call to its
+  // deinitializer (memberwise destruction is not equivalent to aggregate
+  // destruction for a type with a user-defined deinit).
+  if (forwardedOper->get()->getType().isValueTypeWithDeinit())
+    return false;
+  for (auto result : inst->getResults()) {
+    if (result->getType().isValueTypeWithDeinit())
+      return false;
+  }
 
   return true;
 }
@@ -290,7 +297,8 @@ bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
 
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
-        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user)) {
+        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user) &&
+            canOpcodeForwardInnerGuaranteedValues(use)) {
           if (!visitor.visitForwardingUse(use)) {
             return false;
           }

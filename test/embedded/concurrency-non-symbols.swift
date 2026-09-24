@@ -2,6 +2,7 @@
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: optimized_stdlib
+// REQUIRES: embedded_stdlib_default_codegen
 
 // Check for symbols that we explicitly don't want in the Embedded Swift
 // concurrency library.

@@ -275,7 +275,7 @@ bb0(%0 : $*Span<Int>):
   %count_struct = apply %get_count_fn(%0) : $@convention(method) (@in_guaranteed Span<Int>) -> Int
   %count = struct_extract %count_struct, #Int._value
   %is_zero = builtin "cmp_eq_Int64"(%zero : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
-  cond_br %is_zero, bb3, bb1
+  cond_br %is_zero, bb6, bb1
 
 bb1:
   br bb2(%zero : $Builtin.Int64)
@@ -293,7 +293,16 @@ bb2(%i : $Builtin.Int64):
   %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
   %done = builtin "cmp_eq_Int64"(%next : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
-  cond_br %done, bb3, bb2(%next : $Builtin.Int64)
+  cond_br %done, bb5, bb4
+
+bb4:
+  br bb2(%next : $Builtin.Int64)
+
+bb5:
+  br bb3
+
+bb6:
+  br bb3
 
 bb3:
   %t = tuple ()
@@ -315,7 +324,7 @@ bb0(%0 : $*Span<Int>):
   %count_struct = apply %get_count_fn(%0) : $@convention(method) (@in_guaranteed Span<Int>) -> Int
   %count = struct_extract %count_struct, #Int._value
   %is_zero = builtin "cmp_eq_Int64"(%zero : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
-  cond_br %is_zero, bb3, bb1
+  cond_br %is_zero, bb6, bb1
 
 bb1:
   br bb2(%zero : $Builtin.Int64)
@@ -335,7 +344,16 @@ bb2(%i : $Builtin.Int64):
   %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
   %done = builtin "cmp_eq_Int64"(%next : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
-  cond_br %done, bb3, bb2(%next : $Builtin.Int64)
+  cond_br %done, bb5, bb4
+
+bb4:
+  br bb2(%next : $Builtin.Int64)
+
+bb5:
+  br bb3
+
+bb6:
+  br bb3
 
 bb3:
   %t = tuple ()

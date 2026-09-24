@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ImplicitSome
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ImplicitSome
 
 // REQUIRES: swift_feature_ImplicitSome
 
@@ -86,5 +86,11 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{failed to produce diagnostic for expression}}
+
+  // FIXME: Terrible diagnostic
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings)
+  // expected-error@-1 {{conflicting arguments to generic parameter 'Collection<T>' ('Set<Int>' vs. 'Set<String>')}}
+  // expected-error@-2 {{conflicting arguments to generic parameter 'T' ('Int' vs. 'String')}}
+  // expected-error@-3 {{conflicting arguments to generic parameter 'Element' ('String' vs. 'Int')}}
+  // expected-error@-4 {{conflicting arguments to generic parameter 'Collection<T>' ('[Int]' vs. '[String]')}}
 }

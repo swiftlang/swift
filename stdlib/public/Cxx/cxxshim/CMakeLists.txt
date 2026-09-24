@@ -87,7 +87,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
                              DESTINATION "lib/swift/embedded"
                              COMPONENT compiler)
 
-  add_dependencies(embedded-libraries cxxshim-embedded)
+  if(TARGET embedded-libraries)
+    add_dependencies(embedded-libraries cxxshim-embedded)
+  endif()
 endif()
 
 add_custom_target(libcxxshim_modulemap DEPENDS ${libcxxshim_modulemap_target_list})

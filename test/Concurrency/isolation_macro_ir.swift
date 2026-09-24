@@ -24,11 +24,13 @@ func implicitParam(_ x: (any Actor)? = #isolation) {
 //
 // TBI: define swifttailcc void @"$s18isolation_macro_ir46nonisolatedNonsendingUsePoundIsolationDirectlyyyYaF"(ptr swiftasync %0, i64 %1, i64 [[SECOND_WORD:%.*]])
 // TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -3458764513820540929
-// TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(i64 %1, i64 [[MASKED_SECOND_WORD]])
+// TBI: [[SECOND_PTR:%.*]] = inttoptr i64 [[MASKED_SECOND_WORD]] to ptr
+// TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(ptr {{.*}}, ptr [[SECOND_PTR]])
 
 // NO-TBI: define swifttailcc void @"$s18isolation_macro_ir46nonisolatedNonsendingUsePoundIsolationDirectlyyyYaF"(ptr swiftasync %0, i64 [[FIRST_WORD:%.*]], i64 [[SECOND_WORD:%.*]])
 // NO-TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -4
-// NO-TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
+// NO-TBI: [[SECOND_PTR:%.*]] = inttoptr i64 [[MASKED_SECOND_WORD]] to ptr
+// NO-TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(ptr {{.*}}, ptr [[SECOND_PTR]])
 
 public nonisolated(nonsending) func nonisolatedNonsendingUsePoundIsolationDirectly() async {
   let iso = #isolation
@@ -39,11 +41,13 @@ public nonisolated(nonsending) func nonisolatedNonsendingUsePoundIsolationDirect
 //
 // TBI: define swifttailcc void @"$s18isolation_macro_ir45nonisolatedNonsendingPoundIsolationDefaultArgyyYaF"(ptr swiftasync {{%.*}}, i64 {{%.*}}, i64 [[WORD_2:%.*]])
 // TBI: [[MASKED_WORD_2:%.*]] = and i64 [[WORD_2]], -3458764513820540929
-// TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(i64 {{%.*}}, i64 [[MASKED_WORD_2]])
+// TBI: [[WORD_2_PTR:%.*]] = inttoptr i64 [[MASKED_WORD_2]] to ptr
+// TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(ptr {{.*}}, ptr [[WORD_2_PTR]])
 
 // NO-TBI: define swifttailcc void @"$s18isolation_macro_ir45nonisolatedNonsendingPoundIsolationDefaultArgyyYaF"(ptr swiftasync %0, i64 [[WORD_1:%.*]], i64 [[WORD_2:%.*]])
 // NO-TBI: [[MASKED_WORD_2:%.*]] = and i64 [[WORD_2]], -4
-// NO-TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(i64 {{%.*}}, i64 [[MASKED_WORD_2]])
+// NO-TBI: [[WORD_2_PTR:%.*]] = inttoptr i64 [[MASKED_WORD_2]] to ptr
+// NO-TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(ptr {{.*}}, ptr [[WORD_2_PTR]])
 public nonisolated(nonsending) func nonisolatedNonsendingPoundIsolationDefaultArg() async {
   implicitParam()
 }

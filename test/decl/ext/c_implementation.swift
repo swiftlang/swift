@@ -30,12 +30,12 @@ func CImplFuncMissing(_: Int32) {
 
 @implementation @c
 func CImplFuncMismatch1(_: Float) {
-  // expected-error@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @c
 func CImplFuncMismatch2(_: Int32) -> Float {
-  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @c(CImplFuncNameMismatch1)
@@ -49,6 +49,34 @@ func CImplFuncNameMismatch2(_: Int32) {
   // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
 }
+
+
+@implementation @c
+func CImplFuncUnavailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailable1' does not match the declaration in the header because it must be unavailable}}
+
+@available(*, unavailable)
+@implementation @c
+func CImplFuncUnavailable2(_: Int32) { }
+
+// FIXME: There is no way to satisfy this diagnostic, since 'unavailable' cannot
+// be used in an '@available' attribute for the 'swift' domain.
+@implementation @c
+func CImplFuncUnavailableInSwift1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailableInSwift1' does not match the declaration in the header because it must be unavailable in Swift}} {{none}}
+
+@implementation @c
+func CImplFuncDeprecated1(_: Int32) { }
+
+@available(*, unavailable)
+@implementation @c
+func CImplFuncAvailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncAvailable1' does not match the declaration in the header because it is unavailable}}
+// expected-note@-4 {{'CImplFuncAvailable1' has been explicitly marked unavailable here}}
+
+@available(*, deprecated, message: "use something else")
+@implementation @c
+func CImplFuncAvailable2(_: Int32) { }
 
 //
 // TODO: @c for global functions imported as computed vars
@@ -90,4 +118,29 @@ func CImplDuplicate(_: CInt) {
 @implementation @c
 func CImplDuplicate(_: CInt) {
 // expected-error@-2 {{duplicate implementation of imported global function 'CImplDuplicate'}}
+}
+
+//
+// __attribute__((overloadable)) C functions are selected by parameter type,
+// like C++ overloads
+//
+
+@implementation @c
+func CImplOverloaded(_: CInt) {
+  // OK
+}
+
+@implementation @c
+func CImplOverloaded(_: Float) {
+  // OK
+}
+
+@implementation @c
+func CImplOverloaded(_: Double) {
+  // expected-error@-2 {{could not find imported function 'CImplOverloaded' matching global function 'CImplOverloaded'; make sure you import the module or header that declares it}}
+}
+
+@implementation @c
+func CImplOverloadedMixed(_: CInt) {
+  // OK -- the one unmarked overload of an overloadable set
 }

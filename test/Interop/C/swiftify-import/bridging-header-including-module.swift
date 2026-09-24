@@ -37,8 +37,8 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload public func foo(_ p: UnsafeMutableBufferPointer<Int32>) {
-    let len = Int32(exactly: p.count)!
+@_alwaysEmitIntoClient @_disfavoredOverload public func foo(_ p: UnsafeMutableBufferPointer<CInt>) {
+    let len = CInt(exactly: p.count)!
     return unsafe foo(len, p.baseAddress)
 }
 ------------------------------

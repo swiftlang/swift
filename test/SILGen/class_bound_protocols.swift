@@ -165,43 +165,43 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
                                  y: Value) {
   // CHECK:      [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*any InheritsMutatingMethod
   // CHECK-NEXT: [[X_VALUE:%.*]] = load [copy] [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", any InheritsMutatingMethod) Self, #HasMutatingMethod.mutateMe : <Self where Self : HasMutatingMethod> (inout Self) -> () -> (), [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@inout τ_0_0) -> ()
-  // CHECK-NEXT: apply [[METHOD]]<@opened("{{.*}}", any InheritsMutatingMethod) Self>([[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@inout τ_0_0) -> ()
-  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = load [take] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[X_VALUE:%.*]] = init_existential_ref [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@opened("{{.*}}", any InheritsMutatingMethod) Self, $any InheritsMutatingMethod
+  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened({{.*}}, any InheritsMutatingMethod) Self, #HasMutatingMethod.mutateMe : <Self where Self : HasMutatingMethod> (inout Self) -> () -> (), [[X_PAYLOAD]] : $@opened({{.*}}, any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@inout τ_0_0) -> ()
+  // CHECK-NEXT: apply [[METHOD]]<@opened({{.*}}, any InheritsMutatingMethod) Self>([[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@inout τ_0_0) -> ()
+  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = load [take] [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[X_VALUE:%.*]] = init_existential_ref [[X_PAYLOAD]] : $@opened({{.*}}, any InheritsMutatingMethod) Self : $@opened({{.*}}, any InheritsMutatingMethod) Self, $any InheritsMutatingMethod
   // CHECK-NEXT: assign [[X_VALUE]] to [[X_ADDR]] : $*any InheritsMutatingMethod
   // CHECK-NEXT: end_access [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
+  // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
   x.mutateMe()
 
   // CHECK-NEXT: [[X_ADDR:%.*]] = begin_access [read] [unknown] %0 : $*any InheritsMutatingMethod
   // CHECK-NEXT: [[X_VALUE:%.*]] = load [copy] [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", any InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!getter : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}", any InheritsMutatingMethod) Self>([[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
+  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened({{.*}}, any InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!getter : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened({{.*}}, any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
+  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened({{.*}}, any InheritsMutatingMethod) Self>([[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
   // CHECK-NEXT: ignored_use [[RESULT_VALUE]]
   // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
+  // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
   _ = x.mutatingCounter
 
   // CHECK-NEXT: [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*any InheritsMutatingMethod
   // CHECK-NEXT: [[X_VALUE:%.*]] = load [copy] [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", any InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!setter : <Self where Self : HasMutatingMethod> (inout Self) -> (Value) -> (), [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (Value, @inout τ_0_0) -> ()
-  // CHECK-NEXT: apply [[METHOD]]<@opened("{{.*}}", any InheritsMutatingMethod) Self>(%1, [[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (Value, @inout τ_0_0) -> ()
-  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = load [take] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[X_VALUE:%.*]] = init_existential_ref [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@opened("{{.*}}", any InheritsMutatingMethod) Self, $any InheritsMutatingMethod
+  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened({{.*}}, any InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!setter : <Self where Self : HasMutatingMethod> (inout Self) -> (Value) -> (), [[X_PAYLOAD]] : $@opened({{.*}}, any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (Value, @inout τ_0_0) -> ()
+  // CHECK-NEXT: apply [[METHOD]]<@opened({{.*}}, any InheritsMutatingMethod) Self>(%1, [[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (Value, @inout τ_0_0) -> ()
+  // CHECK-NEXT: [[X_PAYLOAD:%.*]] = load [take] [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
+  // CHECK-NEXT: [[X_VALUE:%.*]] = init_existential_ref [[X_PAYLOAD]] : $@opened({{.*}}, any InheritsMutatingMethod) Self : $@opened({{.*}}, any InheritsMutatingMethod) Self, $any InheritsMutatingMethod
   // CHECK-NEXT: assign [[X_VALUE]] to [[X_ADDR]] : $*any InheritsMutatingMethod
   // CHECK-NEXT: end_access [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
+  // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened({{.*}}, any InheritsMutatingMethod) Self
   x.mutatingCounter = y
 
   takesInOut(&x.mutatingCounter)

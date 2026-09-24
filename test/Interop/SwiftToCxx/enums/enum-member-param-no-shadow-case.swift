@@ -21,11 +21,11 @@ public enum E {
 // CHECK: SWIFT_INLINE_THUNK void takeParamA(swift::Int a_)
 // CHECK: static SWIFT_INLINE_THUNK void takeParamB(swift::Int b_)
 
-// CHECK: E E::init(swift::Int b_) {
+// CHECK: E E::init(swift::Int b_) noexcept {
 // CHECK: _impl::$s5Enums1EOyACSicfC(b_)
 
-// CHECK: void E::takeParamA(swift::Int a_) const {
+// CHECK: void E::takeParamA(swift::Int a_) const noexcept {
 // CHECK: _impl::$s5Enums1EO10takeParamAyySiF(a_,
 
-// CHECK: void E::takeParamB(swift::Int b_) {
+// CHECK: void E::takeParamB(swift::Int b_) noexcept {
 // CHECK: _impl::$s5Enums1EO10takeParamByySiFZ(b_);

@@ -79,7 +79,10 @@ bb1:
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -98,7 +101,7 @@ bb2:
 // CHECK:   release
 // CHECK:   apply [[MM]]([[ARRAY]]
 // CHECK:   apply [[EM]]([[ARRAY]]
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:  cond_br {{.*}}, bb2
 // CHECK: } // end sil function 'hoist_ignoring_paired_retain_release_and_hoist'
 sil @hoist_ignoring_paired_retain_release_and_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
@@ -114,7 +117,10 @@ bb1:
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -128,7 +134,7 @@ bb2:
 // CHECK: retain_value
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
 // CHECK: apply [[MM]]
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:  cond_br {{.*}}, bb2
 sil @hoist_blocked_by_unpaired_retain_release_1 : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -142,7 +148,10 @@ bb1:
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -156,7 +165,7 @@ bb2:
 // CHECK: retain_value
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
 // CHECK: apply [[MM]]
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:  cond_br {{.*}}, bb2
 sil @hoist_blocked_by_unpaired_retain_release_2 : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   br bb1
@@ -175,7 +184,10 @@ bb1:
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -208,7 +220,10 @@ bb1:
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -244,10 +259,13 @@ bb3:
   br bb4(%p1 : $MyArray<MyStruct>)
 
 bb4(%p2 : $MyArray<MyStruct>):
-  cond_br undef, bb1(%p2 : $MyArray<MyStruct>), bb5(%p2 : $MyArray<MyStruct>)
+  cond_br undef, bb1a, bb5
 
-bb5(%p3 : $MyArray<MyStruct>):
-  return %p3 : $MyArray<MyStruct>
+bb1a:
+  br bb1(%p2 : $MyArray<MyStruct>)
+
+bb5:
+  return %p2 : $MyArray<MyStruct>
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
@@ -283,7 +301,10 @@ bb1:
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   mark_dependence %1 : $*Builtin.Int1 on %99999 : $Builtin.NativeObject
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -320,7 +341,10 @@ bb1:
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   mark_dependence %1 : $*Builtin.Int1 on %2 : $MyArray<MyStruct>
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -359,7 +383,10 @@ bb1:
   mark_dependence %1 : $*Builtin.Int1 on %e : $Optional<MyArray<MyStruct>>
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br %3, bb1, bb2
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -393,7 +420,10 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   br bb3
@@ -407,7 +437,10 @@ bb3:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb4, bb3
+  cond_br undef, bb4, bb3a
+
+bb3a:
+  br bb3
 
 bb4:
   br bb5
@@ -421,7 +454,10 @@ bb5:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb5, bb6
+  cond_br undef, bb5a, bb6
+
+bb5a:
+  br bb5
 
 bb6:
   br bb7
@@ -435,7 +471,10 @@ bb7:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb7, bb8
+  cond_br undef, bb7a, bb8
+
+bb7a:
+  br bb7
 
 bb8:
   br bb9
@@ -450,7 +489,10 @@ bb9:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb9, bb10
+  cond_br undef, bb9a, bb10
+
+bb9a:
+  br bb9
 
 bb10:
   %r = tuple()
@@ -491,7 +533,10 @@ bb1:
   %13 = mark_dependence %1 : $*Builtin.Int1 on %12 : $Optional<MyArray<MyStruct>>
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br %l, bb1, bb2
+  cond_br %l, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %15 = tuple ()
@@ -507,8 +552,10 @@ bb2:
 // CHECK: bb2:
 // CHECK-NOT: apply [[F]](
 // CHECK: bb3:
-// CHECK: apply [[F]](
+// CHECK-NOT: apply [[F]](
 // CHECK: bb4:
+// CHECK: apply [[F]](
+// CHECK: bb5:
 
 sil @cow_type_based_hoisting_retain_release_matching : $@convention(thin) (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
 bb0(%0 : $MyArrayContainer<MyStruct>, %00 : $Builtin.NativeObject):
@@ -531,7 +578,10 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %9(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   br bb3
@@ -544,7 +594,10 @@ bb3:
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   apply %9(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb3, bb4
+  cond_br undef, bb3a, bb4
+
+bb3a:
+  br bb3
 
 bb4:
   %8 = tuple()
@@ -596,7 +649,10 @@ bb3:
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -633,7 +689,10 @@ bb2:
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb3
+  cond_br undef, bb1a, bb3
+
+bb1a:
+  br bb1
 
 bb3:
   %r = tuple()
@@ -667,7 +726,10 @@ bb3:
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -697,7 +759,10 @@ bb1:
   %6 = apply %5(%3) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = apply %7(%3) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -743,7 +808,10 @@ bb1:
   %14 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %15 = apply %14(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %16 = apply %14(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -789,7 +857,10 @@ bb1:
   %15 = apply %14(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %16 = apply %4(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %17 = apply %14(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()
@@ -833,7 +904,10 @@ bb1:
   %14 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %15 = apply %14(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %17 = apply %14(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
 
 bb2:
   %r = tuple()

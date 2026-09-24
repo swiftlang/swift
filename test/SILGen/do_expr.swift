@@ -59,6 +59,7 @@ func test6() -> Int {
 // CHECK:       [[BB_NORMAL]]
 // CHECK-NEXT:  ignored_use
 // CHECK-NEXT:  store [[MVY]] to [trivial] [[RESULT]] : $*Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  extend_lifetime [[MVY]] : $Int
 // CHECK-NEXT:  br [[BB_EXIT:bb[0-9]+]]
 //
@@ -95,6 +96,7 @@ func test7() throws -> Int {
 //
 // CHECK:       [[BB_NORMAL]]([[I:%[0-9]+]] : $Int)
 // CHECK-NEXT:  store [[I]] to [trivial] [[RESULT]] : $*Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  extend_lifetime [[MVY]] : $Int
 // CHECK-NEXT:  br [[BB_EXIT:bb[0-9]+]]
 //

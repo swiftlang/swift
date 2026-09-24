@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s -o /dev/null -verify
 //
 // REQUIRES: VENDOR=apple
+// REQUIRES: optimized_stdlib
 
 // Tests for the diagnostics produced by the OSLogOptimization pass that
 // performs compile-time analysis and optimization of the new os log APIs.

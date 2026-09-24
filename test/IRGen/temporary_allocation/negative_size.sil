@@ -1,4 +1,13 @@
 // RUN: %target-swift-frontend %s -emit-ir -o /dev/null -verify
+
+// Also check a 32-bit target, where the negative byte count is not
+// representable as a size value.
+// RUN: %swift -disable-legacy-type-info -target armv7-apple-ios7 %s -emit-ir -o /dev/null -verify
+// RUN: %swift -disable-legacy-type-info -target i386-apple-ios7 %s -emit-ir -o /dev/null -verify
+
+// REQUIRES: CODEGENERATOR=ARM
+// REQUIRES: CODEGENERATOR=X86
+
 import Builtin
 
 sil @stack_alloc_builtin: $@convention(thin) () -> () {

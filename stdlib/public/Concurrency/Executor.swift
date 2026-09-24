@@ -155,7 +155,7 @@ extension Executor {
   #endif
   @available(StdlibDeploymentTarget 6.3, *)
   internal var isMainExecutor: Bool {
-    #if os(WASI) || os(Emscripten) || !$Embedded
+    #if !$Embedded
     return self is any MainExecutor
     #else
     return false
@@ -683,7 +683,7 @@ extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.3, *)
   static var unownedDefaultExecutor: UnownedTaskExecutor {
     _createDefaultExecutorsOnce()
-    return unsafe UnownedTaskExecutor(_defaultExecutor!)
+    return unsafe UnownedTaskExecutor(Builtin.buildOrdinaryTaskExecutorRef(_defaultExecutor!))
   }
 }
 

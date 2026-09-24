@@ -21,7 +21,6 @@
 #include "IRGenFunction.h"
 #include "SwiftTargetInfo.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace irgen;
@@ -106,7 +105,7 @@ llvm::Value *PointerInfo::getExtraInhabitantIndex(IRGenFunction &IGF,
                                                   Address src) const {
   llvm::BasicBlock *contBB = IGF.createBasicBlock("is-valid-pointer");
   SmallVector<std::pair<llvm::BasicBlock*, llvm::Value*>, 3> phiValues;
-  auto invalidIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
+  auto invalidIndex = llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
 
   src = IGF.Builder.CreateElementBitCast(src, IGF.IGM.SizeTy);
 

@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -enable-experimental-feature ThenStatements %s -o /dev/null
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements %s

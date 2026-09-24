@@ -3,17 +3,23 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: PTRSIZE=64
 
+public func testOverflow(_ a: Int, _ b: Int) -> Int {
+    return a + b
+}
+
+// CHECK: define{{.*}} swiftcc i64 @"$s1A12testOverflowyS2i_SitF"(i64 %0, i64 %1)
+
+// CHECK:  [[ADD:%.*]] = {{.*}}call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %0, i64 %1)
+// CHECK:  [[OVERFLOW:%.*]] = extractvalue { i64, i1 } [[ADD]], 1
+// CHECK:  br i1 [[OVERFLOW]], {{.*}}!annotation ![[ARITH_OVERFLOW:[0-9]+]]
+
 public func test(_ a: [Int], _ i: Int) -> Int {
     return a[i + 1]
 }
 
 // CHECK: define{{.*}} swiftcc i64 @"$s1A4testySiSaySiG_SitF"(ptr{{.*}} %0, i64 %1)
 
-// CHECK:  [[ADD:%.*]] = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %1, i64 1)
-// CHECK:  [[IDX:%.*]] = extractvalue { i64, i1 } [[ADD]], 0
-// CHECK:  [[OVERFLOW:%.*]] = extractvalue { i64, i1 } [[ADD]], 1
-// CHECK:  br i1 [[OVERFLOW]], {{.*}}!annotation ![[ARITH_OVERFLOW:[0-9]+]]
-
+// CHECK:  [[IDX:%.*]] = add i64 %1, 1
 // CHECK:  [[C0:%.*]] = icmp slt i64 [[IDX]], 0
 // CHECK:  br i1 [[C0]], {{.*}}!annotation ![[ARRAY_INDEX_OUT_OF_BOUNDS:[0-9]+]]
 

@@ -132,6 +132,8 @@ extension MutatingContext {
        !instAfterInlining.isDeleted {
       notifyNewInstructions(from: instBeforeInlining, to: instAfterInlining)
     }
+    notifyInstructionsChanged()
+    notifyBranchesChanged()
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {

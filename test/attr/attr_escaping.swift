@@ -271,3 +271,42 @@ class C_57070 {
     // expected-note@-1{{parameter #1 expects escaping value of type '() -> Void'}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/90695
+// Note the escaping mismatch on each candidate, not just "no exact matches".
+func overloadedEscaping(_ fn: @escaping () -> Void) {}
+// expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+func overloadedEscaping(_ fn: @escaping () throws -> Void) {}
+// expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+
+func testOverloadedEscaping(_ c: () -> Void) {
+  overloadedEscaping(c) // expected-error{{no exact matches in call to global function 'overloadedEscaping'}}
+}
+
+// Overloads that fail differently keep their own note.
+func mixedOverload(_ fn: @escaping () -> Void) {}
+// expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+func mixedOverload(_ fn: (Int) -> Void) {}
+// expected-note@-1{{candidate has partially matching parameter list ((Int) -> Void)}}
+
+func testMixedOverload(_ c: () -> Void) {
+  mixedOverload(c) // expected-error{{no exact matches in call to global function 'mixedOverload'}}
+}
+
+// Methods and subscripts get the note too (they don't anchor on a DeclRefExpr).
+struct OverloadedEscaping {
+  func method(_ fn: @escaping () -> Void) {}
+  // expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+  func method(_ fn: @escaping () throws -> Void) {}
+  // expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+
+  subscript(fn: @escaping () -> Void) -> Int { 0 }
+  // expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+  subscript(fn: @escaping () throws -> Void) -> Int { 0 }
+  // expected-note@-1{{candidate expects an '@escaping' closure for parameter #1, but argument #1 is non-escaping}}
+}
+
+func testMethodAndSubscript(_ o: OverloadedEscaping, _ c: () -> Void) {
+  o.method(c) // expected-error{{no exact matches in call to instance method 'method'}}
+  _ = o[c] // expected-error{{no exact matches in call to subscript}}
+}

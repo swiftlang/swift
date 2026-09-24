@@ -1,0 +1,64 @@
+// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -parse-stdlib -target i686-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s -DCC="x86_stdcallcc "
+// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -parse-stdlib -target x86_64-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s -DCC=""
+// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -parse-stdlib -target i686-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s -DCC=""
+
+// REQUIRES: CODEGENERATOR=X86
+
+sil_stage canonical
+import Builtin
+
+// CHECK-LABEL: define{{.*}} @com_method(
+// CHECK-SAME: ptr {{%.*}}, i32 [[VALUE:%.*]])
+// CHECK: ret i32 [[VALUE]]
+sil @com_method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+bb0(%value : $Builtin.Int32, %interface : $Builtin.RawPointer):
+  return %value : $Builtin.Int32
+}
+
+// CHECK-LABEL: define{{.*}} @com_self(
+// CHECK-SAME: ptr [[SELF:%.*]])
+// CHECK: ret ptr [[SELF]]
+sil @com_self : $@convention(com_method) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%interface : $Builtin.RawPointer):
+  return %interface : $Builtin.RawPointer
+}
+
+// An indirect SIL self is materialized locally from the physical interface pointer.
+// CHECK-LABEL: define{{.*}} @com_indirect_self(
+// CHECK-SAME: ptr [[SELF:%.*]])
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%.*]]
+// CHECK: [[VALUE:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: ret ptr [[VALUE]]
+sil @com_indirect_self : $@convention(com_method) (@in_guaranteed Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%interface : $*Builtin.RawPointer):
+  %value = load %interface : $*Builtin.RawPointer
+  return %value : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: define{{.*}} @call_com_method(
+// CHECK-SAME: ptr [[SELF:%.*]], i32 [[VALUE:%.*]])
+// CHECK: [[RESULT:%.*]] = call [[CC]]i32 @com_method(ptr [[SELF]], i32 [[VALUE]])
+// CHECK: ret i32 [[RESULT]]
+sil @call_com_method : $@convention(thin) (Builtin.RawPointer, Builtin.Int32) -> Builtin.Int32 {
+bb0(%interface : $Builtin.RawPointer, %value : $Builtin.Int32):
+  %fn = function_ref @com_method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+  %result = apply %fn(%value, %interface) : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+  return %result : $Builtin.Int32
+}
+
+// The call passes the stored interface pointer, not its temporary's address.
+// CHECK-LABEL: define{{.*}} @call_indirect_self(
+// CHECK-SAME: ptr [[SELF:%.*]])
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%.*]]
+// CHECK: [[VALUE:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: [[RESULT:%.*]] = call [[CC]]ptr @com_indirect_self(ptr [[VALUE]])
+// CHECK: ret ptr [[RESULT]]
+sil @call_indirect_self : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%interface : $Builtin.RawPointer):
+  %storage = alloc_stack $Builtin.RawPointer
+  store %interface to %storage : $*Builtin.RawPointer
+  %fn = function_ref @com_indirect_self : $@convention(com_method) (@in_guaranteed Builtin.RawPointer) -> Builtin.RawPointer
+  %result = apply %fn(%storage) : $@convention(com_method) (@in_guaranteed Builtin.RawPointer) -> Builtin.RawPointer
+  dealloc_stack %storage : $*Builtin.RawPointer
+  return %result : $Builtin.RawPointer
+}

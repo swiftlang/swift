@@ -1,16 +1,18 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target aarch64-unknown-linux-android28 %s
 
+// expected-warning@<unknown> * {{libc not found for 'aarch64-unknown-linux-android28'; C stdlib may be unavailable}}
+
 @available(Android, introduced: 1.0, deprecated: 2.0, obsoleted: 28.0,
               message: "you don't want to do that anyway")
 func doSomething() { }
-// expected-note @-1{{'doSomething()' was obsoleted in Android 28.0}}
+// expected-note @-3{{'doSomething()' was obsoleted in Android 28.0}}
 
 doSomething() // expected-error{{'doSomething()' is unavailable in Android: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @available(Android, introduced: 1.0, deprecated: 2.0, obsoleted: 27.0)
 func doSomethingElse() { }
-// expected-note @-1{{'doSomethingElse()' was obsoleted in Android 27.0}}
+// expected-note @-2{{'doSomethingElse()' was obsoleted in Android 27.0}}
 
 doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in Android}}
 

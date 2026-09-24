@@ -331,6 +331,14 @@ private:
     if (isa<ExtensionDecl>(decl))
       return true;
 
+    // Declarations in local contexts may have availability attributes that are
+    // synthesized from the availability scopes that contain them (see
+    // SynthesizeLocalAvailableAttrsRequest). Expanding lazily ensures that
+    // building out the scopes for the enclosing function body does not query
+    // the availability of these declarations, which would be circular.
+    if (SynthesizeLocalAvailableAttrsRequest::appliesTo(decl))
+      return true;
+
     return false;
   }
 
@@ -982,14 +990,7 @@ private:
     auto primaryRange = runtimeRangeForSpec(spec);
     auto variantRange = runtimeRangeForSpec(variantSpec);
 
-    switch (domain.getKind()) {
-    case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguageMode:
-    case AvailabilityDomain::Kind::PackageDescription:
-      // These domains don't support queries.
-      llvm::report_fatal_error("unsupported domain");
-
-    case AvailabilityDomain::Kind::Universal:
+    if (domain.isUniversal()) {
       DEBUG_ASSERT(spec.isWildcard());
 
       // If all of the specs that matched are '*', then the query trivially
@@ -1005,30 +1006,9 @@ private:
       //
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
-
-    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
-      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
-
-    case AvailabilityDomain::Kind::Platform:
-      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
-      // is responsible eliminating these checks when it can prove that they can
-      // never fail (due to the deployment target). We can't perform that
-      // analysis here because it may depend on inlining.
-      return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
-    case AvailabilityDomain::Kind::Custom:
-      auto customDomain = domain.getCustomDomain();
-      ASSERT(customDomain);
-
-      switch (customDomain->getKind()) {
-      case CustomAvailabilityDomain::Kind::Enabled:
-      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
-        return AvailabilityQuery::constant(domain, true);
-      case CustomAvailabilityDomain::Kind::Disabled:
-        return AvailabilityQuery::constant(domain, false);
-      case CustomAvailabilityDomain::Kind::Dynamic:
-        return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
-      }
     }
+
+    return AvailabilityQuery::forDomain(domain, primaryRange, variantRange);
   }
 
   /// Build the availability scopes for a StmtCondition and return a pair of
@@ -1182,7 +1162,7 @@ private:
         // diagnostic and just use the current scope.
         Context.Diags.diagnose(
             query->getLoc(), diag::availability_query_required_for_platform,
-            platformString(targetPlatform(Context.LangOpts)));
+            Context.getTargetAvailabilityDomain().getNameForAttributePrinting());
         falseFlowBuilder.setUndefined();
         continue;
       }
@@ -1216,44 +1196,10 @@ private:
         newContext.constrainWithAvailabilityRange(*trueRange, domain, Context);
 
       // Check whether the new context refines availability. If it doesn't, the
-      // query is useless and should potentially be diagnosed.
-      if (currentContext.isContainedIn(newContext)) {
-        // If the explicitly-specified (via #availability) version range for the
-        // current scope is completely contained in the range for the spec, then
-        // a version query can never be false, so the spec is useless.
-        // If so, report this.
-        auto explicitRange =
-            currentScope->getExplicitAvailabilityRange(domain, Context);
-        if (explicitRange && trueRange &&
-            explicitRange->isContainedIn(*trueRange)) {
-          // Platform unavailability queries never refine availability so don't
-          // diangose them.
-          if (isUnavailability.value())
-            continue;
-
-          // Skip diagnosing useless availability in fragile functions with
-          // opaque result types since removing an availability check could
-          // change the ABI of the function and result in a miscompilation.
-          auto *dc = getCurrentDeclContext();
-          if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-            if (auto decl = dc->getInnermostDeclarationDeclContext()) {
-              if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-                if (afd->getOpaqueResultTypeDecl())
-                  continue;
-              }
-            }
-          }
-
-          DiagnosticEngine &diags = Context.Diags;
-          diags.diagnose(query->getLoc(),
-                         diag::availability_query_useless_enclosing_scope,
-                         domain.getNameForAttributePrinting());
-          diags.diagnose(currentScope->getIntroductionLoc(),
-                         diag::availability_query_useless_enclosing_scope_here);
-        }
-
+      // query is useless. Diagnosing that is the responsibility of
+      // diagnoseAvailabilityCondition() in MiscDiagnostics.
+      if (currentContext.isContainedIn(newContext))
         continue;
-      }
 
       // If the #available() is not useless then there is a potential false
       // flow and we need to potentially expand the range covered by the false
@@ -1264,6 +1210,7 @@ private:
       auto *scope = AvailabilityScope::createForConditionFollowingQuery(
           Context, query, lastElement, getCurrentDeclContext(), currentScope,
           newContext);
+      query->setIntroducedAvailabilityScope(scope);
 
       pushContext(scope, ParentTy());
       ++nestedCount;
@@ -1347,13 +1294,13 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      auto platform = domain.getPlatformKind();
+      auto platform = *domain.getPlatformKind();
       if (isPlatformActive(platform, Context.LangOpts, forTargetVariant,
                            /* ForRuntimeQuery */ true)) {
 
         if (!bestSpec ||
             inheritsAvailabilityFromPlatform(
-                platform, bestSpec->getDomain().getPlatformKind())) {
+                platform, *bestSpec->getDomain().getPlatformKind())) {
           bestSpec = spec;
         }
       }

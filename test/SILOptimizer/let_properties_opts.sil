@@ -64,8 +64,8 @@ bb0(%0 : @guaranteed $HasCenter):
   %1 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
   %2 = struct_element_addr %1 : $*Point, #Point.x
   %3 = struct_element_addr %2, #Int64._value
-  debug_value %3, var, name "z"
-  debug_value %2, var, name "x"
+  debug_value %3, var, name "z", expr op_deref
+  debug_value %2, var, name "x", expr op_deref
   %4 = load [trivial] %3
   return %4
 }

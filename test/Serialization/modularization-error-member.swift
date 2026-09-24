@@ -50,7 +50,7 @@ float foo(struct S *data) __attribute__((swift_name("S.foo(self:)")));
 
 // CHECK: error: reference to declaration 'S.foo' broken by a context change; the declaration kind of 'S.foo' from 'A' changed since building 'LibWithXRef'
 // CHECK: note: the declaration was expected to be found in module 'A' at '{{.*}}module.modulemap'
-// CHECK: note: a candidate was filtered out because of a type mismatch; expected: '(inout S) -> () -> Double', found: '(inout S) -> () -> Float'
+// CHECK: note: a candidate was filtered out because of a type mismatch; expected: '(inout S) -> () -> Double', found: '(inout S) -> () -> CFloat' (aka '(inout S) -> () -> Float')
 // CHECK-NOT: *** DESERIALIZATION FAILURE ***
 
 //--- LibWithXRef.swift

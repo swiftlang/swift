@@ -19,10 +19,8 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
-#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/MC/MCTargetOptions.h"
 #include <optional>
 
 #include <set>
@@ -255,6 +253,9 @@ public:
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
   std::optional<bool> SerializeOptionsForDebugging;
+  /// When true, generated .swiftsourceinfo files will apply prefix maps from
+  /// -file-prefix-map flag and use a 0 value for the last modified timestamp.
+  bool PrefixMapSourceInfo = false;
 
   /// When true the debug prefix map entries will be applied to debugging
   /// options before serialization. These can be reconstructed at debug time by
@@ -284,11 +285,6 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
-
-  /// Emit parseable-output directly from the frontend, instead of relying
-  /// the driver to emit it. This is used in context where frontend jobs are executed by
-  /// clients other than the driver.
-  bool FrontendParseableOutput = false;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -448,10 +444,11 @@ public:
   /// such as `-Xcc` flags, etc.
   bool StrictImplicitModuleContext = false;
 
-  /// Downgrade all errors emitted in the module interface verification phase
-  /// to warnings.
+  /// Whether to downgrade all errors emitted in the module interface
+  /// verification phase to warnings. When this has no value, the blocklists
+  /// decide whether the module's interface verification errors are downgraded.
   /// TODO: remove this after we fix all project-side warnings in the interface.
-  bool DowngradeInterfaceVerificationError = false;
+  std::optional<bool> DowngradeInterfaceVerificationError;
 
   /// True if the "-static" option is set.
   bool Static = false;
@@ -540,10 +537,14 @@ public:
   /// loaded before it is run.
   static bool doesActionRequireSwiftStandardLibrary(ActionType);
 
+  /// \return true if the given action runs full semantic analysis over the
+  /// whole module, providing a fully typechecked main module.
+  static bool doesActionTypeCheckWholeModule(ActionType);
+
   /// \return true if the given action requires input files to be provided.
   static bool doesActionRequireInputs(ActionType action);
 
-  /// \return true if the given action requires input files to be provided.
+  /// \return true if the given action performs end of pipeline actions.
   static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
   /// \return true if the given action supports caching.
@@ -630,6 +631,12 @@ public:
   /// Augment modular imports in any emitted ObjC headers with equivalent
   /// textual imports
   bool EmitClangHeaderWithNonModularIncludes = false;
+
+  /// When non-empty, the generated Objective-C header for a mixed-source module
+  /// imports the underlying Clang module's headers using quoted includes
+  /// spelled relative to this path, instead of assuming a framework-style
+  /// umbrella header named after the module.
+  std::string GeneratedHeaderUnderlyingModuleIncludeBase;
 
   /// All block list configuration files to be honored in this compilation.
   std::vector<std::string> BlocklistConfigFilePaths;

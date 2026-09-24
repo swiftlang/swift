@@ -9,11 +9,11 @@ import Builtin
 //
 // CHECK-LABEL: sil @preserve_bitwise_operands : $@convention(thin) () -> Builtin.Int32 {
 // CHECK:       bb0:
-// CHECK-NEXT:    debug_value undef : $Builtin.Int32, let, name "x", transform {
+// CHECK-NEXT:    debug_value (), let, name "x", transform {
 // CHECK:           %0 = integer_literal $Builtin.Int32, 1
 // CHECK:           return %0 : $Builtin.Int32
 // CHECK:         }
-// CHECK:         debug_value undef : $Builtin.Int32, let, name "y", transform {
+// CHECK:         debug_value (), let, name "y", transform {
 // CHECK:           %0 = integer_literal $Builtin.Int32, 2
 // CHECK:           return %0 : $Builtin.Int32
 // CHECK:         }
@@ -32,11 +32,11 @@ bb0:
 
 // CHECK-LABEL: sil @preserve_add_operands : $@convention(thin) () -> Builtin.Int32 {
 // CHECK:       bb0:
-// CHECK-NEXT:    debug_value undef : $Builtin.Int32, let, name "x", transform {
+// CHECK-NEXT:    debug_value (), let, name "x", transform {
 // CHECK:           %0 = integer_literal $Builtin.Int32, -1
 // CHECK:           return %0 : $Builtin.Int32
 // CHECK:         }
-// CHECK:         debug_value undef : $Builtin.Int32, let, name "y", transform {
+// CHECK:         debug_value (), let, name "y", transform {
 // CHECK:           %0 = integer_literal $Builtin.Int32, 2
 // CHECK:           return %0 : $Builtin.Int32
 // CHECK:         }

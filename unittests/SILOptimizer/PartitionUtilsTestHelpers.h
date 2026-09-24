@@ -81,6 +81,8 @@ struct MockedPartitionOpEvaluator final
 
   static SILLocation getLoc(Operand *) { return SILLocation::invalid(); }
 
+  static SILInstruction *getUser(Operand *) { return nullptr; }
+
   static SILIsolationInfo getIsolationInfo(const PartitionOp &) { return {}; }
 
   static SILInstruction *getSourceInst(const PartitionOp &) { return nullptr; }

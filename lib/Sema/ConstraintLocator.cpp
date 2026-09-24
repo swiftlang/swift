@@ -49,7 +49,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
   case ConstraintLocator::ConstructorMemberType:
-  case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalInjection:
@@ -110,12 +109,14 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackExpansionType:
   case ConstraintLocator::ThrownErrorType:
   case ConstraintLocator::FunctionSendability:
+  case ConstraintLocator::FunctionExecutionSemantics:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
   case ConstraintLocator::ExistentialMemberAccessConversion:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
+  case ConstraintLocator::FunctionYield:
   case ConstraintLocator::FunctionResult:
     return IsFunctionConversion;
 
@@ -215,12 +216,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "function argument";
     break;
 
-  case ConstraintLocator::FunctionResult:
-    out << "function result";
+  case ConstraintLocator::FunctionYield:
+    out << "function yield";
     break;
 
-  case ConstraintLocator::ResultBuilderBodyResult:
-    out << "result builder body result";
+  case ConstraintLocator::FunctionResult:
+    out << "function result";
     break;
 
   case ConstraintLocator::SequenceElementType:
@@ -524,6 +525,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "function sendability";
     break;
   }
+  case ConstraintLocator::FunctionExecutionSemantics: {
+    out << "function execution semantics";
+    break;
+  }
   case ConstraintLocator::FallbackType: {
     out << "fallback type";
     break;
@@ -683,10 +688,6 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
-bool ConstraintLocator::isForResultBuilderBodyResult() const {
-  return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
-}
-
 bool ConstraintLocator::isForMacroExpansion() const {
   return directlyAt<MacroExpansionExpr>();
 }
@@ -769,6 +770,10 @@ NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {
 
 bool ConstraintLocator::isForPatternMatch() const {
   return getPatternMatch() != nullptr;
+}
+
+bool ConstraintLocator::isForPatternDecl() const {
+  return isLastElement<LocatorPathElt::PatternDecl>();
 }
 
 bool ConstraintLocator::isForCollectionElement() const {

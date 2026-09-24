@@ -9,7 +9,16 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// Default code generation model
 // RUN: %target-swift-frontend -c -emit-module -o %t/Provider.o %t/Provider.swift -enable-experimental-feature Embedded -enable-experimental-feature CAttribute -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Consumer.o %t/Consumer.swift -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Provider.o %t/Consumer.o %t/Application.o -o %t/Application
+// RUN: %target-run %t/Application | %FileCheck %s
+
+// Provider built in the "interface" code-generation model — exercises the
+// SIL Linker on a cross-module reference whose body lives in another module.
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Provider.o %t/Provider.swift -enable-experimental-feature Embedded -enable-experimental-feature CAttribute -enable-experimental-feature CodeGenerationModel=interface -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Consumer.o %t/Consumer.swift -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Provider.o %t/Consumer.o %t/Application.o -o %t/Application

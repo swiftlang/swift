@@ -26,29 +26,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "OpenedExistentials.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSBindings.h"
 #include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 #define DEBUG_TYPE "CSLookahead"
 #include "llvm/Support/Debug.h"
@@ -738,11 +732,27 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
 
   auto PO = PrintOptions::forDebugging();
 
-  // The below only depends on the overload choices and argument types, so
-  // we can skip it if the argument type is already known.
+  // We skip pruning the disjunction if neither of these changed:
+  // 1) The simplified argument and result types at the call site.
+  // 2) In the case where the result type is a type variable, the generation
+  // number of that type variable's potential bindings.
+  //
+  // (Thus, disjunction pruning is only allowed to depend on those two things; the
+  // simplified type of the disjunction, and the potential bindings of the
+  // result.)
   auto newFuncType =
       cs.simplifyType(applicableFn->getFirstType())->castTo<FunctionType>();
-  if (newFuncType == argFuncType) {
+  auto newTypeVar =
+      newFuncType->getResult()->getAs<TypeVariableType>();
+  unsigned newGenerationNumber = 0;
+  if (newTypeVar) {
+    const auto &bindings = cs.getConstraintGraph()[newTypeVar].getPotentialBindings();
+    newGenerationNumber = bindings.GenerationNumber;
+  }
+
+  if (newFuncType == argFuncType &&
+      newTypeVar == resultTypeVar &&
+      newGenerationNumber == resultGenerationNumber) {
     ++NumDisjunctionsSkipped;
     LLVM_DEBUG(llvm::dbgs() << "No change: " << newFuncType->getString(PO) << "\n");
     if (verifyIncrementalDisjunctionPruning)
@@ -761,9 +771,13 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
   // saved type for the disjunction.
   if (cs.solverState) {
     cs.recordChange(
-      SolverTrail::Change::PrunedDisjunction(disjunction, argFuncType));
+      SolverTrail::Change::PrunedDisjunction(disjunction,
+                                             argFuncType,
+                                             resultGenerationNumber));
   }
   argFuncType = newFuncType;
+  resultTypeVar = newTypeVar;
+  resultGenerationNumber = newGenerationNumber;
 
   pruneDisjunction(cs, applicableFn, /*verify=*/false);
 }
@@ -875,13 +889,33 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
         if (paramFlags.isAutoClosure())
           paramType = paramType->castTo<FunctionType>()->getResult();
 
-        reason |= checkConversion(cs, argType, paramType, genericSig);
+        reason |= checkConversion(cs.CC, argType, paramType, genericSig);
       }
 
       auto overloadResultType = overloadType->getResult();
-      auto applyResultType = argFuncType->getResult();
-      reason |= checkConversion(cs, overloadResultType,
-                                applyResultType, genericSig);
+
+      // If the result of the applicable fn is a type variable, consider each
+      // potential subtype binding on this type variable. If any of them
+      // contradict the result type of this overload, we can prune the overload.
+      if (resultTypeVar != nullptr) {
+        const auto &node = cs.getConstraintGraph()[resultTypeVar];
+        const auto &bindings = node.getPotentialBindings();
+        ASSERT(bindings.GenerationNumber == resultGenerationNumber);
+
+        for (const auto &binding : bindings.Bindings) {
+          if (binding.Kind == inference::AllowedBindingKind::Subtypes) {
+            reason |= checkConversion(cs.CC, overloadResultType,
+                                      binding.BindingType,
+                                      genericSig);
+          }
+        }
+
+      // Otherwise, the result type is concrete. Check conversion directly.
+      } else {
+        reason |= checkConversion(cs.CC, overloadResultType,
+                                  argFuncType->getResult(),
+                                  genericSig);
+      }
 
       if (reason) {
         if (cs.isDebugMode()) {

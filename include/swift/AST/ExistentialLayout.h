@@ -21,7 +21,6 @@
 #ifndef SWIFT_EXISTENTIAL_LAYOUT_H
 #define SWIFT_EXISTENTIAL_LAYOUT_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 
@@ -29,6 +28,30 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolType;
   class ProtocolCompositionType;
+
+struct COMExistentialInterfaceResolution {
+  ProtocolDecl *interface = nullptr;
+
+  /// The first interface incomparable with \c interface in canonical order.
+  ///
+  /// Two interfaces are incomparable when neither refines the other and
+  /// therefore require distinct physical interface pointers.
+  ProtocolDecl *firstIncomparableInterface = nullptr;
+
+  /// The first non-marker Swift protocol, retained for diagnostics.
+  ProtocolDecl *firstNonMarkerProtocol = nullptr;
+
+  /// A compiler-managed COM identity protocol contained by the composition.
+  ProtocolDecl *identityProtocol = nullptr;
+
+  /// A resolution is invalid if there are incomparable interfaces, non-marker
+  /// Swift protocol conformances, or if there is an explicitly stated identity
+  /// protocol conformance.
+  bool isInvalid() const {
+    return firstIncomparableInterface || firstNonMarkerProtocol ||
+           identityProtocol;
+  }
+};
 
 struct ExistentialLayout {
   enum Kind { Class, Error, Opaque };
@@ -105,6 +128,13 @@ struct ExistentialLayout {
   /// Does this existential consist of an Error protocol only with no other
   /// constraints?
   bool isErrorExistential() const;
+
+  /// Resolve the most-dervied COM interface and any protocols that prevent this
+  /// existential layout from representing a single COM interface.
+  COMExistentialInterfaceResolution resolveCOMInterface() const;
+
+  /// Retrieve the single COM interface represented by a valid layout.
+  ProtocolDecl *getCOMInterface() const;
 
   ArrayRef<ProtocolDecl*> getProtocols() const & {
     return protocols;

@@ -1,26 +1,15 @@
 // RUN: %target-swift-ide-test -source-filename=x -print-module -print-implicit-attrs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -module-to-print=MemberInheritance -I %S/Inputs  \
-// RUN: | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
-// RUN: %target-swift-ide-test -source-filename=x -print-module -print-implicit-attrs \
-// RUN:   -cxx-interoperability-mode=default \
-// RUN:   -module-to-print=MemberInheritance -I %S/Inputs  \
-// RUN:   -enable-experimental-feature ForeignReferenceTypeInheritance \
-// RUN: | %FileCheck --check-prefixes=CHECK,CHECK-ON %s
-
-// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
+// RUN: | %FileCheck %s
 
 // CHECK: class ImmortalBase {
-// CHECK:  func get42() -> Int32
-// CHECK:  func getOverridden42() -> Int32
+// CHECK:  func get42() -> CInt
+// CHECK:  func getOverridden42() -> CInt
 // CHECK: }
-// CHECK-OFF: class Immortal {
-// CHECK-OFF:  func getOverridden42() -> Int32
-// CHECK-OFF:  func get42() -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class Immortal : ImmortalBase {
-// CHECK-ON:  override func getOverridden42() -> Int32
-// CHECK-ON: }
+// CHECK: class Immortal : ImmortalBase {
+// CHECK:  override func getOverridden42() -> CInt
+// CHECK: }
 
 // CHECK: class Immortal2 {
 // CHECK-NEXT: final func virtualMethod(_: HasDestructor)
@@ -28,194 +17,153 @@
 // CHECK: }
 
 // CHECK: class A1 {
-// CHECK:  final func virtualMethod() -> Int32
-// CHECK:  final func swiftFooRename() -> Int32
-// CHECK:  final func swiftBarRename() -> Int32
-// CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
+// CHECK:  final func virtualMethod() -> CInt
+// CHECK:  final func swiftFooRename() -> CInt
+// CHECK:  final func swiftBarRename() -> CInt
+// CHECK:  final func swiftParamsRename(a1 i: CInt) -> CInt
 // CHECK: }
 
-// CHECK-OFF: class B1 {
-// CHECK-OFF:  final func virtualMethod() -> Int32
-// CHECK-OFF:  final func swiftFooRename() -> Int32
-// CHECK-OFF:  final func swiftBarRename() -> Int32
-// CHECK-OFF:  final func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class B1 : A1 {
-// CHECK-ON:  final override func virtualMethod() -> Int32
-// CHECK-ON:  final override func swiftFooRename() -> Int32
-// CHECK-ON:  final override func swiftBarRename() -> Int32
-// CHECK-ON:  final override func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-ON: }
+// CHECK: class B1 : A1 {
+// CHECK:  final override func virtualMethod() -> CInt
+// CHECK:  final override func swiftFooRename() -> CInt
+// CHECK:  final override func swiftBarRename() -> CInt
+// CHECK:  final override func swiftParamsRename(a1 i: CInt) -> CInt
+// CHECK: }
 
-// CHECK-OFF: class B2 {
-// CHECK-OFF:   final func virtualMethod() -> Int32
-// CHECK-OFF:   final func swiftFooRename() -> Int32
-// CHECK-OFF:   final func swiftBarRename() -> Int32
-// CHECK-OFF:   final func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class B2 : A1 {
-// CHECK-ON:   final override func virtualMethod() -> Int32
-// CHECK-ON:   final override func swiftFooRename() -> Int32
-// CHECK-ON:   final override func swiftBarRename() -> Int32
-// CHECK-ON: }
+// CHECK: class B2 : A1 {
+// CHECK:   final override func virtualMethod() -> CInt
+// CHECK:   final override func swiftFooRename() -> CInt
+// CHECK:   final override func swiftBarRename() -> CInt
+// CHECK: }
 
-// CHECK-OFF: class C1 {
-// CHECK-OFF:  final func swiftFooRename() -> Int32
-// CHECK-OFF:  final func swiftBarRename() -> Int32
-// CHECK-OFF:  final func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-OFF:  final func virtualMethod() -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class C1 : B1 {
-// CHECK-ON:  final override func swiftFooRename() -> Int32
-// CHECK-ON:  final override func swiftBarRename() -> Int32
-// CHECK-ON:  final override func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-ON: }
+// CHECK: class C1 : B1 {
+// CHECK:  final override func swiftFooRename() -> CInt
+// CHECK:  final override func swiftBarRename() -> CInt
+// CHECK:  final override func swiftParamsRename(a1 i: CInt) -> CInt
+// CHECK: }
 
-// CHECK-OFF: class C2 {
-// CHECK-OFF:  final func virtualMethod() -> Int32
-// CHECK-OFF:  final func swiftFooRename() -> Int32
-// CHECK-OFF:  final func swiftBarRename() -> Int32
-// CHECK-OFF:  final func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class C2 : B1 {
-// CHECK-ON:  final override func virtualMethod() -> Int32
-// CHECK-ON:  final override func swiftFooRename() -> Int32
-// CHECK-ON:  final override func swiftBarRename() -> Int32
-// CHECK-ON:  final override func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK-ON: }
+// CHECK: class C2 : B1 {
+// CHECK:  final override func virtualMethod() -> CInt
+// CHECK:  final override func swiftFooRename() -> CInt
+// CHECK:  final override func swiftBarRename() -> CInt
+// CHECK:  final override func swiftParamsRename(a1 i: CInt) -> CInt
+// CHECK: }
 
 // CHECK: class A2 {
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  final func swiftFooRename() -> Int32
-// CHECK:  final func A2BarRename() -> Int32
-// CHECK:  final func swiftParamsRename(a2 i: Int32) -> Int32
+// CHECK:  final func swiftVirtualMethod() -> CInt
+// CHECK:  final func swiftFooRename() -> CInt
+// CHECK:  final func A2BarRename() -> CInt
+// CHECK:  final func swiftParamsRename(a2 i: CInt) -> CInt
 // CHECK: }
 
 // CHECK: class D1 {
-// CHECK:  final func virtualMethod() -> Int32
-// CHECK:  final func swiftFooRename() -> Int32
-// CHECK:  final func swiftBarRename() -> Int32
-// CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  final func A2BarRename() -> Int32
-// CHECK:  final func swiftParamsRename(a2 i: Int32) -> Int32
+// CHECK:  final func virtualMethod() -> CInt
+// CHECK:  final func swiftFooRename() -> CInt
+// CHECK:  final func swiftBarRename() -> CInt
+// CHECK:  final func swiftParamsRename(a1 i: CInt) -> CInt
+// CHECK:  final func swiftVirtualMethod() -> CInt
+// CHECK:  final func A2BarRename() -> CInt
+// CHECK:  final func swiftParamsRename(a2 i: CInt) -> CInt
 // CHECK: }
 
 // CHECK: class D2 {
-// CHECK:  final func swiftFooRename() -> Int32
+// CHECK:  final func swiftFooRename() -> CInt
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
-// CHECK:  final func virtualMethod() -> Int32
+// CHECK:  final func virtualMethod() -> CInt
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
-// CHECK:  final func swiftBarRename() -> Int32
+// CHECK:  final func swiftBarRename() -> CInt
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
-// CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
+// CHECK:  final func swiftParamsRename(a1 i: CInt) -> CInt
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
+// CHECK:  final func swiftVirtualMethod() -> CInt
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
-// CHECK:  final func A2BarRename() -> Int32
+// CHECK:  final func A2BarRename() -> CInt
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
-// CHECK:  final func swiftParamsRename(a2 i: Int32) -> Int32
+// CHECK:  final func swiftParamsRename(a2 i: CInt) -> CInt
 // CHECK: }
 
 // CHECK: class D3 {
-// CHECK:  final func virtualMethod() -> Int32
-// CHECK:  final func swiftFooRename() -> Int32
-// CHECK:  final func swiftBarRename() -> Int32
-// CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
+// CHECK:  final func virtualMethod() -> CInt
+// CHECK:  final func swiftFooRename() -> CInt
+// CHECK:  final func swiftBarRename() -> CInt
+// CHECK:  final func swiftParamsRename(a1 i: CInt) -> CInt
 // CHECK: }
 
 // CHECK: class D4 {
-// CHECK:  final func swiftFooRename() -> Int32
-// CHECK:  final func swiftBarRename() -> Int32
-// CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
-// CHECK:  final func virtualMethod() -> Int32
+// CHECK:  final func swiftFooRename() -> CInt
+// CHECK:  final func swiftBarRename() -> CInt
+// CHECK:  final func swiftParamsRename(a1 i: CInt) -> CInt
+// CHECK:  final func virtualMethod() -> CInt
 // CHECK: }
 
 // CHECK: struct ValueType {
-// CHECK:   func virtualMethod() -> Int32
-// CHECK:   func swiftRenameMethodBase() -> Int32
-// CHECK:   func renameMethodDerived() -> Int32
+// CHECK:   func virtualMethod() -> CInt
+// CHECK:   func swiftRenameMethodBase() -> CInt
+// CHECK:   func renameMethodDerived() -> CInt
 // CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
-// CHECK:   func pureVirtualMethod() -> Int32
+// CHECK:   func pureVirtualMethod() -> CInt
 // CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
-// CHECK:   func swiftPureRenameBase() -> Int32
+// CHECK:   func swiftPureRenameBase() -> CInt
 // CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
-// CHECK:   func pureRenameDerived() -> Int32
+// CHECK:   func pureRenameDerived() -> CInt
 // CHECK: }
 
 // CHECK: class DerivedFRTValueType {
-// CHECK:   final func virtualMethod() -> Int32
-// CHECK:   final func swiftRenameMethodBase() -> Int32
-// CHECK:   final func renameMethodDerived() -> Int32
-// CHECK:   final func pureVirtualMethod() -> Int32
-// CHECK:   final func swiftPureRenameBase() -> Int32
-// CHECK:   final func pureRenameDerived() -> Int32
+// CHECK:   final func virtualMethod() -> CInt
+// CHECK:   final func swiftRenameMethodBase() -> CInt
+// CHECK:   final func renameMethodDerived() -> CInt
+// CHECK:   final func pureVirtualMethod() -> CInt
+// CHECK:   final func swiftPureRenameBase() -> CInt
+// CHECK:   final func pureRenameDerived() -> CInt
 // CHECK: }
 
 // CHECK: class EmptyDerivedFRTValueType {
-// CHECK:   func virtualMethod() -> Int32
-// CHECK:   func swiftRenameMethodBase() -> Int32
-// CHECK:   func renameMethodDerived() -> Int32
+// CHECK:   func virtualMethod() -> CInt
+// CHECK:   func swiftRenameMethodBase() -> CInt
+// CHECK:   func renameMethodDerived() -> CInt
 // CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
-// CHECK:   func pureVirtualMethod() -> Int32
+// CHECK:   func pureVirtualMethod() -> CInt
 // CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
-// CHECK:   func swiftPureRenameBase() -> Int32
+// CHECK:   func swiftPureRenameBase() -> CInt
 // CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
-// CHECK:   func pureRenameDerived() -> Int32
+// CHECK:   func pureRenameDerived() -> CInt
 // CHECK: }
 
 // CHECK: struct DerivedValueType {
-// CHECK:   func virtualMethod() -> Int32
-// CHECK:   func swiftRenameMethodBase() -> Int32
-// CHECK:   func renameMethodDerived() -> Int32
-// CHECK:   func pureVirtualMethod() -> Int32
-// CHECK:   func swiftPureRenameBase() -> Int32
-// CHECK:   func pureRenameDerived() -> Int32
+// CHECK:   func virtualMethod() -> CInt
+// CHECK:   func swiftRenameMethodBase() -> CInt
+// CHECK:   func renameMethodDerived() -> CInt
+// CHECK:   func pureVirtualMethod() -> CInt
+// CHECK:   func swiftPureRenameBase() -> CInt
+// CHECK:   func pureRenameDerived() -> CInt
 // CHECK: }
 
 // CHECK: class AbstractFRT {
-// CHECK:   final func pureVirtualMethod() -> Int32
-// CHECK:   final func swiftPureRenameBase() -> Int32
-// CHECK:   final func pureRenameDerived() -> Int32
+// CHECK:   final func pureVirtualMethod() -> CInt
+// CHECK:   final func swiftPureRenameBase() -> CInt
+// CHECK:   final func pureRenameDerived() -> CInt
 // CHECK: }
 
-// CHECK-OFF: class DerivedAbstractFRT {
-// CHECK-OFF:   init()
-// CHECK-OFF:   final func pureVirtualMethod() -> Int32
-// CHECK-OFF:   final func swiftPureRenameBase() -> Int32
-// CHECK-OFF:   final func pureRenameDerived() -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class DerivedAbstractFRT : AbstractFRT {
-// CHECK-ON:   final override func pureVirtualMethod() -> Int32
-// CHECK-ON:   final override func swiftPureRenameBase() -> Int32
-// CHECK-ON:   final override func pureRenameDerived() -> Int32
-// CHECK-ON: }
+// CHECK: class DerivedAbstractFRT : AbstractFRT {
+// CHECK:   final override func pureVirtualMethod() -> CInt
+// CHECK:   final override func swiftPureRenameBase() -> CInt
+// CHECK:   final override func pureRenameDerived() -> CInt
+// CHECK: }
 
-// CHECK-OFF: class EmptyDerivedAbstractFRT {
-// CHECK-OFF:   final func pureVirtualMethod() -> Int32
-// CHECK-OFF:   final func swiftPureRenameBase() -> Int32
-// CHECK-OFF:   final func pureRenameDerived() -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class EmptyDerivedAbstractFRT : AbstractFRT {
-// CHECK-ON: }
+// CHECK: class EmptyDerivedAbstractFRT : AbstractFRT {
+// CHECK: }
 
 // CHECK: class BaseWithInitMethod {
-// CHECK:   func `init`() -> Int32
+// CHECK:   func `init`() -> CInt
 // CHECK: }
 
-// CHECK-OFF: class DerivedWithInitMethod {
-// CHECK-OFF:   func `init`() -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class DerivedWithInitMethod : BaseWithInitMethod {
-// CHECK-ON:   func `init`() -> Int32
-// CHECK-ON: }
+// CHECK: class DerivedWithInitMethod : BaseWithInitMethod {
+// CHECK:   func `init`() -> CInt
+// CHECK: }
 
 // CHECK: class RenamedBaseWithInitMethod {
-// CHECK:   func method() -> Int32
+// CHECK:   func method() -> CInt
 // CHECK: }
 
-// CHECK-OFF: class RenamedDerivedWithInitMethod {
-// CHECK-OFF:   func method() -> Int32
-// CHECK-OFF: }
-// CHECK-ON: class RenamedDerivedWithInitMethod : RenamedBaseWithInitMethod {
-// CHECK-ON: }
+// CHECK: class RenamedDerivedWithInitMethod : RenamedBaseWithInitMethod {
+// CHECK: }

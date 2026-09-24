@@ -19,12 +19,9 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ConstTypeInfo.h"
 #include "swift/AST/EvaluatorDependencies.h"
-#include "swift/AST/FileUnit.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/TinyPtrVector.h"
 

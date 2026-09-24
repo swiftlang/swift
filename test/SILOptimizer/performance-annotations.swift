@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -parse-as-library -target %target-swift-5.1-abi-triple -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_RawLayout
@@ -603,4 +603,9 @@ extension G where T == Int {
       takesGInt(self) // OK
     }
   }
+}
+
+@_noAllocation
+func testUntypedDeallocation(_ p: UnsafeMutableRawPointer) {
+    p.deallocate() // expected-error {{this code pattern can cause a deallocation}}
 }

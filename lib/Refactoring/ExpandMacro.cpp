@@ -12,7 +12,9 @@
 
 #include "ContextFinder.h"
 #include "RefactoringActions.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeRepr.h"
 
 using namespace swift::refactoring;
 
@@ -170,6 +172,155 @@ getMacroExpansionBuffers(SourceManager &sourceMgr, ResolvedCursorInfoPtr Info) {
   return {};
 }
 
+static NominalTypeDecl *findProtocolsAndNominal(
+    SourceManager &SM, ResolvedCursorInfoPtr cursorInfo,
+    llvm::SmallSetVector<ProtocolDecl *, 4> &derivedProtocols) {
+
+  // We should be somewhere here:
+  // extension T : SomeProtocol, ... { ... }
+  //                   ^
+  // or
+  // (struct|enum|class) T: SomeProtocol, ... { ... }
+  //                          ^
+  // Where `SomeProtocol` can be a regular protocol or a typealias.
+
+  SourceFile *containingSF = cursorInfo->getSourceFile();
+  if (!containingSF)
+    return nullptr;
+
+  SourceLoc loc = cursorInfo->getLoc();
+
+  auto entryContainingLoc =
+      [&](InheritedTypes inherited) -> std::optional<unsigned> {
+    for (auto i : inherited.getIndices()) {
+      auto *repr = inherited.getTypeRepr(i);
+      if (repr && SM.rangeContainsTokenLoc(repr->getSourceRange(), loc))
+        return i;
+    }
+    return std::nullopt;
+  };
+
+  auto collectProtocols = [&](InheritedTypes inherited) {
+    auto index = entryContainingLoc(inherited);
+    if (!index)
+      return false;
+
+    Type entryTy = inherited.getResolvedType(*index);
+    if (!entryTy || !entryTy->isExistentialType())
+      return false;
+
+    auto layout = entryTy->getExistentialLayout();
+    for (auto *protocol : layout.getProtocols()) {
+      // Only collect protocols that can be derived, so we don't have to resolve
+      // unnecessary conformances
+      if (!protocol->getKnownDerivableProtocolKind())
+        continue;
+      derivedProtocols.insert(protocol);
+    }
+    return !derivedProtocols.empty();
+  };
+
+  ContextFinder Finder(*containingSF, loc, [&](ASTNode N) {
+    auto *D = N.dyn_cast<Decl *>();
+    if (!D)
+      return false;
+    if (auto *ext = dyn_cast<ExtensionDecl>(D))
+      return entryContainingLoc(InheritedTypes(ext)).has_value();
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
+      return entryContainingLoc(InheritedTypes(nominal)).has_value();
+    return false;
+  });
+
+  Finder.resolve();
+
+  // Get innermost context using reverse
+  for (auto ctx : llvm::reverse(Finder.getContexts())) {
+    auto *D = ctx.dyn_cast<Decl *>();
+    if (auto *ext = dyn_cast_or_null<ExtensionDecl>(D)) {
+      if (collectProtocols(InheritedTypes(ext)))
+        return ext->getExtendedNominal();
+      break;
+    }
+    if (auto *nominal = dyn_cast_or_null<NominalTypeDecl>(D)) {
+      if (!isa<StructDecl>(D) && !isa<ClassDecl>(D) && !isa<EnumDecl>(D))
+        continue;
+      if (collectProtocols(InheritedTypes(nominal)))
+        return nominal;
+      break;
+    }
+  }
+  return nullptr;
+}
+
+static llvm::SmallSetVector<unsigned, 2>
+getDerivedConformancesExpansionBuffers(SourceManager &SM,
+                                       ResolvedCursorInfoPtr cursorInfo) {
+  // Make sure we only do the work if the `DeriveConformancesViaMacros`
+  // experimental feature is enabled. If not, then no conformance is derived
+  // using macros, so this is pointless.
+  auto *sf = cursorInfo->getSourceFile();
+  if (!sf)
+    return {};
+  if (!sf->getASTContext().LangOpts.hasFeature(
+          Feature::DeriveConformancesViaMacros))
+    return {};
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> derivedProtocols;
+
+  auto ty = findProtocolsAndNominal(SM, cursorInfo, derivedProtocols);
+  if (!ty)
+    return {};
+
+  llvm::SmallSetVector<unsigned, 2> bufferIDs;
+
+  auto registerProtocol = [&](ProtocolDecl *protocol) {
+    llvm::SmallVector<ProtocolConformance *, 2> conformances;
+    ty->lookupConformance(protocol, conformances);
+    for (auto *conformance : conformances) {
+      for (auto *requirement : protocol->getProtocolRequirements()) {
+        if (isa<AssociatedTypeDecl>(requirement))
+          continue;
+        auto *witness = conformance->getWitnessDecl(requirement);
+        if (!witness || !witness->isFromSyntheticMacroExpansion())
+          continue;
+        auto loc = witness->getStartLoc();
+        if (loc.isInvalid())
+          continue;
+        bufferIDs.insert(SM.findBufferContainingLoc(loc));
+      }
+    }
+  };
+
+  for (auto *derived : derivedProtocols) {
+    registerProtocol(derived);
+    for (auto *inherited : derived->getAllInheritedProtocols()) {
+      registerProtocol(inherited);
+    }
+  }
+  return bufferIDs;
+}
+
+static bool
+expandDerivedConformanceWitnesses(SourceManager &SM,
+                                  ResolvedCursorInfoPtr cursorInfo,
+                                  SourceEditConsumer &editConsumer) {
+  auto bufferIDs = getDerivedConformancesExpansionBuffers(SM, cursorInfo);
+  if (bufferIDs.empty())
+    return true;
+
+  SourceFile *containingSF = cursorInfo->getSourceFile();
+  if (!containingSF)
+    return true;
+
+  // Send all of the rewritten buffer snippets.
+  for (auto bufferID : bufferIDs) {
+    editConsumer.acceptMacroExpansionBuffer(SM, bufferID, containingSF,
+                                            /*adjustExpansion=*/true,
+                                            /*includeBufferName=*/true);
+  }
+  return false;
+}
+
 static bool expandMacro(SourceManager &SM, ResolvedCursorInfoPtr cursorInfo,
                         SourceEditConsumer &editConsumer,
                         bool adjustExpansion) {
@@ -210,6 +361,17 @@ bool RefactoringActionExpandMacro::isApplicable(ResolvedCursorInfoPtr Info,
 bool RefactoringActionExpandMacro::performChange() {
   return expandMacro(SM, CursorInfo, EditConsumer, /*adjustExpansion=*/false);
 }
+
+bool RefactoringActionExpandDerivedConformance::isApplicable(ResolvedCursorInfoPtr Info,
+                                                DiagnosticEngine &Diag) {
+  // Mirrors `RefactoringActionInlineMacro::isApplicable`
+  return !getDerivedConformancesExpansionBuffers(Diag.SourceMgr, Info).empty();
+}
+
+bool RefactoringActionExpandDerivedConformance::performChange() {
+  return expandDerivedConformanceWitnesses(SM, CursorInfo, EditConsumer);
+}
+
 
 bool RefactoringActionInlineMacro::isApplicable(ResolvedCursorInfoPtr Info,
                                                 DiagnosticEngine &Diag) {

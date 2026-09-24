@@ -315,6 +315,72 @@ class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(current_commit, self.commit_hash)
 
 
+class SchemeWithURLOverrideTestCase(scheme_mock.SchemeMockTestCase):
+    """
+    Test the per-repository clone URL overrides. 'repo1' is given overrides
+    pointing at its own mock remote, plus unusable overrides that must not be
+    selected; 'repo2' is always skipped, since it can only be cloned through
+    the (unusable) ssh clone pattern of the mock config.
+    """
+
+    UNUSABLE_URL = "file:///unusable/repo1"
+
+    def setUp(self):
+        super().setUp()
+        # The https clone pattern of the mock config points at the mock
+        # remotes, so this is a URL that can actually be cloned from.
+        self.usable_url = self.config["https-clone-pattern"] % "repo1"
+
+    def _clone_repo1_with_overrides(self, overrides, additional_flags=[]):
+        import json
+
+        self.config["repos"]["repo1"]["remote"].update(overrides)
+        with open(self.config_path, "w") as f:
+            json.dump(self.config, f)
+
+        self.call(
+            self.base_args
+            + [
+                "--clone",
+                "--skip-repository",
+                "repo2",
+                "--max-retries",
+                "0",
+            ]
+            + additional_flags
+        )
+        self.assertTrue(os.path.isdir(os.path.join(self.source_root, "repo1")))
+
+    def test_clone_with_url_override(self):
+        # A protocol-agnostic override is used for both protocols.
+        self._clone_repo1_with_overrides({"url": self.usable_url})
+
+    def test_clone_with_url_override_and_ssh(self):
+        self._clone_repo1_with_overrides({"url": self.usable_url}, ["--clone-with-ssh"])
+
+    def test_clone_with_https_url_override(self):
+        self._clone_repo1_with_overrides(
+            {"https-url": self.usable_url, "ssh-url": self.UNUSABLE_URL}
+        )
+
+    def test_clone_with_ssh_url_override(self):
+        self._clone_repo1_with_overrides(
+            {"ssh-url": self.usable_url, "https-url": self.UNUSABLE_URL},
+            ["--clone-with-ssh"],
+        )
+
+    def test_clone_with_ssh_url_override_wins_over_url(self):
+        self._clone_repo1_with_overrides(
+            {"ssh-url": self.usable_url, "url": self.UNUSABLE_URL},
+            ["--clone-with-ssh"],
+        )
+
+    def test_clone_with_https_url_override_wins_over_url(self):
+        self._clone_repo1_with_overrides(
+            {"https-url": self.usable_url, "url": self.UNUSABLE_URL}
+        )
+
+
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

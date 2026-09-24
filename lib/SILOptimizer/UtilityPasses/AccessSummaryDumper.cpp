@@ -11,10 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-dumper"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

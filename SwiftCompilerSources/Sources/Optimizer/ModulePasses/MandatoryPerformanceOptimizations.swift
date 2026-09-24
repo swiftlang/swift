@@ -31,15 +31,30 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   (moduleContext: ModulePassContext) in
 
   var worklist = FunctionWorklist()
+  // Types whose deinits have already been specialized, shared across the whole
+  // pass so that no aggregate is walked twice.
+  var handledDeinitTypes = Set<Type>()
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
-    worklist.addAllNonGenericFunctions(of: moduleContext)
+    worklist.addAllNonGenericFunctionsAndEmbeddedThunks(of: moduleContext)
+
+    // IRGen emits the value witnesses of a type's metadata, and the destroy
+    // witness calls the deinits of the type and its members. Those deinits must
+    // be fully specialized, because unspecialized generic functions take type
+    // metadata, which doesn't exist in embedded Swift. Seed the worklist with
+    // the specializations so that they get optimized like any other function.
+    //
+    // This covers types which are `@export(interface)`, whose metadata is
+    // emitted eagerly. The other things IRGen emits metadata for -- boxes and
+    // existentials -- are handled in `optimize` when their instructions are
+    // visited.
+    specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
-  optimizeFunctionsTopDown(using: &worklist, moduleContext)
+  optimizeFunctionsTopDown(using: &worklist, &handledDeinitTypes, moduleContext)
 
   // It's not required to set the perf_constraint flag on all functions in embedded mode.
   // Embedded mode already implies that flag.
@@ -49,11 +64,12 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
+                                      _ handledDeinitTypes: inout Set<Type>,
                                       _ moduleContext: ModulePassContext) {
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
       if context.loadFunction(function: f, loadCalleesRecursively: true) {
-        optimize(function: f, context, moduleContext, &worklist)
+        optimize(function: f, context, moduleContext, &worklist, &handledDeinitTypes)
       }
     }
 
@@ -63,6 +79,43 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
     removeMetatypeArgumentsInCallees(of: f, moduleContext)
 
     worklist.addCallees(of: f, moduleContext)
+  }
+}
+
+/// Creates specialized deinits for the non-copyable types whose metadata IRGen
+/// may emit, so that the destroy value witness can call a concrete deinit.
+private func specializeDeinitsOfEmittedMetadata(_ moduleContext: ModulePassContext,
+                                                _ handled: inout Set<Type>,
+                                                _ worklist: inout FunctionWorklist) {
+  // Any function works to answer type-lowering queries about these types; the
+  // types are fully concrete, so the answers don't depend on the context.
+  // Prefer a definition, but a declaration is enough to lower a concrete type.
+  guard let anyFunction = moduleContext.functions.first(where: { $0.isDefinition })
+                          ?? moduleContext.functions.first(where: { _ in true }) else {
+    return
+  }
+  for type in moduleContext.typesWithEmittedMetadata {
+    Optimizer.specializeDeinits(forType: type, in: anyFunction, handled: &handled,
+                                moduleContext) {
+      worklist.pushIfNotVisited($0)
+    }
+  }
+}
+
+/// Specializes the deinits of the non-copyable `type`, and of its stored
+/// properties and enum payloads, because IRGen is about to emit metadata for it.
+private func specializeDeinits(ofType type: Type,
+                               in function: Function,
+                               _ handled: inout Set<Type>,
+                               _ moduleContext: ModulePassContext,
+                               _ worklist: inout FunctionWorklist) {
+  let objectType = type.objectType
+  guard objectType.isMoveOnly, !handled.contains(objectType) else {
+    return
+  }
+  Optimizer.specializeDeinits(forType: objectType, in: function, handled: &handled,
+                              moduleContext) {
+    worklist.pushIfNotVisited($0)
   }
 }
 
@@ -82,7 +135,7 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist, _ handledDeinitTypes: inout Set<Type>) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
 
   // ObjectOutliner replaces calls to findStringSwitchCase with _findStringSwitchCaseWithCache, but this happens as a late SIL optimization,
@@ -104,6 +157,21 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         worklist.pushIfNotVisited($0)
       }
     }
+  }
+
+  // IRGen emits type metadata for a boxed or existential value, and for the
+  // destination of a checked cast. The destroy value witness of that metadata
+  // calls the type's deinit, which in embedded Swift has to be fully
+  // specialized first.
+  func specializeDeinitsOfMetadata(for type: Type) {
+    if context.options.enableEmbeddedSwift {
+      specializeDeinits(ofType: type, in: function, &handledDeinitTypes, moduleContext,
+                        &worklist)
+    }
+  }
+
+  func specializeDeinitsOfMetadata(forFormalType type: CanonicalType) {
+    specializeDeinitsOfMetadata(for: type.loweredType(in: function))
   }
 
   var changed = true
@@ -128,9 +196,27 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         }
       case let cast as UnconditionalCheckedCastInst:
         specializeVTable(for: cast.type, instruction: cast)
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
       case let cast as UncheckedRefCastInst:
         specializeVTable(for: cast.type, instruction: cast)
+
+      // The destination of a checked cast needs metadata for the runtime check.
+      case let cast as UnconditionalCheckedCastAddrInst:
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
+      case let cast as CheckedCastBranchInst:
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
+      case let cast as CheckedCastAddrBranchInst:
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
+
       case let kpi as KeyPathInst:
+        // In Embedded Swift, specialize the functions that are referenced
+        // by the key path.
+        if context.options.enableEmbeddedSwift,
+           context.specializeKeyPathInst(kpi) {
+          // `kpi` has been replaced and erased; the replacement is visited on
+          // the next simplification round.
+          return
+        }
         // In embedded Swift, IRGen may emit a `keypath` inst as an immortal
         // static object of a specific concrete `KeyPath` subclass (chosen
         // per the pattern's mutability/root kind).  IRGen requests the
@@ -150,6 +236,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
+          specializeDeinitsOfMetadata(for: initExRef.instance.type)
           for c in initExRef.conformances where c.isConcrete {
             specializeWitnessTable(for: c, moduleContext)
             worklist.addWitnessMethods(of: c, moduleContext)
@@ -158,9 +245,19 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let initExAddr as InitExistentialAddrInst:
         if context.options.enableEmbeddedSwift {
+          specializeDeinitsOfMetadata(for: initExAddr.formalConcreteType.loweredType(in: function))
           for c in initExAddr.conformances where c.isConcrete && !c.protocol.isMarkerProtocol {
             specializeWitnessTable(for: c, moduleContext)
             worklist.addWitnessMethods(of: c, moduleContext)
+          }
+        }
+
+      case let allocBox as AllocBoxInst:
+        // Metadata is emitted for the boxed type, and its destroy value witness
+        // calls that type's deinit.
+        if context.options.enableEmbeddedSwift {
+          for field in allocBox.type.getBoxFields(in: function) {
+            specializeDeinitsOfMetadata(for: field)
           }
         }
 
@@ -186,7 +283,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let iem as InitExistentialMetatypeInst:
         if iem.uses.ignoreDebugUses.isEmpty {
-          context.erase(instructionIncludingDebugUses: iem)
+          context.erase(instruction: iem)
         }
 
       case let fri as FunctionRefInst:
@@ -261,7 +358,8 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     return
   }
 
-  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions) {
+  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions,
+                  context) {
     if apply.inliningCanInvalidateStackNesting  {
       simplifyCtxt.notifyInvalidatedStackNesting()
     }
@@ -282,22 +380,36 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
   for inst in function.instructions {
     if let mt = inst as? MetatypeInst,
        mt.isTriviallyDeadIgnoringDebugUses {
-      context.erase(instructionIncludingDebugUses: mt)
+      context.erase(instruction: mt)
     }
   }
 }
 
-private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
+private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
+                          _ context: FunctionPassContext) -> Bool {
   if let beginApply = apply as? BeginApplyInst,
      !beginApply.canInline
   {
     return false
   }
 
+  // In embedded Swift, a non-final class conforming to a protocol via a
+  // protocol-extension default implementation gets a witness thunk that is
+  // generic over its (class-constrained) conforming type — the covariant-Self
+  // pattern, `<τ : ConcreteClass>`. We want to inline the default impl into
+  // such a thunk to strip the thunk's dependence on the still-generic default
+  // implementation. See the corresponding `return true` below.
+  let isEmbeddedGenericThunkCaller = context.options.enableEmbeddedSwift &&
+                                     apply.parentFunction.thunkKind == .thunk &&
+                                     apply.parentFunction.isGeneric
+
   guard callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) ||
         // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
         // in embedded swift.
         callee.thunkKind == .thunk ||
+        // Likewise, the default implementation we fold into an embedded generic
+        // witness thunk may not share the thunk's serialization kind.
+        isEmbeddedGenericThunkCaller ||
         // Force inlining transparent co-routines. This might be necessary if `-enable-testing` is turned on.
         (apply is BeginApplyInst && callee.isTransparent)
   else {
@@ -314,15 +426,16 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return true
   }
 
+  if callee.mayBindDynamicSelf {
+    // We don't support inlining a function that binds dynamic self, e.g. into a
+    // global-init function, because the caller cannot provide the self metadata
+    // for the cloner to rewrite the callee's references to.
+    return false
+  }
+
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true
-  }
-
-  if callee.mayBindDynamicSelf {
-    // We don't support inlining a function that binds dynamic self into a global-init function
-    // because the global-init function cannot provide the self metadata.
-    return false
   }
 
   if apply.parentFunction.isGlobalInitOnceFunction && (
@@ -336,6 +449,20 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   if apply.substitutionMap.isEmpty,
      let pathIntoGlobal = apply.resultIsUsedInGlobalInitialization(),
      alreadyInlinedFunctions.insert(PathFunctionTuple(path: pathIntoGlobal, function: callee)).inserted {
+    return true
+  }
+
+  // In Embedded Swift, inline the protocol-extension default implementation
+  // that a generic witness thunk dispatches to, when that default impl's
+  // own generic signature cannot be emitted in embedded Swift (e.g. it is
+  // generic over `<Self : Protocol>`).
+  // Folding it into the thunk removes the reference to the un-emittable generic
+  // callee; the thunk itself stays generic over the class-constrained type,
+  // which IRGen can emit.
+  if isEmbeddedGenericThunkCaller,
+     !callee.genericSignature.isEmpty,
+     !callee.genericSignature.canBeEmittedInEmbeddedSwift,
+     alreadyInlinedFunctions.insert(PathFunctionTuple(path: SmallProjectionPath(), function: callee)).inserted {
     return true
   }
 
@@ -491,6 +618,24 @@ extension FunctionWorklist {
     return
   }
 
+  /// Like `addAllNonGenericFunctions`, but also pulls in generic protocol
+  /// witness thunks whose signature satisfies the embedded-Swift rules.
+  /// These thunks aren't reachable via the usual "specialize callees of
+  /// non-generic functions" traversal, but their bodies may contain calls to
+  /// generic protocol-extension default implementations that MUST be inlined
+  /// away before IRGen sees them (otherwise the still-generic callee trips
+  /// `hasValidSignatureForEmbedded` in IRGen). Optimizing the thunk itself
+  /// gives the inliner a chance to fold in those default-impl calls.
+  mutating func addAllNonGenericFunctionsAndEmbeddedThunks(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions {
+      if !f.isGeneric {
+        pushIfNotVisited(f)
+      } else if f.thunkKind == .thunk && f.genericSignature.canBeEmittedInEmbeddedSwift {
+        pushIfNotVisited(f)
+      }
+    }
+  }
+
   mutating func addCallees(of function: Function, _ context: ModulePassContext) {
     for inst in function.instructions {
       switch inst {
@@ -503,6 +648,16 @@ extension FunctionWorklist {
       case let apply as ApplySite:
         if let callee = apply.referencedFunction {
           pushIfNotVisited(callee)
+        }
+      case let kpi as KeyPathInst:
+        // A key path pattern's accessor thunks are referenced by the pattern
+        // rather than by a `function_ref`, so they are invisible to the cases
+        // above. In embedded Swift they must still be optimized: after
+        // `specializeKeyPathInst` folds the substitutions into the pattern, the
+        // specialized thunk bodies can contain calls to the still-generic
+        // accessors they wrap, and those have to be specialized before IRGen.
+        if context.options.enableEmbeddedSwift {
+          kpi.visitReferencedFunctions { pushIfNotVisited($0) }
         }
       case let bi as BuiltinInst:
         switch bi.id {
@@ -552,6 +707,10 @@ extension FunctionWorklist {
                                                      visited: inout Set<Conformance>,
                                                      _ context: ModulePassContext)
   {
+    // If an associated type is an opaque result type the conformance is abstract. The witness
+    // methods of the underlying type's conformance still need to be optimized, because IRGen
+    // looks through the opaque type when it emits the witness table entry.
+    let conformance = conformance.lookingThroughOpaqueTypes(context)
     guard conformance.isConcrete,
           visited.insert(conformance).inserted
     else {
@@ -571,8 +730,8 @@ extension FunctionWorklist {
         break
       case .method(_, let witness):
         if let method = witness,
-           // A new witness table can still contain a generic function if the method couldn't be specialized for
-           // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+           // A witness table can still contain a generic function, even though it's not actually
+           // callable through the witness table.
            !method.isGeneric
         {
           pushIfNotVisited(method)

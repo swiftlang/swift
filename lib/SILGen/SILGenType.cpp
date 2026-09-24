@@ -20,7 +20,6 @@
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
-#include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -809,11 +808,9 @@ SILFunction *SILGenModule::emitProtocolWitness(
     genericEnv = nullptr;
   }
 
-  reqtSubstTy =
-    CanAnyFunctionType::get(genericSig,
-                            reqtSubstTy->getParams(),
-                            reqtSubstTy.getResult(),
-                            reqtSubstTy->getExtInfo());
+  reqtSubstTy = CanAnyFunctionType::get(
+      genericSig, reqtSubstTy->getParams(), reqtSubstTy.getYields(),
+      reqtSubstTy.getResult(), reqtSubstTy->getExtInfo());
 
   // Coroutine lowering requires us to provide these substitutions
   // in order to recreate the appropriate yield types for the accessor
@@ -1351,7 +1348,8 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
           .SILFnType;
   auto originalFn =
       SGF.emitClassMethodRef(loc, self.getValue(), original, originalTy);
-  auto originalConvention = SILFunctionConventions(originalTy, M);
+  auto originalConvention = SILFunctionConventions(
+      originalTy, SILAddressConventions::forFunction(SGF.F));
   assert(indirectErrors.size() == 0 &&
          "coroutine accessor with indirect error!?");
   SmallVector<SILValue> args;
@@ -1428,6 +1426,29 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
 }
 
+void SILGenModule::recordNonCopyableTypeWithEmittedMetadata(
+    NominalTypeDecl *nom) {
+  // Only in Embedded Swift, where the deinits reachable from a type's value
+  // witnesses have to be specialized before IRGen runs.
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  // A generic type's metadata is emitted per-specialization, so there is
+  // nothing to record for the generic declaration itself.
+  if (nom->isGenericContext())
+    return;
+
+  // Only `@export(interface)` types get their metadata emitted eagerly; the
+  // metadata of any other type is emitted lazily, and only if something
+  // actually needs it.
+  if (nom->getEffectiveCodeGenerationModel() != CodeGenerationModel::Interface)
+    return;
+
+  auto type = nom->getDeclaredInterfaceType()->getCanonicalType();
+  M.addNonCopyableTypeWithEmittedMetadata(
+      SILType::getPrimitiveObjectType(type));
+}
+
 namespace {
 
 /// An ASTVisitor for generating SIL from method declarations
@@ -1467,6 +1488,7 @@ public:
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
       if (!nom->canBeCopyable()) {
         SGM.emitNonCopyableTypeDeinitTable(nom);
+        SGM.recordNonCopyableTypeWithEmittedMetadata(nom);
       }
     }
 
@@ -1511,6 +1533,9 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce SIL");
+  }
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -1681,6 +1706,9 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce SIL");
+  }
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }

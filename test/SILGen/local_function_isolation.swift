@@ -107,7 +107,7 @@ actor AsyncDeferActor {
     // CHECK-LABEL: // $defer #1 () in AsyncDeferActor.foo()
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
     // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation15AsyncDeferActorC3fooyyYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed AsyncDeferActor) -> () {
-    // CHECK-NEXT: // %0 "self" // users: %2, %1
+    // CHECK-NEXT: // %0 "self"
     // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $AsyncDeferActor):
     defer {
       await test()
@@ -124,8 +124,8 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
   // CHECK-LABEL: // $defer #1 () in testAsyncDeferIsolatedParam(isolated:)
   // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
   // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaF6$deferL_yyYaF : $@convention(thin) @async (Int, @sil_isolated @guaranteed Optional<any Actor>) -> () {
-  // CHECK-NEXT: // %0 "x" // users: %10, %2
-  // CHECK-NEXT: // %1 "isolated" // users: %4, %3
+  // CHECK-NEXT: // %0 "x"
+  // CHECK-NEXT: // %1 "isolated"
   // CHECK-NEXT: bb0(%0 : @closureCapture $Int, %1 : @closureCapture @guaranteed $Optional<any Actor>):
   defer {
     await test()
@@ -141,7 +141,7 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
     // CHECK-LABEL: // $defer #1 () in closure #1 in testAsyncDeferIsolatedParam(isolated:)
     // CHECK-NEXT: // Isolation: global_actor. type: MainActor
     // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_6$deferL_yyYaF : $@convention(thin) @async (Int) -> () {
-    // CHECK-NEXT: // %0 "z" // users: %7, %1
+    // CHECK-NEXT: // %0 "z"
     // CHECK-NEXT: bb0(%0 : @closureCapture $Int):
     defer {
       await test()
@@ -155,8 +155,8 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
       // CHECK-LABEL: // $defer #1 () in inner #1 (isolated:) in closure #1 in testAsyncDeferIsolatedParam(isolated:)
       // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
       // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_5innerL_ACyADYi_tYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>, Int) -> () {
-      // CHECK-NEXT: // %0 "isolated" // users: %12, %4, %2
-      // CHECK-NEXT: // %1 "y" // users: %10, %3
+      // CHECK-NEXT: // %0 "isolated"
+      // CHECK-NEXT: // %1 "y"
       // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $Optional<any Actor>, %1 : @closureCapture $Int): 
       defer {
         await test()
@@ -164,7 +164,7 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
         // CHECK-LABEL: // $defer #1 () in $defer #1 () in inner #1 (isolated:) in closure #1 in testAsyncDeferIsolatedParam(isolated:)
         // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
         // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_5innerL_ACyADYi_tYaF6$deferL_yyYaFAFL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>) -> () {
-        // CHECK-NEXT: // %0 "isolated" // users: %2, %1
+        // CHECK-NEXT: // %0 "isolated"
         // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $Optional<any Actor>):
         defer {
           await test()

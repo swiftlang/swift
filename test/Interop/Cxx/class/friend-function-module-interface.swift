@@ -2,7 +2,7 @@
 
 // CHECK:       struct A {
 // CHECK-NEXT:    init()
-// CHECK-NEXT:    func memberInA(_ x: Int32)
+// CHECK-NEXT:    func memberInA(_ x: CInt)
 // CHECK-NEXT:  }
 // CHECK:       struct B {
 // CHECK-NEXT:    init()

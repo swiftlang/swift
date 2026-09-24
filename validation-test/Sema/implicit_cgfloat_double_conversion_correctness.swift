@@ -1,10 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-crash-on-valid-salvage
-// RUN: %target-typecheck-verify-swift -DSALVAGE -solver-disable-crash-on-valid-salvage
-// RUN: not --crash %target-typecheck-verify-swift -DSALVAGE -solver-enable-crash-on-valid-salvage
-
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -swift-version 5
 // REQUIRES: objc_interop
 
-// Note this cannot use a fake Foundation because it lacks required operator overloads
+// Note this cannot use the mock SDK Foundation because it lacks required
+// operator overloads
 
 import Foundation
 import CoreGraphics
@@ -127,22 +125,14 @@ func testLeadingDotAmbiguity() {
   func f16(_: CGFloat?, _: Double?) {}
 
   func test1(z: Double) {
-    f1(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-#if SALVAGE
+    f1(max(.x, z), max(.y, z))
     f2(max(.x, z), max(.y, z))
-#endif
-    f3(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-#if SALVAGE
+    f3(max(.x, z), max(.y, z))
     f4(max(.x, z), max(.y, z))
-#endif
-    f5(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-#if SALVAGE
+    f5(max(.x, z), max(.y, z))
     f6(max(.x, z), max(.y, z))
-#endif
-    f7(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-#if SALVAGE
+    f7(max(.x, z), max(.y, z))
     f8(max(.x, z), max(.y, z))
-#endif
     f9(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
     f10(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
     f11(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
@@ -154,12 +144,10 @@ func testLeadingDotAmbiguity() {
   }
 
   func test2(z: Double) {
-    f1(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f2(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-#if SALVAGE
+    f1(max(.y, z), max(.x, z))
+    f2(max(.y, z), max(.x, z))
     f3(max(.y, z), max(.x, z))
     f4(max(.y, z), max(.x, z))
-#endif
     f5(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f6(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f7(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
@@ -168,11 +156,73 @@ func testLeadingDotAmbiguity() {
     f10(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f11(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f12(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f13(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f14(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-#if SALVAGE
+    f13(max(.y, z), max(.x, z))
+    f14(max(.y, z), max(.x, z))
     f15(max(.y, z), max(.x, z))
     f16(max(.y, z), max(.x, z))
-#endif
   }
+}
+
+// Optional-to-optional conversion
+func optional_to_optional(x: CGFloat?) -> Double? {
+  return x
+}
+
+func test_joins_requiring_optional_to_optional_conversion(_ x1: Double, _ x2: CGFloat,
+                                                          _ y1: Double?, _ y2: CGFloat?) {
+  if x1 != y1 {}
+  if x1 != y2 {}
+  if x2 != y1 {}
+  if x2 != y2 {}
+
+  if y1 != x1 {}
+  if y1 != x2 {}
+  if y2 != x1 {}
+  if y2 != x2 {}
+}
+
+// Unapplied references to operators
+func test_unapplied_1(_ x: [CGFloat], y: Double) {
+  let _ = x.reduce(0, +) / y
+  let _ = x.reduce(0, *) / y
+  let _ = x.reduce(0, -) / y
+  let _ = x.reduce(0, /) / y
+}
+
+func test_unapplied_2(_ x: [Double], y: CGFloat) {
+  let _ = x.reduce(0, +) / y
+  let _ = x.reduce(0, *) / y
+  let _ = x.reduce(0, -) / y
+  let _ = x.reduce(0, /) / y
+}
+
+struct Blob {
+  let area: Double
+  let circumference: CGFloat
+}
+
+func test_unapplied_3(_ blobs: [Blob]) {
+  let _: Double = blobs.map(\.area).reduce(0, +)
+  let _: Double = blobs.map(\.area).reduce(0.0, +)
+
+  let _: CGFloat = blobs.map(\.area).reduce(0, +)
+  let _: CGFloat = blobs.map(\.area).reduce(0.0, +)
+
+  let _: Double = blobs.map(\.circumference).reduce(0, +)
+  let _: Double = blobs.map(\.circumference).reduce(0.0, +)
+
+  let _: CGFloat = blobs.map(\.circumference).reduce(0, +)
+  let _: CGFloat = blobs.map(\.circumference).reduce(0.0, +)
+
+  let _: Double = blobs.map { $0.area }.reduce(0, +)
+  let _: Double = blobs.map { $0.area }.reduce(0.0, +)
+
+  let _: CGFloat = blobs.map { $0.area }.reduce(0, +)
+  let _: CGFloat = blobs.map { $0.area }.reduce(0.0, +)
+
+  let _: Double = blobs.map { $0.circumference }.reduce(0, +)
+  let _: Double = blobs.map { $0.circumference }.reduce(0.0, +)
+
+  let _: CGFloat = blobs.map { $0.circumference }.reduce(0, +)
+  let _: CGFloat = blobs.map { $0.circumference }.reduce(0.0, +)
 }

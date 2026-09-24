@@ -14,6 +14,11 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -55,12 +60,149 @@ AvailabilityRestriction::getFixItDomainAndRange(const ASTContext &ctx) const {
 
 bool AvailabilityRestriction::isActiveForRuntimeQueries(
     const ASTContext &ctx) const {
-  if (getAttr().getPlatform() == PlatformKind::none)
+  auto platform = getAttr().getPlatform();
+  if (!platform)
     return true;
 
-  return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
+  return swift::isPlatformActive(*platform, ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
+}
+
+bool AvailabilityRestriction::emitNoteForDecl(const Decl *decl) const {
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // declarations, have no location; refer to the declaration instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(decl, diag);
+  };
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diagnose({diag::availability_marked_unavailable, decl})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diagnose({diag::availability_introduced_in_version, decl,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableObsolete:
+    diagnose({diag::availability_obsoleted, decl, domainAndRange.getDomain(),
+              domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::emitNoteForConformance(
+    const ExtensionDecl *ext, const RootProtocolConformance *rootConf) const {
+  auto &ctx = ext->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // extensions, have no location; refer to the extension instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(ext, diag);
+  };
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diagnose({diag::conformance_availability_marked_unavailable, type, proto})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diagnose({diag::conformance_availability_introduced_in_version, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()});
+    break;
+  case Reason::UnavailableObsolete:
+    diagnose({diag::conformance_availability_obsoleted, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
+  switch (getDomain().getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::Platform:
+    return false;
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+    switch (getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+      return false;
+    case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
+      return true;
+    }
+  }
+}
+
+StringRef AvailabilityRestriction::getDiagnosticDescription(
+    llvm::SmallString<64> &scratch, const ASTContext &ctx,
+    bool includeMessage) const {
+  auto domainAndRange = getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  llvm::raw_svector_ostream os(scratch);
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+  case Reason::UnavailableObsolete:
+  case Reason::UnavailableUnintroduced: {
+    os << "is unavailable";
+
+    if (!shouldHideDomainNameInDiagnostics())
+      os << " in " << domain.getNameForDiagnostics();
+
+    // Include the message from the `@available` attribute, if there is one.
+    if (includeMessage) {
+      EncodedDiagnosticMessage encodedMessage(getAttr().getMessage());
+      if (!encodedMessage.Message.empty())
+        os << ": " << encodedMessage.Message;
+    }
+    break;
+  }
+  case Reason::Unintroduced: {
+    os << "is only available in " << domain.getNameForDiagnostics();
+    if (domainAndRange.getRange().hasMinimumVersion())
+      os << " " << domainAndRange.getRange().getVersionString() << " or newer";
+    break;
+  }
+  case Reason::Deprecated:
+    llvm_unreachable("deprecation requires a different diagnostic");
+  }
+  return scratch.str();
 }
 
 void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
@@ -169,29 +311,31 @@ static bool canIgnoreRestrictionInUnavailableContexts(
   }
 }
 
-static bool
-shouldIgnoreRestrictionInContext(const Decl *decl,
-                                 const AvailabilityRestriction &restriction,
-                                 const AvailabilityContext &context,
-                                 const AvailabilityRestrictionFlags flags) {
-  if (!context.isUnavailable())
-    return false;
+/// Returns the domain for the target platform if \p restriction may be narrowed
+/// to apply to that domain when determining whether the restriction may be
+/// ignored in an unavailable context. Returns `std::nullopt` otherwise.
+static std::optional<AvailabilityDomain>
+getSubstituteDomainForRestriction(const AvailabilityRestriction &restriction,
+                                  const ASTContext &ctx) {
+  // Only narrow anyAppleOS availability restrictions.
+  if (!restriction.getDomain().contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS)))
+    return std::nullopt;
 
-  if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
-    return false;
-
-  // If the restriction's domain is a superset of the compilation's target
-  // availability domain, use the more specific target availability domain
-  // instead. This allows declarations that are @available(macOS, unavailable)
-  // to be used in contexts that are @available(macOSApplicationExtension,
-  // unavailable), for example.
-  auto &ctx = decl->getASTContext();
-  auto domain = restriction.getDomain();
   auto targetDomain = ctx.getTargetAvailabilityDomain();
-  if (domain.isSupersetOf(targetDomain))
-    domain = targetDomain;
 
-  return context.isUnavailableForDomain(domain);
+  // Don't narrow to an app extension domain. A module compiled with
+  // -application-extension cannot safely use declarations that are unavailable
+  // in the base platform domain.
+  if (auto platform = targetDomain.getPlatformKind()) {
+    if (auto basePlatform = basePlatformForExtensionPlatform(*platform))
+      targetDomain = AvailabilityDomain::forPlatform(*basePlatform);
+  }
+
+  if (restriction.getDomain().isSupersetOf(targetDomain))
+    return targetDomain;
+
+  return std::nullopt;
 }
 
 static std::optional<AvailabilityRestriction>
@@ -214,8 +358,10 @@ getDeprecationRestrictionForAttr(const Decl *decl,
   if (availableRange && availableRange->isKnownUnreachable())
     return std::nullopt;
 
-  if (attr.isUnconditionallyDeprecated())
-    return AvailabilityRestriction::deprecated(attr);
+  if (attr.isUnconditionallyDeprecated()) {
+    if (attr.getDomain().isUniversal() || availableRange)
+      return AvailabilityRestriction::deprecated(attr);
+  }
 
   auto &ctx = decl->getASTContext();
   if (auto deprecatedRange = attr.getDeprecatedRange(ctx)) {
@@ -224,12 +370,55 @@ getDeprecationRestrictionForAttr(const Decl *decl,
     if (includeSoftDeprecation)
       return AvailabilityRestriction::deprecated(attr);
 
-    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
-    if (deploymentRange && deploymentRange->isContainedIn(*deprecatedRange))
+    if (availableRange && availableRange->isContainedIn(*deprecatedRange))
       return AvailabilityRestriction::deprecated(attr);
   }
 
   return std::nullopt;
+}
+
+/// Returns true if \p restriction should not be reported for a reference to
+/// \p decl from \p context.
+static bool shouldIgnoreRestriction(const Decl *decl,
+                                    const AvailabilityRestriction &restriction,
+                                    const AvailabilityContext &context,
+                                    const AvailabilityRestrictionFlags flags) {
+  auto &ctx = decl->getASTContext();
+
+  // The caller may have opted out of diagnosing potential unavailability for
+  // some of the domains that the restriction could belong to.
+  if (restriction.getReason() ==
+      AvailabilityRestriction::Reason::Unintroduced) {
+    if (flags.contains(
+            AvailabilityRestrictionFlag::AllowUnintroducedInPlatformDomains) &&
+        restriction.getDomain().isPlatform())
+      return true;
+
+    if (flags.contains(AvailabilityRestrictionFlag::
+                           AllowUnintroducedAtOrBelowDeploymentRange)) {
+      auto domainAndRange = restriction.getDomainAndRange(ctx);
+      if (auto deploymentRange =
+              domainAndRange.getDomain().getDeploymentRange(ctx)) {
+        if (deploymentRange->isContainedIn(domainAndRange.getRange()))
+          return true;
+      }
+    }
+  }
+
+  // The remaining reasons to ignore a restriction all require the context of
+  // the reference to be unavailable.
+  if (!context.isUnavailable())
+    return false;
+
+  if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
+    return false;
+
+  auto domain = restriction.getDomain();
+  if (auto substituteDomain =
+          getSubstituteDomainForRestriction(restriction, ctx))
+    domain = *substituteDomain;
+
+  return context.isUnavailableForDomain(domain);
 }
 
 std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
@@ -278,7 +467,7 @@ std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
 
   auto restriction = getRestriction();
   if (restriction &&
-      shouldIgnoreRestrictionInContext(decl, *restriction, context, flags))
+      shouldIgnoreRestriction(decl, *restriction, context, flags))
     return std::nullopt;
 
   return restriction;

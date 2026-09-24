@@ -27,12 +27,14 @@
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 
+#include "ClassTypeInfo.h"
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenConcurrency.h"
 #include "GenDistributed.h"
 #include "GenEnum.h"
+#include "GenHeap.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenOpaque.h"
@@ -259,6 +261,44 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getIsBitwiseTakable(IGF, valueTy.first));
+    return;
+  }
+
+  case BuiltinValueKind::TypedAllocationID: {
+    (void)args.claimAll();
+    // The T.Type argument is dropped in SILGen; only its substitution
+    // (read via `substitutions` below) is needed here.
+    if (!IGF.IGM.isTypedAllocationAvailable()) {
+      IGF.IGM.error(Inst->getLoc().getSourceLoc(),
+                    "MemoryLayout.typedAllocationID requires Embedded Swift "
+                    "with typed allocation enabled");
+      out.add(llvm::ConstantInt::get(IGF.IGM.Int64Ty, 0));
+      return;
+    }
+    auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    SILType loweredTy = IGF.IGM.getLoweredType(boundTy);
+    std::optional<uint64_t> descriptor;
+    if (boundTy->getClassOrBoundGenericClass()) {
+      // For a class, describe the heap object.
+      auto &classTI = IGF.IGM.getTypeInfo(loweredTy).as<ClassTypeInfo>();
+      auto &classLayout = classTI.getClassLayout(
+          IGF.IGM, loweredTy, /*forBackwardDeployment=*/false);
+      descriptor =
+          classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, loweredTy);
+    } else {
+      SmallVector<SILType, 1> fieldTypes{loweredTy};
+      descriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes,
+                                                    /*isArray=*/false);
+    }
+    if (descriptor) {
+      out.add(llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor));
+    } else {
+      IGF.IGM.error(
+          Inst->getLoc().getSourceLoc(),
+          "cannot compute MemoryLayout.typedAllocationID for a "
+          "non-fixed-size type");
+      out.add(llvm::ConstantInt::get(IGF.IGM.Int64Ty, 0));
+    }
     return;
   }
 
@@ -632,6 +672,84 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Translate the alignment to a mask.
     auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
     IGF.emitDeallocRawCall(pointer, size, alignMask);
+    return;
+  }
+
+  case BuiltinValueKind::AllocRawTyped: {
+    auto size = args.claimNext();
+    auto align = args.claimNext();
+    // The T.Type argument is dropped in SILGen; only its substitution
+    // (read via `substitutions` below) is needed here.
+    // Translate the alignment to a mask.
+    auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
+    auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
+    llvm::Value *alloc;
+    if (auto descriptor = computeTypedMallocTypeDescriptor(
+            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+      auto descriptorConst =
+          llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
+      alloc = IGF.emitAllocRawTypedCall(size, alignMask, descriptorConst,
+                                        "builtin-allocRawTyped");
+    } else {
+      alloc = IGF.emitAllocRawCall(size, alignMask, "builtin-allocRaw");
+    }
+    out.add(alloc);
+    return;
+  }
+
+  case BuiltinValueKind::DeallocRawTyped: {
+    auto pointer = args.claimNext();
+    auto size = args.claimNext();
+    auto align = args.claimNext();
+    // The T.Type argument is dropped in SILGen; only its substitution
+    // (read via `substitutions` below) is needed here.
+    // Translate the alignment to a mask.
+    auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
+    auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
+    if (auto descriptor = computeTypedMallocTypeDescriptor(
+            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+      auto descriptorConst =
+          llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
+      IGF.emitDeallocRawTypedCall(pointer, size, alignMask, descriptorConst);
+    } else {
+      IGF.emitDeallocRawCall(pointer, size, alignMask);
+    }
+    return;
+  }
+
+  case BuiltinValueKind::AllocErrorBoxTyped: {
+    auto metadata = args.claimNext();
+    auto size = args.claimNext();
+    auto alignMask = args.claimNext();
+    // Fixed header layout: heap object header (metadata + refcount) followed
+    // by the error box's type pointer and error conformance pointer.
+    auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
+                                       rawPointerType, rawPointerType};
+    auto *typedMetadata =
+        IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+    auto *alloc = IGF.emitAllocObjectCall(
+        typedMetadata, size, alignMask,
+        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes),
+        "builtin-allocErrorBoxTyped");
+    out.add(IGF.Builder.CreateBitCast(alloc, IGF.IGM.Int8PtrTy));
+    return;
+  }
+
+  case BuiltinValueKind::DeallocErrorBoxTyped: {
+    auto pointer = args.claimNext();
+    auto size = args.claimNext();
+    auto alignMask = args.claimNext();
+    auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
+                                       rawPointerType, rawPointerType};
+    auto *object =
+        IGF.Builder.CreateBitCast(pointer, IGF.IGM.RefCountedPtrTy);
+    emitDeallocateHeapObject(
+        IGF, object, size, alignMask,
+        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes));
     return;
   }
 
@@ -1579,10 +1697,41 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskAddCancellationHandler:
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
   case BuiltinValueKind::TaskAddPriorityEscalationHandler: {
     auto func = args.claimNext();
     auto context = args.claimNext();
     out.add(emitBuiltinTaskAddHandler(IGF, Builtin.ID, func, context));
+    return;
+  }
+  case BuiltinValueKind::TaskCancellationScopePush: {
+    out.add(emitBuiltinTaskCancellationScopePush(IGF));
+    return;
+  }
+  case BuiltinValueKind::TaskCancellationScopePop: {
+    auto *record = args.claimNext();
+    emitBuiltinTaskCancellationScopePop(IGF, record);
+    return;
+  }
+  case BuiltinValueKind::TaskPushDeadline: {
+    // <C, I> (clock: borrowing C, instant: borrowing I) -> UnsafeRawPointer
+    //
+    // Under `borrowing` opaque-generic operands, SIL passes the values
+    // by address ($*C, $*I), which IRGen sees as raw `i8*` pointers.
+    // Metadata comes from the generic substitutions.
+    auto *clockPtr = args.claimNext();
+    auto *instantPtr = args.claimNext();
+    auto clockTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto instantTy = substitutions.getReplacementTypes()[1]->getCanonicalType();
+    auto *clockType = IGF.emitTypeMetadataRef(clockTy);
+    auto *instantType = IGF.emitTypeMetadataRef(instantTy);
+    out.add(emitBuiltinTaskPushDeadline(IGF, clockPtr, instantPtr,
+                                        clockType, instantType));
+    return;
+  }
+  case BuiltinValueKind::TaskPopDeadline: {
+    auto *record = args.claimNext();
+    emitBuiltinTaskPopDeadline(IGF, record);
     return;
   }
   case BuiltinValueKind::RemoveTaskLocalValue:

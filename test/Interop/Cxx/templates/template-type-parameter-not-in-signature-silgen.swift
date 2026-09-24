@@ -1,11 +1,5 @@
 // RUN: %target-swift-emit-silgen %s -cxx-interoperability-mode=default -I %S/Inputs \
 // RUN: | %FileCheck %s
-//
-// RUN: %target-swift-emit-silgen %s -cxx-interoperability-mode=default -I %S/Inputs \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
-// RUN: | %FileCheck %s
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 import TemplateTypeParameterNotInSignature
 

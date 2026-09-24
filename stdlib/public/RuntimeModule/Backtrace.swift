@@ -405,12 +405,16 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     var n = 0
     for frame in frames {
       lines.append("\(n)\t\(frame.description)")
+      let frameCount: Int
       switch frame {
         case let .omittedFrames(count):
-          n += count
+          frameCount = count
         default:
-          n += 1
+          frameCount = 1
       }
+
+      let (wrapped, overflow) = n.addingReportingOverflow(frameCount)
+      n = overflow ? Int.max : wrapped
     }
 
     if let images = images {

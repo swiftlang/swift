@@ -37,6 +37,9 @@ import WinSDK
 
 @main
 class SwiftMacroTestGen: SyntaxVisitor {
+  var classDecls: [String: ClassDeclSyntax] = [:]
+  var curClass: String? = nil
+
   static func main() {
     if CommandLine.argc < 2 {
       printError("missing module name (passed 0 arguments, expected 2)")
@@ -70,11 +73,17 @@ class SwiftMacroTestGen: SyntaxVisitor {
     if res.attributes.contains(where: { $0.isUnavailable }) {
       return .skipChildren
     }
-    let surroundingType = getParentType(res)
-    let isMutating = res.modifiers.contains(where: {
-      $0.name.tokenKind == .keyword(.mutating)
-    })
-    let selfParam = surroundingType.map { type in res.isClassMethod ? type.with(\.trailingTrivia, "") : TokenSyntax("self") }
+    let surroundingType = getParentType(res)?.trimmed
+    let isClass = surroundingType != nil && classDecls.keys.contains(surroundingType!.text)
+    let selfParam = surroundingType.flatMap { type in
+      if res.isClassMethod {
+        return type.with(\.trailingTrivia, "")
+      }
+      if isClass, type.text != curClass {
+        return .keyword(.super)
+      }
+      return nil
+    }
     res = createFunctionSignature(res)
     res =
       res
@@ -82,30 +91,30 @@ class SwiftMacroTestGen: SyntaxVisitor {
       .with(\.name, "call_\(res.name.withoutBackticks)")
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
     if let surroundingType {
-      if !res.isClassMethod {
-        res =
-          res
-          .with(
-            \.signature.parameterClause.parameters,
-            addSelfParam(
-              res.signature.parameterClause.parameters, surroundingType, selfParam!,
-              isMutating: isMutating)
-          )
-      }
+      let superKw = selfParam?.text == "super" ? "_super" : ""
+      let classmethod = res.isClassMethod ? "_classmethod" : ""
+      res.name = "\(res.name)_\(surroundingType)\(raw: superKw)\(raw: classmethod)"
       res =
         res
-        .with(\.leadingTrivia, "\n")
         .with(
           \.modifiers,
           res.modifiers.filter { modifier in
             switch modifier.name.tokenKind {
-            case .keyword(.mutating), .keyword(.open), .keyword(.class), .keyword(.final):
+            case .keyword(.open), .keyword(.class), .keyword(.final), .keyword(.public),
+              .keyword(.override):
               false
             default:
               true
             }
           }
         )
+      let origIndent = node.firstToken(viewMode: .sourceAccurate)!.indentationOfLine
+      res = res.with(\.leadingTrivia, "")
+      if isClass {
+        // filter out "final" above so that we can add it back unconditionally
+        res.modifiers.append(DeclModifierSyntax(name: .keyword(.final), trailingTrivia: .space))
+      }
+      res = res.indented(by: origIndent, indentFirstLine: true)
     }
     print(res)
     return .skipChildren
@@ -127,17 +136,75 @@ class SwiftMacroTestGen: SyntaxVisitor {
     return .skipChildren
   }
 
-  override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
-    if node.attributes.contains(where: { $0.isUnavailable }) {
+  class HasCallableFunction: SyntaxVisitor {
+    var hasCallableFunction = false
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+      if !node.attributes.contains(where: { $0.isUnavailable }) {
+        hasCallableFunction = true
+      }
       return .skipChildren
     }
+  }
+  func shouldVisit(_ node: DeclGroupSyntax) -> Bool {
+    guard !node.attributes.contains(where: { $0.isUnavailable }) else {
+      return false
+    }
+    let walker = HasCallableFunction(viewMode: .all)
+    walker.walk(node.memberBlock)
+    return walker.hasCallableFunction
+  }
+
+  func visitPreImpl(_ node: DeclGroupSyntax, type: TypeSyntaxProtocol) -> SyntaxVisitorContinueKind {
+    guard shouldVisit(node) else {
+      return .skipChildren
+    }
+    let keyword: TokenSyntax = .keyword(
+      .extension, leadingTrivia: Trivia(), trailingTrivia: node.introducer.trailingTrivia)
+    let attributes = node.attributes.filter({ !$0.trimmed.description.starts(with: "@_") })
+      .with(\.leadingTrivia, Trivia())
+      .with(\.trailingTrivia, .newline)
+    let e = ExtensionDeclSyntax(
+      leadingTrivia: .newline, attributes: attributes,
+      modifiers: node.modifiers.with(\.leadingTrivia, Trivia()), extensionKeyword: keyword,
+      extendedType: type,
+      memberBlock: MemberBlockSyntax(stringLiteral: "{"))
+    print(e)
     return .visitChildren
   }
-  override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
-    if node.attributes.contains(where: { $0.isUnavailable }) {
-      return .skipChildren
+  func visitPostImpl(_ node: DeclGroupSyntax) {
+    if shouldVisit(node) {
+      print("}")
     }
-    return .visitChildren
+  }
+
+  override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+    let ret = visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
+    if ret == .visitChildren {
+      classDecls[node.name.trimmed.text] = node
+      curClass = node.name.trimmed.text
+    }
+    return ret
+  }
+  override func visitPost(_ node: ClassDeclSyntax) {
+    if let parentName = node.inheritanceClause?.inheritedTypes.first,
+      let parentClass = classDecls[parentName.type.trimmed.description]
+    {
+      walk(parentClass.memberBlock)
+    }
+    curClass = nil
+    visitPostImpl(node)
+  }
+  override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+    visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
+  }
+  override func visitPost(_ node: StructDeclSyntax) {
+    visitPostImpl(node)
+  }
+  override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+    visitPreImpl(node, type: node.extendedType)
+  }
+  override func visitPost(_ node: ExtensionDeclSyntax) {
+    visitPostImpl(node)
   }
 
   func createFunctionSignature(_ f: FunctionDeclSyntax) -> FunctionDeclSyntax {
@@ -290,6 +357,9 @@ func getParentType(_ node: some SyntaxProtocol) -> TokenSyntax? {
   }
   if let classType = parent.as(ClassDeclSyntax.self) {
     return classType.name
+  }
+  if let extensionType = parent.as(ExtensionDeclSyntax.self) {
+    return TokenSyntax("\(raw: extensionType.extendedType.trimmedDescription)")
   }
   return getParentType(parent)
 }

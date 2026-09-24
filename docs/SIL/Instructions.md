@@ -2471,6 +2471,28 @@ Performs Objective-C method dispatch using `objc_msgSend()`.
 
 Objective-C method calls are never candidates for de-virtualization.
 
+### com_method
+
+```
+sil-instruction ::= 'com_method' sil-operand ',' sil-decl-ref ',' sil-type
+
+%method = com_method %self : $@opened(1, any P) Self, #P.method,
+    $@convention(com_method) (@guaranteed @opened(1, any P) Self) -> ()
+```
+
+Looks up an instance requirement in a COM interface's vtable. The receiver is
+an archetype constrained to the declaring interface or an interface that
+inherits from it; it may be a value or an address. Extension helpers do not
+occupy interface vtable slots and cannot be referenced by this instruction.
+
+The result is a context-free function with the `com_method` convention. A
+lookup does not consume its receiver. The receiver remains the final SIL
+argument when applying the resulting function.
+
+The lookup carries type-dependent operands for opened archetypes in both its
+receiver type and its result type. A generic callee type can omit the receiver's
+opened archetype, so the result type alone does not determine these dependencies.
+
 ### super_method
 
 ```
@@ -4098,6 +4120,22 @@ pointer can be used with any operation on archetypes, such as
 [witness_method](#witness_method). When the operand is of metatype type,
 the result will be the metatype of the opened archetype.
 
+### open_com_existential
+
+```
+sil-instruction ::= 'open_com_existential' sil-operand 'to' sil-type
+
+%1 = open_com_existential %0 : $any P to $@opened(1, any P) Self
+```
+
+Opens a COM existential value as a fresh archetype with the same interface
+constraints. Both operand and result are object values. The result preserves
+the existential's interface-pointer representation and forwards ownership of
+the operand. It is a nontrivial, loadable value, not a Swift class reference.
+
+The instruction defines the opened archetype for subsequent instructions in
+the function. Cloning an opening creates a fresh archetype and remaps its uses.
+
 ### init_existential_metatype
 
 ```
@@ -4329,7 +4367,7 @@ pack type. The value of the instruction has type `Builtin.Word`.
 ### open_pack_element
 
 ```
-sil-instruction ::= 'open_pack_element' sil-value 'of' generic-parameter-list+ 'at' sil-apply-substitution-list ',' 'shape' sil-type ',' 'uuid' string-literal
+sil-instruction ::= 'open_pack_element' sil-value 'of' generic-parameter-list+ 'at' sil-apply-substitution-list ',' 'shape' sil-type ',' 'id' integer
 ```
 
 Binds one or more opened pack element archetypes in the local type
@@ -4343,12 +4381,11 @@ The `shape` type operand is resolved in the context of the
 generalization signature. It must name a pack parameter. Archetypes will
 be bound for all pack parameters with the same shape as this parameter.
 
-The `uuid` operand must be an RFC 4122 UUID string, which is composed of
-32 hex digits separated by hyphens in the pattern `8-4-4-4-12`. There
-must not be any other `open_pack_element` instruction with this UUID in
-the SIL function. Opened pack element archetypes are identified by this
-UUID and are different from any other opened pack element archetypes in
-the function, even if the operands otherwise match exactly.
+The `id` operand must be an unsigned integer. There must not be any other
+`open_pack_element` instruction with this ID in the SIL module. Opened
+pack element archetypes are identified by this ID and are different from
+any other opened pack element archetypes anywhere else, even if the
+operands otherwise match exactly.
 
 The value operand is the pack index and must be the result of a pack
 indexing instruction.
@@ -4630,7 +4667,7 @@ does not have ownership semantics. It is undefined behavior to cast a
 ### raw_pointer_to_ref
 
 ```
-sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
+sil-instruction ::= 'raw_pointer_to_ref' '[immortal]'? sil-operand 'to' sil-type
 
 %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
 // $C must be a class type, or Builtin.NativeObject, or AnyObject
@@ -4644,6 +4681,14 @@ ownership semantics for the object on its own). It is undefined behavior
 to cast a `RawPointer` to a type unrelated to the dynamic type of the
 heap object. It is also undefined behavior to cast a `RawPointer` from
 an address to any heap object type.
+
+The `immortal` flag means that the resulting object is immortal, i.e. it is
+never deallocated and therefore doesn't need to be retained or released. In
+OSSA the result of an `immortal` `raw_pointer_to_ref` has `none` ownership,
+whereas the result of a non-`immortal` `raw_pointer_to_ref` is `owned` - the
+instruction "creates" a new reference which must be consumed exactly once.
+Accordingly, lowering out of OSSA inserts a
+[strong_retain](#strong_retain) after a non-`immortal` `raw_pointer_to_ref`.
 
 ### ref_to_unowned
 
@@ -4983,17 +5028,21 @@ ownership are unsupported.
 ```
 sil-instruction ::= 'unconditional_checked_cast_addr'
                     sil-prohibit-isolated-conformances?
+                    '[copy]'?
                     sil-type 'in' sil-operand 'to'
                     sil-type 'in' sil-operand
 
-unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
-// $A and $B must be both addresses
-// %1 will be of type $*B
-// $A is destroyed during the conversion. There is no implicit copy.
+unconditional_checked_cast_addr A in %0 : $*A to B in %1 : $*B
+// %0 and %1 must both be addresses.
+// Without [copy], %0 is consumed during the conversion.
+// With [copy], %0 remains initialized and is not consumed.
 ```
 
-Performs a checked indirect conversion, causing a runtime failure if the
-conversion fails.
+Performs a checked indirect conversion, initializing the destination on success
+and causing a runtime failure if the conversion fails. The destination must be
+uninitialized. By default, the source value is consumed. `[copy]` preserves
+it and produces an independently owned destination value. Both forms
+terminate execution on failure rather than continuing along a failure edge.
 
 ## Runtime Failures
 
@@ -5173,25 +5222,16 @@ destination basic block.
 ### cond_br
 
 ```
-sil-terminator ::= 'cond_br' sil-operand ','
-                     sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
-                     sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
+sil-terminator ::= 'cond_br' sil-operand ',' sil-identifier ',' sil-identifier
 
-cond_br %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), 
-                               false_label (%x : $X, %y : $Y, ...)
+cond_br %0 : $Builtin.Int1, true_label, false_label
 // %0 must be of $Builtin.Int1 type
 // `true_label` and `false_label` must refer to block labels within the
 //   current function and must not be identical
-// %a, %b, etc. must be of the types of `true_label`'s arguments
-// %x, %y, etc. must be of the types of `false_label`'s arguments
 ```
 
 Conditionally branches to `true_label` if `%0` is equal to `1` or to
-`false_label` if `%0` is equal to `0`, binding the corresponding set of
-values to the arguments of the chosen destination block.
-
-In OSSA, `cond_br` must not have any arguments because in OSSA critical control
-flow edges are not allowed.
+`false_label` if `%0` is equal to `0`.
 
 ### switch_value
 
@@ -5395,22 +5435,44 @@ sil-terminator ::= 'checked_cast_addr_br'
                     sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
-                    sil-stype 'in' sil-operand ','
+                    sil-stype ('in' sil-operand)? ','
                     sil-identifier ',' sil-identifier
 sil-cast-consumption-kind ::= 'take_always'
 sil-cast-consumption-kind ::= 'take_on_success'
 sil-cast-consumption-kind ::= 'copy_on_success'
+sil-cast-consumption-kind ::= 'test_only'
 
 checked_cast_addr_br take_always $A in %0 : $*@thick A to $B in %2 : $*@thick B, bb1, bb2
 // $A and $B must be both address types
 // bb1 must take a single argument of type $*B
 // bb2 must take no arguments
+
+checked_cast_addr_br test_only $A in %0 : $*@thick A to $B, bb1, bb2
+// A 'test_only' cast has no destination operand
 ```
 
 Performs a checked indirect conversion from `$A` to `$B`. If the
 conversion succeeds, control is transferred to `bb1`, and the result of
 the cast is left in the destination. If the conversion fails, control is
 transferred to `bb2`.
+
+The consumption kind describes what happens to the source operand:
+`take_always` consumes it whether or not the cast succeeds, `take_on_success`
+consumes it only on success, and `copy_on_success` leaves it in place and copies
+into the destination on success.
+
+`test_only` is different in kind: it reports only whether the conversion would
+have succeeded, and produces **no destination value at all**. The source is
+neither taken nor copied, and the instruction carries no destination operand, so
+it names only the target type. `CheckedCastAddrBranchInst::getDest()` returns an
+invalid `SILValue` for it, and `hasDest()` says so up front; code that reads the
+destination of a cast must check.
+
+`test_only` exists because some values cannot answer a cast question any other
+way. Producing the result of the cast would copy a payload whose type forbids
+copying, and taking it would destroy the very value being asked about — so
+neither `copy_on_success` nor `take_on_success` can implement `is` or
+`case is T` on a non-`Copyable` existential.
 
 ### try_apply
 
@@ -5663,6 +5725,22 @@ consumed at most once. If the marker is `no_consume_or_assign`, then the
 move checker will validate that the result of this instruction is never
 consumed or assigned over.
 
+### end_formal_scope
+
+```
+sil-instruction ::= 'end_formal_scope' sil-operand
+
+end_formal_scope %0 : $T
+```
+
+`end_formal_scope` is a marker that corresponds to the end of the formal
+scope of a local variable as written in source code. This does not necessarily
+indicate the end of the bound value's lifetime, since it could be consumed prior
+to the end of the variable binding, or it could be moved somewhere else, but
+the marker serves to provide barriers for the diagnostic passes that establish
+value lifetimes so that, for instance, dependent values do not extend a variable
+value outside of its original scope.
+
 ## No Implicit Copy and No Escape Value Instructions
 
 ### copyable_to_moveonlywrapper
@@ -5818,15 +5896,19 @@ location.
 The result `%borrow` has a lifetime dependency on the borrow stored
 at the memory location `%target`.
 
-### dereference_addr_borrow
+### dereference_borrow_addr
 
 ```none
-sil-instruction ::= 'dereference_addr_borrow' sil-value
+sil-instruction ::= 'dereference_borrow_addr' sil-value
 
-%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+%target: $*T = dereference_borrow_addr %borrow: $*Builtin.Borrow<T>
 ```
 
 Returns the address of the value referenced by a `Builtin.Borrow`.
+
+It takes the borrow operand indirectly by address, by contrast
+with `dereference_addr_borrow` below, which projects an address
+from a borrow value.
 
 ### init_borrow_addr
 
@@ -5850,7 +5932,8 @@ sil-instruction ::= 'dereference_addr_borrow' sil-value
 %target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
 ```
 
-Returns the address of the value referenced by a `Builtin.Borrow` in memory.
+Returns the address of the value referenced by a `Builtin.Borrow`, projecting
+it from the borrow value directly rather than from a borrow in memory.
 
 
 ## Miscellaneous instructions

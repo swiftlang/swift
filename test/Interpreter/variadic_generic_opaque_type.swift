@@ -7,6 +7,11 @@
 // RUN: %target-codesign %t/main.out
 //
 // RUN: %target-run %t/main.out %t/%target-library-name(variadic_generic_opaque_type_other)
+//
+// RUN: %target-build-swift %s -Xfrontend -enable-sil-opaque-values -I %t -o %t/main-opaque-values.out -L %t %target-rpath(%t) -lvariadic_generic_opaque_type_other
+// RUN: %target-codesign %t/main-opaque-values.out
+//
+// RUN: %target-run %t/main-opaque-values.out %t/%target-library-name(variadic_generic_opaque_type_other)
 
 // REQUIRES: executable_test
 

@@ -5,6 +5,7 @@ add_swift_host_library(swiftSema STATIC
   BindingProducer.cpp
   BuilderTransform.cpp
   Comment.cpp
+  ConformanceCache.cpp
   CSApply.cpp
   CSBindings.cpp
   CSDisjunction.cpp
@@ -64,6 +65,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckCaptures.cpp
   TypeCheckCircularity.cpp
   TypeCheckCodeCompletion.cpp
+  TypeCheckCOM.cpp
   TypeCheckConcurrency.cpp
   TypeCheckDistributed.cpp
   TypeCheckConstraints.cpp
@@ -78,6 +80,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckFullyInhabited.cpp
   TypeCheckGeneric.cpp
   TypeCheckInvertible.cpp
+  TypeCheckIsolatedConformance.cpp
   TypeCheckMacros.cpp
   TypeCheckNameLookup.cpp
   TypeCheckPattern.cpp

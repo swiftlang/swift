@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -21,12 +20,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -254,10 +247,10 @@ static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
     return doOperandsAlias(BI->getAllOperands(), Ptr, AA);
   }
 
-  if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
-    bool First = doOperandsAlias(CBI->getTrueOperands(), Ptr, AA);
-    bool Second = doOperandsAlias(CBI->getFalseOperands(), Ptr, AA);
-    return First || Second;
+  if (isa<CondBranchInst>(TI)) {
+    // A cond_br only uses its Int1 condition operand and passes no branch
+    // arguments, so it never uses a reference-counted value.
+    return false;
   }
 
   if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI)) {

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -21,7 +20,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 
@@ -567,12 +565,6 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 
       // We must avoid that we are going to change a block twice.
       if (BlocksToEdit.contains(PredBB))
-        return false;
-
-      // Don't allow critical edges from PredBB to BB. This ensures that
-      // splitAllCriticalEdges() will not invalidate our predecessor lists.
-      if (!BB->getSinglePredecessorBlock() &&
-          !PredBB->getSingleSuccessorBlock())
         return false;
 
       SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();

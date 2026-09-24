@@ -1395,8 +1395,9 @@ extension Array: RangeReplaceableCollection {
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
-    }
-    else if _buffer.isMutableAndUniquelyReferenced() {
+    } else if self.isEmpty {
+      return
+    } else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
     }
     else {
@@ -1531,41 +1532,6 @@ extension Array {
     )
   }
 #endif
-
-  /// Implementation for:
-  /// Array(unsafeUninitializedCapacity:initializingWith:)
-  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
-  @export(implementation)
-  internal init<E: Error>(
-    _unsafeUninitializedCapacity: Int,
-    initializingWithTypedThrowsInitializer initializer: (
-      _ buffer: inout UnsafeMutableBufferPointer<Element>,
-      _ initializedCount: inout Int
-    ) throws(E) -> Void
-  ) throws(E) {
-    var firstElementAddress: UnsafeMutablePointer<Element>
-    unsafe (self, firstElementAddress) =
-      unsafe Array._allocateUninitialized(_unsafeUninitializedCapacity)
-
-    var initializedCount = 0
-    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: _unsafeUninitializedCapacity)
-    defer {
-      // Update self.count even if initializer throws an error.
-      _precondition(
-        UInt(truncatingIfNeeded: initializedCount) <=
-        UInt(truncatingIfNeeded: _unsafeUninitializedCapacity),
-        "Initialized count must be in 0 ... _unsafeUninitializedCapacity."
-      )
-      unsafe _precondition(
-        buffer.baseAddress == firstElementAddress,
-        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
-      )
-      self._buffer.mutableCount = initializedCount
-      _endMutation()
-    }
-    try unsafe initializer(&buffer, &initializedCount)
-  }
 
   /// Creates an array with the specified capacity, and then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
@@ -1764,13 +1730,13 @@ extension Array {
         let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
         let pointer = unsafe buffer.firstElementAddress
         let count = buffer.immutableCount
-        let span = unsafe Span(_unsafeStart: pointer, count: count)
+        let span = unsafe Span(_unchecked: pointer, count: count)
         return unsafe _overrideLifetime(span, borrowing: self)
       }
 #endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.immutableCount
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      let span = unsafe Span(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -1896,7 +1862,7 @@ extension Array {
 #endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.mutableCount
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      let span = unsafe MutableSpan(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }

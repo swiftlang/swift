@@ -91,9 +91,11 @@ bool emitSuccessfulIndirectUnconditionalCast(
 bool emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, SILLocation loc,
                                              SILDynamicCastInst dynamicCast);
 
-/// Can the given cast be performed by the scalar checked-cast instructions in
-/// the current SIL stage, or do we need to use the indirect instructions?
+/// Can the given cast be performed by the scalar checked-cast instructions for
+/// a function with the given lowered-address state, or do we need to use the
+/// indirect instructions?
 bool canSILUseScalarCheckedCastInstructions(SILModule &M,
+                                            bool loweredAddresses,
                                             CanType sourceType,
                                             CanType targetType);
 
@@ -211,8 +213,11 @@ public:
     // checked_cast_value_br yet. Should we ever support it, please
     // review this code.
     case SILDynamicCastKind::CheckedCastBranchInst:
-    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return CastConsumptionKind::TakeAlways;
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->isCopy()
+                 ? CastConsumptionKind::CopyOnSuccess
+                 : CastConsumptionKind::TakeAlways;
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return CastConsumptionKind::CopyOnSuccess;
     }
@@ -303,7 +308,9 @@ public:
     llvm_unreachable("covered switch");
   }
 
-  // Returns the success value.
+  // Returns the success value. Invalid if the cast produces no value, which
+  // is the case for `checked_cast_addr_br test_only` as well as the two scalar
+  // forms below.
   SILValue getDest() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
@@ -367,7 +374,7 @@ public:
   SILType getTargetLoweredType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      return cast<CheckedCastAddrBranchInst>(inst)->getDest()->getType();
+      return cast<CheckedCastAddrBranchInst>(inst)->getTargetLoweredType();
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getTargetLoweredType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -465,7 +472,8 @@ public:
 
   bool canSILUseScalarCheckedCastInstructions() const {
     return swift::canSILUseScalarCheckedCastInstructions(
-        getModule(), getSourceFormalType(), getTargetFormalType());
+        getModule(), getFunction()->hasLoweredAddresses(),
+        getSourceFormalType(), getTargetFormalType());
   }
 
   CheckedCastInstOptions getCheckedCastOptions() const {

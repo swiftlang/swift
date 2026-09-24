@@ -32,6 +32,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
   list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
 endif()
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+
+  # We lazy link these libraries to avoid loading them unnecessarily, and upward
+  # link to indicate that this shouldn't be considered part of a dependency
+  # cycle.
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy-lswiftObjectiveC")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward-lswiftObjectiveC")
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -83,6 +97,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
   set(swiftDemanglingSources
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Ownership.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
@@ -91,9 +106,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
-  set(swiftDemanglingCRSources
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
-
   set(swift_demangling_cflags)
 
   if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
@@ -125,13 +137,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
       ${swift_demangling_cflags}
     C_COMPILE_FLAGS_LINUX -fno-lto
     INSTALL_IN_COMPONENT never_install)
-
-  add_swift_target_library(swiftDemanglingCR OBJECT_LIBRARY
-    ${swiftDemanglingCRSources}
-    C_COMPILE_FLAGS
-      -DswiftCore_EXPORTS
-      ${swift_demangling_cflags}
-    INSTALL_IN_COMPONENT never_install)
 endif()
 
 option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
@@ -145,6 +150,37 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
 option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
        "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
        FALSE)
+
+set(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    built using the platform abstraction layer (hooks in
+    swift/EmbeddedPlatform.h). This is the per-triple analogue of
+    SWIFT_USE_SWIFT_EMBEDDED_PLATFORM (which turns the abstraction layer on
+    for every embedded triple); the two are OR'd together, so a triple
+    uses the abstraction layer when either the global option is TRUE or the
+    regex matches.")
+
+set(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    built using the Interface code-generation model. Their libraries' object
+    files contain real code (rather than the empty/stub objects produced for
+    the default Inlinable model), and clients reference the library's strong
+    external symbols instead of re-emitting `linkonce_odr` copies. Because
+    those archives are what clients link against, they are installed into
+    lib/swift/embedded/<triple>/ alongside the swiftmodules.")
+
+set(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    compiled with LLVM LTO (-lto=<type>). This is orthogonal to
+    SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX — enabling LTO on
+    triples that still use the default (empty-object-file) code-generation
+    model is harmless but produces no meaningful bitcode; you almost always
+    want to select the same triple set for both.")
+
+set(SWIFT_EMBEDDED_LTO_TYPE "llvm-full" CACHE STRING
+    "LTO type for embedded Swift libraries selected by
+SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX. Either 'llvm-thin' or
+'llvm-full'.")
 
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
@@ -346,6 +382,8 @@ if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  get_threading_package(EMBEDDED "embedded" SWIFT_SDK_embedded_THREADING_PACKAGE)
+
   set(triples)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -366,6 +404,19 @@ else()
   # include the libstdc++ modulemap into the build even when not building
   # C++ interop modules.
   add_subdirectory(Cxx/libstdcxx)
+endif()
+
+# Directory containing the freshly-built compiler plugins (SwiftMacros, etc.).
+# Stdlib modules that use a compiler-plugin macro -- e.g. `@DebugDescription`,
+# or `_SwiftifyImport` synthesized from Clang bounds-safety annotations in a
+# bridging header -- must pass this via `-plugin-path` so the compiler uses the
+# just-built plugin instead of falling back to a stale one from the host
+# toolchain. Computed once here and inherited by the stdlib subdirectories
+# below (core, EmbeddedPlatform, Synchronization, ...).
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_HOST_PLUGINS_DIR "${CMAKE_BINARY_DIR}/lib/swift/host/plugins")
+else()
+  set(SWIFT_HOST_PLUGINS_DIR "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/host/plugins")
 endif()
 
 if(SWIFT_BUILD_STDLIB)

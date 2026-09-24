@@ -21,12 +21,19 @@
 #include "llvm/Support/Casting.h"
 #include <algorithm>
 #include <cassert>
-#include <functional>
 #include <iterator>
 #include <numeric>
 #include <optional>
 #include <type_traits>
+// <functional> and <unordered_set> are only needed for the std::function
+// function_traits specialization and the std::unordered_set erase_if
+// overload below, which are never used by the embedded runtime (which
+// doesn't use std::function or std::unordered_set). GCC's libstdc++ hard-
+// errors on both headers under -ffreestanding, so keep them hosted-only.
+#if __STDC_HOSTED__
+#include <functional>
 #include <unordered_set>
+#endif
 
 namespace swift {
 
@@ -50,11 +57,13 @@ template <class R, class... Args> struct function_traits<R (*)(Args...)> {
 };
 
 // std::function
+#if __STDC_HOSTED__
 template <class R, class... Args>
 struct function_traits<std::function<R(Args...)>> {
   using result_type = R;
   using argument_types = std::tuple<Args...>;
 };
+#endif
 
 // pointer-to-member-function (i.e., operator()'s)
 template <class T, class R, class... Args>
@@ -754,6 +763,7 @@ using are_all_compound = all_true<std::is_compound<Ts>::value...>;
 
 /// Erase all elements in \p c that match the given predicate \p pred.
 // FIXME: Remove this when C++20 is the new baseline.
+#if __STDC_HOSTED__
 template <class Key, class Hash, class KeyEqual, class Alloc, class Pred>
 typename std::unordered_set<Key, Hash, KeyEqual, Alloc>::size_type
 erase_if(std::unordered_set<Key, Hash, KeyEqual, Alloc> &c, Pred pred) {
@@ -767,6 +777,7 @@ erase_if(std::unordered_set<Key, Hash, KeyEqual, Alloc> &c, Pred pred) {
   }
   return startingSize - c.size();
 }
+#endif
 
 /// Call \c vector.emplace_back with each of the other arguments
 /// to this function, in order.  Constructing an intermediate

@@ -352,19 +352,26 @@ public:
   synthesizeStaticFactoryForCXXForeignRef(
       const clang::CXXRecordDecl *cxxRecordDecl);
 
+  /// Synthesize (and import) a C++ function that performs a `static_cast` from
+  /// a pointer to \p derivedClass to a pointer to \p baseClass, i.e.
+  ///
+  /// \code
+  /// static Base * _Nonnull __swift_interopStaticCast_...(
+  ///     Derived * _Nonnull from) {
+  ///   return static_cast<Base *>(from);
+  /// }
+  /// \endcode
+  ///
+  /// Returns `nullptr` on failure; result is cached per (derived, base) pair.
+  FuncDecl *
+  makeBaseClassPointerCastFunction(const clang::CXXRecordDecl *derivedClass,
+                                   const clang::CXXRecordDecl *baseClass);
+
   /// Look for an explicitly-provided "destroy" operation. If one exists
   /// and the type has been imported as noncopyable, add an explicit `deinit`
   /// that calls that destroy operation.
   void addExplicitDeinitIfRequired(
       NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
-
-  /// When a base class is marked as SHARED_REFERENCE, synthesize a call to
-  /// the ref counting operations. This call does the derived to base conversion
-  /// that is responsible for all the offset adjustments on the pointer.
-  std::pair<CustomRefCountingOperationResult, CustomRefCountingOperationResult>
-  addRefCountOperations(ClassDecl *decl, clang::CXXRecordDecl *clangDecl,
-                        const ClassDecl *baseDecl,
-                        const clang::CXXRecordDecl *baseClangDecl);
 
   /// Synthesize a Swift function that calls the Clang runtime predicate
   /// function for the availability domain represented by `var`.

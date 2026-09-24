@@ -59,3 +59,8 @@ module InheritedStringField {
   header "inherited-string-field.h"
   requires cplusplus
 }
+
+module AbstractClassValueType {
+  header "abstract-class-value-type.h"
+  requires cplusplus
+}

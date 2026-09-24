@@ -26,7 +26,6 @@
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -503,6 +502,19 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   // 'any' followed by another identifier is an existential type.
   if (Tok.isContextualKeyword("any") &&
+      (peekToken().is(tok::identifier) ||
+       peekToken().isContextualPunctuator("~")) &&
+      !peekToken().isAtStartOfLine()) {
+    ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
+    auto *typeExpr = new (Context) TypeExpr(ty.get());
+    return makeParserResult(typeExpr);
+  }
+
+  // 'some' followed by another identifier is an opaque type.
+  if (Tok.isContextualKeyword("some") &&
       (peekToken().is(tok::identifier) ||
        peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {
@@ -2781,6 +2793,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       // "unowned(safe/unsafe)".
       SourceLoc ownershipLocStart, ownershipLocEnd;
       auto ownershipKind = ReferenceOwnership::Strong;
+      // `sending` specifier.
+      bool isSending = false;
       if (Tok.isContextualKeyword("weak")){
         ownershipLocStart = ownershipLocEnd = consumeToken(tok::identifier);
         ownershipKind = ReferenceOwnership::Weak;
@@ -2801,6 +2815,13 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
           if (!consumeIf(tok::r_paren, ownershipLocEnd))
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
+        // `sending <<identifier>>` or `self`
+      } else if (Context.LangOpts.hasFeature(Feature::CalledAttribute) &&
+                 Tok.isContextualKeyword("sending") &&
+                 (peekToken().is(tok::identifier) ||
+                  peekToken().is(tok::kw_self))) {
+        (void)consumeToken(tok::identifier);
+        isSending = true;
       } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square,
                                    tok::period)) {
@@ -2884,8 +2905,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       // closure) since the initializer expression is evaluated before the
       // closure is formed.
       auto CLE = CaptureListEntry::createParsed(
-          Context, ownershipKind, {ownershipLocStart, ownershipLocEnd}, name,
-          nameLoc, equalLoc, initializer, CurDeclContext);
+          Context, ownershipKind, {ownershipLocStart, ownershipLocEnd},
+          isSending, name, nameLoc, equalLoc, initializer, CurDeclContext);
 
       // If we captured something under the name "self", remember that.
       if (name == Context.Id_self)

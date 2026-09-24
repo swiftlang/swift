@@ -77,8 +77,6 @@
 /// TODO: Handle partial_apply, try_apply, and begin_apply.
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -92,7 +90,6 @@
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallVector.h"
 
 #define DEBUG_TYPE "copy-propagation"
@@ -767,7 +764,7 @@ bool FilterCandidates::rewritableArgumentIndicesForApply(
         auto convention = apply.getArgumentConvention(operand);
         if (isSimpleExtendedIntroducerDef(operand.get()) &&
             convention.isOwnedConventionInCaller()) {
-          indices.push_back(apply.getCalleeArgIndex(operand));
+          indices.push_back(apply.getSubstCalleeArgIndex(operand));
         } else {
           // This argument is a use of %lifetime but not an owned use that we
           // can rewrite.

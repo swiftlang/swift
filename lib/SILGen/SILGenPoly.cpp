@@ -489,7 +489,7 @@ ManagedValue Transform::transform(ManagedValue v,
   // expect this.
   if (v.getType().isAddress()) {
     auto &inputTL = SGF.getTypeLowering(v.getType());
-    if (!inputTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) {
+    if (inputTL.isLoadableOrOpaque(SGF.F)) {
       v = emitManagedLoad(SGF, Loc, v, inputTL);
     }
   }
@@ -917,7 +917,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
                                        SGFContext ctxt) {
   const TypeLowering &outputTL =
     SGF.getTypeLowering(outputLoweredTy);
-  assert((outputTL.isAddressOnly() == inputTuple.getType().isAddress() ||
+  assert((outputTL.getRecursiveProperties().isAddressOnly() == inputTuple.getType().isAddress() ||
           !SGF.silConv.useLoweredAddresses()) &&
          "expected loadable inputs to have been loaded");
 
@@ -933,7 +933,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
   // If the tuple is address only, we need to do the operation in memory.
   SILValue outputAddr;
-  if (outputTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
+  if (!outputTL.isLoadableOrOpaque(SGF.F))
     outputAddr = SGF.getBufferForExprResult(Loc, outputLoweredTy, ctxt);
 
   // Explode the tuple into individual managed values.
@@ -947,7 +947,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   for (auto index : indices(inputType->getElementTypes())) {
     auto &inputEltTL = SGF.getTypeLowering(inputElts[index].getType());
     ManagedValue inputElt = inputElts[index];
-    if (inputElt.getType().isAddress() && !inputEltTL.isAddressOnly()) {
+    if (inputElt.getType().isAddress() && !inputEltTL.getRecursiveProperties().isAddressOnly()) {
       inputElt = emitManagedLoad(SGF, Loc, inputElt, inputEltTL);
     }
 
@@ -965,7 +965,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
       auto &outputEltTL = SGF.getTypeLowering(outputEltLoweredTy);
-      assert(outputEltTL.isAddressOnly() == inputEltTL.isAddressOnly());
+      assert(outputEltTL.getRecursiveProperties().isAddressOnly() == inputEltTL.getRecursiveProperties().isAddressOnly());
       auto cleanup =
         SGF.enterDormantTemporaryCleanup(outputEltAddr, outputEltTL);
       outputEltTemp.emplace(outputEltAddr, cleanup);
@@ -982,7 +982,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // later assembly into a tuple.
     if (!outputEltTemp) {
       assert(outputElt);
-      assert(!inputEltTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses());
+      assert(inputEltTL.isLoadableOrOpaque(SGF.F));
       outputElts.push_back(outputElt);
       continue;
     }
@@ -1255,7 +1255,7 @@ class ParamInfo {
       return false;
     }
     auto &tl = getTypeLowering(SGF);
-    if (tl.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+    if (!tl.isLoadableOrOpaque(SGF.F)) {
       // In address-lowered mode, address-only types can't be loaded in the
       // first place before being store_borrow'd.
       return false;
@@ -1264,7 +1264,7 @@ class ParamInfo {
       // Can only store_borrow into a temporary allocation for @in_guaranteed.
       return false;
     }
-    if (tl.isTrivial()) {
+    if (tl.isTrivial(&SGF.F)) {
       // Can't store_borrow a trivial type.
       return false;
     }
@@ -3016,8 +3016,7 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       auto forwardedArg =
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (forwardedArg->getType().isObject() &&
-          fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
+      if (forwardedArg->getType().isObject() && fTy->hasGuaranteedResult()) {
         forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
       }
       forwardedArgs.push_back(forwardedArg);
@@ -3327,12 +3326,14 @@ public:
             CanSILFunctionType innerFnType, CanSILFunctionType outerFnType) {
     // Assert that the indirect results are set up like we expect.
     assert(InnerArgs.empty());
-    assert(SGF.F.begin()->args_size()
-           >= SILFunctionConventions(outerFnType, SGF.SGM.M)
-                  .getNumIndirectSILResults());
+    assert(SGF.F.begin()->args_size() >=
+           SILFunctionConventions(
+               outerFnType, SILAddressConventions::forFunction(SGF.F))
+               .getNumIndirectSILResults());
 
     InnerArgs.reserve(
-        SILFunctionConventions(innerFnType, SGF.SGM.M)
+        SILFunctionConventions(innerFnType,
+                               SILAddressConventions::forFunction(SGF.F))
             .getNumIndirectSILResults());
 
     AllOuterResults = outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
@@ -3347,7 +3348,8 @@ public:
     assert(AllOuterResults.empty());
     assert(AllInnerResults.empty());
     assert(InnerArgs.size() ==
-           SILFunctionConventions(innerFnType, SGF.SGM.M)
+           SILFunctionConventions(
+               innerFnType, SILAddressConventions::forFunction(SGF.F))
                .getNumIndirectSILResults());
     OuterArgs.finish();
   }
@@ -5340,8 +5342,9 @@ SILValue ResultPlanner::execute(SILValue innerResult,
   // results).
   SmallVector<SILValue, 4> innerDirectResultStack;
   unsigned numInnerDirectResults =
-    SILFunctionConventions(innerFnType, SGF.SGM.M)
-        .getNumDirectSILResults();
+      SILFunctionConventions(innerFnType,
+                             SILAddressConventions::forFunction(SGF.F))
+          .getNumDirectSILResults();
   if (numInnerDirectResults == 0) {
     // silently ignore the result
   } else if (numInnerDirectResults > 1) {
@@ -5842,7 +5845,8 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
     SGF.B.createPartialApply(loc, thunkValue,
                              interfaceSubs, thunkArgs,
                              toType->getCalleeConvention(),
-                             toType->getIsolation());
+                             toType->getIsolation(),
+                             toType->isCalledOnce());
 }
 
 static ManagedValue createDifferentiableFunctionThunk(
@@ -5909,6 +5913,9 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   assert(expectedType->getLanguage() ==
          fn.getType().castTo<SILFunctionType>()->getLanguage() &&
          "bridging in re-abstraction thunk?");
+  // We cannot reabstract coroutines (yet)
+  assert(!expectedType->isCoroutine() && !sourceType->isCoroutine() &&
+         "cannot reabstract a coroutine");
 
   // Declare the thunk.
   SubstitutionMap interfaceSubs;
@@ -6354,8 +6361,10 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   thunkSGF.collectThunkParams(
       loc, params, &thunkIndirectResults, &thunkIndirectErrorResults);
 
-  SILFunctionConventions fromConv(fromType, getModule());
-  SILFunctionConventions toConv(toType, getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(thunkSGF.F);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   if (!toConv.useLoweredAddresses()) {
     SmallVector<ManagedValue, 4> thunkArguments;
     for (auto indRes : thunkIndirectResults)
@@ -6655,11 +6664,16 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
   auto origFnTy = originalFn->getLoweredFunctionType();
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig,
+      /*isReabstractionThunk*/ false, /* origTypeOfAbstraction */ CanType(),
+      isDefaultDerivative);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler(getASTContext());
@@ -6780,7 +6794,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
           ->mapTypeIntoEnvironment(
               thunkFnTy->getResults().back().getSILStorageInterfaceType())
           .castTo<SILFunctionType>();
-  SILFunctionConventions conv(thunkFnTy, thunkSGF.getModule());
+  SILFunctionConventions conv(
+      thunkFnTy, SILAddressConventions::forFunction(thunkSGF.F));
 
   // Create return instruction in the thunk, first deallocating local
   // allocations and freeing arguments-to-free.
@@ -7611,32 +7626,42 @@ void SILGenFunction::emitProtocolWitness(
   if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
-    std::optional<ManagedValue> actorSelf;
+    std::optional<ManagedValue> actor;
 
-    // For an instance actor, get the actor 'self'.
-    if (*enterIsolation == ActorIsolation::ActorInstance) {
-      assert(enterIsolation->isActorInstanceForSelfParameter() && "Not self?");
-      auto actorSelfVal = origParams.back();
+    // If the requirement is isolated to an actor instance it could be either
+    // `self` or an `isolated` parameter.
+    if (enterIsolation->isActorInstanceIsolated()) {
+      ManagedValue actorParamVal;
+      if (enterIsolation->isActorInstanceForSelfParameter()) {
+        // Get the actor 'self'.
+        actorParamVal = origParams.back();
+      } else {
+        // Or `isolated` parameter.
+        unsigned formalIndex = enterIsolation->getActorInstanceParameterIndex();
+        actorParamVal =
+            origParams[reqtOrigTy.getLoweredParamIndex(formalIndex)];
+      }
 
-      if (actorSelfVal.getType().isAddress()) {
-        auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
-        if (!actorSelfTL.isAddressOnly()) {
-          actorSelfVal = emitManagedLoad(
-              *this, loc, actorSelfVal, actorSelfTL);
+      // Load the actor instance if necessary.
+      if (actorParamVal.getType().isAddress()) {
+        auto &actorInstanceTL = getTypeLowering(actorParamVal.getType());
+        if (!actorInstanceTL.getRecursiveProperties().isAddressOnly()) {
+          actorParamVal = emitManagedLoad(
+              *this, loc, actorParamVal, actorInstanceTL);
         }
       }
 
-      actorSelf = actorSelfVal;
+      actor = actorParamVal;
     }
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
 
       if (getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled()) {
-        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actor);
       }
     } else {
-      emitHopToTargetActor(loc, enterIsolation, actorSelf);
+      emitHopToTargetActor(loc, enterIsolation, actor);
     }
   }
 

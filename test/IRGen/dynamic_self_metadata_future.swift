@@ -28,17 +28,17 @@ struct G<T> : P {
 
 class C {
   class func fromMetatype() -> Self? { return nil }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s28dynamic_self_metadata_future1CC12fromMetatypeACXDSgyFZ"(ptr swiftself %0)
-  // CHECK: ret i64 0
+  // CHECK-LABEL: define hidden swiftcc ptr @"$s28dynamic_self_metadata_future1CC12fromMetatypeACXDSgyFZ"(ptr swiftself %0)
+  // CHECK: ret ptr null
 
   func fromInstance() -> Self? { return nil }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s28dynamic_self_metadata_future1CC12fromInstanceACXDSgyF"(ptr swiftself %0)
-  // CHECK: ret i64 0
+  // CHECK-LABEL: define hidden swiftcc ptr @"$s28dynamic_self_metadata_future1CC12fromInstanceACXDSgyF"(ptr swiftself %0)
+  // CHECK: ret ptr null
 
   func dynamicSelfArgument() -> Self? {
     return id(nil)
   }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s28dynamic_self_metadata_future1CC0A12SelfArgumentACXDSgyF"(ptr swiftself %0)
+  // CHECK-LABEL: define hidden swiftcc ptr @"$s28dynamic_self_metadata_future1CC0A12SelfArgumentACXDSgyF"(ptr swiftself %0)
   // CHECK: [[TYPE1:%.+]] = load {{.*}} %0
   // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$sSqMa"(i64 0, ptr [[TYPE1]])
   // CHECK: [[TYPE2:%.+]] = extractvalue %swift.metadata_response [[T0]], 0
@@ -48,7 +48,7 @@ class C {
     _ = G(t: self).f()
     return nil
   }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s28dynamic_self_metadata_future1CC0A18SelfConformingTypeACXDSgyF"(ptr swiftself %0)
+  // CHECK-LABEL: define hidden swiftcc ptr @"$s28dynamic_self_metadata_future1CC0A18SelfConformingTypeACXDSgyF"(ptr swiftself %0)
   // CHECK: [[SELF_TYPE:%.+]] = load {{.*}} %0
   // CHECK: call ptr @swift_getWitnessTable(
   // CHECK-SAME:   ptr  @"$s28dynamic_self_metadata_future1GVyxGAA1PAAMc"

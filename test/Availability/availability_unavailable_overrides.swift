@@ -2,25 +2,25 @@
 
 func testAvailableOverrideOfUnavailableDecl() {
   class Base {
-    @available(*, unavailable)
+    @available(*, unavailable) // expected-note {{'unavailableMethod()' has been explicitly marked unavailable here}}
     func unavailableMethod() {}
-    // expected-note@-1 2 {{'unavailableMethod()' has been explicitly marked unavailable here}}
+    // expected-note@-1 {{'unavailableMethod()' has been explicitly marked unavailable here}}
 
-    @available(*, unavailable)
+    @available(*, unavailable) // expected-note {{'init(x:)' has been explicitly marked unavailable here}}
     init(x: Int) {}
-    // expected-note@-1 2 {{'init(x:)' has been explicitly marked unavailable here}}
+    // expected-note@-1 {{'init(x:)' has been explicitly marked unavailable here}}
 
     @available(*, unavailable)
     required init(requiredX: Int) {}
-    // expected-note@-1 {{'init(requiredX:)' has been explicitly marked unavailable here}}
+    // expected-note@-2 {{'init(requiredX:)' has been explicitly marked unavailable here}}
 
-    @available(*, unavailable)
+    @available(*, unavailable) // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
     subscript (i: Int) -> Int { return i }
-    // expected-note@-1 2 {{'subscript(_:)' has been explicitly marked unavailable here}}
+    // expected-note@-1 {{'subscript(_:)' has been explicitly marked unavailable here}}
 
-    @available(*, unavailable)
+    @available(*, unavailable) // expected-note {{'unavailableComputedProperty' has been explicitly marked unavailable here}}
     var unavailableComputedProperty: Int {
-      // expected-note@-1 2 {{'unavailableComputedProperty' has been explicitly marked unavailable here}}
+      // expected-note@-1 {{'unavailableComputedProperty' has been explicitly marked unavailable here}}
       get { 0 }
       set {}
     }
@@ -244,8 +244,8 @@ func testImplicitSuperInit() {
   // relaxed since both initializers are unreachable and the developer cannot
   // wrap the call to super in a conditional compilation block.
   class Base {
-    @available(*, unavailable)
-    init() {} // expected-note {{'init()' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note {{'init()' has been explicitly marked unavailable here}}
+    init() {}
   }
 
   class Derived: Base {

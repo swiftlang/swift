@@ -322,6 +322,9 @@ class RemotePathSet(object):
         self.nodir_outputs = set()
 
 class PrefixProcessor(object):
+    # Darwin toolchains put DWARF in a .dSYM instead of inside the binary.
+    DEBUG_INFO_SUFFIX = '.dSYM'
+
     def __init__(self,
                  input_prefix, output_prefix,
                  remote_dir, remote_input_prefix,
@@ -358,6 +361,16 @@ class PrefixProcessor(object):
         else:
             self.output_prefix_split = (0, '', '')
 
+    def _add_debug_info(self, orig_name, name, upload_set):
+        """Send a binary's debug info bundle up along with the binary.
+
+        Without this the crash handler only reports symbol names on remote run
+        crash logs, no source locations/inlined frames.
+        On platforms that keep debug info in the binary this does nothing.
+        """
+        if os.path.isdir(orig_name + self.DEBUG_INFO_SUFFIX):
+            upload_set.add(name + self.DEBUG_INFO_SUFFIX)
+
     def process_one(self, orig_name):
         iplen, ipfxdir, ipfx = self.input_prefix_split
         oplen, opfxdir, opfx = self.output_prefix_split
@@ -381,11 +394,15 @@ class PrefixProcessor(object):
                 self.path_set.nodir_outputs.add(name)
                 if os.path.exists(orig_name):
                     self.path_set.existing_nodir_outputs.add(name)
+                    self._add_debug_info(orig_name, name,
+                                         self.path_set.existing_nodir_outputs)
             else:
                 name = strip_sep(name)
                 self.path_set.outputs.add(name)
                 if os.path.exists(orig_name):
                     self.path_set.existing_outputs.add(name)
+                    self._add_debug_info(orig_name, name,
+                                         self.path_set.existing_outputs)
             return posixpath.join(self.remote_dir,
                                   self.remote_output_prefix,
                                   name)

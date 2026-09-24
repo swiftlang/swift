@@ -195,13 +195,14 @@ func reassignments_1_fixed_2() {
 public func basic_loop_trivial_values(_ t: Triangle, _ xs: [Triangle]) {
   var p: Pair = t.a
   for x in xs { // expected-warning {{independent copy of 'xs' is required}}
+                // expected-warning@-1 {{accessing 'x' may produce a copy}}
     p = p.midpoint(x.a)
   }
   t.a = p
 }
 public func basic_loop_trivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
   var p: Pair = t.a
-  for x in copy xs {
+  for x in copy xs { // expected-warning {{accessing 'x' may produce a copy}}
     p = p.midpoint(x.a)
   }
   t.a = p
@@ -216,6 +217,7 @@ public func basic_loop_trivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
 public func basic_loop_nontrivial_values(_ t: Triangle, _ xs: [Triangle]) {
   var p: Pair = t.nontrivial.a // expected-warning {{accessing 't.nontrivial' may produce a copy}}
   for x in xs { // expected-warning {{independent copy of 'xs' is required}}
+                // expected-warning@-1 {{accessing 'x' may produce a copy}}
     p = p.midpoint(x.nontrivial.a) // expected-warning {{accessing 'x.nontrivial' may produce a copy}}
   }
   t.nontrivial.a = p // expected-warning {{accessing 't.nontrivial' may produce a copy}}
@@ -223,7 +225,7 @@ public func basic_loop_nontrivial_values(_ t: Triangle, _ xs: [Triangle]) {
 
 public func basic_loop_nontrivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
   var p: Pair = (copy t.nontrivial).a
-  for x in copy xs {
+  for x in copy xs { // expected-warning {{accessing 'x' may produce a copy}}
     p = p.midpoint((copy x.nontrivial).a)
   }
   (copy t.nontrivial).a = p
@@ -233,7 +235,7 @@ public func basic_loop_nontrivial_values_reduced_copies(_ t: Triangle, _ xs: [Tr
   // FIXME: confusing variable names are chosen (rdar://161360537)
   let nt = t.nontrivial // expected-warning {{accessing 'nt' may produce a copy}}
   var p: Pair = nt.a
-  for x in copy xs {
+  for x in copy xs { // expected-warning {{accessing 'x' may produce a copy}}
     let xnt = x.nontrivial // expected-warning {{accessing 'xnt' may produce a copy}}
     p = p.midpoint(xnt.a)
   }
@@ -242,7 +244,7 @@ public func basic_loop_nontrivial_values_reduced_copies(_ t: Triangle, _ xs: [Tr
 public func basic_loop_nontrivial_values_reduced_copies_fixed(_ t: Triangle, _ xs: [Triangle]) {
   let nt = copy t.nontrivial
   var p: Pair = nt.a
-  for x in copy xs {
+  for x in copy xs { // expected-warning {{accessing 'x' may produce a copy}}
     let xnt = copy x.nontrivial
     p = p.midpoint(xnt.a)
   }
@@ -401,7 +403,7 @@ func benchCaptureProp<S : Sequence>(
   let initial = it.next()!
   return
     IteratorSequence(it) // expected-warning {{accessing 'it' may produce a copy}}
-      .reduce(initial, f) // expected-warning {{accessing 'initial' may produce a copy; write 'copy' to acknowledge or 'consume' to elide}}
+           .reduce(initial, f)
 }
 func benchCaptureProp_fixed<S : Sequence>(
   _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
@@ -410,7 +412,7 @@ func benchCaptureProp_fixed<S : Sequence>(
   let initial = it.next()!
   return
     IteratorSequence(copy it)
-           .reduce(initial, f) // expected-warning {{accessing 'initial' may produce a copy; write 'copy' to acknowledge or 'consume' to elide}}
+           .reduce(initial, f)
 }
 
 extension FixedWidthInteger {

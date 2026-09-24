@@ -16,12 +16,14 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
@@ -189,13 +191,16 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
 
   bool hasActiveSemanticResultArgument = false;
   bool hasActiveArguments = false;
-  auto numIndirectResults = fai.getNumIndirectSILResults();
+  // `getArgumentsWithoutIndirectResults()` skips the indirect results and the
+  // indirect error results, so the parameters start at
+  // `getSILArgIndexOfFirstParam()` in SIL argument order.
+  auto firstParamArgIdx = fai.getSubstCalleeConv().getSILArgIndexOfFirstParam();
   for (auto argIdx : range(fai.getSubstCalleeConv().getNumParameters())) {
     auto arg = fai.getArgumentsWithoutIndirectResults()[argIdx];
     if (activityInfo.isActive(arg, config)) {
       hasActiveArguments = true;
       auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(
-          numIndirectResults + argIdx);
+          firstParamArgIdx + argIdx);
       if (paramInfo.isAutoDiffSemanticResult())
         hasActiveSemanticResultArgument = true;
     }
@@ -307,12 +312,13 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     GenericFunctionType::ExtInfo info;
     astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
-        info);
+        genSig, params, /* yields */ {},
+        silFnTy->getAllResultsInterfaceType().getASTType(), info);
   } else {
     FunctionType::ExtInfo info;
     astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
+        params, /* yields */ {},
+        silFnTy->getAllResultsInterfaceType().getASTType(), info);
   }
 
   Type resultType =

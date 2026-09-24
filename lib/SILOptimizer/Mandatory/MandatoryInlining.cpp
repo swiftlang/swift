@@ -538,12 +538,8 @@ static void collectPartiallyAppliedArguments(
     SmallVectorImpl<ParameterConvention> &CapturedArgConventions,
     SmallVectorImpl<SILValue> &FullArgs) {
   ApplySite Site(PAI);
-  SILFunctionConventions CalleeConv(Site.getSubstCalleeType(),
-                                    PAI->getModule());
   for (auto &Arg : PAI->getArgumentOperands()) {
-    unsigned CalleeArgumentIndex = Site.getCalleeArgIndex(Arg);
-    assert(CalleeArgumentIndex >= CalleeConv.getSILArgIndexOfFirstParam());
-    auto ParamInfo = CalleeConv.getParamInfoForSILArg(CalleeArgumentIndex);
+    auto ParamInfo = Site.getParamInfoForOperand(Arg);
     CapturedArgConventions.push_back(ParamInfo.getConvention());
     FullArgs.push_back(Arg.get());
   }
@@ -771,8 +767,9 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     break;
-    
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:

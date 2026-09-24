@@ -2,6 +2,8 @@
 // RUN: %gyb %s -o %t/mapped-integers.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/mapped-integers.swift
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ctypes
 
 func testUnsignedIntegers() {

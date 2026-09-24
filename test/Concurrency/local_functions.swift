@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o - -verify -strict-concurrency=complete -enable-actor-data-race-checks -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-6.1-abi-triple %s -emit-sil -o - -verify -strict-concurrency=complete -enable-actor-data-race-checks | %FileCheck %s
 
 // Issue #80772. This used to crash in SILGen because we gave local functions
 // the isolation of their enclosing context instead of trying to convert

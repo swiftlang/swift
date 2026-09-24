@@ -33,6 +33,15 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   return nullptr;
 }
 
+/// Find a accessor record for given identifier (remote call target identifier).
+///
+/// Returns the AccessibleFunctionRecord as an opaque pointer; the record is process-lifetime stable.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const void *swift_distributed_getAccessibleRecord(const char *targetNameStart,
+                                                  size_t targetNameLength) {
+  return findDistributedAccessor(targetNameStart, targetNameLength);
+}
+
 
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swiftDistributed)

@@ -1,6 +1,3 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-5.9)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
 // RUN: %target-run-simple-swift(-g -I %S/Inputs -cxx-interoperability-mode=default)
 //
 // REQUIRES: executable_test

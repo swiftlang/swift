@@ -15,14 +15,16 @@
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "clang/Basic/AddressSpaces.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 
@@ -153,7 +155,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
                                      PrimitiveTypeMapping &typeMapping,
                                      bool isCForwardDefinition) {
-  Type supportedPrimitiveTypes[] = {
+  SmallVector<Type, 16> supportedPrimitiveTypes = {
       astContext.getBoolType(),
 
       // Primitive integer, C integer and Int/UInt mappings.
@@ -168,10 +170,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       // Pointer types.
       // FIXME: support raw pointers?
       astContext.getOpaquePointerType(),
-
-      astContext.getIntType(), astContext.getUIntType()};
-
-  auto primTypesArray = llvm::ArrayRef(supportedPrimitiveTypes);
+  };
 
   // Ensure that `long` and `unsigned long` are treated as valid
   // generic Swift types (`Int` and `UInt`) on platforms
@@ -183,8 +182,16 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       clangTI.getPtrDiffType(clang::LangAS::Default) == clang::TransferrableTargetInfo::SignedLong;
   bool isInt64Long =
       clangTI.getInt64Type() == clang::TransferrableTargetInfo::SignedLong;
-  if (!(isSwiftIntLong && !isInt64Long))
-    primTypesArray = primTypesArray.drop_back(2);
+  if (isSwiftIntLong && !isInt64Long) {
+    supportedPrimitiveTypes.push_back(astContext.getIntType());
+    supportedPrimitiveTypes.push_back(astContext.getUIntType());
+  }
+
+  // The following Swift types bridge to C++ types that aren't available on
+  // every target. Only emit trait specializations for them when the target
+  // supports the underlying C++ type, so that the generated header remains
+  // compilable everywhere while still supporting these types where possible.
+  auto stdlibModule = astContext.getStdlibModule();
 
   // We do not have metadata for primitive types in Embedded Swift.
   // As a result, the following features are not supported with primitive types in this mode:
@@ -194,7 +201,35 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
 
-  for (Type type : primTypesArray) {
+  // Some of these types were introduced after the oldest runtime that the
+  // deployment target supports. Referencing their type metadata from the
+  // generated header would make the C++ client fail to launch when back
+  // deployed.
+  auto isAvailableAtDeploymentTarget = [&](Type type) {
+    auto nominal = type->getNominalOrBoundGenericNominal();
+    if (!nominal)
+      return false;
+    if (embedded)
+      return true;
+    return AvailabilityRange::forDeploymentTarget(astContext)
+        .isContainedIn(AvailabilityInference::availableRange(nominal));
+  };
+  auto addIfAvailable = [&](Type type) {
+    if (type && isAvailableAtDeploymentTarget(type))
+      supportedPrimitiveTypes.push_back(type);
+  };
+
+  addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "CChar32"));
+
+  if (clangTI.hasInt128Type()) {
+    addIfAvailable(astContext.getInt128Type());
+    addIfAvailable(astContext.getUInt128Type());
+  }
+
+  if (clangTI.hasFloat16Type())
+    addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "Float16"));
+
+  for (Type type : supportedPrimitiveTypes) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
         type->getNominalOrBoundGenericNominal());
 
@@ -220,7 +255,10 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
        << "  static ";
-    ClangSyntaxPrinter(astContext, os).printInlineForThunk();
+    // This is deliberately not printed as an inline thunk: in debug mode
+    // inline thunks are marked as `used`, which would emit all of these
+    // accessors even when the program never uses the corresponding type.
+    ClangSyntaxPrinter(astContext, os).printInlineForHelperFunction();
     os << "void * _Nonnull getTypeMetadata() {\n"
        << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << typeMetadataVarName << ";\n"

@@ -249,6 +249,13 @@ public:
     return  (c->Superclass && c->Superclass != getRootSuperclass());
   }
 
+  /// Complete instance layout and field offsets without registering the class
+  /// with the Objective-C runtime or installing its vtable.
+  SWIFT_RUNTIME_STDLIB_INTERNAL
+  void initClassFieldOffsetVector(ClassMetadata *self, size_t numFields,
+                                  const TypeLayout *const *fieldTypes,
+                                  size_t *fieldOffsets);
+
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///
@@ -689,6 +696,16 @@ public:
   /// Is the given type imported from a C tag type?
   bool _isCImportedTagType(const TypeContextDescriptor *type,
                            const ParsedTypeIdentity &identity);
+
+  /// The type context descriptor of a foreign type's metadata.
+  inline const TypeContextDescriptor *
+  getForeignTypeDescription(const Metadata *metadata) {
+    if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata))
+      return foreignClass->getDescription();
+    if (auto foreignRef = dyn_cast<ForeignReferenceTypeMetadata>(metadata))
+      return foreignRef->getDescription();
+    return cast<ValueMetadata>(metadata)->getDescription();
+  }
 
   /// The execution context for a conformance, containing any additional
   /// checking that has to be done in context to determine whether a given

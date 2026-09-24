@@ -39,8 +39,11 @@ swift_compiler_sources(Optimizer
   SimplifyLoadBorrow.swift
   SimplifyMarkDependence.swift
   SimplifyMoveValue.swift
+  SimplifyOpenExistentialRef.swift
   SimplifyPartialApply.swift
+  SimplifyPhiArgument.swift
   SimplifyPointerToAddress.swift
+  SimplifyRawPointerToRef.swift
   SimplifyRefCasts.swift
   SimplifyRetainReleaseValue.swift
   SimplifyStoreBorrow.swift
@@ -48,6 +51,7 @@ swift_compiler_sources(Optimizer
   SimplifyStruct.swift
   SimplifyStructExtract.swift
   SimplifySwitchEnum.swift
+  SimplifySwitchEnumAddr.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
   SimplifyTuplePackElementAddr.swift

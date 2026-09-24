@@ -321,6 +321,11 @@ extension String.UTF8View {
 extension String.UTF8View {
 
   @_lifetime(borrow self)
+#if !_runtime(_ObjC)
+  // Unfortunately we cannot add these attributes unconditionally because
+  // the `_ObjC` branch references an internal function
+  @inlinable @inline(always)
+#endif
   internal borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
 #if _runtime(_ObjC)
     // handle non-UTF8 Objective-C bridging cases here
@@ -356,6 +361,11 @@ extension String.UTF8View {
   ///
   /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
   ///   UTF-16 strings.
+#if !_runtime(_ObjC)
+  // Unfortunately we cannot add these attributes unconditionally because
+  // the `_ObjC` branch in `_underlyingSpan` references an internal function
+  @inlinable @inline(always)
+#endif
   @available(SwiftStdlib 6.2, *)
   public var span: Span<UTF8.CodeUnit> {
     @_lifetime(borrow self)

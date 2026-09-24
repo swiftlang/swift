@@ -4,7 +4,7 @@
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 11.0,
               message: "you don't want to do that anyway")
 func obsoletedIn11() { }
-// expected-note @-1{{'obsoletedIn11()' was obsoleted in macOS 11.0}}
+// expected-note @-3{{'obsoletedIn11()' was obsoleted in macOS 11.0}}
 
 obsoletedIn11() // expected-error{{'obsoletedIn11()' is unavailable in macOS: you don't want to do that anyway}}
 
@@ -12,21 +12,21 @@ obsoletedIn11() // expected-error{{'obsoletedIn11()' is unavailable in macOS: yo
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 10.16,
               message: "you don't want to do that anyway")
 func obsoletedIn10_16() { }
-// expected-note @-1{{'obsoletedIn10_16()' was obsoleted in macOS 11.0}}
+// expected-note @-3{{'obsoletedIn10_16()' was obsoleted in macOS 11.0}}
 
 obsoletedIn10_16() // expected-error{{'obsoletedIn10_16()' is unavailable in macOS: you don't want to do that anyway}}
 
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 16.0,
               message: "you don't want to do that anyway")
 func obsoletedIn16() { }
-// expected-note @-1{{'obsoletedIn16()' was obsoleted in macOS 26.0}}
+// expected-note @-3{{'obsoletedIn16()' was obsoleted in macOS 26.0}}
 
 obsoletedIn16() // expected-error{{'obsoletedIn16()' is unavailable in macOS: you don't want to do that anyway}}
 
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 26.0,
               message: "you don't want to do that anyway")
 func obsoletedIn26() { }
-// expected-note @-1{{'obsoletedIn26()' was obsoleted in macOS 26.0}}
+// expected-note @-3{{'obsoletedIn26()' was obsoleted in macOS 26.0}}
 
 obsoletedIn26() // expected-error{{'obsoletedIn26()' is unavailable in macOS: you don't want to do that anyway}}
 

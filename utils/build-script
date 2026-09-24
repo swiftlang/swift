@@ -339,11 +339,13 @@ def apply_default_arguments(toolchain, args):
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
 
-    # Force --llvm-enable-index-store off when --sccache is in use. sccache
-    # can't cache compilations that emit -index-store-path side outputs, so
-    # leaving the index store enabled forces a cache miss on every
-    # translation unit.
-    if args.sccache:
+    # Force --llvm-enable-index-store off when a compiler-cache launcher is in
+    # use. sccache (and other caching wrappers) can't cache compilations that
+    # emit -index-store-path side outputs, so leaving the index store enabled
+    # forces a cache miss on every translation unit. --sccache is translated
+    # into --cmake-c-launcher/--cmake-cxx-launcher later on, but a launcher can
+    # also be passed explicitly, so cover both spellings here.
+    if args.sccache or args.cmake_c_launcher or args.cmake_cxx_launcher:
         args.llvm_enable_index_store = False
 
     # Enable test colors if we're on a tty.
@@ -906,6 +908,9 @@ def main_normal():
             not args.caching_remote_service_path and
             os.environ.get('SWIFT_CACHE_DISABLE_MCCAS') is None)
 
+        if not args.caching_enable_mccas:
+            os.environ["CLANG_CACHE_DISABLE_MCCAS"] = '1'
+
     cmake = CMake(args=args, toolchain=toolchain)
     toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
                                            build_root=SWIFT_BUILD_ROOT)
@@ -1036,6 +1041,8 @@ def main_normal():
                     f.write('    export {}={}\n'.format(
                         name, shlex.quote(value)))
                     f.write('fi\n')
+                if not args.caching_enable_mccas:
+                    f.write('export CLANG_CACHE_DISABLE_MCCAS=1\n')
                 f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
                 f.write('  exec "{}" "$@"\n'.format(toolchain.ninja))
                 f.write('else\n')

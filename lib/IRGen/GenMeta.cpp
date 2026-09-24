@@ -40,7 +40,6 @@
 #include "swift/Strings.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -67,7 +66,6 @@
 #include "GenStruct.h"
 #include "GenValueWitness.h"
 #include "GenericArguments.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -75,7 +73,6 @@
 #include "MetadataRequest.h"
 #include "MetatypeMetadataVisitor.h"
 #include "ProtocolInfo.h"
-#include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
@@ -884,9 +881,10 @@ namespace {
 
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
-                                     SILDefaultWitnessTable *defaultWitnesses)
-      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.getSwiftModule()->isResilient()) {}
+                              SILDefaultWitnessTable *defaultWitnesses)
+        : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
+          Resilient(IGM.getSwiftModule()->isResilient() &&
+                    !Proto->isCOMInterface()) {}
 
     void layout() {
       super::layout();
@@ -925,6 +923,7 @@ namespace {
       NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
       NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
       asImpl().addAssociatedTypeNames();
+      asImpl().addCOMInterfaceID();
       asImpl().addRequirementSignature();
       asImpl().addRequirements();
       auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
@@ -939,6 +938,16 @@ namespace {
       auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
+    }
+
+    void addCOMInterfaceID() {
+      if (!Proto->isCOMInterface())
+        return;
+
+      const COMDeclInfo *info = Proto->getCOMDeclInfo();
+      ASSERT(info && info->isInterface());
+
+      B.add(IGM.getCOMIdentityConstant(info->getInterfaceID()));
     }
 
     void addRequirementSignature() {
@@ -1068,7 +1077,8 @@ namespace {
         auto address =
           B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
         int offset = WitnessTableFirstRequirementOffset;
-        auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
+        auto firstReqAdjustment =
+            llvm::ConstantInt::getSigned(IGM.Int32Ty, -offset);
         address = llvm::ConstantExpr::getGetElementPtr(
             IGM.ProtocolRequirementStructTy, address, firstReqAdjustment);
 
@@ -1471,6 +1481,17 @@ namespace {
       InvertibleProtocolSet result;
       auto nominal = dyn_cast<NominalTypeDecl>(Type);
       if (!nominal)
+        return result;
+
+      // GenericContextDescriptorFlags must be zero for descriptors that might
+      // be seen by a pre-5.8 runtime, so omit this on pre-5.8 targets unless
+      // we're building the runtime itself.
+      auto deploymentAvailability =
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (!IGM.Context.LangOpts.DisableAvailabilityChecking &&
+          !deploymentAvailability.isContainedIn(
+              IGM.Context.getSwift58Availability()) &&
+          !IGM.getSwiftModule()->isStdlibModule())
         return result;
 
       auto checkProtocol = [&](InvertibleProtocolKind kind) {
@@ -2860,8 +2881,7 @@ namespace {
               if (isUnavailability) {
                 // Invert the result of "at least" check by xor'ing resulting
                 // boolean with `-1`.
-                success =
-                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+                success = IGF.Builder.CreateXor(success, IGF.Builder.getTrue());
               }
 
               auto nextCondOrRet = queryIndex == queries.size() - 1
@@ -3602,7 +3622,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   // If we don't have a count, then we're the 'like:' variant and we need to
   // pass '-1' to the runtime call.
   if (!count) {
-    count = llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
+    count = llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
   }
 
   // Call swift_initRawStructMetadata().
@@ -3640,7 +3660,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
       rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                           IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
     } else {
@@ -3650,7 +3670,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
       rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }
@@ -4767,7 +4787,7 @@ namespace {
         // It should be never called. We add a pointer to an error function.
         if (afd->hasAsync()) {
           ptr = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (accessor && requiresFeatureCoroutineAccessors(
                                    accessor->getAccessorKind())) {
@@ -7588,6 +7608,9 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
 
 /// Get the runtime identifier for a special protocol, if any.
 SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
+  if (P->isCOMInterface())
+    return SpecialProtocol::COM;
+
   auto known = P->getKnownProtocolKind();
   if (!known)
     return SpecialProtocol::None;
@@ -7676,6 +7699,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::TaskExecutor:
+  case KnownProtocolKind::Clock:
   case KnownProtocolKind::ExecutorFactory:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
@@ -7689,6 +7713,9 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ConvertibleFromBytes:
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
+  case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 
@@ -8200,6 +8227,32 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
   builder.addInt32(size.getValue());
   return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
       entity, builder.finishAndCreateFuture()));
+}
+
+// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub(), used
+// to fill dead async-method vtable/witness slots.
+llvm::Constant *IRGenModule::getOrCreateDeadAsyncMethodErrorFunctionPointer() {
+  if (DeadAsyncMethodErrorFunctionPointer)
+    return DeadAsyncMethodErrorFunctionPointer;
+  auto *asyncStub = getOrCreateDeadMethodErrorAsyncStub();
+  // Set up the AsyncFunctionPointer struct, roughly following
+  // emitAsyncFunctionPointer() and getOrCreateDeadMethodErrorStub()
+  ConstantInitBuilder initBuilder(*this);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(AsyncFunctionPointerTy));
+  builder.addCompactFunctionReference(asyncStub);
+  builder.addInt32((NumWords_AsyncLet * getPointerSize()).getValue());
+  bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+  auto *afp = builder.finishAndCreateGlobal(
+      "_swift_dead_async_method_error_afp", getPointerAlignment(),
+      /*constant*/ true,
+      canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                  : llvm::GlobalValue::InternalLinkage);
+  ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                             : IRLinkage::Internal)
+      .to(afp, /* nonAliasedDefinition */ false);
+  DeadAsyncMethodErrorFunctionPointer = afp;
+  return afp;
 }
 
 llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,

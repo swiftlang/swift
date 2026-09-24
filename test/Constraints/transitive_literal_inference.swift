@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -DSALVAGE -solver-disable-crash-on-valid-salvage
-// RUN: not --crash %target-typecheck-verify-swift -DSALVAGE -solver-enable-crash-on-valid-salvage
-// RUN: %target-typecheck-verify-swift -solver-enable-crash-on-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -solver-disable-diagnose-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
 
 // All of the below should of course type check successfully.
 // FIXME: Once everything below is passing, we can gyb it.
@@ -113,31 +112,22 @@ let _: Float? = f(f(3.0, 3), nil)  // expected-error {{conflicting arguments to 
 
 let _: Float? = (b ? nil : (b ? 3 : 3.0))
 
-// Everything in an #if SALVAGE block is solved in salvage
-#if SALVAGE
 let _: Float? = (b ? nil : (b ? 3.0 : 3))
-#endif
 
 let _: Float? = (b ? 3 : (b ? 3.0 : nil))
 let _: Float? = (b ? 3 : (b ? nil : 3.0))
 
-#if SALVAGE
 let _: Float? = (b ? 3.0 : (b ? nil : 3))
 let _: Float? = (b ? 3.0 : (b ? 3 : nil))
-#endif
 
 let _: Float? = (b ? (b ? nil : 3) : 3.0)
 
-#if SALVAGE
 let _: Float? = (b ? (b ? nil : 3.0) : 3)
-#endif
 
 let _: Float? = (b ? (b ? 3 : 3.0) : nil)
 let _: Float? = (b ? (b ? 3 : nil) : 3.0)
 
-#if SALVAGE
 let _: Float? = (b ? (b ? 3.0 : nil) : 3)
 let _: Float? = (b ? (b ? 3.0 : 3) : nil)
-#endif
 
 // TODO: Add more tests.

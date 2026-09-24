@@ -161,6 +161,7 @@ private func processAllocStack(_ allocStack: AllocStackInst, _ context: Function
 private struct UseCollector : AddressDefUseWalker {
 
   let context: FunctionPassContext
+  let allocation: SingleValueInstruction
   var objectLiverange: BasicBlockRange
 
   typealias SSAUpdater = InstructionBasedSSAUpdater<FunctionPassContext>
@@ -176,6 +177,8 @@ private struct UseCollector : AddressDefUseWalker {
     case load(LoadLikeInstruction)
     // A hybrid between "destroy" and "load"
     case loadTake(LoadInst)
+    // A hybrid between "store" and "load"
+    case markDependenceAddr(MarkDependenceAddrInst)
 
     var instruction: Instruction {
       switch self {
@@ -183,6 +186,7 @@ private struct UseCollector : AddressDefUseWalker {
         case .store(let store):     return store
         case .loadTake(let load):   return load
         case .load(let load):       return load
+        case .markDependenceAddr(let markDep): return markDep
       }
     }
 
@@ -192,6 +196,7 @@ private struct UseCollector : AddressDefUseWalker {
       case .store(let store):     return store.valueType
       case .loadTake(let load):   return load.type
       case .load(let load):       return load.valueType
+      case .markDependenceAddr(let markDep): return markDep.address.type.objectType
       }
     }
 
@@ -208,7 +213,7 @@ private struct UseCollector : AddressDefUseWalker {
     // Unconditional destroys at this level (including parent-level destroys passed down from the caller).
     var destroys: [Instruction]
 
-    // Pairs each store / projected-destroy / load-take with its placeholder.
+    // Pairs each store / projected-destroy / load-take / `mark_dependence_addr` with its placeholder.
     var mutatingAccesses = [(subPath: SmallProjectionPath, access: Access, placeholder: PlaceholderInst)]()
 
     // Non-consuming reads processed after all mutations.
@@ -240,12 +245,13 @@ private struct UseCollector : AddressDefUseWalker {
           addMutatingAccess(access, at: destroy, path: subPath, &ssaUpdater, context)
         }
       case .store(let store):
-        context.salvageDebugInfo(of: store)
         addMutatingAccess(access, at: store, path: subPath, &ssaUpdater, context)
       case .load(let load):
         loads.append((subPath: subPath, load: load))
       case .loadTake(let load):
         addMutatingAccess(access, at: load, path: subPath, &ssaUpdater, context)
+      case .markDependenceAddr(let markDep):
+        addMutatingAccess(access, at: markDep, path: subPath, &ssaUpdater, context)
       }
     }
 
@@ -280,6 +286,7 @@ private struct UseCollector : AddressDefUseWalker {
 
   init(of startInstruction: SingleValueInstruction, _ context: FunctionPassContext) {
     self.context = context
+    self.allocation = startInstruction
     self.objectLiverange = BasicBlockRange(begin: startInstruction.parentBlock, context)
   }
 
@@ -479,6 +486,14 @@ private struct UseCollector : AddressDefUseWalker {
       }
       return .abortWalk
 
+    case let markDep as MarkDependenceAddrInst:
+      assert(address == markDep.addressOperand, "uses of `base` should not be handled by the walker")
+      guard address.value is AllocStackInst else {
+        return .abortWalk
+      }
+      accessTree.append((SmallProjectionPath(), .markDependenceAddr(markDep)))
+      return .continueWalk
+
     default:
       return .abortWalk
     }
@@ -561,6 +576,10 @@ private struct UseCollector : AddressDefUseWalker {
           if !subPath.isEmpty {
             projectedMutations.append(load)
           }
+        case .markDependenceAddr(let markDep):
+          hasLoad = true
+          hasStore = true
+          projectedMutations.append(markDep)
         }
         index += 1
 
@@ -632,12 +651,13 @@ private struct UseCollector : AddressDefUseWalker {
     let firstPath = accessTree[index].path
 
     // Threads the current stored value through the control flow during rewriting. After each
-    // mutating access (store, `load [take]`, projected destroy) a `mark_dependence` placeholder
-    // anchors the updated aggregate in SSA form.
+    // mutating access (store, `load [take]`, projected destroy, `mark_dependence_addr`) a
+    // `mark_dependence` placeholder anchors the updated aggregate in SSA form.
     //
     var ssaUpdater = SSAUpdater(type: accesses.valueType,
                                 ownership: isTrivial ? .none : .owned,
                                 context)
+    defer { ssaUpdater.deinitialize() }
 
     // Prevent any phi arguments to be created "before" the allocation
     let undef = Undef.get(type: accesses.valueType, context)
@@ -750,7 +770,7 @@ private struct UseCollector : AddressDefUseWalker {
     //   destroy_addr %2
     // ```
 
-    eraseStores(of: accesses.mutatingAccesses.lazy.map(\.access))
+    eraseRewrittenMutations(of: accesses.mutatingAccesses.lazy.map(\.access))
     // ```
     //   %2 = alloc_stack $Pair
     //                                              <- store removed
@@ -791,10 +811,15 @@ private struct UseCollector : AddressDefUseWalker {
     // ```
   }
 
-  private func eraseStores(of accesses: some Sequence<Access>) {
+  private func eraseRewrittenMutations(of accesses: some Sequence<Access>) {
     for access in accesses {
-      if case .store(let store) = access {
+      switch access {
+      case .store(let store):
         context.erase(instruction: store)
+      case .markDependenceAddr(let markDep):
+        context.erase(instruction: markDep)
+      case .destroy, .load, .loadTake:
+        break
       }
     }
   }
@@ -833,6 +858,16 @@ private struct UseCollector : AddressDefUseWalker {
         insertMarkDependencies(for: load, context)
         load.replace(with: projected, context)
         updatedValue = updated
+
+      case .markDependenceAddr(let markDep):
+        assert(path.isEmpty, "mark_dependence_addr is always recorded at the root path")
+        if value is Undef || markDep.base == allocation {
+          // Drop dependences on nothing or self.
+          updatedValue = value
+        } else {
+          updatedValue = builder.createMarkDependence(value: value, base: markDep.base,
+                                                      kind: markDep.dependenceKind)
+        }
 
       case .load:
         fatalError()

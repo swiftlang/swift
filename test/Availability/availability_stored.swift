@@ -79,19 +79,21 @@ struct BadReferenceStruct1 { // expected-note 3 {{add '@available' attribute to 
     get { x }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
   var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
   var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
+
+  init() { fatalError() } // To suppress memberwise initializer
 }
 
 @available(macOS 40, *)
@@ -120,19 +122,21 @@ struct BadReferenceStruct2 {
     get { x }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
   var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
   var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
+
+  init() { fatalError() } // To suppress memberwise initializer
 }
 
 @available(macOS 40, *)
@@ -161,19 +165,21 @@ public struct PublicStruct {
     get { x }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
   public var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
   public var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
+
+  init() { fatalError() } // To suppress memberwise initializer
 }
 
 // The same behavior should hold for enum elements with payloads.
@@ -207,4 +213,45 @@ public enum PublicReferenceEnum {
   // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   case x(NewStruct)
+}
+
+struct SuppressedMemberwiseInit { // expected-error {{cannot automatically synthesize memberwise initializer for 'SuppressedMemberwiseInit'}}
+  // Ok, available at the deployment target.
+  @available(macOS 10.9, *)
+  var oldComputedWithInit: Int {
+    init { _ = newValue }
+    get { 0 }
+  }
+
+  @available(macOS 50, *)
+  var computedWithInit: NewStruct { // expected-note {{potentially unavailable property 'computedWithInit' with init accessor prevents automatic synthesis of memberwise initializer}}
+    init { _ = newValue }
+    get { NewStruct() }
+  }
+}
+
+@available(macOS 40, *)
+struct SuppressedMemberwiseInitLater { // expected-error {{cannot automatically synthesize memberwise initializer for 'SuppressedMemberwiseInitLater'}}
+  // Ok, as available as struct.
+  @available(macOS 40, *)
+  var computedWithInit: Int {
+    init { _ = newValue }
+    get { 0 }
+  }
+
+  @available(macOS 50, *)
+  var newComputedWithInit: NewStruct { // expected-note {{potentially unavailable property 'newComputedWithInit' with init accessor prevents automatic synthesis of memberwise initializer}}
+    init { _ = newValue }
+    get { NewStruct() }
+  }
+}
+
+@available(macOS, unavailable)
+struct HasMemberwiseInitUnavailableMacOS {
+  // Ok, struct is unavailable
+  @available(macOS 50, *)
+  var computedWithInit: NewStruct {
+    init { _ = newValue }
+    get { NewStruct() }
+  }
 }

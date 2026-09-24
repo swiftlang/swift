@@ -11,17 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
@@ -515,6 +510,40 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
           }
           guaranteedForwardingOps.insert(valUse);
         }
+      }
+    }
+  }
+  return true;
+}
+
+bool swift::visitExtendedGuaranteedForwardingPhis(
+    SILValue value, function_ref<bool(Operand *)> visitor) {
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+
+  ValueWorklist worklist(value);
+
+  while (auto val = worklist.pop()) {
+    for (auto *use : val->getUses()) {
+      if (use->getOperandOwnership() !=
+          OperandOwnership::GuaranteedForwarding) {
+        continue;
+      }
+      if (auto phiOperand = PhiOperand(use)) {
+        if (!visitor(use)) {
+          return false;
+        }
+        // Look through BorrowedFromInst to find further forwarding uses
+        // that go through the phi's borrowed_from result.
+        SILValue phiVal = phiOperand.getValue();
+        if (auto *bfi = getBorrowedFromUser(phiVal))
+          worklist.pushIfNotVisited(SILValue(bfi));
+      } else {
+        ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+          if (result->getOwnershipKind() == OwnershipKind::None)
+            return true;
+          worklist.pushIfNotVisited(result);
+          return true;
+        });
       }
     }
   }
@@ -1133,10 +1162,10 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
 
     auto *user = op->getUser();
     if (isa<DebugValueInst>(user) || isa<SuperMethodInst>(user) ||
-        isa<ClassMethodInst>(user) || isa<CopyValueInst>(user) ||
-        isa<EndBorrowInst>(user) || isa<ApplyInst>(user) ||
-        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
-        isa<UnmanagedRetainValueInst>(user) ||
+        isa<ClassMethodInst>(user) || isa<COMMethodInst>(user) ||
+        isa<CopyValueInst>(user) || isa<EndBorrowInst>(user) ||
+        isa<ApplyInst>(user) || isa<StoreInst>(user) ||
+        isa<PartialApplyInst>(user) || isa<UnmanagedRetainValueInst>(user) ||
         isa<UnmanagedReleaseValueInst>(user) ||
         isa<UnmanagedAutoreleaseValueInst>(user)) {
       continue;

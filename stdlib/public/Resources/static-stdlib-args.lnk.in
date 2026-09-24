@@ -1,0 +1,10 @@
+-ldl
+@libpthread@
+@android_libraries@
+-lswiftCore
+@concurrency_libs@
+-lstdc++
+-lm
+-Xlinker -export-dynamic
+-Xlinker --exclude-libs
+-Xlinker ALL

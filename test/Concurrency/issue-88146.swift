@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -disable-availability-checking -language-mode 5 -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -disable-availability-checking -language-mode 6 %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -language-mode 5 -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -language-mode 6 %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 

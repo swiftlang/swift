@@ -21,9 +21,9 @@ struct DeprecatedWrapper<T> {
   var wrappedValue: T
 }
 
-@available(*, unavailable)
+@available(*, unavailable) // expected-note 12 {{'UnavailableWrapper' has been explicitly marked unavailable here}}
 @propertyWrapper
-struct UnavailableWrapper<T> { // expected-note 12 {{'UnavailableWrapper' has been explicitly marked unavailable here}}
+struct UnavailableWrapper<T> {
   var wrappedValue: T
 }
 
@@ -31,8 +31,8 @@ struct UnavailableWrapper<T> { // expected-note 12 {{'UnavailableWrapper' has be
 struct WrappedValueUnavailableOnMacOS<T> {
   init(wrappedValue: T) { fatalError() }
 
-  @available(macOS, unavailable)
-  var wrappedValue: T { // expected-note 6 {{'wrappedValue' has been explicitly marked unavailable here}}
+  @available(macOS, unavailable) // expected-note 6 {{'wrappedValue' has been explicitly marked unavailable here}}
+  var wrappedValue: T {
     get { fatalError() }
     set { fatalError() }
   }

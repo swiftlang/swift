@@ -18,17 +18,20 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/AdjointValue.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
@@ -36,8 +39,8 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
@@ -2854,6 +2857,7 @@ bool PullbackCloner::Implementation::run() {
     auto *pm = &getContext().getPassManager();
     pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&pullback);
     completeAllLifetimes(pm, &pullback);
+    lowerAddress(pm, &pullback);
     pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 

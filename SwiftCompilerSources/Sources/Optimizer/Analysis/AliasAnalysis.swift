@@ -317,6 +317,12 @@ struct AliasAnalysis {
       return getBuiltinEffect(of: builtin, on: memLoc)
 
     case let endBorrow as EndBorrowInst:
+      let type = endBorrow.borrow.type
+      if type.isNonTrivialOnlyBecauseNonEscapable(in: endBorrow.parentFunction) {
+        // Ending a borrow of a non-Escapable type that is otherwise trivial can
+        // be considered to have no effects.
+        return .noEffects
+      }
       switch endBorrow.borrow {
       case let storeBorrow as StoreBorrowInst:
         precondition(endBorrow.borrow.type.isAddress)
@@ -324,12 +330,13 @@ struct AliasAnalysis {
       case let beginBorrow as BeginBorrowInst where !beginBorrow.hasPointerEscape:
         return getBorrowEffects(of: endBorrow, on: memLoc)
       case let loadBorrow as LoadBorrowInst:
-        let borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
-        // In addition to the "regular" borrow effects, a load_borrow also has effects on the memory location
-        // from where it loads the value. This includes "write" to prevent any optimization to change the
+        var borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
+        // In addition to the "regular" borrow effects, a load_borrow also has
+        // effects on the memory location from where it loads the value. A
+        // "read" effect is added to prevent any optimization from changing the
         // memory location after the load_borrow.
-        if borrowEffects != .worstEffects && memLoc.mayAlias(with: loadBorrow.address, self) {
-          return .worstEffects
+        if !borrowEffects.read && memLoc.mayAlias(with: loadBorrow.address, self) {
+          borrowEffects.read = true
         }
         return borrowEffects
       default:
@@ -338,20 +345,27 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
 
     case let debugValue as DebugValueInst:
-      let v = debugValue.operand.value
-      if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
-        return .init(read: true)
-      } else {
-        return .noEffects
+      for operand in debugValue.operands {
+        let v = operand.value
+        if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
+          return .init(read: true)
+        }
       }
+      return .noEffects
 
     case let destroy as DestroyValueInst:
-      if destroy.destroyedValue.type.isNoEscapeFunction {
+      let type = destroy.destroyedValue.type
+      if type.isNoEscapeFunction {
         return .noEffects
       }
       if destroy.isDeadEnd {
         // We don't have to take deinit effects into account for a `destroy_value [dead_end]`.
         // Such destroys are lowered to no-ops and will not call any deinit.
+        return .noEffects
+      }
+      if type.isNonTrivialOnlyBecauseNonEscapable(in: destroy.parentFunction) {
+        // If the type is only non-trivial because it is ~Escapable,
+        // destroy_value is still a no-op.
         return .noEffects
       }
       return defaultEffects(of: destroy, on: memLoc)
@@ -953,7 +967,7 @@ private extension Type {
     }
     // Only support the most important builtin types to be on the safe side.
     // Historically we assumed that Builtin.RawPointer can alias everything (but why?).
-    if isBuiltinInteger || isBuiltinFloat {
+    if isBuiltinInteger || isBuiltinFloat || isBuiltinBridgeObject {
       return true
     }
     return false

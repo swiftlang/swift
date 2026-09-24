@@ -25,6 +25,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/shims/_SwiftCOMShims.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
@@ -1563,7 +1564,27 @@ tryCastToClassExistential(
     auto metatype = *metatypePtr;
     if (auto tmp = swift_dynamicCastMetatypeToObjectConditional(metatype)) {
       auto value = reinterpret_cast<OpaqueValue *>(&tmp);
-      auto type = reinterpret_cast<const Metadata *>(tmp);
+
+      // When ObjC interop is enabled, metatypes may be able to fulfill a
+      // superclass constraint, since a class is also an instance of its root
+      // class.
+      if (auto *superclass = destExistentialType->getSuperclassConstraint()) {
+        auto *superclassObjC = superclass->getClassObject();
+        if (superclassObjC == nullptr ||
+            swift_dynamicCastObjCClass(tmp, superclassObjC) == nullptr) {
+          return DynamicCastResult::Failure;
+        }
+      }
+
+      // Conformances have to be looked up on the metaclass, which is the class
+      // object's type. Reinterpreting the class object as metadata would find
+      // the instance type's conformances instead, producing a witness table
+      // that expects an instance. Walking the metaclass chain finds only
+      // conformances declared on a class the class object is an instance of,
+      // i.e. its root class.
+      auto *type = swift_getObjCClassMetadata(
+          reinterpret_cast<const ClassMetadata *>(object_getClass((id)tmp)));
+
       if (_conformsToProtocols(value, type, destExistentialType,
                                destExistentialLocation->getWitnessTables(),
                                prohibitIsolatedConformances)) {
@@ -1780,6 +1801,78 @@ tryCastToErrorExistential(
   }
 }
 
+namespace {
+// The reserved ISwiftObject identity must be available without loading the
+// supplemental COM module. Encode {8E369447-5188-5ADA-B9EC-8FCB732D226B} in
+// native GUID byte order, with the alignment required by its integer fields.
+alignas(uint32_t) constexpr TargetCOMInterfaceID<InProcess> IID_ISwiftObject = {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    {0x47, 0x94, 0x36, 0x8e, 0x88, 0x51, 0xda, 0x5a,
+     0xb9, 0xec, 0x8f, 0xcb, 0x73, 0x2d, 0x22, 0x6b}
+#else
+#error GUID representation is byte-order dependent
+#endif
+};
+
+/// A borrowed Swift identity kept alive by an owned ISwiftObject reference.
+///
+/// The incoming interface need not share an address or allocation layout with
+/// the recovered Swift object. Only the ISwiftObject ABI is inspected.
+class COMSwiftObject {
+  void *Interface = nullptr;
+  HeapObject *Object = nullptr;
+  const Metadata *Type = nullptr;
+
+public:
+  explicit COMSwiftObject(void *source) {
+    if (!source)
+      return;
+
+    auto **vtable = *reinterpret_cast<void ***>(source);
+    auto QueryInterface =
+        reinterpret_cast<_SwiftCOMQueryInterfaceFunction>(vtable[0]);
+    void *identity = nullptr;
+    if (QueryInterface(source, IID_ISwiftObject.Bytes, &identity) < 0 ||
+        !identity)
+      return;
+    Interface = identity;
+
+    using ISwiftObject_get_Object = void *(__SWIFT_STDCALL *)(void *);
+    using ISwiftObject_get_Metadata =
+        const Metadata *(__SWIFT_STDCALL *)(void *);
+    vtable = *reinterpret_cast<void ***>(Interface);
+    auto get_Object = reinterpret_cast<ISwiftObject_get_Object>(vtable[3]);
+    auto get_Metadata = reinterpret_cast<ISwiftObject_get_Metadata>(vtable[4]);
+    auto *object = static_cast<HeapObject *>(get_Object(Interface));
+    auto *metadata = get_Metadata(Interface);
+
+    // Both requirements must describe the same native class object before
+    // its identity can be used by ordinary Swift runtime operations.
+    if (!object || !metadata || metadata->getKind() != MetadataKind::Class ||
+        swift_getObjectType(object) != metadata)
+      return;
+    Object = object;
+    Type = metadata;
+  }
+
+  COMSwiftObject(const COMSwiftObject &) = delete;
+  COMSwiftObject &operator=(const COMSwiftObject &) = delete;
+
+  ~COMSwiftObject() {
+    if (Interface) {
+      auto **vtable = *reinterpret_cast<void ***>(Interface);
+      auto Release = reinterpret_cast<_SwiftCOMLifetimeFunction>(vtable[2]);
+      Release(Interface);
+    }
+  }
+
+  explicit operator bool() const { return Object != nullptr; }
+  HeapObject *getObject() const { return Object; }
+  const Metadata *getType() const { return Type; }
+};
+
+} // namespace
+
 static DynamicCastResult
 tryCastUnwrappingExistentialSource(
   OpaqueValue *destLocation, const Metadata *destType,
@@ -1819,14 +1912,65 @@ tryCastUnwrappingExistentialSource(
     srcInnerValue = const_cast<OpaqueValue *>(srcErrorValue);
     break;
   }
+  case ExistentialTypeRepresentation::COM: {
+    srcFailureType = srcType;
+    destFailureType = destType;
+
+    // A COM-to-COM cast has already queried the destination interface. Do not
+    // follow its failure with an unrelated query for Swift identity.
+    if (auto *destination = dyn_cast<ExistentialTypeMetadata>(destType)) {
+      if (destination->getRepresentation() ==
+          ExistentialTypeRepresentation::COM)
+        return DynamicCastResult::Failure;
+    }
+
+    COMSwiftObject identity(*reinterpret_cast<void **>(srcValue));
+    if (!identity)
+      return DynamicCastResult::Failure;
+
+    // The queried interface owns the borrowed object for this recursive cast.
+    // Give a successful Swift result independent ownership. The outer driver
+    // consumes the original COM source when requested.
+    auto *object = identity.getObject();
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&object);
+    srcInnerType = identity.getType();
+    srcFailureType = srcInnerType;
+    return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                   destFailureType, srcFailureType, /*takeOnSuccess=*/false,
+                   mayDeferChecks, prohibitIsolatedConformances);
+  }
   }
 
   srcFailureType = srcInnerType;
-  return tryCast(destLocation, destType,
-                 srcInnerValue, srcInnerType,
-                 destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue),
-                 mayDeferChecks, prohibitIsolatedConformances);
+
+  // If the source is non-copyable, then we must try to take/move it
+  bool srcInnerIsNoncopyable =
+      !srcInnerType->getValueWitnesses()->flags.isCopyable();
+  // If the value is boxed, there might be another reference, but
+  // if it's inline, we can optimize by using take/move semantics:
+  bool srcIsInline = (srcInnerValue == srcValue);
+  bool takeInnerValue =
+      takeOnSuccess && (srcInnerIsNoncopyable || srcIsInline);
+
+  auto result = tryCast(destLocation, destType,
+                        srcInnerValue, srcInnerType,
+                        destFailureType, srcFailureType,
+                        takeInnerValue,
+                        mayDeferChecks, prohibitIsolatedConformances);
+
+  // If we (a) moved the payload out of a (b) boxed (out-of-line) (c) opaque
+  // existential container, the box itself still needs to be freed.
+  if (result == DynamicCastResult::SuccessViaTake && // (a)
+      !srcIsInline && // (b)
+      srcExistentialType->getRepresentation() ==
+      ExistentialTypeRepresentation::Opaque) // (c)
+  {
+    auto *vwt = srcInnerType->getValueWitnesses();
+    auto *box = *reinterpret_cast<HeapObject **>(srcValue);
+    swift_deallocUninitializedObject(box, vwt->size, vwt->getAlignmentMask());
+  }
+
+  return result;
 }
 
 static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
@@ -1871,10 +2015,33 @@ static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
   }
 
   srcFailureType = srcInnerType;
-  return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
-                 destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks,
-                 prohibitIsolatedConformances);
+
+  // Noncopyable payload must be moved, not copied.
+  bool srcInnerIsNoncopyable =
+      !srcInnerType->getValueWitnesses()->flags.isCopyable();
+  // If the value is boxed, there might be another reference, but
+  // if it's inline, we can optimize by using take/move semantics:
+  bool srcIsInline = (srcInnerValue == srcValue);
+  bool takeInnerValue =
+      takeOnSuccess && (srcInnerIsNoncopyable || srcIsInline);
+
+  auto result = tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                        destFailureType, srcFailureType,
+                        takeInnerValue, mayDeferChecks,
+                        prohibitIsolatedConformances);
+
+  if (result == DynamicCastResult::SuccessViaTake &&
+      !srcIsInline &&
+      srcExistentialType->Shape->Flags.getSpecialKind() ==
+          ExtendedExistentialTypeShape::SpecialKind::None) {
+    // Value was moved out of a heap-allocated box, so we
+    // need to free the empty box:
+    auto *vwt = srcInnerType->getValueWitnesses();
+    auto *box = *reinterpret_cast<HeapObject **>(srcValue);
+    swift_deallocUninitializedObject(box, vwt->size, vwt->getAlignmentMask());
+  }
+
+  return result;
 }
 
 static DynamicCastResult
@@ -2249,6 +2416,57 @@ tryCastToExistentialMetatype(
   }
 }
 
+static DynamicCastResult tryCastToCOMExistential(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks,
+    bool prohibitIsolatedConformances) {
+  srcFailureType = srcType;
+  destFailureType = destType;
+
+  // Query an interface pointer directly. The cast driver unwraps other
+  // source representations, such as an interface stored in Any.
+  if (srcType->getKind() != MetadataKind::Existential)
+    return DynamicCastResult::Failure;
+
+  auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
+  if (srcExistentialType->getRepresentation() !=
+      ExistentialTypeRepresentation::COM)
+    return DynamicCastResult::Failure;
+
+  auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
+
+  // Canonicalization leaves only the most-derived interface, and marker
+  // protocols are omitted from existential metadata.
+  assert(destExistentialType->NumProtocols == 1 &&
+         "COM existential must contain exactly one interface");
+  auto protocol = destExistentialType->getProtocols().front();
+  assert(protocol.getSpecialProtocol() == SpecialProtocol::COM &&
+         "COM existential must contain a COM interface");
+  auto *interfaceProtocol = protocol.getSwiftProtocol();
+
+  auto iid = interfaceProtocol->getCOMInterfaceID();
+  auto sourceInterface = *reinterpret_cast<void **>(srcValue);
+  if (!sourceInterface)
+    return DynamicCastResult::Failure;
+
+  auto **vtable = *reinterpret_cast<void ***>(sourceInterface);
+  auto queryInterface =
+      reinterpret_cast<_SwiftCOMQueryInterfaceFunction>(vtable[0]);
+
+  void *resultInterface = nullptr;
+  auto result = queryInterface(sourceInterface, iid, &resultInterface);
+  if (result < 0 || !resultInterface)
+    return DynamicCastResult::Failure;
+
+  *reinterpret_cast<void **>(destLocation) = resultInterface;
+
+  // `QueryInterface` returns an owned (+1) interface pointer. Report a copy
+  // even when the caller requested a take: the top-level cast driver will then
+  // destroy the independent source ownership exactly once.
+  return DynamicCastResult::SuccessViaCopy;
+}
+
 /******************************************************************************/
 /********************************** Dispatch **********************************/
 /******************************************************************************/
@@ -2320,6 +2538,8 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
       return tryCastToClassExistential; // => AnyObject, with or without protocol constraints
     case ExistentialTypeRepresentation::Error: // => Error existential
       return tryCastToErrorExistential;
+    case ExistentialTypeRepresentation::COM:
+      return tryCastToCOMExistential;
     }
     swift_unreachable(
       "Unknown existential type representation in dynamic cast dispatch");
@@ -2724,3 +2944,158 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
+
+/******************************************************************************/
+/**************************** Non-consuming Test ******************************/
+/******************************************************************************/
+
+// swift_dynamicCast always produces a value, so asking it whether a cast would
+// succeed costs either a copy or a take of the source. Neither is available for
+// a noncopyable value: the copy is what its type forbids, and the take is what
+// `is` and `case is T` must not do. The entry point below answers the same
+// question while only reading the source.
+//
+// TODO: Refactor tryCast() to accept a test_only mode so that we have
+// a common implementation behind both swift_dynamicCast and
+// swift_dynamicCastTest.
+//
+// Deferred until there is enough compiler support to exercise the nested shapes
+// end-to-end: today SILGen cannot emit a test against them, so any handling
+// added here would be untestable and therefore unverified.
+
+/// Peel one layer of existential container off \p srcType / \p srcValue.
+///
+/// Returns false if \p srcType is not an existential, or is one whose payload
+/// we cannot reach, leaving both arguments untouched.
+///
+/// This only reads the container. The returned \p srcValue points into it, so
+/// it stays valid exactly as long as the caller's borrow of the original does.
+static bool unwrapExistentialForTest(const Metadata *&srcType,
+                                     OpaqueValue *&srcValue) {
+  if (srcType->getKind() != MetadataKind::Existential)
+    return false;
+
+  auto existentialType = cast<ExistentialTypeMetadata>(srcType);
+  switch (existentialType->getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
+    auto classContainer =
+        reinterpret_cast<ClassExistentialContainer *>(srcValue);
+    srcType = swift_getObjectType((HeapObject *)classContainer->Value);
+    srcValue = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
+    return true;
+  }
+  case ExistentialTypeRepresentation::Opaque: {
+    auto opaqueContainer =
+        reinterpret_cast<OpaqueExistentialContainer *>(srcValue);
+    srcType = opaqueContainer->Type;
+    srcValue = existentialType->projectValue(srcValue);
+    return true;
+  }
+  case ExistentialTypeRepresentation::Error: {
+    const SwiftError *errorBox =
+        *reinterpret_cast<const SwiftError *const *>(srcValue);
+    srcValue = errorBox->isPureNSError()
+                   ? srcValue
+                   : const_cast<OpaqueValue *>(errorBox->getValue());
+    srcType = errorBox->getType();
+    return true;
+  }
+  case ExistentialTypeRepresentation::COM:
+    // As in tryCastUnwrappingExistentialSource: do not reinterpret a COM
+    // interface pointer as a Swift existential payload.
+    return false;
+  }
+  return false;
+}
+
+/// Answer the cast relation for a noncopyable source value, reading only the
+/// metadata and (for Optional) the enum tag.
+///
+/// A noncopyable type reaches none of tryCast()'s value-producing conversions:
+/// ObjC bridging requires _ObjectiveCBridgeable, AnyHashable's init requires a
+/// Copyable H, __SwiftValue boxing requires a copy, and `any Error` requires
+/// Error, which is Copyable. Note that Hashable itself *is* ~Copyable, so a
+/// noncopyable type can conform to it -- but it still cannot be boxed into
+/// AnyHashable, which is what tryCastToAnyHashable would have to do. What is
+/// left is subtyping, which metadata decides, modulo Optional on either side.
+static bool dynamicCastTestNoncopyable(OpaqueValue *srcValue,
+                                       const Metadata *srcType,
+                                       const Metadata *targetType) {
+  // `T?.none` casts to any optional type, so remember whether the target was
+  // optional before unwrapping it (see tryCastUnwrappingOptionalBoth).
+  bool targetWasOptional = (targetType->getKind() == MetadataKind::Optional);
+  while (targetType->getKind() == MetadataKind::Optional)
+    targetType = cast<EnumMetadata>(targetType)->getGenericArgs()[0];
+
+  for (;;) {
+    if (swift_dynamicCastMetatype(srcType, targetType) != nullptr)
+      return true;
+
+    if (srcType->getKind() != MetadataKind::Optional)
+      return false;
+
+    // A single-payload Optional stores its payload at its own address, so
+    // unwrapping the type does not move the value pointer.
+    auto innerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+    if (innerType->vw_getEnumTagSinglePayload(srcValue, /*emptyCases=*/1) != 0)
+      return targetWasOptional; // Source is nil.
+    srcType = innerType;
+  }
+}
+
+bool swift::swift_dynamicCastTest(OpaqueValue *srcValue,
+                                  const Metadata *srcType,
+                                  const Metadata *targetType,
+                                  DynamicCastFlags flags) {
+  // Peel existential containers here so that the copyability decision below is
+  // made about the value that would actually be cast, not about its box. The
+  // box of a `~Copyable` existential is itself noncopyable no matter what it
+  // holds, so testing the container would send copyable payloads -- which may
+  // still need bridging -- down the metadata-only path.
+  while (unwrapExistentialForTest(srcType, srcValue)) {
+  }
+
+  if (!srcType->getValueWitnesses()->flags.isCopyable())
+    return dynamicCastTestNoncopyable(srcValue, srcType, targetType);
+
+  // A copyable source can reach conversions whose outcome is not decidable
+  // from metadata, so defer to the real cast. Default flags mean copy on
+  // success and leave the source alone on failure, so srcValue is unchanged
+  // either way; the copy is legal precisely because we got here.
+  auto *targetVW = targetType->getValueWitnesses();
+  size_t targetSize = targetVW->getSize();
+  size_t targetAlignMask = targetVW->getAlignmentMask();
+
+  struct FreeBuffer {
+    void *Buffer = nullptr;
+    size_t size, alignMask;
+    FreeBuffer(size_t size, size_t alignMask)
+        : size(size), alignMask(alignMask) {}
+    ~FreeBuffer() {
+      if (Buffer)
+        swift_slowDealloc(Buffer, size, alignMask);
+    }
+  } freeBuffer{targetSize, targetAlignMask};
+
+  const size_t inlineValueSize = 3 * sizeof(void *);
+  alignas(MaximumAlignment) char inlineBuffer[inlineValueSize + 1];
+  void *scratch;
+  if (targetVW->getStride() <= inlineValueSize) {
+    scratch = inlineBuffer;
+  } else {
+    scratch = swift_slowAlloc(targetSize, targetAlignMask);
+    freeBuffer.Buffer = scratch;
+  }
+
+  auto castFlags = DynamicCastFlags::Default;
+  if (flags & DynamicCastFlags::ProhibitIsolatedConformances)
+    castFlags |= DynamicCastFlags::ProhibitIsolatedConformances;
+
+  if (!swift_dynamicCast((OpaqueValue *)scratch, srcValue, srcType, targetType,
+                         castFlags))
+    return false;
+
+  // We asked a question, not for a value; discard what the cast produced.
+  targetType->vw_destroy((OpaqueValue *)scratch);
+  return true;
+}

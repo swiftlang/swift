@@ -210,7 +210,6 @@ add_library(swiftCore
   Substring.swift
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
-  ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
   UnicodeData.swift

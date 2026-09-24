@@ -86,6 +86,26 @@
 #define SWIFT_PRIVATE_ATTR
 #endif
 
+/// The `SWIFT_LIFETIMEBOUND` macro is applied to a parameter of an inline thunk
+/// whose lifetime the thunk's return value depends on, so that Clang's lifetime
+/// analyses can diagnose calls that let the return value outlive the argument.
+///
+/// `SWIFT_SELF_LIFETIMEBOUND` is the equivalent for the implicit object
+/// parameter of a member thunk. Clang rejects the GNU spelling of the attribute
+/// in that position, so it is only available in language modes that support the
+/// `[[...]]` spelling.
+#if defined(__cplusplus) && __cplusplus >= 201103L &&                          \
+    __has_cpp_attribute(clang::lifetimebound)
+#define SWIFT_LIFETIMEBOUND [[clang::lifetimebound]]
+#define SWIFT_SELF_LIFETIMEBOUND [[clang::lifetimebound]]
+#elif __has_attribute(lifetimebound)
+#define SWIFT_LIFETIMEBOUND __attribute__((lifetimebound))
+#define SWIFT_SELF_LIFETIMEBOUND
+#else
+#define SWIFT_LIFETIMEBOUND
+#define SWIFT_SELF_LIFETIMEBOUND
+#endif
+
 namespace swift SWIFT_PRIVATE_ATTR {
 namespace _impl {
 

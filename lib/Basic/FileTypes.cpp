@@ -10,11 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 
-#include "swift/Strings.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -122,6 +119,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_SymbolGraphFile:
+  case file_types::TY_SARIFDiagnostics:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -186,6 +184,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_SerializedDiagnostics:
+  case file_types::TY_SARIFDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
@@ -251,6 +250,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SerializedDiagnostics:
+  case file_types::TY_SARIFDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
@@ -285,6 +285,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
 bool file_types::isProducedFromDiagnostics(ID Id) {
   switch (Id) {
   case file_types::TY_SerializedDiagnostics:
+  case file_types::TY_SARIFDiagnostics:
   case file_types::TY_SwiftFixIt:
   case file_types::TY_CachedDiagnostics:
     return true;

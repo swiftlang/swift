@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalActorIsolatedFunction.swiftmodule -module-name GlobalActorIsolatedFunction -strict-concurrency=complete %S/Inputs/GlobalActorIsolatedFunction.swift
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -disable-availability-checking -verify %s -o /dev/null -parse-as-library -I %t
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -emit-module-path %t/GlobalActorIsolatedFunction.swiftmodule -module-name GlobalActorIsolatedFunction -strict-concurrency=complete %S/Inputs/GlobalActorIsolatedFunction.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -swift-version 6 -verify %s -o /dev/null -parse-as-library -I %t
 
 // README: This is testing that we properly serialize ActorIsolation on
 // SILFunctions. We do not print it yet on SILFunctions, but we can observe it

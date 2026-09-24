@@ -21,11 +21,9 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -35,7 +33,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
-#include "clang/AST/Decl.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -217,7 +214,9 @@ static BridgedFunction::ParseFn parseFunction = nullptr;
 static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
+static BridgedFunction::HasComputedSideEffectsFn hasComputedSideEffectsFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
+static BridgedFunction::ArgumentMayWriteFn argumentMayWriteFunction = nullptr;
 static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
@@ -286,6 +285,12 @@ void SILFunction::init(
   this->IsPerformanceConstraint = false;
   this->NeedBreakInfiniteLoops = false;
   this->NeedCompleteLifetimes = false;
+  // Set by AddressLowering when it lowers this function in the Raw-stage
+  // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
+  // born after the module advances past Raw are reported lowered by the
+  // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
+  this->HasLoweredAddresses = false;
+  this->HasOwnershipForTrivialValues = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -299,6 +304,47 @@ void SILFunction::init(
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
   setDebugScope(DebugScope);
   setGenericEnvironment(genericEnv);
+}
+
+bool SILFunction::hasLoweredAddresses() const {
+  // Lowered if:
+  // - This function was individually lowered by AddressLowering
+  // - This function arrived already canonical via deserialization
+  // - This is a non-opaque-values build
+  // - Module has committed past Raw SIL stage 
+  return HasLoweredAddresses || WasDeserializedCanonical ||
+         !getModule().usesOpaqueValues() ||
+         getModule().getStage() != SILStage::Raw;
+}
+
+SILAddressConventions SILAddressConventions::forRawSIL(SILModule &M) {
+  // The module's Raw-stage representation: opaque values under opaque-values
+  // mode, raw addresses otherwise. No function in scope, so this is keyed to
+  // build mode, not the module stage (a detached value has no per-function
+  // lowered state).
+  return SILAddressConventions::withLoweredAddresses(M, !M.usesOpaqueValues());
+}
+
+SILAddressConventions SILAddressConventions::forFunction(const SILFunction &fn) {
+  return SILAddressConventions::withLoweredAddresses(fn.getModule(),
+                                                     fn.hasLoweredAddresses());
+}
+
+SILAddressConventions
+SILAddressConventions::forFunctionOrRawSIL(const SILFunction *fn,
+                                           SILModule &M) {
+  if (!fn)
+    return forRawSIL(M);
+  return forFunction(*fn);
+}
+
+SILAddressConventions SILAddressConventions::forFunctionWithOverride(
+    SILModule &M, std::optional<SILAddressConventions> overrideConv,
+    const SILFunction *fn) {
+  bool loweredAddresses =
+      (overrideConv.has_value() && overrideConv->useLoweredAddresses()) ||
+      (fn && fn->hasLoweredAddresses());
+  return SILAddressConventions::withLoweredAddresses(M, loweredAddresses);
 }
 
 SILFunction::~SILFunction() {
@@ -372,6 +418,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
+  newSnapshot->HasLoweredAddresses = HasLoweredAddresses;
 
   SILFunctionCloner cloner(newSnapshot);
   cloner.cloneFunction(this);
@@ -659,11 +706,13 @@ const TypeLowering &SILFunction::getTypeLowering(Type t) const {
 SILType
 SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getLoweredType(orig, subst,
-                                          TypeExpansionContext(*this));
+                                          TypeExpansionContext(*this),
+                                          hasLoweredAddresses());
 }
 
 SILType SILFunction::getLoweredType(Type t) const {
-  return getModule().Types.getLoweredType(t, TypeExpansionContext(*this));
+  return getModule().Types.getLoweredType(t, TypeExpansionContext(*this),
+                                          hasLoweredAddresses());
 }
 
 CanType
@@ -678,7 +727,8 @@ CanType SILFunction::getLoweredRValueType(Type t) const {
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
   auto &M = getModule();
-  return M.Types.getLoweredLoadableType(t, TypeExpansionContext(*this), M);
+  return M.Types.getLoweredLoadableType(t, TypeExpansionContext(*this),
+                                        hasLoweredAddresses());
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
@@ -954,6 +1004,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return "";
   }
 };
+
 } // namespace llvm
 #endif
 
@@ -983,6 +1034,23 @@ void SILFunction::viewCFGOnly() const {
   viewCFGHelper(this, /*skipBBContents=*/true);
 }
 
+static void viewDomTreeHelper(const SILFunction *f, bool shortNames) {
+#ifndef NDEBUG
+  auto *nonConstF = const_cast<SILFunction *>(f);
+  DominanceInfo domInfo(nonConstF);
+
+  llvm::ViewGraph(&domInfo, "domtree_" + f->getName().str(),
+                  /*ShortNames=*/shortNames);
+#endif
+}
+
+void SILFunction::viewDomTree() const {
+  viewDomTreeHelper(this, /*shortNames=*/false);
+}
+
+void SILFunction::viewDomTreeOnly() const {
+  viewDomTreeHelper(this, /*shortNames=*/true);
+}
 
 bool SILFunction::hasDynamicSelfMetadata() const {
   auto paramTypes =
@@ -1065,6 +1133,14 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   // An external forward declaration is resolved at link time, so any linkage
   // is valid.
   if (isExternForwardDeclaration())
+    return true;
+
+  // A function exported through the interface-mode contract has its body
+  // emitted as a strong external definition by its owning module, not
+  // inlined into clients. A serialized caller in another module can
+  // reference it by name; the linker resolves the call to the owning
+  // module's definition.
+  if (isNeverEmitIntoClient())
     return true;
 
   // The call site of this function must have checked that
@@ -1295,14 +1371,13 @@ void SILFunction::forEachSpecializeAttrTargetFunction(
   }
 }
 
-void BridgedFunction::registerBridging(SwiftMetatype metatype,
-            RegisterFn initFn, RegisterFn destroyFn,
-            WriteFn writeFn, ParseFn parseFn,
-            CopyEffectsFn copyEffectsFn,
-            GetEffectInfoFn effectInfoFn,
-            GetMemBehaviorFn memBehaviorFn,
-            ArgumentMayReadFn argumentMayReadFn,
-            IsDeinitBarrierFn isDeinitBarrierFn) {
+void BridgedFunction::registerBridging(
+    SwiftMetatype metatype, RegisterFn initFn, RegisterFn destroyFn,
+    WriteFn writeFn, ParseFn parseFn, CopyEffectsFn copyEffectsFn,
+    GetEffectInfoFn effectInfoFn, GetMemBehaviorFn memBehaviorFn,
+    HasComputedSideEffectsFn hasComputedSideEffectsFn,
+    ArgumentMayReadFn argumentMayReadFn, ArgumentMayWriteFn argumentMayWriteFn,
+    IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1311,7 +1386,9 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   copyEffectsFunction = copyEffectsFn;
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
+  hasComputedSideEffectsFunction = hasComputedSideEffectsFn;
   argumentMayReadFunction = argumentMayReadFn;
+  argumentMayWriteFunction = argumentMayWriteFn;
   isDeinitBarrierFunction = isDeinitBarrierFn;
 }
 
@@ -1407,11 +1484,26 @@ MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
 }
 
 // Used by the MemoryLifetimeVerifier
+bool SILFunction::hasComputedSideEffects() const {
+  if (!hasComputedSideEffectsFunction)
+    return false;
+
+  return hasComputedSideEffectsFunction({const_cast<SILFunction *>(this)});
+}
+
+// Used by the MemoryLifetimeVerifier
 bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
   if (!argumentMayReadFunction)
     return true;
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
+}
+
+bool SILFunction::argumentMayWrite(Operand *argOp, SILValue addr) {
+  if (!argumentMayWriteFunction)
+    return true;
+
+  return argumentMayWriteFunction({this}, {argOp}, {addr});
 }
 
 bool SILFunction::isDeinitBarrier() {

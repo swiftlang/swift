@@ -210,5 +210,15 @@ extension SIMDMask where Storage == ${Vector} {
   }
 }
 
+@export(implementation)
+public func any(_ mask: SIMDMask<${Vector}>) -> Bool {
+  return mask._storage.min() < 0
+}
+
+@export(implementation)
+public func all(_ mask: SIMDMask<${Vector}>) -> Bool {
+  return mask._storage.max() < 0
+}
+
 % end
 %end

@@ -38,19 +38,19 @@ return %0 : $Builtin.Int64
 sil @constant : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
 // CHECK: #dbg_value(i64 42, ![[CONST_VAR:[0-9]+]], !DIExpression()
-debug_value undef : $Builtin.Int64, var, name "const", transform {
+debug_value (), var, name "const", transform {
 bb0:
   %1 = integer_literal $Builtin.Int64, 42
   return %1 : $Builtin.Int64
 }
 // CHECK: #dbg_value(i64 3645, ![[CONSTINT_VAR:[0-9]+]], !DIExpression()
-debug_value undef : $Builtin.Int64, var, name "constint", type $Int64, expr op_fragment:#Int64._value, transform {
+debug_value (), var, name "constint", type $Int64, expr op_fragment:#Int64._value, transform {
 bb0:
   %1 = integer_literal $Builtin.Int64, 3645
   return %1 : $Builtin.Int64
 }
 // CHECK: #dbg_value(i64 6, ![[CONSTUPLE_VAR:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
-debug_value undef : $Builtin.Int64, var, name "constuple", type $(Int64, Int64), expr op_tuple_fragment:$(Int64, Int64):0:op_fragment:#Int64._value, transform {
+debug_value (), var, name "constuple", type $(Int64, Int64), expr op_tuple_fragment:$(Int64, Int64):0:op_fragment:#Int64._value, transform {
 bb0:
   %1 = integer_literal $Builtin.Int64, 6
   return %1 : $Builtin.Int64
@@ -62,7 +62,7 @@ return %0 : $Builtin.Int64
 sil @float_constant : $@convention(thin) (Builtin.FPIEEE64) -> (Builtin.FPIEEE64) {
 bb0(%0 : $Builtin.FPIEEE64):
   // CHECK: #dbg_value(double 2.000000e+00, ![[FCONST_VAR:[0-9]+]], !DIExpression()
-  debug_value undef : $Builtin.FPIEEE64, var, name "fconst", transform {
+  debug_value (), var, name "fconst", transform {
   bb0:
     %1 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2.0
     return %1 : $Builtin.FPIEEE64

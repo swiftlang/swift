@@ -169,10 +169,10 @@ func butt(x: inout Butt) { // expected-note * {{}}
     }
 }
 
-@available(macOS, unavailable)
+@available(macOS, unavailable) // expected-note {{has been explicitly marked unavailable here}}
 extension Butt {
   @available(iOS, unavailable)
-  struct Nested { // expected-note {{has been explicitly marked unavailable here}}
+  struct Nested {
     @SetterMoreAvailable
     var wrapped_setter_more_available: Int // expected-note 2 {{has been explicitly marked unavailable here}}
 
@@ -192,8 +192,8 @@ func testButtNested(x: inout Butt.Nested) { // expected-error {{'Nested' is unav
 @_spi_available(macOS, introduced: 51)
 extension Butt {
   struct NestedInSPIAvailableExtension {
-    @available(macOS, unavailable)
-    public var unavailable: Int {// expected-note {{'unavailable' has been explicitly marked unavailable here}}
+    @available(macOS, unavailable) // expected-note {{'unavailable' has been explicitly marked unavailable here}}
+    public var unavailable: Int {
       get { 0 }
       set {}
     }

@@ -150,7 +150,7 @@ private extension UnaryInstruction {
         }
     }
     if canEraseInst {
-      context.erase(instructionIncludingDebugUses: inst)
+      context.erase(instruction: inst)
     }
     return true
   }

@@ -131,3 +131,39 @@ public struct HasWrappers {
   // CHECK: public func hasParameterWithAPIWrapperComposed(@TestResilient::ProjectedValueWrapper<TestResilient::Wrapper<Swift::Int>> @TestResilient::Wrapper x: Swift::Int)
   public func hasParameterWithAPIWrapperComposed(@ProjectedValueWrapper @Wrapper x: Int) { }
 }
+
+// CHECK: @frozen public struct HasWrappersFrozen {
+@frozen
+public struct HasWrappersFrozen {
+  // CHECK:      @TestResilient::Wrapper<Swift::Int> public var x: Swift::Int {
+  // CHECK-NEXT:   get
+  // CHECK-NEXT:   set
+  // CHECK-NEXT:   _modify
+  // CHECK-NEXT: }
+  // CHECK-NOT:  _x
+  @Wrapper public var x: Int
+
+  // The backing storage of a non-public wrapped property is still printed,
+  // because it contributes to the layout of the frozen struct and the wrapped
+  // property itself is not printed.
+  // CHECK: private var _y: TestResilient::Wrapper<Swift::Int>
+  @Wrapper internal var y: Int
+
+  // CHECK:      @TestResilient::WrapperWithInitialValue<Swift::Int> @_projectedValueProperty($z) public var z: Swift::Int {
+  // CHECK-NEXT:   get
+  // CHECK-NEXT:   set
+  // CHECK-NEXT:   _modify
+  // CHECK-NEXT: }
+  // CHECK-NOT:  _z
+  // CHECK:      public var $z: TestResilient::Wrapper<Swift::Int> {
+  // CHECK-NEXT:   get
+  // CHECK-NEXT:   set
+  // CHECK-NEXT: }
+  @WrapperWithInitialValue public var z = 17
+
+  // CHECK: public init(x: Swift::Int, y: Swift::Int)
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+}

@@ -242,7 +242,8 @@ class SwiftDependencyTracker {
 public:
   SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
                          llvm::PrefixMapper *Mapper,
-                         const CompilerInvocation &CI);
+                         const CompilerInvocation &CI,
+                         ArrayRef<std::string> ExtraFiles = {});
   
   void startTracking(bool includeCommonDeps = true);
 
@@ -290,12 +291,7 @@ public:
 
   /// CAS Dependency Tracker.
   std::optional<SwiftDependencyTracker>
-  createSwiftDependencyTracker(const CompilerInvocation &CI) {
-    if (!CAS)
-      return std::nullopt;
-
-    return SwiftDependencyTracker(CAS, PrefixMapper.get(), CI);
-  }
+  createSwiftDependencyTracker(const CompilerInvocation &CI);
 
   /// PrefixMapper for scanner.
   bool hasPathMapping() const {

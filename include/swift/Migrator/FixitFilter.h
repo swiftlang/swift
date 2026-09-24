@@ -126,8 +126,8 @@ struct FixitFilter {
         Info.ID == diag::deprecated_any_composition.ID ||
         Info.ID == diag::deprecated_operator_body.ID ||
         Info.ID == diag::unbound_generic_parameter_explicit_fix.ID ||
-        Info.ID == diag::missing_several_cases.ID ||
-        Info.ID == diag::missing_particular_case.ID ||
+        Info.ID == diag::missing_cases.ID ||
+        Info.ID == diag::missing_default_case.ID ||
         Info.ID == diag::missing_unknown_case.ID ||
         Info.ID == diag::paren_void_probably_void.ID ||
         Info.ID == diag::make_decl_objc.ID ||

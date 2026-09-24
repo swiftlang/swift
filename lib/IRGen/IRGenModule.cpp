@@ -17,7 +17,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/DiagnosticsIRGen.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
+#include "swift/Basic/UUID.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -36,17 +36,21 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/HeaderSearch.h"
-#include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Frontend/Debug/Options.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
@@ -69,6 +73,7 @@
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
 #include "ProtocolInfo.h"
@@ -218,7 +223,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()),
       VariantTriple(irgen.getEffectiveClangVariantTriple()),
-      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      TargetMachine(std::move(target)),
+      silConv(SILAddressConventions::forFullyLoweredModule(irgen.SIL)),
       OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
       CacheKeyForJob(CacheKeyForJob), TargetInfo(SwiftTargetInfo::get(*this)),
@@ -234,6 +240,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
+  // respect program address space in llvm data layout
+  // for function pointers
+  FunctionPtrTy = llvm::PointerType::get(getLLVMContext(),
+    DataLayout.getProgramAddressSpace());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
@@ -1028,6 +1038,44 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  TaskCancellationScopeAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskCancellationScopeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  TaskDeadlineAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskDeadlineAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CancellationHandlerWithReasonAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCancellationHandlerWithReasonAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  EmbeddedDistributedSwiftAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getEmbeddedDistributedSwiftAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
@@ -1199,11 +1247,6 @@ llvm::Constant *swift::getRuntimeFn(
   return cache;
 }
 
-llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
-  return getAddrOfLLVMVariableOrGOTEquivalent(
-      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
-}
-
 llvm::Constant *IRGenModule::
     getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
   // A callee-allocated (yield_once_2) coroutine accessor method that is removed
@@ -1250,6 +1293,56 @@ llvm::Function *IRGenModule::getOrCreateDeadMethodErrorStub() {
   new llvm::UnreachableInst(getLLVMContext(), entry);
 
   DeadMethodErrorStub = stub;
+  return stub;
+}
+
+// Local async stub that tail-calls into swift_deletedAsyncMethodError()
+llvm::Function *IRGenModule::getOrCreateDeadMethodErrorAsyncStub() {
+  if (DeadMethodErrorAsyncStub)
+    return DeadMethodErrorAsyncStub;
+  // Set up the stub, roughly following getOrCreateDeadMethodErrorStub()
+  bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+  auto *fnTy = llvm::FunctionType::get(VoidTy, {Int8PtrTy}, false);
+  auto *stub = llvm::Function::Create(
+      fnTy,
+      canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                  : llvm::GlobalValue::InternalLinkage,
+      "_swift_dead_method_async_stub", &Module);
+  ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                             : IRLinkage::Internal)
+      .to(stub, /* nonAliasedDefinition */ false);
+  stub->setAttributes(constructInitialAttributes().addParamAttribute(
+      getLLVMContext(), 0, llvm::Attribute::SwiftAsync));
+  stub->setCallingConv(SwiftAsyncCC);
+  DeadMethodErrorAsyncStub = stub;  // cache before recursing for AFP below
+  // Emit async function entry code, roughly following emitAsyncFunctionEntry()
+  IRGenFunction IGF(*this, stub);  // emitPrologue() sets up the entry block
+  auto &Builder = IGF.Builder;
+  Size contextSize = NumWords_AsyncLet * getPointerSize();
+  auto *afpPtr = Builder.CreateBitOrPointerCast(
+      getOrCreateDeadAsyncMethodErrorFunctionPointer(), Int8PtrTy);
+  auto *id = Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_id_async,
+      {llvm::ConstantInt::get(Int32Ty, contextSize.getValue()),
+       llvm::ConstantInt::get(Int32Ty, 16),
+       llvm::ConstantInt::get(Int32Ty, 0), afpPtr});
+  auto *hdl = Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_begin,
+      {id, llvm::ConstantPointerNull::get(Int8PtrTy)});
+  // Emit async function tail call, roughly following emitAsyncReturn()
+  llvm::Value *context = stub->getArg(0);
+  Signature calleeSig(fnTy, llvm::AttributeList(), SwiftAsyncCC);
+  auto *calleeFn =
+      Builder.CreateBitOrPointerCast(getDeletedAsyncMethodErrorFn(), Int8PtrTy);
+  auto fnPtr = FunctionPointer::createUnsigned(FunctionPointer::Kind::Function,
+                                               calleeFn, calleeSig);
+  auto *dispatchFn = IGF.createAsyncDispatchFn(fnPtr, {context});
+  auto *rawFnPtr =
+      Builder.CreateBitOrPointerCast(fnPtr.getRawPointer(), Int8PtrTy);
+  Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_end_async,
+      {hdl, Builder.getFalse(), dispatchFn, rawFnPtr, context});
+  Builder.CreateUnreachable();
   return stub;
 }
 
@@ -1326,6 +1419,24 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
+
+llvm::Constant *
+IRGenModule::getCOMIdentityConstant(StringRef identity) {
+  std::optional<UUID> uuid = UUID::fromString(identity.str().c_str());
+  ASSERT(uuid && "COM interface ID should have been validated by Sema");
+
+  unsigned char bytes[UUID::Size];
+  uuid->getCanonicalBytes(bytes);
+
+  if (!Triple.isLittleEndian())
+    return llvm::ConstantDataArray::get(getLLVMContext(), llvm::ArrayRef(bytes));
+
+  std::reverse(bytes + 0, bytes + 4);
+  std::reverse(bytes + 4, bytes + 6);
+  std::reverse(bytes + 6, bytes + 8);
+
+  return llvm::ConstantDataArray::get(getLLVMContext(), llvm::ArrayRef(bytes));
+}
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
 IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
@@ -1606,6 +1717,8 @@ void IRGenModule::constructInitialFnAttributes(
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
+  // Mirror Clang (getTrivialDefaultFunctionAttributes): only size-optimized
+  // functions get OptimizeForSize/MinSize; speed functions get neither.
   if (FuncOptMode == OptimizationMode::ForSize) {
     Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
@@ -1636,6 +1749,58 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
   llvm::AttrBuilder b(getLLVMContext());
   constructInitialFnAttributes(b);
   return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
+}
+
+void IRGenModule::addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                                  StringRef targetString) {
+  if (targetString.empty())
+    return;
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Context.getClangModuleLoader());
+  auto &TI = clangImporter->getTargetInfo();
+  clang::ParsedTargetAttr parsed = TI.parseTargetAttr(targetString);
+  StringRef targetCPU = TI.getTargetOpts().CPU;
+  StringRef tuneCPU = TI.getTargetOpts().TuneCPU;
+  if (!parsed.CPU.empty() && TI.isValidCPUName(parsed.CPU)) {
+    targetCPU = parsed.CPU;
+    tuneCPU = ""; // Clear the tune CPU
+  }
+  if (!parsed.Tune.empty() && TI.isValidCPUName(parsed.Tune))
+    tuneCPU = parsed.Tune;
+  llvm::StringMap<bool> featureMap;
+  static clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine diags(clang::DiagnosticIDs::create(), diagOpts,
+                                 new clang::IgnoringDiagConsumer());
+  TI.initFeatureMap(featureMap, diags, targetCPU, parsed.Features);
+  if (!featureMap.empty()) {
+    std::vector<std::string> features;
+    for (auto &entry : featureMap)
+      features.push_back((entry.getValue() ? "+" : "-") + entry.getKey().str());
+    llvm::sort(features);
+    fn->addFnAttr("target-features", llvm::join(features, ","));
+  }
+  if (!targetCPU.empty())
+    fn->addFnAttr("target-cpu", targetCPU);
+  if (!tuneCPU.empty())
+    fn->addFnAttr("tune-cpu", tuneCPU);
+  if (!parsed.BranchProtection.empty()) {
+    clang::TargetInfo::BranchProtectionInfo BPI;
+    StringRef diagMsg;
+    if (TI.validateBranchProtection(parsed.BranchProtection, parsed.CPU, BPI,
+                                    clangImporter->getClangASTContext().getLangOpts(),
+                                    diagMsg)) {
+      if (BPI.SignReturnAddr != clang::LangOptions::SignReturnAddressScopeKind::None) {
+        fn->addFnAttr("sign-return-address", BPI.getSignReturnAddrStr());
+        fn->addFnAttr("sign-return-address-key", BPI.getSignKeyStr());
+      }
+      if (BPI.BranchTargetEnforcement)
+        fn->addFnAttr("branch-target-enforcement");
+      if (BPI.BranchProtectionPAuthLR)
+        fn->addFnAttr("branch-protection-pauth-lr");
+      if (BPI.GuardedControlStack)
+        fn->addFnAttr("guarded-control-stack");
+    }
+  }
 }
 
 llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
@@ -2352,7 +2517,8 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
    // to a function imported from clang module, so it doesn't have a mapping
    // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
    // and purposes they belong to the primary module.
-   ASSERT(SF->getParentModule()->findUnderlyingClangModule());
+   const ModuleDecl *M = SF->getParentModule();
+   ASSERT(M->findUnderlyingClangModule() || M->isClangBridgingHeaderImportModule());
    return getPrimaryIGM();
  }
 

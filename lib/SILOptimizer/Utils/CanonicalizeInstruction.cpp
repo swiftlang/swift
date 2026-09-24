@@ -18,7 +18,6 @@
 
 // CanonicalizeInstruction defines a default DEBUG_TYPE: "sil-canonicalize"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -337,7 +336,9 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
          && nextII->isDebugInstruction()) {
     ++nextII;
   }
-  deleteAllDebugUses(*loadInst, pass.getCallbacks());
+  // TODO: this might be useless as salvageLoadDebugInfo shouldn't let any
+  // debug uses behind.
+  deleteAllDebugUses(*loadInst, pass.getCallbacks(), /*salvage=*/ false);
   nextII = killInstAndIncidentalUses(*loadInst, nextII, pass);
   /// A change has been made; and the load instruction is deleted.  The caller
   /// should now process the instruction where the load was before.

@@ -34,7 +34,7 @@ public struct UniqueBox<Value: ~Copyable>: ~Copyable {
   @_transparent
   deinit {
     unsafe pointer.deinitialize(count: 1)
-    unsafe pointer.deallocate()
+    unsafe pointer._deallocate(capacity: 1)
   }
 }
 
@@ -68,7 +68,7 @@ extension UniqueBox where Value: ~Copyable {
   @_transparent
   public consuming func consume() -> Value {
     let result = unsafe pointer.move()
-    unsafe pointer.deallocate()
+    unsafe pointer._deallocate(capacity: 1)
     discard self
     return result
   }
@@ -87,7 +87,8 @@ extension UniqueBox where Value: ~Copyable {
     @_lifetime(borrow self)
     @_transparent
     get {
-      unsafe Span(_unsafeStart: pointer, count: 1)
+      let s = unsafe Span(_unchecked: UnsafePointer(pointer), count: 1)
+      return unsafe _overrideLifetime(s, borrowing: self)
     }
   }
 
@@ -102,7 +103,7 @@ extension UniqueBox where Value: ~Copyable {
     @_lifetime(&self)
     @_transparent
     mutating get {
-      unsafe MutableSpan(_unsafeStart: pointer, count: 1)
+      unsafe MutableSpan(_unchecked: pointer, count: 1)
     }
   }
 }

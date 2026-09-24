@@ -19,11 +19,12 @@
 
 #include <atomic>
 #include <iterator>
-#include <string>
+#include <limits>
 #include <type_traits>
 #include <utility>
 #include <string.h>
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/MathExtras.h"
 #include "swift/Strings.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Once.h"
@@ -34,12 +35,20 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/TrailingObjects.h"
 #include "swift/ABI/ValueWitnessTable.h"
+// Malloc.h (AlignedAlloc/AlignedFree) is not used by anything in this file;
+// it's included here only for the benefit of clients that don't include it
+// themselves. Its posix_memalign/aligned_alloc usage is hosted-only, and all
+// real callers of AlignedAlloc/AlignedFree are hosted-only compiler code
+// (lib/AST, lib/SIL, lib/SILOptimizer), so keep this hosted-only.
+#if __STDC_HOSTED__
 #include "swift/Basic/Malloc.h"
+#endif
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Basic/Unreachable.h"
+#include "swift/shims/Metadata.h"
 #include "swift/shims/HeapObject.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
@@ -1053,6 +1062,8 @@ public:
   }
   void setInstanceSize(StoredSize size) {
     assert(isTypeMetadata());
+    assert(size <= std::numeric_limits<decltype(InstanceSize)>::max() &&
+           "class instance size does not fit in the InstanceSize field");
     InstanceSize = size;
   }
 
@@ -1062,6 +1073,9 @@ public:
   }
   void setInstanceAddressPoint(StoredSize size) {
     assert(isTypeMetadata());
+    assert(size <= std::numeric_limits<decltype(InstanceAddressPoint)>::max() &&
+           "class instance address point does not fit in the "
+           "InstanceAddressPoint field");
     InstanceAddressPoint = size;
   }
 
@@ -1833,6 +1847,11 @@ TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
 }
 
 template <typename Runtime>
+struct TargetCOMInterfaceID {
+  uint8_t Bytes[16];
+};
+
+template <typename Runtime>
 struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
     TargetProtocolDescriptor;
 
@@ -1938,6 +1957,8 @@ enum class ExistentialTypeRepresentation {
   Class,
   /// The type uses the Error boxed existential representation.
   Error,
+  /// The type is represented by a single COM interface pointer.
+  COM,
 };
 
 /// The structure of type metadata for simple existential types which
@@ -2193,7 +2214,7 @@ private:
     if (!Flags.hasTypePacks())
       return 0;
 
-    return getGenSigPackShapeHeader().NumTypePacks;
+    return getGenSigPackShapeHeader().NumPacks;
   }
 
   const TargetGenericContextDescriptorHeader<Runtime> *
@@ -2600,13 +2621,29 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
     return reinterpret_cast<OpaqueValue *>(bytes + Offset);
   }
 
-  /// Get the allocation size of this box.
-  unsigned getAllocSize() const {
-    return Offset + BoxedType->getValueWitnesses()->getSize();
+  typename Runtime::StoredSize getAllocSize() const {
+    using StoredSize = typename Runtime::StoredSize;
+    return (StoredSize)Offset +
+           (StoredSize)BoxedType->getValueWitnesses()->getSize();
+  }
+
+  /// Get the allocation size of this box, writing it into \p result. Returns
+  /// false if the calculation overflowed and the size is not representable.
+  bool
+  getAllocSizeCheckingOverflow(typename Runtime::StoredSize &result) const {
+    using StoredSize = typename Runtime::StoredSize;
+    bool overflowed = false;
+    StoredSize size = llvm::SaturatingAdd(
+        (StoredSize)Offset,
+        (StoredSize)BoxedType->getValueWitnesses()->getSize(), &overflowed);
+    if (overflowed)
+      return false;
+    result = size;
+    return true;
   }
 
   /// Get the allocation alignment of this box.
-  unsigned getAllocAlignMask() const {
+  typename Runtime::StoredSize getAllocAlignMask() const {
     // Heap allocations are at least pointer aligned.
     return BoxedType->getValueWitnesses()->getAlignmentMask()
       | (alignof(void*) - 1);
@@ -3345,15 +3382,18 @@ struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
     : TargetContextDescriptor<Runtime>,
       swift::ABI::TrailingObjects<
         TargetProtocolDescriptor<Runtime>,
+        TargetCOMInterfaceID<Runtime>,
         TargetGenericRequirementDescriptor<Runtime>,
         TargetProtocolRequirement<Runtime>>
 {
 private:
-  using TrailingObjects
-    = swift::ABI::TrailingObjects<
-        TargetProtocolDescriptor<Runtime>,
-        TargetGenericRequirementDescriptor<Runtime>,
-        TargetProtocolRequirement<Runtime>>;
+  using COMInterfaceID = TargetCOMInterfaceID<Runtime>;
+
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<TargetProtocolDescriptor<Runtime>,
+                                  COMInterfaceID,
+                                  TargetGenericRequirementDescriptor<Runtime>,
+                                  TargetProtocolRequirement<Runtime>>;
 
   friend TrailingObjects;
 
@@ -3361,6 +3401,12 @@ private:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
+  size_t numTrailingObjects(OverloadToken<COMInterfaceID>) const {
+    SpecialProtocol protocol =
+        getProtocolContextDescriptorFlags().getSpecialProtocol();
+    return protocol == SpecialProtocol::COM ? 1 : 0;
+  }
+
   size_t numTrailingObjects(
             OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return NumRequirementsInSignature;
@@ -3391,6 +3437,20 @@ public:
 
   ProtocolContextDescriptorFlags getProtocolContextDescriptorFlags() const {
     return ProtocolContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
+  /// Retrieve the target-native 16-byte interface identifier for this COM
+  /// interface protocol.
+  ///
+  /// A COM protocol descriptor carries the bytes inline immediately after its
+  /// fixed header. Other protocol descriptors have no such trailing field,
+  /// preserving their existing layout.
+  const uint8_t *getCOMInterfaceID() const {
+    SpecialProtocol protocol =
+        getProtocolContextDescriptorFlags().getSpecialProtocol();
+    if (protocol == SpecialProtocol::COM)
+      return this->template getTrailingObjects<COMInterfaceID>()->Bytes;
+    return nullptr;
   }
 
   /// Retrieve the requirements that make up the requirement signature of
@@ -3429,6 +3489,9 @@ public:
     return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
+
+static_assert(sizeof(_SwiftProtocolDescriptorHeader) == sizeof(TargetProtocolDescriptor<InProcess>),
+              "_SwiftProtocolDescriptorHeader does not match TargetProtocolDescriptor");
 
 /// The descriptor for an opaque type.
 template <typename Runtime>
@@ -3714,7 +3777,10 @@ struct TargetGenericClassMetadataPattern final :
   /// in words.
   uint16_t MetaclassRODataOffset;
 
-  uint16_t Reserved;
+  /// The size in pointer words of the native instance-prefix template.
+  /// Generic metadata layout rounds this up to the instance alignment to
+  /// produce the final HeapObject address point.
+  uint16_t InstancePrefixSizeInWords;
 
   bool hasImmediateMembersPattern() const {
     return PatternFlags.class_hasImmediateMembersPattern();
@@ -4271,49 +4337,85 @@ struct TargetObjCResilientClassStubInfo {
   TargetRelativeDirectPointer<Runtime, const void> Stub;
 };
 
+/// Describes bytes copied ahead of a native class instance's address point.
+///
+/// This is an optional trailing record in a class context descriptor, selected
+/// by TypeContextDescriptorFlags::class_hasInstancePrefix(). It is deliberately
+/// independent of any particular foreign object model.
+///
+/// The prefix template contains exactly PrefixSizeInWords pointer words. The
+/// allocator copies it immediately before the HeapObject address point.
+/// InstanceAddressPoint can be larger than the template when leading padding
+/// is needed to preserve the native instance alignment.
+///
+/// A descriptor always references the complete template for that dynamic
+/// class, including inherited prefix words. Consequently the allocator needs
+/// no static knowledge of the allocation's class declaration.
+///
+/// The record is last among the class descriptor's trailing records so a
+/// future version can append data without changing the locations of existing
+/// trailing records. Runtimes must reject versions they do not understand.
+template <typename Runtime>
+struct TargetClassInstancePrefixDescriptor {
+  using PrefixTemplatePointerType =
+      TargetRelativeDirectPointer<Runtime, const void, /*nullable*/ false>;
+  static constexpr uint16_t CurrentVersion =
+      ClassInstancePrefixDescriptorVersion;
+
+  uint16_t Version;
+  uint16_t PrefixSizeInWords;
+  PrefixTemplatePointerType PrefixTemplate;
+};
+
+using ClassInstancePrefixDescriptor =
+    TargetClassInstancePrefixDescriptor<InProcess>;
+
 template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
     TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
-      public TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                              TargetTypeGenericContextDescriptorHeader,
-                              /*additional trailing objects:*/
-                              TargetResilientSuperclass<Runtime>,
-                              TargetForeignMetadataInitialization<Runtime>,
-                              TargetSingletonMetadataInitialization<Runtime>,
-                              TargetVTableDescriptorHeader<Runtime>,
-                              TargetMethodDescriptor<Runtime>,
-                              TargetOverrideTableHeader<Runtime>,
-                              TargetMethodOverrideDescriptor<Runtime>,
-                              TargetObjCResilientClassStubInfo<Runtime>,
-                              TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                              TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                              TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
-                              TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                              InvertibleProtocolSet,
-                              TargetSingletonMetadataPointer<Runtime>,
-                              TargetMethodDefaultOverrideTableHeader<Runtime>,
-                              TargetMethodDefaultOverrideDescriptor<Runtime>> {
+      public TrailingGenericContextObjects<
+          TargetClassDescriptor<Runtime>,
+          TargetTypeGenericContextDescriptorHeader,
+          /*additional trailing objects:*/
+          TargetResilientSuperclass<Runtime>,
+          TargetForeignMetadataInitialization<Runtime>,
+          TargetSingletonMetadataInitialization<Runtime>,
+          TargetVTableDescriptorHeader<Runtime>,
+          TargetMethodDescriptor<Runtime>,
+          TargetOverrideTableHeader<Runtime>,
+          TargetMethodOverrideDescriptor<Runtime>,
+          TargetObjCResilientClassStubInfo<Runtime>,
+          TargetCanonicalSpecializedMetadatasListCount<Runtime>,
+          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
+          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+          InvertibleProtocolSet,
+          TargetSingletonMetadataPointer<Runtime>,
+          TargetMethodDefaultOverrideTableHeader<Runtime>,
+          TargetMethodDefaultOverrideDescriptor<Runtime>,
+          TargetClassInstancePrefixDescriptor<Runtime>> {
 private:
-  using TrailingGenericContextObjects = 
-    swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                                         TargetTypeGenericContextDescriptorHeader,
-                                         TargetResilientSuperclass<Runtime>,
-                                         TargetForeignMetadataInitialization<Runtime>,
-                                         TargetSingletonMetadataInitialization<Runtime>,
-                                         TargetVTableDescriptorHeader<Runtime>,
-                                         TargetMethodDescriptor<Runtime>,
-                                         TargetOverrideTableHeader<Runtime>,
-                                         TargetMethodOverrideDescriptor<Runtime>,
-                                         TargetObjCResilientClassStubInfo<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                                         TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                                         InvertibleProtocolSet,
-                                         TargetSingletonMetadataPointer<Runtime>,
-                                         TargetMethodDefaultOverrideTableHeader<Runtime>,
-                                         TargetMethodDefaultOverrideDescriptor<Runtime>>;
+  using TrailingGenericContextObjects = swift::TrailingGenericContextObjects<
+      TargetClassDescriptor<Runtime>,
+      TargetTypeGenericContextDescriptorHeader,
+      TargetResilientSuperclass<Runtime>,
+      TargetForeignMetadataInitialization<Runtime>,
+      TargetSingletonMetadataInitialization<Runtime>,
+      TargetVTableDescriptorHeader<Runtime>,
+      TargetMethodDescriptor<Runtime>,
+      TargetOverrideTableHeader<Runtime>,
+      TargetMethodOverrideDescriptor<Runtime>,
+      TargetObjCResilientClassStubInfo<Runtime>,
+      TargetCanonicalSpecializedMetadatasListCount<Runtime>,
+      TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+      TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
+      TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+      InvertibleProtocolSet,
+      TargetSingletonMetadataPointer<Runtime>,
+      TargetMethodDefaultOverrideTableHeader<Runtime>,
+      TargetMethodDefaultOverrideDescriptor<Runtime>,
+      TargetClassInstancePrefixDescriptor<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4349,6 +4451,7 @@ public:
       TargetMethodDefaultOverrideTableHeader<Runtime>;
   using DefaultOverrideDescriptor =
       TargetMethodDefaultOverrideDescriptor<Runtime>;
+  using InstancePrefixDescriptor = TargetClassInstancePrefixDescriptor<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -4504,6 +4607,10 @@ private:
     return getDefaultOverrideTable()->NumEntries;
   }
 
+  size_t numTrailingObjects(OverloadToken<InstancePrefixDescriptor>) const {
+    return hasInstancePrefix() ? 1 : 0;
+  }
+
 public:
   const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
   getResilientSuperclass() const {
@@ -4537,6 +4644,16 @@ public:
 
   bool hasDefaultOverrideTable() const {
     return getTypeContextDescriptorFlags().class_hasDefaultOverrideTable();
+  }
+
+  bool hasInstancePrefix() const {
+    return getTypeContextDescriptorFlags().class_hasInstancePrefix();
+  }
+
+  const InstancePrefixDescriptor *getInstancePrefixDescriptor() const {
+    if (!hasInstancePrefix())
+      return nullptr;
+    return this->template getTrailingObjects<InstancePrefixDescriptor>();
   }
 
   bool isActor() const {

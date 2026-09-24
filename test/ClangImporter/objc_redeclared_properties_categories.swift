@@ -104,8 +104,8 @@ func readwriteRefinementProto(_ x: MyDerivedClass) {
 // CHECK-PUBLIC-NEXT: }
 // CHECK-PUBLIC-NEXT: struct SomeStruct_s {
 // CHECK-PUBLIC-NEXT:   init()
-// CHECK-PUBLIC-NEXT:   init(inner: Int32)
-// CHECK-PUBLIC-NEXT:   var inner: Int32
+// CHECK-PUBLIC-NEXT:   init(inner: CInt)
+// CHECK-PUBLIC-NEXT:   var inner: CInt
 // CHECK-PUBLIC-NEXT: }
 // CHECK-PUBLIC-NEXT: typealias SomeStruct = SomeStruct_s
 // CHECK-PUBLIC-NEXT: class MyColor : Base {
@@ -149,10 +149,10 @@ func readwriteRefinementProto(_ x: MyDerivedClass) {
 // CHECK-PUBLIC-NEXT:   var requirement: Base { get }
 // CHECK-PUBLIC-NEXT: }
 // CHECK-PUBLIC-NEXT: protocol ReadonlyProtocol {
-// CHECK-PUBLIC-NEXT:   var answer: Int32 { get }
+// CHECK-PUBLIC-NEXT:   var answer: CInt { get }
 // CHECK-PUBLIC-NEXT: }
 // CHECK-PUBLIC-NEXT: protocol ReadwriteProtocol : ReadonlyProtocol {
-// CHECK-PUBLIC-NEXT:   var answer: Int32 { get set }
+// CHECK-PUBLIC-NEXT:   var answer: CInt { get set }
 // CHECK-PUBLIC-NEXT: }
 
 // CHECK-PRIVATE:      import CategoryOverrides
@@ -179,5 +179,5 @@ func readwriteRefinementProto(_ x: MyDerivedClass) {
 // CHECK-PRIVATE-NEXT:   var requirement: Base { get }
 // CHECK-PRIVATE-NEXT: }
 // CHECK-PRIVATE-NEXT: extension MyDerivedClass : ReadwriteProtocol {
-// CHECK-PRIVATE-NEXT:   var answer: Int32
+// CHECK-PRIVATE-NEXT:   var answer: CInt
 // CHECK-PRIVATE-NEXT: }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -print-ast -disable-availability-checking %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -print-ast -target %target-swift-5.1-abi-triple %s 2>&1 | %FileCheck %s
 
 func fetch() async throws -> String {
 }

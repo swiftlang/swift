@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
-// RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=EXIST-IR %s
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
-// RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 
@@ -15,6 +15,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: embedded_stdlib_default_codegen
 
 import _Concurrency
 
@@ -45,7 +46,7 @@ actor MyActor {
 // CHECK-IR-SAME:   ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // CHECK-IR-SAME:   ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // CHECK-IR-SAME:   ptr @"$e4main7MyActorC3fooyyYaFTu{{(.ptrauth[.0-9]*)?}}",
-// CHECK-IR-SAME:   ptr @got.swift_deletedAsyncMethodErrorTu{{(.ptrauth[.0-9]*)?}},
+// CHECK-IR-SAME:   ptr @_swift_dead_async_method_error_afp{{[^,]*}},
 // CHECK-IR-SAME:   ptr @"$e4main7MyActorCACycfC{{(.ptrauth[.0-9]*)?}}"
 // CHECK-IR-SAME: }>, align {{[48]}}
 
@@ -65,7 +66,7 @@ actor MyActor {
 // EXIST-IR-SAME:  ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // EXIST-IR-SAME:  ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // EXIST-IR-SAME:  ptr @"$e4main7MyActorC3fooyyYaFTu{{(.ptrauth[.0-9]*)?}}",
-// EXIST-IR-SAME:  ptr @got.swift_deletedAsyncMethodErrorTu{{(.ptrauth[.0-9]*)?}},
+// EXIST-IR-SAME:  ptr @_swift_dead_async_method_error_afp{{[^,]*}},
 // EXIST-IR-SAME:  ptr @"$e4main7MyActorCACycfC{{(.ptrauth[.0-9]*)?}}" }>
 
 // EXIST-IR-DAG: @"$e4main7MyActorCN" = {{.*}}alias{{.*}} ptr @"$e4main7MyActorCMf", i32 0, i32 1)

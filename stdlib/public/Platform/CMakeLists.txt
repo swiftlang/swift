@@ -570,6 +570,7 @@ add_dependencies(sdk-overlay emscriptenlibc_modulemap)
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
       ucrt.modulemap
+      WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
       winsdk_um.modulemap
@@ -621,7 +622,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-stdlib-platform-${triple}
       swiftEmscriptenLibc
-      ONLY_SWIFTMODULE
       IS_STDLIB IS_FRAGILE
         ${swift_platform_sources}
         POSIXError.swift

@@ -789,4 +789,4 @@ if a > 1 {
 if a > 1 {
 
 // This test case used to cause an assertion failure during parsing cut off.
-// RUN: not %swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s

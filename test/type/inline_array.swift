@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple
 
 let _: [3 of Int]
 let _ = [3 of Int](repeating: 0)

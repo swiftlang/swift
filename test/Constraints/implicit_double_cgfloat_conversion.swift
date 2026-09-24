@@ -442,36 +442,3 @@ func test_init_validation() {
     }
   }
 }
-
-// Optional-to-optional conversion
-func optional_to_optional(x: CGFloat?) -> Double? {
-  return x
-}
-
-func test_joins_requiring_optional_to_optional_conversion(_ x1: Double, _ x2: CGFloat,
-                                                          _ y1: Double?, _ y2: CGFloat?) {
-  if x1 != y1 {}
-  if x1 != y2 {}
-  if x2 != y1 {}
-  if x2 != y2 {}
-
-  if y1 != x1 {}
-  if y1 != x2 {}
-  if y2 != x1 {}
-  if y2 != x2 {}
-}
-
-// Unapplied references to operators
-func test_unapplied_1(_ x: [CGFloat], y: Double) {
-  let _ = x.reduce(0, +) / y
-  let _ = x.reduce(0, *) / y
-  let _ = x.reduce(0, -) / y
-  let _ = x.reduce(0, /) / y
-}
-
-func test_unapplied_2(_ x: [Double], y: CGFloat) {
-  let _ = x.reduce(0, +) / y
-  let _ = x.reduce(0, *) / y
-  let _ = x.reduce(0, -) / y
-  let _ = x.reduce(0, /) / y
-}

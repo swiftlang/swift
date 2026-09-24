@@ -43,6 +43,6 @@ func test2() {
 
 #endif
 
-// CHECK: error: unrecognized platform name 'EnabledDomain'
+// CHECK: error: cannot find availability domain 'EnabledDomain'
 // CHECK: warning: ignoring unresolved custom availability domain 'EnabledDomain'
 // CHECK: warning: ignoring unresolved custom availability domain 'AlwaysEnabledDomain'

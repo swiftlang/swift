@@ -19,9 +19,6 @@
 #define SWIFT_IRGEN_GENTYPE_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/StringMap.h"
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
@@ -47,6 +44,7 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolType;
   class SILFunctionType;
+  class SerializableHiddenTypeInfoRepresentation;
   class StructDecl;
   class TupleType;
   class TypeBase;
@@ -64,6 +62,10 @@ namespace irgen {
   class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
+
+std::unique_ptr<TypeInfo> createTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableHiddenTypeInfoRepresentation &representation);
   
 /// The helper class for generating types.
 class TypeConverter {
@@ -190,6 +192,8 @@ private:
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
+
+  const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
 
   Mode getLoweringMode() const {
     return LoweringMode;

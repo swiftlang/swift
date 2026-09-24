@@ -67,3 +67,37 @@ func testAddressableSwitchBinding(e: TestEnum) -> Bool {
         false
     }
 }
+
+// A loadable noncopyable payload bound by a borrowing pattern match and 
+// used as an addressable argument materializes an addressable buffer
+// for the binding. The buffer is allocated dominating the bound value and torn                              
+// down before the value is destroyed. 
+struct AddressableLoadable: ~Copyable {
+    var x: Int
+    @_addressableSelf borrowing func get() -> Int { x }
+}
+
+enum NoncopyableBox: ~Copyable {
+    case some(AddressableLoadable)
+    case none
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}33testAddressableNoncopyableBinding{{.*}} :
+// CHECK:       bb1([[PAYLOAD:%.*]] : @guaranteed $AddressableLoadable):
+// CHECK:         [[COPY:%.*]] = copy_value [[PAYLOAD]]
+// CHECK:         [[BUF:%.*]] = alloc_stack $AddressableLoadable
+// CHECK:         [[BIND:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[COPY]]
+// CHECK:         [[SB:%.*]] = store_borrow [[BIND]] to [[BUF]]
+// CHECK:         [[SBM:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SB]]
+// CHECK:         apply {{%.*}}([[SBM]])
+// CHECK:         end_borrow [[SB]]
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         destroy_value [[BIND]]
+func testAddressableNoncopyableBinding(box: borrowing NoncopyableBox) -> Int {
+    switch box {
+    case .some(let v):
+        return v.get()
+    case .none:
+        return 0
+    }
+}

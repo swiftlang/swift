@@ -54,6 +54,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"

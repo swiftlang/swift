@@ -13,10 +13,10 @@ func testUnsafe(_ ut: UnsafeType) {
   var array: [CInt] = [1, 2, 3, 4, 5]
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
   print_ints(&array, CInt(array.count))
-  // expected-note@-1{{argument #0 in call to global function 'print_ints' has unsafe type 'UnsafeMutablePointer<Int32>?'}}
+  // expected-note@-1{{argument #0 in call to global function 'print_ints' has unsafe type 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
-  _ = print_ints // expected-note{{reference to global function 'print_ints' involves unsafe type 'UnsafeMutablePointer<Int32>'}}
+  _ = print_ints // expected-note{{reference to global function 'print_ints' involves unsafe type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
 }
 
 // Reference a typealias that isn't itself @unsafe, but refers to an unsafe

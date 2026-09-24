@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-enable-type-var-joins
 
 // REQUIRES: objc_interop
 
@@ -19,7 +19,7 @@ var pi = 3.14159265358979
 var d: CGFloat = 2.0
 var dpi:CGFloat = d*pi // Ok (implicit conversion Double -> CGFloat)
 
-let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'CFloat' (aka 'Float') to specified type 'CGFloat'}}
 let _: CGFloat = floor(20.0) // Ok (Double -> CGFloat) conversion
 
 let total = 15.0
@@ -55,9 +55,13 @@ struct MyArray<Element> {} // expected-note {{'Element' declared as parameter to
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<Element>.Type' and 'Int.Type'}}
-       // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
+        a = MyArray<Int
+        // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+        // expected-note@-2 {{required by referencing operator function '<' on 'Comparable' where 'Self' = 'any Any.Type'}}
+        // expected-error@-3 {{type 'any Any.Type' cannot conform to 'Comparable'}}
+        // expected-error@-4 {{generic parameter 'Element' could not be inferred}}
+        // expected-note@-5 {{explicitly specify the generic arguments to fix this issue}}
+        // expected-error@-6 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
 

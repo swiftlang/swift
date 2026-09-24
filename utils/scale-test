@@ -660,6 +660,8 @@ def report(args, rng, runs):
         perfect_fit = False
         fit_r2_thresh = 0.99
         lin_b, lin_a, lin_r2 = fit_linear_model(rng, bounded)
+        if args.trace:
+            print("lin_r2=%f" % lin_r2)
         if lin_r2 > fit_r2_thresh:
             one_fit = True
         if lin_r2 == 1.0:
@@ -669,18 +671,26 @@ def report(args, rng, runs):
         try:
             if not perfect_fit:
                 p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
+                if args.trace:
+                    print("p_r2=%f" % p_r2)
                 if p_r2 > fit_r2_thresh:
                     one_fit = True
                 if p_r2 == 1.0:
                     perfect_fit = True
-        except ValueError:
+        except ValueError as e:
+            if args.trace:
+                print("exception from fit_polynomial_model: %r" % e)
             pass
         try:
             if not perfect_fit:
                 e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+                if args.trace:
+                    print("e_r2=%f" % e_r2)
                 if e_r2 > fit_r2_thresh:
                     one_fit = True
-        except ValueError:
+        except ValueError as e:
+            if args.trace:
+                print("exception from fit_exponential_model: %r" % e)
             pass
         if not one_fit:
             print("failed to fit model to " + repr(vals))

@@ -24,7 +24,7 @@ function(_swift_gyb_target_sources target scope)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
-        ${CMAKE_COMMAND} -E env $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+        ${CMAKE_COMMAND} -E env -- $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
@@ -801,6 +801,8 @@ function(add_swift_host_library name)
   set_target_properties(${name} PROPERTIES
     BUILD_WITH_INSTALL_RPATH YES
     FOLDER "Swift libraries")
+  set_target_properties(${name} PROPERTIES
+    PURE_SWIFT_LIB NO)
 
   _add_host_variant_c_compile_flags(${name})
   _add_host_variant_link_flags(${name})

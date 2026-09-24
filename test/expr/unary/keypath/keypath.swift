@@ -50,11 +50,11 @@ struct C<T> { // expected-note 4 {{'T' declared as parameter to type 'C'}}
 struct Unavailable {
   @available(*, unavailable)
   var unavailableProperty: Int { 0 }
-  // expected-note@-1 {{'unavailableProperty' has been explicitly marked unavailable here}}
+  // expected-note@-2 {{'unavailableProperty' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   subscript(x: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(_:)' has been explicitly marked unavailable here}}
+  // expected-note@-2 {{'subscript(_:)' has been explicitly marked unavailable here}}
 }
 
 struct Deprecated {
@@ -598,8 +598,8 @@ func useUnambiguousSubscript(_ sub: Sub) {
 }
 
 struct BothUnavailableSubscript {
-  @available(*, unavailable)
-  subscript(sub: Sub) -> Int { get { } set { } } // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
+  @available(*, unavailable) // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
+  subscript(sub: Sub) -> Int { get { } set { } }
 
   @available(*, unavailable)
   subscript(y y: Sub) -> Int { get { } set { } }

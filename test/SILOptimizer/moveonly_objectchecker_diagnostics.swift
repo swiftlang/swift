@@ -4311,3 +4311,11 @@ struct rdar_167469090_S: ~Copyable {
         }
     }
 }
+
+
+func callee(_ h: borrowing (borrowing Int) -> Bool) -> Bool {
+    h(0)
+}
+func caller(_ handler: borrowing (Int) -> Bool) -> Bool {
+    callee(handler)
+}

@@ -145,7 +145,10 @@ bb0:
 bb1:
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   %15 = tuple ()
@@ -161,12 +164,24 @@ bb2:
 // CHECK: } // end sil function 'dont_licm_ginit_prehead_not_pdom'
 sil @dont_licm_ginit_prehead_not_pdom : $@convention(thin) () -> () {
 bb0:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb6, bb4
+
+bb6:
+  br bb1
+
+bb4:
+  br bb2
 
 bb1:
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb5
+
+bb3:
+  br bb1
+
+bb5:
+  br bb2
 
 bb2:
   %15 = tuple ()
@@ -196,7 +211,10 @@ bb3:
 bb4:
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  cond_br undef, bb1, bb5
+  cond_br undef, bb6, bb5
+
+bb6:
+  br bb1
 
 bb5:
   %15 = tuple ()
@@ -226,7 +244,10 @@ bb3:
   br bb4
 
 bb4:
-  cond_br undef, bb1, bb5
+  cond_br undef, bb6, bb5
+
+bb6:
+  br bb1
 
 bb5:
   %15 = tuple ()
@@ -261,7 +282,10 @@ bb3:
 bb4:
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  cond_br undef, bb1, bb5
+  cond_br undef, bb6, bb5
+
+bb6:
+  br bb1
 
 bb5:
   %15 = tuple ()
@@ -286,7 +310,10 @@ bb1:
   %a = apply %f() : $@convention(thin) () -> ()
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   %15 = tuple ()
@@ -311,7 +338,10 @@ bb1:
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
   %f = function_ref @unknown : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   %15 = tuple ()

@@ -69,9 +69,7 @@
 
 #include <inttypes.h>
 
-#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <malloc/malloc.h>
-#else
+#ifndef SWIFT_HAVE_CRASHREPORTERCLIENT
 static std::atomic<const char *> kFatalErrorMessage;
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -299,52 +297,35 @@ static void
 reportOnCrash(uint32_t flags, const char *message)
 {
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-  char *oldMessage = nullptr;
-  char *newMessage = nullptr;
-
-  oldMessage = std::atomic_load_explicit(
-    (volatile std::atomic<char *> *)&gCRAnnotations.message,
-    SWIFT_MEMORY_ORDER_CONSUME);
-
-  do {
-    if (newMessage) {
-      free(newMessage);
-      newMessage = nullptr;
-    }
-
-    if (oldMessage) {
-      swift_asprintf(&newMessage, "%s%s", oldMessage, message);
-    } else {
-      newMessage = strdup(message);
-    }
-  } while (!std::atomic_compare_exchange_strong_explicit(
-             (volatile std::atomic<char *> *)&gCRAnnotations.message,
-             &oldMessage, newMessage,
-             std::memory_order_release,
-             SWIFT_MEMORY_ORDER_CONSUME));
+  swift::appendCrashLogMessage(message);
 #else
-  const char *previous = nullptr;
-  char *current = nullptr;
-  previous =
-      std::atomic_load_explicit(&kFatalErrorMessage, SWIFT_MEMORY_ORDER_CONSUME);
+  // Reading the old message, replacing it, and freeing it has to be exclusive.
+  // Use an "unsafe" mutex, because the checked one reports a fatal error when
+  // it detects a problem, and reporting an error comes back here.
+  static LazyUnsafeMutex lock;
 
-  do {
-    ::free(current);
-    current = nullptr;
+  // The message last stored here. swift_getFatalErrorMessageBuffer() hands the
+  // buffer out, so anything else in it belongs to whoever put it there.
+  static const char *ownedMessage = nullptr;
 
-    if (previous)
-      swift_asprintf(&current, "%s%s", previous, message);
-    else
-#if defined(_WIN32)
-      current = ::_strdup(message);
-#else
-      current = ::strdup(message);
-#endif
-  } while (!std::atomic_compare_exchange_strong_explicit(&kFatalErrorMessage,
-                                                         &previous,
-                                                         static_cast<const char *>(current),
-                                                         std::memory_order_release,
-                                                         SWIFT_MEMORY_ORDER_CONSUME));
+  // LazyUnsafeMutex inherits LazyMutex::ScopedLock, which takes the checked
+  // lock.
+  ScopedLockT<LazyUnsafeMutex, false> guard(lock);
+
+  const char *previous =
+      std::atomic_load_explicit(&kFatalErrorMessage, std::memory_order_relaxed);
+
+  char *current = appendToCrashLogMessage(previous, message);
+  if (!current)
+    return;
+
+  std::atomic_store_explicit(&kFatalErrorMessage,
+                             static_cast<const char *>(current),
+                             std::memory_order_release);
+
+  if (previous && previous == ownedMessage)
+    ::free(const_cast<char *>(previous));
+  ownedMessage = current;
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
 

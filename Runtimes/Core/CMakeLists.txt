@@ -124,6 +124,7 @@ option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context des
 option(SwiftCore_ENABLE_FILESYSTEM_SUPPORT "Build for systems that have a filesystem" ON)
 option(SwiftCore_ENABLE_OS_TRACE_LAZY_INIT "Use os_trace call to check if lazy init has been completed before making os_signpost calls." ${SwiftCore_HAS_OS_TRACE})
 option(SwiftCore_HAS_DARWIN_LIBMALLOC "Use Darwin malloc features" ${APPLE})
+option(SwiftCore_ENABLE_STDLIB_LAZY_LINK "Use lazy linking instead of dlsym for upward-linked symbols" OFF)
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
@@ -233,6 +234,25 @@ endif()
 if(SwiftCore_ENABLE_REMOTE_MIRROR)
   add_subdirectory(RemoteInspection)
   add_subdirectory(SwiftRemoteMirror)
+endif()
+
+if(SwiftCore_ENABLE_STDLIB_LAZY_LINK)
+  # We lazy link these libraries to avoid loading them unnecessarily, and upward
+  # link to indicate that this shouldn't be considered part of a dependency
+  # cycle.
+  target_link_options(swiftRuntimeCore PUBLIC
+    "SHELL:-Xlinker -lazy_framework -Xlinker Foundation"
+    "SHELL:-Xlinker -upward_framework -Xlinker Foundation"
+    "SHELL:-Xlinker -lazy-lswiftObjectiveC"
+    "SHELL:-Xlinker -upward-lswiftObjectiveC")
+  target_link_options(swiftStdlibStubs PUBLIC
+    "SHELL:-Xlinker -lazy_framework -Xlinker CoreFoundation"
+    "SHELL:-Xlinker -upward_framework -Xlinker CoreFoundation")
+  if(SwiftCore_ENABLE_CONCURRENCY)
+    target_link_options(swift_Concurrency PRIVATE
+      "SHELL:-Xlinker -lazy_framework -Xlinker CoreFoundation"
+      "SHELL:-Xlinker -upward_framework -Xlinker CoreFoundation")
+  endif()
 endif()
 
 # Inter-project install info

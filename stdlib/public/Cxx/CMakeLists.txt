@@ -15,7 +15,7 @@ set(SWIFT_CXX_SOURCES
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
-    CxxBorrowingSequence.swift
+    CxxIterable.swift
     CxxVector.swift
     CxxSpan.swift
     UnsafeCxxIterators.swift
@@ -52,7 +52,9 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY
     INSTALL_WITH_SHARED)
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+# stdlib-less builds skip the upper CMakeLists.txt, so the `embedded-libraries`
+# target never gets defined.
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET embedded-libraries)
   add_custom_target(embedded-cxx)
   add_dependencies(embedded-libraries embedded-cxx)
 

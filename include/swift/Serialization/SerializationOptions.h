@@ -25,6 +25,8 @@
 
 namespace swift {
 
+class IRGenOptions;
+
 class SerializationOptions {
 public:
   SerializationOptions() = default;
@@ -56,6 +58,9 @@ public:
 
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebuggingOptionsPrefixMap;
+
+  /// Path prefixes that should be rewritten in source info.
+  PathRemapper SourceInfoPrefixMap;
 
   /// Obfuscate the serialized paths so we don't have the actual paths encoded
   /// in the .swiftmodule file.
@@ -153,12 +158,16 @@ public:
   ArrayRef<FileDependency> Dependencies;
   ArrayRef<std::tuple<std::string, bool>> PublicDependentLibraries;
 
+  /// IRGen options used to derive TypeInfo for hidden layout records.
+  const IRGenOptions *IRGenOpts = nullptr;
+
   bool AutolinkForceLoad = false;
   bool SerializeAllSIL = false;
   bool SerializeDebugInfoSIL = false;
   bool SerializeOptionsForDebugging = false;
   bool IsSIB = false;
   bool DisableCrossModuleIncrementalInfo = false;
+  bool PrefixMapSourceInfo = false;
   bool StaticLibrary = false;
   bool HermeticSealAtLink = false;
   bool EmbeddedSwiftModule = false;
@@ -166,6 +175,7 @@ public:
   bool SkipImplementationOnlyDecls = false;
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
+  bool EnableHiddenTypeLayoutSerializationRemarks = false;
   bool IsInterfaceSDKRelative = false;
 };
 

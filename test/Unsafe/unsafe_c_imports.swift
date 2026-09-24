@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-memory-safety -I %S/Inputs
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -I %S/Inputs -verify-additional-file %S/Inputs%{fs-sep}unsafe_decls.h
 
 import unsafe_decls
 
