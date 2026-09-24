@@ -381,6 +381,13 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   llvm_unreachable("Unhandled type kind!");
 }
 
+bool CanType::allowsOwnership(const GenericSignatureImpl *sig) const {
+  if (isReferenceTypeImpl(*this, sig, /*functionsCount=*/false))
+    return true;
+
+  return isCOMExistentialType();
+}
+
 /// Are variables of this type permitted to have
 /// ownership attributes?
 ///
@@ -388,6 +395,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 ///   - class types, generic or not
 ///   - archetypes with class or class protocol bounds
 ///   - existentials with class or class protocol bounds
+///   - COM interface existentials
 /// But not:
 ///   - function types
 bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {

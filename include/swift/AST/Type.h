@@ -431,12 +431,10 @@ public:
   ///   - class types, generic or not
   ///   - archetypes with class or class protocol bounds
   ///   - existentials with class or class protocol bounds
+  ///   - COM interface existentials
   /// But not:
   ///   - function types
-  bool allowsOwnership(const GenericSignatureImpl *sig) const {
-    return isReferenceTypeImpl(*this, sig,
-                               /*functions count*/ false);
-  }
+  bool allowsOwnership(const GenericSignatureImpl *sig) const;
 
   /// Are values of this type essentially just class references,
   /// possibly with some extra metadata?
