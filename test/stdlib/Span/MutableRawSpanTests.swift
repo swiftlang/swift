@@ -914,6 +914,18 @@ suite.test("init(bytesOf:) from value")
   }
 }
 
+suite.test("init(bytesOf:) from integer")
+.xfail(.always("https://github.com/swiftlang/swift/issues/92562"))
+.require(.stdlib_6_5).code {
+  var value = 42
+
+  var span = MutableRawSpan(bytesOf: &value)
+  expectEqual(span.byteCount, MemoryLayout<Int>.size)
+  span.storeBytes(of: 43, toByteOffset: 0, as: Int.self)
+
+  expectEqual(value, 43)
+}
+
 suite.test("init(bytesOf:) from value: round-trip")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   var value = UInt64.zero
