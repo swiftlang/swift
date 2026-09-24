@@ -1,0 +1,95 @@
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -alloc-stack-hoisting -opt-mode=none | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -alloc-stack-hoisting -opt-mode=none -sil-merge-stack-slots=false | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -emit-ir -g -Onone %s | %FileCheck %s --check-prefix=CHECK-IR
+
+// AllocStackHoisting moves dynamically sized alloc_stacks into the
+// entry block.  A hoisted alloc_stack must not keep an inlined debug
+// scope: the entry block would become part of the inlined subroutine's
+// address ranges, and a breakpoint on the call site line would resolve
+// into the prologue. The variable itself stays described in the inlined
+// scope at its original position.
+
+sil_stage canonical
+
+import Builtin
+
+sil @use : $@convention(thin) <T> (@in T) -> ()
+sil @callee : $@convention(thin) () -> ()
+
+sil_scope 1 { loc "a.swift":1:6 parent @hoist_inlined : $@convention(thin) <T> (@in T, Builtin.Int1) -> () }
+sil_scope 2 { loc "b.swift":1:6 parent @callee : $@convention(thin) () -> () }
+sil_scope 3 { loc "b.swift":2:3 parent 2 inlined_at 1 }
+
+// CHECK-SIL: sil_scope [[FN:[0-9]+]] { loc "a.swift":1:6 parent @hoist_inlined
+// CHECK-SIL: sil_scope [[INLINED:[0-9]+]] { loc "b.swift":2:3 parent {{[0-9]+}} inlined_at [[FN]] }
+// CHECK-SIL:       // hoist_inlined, loc {{.*}}, scope [[FNSCOPE:[0-9]+]]
+// CHECK-SIL-LABEL: sil @hoist_inlined :
+// CHECK-SIL:       bb0({{.*}}):
+// CHECK-SIL-NEXT:    [[STACK:%[0-9]+]] = alloc_stack $T, loc * "<compiler-generated>":0:0, scope [[FNSCOPE]]{{$| }}
+// CHECK-SIL:       bb1:
+// CHECK-SIL-NEXT:    debug_value [[STACK]], let, name "x", {{.*}}, scope [[INLINED]]{{$| }}
+// CHECK-SIL:       } // end sil function 'hoist_inlined'
+
+// The dynamic alloca is attributed to the function, not to the inlined code.
+// CHECK-IR-LABEL: define {{.*}} @hoist_inlined(
+// CHECK-IR-SAME:    !dbg ![[SP:[0-9]+]]
+// CHECK-IR:       entry:
+// CHECK-IR:         = alloca i8, i{{32|64}} %size, {{.*}}!dbg ![[ALLOCA_LOC:[0-9]+]]
+// CHECK-IR:         br i1
+// CHECK-IR:       ![[ALLOCA_LOC]] = !DILocation(line: 0, scope: ![[SP]])
+
+sil @hoist_inlined : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2, loc "a.swift":2:3, scope 1
+
+bb1:
+  %2 = alloc_stack $T, let, name "x", loc "b.swift":2:7, scope 3
+  copy_addr %0 to [init] %2 : $*T, loc "b.swift":2:7, scope 3
+  %3 = function_ref @use : $@convention(thin) <T> (@in T) -> (), loc "b.swift":3:3, scope 3
+  %4 = apply %3<T>(%2) : $@convention(thin) <T> (@in T) -> (), loc "b.swift":3:3, scope 3
+  dealloc_stack %2 : $*T, loc "b.swift":3:3, scope 3
+  br bb3, loc "a.swift":3:3, scope 1
+
+bb2:
+  br bb3, loc "a.swift":4:3, scope 1
+
+bb3:
+  destroy_addr %0 : $*T, loc "a.swift":5:3, scope 1
+  %5 = tuple (), loc "a.swift":5:3, scope 1
+  return %5 : $(), loc "a.swift":5:3, scope 1
+}
+
+// A variable with moveable debug info keeps it when it is split off the
+// hoisted alloc_stack.
+sil_scope 4 { loc "a.swift":7:6 parent @hoist_moved_inlined : $@convention(thin) <T> (@in T, Builtin.Int1) -> () }
+sil_scope 5 { loc "b.swift":2:3 parent 2 inlined_at 4 }
+
+// CHECK-SIL: sil_scope [[FN:[0-9]+]] { loc "a.swift":7:6 parent @hoist_moved_inlined
+// CHECK-SIL: sil_scope [[INLINED:[0-9]+]] { loc "b.swift":2:3 parent {{[0-9]+}} inlined_at [[FN]] }
+// CHECK-SIL:       // hoist_moved_inlined, loc {{.*}}, scope [[FNSCOPE:[0-9]+]]
+// CHECK-SIL-LABEL: sil @hoist_moved_inlined :
+// CHECK-SIL:       bb0({{.*}}):
+// CHECK-SIL-NEXT:    [[STACK:%[0-9]+]] = alloc_stack [moveable_value_debuginfo] $T, loc * "<compiler-generated>":0:0, scope [[FNSCOPE]]{{$| }}
+// CHECK-SIL:       bb1:
+// CHECK-SIL-NEXT:    debug_value [moveable_value_debuginfo] [[STACK]], let, name "y", {{.*}}, scope [[INLINED]]{{$| }}
+// CHECK-SIL:       } // end sil function 'hoist_moved_inlined'
+sil @hoist_moved_inlined : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2, loc "a.swift":8:3, scope 4
+
+bb1:
+  %2 = alloc_stack [moveable_value_debuginfo] $T, let, name "y", loc "b.swift":2:7, scope 5
+  copy_addr %0 to [init] %2 : $*T, loc "b.swift":2:7, scope 5
+  %3 = function_ref @use : $@convention(thin) <T> (@in T) -> (), loc "b.swift":3:3, scope 5
+  %4 = apply %3<T>(%2) : $@convention(thin) <T> (@in T) -> (), loc "b.swift":3:3, scope 5
+  dealloc_stack %2 : $*T, loc "b.swift":3:3, scope 5
+  br bb3, loc "a.swift":9:3, scope 4
+
+bb2:
+  br bb3, loc "a.swift":10:3, scope 4
+
+bb3:
+  destroy_addr %0 : $*T, loc "a.swift":11:3, scope 4
+  %5 = tuple (), loc "a.swift":11:3, scope 4
+  return %5 : $(), loc "a.swift":11:3, scope 4
+}
