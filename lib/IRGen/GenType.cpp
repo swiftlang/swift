@@ -17,6 +17,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
@@ -2872,19 +2873,23 @@ const TypeInfo *TypeConverter::convertPackType(SILPackType *pack) {
 
 /// Convert a reference storage type. The implementation here depends on the
 /// underlying reference type. The type may be optional.
-#define REF_STORAGE(Name, ...) \
-const TypeInfo * \
-TypeConverter::convert##Name##StorageType(Name##StorageType *refType) { \
-  CanType referent(refType->getReferentType()); \
-  bool isOptional = false; \
-  if (auto referentObj = referent.getOptionalObjectType()) { \
-    referent = referentObj; \
-    isOptional = true; \
-  } \
-  assert(referent->allowsOwnership()); \
-  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent)); \
-  return referentTI.create##Name##StorageType(*this, isOptional); \
-}
+#define REF_STORAGE(Name, ...)                                                 \
+  const TypeInfo *TypeConverter::convert##Name##StorageType(                   \
+      Name##StorageType *refType) {                                            \
+    CanType referent(refType->getReferentType());                              \
+    bool isOptional = false;                                                   \
+    if (auto referentObj = referent.getOptionalObjectType()) {                 \
+      referent = referentObj;                                                  \
+      isOptional = true;                                                       \
+    }                                                                          \
+    if (refType->getOwnership() == ReferenceOwnership::Unmanaged &&            \
+        referent.isCOMExistentialType())                                       \
+      return createUnmanagedStorageType(IGM.Int8PtrTy,                         \
+                                        ReferenceCounting::None, isOptional);  \
+    assert(referent->allowsOwnership());                                       \
+    auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent)); \
+    return referentTI.create##Name##StorageType(*this, isOptional);            \
+  }
 #include "swift/AST/ReferenceStorage.def"
 
 static void overwriteForwardDecl(llvm::DenseMap<TypeBase *, const TypeInfo *> &cache,
