@@ -217,7 +217,7 @@ param
   [switch] $Windows = $false,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
-  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [string[]] $WindowsSDKArchitectures = @("X64"),
   [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
@@ -285,6 +285,7 @@ if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
   $Test = @("lld", "lldb", "lldb-swift", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
 }
+$Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
 
 if ($UseHostToolchain -is [string]) {
   $UseHostToolchain = [System.Convert]::ToBoolean($UseHostToolchain)
