@@ -4,12 +4,35 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -enable-llvm-wme -parse-as-library %s -DLIBRARY -module-name Library -emit-module -o %t/Library.swiftmodule
 // RUN: %target-build-swift -Xfrontend -enable-llvm-wme -parse-as-library %s -DCLIENT -module-name Main -I%t -emit-ir -o - | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-llvm-wme -parse-as-library %s -DIMPLEMENTATION -module-name Implementation -I%t -O -emit-ir -o - | %FileCheck %s --check-prefixes=PRIVATE-CONFORMANCE,PUBLIC-VISIBILITY
+// RUN: %target-build-swift -Xfrontend -enable-llvm-wme -Xfrontend -internalize-at-link -parse-as-library %s -DIMPLEMENTATION -module-name Implementation -I%t -O -emit-ir -o - | %FileCheck %s --check-prefixes=PRIVATE-CONFORMANCE,LINKAGE-VISIBILITY
 
 #if LIBRARY
 
 public protocol MyLibraryProtocol {
   func library_req()
 }
+
+#endif
+
+#if IMPLEMENTATION
+
+import Library
+
+private struct PrivateConformer: MyLibraryProtocol {
+  func library_req() {}
+}
+
+public func makePrivateConformer() -> any MyLibraryProtocol {
+  PrivateConformer()
+}
+
+// A private conformance can escape its module as an existential. The protocol
+// dispatch thunk lives in Library, so pre-link VFE in Implementation cannot
+// see the call and must preserve the witness until link time.
+// PRIVATE-CONFORMANCE: = internal constant [2 x ptr] [ptr {{.*}}, ptr @"{{.*}}PrivateConformer{{.*}}library_reqyyFTW"], {{.*}}!vcall_visibility ![[VIS:[0-9]+]]
+// PUBLIC-VISIBILITY: ![[VIS]] = !{i64 0,
+// LINKAGE-VISIBILITY: ![[VIS]] = !{i64 1,
 
 #endif
 
