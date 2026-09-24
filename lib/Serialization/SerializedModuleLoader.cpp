@@ -962,6 +962,28 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   SerializedASTFile *fileUnit = nullptr;
 
   if (loadInfo.status == serialization::Status::Valid) {
+    // Reject before importing dependencies or deserializing declarations, whose
+    // imported C++ signatures depend on exception bridging being enabled.
+    if (loadedModuleFileCore->requiresCxxExceptionBridging() &&
+        !Ctx.LangOpts.hasFeature(Feature::CxxExceptionBridging)) {
+      if (diagLoc)
+        Ctx.Diags.diagnose(*diagLoc,
+                          diag::need_cxx_exception_bridging_to_import_module,
+                          M.getName());
+      return nullptr;
+    }
+    // Reconstructing a serialized bridge also needs C++ import support,
+    // regardless of the ordinary advisory interoperability requirement.
+    if (loadedModuleFileCore->requiresCxxExceptionBridging() &&
+        !Ctx.LangOpts.EnableCXXInterop) {
+      if (diagLoc) {
+        Ctx.Diags.diagnose(*diagLoc, diag::need_cxx_interop_to_import_module,
+                           M.getName());
+        Ctx.Diags.diagnose(*diagLoc, diag::enable_cxx_interop_docs);
+      }
+      return nullptr;
+    }
+
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
     M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());

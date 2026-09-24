@@ -2414,6 +2414,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     llvm_unreachable("Unhandled case in switch!");
   }
 
+  case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
   case XREF_GENERIC_PARAM_PATH_PIECE:
   case XREF_INITIALIZER_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
@@ -2474,6 +2475,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         break;
 
       case XREF_EXTENSION_PATH_PIECE:
+      case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
       case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE:
         break;
 
@@ -2900,6 +2902,23 @@ giveUpFastPath:
         return false;
       });
       values.erase(newEnd, values.end());
+      break;
+    }
+
+    case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE: {
+      auto *importer = static_cast<ClangImporter *>(
+          getContext().getClangModuleLoader());
+      auto *facade = values.size() == 1
+                         ? dyn_cast<FuncDecl>(values.front())
+                         : nullptr;
+      auto *adapter = importer && facade
+                          ? importer->getCxxExceptionBridgeAdapter(facade)
+                          : nullptr;
+      if (!adapter)
+        return llvm::make_error<XRefError>("missing C++ exception adapter",
+                                           pathTrace,
+                                           getXRefDeclNameForError());
+      values.assign(1, adapter);
       break;
     }
 
