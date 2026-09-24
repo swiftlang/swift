@@ -332,3 +332,22 @@ class PreconcurrencyInit {
 
 // expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 func downgrade(_: PreconcurrencyInit = .init()) {}
+
+// https://github.com/swiftlang/swift/issues/77985
+// An actor-instance-isolated default value in an actor-isolated context does
+// not cross an isolation boundary, including when the initializer is an
+// immediately-applied closure whose type must be inferred, or which
+// forward-references a member declared later in the actor.
+actor DefaultValueActor {
+  var name = "foo"
+
+  lazy var inferredFromClosure = {
+    name + name
+  }()
+
+  lazy var forwardReferencing: String = {
+    later + later
+  }()
+
+  var later = "bar"
+}
