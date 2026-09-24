@@ -21,6 +21,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -899,6 +900,24 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// Returns nullptr if \a decl doesn't have a valid copy constructor
 const clang::CXXConstructorDecl *
 findCopyConstructor(const clang::CXXRecordDecl *decl);
+
+/// Whether \p decl is a non-trivial C++ record.
+inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {
+  return decl->hasNonTrivialCopyConstructor() ||
+         decl->hasNonTrivialMoveConstructor() ||
+         decl->hasNonTrivialDestructor();
+}
+
+/// Whether \p type is an imported C++ class that C++ cannot pass in registers
+/// (a non-trivial copy or move constructor, or a non-trivial destructor).
+inline bool isNonTrivialCxxRecord(Type type) {
+  const auto *structDecl = type->getStructOrBoundGenericStruct();
+  if (!structDecl)
+    return false;
+  const auto *record =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  return record && isNonTrivialCxxRecord(record);
+}
 
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///

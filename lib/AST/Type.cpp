@@ -3577,12 +3577,13 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         // Non-trivial C++ classes and structures are not
         // supported by @objc attribute, even though they can
-        // be represented in Objective-C++.
+        // be represented in Objective-C++. They are supported by C++.
         if (auto *cxxRec = dyn_cast_or_null<clang::CXXRecordDecl>(
                 nominal->getClangDecl())) {
-          if (cxxRec->hasNonTrivialCopyConstructor() ||
-              cxxRec->hasNonTrivialMoveConstructor() ||
-              cxxRec->hasNonTrivialDestructor())
+          if (language != ForeignLanguage::Cxx &&
+              (cxxRec->hasNonTrivialCopyConstructor() ||
+               cxxRec->hasNonTrivialMoveConstructor() ||
+               cxxRec->hasNonTrivialDestructor()))
             return failure();
         }
 

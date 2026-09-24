@@ -2933,14 +2933,9 @@ namespace {
           // Check if the given type is non-trivial to ensure we can
           // still perform the right copy/move/destroy even if it's
           // not an address-only type.
-          auto isNonTrivial = [](const clang::CXXRecordDecl *decl) -> bool {
-            return decl->hasNonTrivialCopyConstructor() ||
-                   decl->hasNonTrivialMoveConstructor() ||
-                   !decl->hasTrivialDestructor();
-          };
           if (!isAddressOnly &&
               Impl.SwiftContext.LangOpts.Target.isWindowsMSVCEnvironment() &&
-              isNonTrivial(cxxRecordDecl)) {
+              isNonTrivialCxxRecord(cxxRecordDecl)) {
             // MSVC ABI allows non-trivially destroyed C++ types
             // to be passed in register. This is not supported, as such
             // type wouldn't be destroyed in Swift correctly. Therefore,
