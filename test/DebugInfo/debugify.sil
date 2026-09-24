@@ -1,7 +1,8 @@
 // RUN: %target-sil-opt -sil-print-types -debugify -enable-sil-verify-all %s | %FileCheck %s
 
 // Check that debugify attaches a no-op debug reconstruction block to every
-// instruction result, and to debug_values that are already there.
+// instruction result and block argument, and to debug_values that are already
+// there.
 
 sil_stage canonical
 
@@ -11,6 +12,11 @@ import Swift
 struct Point {
   var x: Int
   var y: Int
+}
+
+enum MaybeInt {
+  case some(Int)
+  case none
 }
 
 // An object-typed result gets a block argument of its own type, returned
@@ -34,8 +40,8 @@ bb0(%0 : $Point):
 // carries none.
 //
 // CHECK-LABEL: sil @loadable_address_result
-// CHECK:         [[ADR:%[0-9]+]] = struct_element_addr %0 : $*Point, #Point.y
-// CHECK-NEXT:    debug_value [[ADR]] : $*Int, let, name "debugify$
+// CHECK:         [[LOADABLE_ADR:%[0-9]+]] = struct_element_addr %0 : $*Point, #Point.y
+// CHECK-NEXT:    debug_value [[LOADABLE_ADR]] : $*Int, let, name "debugify$
 // CHECK-NOT:     op_deref
 // CHECK:         bb0(%0 : $*Int):
 // CHECK-NEXT:      %1 = load %0 : $*Int
@@ -53,8 +59,8 @@ bb0(%0 : $*Point):
 // directly, because no load can be inserted.
 //
 // CHECK-LABEL: sil @address_only_result
-// CHECK:         [[ADR:%[0-9]+]] = alloc_stack $T
-// CHECK-NEXT:    debug_value [[ADR]] : $*T, let, name "debugify$[[#]]", expr op_deref, transform {
+// CHECK:         [[ADDR_ONLY_ADR:%[0-9]+]] = alloc_stack $T
+// CHECK-NEXT:    debug_value [[ADDR_ONLY_ADR]] : $*T, let, name "debugify$[[#]]", expr op_deref, transform {
 // CHECK:         bb0(%0 : $*T):
 // CHECK-NEXT:      return %0 : $*T
 // CHECK-NEXT:    }
@@ -99,4 +105,77 @@ bb0:
   end_apply %2 as $()
   %3 = tuple ()
   return %3
+}
+
+// A phi argument gets its variable at the begin of its own block. Function
+// arguments are left alone: they already carry a variable from SILGen.
+//
+// CHECK-LABEL: sil @phi_argument
+// CHECK:         bb0(%0 : $Builtin.Int1, %1 : $Int, %2 : $Int):
+// CHECK-NEXT:    cond_br %0, bb1, bb2
+// CHECK:         bb3([[BR_PHI:%[0-9]+]] : $Int):
+// CHECK-NEXT:      debug_value [[BR_PHI]] : $Int, let, name "debugify$
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      return %0 : $Int
+// CHECK-NEXT:    }
+// CHECK-NEXT:    return [[BR_PHI]] : $Int
+// CHECK:       } // end sil function 'phi_argument'
+sil @phi_argument : $@convention(thin) (Builtin.Int1, Int, Int) -> Int {
+bb0(%0 : $Builtin.Int1, %1 : $Int, %2 : $Int):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int)
+
+bb2:
+  br bb3(%2 : $Int)
+
+bb3(%3 : $Int):
+  return %3
+}
+
+// A terminator result is a block argument too, and is handled the same way.
+//
+// CHECK-LABEL: sil @terminator_result
+// CHECK:         bb1([[PAYLOAD:%[0-9]+]] : $Int):
+// CHECK-NEXT:      debug_value [[PAYLOAD]] : $Int, let, name "debugify$
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      return %0 : $Int
+// CHECK-NEXT:    }
+// CHECK-NEXT:    br bb3([[PAYLOAD]] : $Int)
+// CHECK:       } // end sil function 'terminator_result'
+sil @terminator_result : $@convention(thin) (MaybeInt) -> Int {
+bb0(%0 : $MaybeInt):
+  switch_enum %0, case #MaybeInt.some!enumelt: bb1, case #MaybeInt.none!enumelt: bb2
+
+bb1(%1 : $Int):
+  br bb3(%1 : $Int)
+
+bb2:
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int (%2)
+  br bb3(%3 : $Int)
+
+bb3(%4 : $Int):
+  return %4
+}
+
+// A phi that already has a debug_value only gets a reconstruction block; no
+// second synthetic variable is added for it.
+//
+// CHECK-LABEL: sil @phi_with_existing_debug_value
+// CHECK:         bb1([[NAMED_PHI:%[0-9]+]] : $Int):
+// CHECK-NEXT:      debug_value [[NAMED_PHI]] : $Int, let, name "x", transform {
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      return %0 : $Int
+// CHECK-NEXT:    }
+// CHECK-NEXT:    return [[NAMED_PHI]] : $Int
+// CHECK:       } // end sil function 'phi_with_existing_debug_value'
+sil @phi_with_existing_debug_value : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  br bb1(%0 : $Int)
+
+bb1(%1 : $Int):
+  debug_value %1, let, name "x"
+  return %1
 }
