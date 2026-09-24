@@ -8842,23 +8842,6 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
         MF.getContext().AllocateCopy(lifetimeDependencies));
   }
 
-  // The module may have been built without Clang function types. Reconstruct
-  // a derivable type from the SIL signature when the client requires it, but
-  // preserve serialized types carrying non-default calling conventions.
-  if (MF.getContext().LangOpts.UseClangFunctionTypes && !clangFunctionType &&
-      shouldStoreClangType(*representation)) {
-    if (allResults.size() > 1 || !allYields.empty())
-      return MF.diagnoseFatal();
-    auto result = allResults.empty() ? std::optional<SILResultInfo>()
-                                     : allResults.front();
-    clangFunctionType = MF.getContext().getCanonicalClangFunctionType(
-        allParams, result, *representation);
-    if (!clangFunctionType)
-      return MF.diagnoseFatal();
-    extInfo =
-        extInfo.intoBuilder().withClangFunctionType(clangFunctionType).build();
-  }
-
   return SILFunctionType::get(invocationSig, extInfo, coroutineKind.value(),
                               calleeConvention.value(), allParams, allYields,
                               allResults, errorResult,
