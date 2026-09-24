@@ -1772,10 +1772,6 @@ function Get-Dependencies {
       Write-Success "WiX $($WiX.Version)"
     }
 
-    if (-not $Toolchain) { return }
-
-    DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
-
     if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
       # The make tool isn't part of MSYS
       $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
@@ -1784,6 +1780,10 @@ function Get-Dependencies {
       Expand-ArtifactZip GnuWin32Make-4.4.1.zip GnuWin32Make-4.4.1
       Write-Success "GNUWin32 make 4.4.1"
     }
+
+    if (-not $Toolchain) { return }
+
+    DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
 
     $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
     Invoke-WithArtifactLock "SwiftToolchainExtraction" {

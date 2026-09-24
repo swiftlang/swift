@@ -62,18 +62,17 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
-:: Build the -Test argument, if any, by subtracting skipped tests
+:: Select the test suites by subtracting skipped tests
 set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
-set "TestArg="
+set "TestsToRun="
 :: Strip stray double quotes from SKIP_TESTS so the substring match below still works.
 set "SkipTests=%SKIP_TESTS:"=%"
 set "Skip=,%SkipTests%,"
 for %%I in (%TestsList%) do (
   if "!Skip:,%%I,=!" == "!Skip!" (
-      set "TestArg=!TestArg!%%I,"
+      set "TestsToRun=!TestsToRun! %%I"
   )
 )
-set "TestArg=-Test !TestArg!"
 
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
 set "PackagingArg="
@@ -114,10 +113,32 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
   %PackagingArg% ^
-  %TestArg% ^
   -IncludeSBoM ^
   %DebugInfoArg% ^
   -Summary || (exit /b 1)
+
+:: Run every selected suite, even if an earlier suite fails.
+:: Use -Command because Windows PowerShell -File cannot pass a false switch value.
+:: Omit -Windows and packaging options to avoid rebuilding SDKs or installers.
+set "FailedTests="
+for %%I in (%TestsToRun%) do (
+  powershell.exe -ExecutionPolicy RemoteSigned -Command ^
+    "& '%~dp0build.ps1'" ^
+    %HostArchNameArg% ^
+    -SourceCache "'%SourceRoot%'" ^
+    -BinaryCache "'%BuildRoot%'" ^
+    -ArtifactCache "'%BuildRoot%\ArtifactCache'" ^
+    -BuildRoot "'%BuildRoot%'" ^
+    -ObjectStore "'%BuildRoot%\ObjectStore'" ^
+    -Toolchain:$false ^
+    -Test %%I ^
+    %DebugInfoArg% ^
+    -Summary || (set "FailedTests=!FailedTests! %%I")
+)
+if defined FailedTests (
+  echo Failed test suites:!FailedTests!
+  exit /b 1
+)
 
 if not "%SMOKE_TEST%"=="" (
   powershell.exe -NonInteractive -ExecutionPolicy RemoteSigned -File %~dp0windows-smoke-tests\RunSmokeTest.ps1 ^
