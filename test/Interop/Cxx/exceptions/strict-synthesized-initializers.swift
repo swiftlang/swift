@@ -73,7 +73,18 @@ struct SafeNoDefault { explicit SafeNoDefault(int value) noexcept : value(value)
 union ScalarUnion { int value; double other; };
 extern "C" {
 struct CRecord { int (*callback)(); };
+// A C linkage context does not make C++ member transfers nonthrowing.
+struct CAggregate { Member member; };
+union CMemberUnion {
+  Member member;
+  int value;
+  CMemberUnion() noexcept : value(0) {}
+  CMemberUnion(const CMemberUnion &other) noexcept : value(other.value) {}
+  ~CMemberUnion() noexcept {}
+};
 }
+static_assert(__is_nothrow_constructible(CMemberUnion, const CMemberUnion &),
+              "the C linkage union still requires a separate member check");
 
 //--- check.swift
 import SynthesizedInitializers
@@ -83,6 +94,8 @@ func check(_ member: Member) {
   _ = MemberUnion(member: member) // expected-error {{'init(member:)' is unavailable: synthesized C++ initializers require nonthrowing argument and result transfers in strict C++ exception mode}}
   _ = ArrayUnion(array: (member, member)) // expected-error {{'init(array:)' is unavailable: synthesized C++ initializers require nonthrowing argument and result transfers in strict C++ exception mode}}
   _ = CallbackHolder(callback: nil) // expected-error {{'init(callback:)' is unavailable: potentially throwing C++ callable types are not supported in strict C++ exception mode}}
+  _ = CAggregate(member: member) // expected-error {{'init(member:)' is unavailable: synthesized C++ initializers require nonthrowing argument and result transfers in strict C++ exception mode}}
+  _ = CMemberUnion(member: member) // expected-error {{'init(member:)' is unavailable: synthesized C++ initializers require nonthrowing argument and result transfers in strict C++ exception mode}}
 }
 
 //--- annotated.swift
@@ -94,6 +107,8 @@ func unchanged(_ member: Member) {
   _ = MemberUnion(member: member)
   _ = ArrayUnion(array: (member, member))
   _ = CallbackHolder(callback: nil)
+  _ = CAggregate(member: member)
+  _ = CMemberUnion(member: member)
 }
 
 //--- main.swift
@@ -110,3 +125,5 @@ let memberUnion = MemberUnion(value: 19)
 precondition(memberUnion.value == 19)
 let cRecord = CRecord(callback: nil)
 precondition(cRecord.callback == nil)
+let cMemberUnion = CMemberUnion(value: 29)
+precondition(cMemberUnion.value == 29)

@@ -1009,9 +1009,12 @@ bool SwiftDeclSynthesizer::checkSynthesizedCxxConstructor(
     return true;
   auto *clangRecord =
       dyn_cast_or_null<clang::CXXRecordDecl>(record->getClangDecl());
-  if (!clangRecord || clangRecord->getDeclContext()->isExternCContext())
+  if (!clangRecord)
     return true;
 
+  // An extern "C" context may contain C++ records with throwing transfers.
+  // Preserve C callable imports without exempting those transfers.
+  bool isInCLinkageContext = clangRecord->getDeclContext()->isExternCContext();
   auto &clangCtx = ImporterImpl.getClangASTContext();
   bool canTransfer = canTransferCxxValueWithoutThrowing(
       clangCtx.getRecordType(clangRecord), clangRecord);
@@ -1025,7 +1028,7 @@ bool SwiftDeclSynthesizer::checkSynthesizedCxxConstructor(
   // supplied to one of its synthesized field initializers.
   auto canTransferMember = [&](auto &&self, clang::QualType type,
                                const clang::Decl *decl) -> bool {
-    if (hasPotentiallyThrowingCxxCallableType(type)) {
+    if (!isInCLinkageContext && hasPotentiallyThrowingCxxCallableType(type)) {
       reason = "potentially throwing C++ callable types are not supported in "
                "strict C++ exception mode";
       return false;
