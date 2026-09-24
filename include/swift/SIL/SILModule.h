@@ -150,6 +150,13 @@ enum class SILStage {
   Lowered,
 };
 
+/// The textual spelling of \p stage, as it appears in a `sil_stage` line and in
+/// a function's `[stage=...]` attribute.
+StringRef getSILStageName(SILStage stage);
+
+/// The stage spelled \p name, or None if \p name spells no stage.
+std::optional<SILStage> getSILStageByName(StringRef name);
+
 /// A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
