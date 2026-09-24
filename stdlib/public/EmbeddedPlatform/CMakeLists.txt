@@ -78,11 +78,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   )
 
   # The POSIX pthread-based shim only makes sense on hosted POSIX targets;
-  # skip bare-metal and Windows triples that lack a pthread implementation.
+  # skip bare-metal, Windows, and single-threaded WASI triples that lack the
+  # required pthread and stdio locking support.
   # Also skip Apple targets when the host is not macOS: cross-compiling to
   # Apple from Linux/Windows without an Apple SDK picks up the host libc's
   # `<pthread.h>`, which fails.
-  set(_mt_posix_skip_triple "-none-" "-windows-")
+  set(_mt_posix_skip_triple "-none-" "-windows-" "-wasi(p[0-9]+)?$")
   if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
     list(APPEND _mt_posix_skip_triple "-apple-")
   endif()

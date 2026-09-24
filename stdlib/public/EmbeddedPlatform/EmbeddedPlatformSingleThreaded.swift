@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+@implementation @c
+public func _swift_lockStandardOutput() {
+}
+
+@implementation @c
+public func _swift_unlockStandardOutput() {
+}
+
 fileprivate struct SingleThreadedMutex {
   var checked: Bool
   var lockCount: UInt
