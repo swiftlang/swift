@@ -2689,6 +2689,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         if (fd->hasSendingResult())
           infoBuilder = infoBuilder.withSendingResult();
         infoBuilder = infoBuilder.withCoroutine(fd->isCoroutine());
+        // Carry the trailing 'oneway' modifier into the function type so it
+        // participates in the type identity (mangling, overload resolution and
+        // witness matching), the same way 'async' does.
+        infoBuilder = infoBuilder.withOneway(fd->isOneway());
       }
 
       // Lifetime dependencies only apply to the outer function type for

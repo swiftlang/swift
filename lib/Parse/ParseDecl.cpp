@@ -9566,9 +9566,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   SourceLoc throwsLoc;
   bool rethrows;
   TypeRepr *thrownTy = nullptr;
+  SourceLoc onewayLoc;
   Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
                                    DefaultArgs, asyncLoc, reasync, throwsLoc,
-                                   rethrows, thrownTy, BodyYields, FuncRetTy);
+                                   rethrows, thrownTy, onewayLoc, BodyYields,
+                                   FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return Status;
@@ -9595,6 +9597,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
       /*Async=*/isAsync, asyncLoc,
       /*Throws=*/throwsLoc.isValid(), throwsLoc, thrownTy, GenericParams,
       BodyParams, BodyYields, FuncRetTy, CurDeclContext);
+
+  // Record the trailing 'oneway' modifier, if present. Semantic validity
+  // (Void result, distributed / actor context) is checked later in Sema.
+  if (onewayLoc.isValid())
+    FD->setOneway(true);
 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
@@ -10610,10 +10617,14 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc throwsLoc;
   bool rethrows;
   TypeRepr *thrownTy = nullptr;
+  SourceLoc onewayLoc;
   // TODO: Decide what to do if/when constructor could yield
   Status |= parseFunctionSignature(
       DeclBaseName::createConstructor(), FullName, BodyParams, DefaultArgs,
-      asyncLoc, reasync, throwsLoc, rethrows, thrownTy, bodyYields, FuncRetTy);
+      asyncLoc, reasync, throwsLoc, rethrows, thrownTy, onewayLoc, bodyYields,
+      FuncRetTy);
+  // 'oneway' is not accepted on initializers; parseFunctionSignature only
+  // parses it in a function context, so 'onewayLoc' stays invalid here.
   // TODO: check that bodyYields are empty
 
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {

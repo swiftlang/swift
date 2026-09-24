@@ -886,6 +886,14 @@ ManglingError Remangler::mangleSendingResultFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleOnewayFunctionType(Node *node,
+                                                  unsigned depth) {
+  // The old mangling has no representation for the 'oneway' distributed
+  // remote-call function flavor, which postdates it entirely and never appears
+  // in old-mangled symbols. Fail gracefully, like global-actor isolation
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleFieldOffset(Node *node, unsigned depth) {
   Buffer << "Wv";
   return mangleChildNodes(node, depth + 1); // directness, entity

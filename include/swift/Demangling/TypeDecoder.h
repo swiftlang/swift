@@ -1145,6 +1145,15 @@ protected:
         ++firstChildIdx;
       }
 
+      // The 'oneway' distributed remote-call modifier is an AST-only function
+      // flavor; it is not represented in runtime metadata flags, so simply
+      // consume the annotation node if present (it never appears in runtime
+      // metadata, since SIL lowering drops it).
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::OnewayFunctionType) {
+        ++firstChildIdx;
+      }
+
       bool isAsync = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::AsyncAnnotation) {

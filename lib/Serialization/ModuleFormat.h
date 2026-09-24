@@ -57,8 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1030; // unconditional_checked_cast_addr copy flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1031; // 'oneway' function modifier
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1414,7 +1413,8 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
     BCFixed<1>,                      // called once
-    BCFixed<1>                       // coroutine?
+    BCFixed<1>,                      // coroutine?
+    BCFixed<1>                       // oneway?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1524,6 +1524,7 @@ namespace decls_block {
     BCFixed<1>,                      // has sending result,
     BCFixed<1>,                      // called once
     BCFixed<1>,                      // coroutine?
+    BCFixed<1>,                      // oneway?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1861,6 +1862,7 @@ namespace decls_block {
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
     BCFixed<1>,   // has sending result
+    BCFixed<1>,   // is 'oneway'?
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:

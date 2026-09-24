@@ -37,6 +37,57 @@ You use three main parts when writing code with distributed actors:
   use another library,
   or [write your own distributed actor system](<doc:implementing-a-custom-distributed-actor-system>).
 
+## Oneway Methods
+
+By default, every remote call made on a distributed actor follows a
+request/response pattern: the caller `await`s a reply from the peer, and the
+actor system's `remoteCall` / `remoteCallVoid` implementation is responsible
+for shipping the invocation over the network, awaiting the peer's response,
+and delivering the returned value or thrown error back to the caller.
+
+Some transports (particularly classical actor-model style messaging) benefit
+from opting out of the response half of that pattern. The trailing `oneway`
+function modifier marks a remote call as fire-and-forget: a *hint* the compiler
+carries from the declaration site through the synthesized thunk into
+``Distributed/RemoteCallTarget``, so the actor system can decide whether to
+take an alternative code path.
+
+The hint has no effect on local calls; it only influences the remote branch of
+the synthesized thunk. Individual actor systems are free to ignore it entirely.
+
+`oneway` is experimental and gated by
+`-enable-experimental-feature OnewayMethods`.
+
+### The `oneway` modifier
+
+A oneway remote call is fire-and-forget: the actor system may complete the
+local side of the call as soon as the outgoing message has been written, and
+should not wait for a peer reply. This matches the "message" concept of
+classical actor systems, and is well suited to keep-alive messages, batched
+acknowledgements, and other traffic where a response would only be discarded.
+
+`oneway` is spelled as a trailing function modifier, after the effect
+specifiers:
+
+```swift
+distributed func ping() oneway
+distributed func log(_ line: String) async oneway
+```
+
+Oneway calls may still be `async` and `throws`. The synthesized thunk still
+invokes `try await remoteCallVoid(...)`, so the actor system is allowed to
+suspend the caller until the outbound write completes and to throw on send
+failure. The contract is only that it must not depend on a reply from the peer.
+
+Only `Void`-returning functions may carry the `oneway` modifier; the compiler
+rejects a non-`Void` result at the declaration site. `oneway` is meaningful on
+`distributed` functions; it is permitted but inert on other actor instance
+methods.
+
+The actor system observes the hint via
+``Distributed/RemoteCallTarget/isOnewayRemoteCall`` inside its
+`remoteCallVoid` implementation.
+
 [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 [tspl]: https://docs.swift.org/swift-book/
 [cluster]: https://github.com/apple/swift-distributed-actors/
@@ -54,6 +105,7 @@ You use three main parts when writing code with distributed actors:
 - <doc:implementing-a-custom-distributed-actor-system>
 - ``Distributed/DistributedActorSystem``
 - ``Distributed/RemoteCallTarget``
+- ``Distributed/RemoteCallTarget/isOnewayRemoteCall``
 - ``Distributed/RemoteCallArgument``
 - ``Distributed/DistributedTargetInvocationEncoder``
 - ``Distributed/DistributedTargetInvocationDecoder``

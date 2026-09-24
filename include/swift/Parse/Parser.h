@@ -1653,7 +1653,7 @@ public:
       DeclBaseName functionName, DeclName &fullName, ParameterList *&bodyParams,
       DefaultArgumentInfo &defaultArgs, SourceLoc &asyncLoc, bool &reasync,
       SourceLoc &throws, bool &rethrows, TypeRepr *&thrownType,
-      YieldList *&bodyYields, TypeRepr *&retType);
+      SourceLoc &onewayLoc, YieldList *&bodyYields, TypeRepr *&retType);
 
   /// Parse 'async' and 'throws', if present, putting the locations of the
   /// keywords into the \c SourceLoc parameters.
