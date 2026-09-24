@@ -894,6 +894,11 @@ NON_VALUE_INST(EndLifetimeInst, end_lifetime,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(ExtendLifetimeInst, extend_lifetime,
                SILInstruction, None, DoesNotRelease)
+// A Raw-SIL-only marker for a value needing a diagnostic of the given kind to be
+// emitted for it by some pass. Modeled as MayHaveSideEffects so that DCE does
+// not remove the marker before the diagnostic pass.
+NON_VALUE_INST(DiagnoseInst, diagnose,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(InjectEnumAddrInst, inject_enum_addr,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(DeinitExistentialAddrInst, deinit_existential_addr,
