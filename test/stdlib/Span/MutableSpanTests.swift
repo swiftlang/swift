@@ -499,7 +499,7 @@ suite.test("updateSubrange(_:moving:)")
   expectEqual(LifetimeTracked.instances, originalInstances)
 }
 
-suite.test("updateFromIndex(_:copying:)")
+suite.test("updateElements(from:copying:)")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -511,18 +511,18 @@ suite.test("updateFromIndex(_:copying:)")
   var a = ContiguousArray(repeating: -1, count: capacity)
   var span = a.mutableSpan
 
-  var end = span.updateFromIndex(2, copying: source.span)
+  var end = span.updateElements(from: 2, copying: source.span)
   expectEqual(end, 6)
-  end = span.updateFromIndex(end, copying: more)
+  end = span.updateElements(from: end, copying: more)
   expectEqual(end, capacity)
 
-  end = span.updateFromIndex(capacity, copying: Span())
+  end = span.updateElements(from: capacity, copying: Span())
   expectEqual(end, capacity)
 
   expectEqual(a, [-1, -1, 0, 1, 2, 3, 8, 9])
 }
 
-suite.test("updateFromIndex(_:copying:), Iterable overflows source")
+suite.test("updateElements(from:copying:), Iterable overflows source")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
 .code {
@@ -532,10 +532,10 @@ suite.test("updateFromIndex(_:copying:), Iterable overflows source")
   var a = ContiguousArray(repeating: 0, count: 4)
   var span = a.mutableSpan
   expectCrashLater()
-  _ = span.updateFromIndex(0, copying: source.span)
+  _ = span.updateElements(from: 0, copying: source.span)
 }
 
-suite.test("updateFromIndex(_:copying:), bad index")
+suite.test("updateElements(from:copying:), bad index")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
 .code {
@@ -546,10 +546,10 @@ suite.test("updateFromIndex(_:copying:), bad index")
   expectCrashLater(
     withMessage: _isDebugAssertConfiguration() ? "Index out of bounds" : ""
   )
-  _ = span.updateFromIndex(5, copying: Span())
+  _ = span.updateElements(from: 5, copying: Span())
 }
 
-suite.test("updateFromIndex(_:copying:), from inout borrowing iterator")
+suite.test("updateElements(from:copying:), from inout borrowing iterator")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -561,14 +561,14 @@ suite.test("updateFromIndex(_:copying:), from inout borrowing iterator")
   var first = ContiguousArray(repeating: -1, count: 4)
   var span1 = first.mutableSpan
   var index = 0
-  span1.updateFromIndex(&index, copying: &iterator)
+  span1.updateElements(from: &index, copying: &iterator)
   expectEqual(index, 4)
   expectEqual(first, [0, 1, 2, 3])
 
   var second = ContiguousArray(repeating: -1, count: 4)
   var span2 = second.mutableSpan
   index = 0
-  span2.updateFromIndex(&index, copying: &iterator)
+  span2.updateElements(from: &index, copying: &iterator)
   expectEqual(index, 2)
   expectEqual(second, [4, 5, -1, -1])
 }

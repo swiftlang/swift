@@ -932,13 +932,13 @@ extension MutableRawSpan {
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateFromIndex<
+  public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    _ byteOffset: inout Int, copying source: borrowing I
+    from byteOffset: inout Int, copying source: borrowing I
   ) throws(I.Failure) where I.Element == UInt8 {
     var iterator = source.makeBorrowingIterator()
-    try updateFromIndex(&byteOffset, copying: &iterator)
+    try updateElements(from: &byteOffset, copying: &iterator)
     let next = try iterator.nextSpan()
     _precondition(next.isEmpty)
   }
@@ -956,14 +956,14 @@ extension MutableRawSpan {
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateFromIndex<
+  public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    _ byteOffset: Int, copying source: borrowing I
+    from byteOffset: Int, copying source: borrowing I
   ) -> Int where I.Element == UInt8, I.Failure == Never {
-    var bound = byteOffset
-    updateFromIndex(&bound, copying: source)
-    return bound
+    var byteOffset = byteOffset
+    updateElements(from: &byteOffset, copying: source)
+    return byteOffset
   }
 
   /// Copies bytes from an iterator into this span, starting at byteOffset.
@@ -988,10 +988,10 @@ extension MutableRawSpan {
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateFromIndex<
+  public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    _ byteOffset: inout Int,
+    from byteOffset: inout Int,
     copying source: inout I
   ) throws(I.Failure) where I.Element == UInt8 {
     _precondition(

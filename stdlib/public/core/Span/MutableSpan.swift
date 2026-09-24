@@ -801,13 +801,13 @@ extension MutableSpan {
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateFromIndex<
+  public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    _ index: inout Index, copying source: borrowing I
+    from index: inout Index, copying source: borrowing I
   ) throws(I.Failure) where I.Element == Element {
     var iterator = source.makeBorrowingIterator()
-    try updateFromIndex(&index, copying: &iterator)
+    try updateElements(from: &index, copying: &iterator)
     let next = try iterator.nextSpan()
     _precondition(next.isEmpty)
   }
@@ -825,14 +825,14 @@ extension MutableSpan {
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateFromIndex<
+  public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    _ index: Index, copying source: borrowing I
+    from index: Index, copying source: borrowing I
   ) -> Index where I.Element == Element, I.Failure == Never {
-    var bound = index
-    updateFromIndex(&bound, copying: source)
-    return bound
+    var index = index
+    updateElements(from: &index, copying: source)
+    return index
   }
 
   /// Copies elements from an iterator into this span, starting at index.
@@ -857,10 +857,10 @@ extension MutableSpan {
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateFromIndex<
+  public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    _ index: inout Index, copying source: inout I
+    from index: inout Index, copying source: inout I
   ) throws(I.Failure) where I.Element == Element {
     _precondition(
       UInt(bitPattern: index) <= UInt(bitPattern: _count),
