@@ -614,3 +614,23 @@ class SwiftTestCase(unittest.TestCase):
         self.assertIn(
             '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=FALSE',
             swift.cmake_options)
+
+    def test_caching_flags(self):
+        self.args.enable_caching = True
+        self.args.caching_cas_path = '/path/to/cas'
+        self.args.caching_plugin_path = None
+        self.args.caching_plugin_option = None
+        self.args.caching_prefix_map = False
+        # The default bootstrapping mode (None) as well as explicit modes
+        # should enable caching; CMake decides which targets use it.
+        for mode in [None, 'hosttools', 'bootstrapping']:
+            self.args.bootstrapping_mode = mode
+            swift = Swift(
+                args=self.args,
+                toolchain=self.toolchain,
+                source_dir='/path/to/src',
+                build_dir='/path/to/build')
+            self.assertIn('-DSWIFT_CACHING_BUILD:BOOL=TRUE',
+                          swift.cmake_options)
+            self.assertIn('-DSWIFT_CACHING_BUILD_CAS_PATH:PATH=/path/to/cas',
+                          swift.cmake_options)
