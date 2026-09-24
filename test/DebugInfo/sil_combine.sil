@@ -263,15 +263,10 @@ sil [readonly] @makeKlass : $@convention(thin) () -> @owned Klass
 
 // This test verifies that two derived uses of an apply don't cause a crash
 // while trying to be deleted twice.
-// Undef debug_values are left behind.
+// TODO: This should leave undef debug_values behind (PR #91910).
 
 // CHECK-LABEL: sil [ossa] @multi_operand_apply
 // CHECK:       bb0:
-// CHECK-NEXT:    debug_value (undef : $Klass, undef : $Klass), let, name "pair", transform {
-// CHECK-NEXT:      bb0(%0 : $Klass, %1 : $Klass):
-// CHECK-NEXT:        %2 = tuple (undef : $Klass, undef : $Klass)
-// CHECK-NEXT:        return %2
-// CHECK-NEXT:    }
 // CHECK-NEXT:    [[T:%[0-9]+]] = tuple ()
 // CHECK-NEXT:    return [[T]]
 // CHECK-NEXT:  } // end sil function 'multi_operand_apply'

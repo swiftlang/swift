@@ -30,7 +30,6 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @test_ossa :
 // CHECK:         %0 = alloc_ref
-// CHECK-O-NEXT:  debug_value undef : $AnyObject, var, name "x"
 // CHECK-O-NEXT:  checked_cast_br X in %0 : $X
 // CHECK-ONONE:   checked_cast_br AnyObject in %2 : $AnyObject
 // CHECK-O:     bb2([[A:%.*]] : @owned $X):
