@@ -579,6 +579,10 @@ void importer::getNormalInvocationArguments(
 
       languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
+      // Lets <swift/bridging> distinguish support for SWIFT_THROWS from older
+      // importers that accept swift_attr but ignore this particular spelling.
+      "-D__swift_cxx_throws__=1",
+
       "-fretain-comments-from-system-headers",
 
       "-isystem", searchPathOpts.RuntimeResourcePath
@@ -6168,6 +6172,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
                                   /*implicit=*/true);
     return {body, /*isTypeChecked=*/true};
   }
+  static_cast<ClangImporter *>(ctx.getClangModuleLoader())
+      ->recordInheritedMethodForwarder(funcDecl, forwardedFunc);
 
   SmallVector<Expr *, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
@@ -8545,9 +8551,24 @@ ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
   return Impl.getOriginalForVirtualThunk(decl);
 }
 
+FuncDecl *
+ClangImporter::getVirtualThunkForOriginal(const FuncDecl *decl) const {
+  return Impl.virtualOriginalToThunk.lookup(decl);
+}
+
+void ClangImporter::recordInheritedMethodForwarder(FuncDecl *method,
+                                                   FuncDecl *forwarder) {
+  Impl.inheritedMethodForForwarder[forwarder] = method;
+}
+
+FuncDecl *
+ClangImporter::getInheritedMethodForForwarder(const FuncDecl *decl) const {
+  return Impl.inheritedMethodForForwarder.lookup(decl);
+}
+
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {
-  return cast<ValueDecl>(
-      importDeclDirectly(::getCalledBaseCxxMethod(cast<FuncDecl>(decl))));
+  auto *method = ::getCalledBaseCxxMethod(cast<FuncDecl>(decl));
+  return method ? cast_or_null<ValueDecl>(importDeclDirectly(method)) : nullptr;
 }
 
 bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {
@@ -8722,6 +8743,26 @@ bool importer::hasSwiftAttribute(const clang::Decl *decl,
   }
 
   return false;
+}
+
+bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
+  return llvm::any_of(decl->redecls(), [](const clang::FunctionDecl *redecl) {
+    return hasSwiftAttribute(redecl, {"import_throws"});
+  });
+}
+
+bool ClangImporter::isCxxExceptionBridge(const FuncDecl *decl) const {
+  return Impl.cxxExceptionBridges.contains(decl);
+}
+
+FuncDecl *ClangImporter::getCxxExceptionBridgeAdapter(
+    const FuncDecl *facade) const {
+  return Impl.cxxExceptionBridges.lookup(facade);
+}
+
+FuncDecl *ClangImporter::getCxxExceptionBridgeFacade(
+    const FuncDecl *adapter) const {
+  return Impl.cxxExceptionBridgeFacades.lookup(adapter);
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {

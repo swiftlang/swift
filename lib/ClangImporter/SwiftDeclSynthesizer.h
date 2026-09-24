@@ -65,6 +65,11 @@ public:
   explicit SwiftDeclSynthesizer(ClangImporter *importer)
       : ImporterImpl(importer->Impl) {}
 
+  /// Create a native throwing facade and a C++ adapter that catches exceptions
+  /// without changing the original declaration's calling convention.
+  FuncDecl *makeCxxThrowingFunction(const clang::FunctionDecl *clangDecl,
+                                  FuncDecl *importedDecl);
+
   /// Create a typedpattern(namedpattern(decl))
   static Pattern *createTypedNamedPattern(VarDecl *decl);
 
