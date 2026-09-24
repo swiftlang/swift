@@ -25,6 +25,9 @@ import Musl
 import Android
 #elseif os(WASI)
 import WASILibc
+#if _runtime(_multithreaded)
+import wasi_pthread
+#endif
 #elseif os(Emscripten)
 import EmscriptenLibc
 #elseif os(Windows)
@@ -106,7 +109,7 @@ public func _stdlib_thread_create_block<Argument, Result>(
   } else {
     return (0, ThreadHandle(bitPattern: threadID))
   }
-#elseif os(WASI)
+#elseif os(WASI) && !_runtime(_multithreaded)
   // WASI environment is single-threaded
   return (0, nil)
 #else
@@ -140,7 +143,7 @@ public func _stdlib_thread_join<Result>(
     }
   }
   return (CInt(result), value)
-#elseif os(WASI)
+#elseif os(WASI) && !_runtime(_multithreaded)
    // WASI environment has a only single thread
    return (0, nil)
 #else
