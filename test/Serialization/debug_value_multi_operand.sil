@@ -7,7 +7,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil [serialized] [canonical] @test_single_operand_transform :
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] @test_single_operand_transform :
 // CHECK: debug_value %0 : $Builtin.Int64, let, name "salvaged", transform {
 // CHECK:   bb0(%0 : $Builtin.Int64):
 // CHECK:     return %0 : $Builtin.Int64
@@ -23,7 +23,7 @@ bb0(%0 : $Builtin.Int64):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [serialized] [canonical] @test_zero_operand_transform :
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] @test_zero_operand_transform :
 // CHECK: debug_value (), let, name "const", transform {
 // CHECK:   bb0:
 // CHECK:     [[LIT:%[0-9]+]] = integer_literal $Builtin.Int64, 42
@@ -41,7 +41,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil [serialized] [canonical] @test_multi_operand :
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] @test_multi_operand :
 // CHECK: debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int32), let, name "combined", transform {
 // CHECK:   bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int32):
 // CHECK:     return %0 : $Builtin.Int64
