@@ -382,27 +382,53 @@ private struct Resolver {
   func transform(_ kind: EventList.Kind, to request: TransformRequest, _ isLexical: Bool) -> EventList.Kind {
     log("requested transform \(isLexical ? "(lexical) " : "")to \(request), given \(kind))")
 
+    let newOp: Operand
+    let newDem: Demand
     switch kind {
     case let .use(op, dem):
-      fallthrough
+      newOp = transformOperand(op, to: request, wasTake: false, isLexical)
+      newDem = dem
     case let .take(op, dem):
-      let newOp = transformOperand(op, to: request, isLexical)
-
-      // Reclassify the event based on the transform request.
-      if case .load(.take) = request {
-        return .take(newOp, dem)
-      }
-      return .use(newOp, dem)
-
-      default:
-        fatalError("unexpected event kind to transform: \(kind)")
+      newOp = transformOperand(op, to: request, wasTake: true, isLexical)
+      newDem = dem
+    default:
+      fatalError("unexpected event kind to transform: \(kind)")
     }
+
+    // Reclassify the event based on the transform request.
+    if case .load(.take) = request {
+      return .take(newOp, newDem)
+    }
+    return .use(newOp, newDem)
   }
 
   // Performs the requested transformation.
   // If we're turning a take into a copy, or copying a noncopyable type, we add a `diagnose` instruction.
-  func transformOperand(_ op: Operand, to request: TransformRequest, _ isLexical: Bool) -> Operand {
+  func transformOperand(_ op: Operand, to request: TransformRequest, wasTake: Bool, _ isLexical: Bool) -> Operand {
     switch op.instruction {
+    case let apply as FullApplySite:
+      // We can only handle transform that provides a copy to the apply.
+      guard case .load(.copy) = request, wasTake else {
+        fatalError("cannot satisfy transform to \(request) for apply operand \(op.index) of \(apply)")
+      }
+
+      // Copy the value into a temporary alloc_stack and pass that to the apply, i.e,
+      //    %alloc = alloc_stack
+      //    copy_addr %op to [init] %alloc
+      //    diagnose %op [unpermitted_copy]  <-- only if it's move-only
+      //    apply(%alloc) : (@in) -> ...
+      //    dealloc_stack %alloc
+      let type = op.value.type.objectType
+      let allocBuilder = Builder(before: apply, context)
+      let alloc = allocBuilder.createAllocStack(type)
+      allocBuilder.createCopyAddr(from: op.value, to: alloc, takeSource: false, initializeDest: true)
+      if type.isMoveOnly {
+        allocBuilder.createDiagnose(operand: op.value, kind: .unpermittedCopy)
+      }
+      op.set(to: alloc, context)
+      Builder(after: apply, context).createDeallocStack(alloc)
+      return op
+
     // copy_addr
     case let copyAddr as CopyAddrInst:
       assert(op.value == copyAddr.source, "only the source is being read!")
@@ -411,7 +437,6 @@ private struct Resolver {
         fatalError("unhandled transform of copy_addr to \(request)")
       }
 
-      let wasTake = copyAddr.isTakeOfSource
       let becomesCopy = newOwnership != .take
       copyAddr.set(isTakeOfSource: !becomesCopy, context)
 
@@ -424,10 +449,9 @@ private struct Resolver {
       switch request {
       // load [old] --> load [new]
       case let .load(newOwnership):
-        let priorOwnership = load.loadOwnership
         load.set(ownership: newOwnership, context)
 
-        if newOwnership == .copy && (priorOwnership == .take || load.type.isMoveOnly) {
+        if newOwnership == .copy && (wasTake || load.type.isMoveOnly) {
           Builder(after: load, context).createDiagnose(operand: load, kind: .unpermittedCopy)
         }
         return load.operand
@@ -654,8 +678,17 @@ private struct Resolver {
         }
       case let store as StoringInstruction where store.destination == address.value:
         addUse(.def(address), range)
-      case let apply as FullApplySite where apply.convention(of: address) == .indirectOut:
-        addUse(.def(address), range)
+
+      case let apply as FullApplySite:
+        switch apply.convention(of: address) {
+        case .indirectOut:
+          addUse(.def(address), range)
+        case .indirectIn:
+          addUse(.take(address, .own), range)
+        default:
+          addUse(.unknown(address), range)
+        }
+
       case let tac as TupleAddrConstructorInst where tac.destinationOperand == address:
         addUse(.def(address), range)
       case let copyAddr as CopyAddrInst:

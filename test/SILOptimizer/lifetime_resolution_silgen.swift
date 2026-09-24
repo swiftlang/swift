@@ -177,3 +177,50 @@ func stress_copy_addrs() -> String {
   var str = longStr      // expected-warning {{was never mutated}}
   return str
 }
+
+// The copy into `b` stays a copy, since `a` is still used afterwards.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}copyVarThenUseSource
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "a"
+// CHECK:      [[B:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "b"
+// CHECK:      [[A_BA:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: copy_addr [[A_BA]] to [init] [[B]]
+// CHECK:      [[B_BA:%.*]] = begin_access [read] [unknown] [[B]]
+// CHECK-NEXT: load [take] [[B_BA]]
+// CHECK:      [[A_BA2:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: [[RET:%.*]] = load [take] [[A_BA2]]
+// CHECK-NOT:  destroy_addr
+// CHECK:      return [[RET]]
+// CHECK-LABEL: } // end sil function
+func copyVarThenUseSource() -> Kl {
+  var a = Kl()  // expected-warning {{was never mutated}}
+  var b = a     // expected-warning {{was never mutated}}
+  Use(b)
+  return a
+}
+
+// Each path consumes one variable and destroys the other.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}copyVarBranchReturn
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "a"
+// CHECK:      [[B:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "b"
+// CHECK:      [[A_BA:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: copy_addr [[A_BA]] to [init] [[B]]
+// CHECK:      cond_br
+
+// CHECK:      [[B_BA:%.*]] = begin_access [read] [unknown] [[B]]
+// CHECK-NEXT: load [take] [[B_BA]]
+// CHECK-NOT:  destroy_addr [[B]]
+// CHECK:      destroy_addr [[A]]
+// CHECK:      br
+
+// CHECK:      [[A_BA2:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: load [take] [[A_BA2]]
+// CHECK-NOT:  destroy_addr [[A]]
+// CHECK:      destroy_addr [[B]]
+// CHECK-NOT:  destroy_addr
+// CHECK-LABEL: } // end sil function
+func copyVarBranchReturn(_ c: Bool) -> Kl {
+  var a = Kl()  // expected-warning {{was never mutated}}
+  var b = a     // expected-warning {{was never mutated}}
+  if c { return b }
+  return a
+}
