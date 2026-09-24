@@ -3,9 +3,8 @@
 // RUN: %target-build-swift %s %t/cast.o -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=SUCCESS
-// RUN: not --crash %target-run %t/main fail 2>&1 | %FileCheck %s --check-prefix=FAILURE
+// RUN: %target-not-crash %target-run %t/main fail 2>&1 | %FileCheck %s --check-prefix=FAILURE
 // REQUIRES: executable_test
-// REQUIRES: rdar188040378
 
 @_silgen_name("copyCast")
 func copyCast<T, U>(_ source: borrowing T, _: U.Type) -> U
