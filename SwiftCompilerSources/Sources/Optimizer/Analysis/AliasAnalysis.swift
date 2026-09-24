@@ -330,12 +330,13 @@ struct AliasAnalysis {
       case let beginBorrow as BeginBorrowInst where !beginBorrow.hasPointerEscape:
         return getBorrowEffects(of: endBorrow, on: memLoc)
       case let loadBorrow as LoadBorrowInst:
-        let borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
-        // In addition to the "regular" borrow effects, a load_borrow also has effects on the memory location
-        // from where it loads the value. This includes "write" to prevent any optimization to change the
+        var borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
+        // In addition to the "regular" borrow effects, a load_borrow also has
+        // effects on the memory location from where it loads the value. A
+        // "read" effect is added to prevent any optimization from changing the
         // memory location after the load_borrow.
-        if borrowEffects != .worstEffects && memLoc.mayAlias(with: loadBorrow.address, self) {
-          return .worstEffects
+        if !borrowEffects.read && memLoc.mayAlias(with: loadBorrow.address, self) {
+          borrowEffects.read = true
         }
         return borrowEffects
       default:
