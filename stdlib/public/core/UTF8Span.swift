@@ -52,6 +52,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   /// undefined behavior may result upon use. If `isKnownASCII: true is
   /// passed`, the contents must be ASCII, or else undefined behavior may
   /// result upon use.
+  @inlinable @inline(always)
   @unsafe
   @_lifetime(copy codeUnits)
   public init(
@@ -113,6 +114,7 @@ extension UTF8Span {
   }
 
   // TODO: SPI?
+  @export(implementation)
   @_lifetime(copy codeUnits)
   internal init(
     _uncheckedAssumingValidUTF8 codeUnits: consuming Span<UInt8>,
@@ -199,6 +201,7 @@ extension UTF8Span {
   ///
   /// - Complexity: O(1)
   public var span: Span<UInt8> {
+    @inlinable @inline(always)
     @_lifetime(copy self)
     get {
       let newSpan = unsafe Span<UInt8>(_unchecked: _unsafeBaseAddress, count: self.count)
@@ -229,7 +232,12 @@ extension String {
 extension String {
 
   @_lifetime(borrow self)
-  private borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
+#if !_runtime(_ObjC)
+  // Unfortunately we cannot add these attributes unconditionally because
+  // the `_ObjC` branch references an internal function
+  @inlinable @inline(always)
+#endif
+  internal borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
 #if _runtime(_ObjC)
     // handle non-UTF8 Objective-C bridging cases here
     if !_guts.isFastUTF8, _guts._object.hasObjCBridgeableObject {
@@ -264,6 +272,11 @@ extension String {
   ///
   /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
   ///   UTF-16 strings.
+#if !_runtime(_ObjC)
+  // Unfortunately we cannot add these attributes unconditionally because
+  // the `_ObjC` branch in `_underlyingSpan` references an internal function
+  @inlinable @inline(always)
+#endif
   @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
     @_lifetime(borrow self)
