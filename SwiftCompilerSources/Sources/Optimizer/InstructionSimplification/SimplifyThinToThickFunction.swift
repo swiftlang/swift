@@ -11,14 +11,20 @@
 //===----------------------------------------------------------------------===//
 import SIL
 
-extension ThinToThickFunctionInst : SILCombineSimplifiable {
-  /// Keep convert_function after thickening:
+extension ThinToThickFunctionInst : Simplifiable, SILCombineSimplifiable {
+  /// Keep convert_function after thickening to expose a function_ref callee to
+  /// closure specialization. Closure specialization can look through conversions
+  /// of a thick closure, but needs thin_to_thick_function to directly reference
+  /// the callee.
   ///
   ///   %a = convert_function %f
   ///   %b = thin_to_thick_function %a
   /// ->
+  ///   %a = convert_function %f   // deleted later if dead after this transformation (no uses except %b left)
   ///   %c = thin_to_thick_function %f
   ///   %d = convert_function %c
+  ///
+  /// Uses of %b are replaced with %d. Other uses of %a are unchanged.
   func simplify(_ context: SimplifyContext) {
     guard let conversion = callee as? ConvertFunctionInst else {
       return
