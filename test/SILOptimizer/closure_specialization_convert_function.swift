@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all -module-name CS -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all -module-name CS %s | %FileCheck %s
 
 // Normalizing function conversions must enable closure specialization in the optimization pipeline.
 
@@ -13,8 +13,8 @@ public func make() -> B { B() }
 // CHECK:       bb0:
 // CHECK:         %[[#S0:]] = function_ref @$s2CS4makeAA1BCyF : $@convention(thin) () -> @owned B
 // CHECK:         %[[#S1:]] = apply %[[#S0]]() : $@convention(thin) () -> @owned B
-// CHECK:         %[[#S2:]] = upcast %[[#S1]] : $B to $A
-// CHECK:         return %[[#S2]] : $A
+// CHECK:         %[[#S2:]] = upcast %[[#S1]] to $A
+// CHECK:         return %[[#S2]]
 // CHECK-NEXT:  }
 @inline(never)
 public func use(_ f: () -> A) -> A { f() }
@@ -24,8 +24,8 @@ public func use(_ f: () -> A) -> A { f() }
 // CHECK:         %[[#C0:]] = function_ref @$s2CS3useyAA1ACADyXEF17$s2CS4makeAA1BCyFTf1c_n : $@convention(thin) () -> @owned A
 // CHECK:         %[[#C1:]] = apply %[[#C0]]() : $@convention(thin) () -> @owned A
 // CHECK:         %[[#C2:]] = apply %[[#C0]]() : $@convention(thin) () -> @owned A
-// CHECK:         %[[#C3:]] = tuple (%[[#C1]] : $A, %[[#C2]] : $A)
-// CHECK:         return %[[#C3]] : $(A, A)
+// CHECK:         %[[#C3:]] = tuple (%[[#C1]], %[[#C2]])
+// CHECK:         return %[[#C3]]
 // CHECK-NEXT:  }
 public func test() -> (A, A) {
   let first = use(make)
