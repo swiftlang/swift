@@ -89,6 +89,24 @@ static CanType unwrapExistential(CanType e) {
   return e;
 }
 
+static bool sourceCanInhabitExistential(CanType source, CanType target) {
+  assert(target.isExistentialType() && "target should be an existential type");
+
+  // Non-concrete types cannot be judged here.
+  if (source.isAnyExistentialType() || source->hasArchetype() ||
+      source->hasTypeParameter() || source->hasOpaqueArchetype())
+    return true;
+
+  // Copyable/Escapable targets require Copyable/Escapable source
+  if (source->isNoncopyable() && !target->isNoncopyable())
+    return false;
+  if (!source->isEscapable() && target->isEscapable())
+    return false;
+
+  // Otherwise, we cannot judge.
+  return true;
+}
+
 /// Try to classify a conversion from non-existential type
 /// into an existential type by performing a static check
 /// of protocol conformances if it is possible.
@@ -100,6 +118,10 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
 
   if (source == target)
     return DynamicCastFeasibility::WillSucceed;
+
+  // Reject putting a concrete ~C/~E into a regular (C&E) existential
+  if (!sourceCanInhabitExistential(source, target))
+    return DynamicCastFeasibility::WillFail;
 
   auto *TargetProtocol = cast_or_null<ProtocolDecl>(target.getAnyNominal());
   if (!TargetProtocol)
