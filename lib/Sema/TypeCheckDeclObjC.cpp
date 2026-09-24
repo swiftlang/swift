@@ -399,6 +399,28 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
+    // The C++ ABI decides whether the callee owns a non-trivial class passed
+    // by value (it does not under Itanium, it does under Microsoft), so
+    // `borrowing` and `consuming` each contradict one ABI. Only the default
+    // ownership follows the ABI.
+    auto ownership = param->getValueOwnership();
+    if (language == ForeignLanguage::Cxx &&
+        (ownership == ValueOwnership::Shared ||
+         ownership == ValueOwnership::Owned) &&
+        importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
+      softenIfAccessNote(AFD, Reason.getAttr(),
+                         diags
+                             .diagnose(param->getStartLoc(),
+                                       diag::cxx_param_ownership_unsupported,
+                                       AFD, param,
+                                       ownership == ValueOwnership::Owned)
+                             .highlight(param->getSourceRange())
+                             .limitBehavior(behavior));
+      Reason.describe(AFD);
+
+      return false;
+    }
+
     if (param->getTypeInContext()->hasError())
       return false;
 
