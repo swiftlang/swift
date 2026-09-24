@@ -812,13 +812,18 @@ namespace {
       // stored in that existential. This is distinct from an ordinary
       // generic parameter constrained to a COM interface, which keeps its
       // opaque Swift generic representation.
-      if (type->is<ExistentialArchetypeType>() &&
-          llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
+      if (llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
             return protocol->isCOMInterface();
           })) {
-        return asImpl().handleNonTrivialAggregate(
-            type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-                   isSensitive, DoesNotHaveRawPointer, IsLexical});
+        if (type->is<ExistentialArchetypeType>())
+          return asImpl().handleNonTrivialAggregate(
+              type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+                     isSensitive, DoesNotHaveRawPointer, IsLexical});
+        // AnyObject alone does not establish native reference counting for a
+        // COM value. Keep copies and destruction behind its value witnesses.
+        if (!type->getSuperclass())
+          return asImpl().handleAddressOnly(
+              type, getOpaqueSILTypeProperties(isSensitive));
       }
 
       // TODO: Add a HasOnlyDefaultDeinit "layout protocol".

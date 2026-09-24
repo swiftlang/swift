@@ -403,13 +403,18 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // An opened COM existential contains its interface pointer directly.
   // Ordinary generic parameters constrained to a COM interface remain opaque
   // and continue through the normal generic ABI below.
-  if (isa<ExistentialArchetypeType>(archetype) &&
+  bool isCOM =
       llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
         return protocol->isCOMInterface();
-      }))
+      });
+  if (isCOM && isa<ExistentialArchetypeType>(archetype))
     return createCOMInterfaceTypeInfo(IGM);
 
-  auto layout = archetype->getLayoutConstraint();
+  // A class-bound interface can still contain a foreign COM pointer. Without
+  // a concrete superclass, its value witnesses determine reference counting.
+  auto layout = isCOM && !archetype->getSuperclass()
+                    ? LayoutConstraint()
+                    : archetype->getLayoutConstraint();
 
   // If the archetype is class-constrained, use a class pointer
   // representation.

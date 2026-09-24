@@ -104,13 +104,17 @@ public protocol IProperties: AnyObject {
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IProperties
 // CHECK:         [[COPY:%.*]] = copy_value [[OPEN]]
 // CHECK:         [[SELF:%.*]] = begin_borrow [[COPY]]
-// CHECK:         [[METHOD:%.*]] = com_method [[SELF]], #IProperties.value!getter
+// CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
+// CHECK:         [[BORROW:%.*]] = store_borrow [[SELF]] to [[STORAGE]]
+// CHECK:         [[METHOD:%.*]] = com_method [[BORROW]], #IProperties.value!getter
 // CHECK-SAME:    $@convention(com_method)
-// CHECK-SAME:    @guaranteed
+// CHECK-SAME:    @in_guaranteed
 // CHECK-SAME:    type-defs: [[OPEN]];
-// CHECK:         apply [[METHOD]]<{{.*}}>([[SELF]])
+// CHECK:         apply [[METHOD]]<{{.*}}>([[BORROW]])
+// CHECK:         end_borrow [[BORROW]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         destroy_value [[COPY]]
+// CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         return
 public func readProperty(_ interface: borrowing any IProperties) -> CInt {
   interface.value
@@ -119,11 +123,15 @@ public func readProperty(_ interface: borrowing any IProperties) -> CInt {
 // CHECK-LABEL: sil [ossa] @$s{{.*}}13writeProperty
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IProperties
 // CHECK:         [[COPY:%.*]] = copy_value [[OPEN]]
-// CHECK:         [[METHOD:%.*]] = com_method [[COPY]], #IProperties.value!setter
+// CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
+// CHECK:         store {{%.*}} to [init] [[STORAGE]]
+// CHECK:         [[METHOD:%.*]] = com_method [[STORAGE]], #IProperties.value!setter
 // CHECK-SAME:    $@convention(com_method)
-// CHECK-SAME:    @guaranteed
+// CHECK-SAME:    @in_guaranteed
 // CHECK-SAME:    type-defs: [[OPEN]];
-// CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[COPY]])
+// CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[STORAGE]])
+// CHECK:         destroy_addr [[STORAGE]]
+// CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         destroy_value [[COPY]]
 // CHECK:         return
 public func writeProperty(_ interface: borrowing any IProperties, _ value: CInt) {
@@ -134,13 +142,17 @@ public func writeProperty(_ interface: borrowing any IProperties, _ value: CInt)
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IProperties
 // CHECK:         [[COPY:%.*]] = copy_value [[OPEN]]
 // CHECK:         [[SELF:%.*]] = begin_borrow [[COPY]]
-// CHECK:         [[METHOD:%.*]] = com_method [[SELF]], #IProperties.subscript!getter
+// CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
+// CHECK:         [[BORROW:%.*]] = store_borrow [[SELF]] to [[STORAGE]]
+// CHECK:         [[METHOD:%.*]] = com_method [[BORROW]], #IProperties.subscript!getter
 // CHECK-SAME:    $@convention(com_method)
-// CHECK-SAME:    @guaranteed
+// CHECK-SAME:    @in_guaranteed
 // CHECK-SAME:    type-defs: [[OPEN]];
-// CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[SELF]])
+// CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[BORROW]])
+// CHECK:         end_borrow [[BORROW]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         destroy_value [[COPY]]
+// CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         return
 public func readSubscript(_ interface: borrowing any IProperties, _ index: CInt) -> CInt {
   interface[index]
@@ -148,11 +160,15 @@ public func readSubscript(_ interface: borrowing any IProperties, _ index: CInt)
 
 // CHECK-LABEL: sil [ossa] @$s{{.*}}13discardResult
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IProperties
-// CHECK:         [[METHOD:%.*]] = com_method [[OPEN]], #IProperties.reset
+// CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
+// CHECK:         [[BORROW:%.*]] = store_borrow [[OPEN]] to [[STORAGE]]
+// CHECK:         [[METHOD:%.*]] = com_method [[BORROW]], #IProperties.reset
 // CHECK-SAME:    $@convention(com_method)
-// CHECK-SAME:    (@guaranteed {{.*}}) -> ()
+// CHECK-SAME:    (@in_guaranteed {{.*}}) -> ()
 // CHECK-SAME:    type-defs: [[OPEN]];
-// CHECK:         apply [[METHOD]]<{{.*}}>([[OPEN]])
+// CHECK:         apply [[METHOD]]<{{.*}}>([[BORROW]])
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         return
 public func discardResult(_ interface: borrowing any IProperties) {
   interface.reset()
