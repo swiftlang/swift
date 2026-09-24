@@ -18,6 +18,7 @@ target_link_libraries(swiftSerialization PRIVATE
   swiftClangImporter
   swiftOption
   swiftAST
+  swiftIRGen
   swiftSIL
   clangIndex)
 
