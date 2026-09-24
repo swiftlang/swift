@@ -615,7 +615,7 @@ FUNCTION(ErrorStrongRelease, Swift, swift_errorRelease,
            RETURNS(UnknownPrefix##RefCountedPtrTy), \
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind, WillReturn), \
-           EFFECT(RuntimeEffect::NoEffect), \
+           EFFECT(RuntimeEffect::RefCounting), \
            UNKNOWN_MEMEFFECTS) \
   /* void *swift_##SymName##Take(Name##Reference *object); */ \
   FUNCTION(Nativeness##Name##TakeStrong, Swift, swift_##SymName##TakeStrong, \
@@ -623,7 +623,7 @@ FUNCTION(ErrorStrongRelease, Swift, swift_errorRelease,
            RETURNS(UnknownPrefix##RefCountedPtrTy), \
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind, WillReturn), \
-           EFFECT(RuntimeEffect::NoEffect), \
+           EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating), \
            UNKNOWN_MEMEFFECTS) \
   /* Name##Reference *swift_##SymName##CopyInit(Name##Reference *dest, Name##Reference *src); */ \
   FUNCTION(Nativeness##Name##CopyInit, Swift, swift_##SymName##CopyInit, \
