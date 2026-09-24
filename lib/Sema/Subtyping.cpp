@@ -1136,7 +1136,9 @@ static Type superclassJoinMeetImpl(Operation op, Type lhs, Type rhs) {
     unsigned i = std::min(lhsSuper.size(), rhsSuper.size());
     while (i > 0) {
       --i;
-      if (lhsSuper[i]->isEqual(rhsSuper[i]))
+      auto result = isLikelyExactMatch(lhsSuper[i], rhsSuper[i]);
+      ASSERT(result);
+      if (*result)
         return lhsSuper[i];
     }
   } else {
