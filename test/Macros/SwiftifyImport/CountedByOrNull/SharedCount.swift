@@ -32,11 +32,17 @@ public func myFunc5(_ ptr: UnsafePointer<CInt>, _ ptr2: UnsafePointer<CInt>, _ p
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>) {
     let len = CInt(exactly: ptr2.count)!
     if ptr.count != len {
-      fatalError("bounds check failure in myFunc: expected \(len) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("myFunc", expected, actual)
+      }
+      _boundsCheckFailure(len, ptr.count)
     }
     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, len)
 }
@@ -44,11 +50,17 @@ public func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer
 @__swiftmacro_4test7myFunc215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc2(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ size: CInt) {
     let len = CInt(exactly: ptr.count)!
     if ptr2.count != len * size {
-      fatalError("bounds check failure in myFunc2: expected \(len * size) but got \(ptr2.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("myFunc2", expected, actual)
+      }
+      _boundsCheckFailure(len * size, ptr2.count)
     }
     return unsafe myFunc2(ptr.baseAddress!, ptr2.baseAddress!, len, size)
 }
@@ -56,12 +68,18 @@ public func myFunc2(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointe
 @__swiftmacro_4test7myFunc315_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc3(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ ptr3: UnsafeBufferPointer<CInt>) {
     let len = CInt(exactly: ptr.count)!
     let size = CInt(exactly: ptr2.count)!
     if ptr3.count != len * size {
-      fatalError("bounds check failure in myFunc3: expected \(len * size) but got \(ptr3.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("myFunc3", expected, actual)
+      }
+      _boundsCheckFailure(len * size, ptr3.count)
     }
     return unsafe myFunc3(ptr.baseAddress!, ptr2.baseAddress!, ptr3.baseAddress!, len, size)
 }
@@ -69,12 +87,18 @@ public func myFunc3(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointe
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc4(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ ptr3: UnsafeBufferPointer<CInt>) {
     let size = CInt(exactly: ptr2.count)!
     let len = CInt(exactly: ptr3.count)!
     if ptr.count != len * size {
-      fatalError("bounds check failure in myFunc4: expected \(len * size) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("myFunc4", expected, actual)
+      }
+      _boundsCheckFailure(len * size, ptr.count)
     }
     return unsafe myFunc4(ptr.baseAddress!, ptr2.baseAddress!, ptr3.baseAddress!, len, size)
 }
@@ -82,12 +106,18 @@ public func myFunc4(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointe
 @__swiftmacro_4test7myFunc515_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc5(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ ptr3: UnsafeBufferPointer<CInt>) {
     let size = CInt(exactly: ptr2.count)!
     let len = CInt(exactly: ptr3.count)!
     if ptr.count != len * size {
-      fatalError("bounds check failure in myFunc5: expected \(len * size) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("myFunc5", expected, actual)
+      }
+      _boundsCheckFailure(len * size, ptr.count)
     }
     return unsafe myFunc5(ptr.baseAddress!, ptr2.baseAddress!, ptr3.baseAddress!, len, size)
 }

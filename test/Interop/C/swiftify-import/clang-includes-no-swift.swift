@@ -49,7 +49,7 @@ c1_t foo(void * _Nonnull __sized_by(size), int size);
 /*
 expected-note@-2{{'foo' declared here}}
 expected-expansion@-3:52{{
-  expected-error@2:110{{cannot find type 'c1_t' in scope}}
+  expected-error@2:126{{cannot find type 'c1_t' in scope}}
 }}
 */
 

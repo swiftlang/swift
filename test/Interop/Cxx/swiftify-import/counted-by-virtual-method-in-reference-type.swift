@@ -15,7 +15,7 @@
 struct ValueType {
   // expected-expansion@+8:66{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func sumNonVirtual(_ values: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: values.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe sumNonVirtual(values.baseAddress, len)|}}
@@ -25,7 +25,7 @@ struct ValueType {
 
   // expected-expansion@+8:71{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func sumVirtual(_ values: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: values.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe sumVirtual(values.baseAddress, len)|}}
@@ -37,7 +37,7 @@ struct ValueType {
 struct SWIFT_REFERENCE RefType {
   // expected-expansion@+8:66{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func sumNonVirtual(_ values: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: values.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe sumNonVirtual(values.baseAddress, len)|}}
@@ -47,7 +47,7 @@ struct SWIFT_REFERENCE RefType {
 
   // expected-expansion@+8:71{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func sumVirtual(_ values: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: values.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe sumVirtual(values.baseAddress, len)|}}
