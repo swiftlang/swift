@@ -1873,6 +1873,12 @@ public:
 
 } // namespace
 
+extern "C" SWIFT_RUNTIME_EXPORT const Metadata *
+swift::swift_getCOMDynamicType(void *interface, const Metadata *staticType) {
+  COMSwiftObject identity(interface);
+  return identity ? identity.getType() : staticType;
+}
+
 static DynamicCastResult
 tryCastUnwrappingExistentialSource(
   OpaqueValue *destLocation, const Metadata *destType,
