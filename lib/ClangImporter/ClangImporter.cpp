@@ -579,6 +579,10 @@ void importer::getNormalInvocationArguments(
 
       languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
+      // Lets <swift/bridging> distinguish support for SWIFT_THROWS from older
+      // importers that accept swift_attr but ignore this particular spelling.
+      "-D__swift_cxx_throws__=1",
+
       "-fretain-comments-from-system-headers",
 
       "-isystem", searchPathOpts.RuntimeResourcePath
@@ -6079,6 +6083,11 @@ static const clang::CXXMethodDecl *
 getCalledBaseCxxMethod(const FuncDecl *baseMember) {
   if (baseMember->getClangDecl())
     return dyn_cast<clang::CXXMethodDecl>(baseMember->getClangDecl());
+  auto *importer = static_cast<ClangImporter *>(
+      baseMember->getASTContext().getClangModuleLoader());
+  if (importer->isCxxExceptionBridge(baseMember))
+    return getCalledBaseCxxMethod(
+        cast<FuncDecl>(importer->getForwardingSource(baseMember)));
   // Another synthesized derived thunk is used as a base member here,
   // so extract its synthesized C++ method.
   auto body = baseMember->getBody();
@@ -6089,6 +6098,8 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
   if (!returnStmt)
     return nullptr;
   Expr *returnExpr = returnStmt->getResult();
+  if (auto *tryExpr = dyn_cast<TryExpr>(returnExpr))
+    returnExpr = tryExpr->getSubExpr();
   // Look through a potential 'reinterpretCast' that can be used
   // to cast UnsafeMutablePointer to UnsafePointer in the synthesized
   // Swift body for `.pointee`.
@@ -6116,9 +6127,10 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
     cv = orig;
   if (!cv)
     return nullptr;
-  if (!cv->getClangDecl())
-    return nullptr;
-  return dyn_cast<clang::CXXMethodDecl>(cv->getClangDecl());
+  if (auto *function = dyn_cast<FuncDecl>(cv);
+      function && importer->isCxxExceptionBridge(function))
+    return getCalledBaseCxxMethod(function);
+  return dyn_cast_or_null<clang::CXXMethodDecl>(cv->getClangDecl());
 }
 
 // Construct a Swift method that represents the synthesized C++ method
@@ -6168,6 +6180,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
                                   /*implicit=*/true);
     return {body, /*isTypeChecked=*/true};
   }
+  static_cast<ClangImporter *>(ctx.getClangModuleLoader())
+      ->recordInheritedMethodForwarder(funcDecl, forwardedFunc);
 
   SmallVector<Expr *, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
@@ -6203,9 +6217,16 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto *baseMemberCallExpr = CallExpr::createImplicit(
       ctx, baseMemberDotCallExpr, argList);
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
-  baseMemberCallExpr->setThrows(nullptr);
+  auto thrownType = forwardedFunc->getEffectiveThrownErrorType();
+  baseMemberCallExpr->setThrows(ThrownErrorDestination::forMatchingContextType(
+      thrownType.value_or(Type())));
 
-  auto *returnStmt = ReturnStmt::createImplicit(ctx, baseMemberCallExpr);
+  Expr *result = baseMemberCallExpr;
+  if (thrownType)
+    result = new (ctx)
+        TryExpr(SourceLoc(), result, baseMember->getResultInterfaceType(),
+                /*Implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, result);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
@@ -6749,6 +6770,8 @@ static void handleAmbiguousOverrides(ClangImporter::Implementation &Impl,
                                      ValueDecl *clonedDecl) {
   if (auto *original = Impl.getOriginalForVirtualThunk(baseFunc))
     baseFunc = original;
+  if (Impl.cxxExceptionBridges.count(baseFunc))
+    baseFunc = cast<FuncDecl>(Impl.getForwardingSource(baseFunc));
 
   const auto *baseCxxMethod =
       dyn_cast_or_null<clang::CXXMethodDecl>(baseFunc->getClangDecl());
@@ -6780,18 +6803,39 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
     if (fn->isStatic() ||
         isa_and_nonnull<clang::FunctionTemplateDecl>(fn->getClangDecl()))
       return nullptr;
+    auto *source =
+        Impl.cxxExceptionBridges.count(fn) ? Impl.getForwardingSource(fn) : fn;
     if (auto cxxMethod =
-            dyn_cast_or_null<clang::CXXMethodDecl>(fn->getClangDecl())) {
+            dyn_cast_or_null<clang::CXXMethodDecl>(source->getClangDecl())) {
       // FIXME: if this function has rvalue this, we won't be able to synthesize
       // the accessor correctly (https://github.com/apple/swift/issues/69745).
       if (cxxMethod->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
         return nullptr;
     }
 
+    // Each body needs parameters in its own declaration context. Sharing the
+    // base's parameters would reparent them and invalidate captures in a
+    // synthesized throwing body on the base method.
+    SmallVector<ParamDecl *, 8> parameters;
+    for (auto *parameter : *fn->getParameters()) {
+      auto *clonedParameter = ParamDecl::clone(context, parameter);
+      if (auto *defaultExpr = parameter->getTypeCheckedDefaultExpr()) {
+        // Imported defaults are calls to a shared C++ default-argument
+        // generator. Preserve that expression and its printed spelling, but
+        // let the clone create its own initializer context lazily after it
+        // belongs to the derived method.
+        clonedParameter->setTypeCheckedDefaultExpr(defaultExpr);
+        SmallString<32> scratch;
+        clonedParameter->setDefaultValueStringRepresentation(
+            context.AllocateCopy(
+                parameter->getDefaultValueStringRepresentation(scratch)));
+      }
+      parameters.push_back(clonedParameter);
+    }
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
         fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
-        fn->getGenericParams(), fn->getParameters(),
+        fn->getGenericParams(), ParameterList::create(context, parameters),
         fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
@@ -8545,9 +8589,24 @@ ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
   return Impl.getOriginalForVirtualThunk(decl);
 }
 
+FuncDecl *
+ClangImporter::getVirtualThunkForOriginal(const FuncDecl *decl) const {
+  return Impl.virtualOriginalToThunk.lookup(decl);
+}
+
+void ClangImporter::recordInheritedMethodForwarder(FuncDecl *method,
+                                                   FuncDecl *forwarder) {
+  Impl.inheritedMethodForForwarder[forwarder] = method;
+}
+
+FuncDecl *
+ClangImporter::getInheritedMethodForForwarder(const FuncDecl *decl) const {
+  return Impl.inheritedMethodForForwarder.lookup(decl);
+}
+
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {
-  return cast<ValueDecl>(
-      importDeclDirectly(::getCalledBaseCxxMethod(cast<FuncDecl>(decl))));
+  auto *method = ::getCalledBaseCxxMethod(cast<FuncDecl>(decl));
+  return method ? cast_or_null<ValueDecl>(importDeclDirectly(method)) : nullptr;
 }
 
 bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {
@@ -8722,6 +8781,26 @@ bool importer::hasSwiftAttribute(const clang::Decl *decl,
   }
 
   return false;
+}
+
+bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
+  return llvm::any_of(decl->redecls(), [](const clang::FunctionDecl *redecl) {
+    return hasSwiftAttribute(redecl, {"import_throws"});
+  });
+}
+
+bool ClangImporter::isCxxExceptionBridge(const FuncDecl *decl) const {
+  return Impl.cxxExceptionBridges.contains(decl);
+}
+
+FuncDecl *ClangImporter::getCxxExceptionBridgeAdapter(
+    const FuncDecl *facade) const {
+  return Impl.cxxExceptionBridges.lookup(facade);
+}
+
+FuncDecl *ClangImporter::getCxxExceptionBridgeFacade(
+    const FuncDecl *adapter) const {
+  return Impl.cxxExceptionBridgeFacades.lookup(adapter);
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {

@@ -4465,8 +4465,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
     if (param->hasAttachedPropertyWrapper())
       (void) param->getPropertyWrapperInitializerInfo();
 
-    if (!param->isInvalid()) {
-      auto *SF = owner->getParentSourceFile();
+    // A closure synthesized in an imported declaration has no source file
+    // and cannot have source-level property-wrapper auxiliary variables.
+    if (auto *SF = owner->getParentSourceFile(); SF && !param->isInvalid()) {
       auto &ctx = SF->getASTContext();
       param->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *auxVar) {
         if (!isa<ParamDecl>(auxVar))
