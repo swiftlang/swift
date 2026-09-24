@@ -332,10 +332,15 @@ bool SILDeclRef::isClangImported() const {
     if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
       return !isForeign;
 
-    if (auto *FD = dyn_cast<FuncDecl>(d))
+    if (auto *FD = dyn_cast<FuncDecl>(d)) {
       if (isa<AccessorDecl>(FD) ||
           isa<NominalTypeDecl>(d->getDeclContext()))
         return !isForeign;
+      auto *importer = static_cast<ClangImporter *>(
+          d->getASTContext().getClangModuleLoader());
+      if (importer->isCxxExceptionBridge(FD))
+        return !isForeign;
+    }
   }
   return false;
 }

@@ -74,6 +74,7 @@ namespace dependencies {
 namespace swift {
 enum class ResultConvention : uint8_t;
 class ASTContext;
+class AbstractFunctionDecl;
 class CASOptions;
 class CompilerInvocation;
 class ClangImporterOptions;
@@ -753,7 +754,20 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  /// Return the source-visible virtual thunk for a static-dispatch entry point.
+  FuncDecl *getVirtualThunkForOriginal(const FuncDecl *decl) const;
+  void recordInheritedMethodForwarder(FuncDecl *method, FuncDecl *forwarder);
+  FuncDecl *getInheritedMethodForForwarder(const FuncDecl *decl) const;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
+
+  /// Whether this is the native throwing facade of a C++ exception adapter.
+  bool isCxxExceptionBridge(const AbstractFunctionDecl *decl) const;
+
+  /// Recover either half of a generated exception bridge for serialization.
+  FuncDecl *
+  getCxxExceptionBridgeAdapter(const AbstractFunctionDecl *facade) const;
+  AbstractFunctionDecl *
+  getCxxExceptionBridgeFacade(const FuncDecl *adapter) const;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -989,6 +1003,9 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
+
+/// Whether any redeclaration explicitly requests C++ exception bridging.
+bool hasCxxThrowsAttr(const clang::FunctionDecl *decl);
 
 /// Determines the ownership convention of functions that return libkern's
 /// OSObject or one of its subclasses.

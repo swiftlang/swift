@@ -2414,6 +2414,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     llvm_unreachable("Unhandled case in switch!");
   }
 
+  case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
+  case XREF_CXX_SYNTHESIZED_METHOD_PATH_PIECE:
   case XREF_GENERIC_PARAM_PATH_PIECE:
   case XREF_INITIALIZER_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
@@ -2474,6 +2476,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         break;
 
       case XREF_EXTENSION_PATH_PIECE:
+      case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
+      case XREF_CXX_SYNTHESIZED_METHOD_PATH_PIECE:
       case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE:
         break;
 
@@ -2900,6 +2904,40 @@ giveUpFastPath:
         return false;
       });
       values.erase(newEnd, values.end());
+      break;
+    }
+
+    case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
+    case XREF_CXX_SYNTHESIZED_METHOD_PATH_PIECE: {
+      auto *importer = static_cast<ClangImporter *>(
+          getContext().getClangModuleLoader());
+      auto *facade = values.size() == 1
+                         ? dyn_cast<AbstractFunctionDecl>(values.front())
+                         : nullptr;
+      FuncDecl *projected = nullptr;
+      if (importer && facade) {
+        if (recordID == XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE) {
+          projected = importer->getCxxExceptionBridgeAdapter(facade);
+        } else if (auto *method = dyn_cast<FuncDecl>(facade)) {
+          uint8_t rawKind;
+          XRefCxxSynthesizedMethodPathPieceLayout::readRecord(scratch, rawKind);
+          switch (static_cast<CxxSynthesizedMethodKind>(rawKind)) {
+          case CxxSynthesizedMethodKind::StaticVirtualCall:
+            projected = importer->getOriginalForVirtualThunk(method);
+            break;
+          case CxxSynthesizedMethodKind::InheritedCall:
+            if (importer->getOriginalForClonedMember(method))
+              projected = dyn_cast_or_null<FuncDecl>(
+                  importer->getCalledBaseCxxMethod(method));
+            break;
+          }
+        }
+      }
+      if (!projected)
+        return llvm::make_error<XRefError>(
+            "missing synthesized C++ entry point", pathTrace,
+            getXRefDeclNameForError());
+      values.assign(1, projected);
       break;
     }
 

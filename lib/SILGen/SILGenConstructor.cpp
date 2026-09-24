@@ -24,6 +24,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Generators.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
@@ -675,6 +676,16 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // True if this constructor delegates to a peer constructor with self.init().
   bool isDelegating = ctor->getDelegatingOrChainedInitKind().initKind ==
       BodyInitKind::Delegating;
+
+  // A C++ exception facade delegates construction of the entire value to its
+  // adapter. Track one initialization state for self, including C++ base-class
+  // storage and empty nontrivial types that have no Swift stored properties.
+  // Field-sensitive initialization would consider those values initialized
+  // before the adapter returns and could destroy uninitialized self on failure.
+  if (auto *importer =
+          static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+      importer && importer->isCxxExceptionBridge(ctor))
+    isDelegating = true;
 
   if (ctor->requiresUnavailableDeclABICompatibilityStubs())
     emitApplyOfUnavailableCodeReached();

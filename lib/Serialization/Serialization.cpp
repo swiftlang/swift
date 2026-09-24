@@ -876,6 +876,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
   BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
+  BLOCK_RECORD(options_block, REQUIRES_CXX_EXCEPTION_BRIDGING);
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
@@ -1232,6 +1233,17 @@ void Serializer::writeHeader() {
         options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
+      }
+
+      // Unlike the advisory C++ interoperability requirement, this feature
+      // changes imported function types and serialized adapter references.
+      // Preserve it even when the producer disables the C++ import requirement.
+      const auto &LangOpts = M->getASTContext().LangOpts;
+      if (LangOpts.EnableCXXInterop &&
+          LangOpts.hasFeature(Feature::CxxExceptionBridging)) {
+        options_block::RequiresCxxExceptionBridgingLayout
+            RequiresCxxExceptionBridging(Out);
+        RequiresCxxExceptionBridging.emit(ScratchRecord);
       }
 
       options_block::LibraryLevelLayout LibLevel(Out);
@@ -2482,6 +2494,29 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   }
 
   case DeclContextKind::AbstractFunctionDecl: {
+    if (auto *function = dyn_cast<FuncDecl>(DC)) {
+      auto *importer =
+          static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+      FuncDecl *source = nullptr;
+      auto kind = CxxSynthesizedMethodKind::StaticVirtualCall;
+      if (importer) {
+        source = importer->getVirtualThunkForOriginal(function);
+        if (!source) {
+          source = importer->getInheritedMethodForForwarder(function);
+          kind = CxxSynthesizedMethodKind::InheritedCall;
+        }
+      }
+      if (source) {
+        // Internal entry points cannot be looked up in the C++ header.
+        // Import the source-visible method that generates them first.
+        writeCrossReference(source, pathLen + 1);
+        abbrCode =
+            DeclTypeAbbrCodes[XRefCxxSynthesizedMethodPathPieceLayout::Code];
+        XRefCxxSynthesizedMethodPathPieceLayout::emitRecord(
+            Out, ScratchRecord, abbrCode, static_cast<uint8_t>(kind));
+        break;
+      }
+    }
     if (auto fn = dyn_cast<AccessorDecl>(DC)) {
       auto storage = fn->getStorage();
       writeCrossReference(storage->getDeclContext(), pathLen + 2);
@@ -2580,6 +2615,21 @@ void Serializer::writeCrossReference(const Decl *D) {
   }
 
   if (auto fn = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (auto *function = dyn_cast<FuncDecl>(fn)) {
+      auto *importer = static_cast<ClangImporter *>(
+          getASTContext().getClangModuleLoader());
+      if (auto *facade = importer
+                             ? importer->getCxxExceptionBridgeFacade(function)
+                             : nullptr) {
+        // The adapter is generated on demand. Anchor its reference on the
+        // source API so importing that API reconstructs the adapter first.
+        writeCrossReference(facade, 1);
+        abbrCode = DeclTypeAbbrCodes[XRefCxxExceptionAdapterPathPieceLayout::Code];
+        XRefCxxExceptionAdapterPathPieceLayout::emitRecord(Out, ScratchRecord,
+                                                          abbrCode);
+        return;
+      }
+    }
     // Functions are special because they might be operators.
     writeCrossReference(fn, 0);
     return;
@@ -7064,6 +7114,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
   registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
+  registerDeclTypeAbbr<XRefCxxExceptionAdapterPathPieceLayout>();
+  registerDeclTypeAbbr<XRefCxxSynthesizedMethodPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();

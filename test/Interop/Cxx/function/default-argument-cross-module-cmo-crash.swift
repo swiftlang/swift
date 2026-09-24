@@ -33,6 +33,12 @@ inline int make(int m = 0) {
   return 0;
 }
 
+struct Base {
+  int value(int argument = 42) const { return argument; }
+};
+struct Derived : Base {};
+struct FurtherDerived : Derived {};
+
 //--- Lib.swift
 import CxxLib
 
@@ -43,6 +49,12 @@ public func go() -> Int32 {
   return make()
 }
 
+// Inherited methods have distinct Swift parameter declarations, each of which
+// must retain the default expression and create its own initializer context.
+public func inheritedDefaults() -> Int32 {
+  return Derived().value() + FurtherDerived().value()
+}
+
 //--- Main.swift
 import CxxLib
 import Lib
@@ -51,4 +63,9 @@ import Lib
 // thunk body, and calling make() here synthesizes the same thunk symbol.
 public func run() -> Int32 {
   return make()
+}
+
+public func runInheritedDefaults() -> Int32 {
+  return inheritedDefaults() + Base().value() + Derived().value()
+    + FurtherDerived().value()
 }
