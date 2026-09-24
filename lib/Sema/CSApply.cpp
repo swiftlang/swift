@@ -5148,13 +5148,13 @@ namespace {
         return E;
       }
 
-      // A direct method is absent from the class's Objective-C method list, so
-      // a selector naming it would fail to resolve at runtime rather than at
-      // build time. Clang rejects the equivalent @selector expression; match
-      // it. Unlike Clang we always know which declaration is meant -- #selector
-      // takes a declaration reference, not a bare selector name -- so there is
-      // no "potentially direct" case needing a warning.
-      if (method->isObjCDirectDispatched()) {
+      // Only what was written @objcDirect in Swift, not imported objc_direct.
+      // #selector says nothing about whether the result will be sent, and
+      // NSStringFromSelector(#selector(...)) on a direct method is correct --
+      // sel_registerName() never consults a method list. Imported callers
+      // predate the attribute and are not gated on the feature, so diagnosing
+      // them breaks working code. Clang rejects the @selector form on its side.
+      if (method->isObjCDirect()) {
         de.diagnose(E->getLoc(), diag::expr_selector_objc_direct, foundDecl)
             .highlight(subExpr->getSourceRange());
         de.diagnose(method, diag::note_objc_direct_no_selector);
