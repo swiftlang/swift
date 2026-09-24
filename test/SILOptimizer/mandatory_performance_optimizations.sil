@@ -111,7 +111,7 @@ bb0(%0 : $Builtin.Int32):
 
 // CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @dead_metatype :
 // CHECK-NOT:     metatype
-// CHECK:         debug_value undef : $@thick Int.Type
+// CHECK-NOT:     debug_value
 // CHECK:       } // end sil function 'dead_metatype'
 sil [no_allocation] [ossa] @dead_metatype : $@convention(thin) () -> () {
 bb0:
