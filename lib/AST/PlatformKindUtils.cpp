@@ -15,9 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Version.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -309,6 +312,76 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
     return true;
 
   return false;
+}
+
+bool swift::isDeploymentTargetPlatformActive(const LangOptions &LangOpts,
+                                             StringRef platform) {
+  if (platform == "xrOS")
+    platform = "visionOS";
+
+  if (auto kind = platformFromString(platform))
+    return isPlatformActive(*kind, LangOpts, /*ForTargetVariant=*/false,
+                            /*ForRuntimeQuery=*/true);
+
+  return LangOpts.checkPlatformCondition(PlatformConditionKind::OS, platform);
+}
+
+bool swift::isDeploymentTargetAtLeast(
+    const ASTContext &Ctx, StringRef platform,
+    const version::Version &requiredVersion) {
+  auto deploymentTarget = Ctx.LangOpts.getDeploymentTargetVersion();
+  assert(deploymentTarget && "deployment target condition was not validated");
+  if (!deploymentTarget)
+    return false;
+
+  if (platform == "xrOS")
+    platform = "visionOS";
+
+  if (auto kind = platformFromString(platform)) {
+    auto componentCount = requiredVersion.size();
+    while (componentCount > 5 && requiredVersion[componentCount - 1] == 0)
+      --componentCount;
+
+    // LLVM version tuples hold at most five components. Retain the original
+    // numeric comparison if a longer requirement cannot be represented.
+    if (componentCount > 5)
+      return version::Version(*deploymentTarget) >= requiredVersion;
+
+    llvm::VersionTuple requirement;
+    switch (componentCount) {
+    case 1:
+      requirement = llvm::VersionTuple(requiredVersion[0]);
+      break;
+    case 2:
+      requirement = llvm::VersionTuple(requiredVersion[0], requiredVersion[1]);
+      break;
+    case 3:
+      requirement = llvm::VersionTuple(requiredVersion[0], requiredVersion[1],
+                                        requiredVersion[2]);
+      break;
+    case 4:
+      requirement = llvm::VersionTuple(requiredVersion[0], requiredVersion[1],
+                                        requiredVersion[2], requiredVersion[3]);
+      break;
+    case 5:
+      requirement = llvm::VersionTuple(requiredVersion[0], requiredVersion[1],
+                                        requiredVersion[2], requiredVersion[3],
+                                        requiredVersion[4]);
+      break;
+    default:
+      llvm_unreachable("deployment target requirement is empty");
+    }
+
+    auto version = canonicalizePlatformVersion(*kind, requirement);
+    auto mapped = AvailabilityDomain::forPlatform(*kind)
+                      .getRemappedDomainAndRange(
+                          version, AvailabilityVersionKind::Introduced, Ctx)
+                      .getRange()
+                      .getRawMinimumVersion();
+    return version::Version(*deploymentTarget) >= version::Version(mapped);
+  }
+
+  return version::Version(*deploymentTarget) >= requiredVersion;
 }
 
 std::optional<llvm::Triple::OSType>

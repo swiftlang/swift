@@ -10,6 +10,7 @@
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target x86_64-pc-windows10.0.19041-msvc -parse-stdlib -D EXPECT_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-macosx26.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-ios26.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_PRIMARY
+// RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros1.0 -sdk %S/../../attr/Inputs/XROS1.1.sdk -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK -D EXPECT_BELOW_VISION_1_1
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros2.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK
 
 #if !hasFeature(DeploymentTargetCondition)
@@ -62,18 +63,29 @@
   #endif
 #endif
 
-// A requirement applies only to the platform it names. Availability checking
-// can apply an iOS requirement to visionOS by remapping the version through the
-// SDK, but that information is not available while '#if' is evaluated, so an
-// iOS requirement does not constrain a visionOS target; '*' applies instead.
 #if os(visionOS)
-  #if !deploymentTargetAtLeast(iOS 99, *)
-    #error("an iOS requirement must not constrain a visionOS target")
+  #if !deploymentTargetAtLeast(iOS 17.4, *)
+    #error("expected the wildcard for an iOS-only requirement")
   #endif
 
-  // A requirement naming visionOS is compared against the deployment target.
-  #if deploymentTargetAtLeast(visionOS 99, *)
-    #error("expected the visionOS requirement to be compared")
+  #if deploymentTargetAtLeast(visionOS 1.1, *)
+    #if EXPECT_BELOW_VISION_1_1
+      #error("expected the visionOS requirement to fail")
+    #endif
+  #else
+    #if !EXPECT_BELOW_VISION_1_1
+      #error("expected the visionOS requirement to pass")
+    #endif
+  #endif
+
+  #if deploymentTargetAtLeast(xrOS 1.1.0.0.0.0, *)
+    #if EXPECT_BELOW_VISION_1_1
+      #error("expected the xrOS requirement to fail")
+    #endif
+  #else
+    #if !EXPECT_BELOW_VISION_1_1
+      #error("expected the xrOS requirement to pass")
+    #endif
   #endif
 #endif
 

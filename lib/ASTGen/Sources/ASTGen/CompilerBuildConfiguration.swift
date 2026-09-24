@@ -179,6 +179,26 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   var deploymentTargetVersion: VersionTuple? {
     staticBuildConfiguration.deploymentTargetVersion
   }
+
+  func isDeploymentTargetAtLeast(platform: String, version: VersionTuple) -> Bool {
+    var components = version.components
+    while components.count > 5 && components.last == 0 {
+      components.removeLast()
+    }
+    if components.count > 5 {
+      guard let deploymentTargetVersion else { return false }
+      return deploymentTargetVersion >= version
+    }
+
+    var platformText = platform
+    var versionText = VersionTuple(components: components).description
+    return platformText.withBridgedString { bridgedPlatform in
+      versionText.withBridgedString { bridgedVersion in
+        ctx.isDeploymentTargetAtLeast(
+          platform: bridgedPlatform, version: bridgedVersion)
+      }
+    }
+  }
 }
 
 enum IfConfigError: Error, CustomStringConvertible {

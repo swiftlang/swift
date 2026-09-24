@@ -161,13 +161,12 @@ static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
   return nullptr;
 }
 
-static bool isDeploymentTargetPlatformActive(const LangOptions &langOpts,
-                                             StringRef platform) {
-  if (platform == "macCatalyst") {
-    return langOpts.checkPlatformCondition(
-        PlatformConditionKind::TargetEnvironment, platform);
-  }
-  return langOpts.checkPlatformCondition(PlatformConditionKind::OS, platform);
+static StringRef canonicalDeploymentTargetPlatform(StringRef platform) {
+  if (platform == "OSX")
+    return "macOS";
+  if (platform == "xrOS")
+    return "visionOS";
+  return platform;
 }
 
 /// Returns \c true if \p candidate is a more specific platform than
@@ -176,23 +175,17 @@ static bool isDeploymentTargetPlatformActive(const LangOptions &langOpts,
 /// \c macCatalyst is more specific than \c iOS.
 static bool isMoreSpecificDeploymentTargetPlatform(StringRef candidate,
                                                    StringRef incumbent) {
-  auto candidateKind = platformFromString(candidate);
+  auto candidateKind =
+      platformFromString(canonicalDeploymentTargetPlatform(candidate));
   if (!candidateKind)
     return false;
 
-  auto incumbentKind = platformFromString(incumbent);
+  auto incumbentKind =
+      platformFromString(canonicalDeploymentTargetPlatform(incumbent));
   if (!incumbentKind)
     return true;
 
   return inheritsAvailabilityFromPlatform(*candidateKind, *incumbentKind);
-}
-
-static StringRef canonicalDeploymentTargetPlatform(StringRef platform) {
-  if (platform == "OSX")
-    return "macOS";
-  if (platform == "xrOS")
-    return "visionOS";
-  return platform;
 }
 
 static bool isDeploymentTargetPlatformSupported(StringRef platform) {
@@ -724,11 +717,7 @@ class EvaluateIfConfigCondition :
     if (!selectedVersion)
       return true;
 
-    auto deploymentTarget = Ctx.LangOpts.getDeploymentTargetVersion();
-    assert(deploymentTarget && "deployment target condition was not validated");
-    if (!deploymentTarget)
-      return false;
-    return version::Version(*deploymentTarget) >= *selectedVersion;
+    return isDeploymentTargetAtLeast(Ctx, selectedPlatform, *selectedVersion);
   }
 
 public:

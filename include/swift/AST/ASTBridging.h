@@ -303,6 +303,11 @@ bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
 SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
 void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
+SWIFT_NAME("BridgedASTContext.isDeploymentTargetAtLeast(self:platform:version:)")
+bool BridgedASTContext_isDeploymentTargetAtLeast(
+    BridgedASTContext cContext, BridgedStringRef platform,
+    BridgedStringRef version);
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
