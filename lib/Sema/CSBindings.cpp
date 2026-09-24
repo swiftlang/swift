@@ -2304,20 +2304,49 @@ void BindingSet::promoteBindings() {
     promoteBinding(*std::move(promotedSubtype));
   };
 
-  if (subtypeCount == 1) {
-    // If this type variable represents a closure result, prefer the subtype
-    // binding, to push the conversion into the closure body. This avoids
-    // creating a function conversion thunk if possible.
-    if (TypeVar->getImpl().isClosureResultType()) {
-      promoteSubtypeBinding("closure result");
-      return;
-    }
-  }
+  // This is in service of a hack, see below.
+  auto labelsMismatch = [&](TupleType *lhsTuple, TupleType *rhsTuple) -> bool {
+    if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
+      return false;
 
-  if (supertypeCount == 1) {
-    // If we have both a subtype and a supertype binding, we usually prefer the
-    // supertype binding, except for a few cases.
-    if (subtypeCount == 1) {
+    for (unsigned i : indices(lhsTuple->getElements())) {
+      auto &lhsElt = lhsTuple->getElement(i);
+      auto &rhsElt = rhsTuple->getElement(i);
+      if (lhsElt.hasName() &&
+          rhsElt.hasName() &&
+          lhsElt.getName() != rhsElt.getName())
+        return true;
+    }
+
+    return false;
+  };
+
+  if (subtypeCount == 1) {
+    // First, handle the case where we have both a subtype and a supertype binding.
+    if (supertypeCount == 1) {
+      // If we have something like this:
+      //
+      //  (x: Int, y: Int) conv $T0
+      //  $T0 subtype (xx: Int, yy: Int)
+      //
+      // Due to source compatibility, subtype constraints in some cases allow
+      // mismatched tuple labels, whereas conversion constraints do not. So
+      // in this case, we continue to prefer the supertype binding, despite
+      // anything else below.
+      //
+      // FIXME: If we can remove the AllowTupleLabelMismatch hack, we can remove this
+      // special case.
+      if (auto *tupleSubtype = promotedSubtype->BindingType->getAs<TupleType>()) {
+        if (auto *tupleSupertype = promotedSupertype->BindingType->getAs<TupleType>()) {
+          if (labelsMismatch(tupleSubtype, tupleSupertype)) {
+            promoteSupertypeBinding("tuple");
+            return;
+          }
+        }
+      }
+
+      // Two cases where we prefer the subtype binding:
+      //
       // 1) If the subtype binding comes from a weaker form of conversion constraint,
       // for example:
       //
@@ -2345,19 +2374,37 @@ void BindingSet::promoteBindings() {
         bool isConversionToPointer =
             !!type->lookThroughAllOptionalTypes()->getAnyPointerElementType();
 
-        if (isConversionToPointer ||  // Case 1
-            second->getKind() == ConstraintKind::Bind) {  // Case 2
+        // Case 1
+        if (isConversionToPointer) {
           promoteSubtypeBinding("pointer conversion");
+          return;
+        }
+
+        // Case 2
+        if (second->getKind() == ConstraintKind::Bind) {
+          promoteSubtypeBinding("bind");
           return;
         }
       }
     }
 
+    // One final case where we prefer the subtype binding. If this type variable
+    // represents a closure result, this allows us to push the conversion into
+    // the closure body. This avoids wrapping the closure in a function conversion
+    // thunk.
+    if (TypeVar->getImpl().isClosureResultType()) {
+      promoteSubtypeBinding("closure result");
+      return;
+    }
+  }
+
+  // Otherwise, prefer to promote the supertype binding.
+  if (supertypeCount == 1) {
     promoteSupertypeBinding("preferred");
     return;
   }
 
-  // There was no supertype binding to promote, but we might still have a
+  // There was no supertype binding to promote, so take another look at the
   // subtype binding.
   if (subtypeCount == 1) {
     // For now, only do this for ternary results.
