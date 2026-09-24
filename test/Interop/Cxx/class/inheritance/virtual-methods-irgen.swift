@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -I %S/Inputs -cxx-interoperability-mode=default %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %S/Inputs -cxx-interoperability-mode=default %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-ptrsize
 
 import VirtualMethods
 
@@ -20,7 +20,8 @@ d4.f()
 // CHECK: call {{.*}} @{{_ZN8Derived31fEv|"\?f@Derived3@@UEAAHXZ"}}
 // CHECK: call swiftcc {{.*}} @"$sSo8Derived4V1fs5Int32VyF"
 
-// CHECK: define {{.*}} @"$sSo8Derived4V1fs5Int32VyF"(ptr noalias swiftself align 8 dereferenceable
+// CHECK-32: define {{.*}} @"$sSo8Derived4V1fs5Int32VyF"(ptr noalias swiftself align 4 dereferenceable
+// CHECK-64: define {{.*}} @"$sSo8Derived4V1fs5Int32VyF"(ptr noalias swiftself align 8 dereferenceable
 // CHECK: call {{.*}}  @{{.*}}__synthesizedBaseCall_{{.*}}
 
 // CHECK: define {{.*}}void @{{_ZN7DerivedIiE3fooEv|"\?foo@\?\$Derived@H@@UEAAXXZ"}}
