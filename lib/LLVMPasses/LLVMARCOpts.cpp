@@ -35,6 +35,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
@@ -406,6 +407,16 @@ OutOfLoop:
 //                         Retain() Motion
 //===----------------------------------------------------------------------===//
 
+/// isNonReleasingMemoryAccess - Return true if the specified instruction is a
+/// load, store, memcpy etc that can't cause any object to be released.  A store
+/// with release or stronger ordering doesn't qualify: it can publish an object
+/// to another thread, which may then release it.
+static bool isNonReleasingMemoryAccess(const Instruction &I) {
+  if (auto *SI = dyn_cast<StoreInst>(&I))
+    return !isReleaseOrStronger(SI->getOrdering());
+  return isa<LoadInst>(I) || isa<MemIntrinsic>(I);
+}
+
 /// performLocalRetainMotion - Scan forward from the specified retain, moving it
 /// later in the function if possible, over instructions that provably can't
 /// release the object.  If we get to a release of the object, zap both.
@@ -501,9 +512,8 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
       if (isa<LoadInst>(CurInst))
         continue;
 
-      // Load, store, memcpy etc can't do a release.
-      if (isa<LoadInst>(CurInst) || isa<StoreInst>(CurInst) ||
-          isa<MemIntrinsic>(CurInst))
+      // Store, memcpy etc can't do a release.
+      if (isNonReleasingMemoryAccess(CurInst))
         break;
 
       // CurInst->dump(); BBI->dump();
@@ -911,8 +921,8 @@ static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
       }
         
       case RT_Unknown:
-        // Loads cannot affect the retain.
-        if (isa<LoadInst>(I) || isa<StoreInst>(I) || isa<MemIntrinsic>(I))
+        // Loads, stores, memcpy etc cannot affect the retain.
+        if (isNonReleasingMemoryAccess(I))
           continue;
         break;
         
