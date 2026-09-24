@@ -995,6 +995,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability BorrowingAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getBorrowingAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability InitRawStructMetadataAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getInitRawStructMetadataAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
