@@ -193,12 +193,12 @@ public func imported(_ interface: borrowing any ISwiftObject) -> UnsafeMutableRa
 
 // CHECK-LABEL: sil [ossa] @$s{{.*}}7generic
 // CHECK-NOT:     open_com_existential
-// CHECK-NOT:     = com_method
-// CHECK:         [[METHOD:%.*]] = witness_method $T, #IBase.method
-// CHECK-SAME:    $@convention(witness_method: IBase)
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
+// CHECK:         [[METHOD:%.*]] = com_method {{%.*}}, #IBase.method
+// CHECK-SAME:    $@convention(com_method)
+// CHECK-NOT:     = witness_method
 // CHECK:         apply [[METHOD]]<T>
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
 // CHECK:         return
 public func generic<T: IBase>(_ interface: borrowing T, _ value: CInt) -> CInt {
   interface.method(value)
@@ -206,12 +206,12 @@ public func generic<T: IBase>(_ interface: borrowing T, _ value: CInt) -> CInt {
 
 // CHECK-LABEL: sil [ossa] @$s{{.*}}14genericDerived
 // CHECK-NOT:     open_com_existential
-// CHECK-NOT:     = com_method
-// CHECK:         [[METHOD:%.*]] = witness_method $T, #IBase.method
-// CHECK-SAME:    $@convention(witness_method: IBase)
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
+// CHECK:         [[METHOD:%.*]] = com_method {{%.*}}, #IBase.method
+// CHECK-SAME:    $@convention(com_method)
+// CHECK-NOT:     = witness_method
 // CHECK:         apply [[METHOD]]<T>
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
 // CHECK:         return
 public func genericDerived<T: IDerived>(_ interface: borrowing T, _ value: CInt) -> CInt {
   interface.method(value)
@@ -219,26 +219,26 @@ public func genericDerived<T: IDerived>(_ interface: borrowing T, _ value: CInt)
 
 // CHECK-LABEL: sil [ossa] @$s{{.*}}12genericClass
 // CHECK-NOT:     open_com_existential
-// CHECK-NOT:     = com_method
-// CHECK:         [[METHOD:%.*]] = witness_method $T, #IProperties.value!getter
-// CHECK-SAME:    $@convention(witness_method: IProperties)
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
+// CHECK:         [[METHOD:%.*]] = com_method {{%.*}}, #IProperties.value!getter
+// CHECK-SAME:    $@convention(com_method)
+// CHECK-NOT:     = witness_method
 // CHECK:         apply [[METHOD]]<T>
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
 // CHECK:         return
 public func genericClass<T: IProperties>(_ interface: borrowing T) -> CInt {
   interface.value
 }
 
 // Protocol extension helpers are native methods. Their abstract Self receiver
-// still dispatches requirements through a Swift witness table.
+// dispatches requirements through the foreign interface.
 // CHECK-LABEL: sil [ossa] @$s{{.*}}5IBaseP{{.*}}6helper
 // CHECK-SAME:    $@convention(method)
-// CHECK-NOT:     = com_method
-// CHECK:         [[METHOD:%.*]] = witness_method $Self, #IBase.method
-// CHECK-SAME:    $@convention(witness_method: IBase)
+// CHECK-NOT:     = witness_method
+// CHECK:         [[METHOD:%.*]] = com_method {{%.*}}, #IBase.method
+// CHECK-SAME:    $@convention(com_method)
 // CHECK:         apply [[METHOD]]<Self>
-// CHECK-NOT:     = com_method
+// CHECK-NOT:     = witness_method
 // CHECK:         return
 extension IBase {
   public func helper(_ value: CInt) -> CInt {
@@ -349,3 +349,19 @@ public func bound(_ interface: any IBase) -> (CInt) -> CInt {
 // CHECK:         end_borrow [[BORROW]]
 // CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         return
+
+// Read-write accesses on generic COM receivers must use the foreign getter
+// and setter, including writeback along a throwing path.
+// CHECK-LABEL: sil [ossa] @$s{{.*}}16genericWriteback
+// CHECK-NOT: #IProperties.value!modify
+// CHECK: com_method {{%.*}}, #IProperties.value!getter
+// CHECK: try_apply
+// CHECK: com_method {{%.*}}, #IProperties.value!setter
+// CHECK: return
+// CHECK: com_method {{%.*}}, #IProperties.value!setter
+// CHECK: throw
+public func genericWriteback<T: IProperties>(
+  _ interface: borrowing T, _ body: (inout CInt) throws -> Void
+) rethrows {
+  try body(&interface.value)
+}

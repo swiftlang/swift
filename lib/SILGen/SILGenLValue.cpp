@@ -3602,14 +3602,11 @@ namespace {
           strategy.getKind() == AccessStrategy::DispatchToAccessor) {
         auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
         if (protocol && protocol->isCOMInterface()) {
-          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
-          if (selfType->is<ExistentialArchetypeType>()) {
-            strategy = AccessStrategy::getMaterializeToTemporary(
-                AccessStrategy::getAccessor(AccessorKind::Get,
-                                            /*dispatched=*/true),
-                AccessStrategy::getAccessor(AccessorKind::Set,
-                                            /*dispatched=*/true));
-          }
+          strategy = AccessStrategy::getMaterializeToTemporary(
+              AccessStrategy::getAccessor(AccessorKind::Get,
+                                          /*dispatched=*/true),
+              AccessStrategy::getAccessor(AccessorKind::Set,
+                                          /*dispatched=*/true));
         }
       }
 
