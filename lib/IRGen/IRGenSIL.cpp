@@ -8535,6 +8535,9 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
 }
 
 void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
+  bindOpenedCOMExistentialArchetype(*this,
+                                    i->getType().castTo<ArchetypeType>());
+
   Explosion base = getLoweredExplosion(i->getOperand());
 
   Explosion result;

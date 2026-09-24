@@ -1999,6 +1999,18 @@ static void bindArchetype(IRGenFunction &IGF,
   assert(wtableI == wtables.size());
 }
 
+void irgen::bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                              CanArchetypeType archetype) {
+  // An opened foreign interface already points at its interface address point.
+  for (auto *protocol : archetype->getConformsTo()) {
+    if (!protocol->isCOMInterface())
+      continue;
+    IGF.setUnscopedLocalTypeData(
+        archetype, LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+        llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
+  }
+}
+
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(

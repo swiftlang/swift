@@ -68,7 +68,20 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   // Check for an existing cache entry.
   if (auto response = IGF.tryGetLocalTypeMetadata(archetype, request))
     return response;
-  
+
+  if (isa<ExistentialArchetypeType>(archetype)) {
+    auto existential = archetype->getGenericEnvironment()
+                           ->getOpenedExistentialType()
+                           ->getCanonicalType();
+    if (existential.isCOMExistentialType()) {
+      // The generic value is the interface pointer. Its existential metadata
+      // supplies the COM value witnesses, without querying Swift identity.
+      auto response = IGF.emitTypeMetadataRef(existential, request);
+      IGF.setScopedLocalTypeMetadata(archetype, response);
+      return response;
+    }
+  }
+
   // If this is an opaque archetype, we'll need to instantiate using its
   // descriptor.
   if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
