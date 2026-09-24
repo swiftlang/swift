@@ -5395,7 +5395,7 @@ namespace {
       cs.cacheType(paramRef);
 
       // let outerParamRef = "$kp$"
-      Expr *outerParamRef = new (ctx)
+      auto outerParamRef = new (ctx)
           DeclRefExpr(outerParam, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
       outerParamRef->setType(captureTy);
       cs.cacheType(outerParamRef);
