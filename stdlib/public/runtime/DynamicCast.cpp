@@ -54,6 +54,7 @@ using namespace hashable_support;
 //
 // Each such function accepts the following arguments:
 // * Destination location and type
+//   (`is` tests use a NULL destination location)
 // * Source value address and type
 // * References to the types that will be used to report failure.
 //   The function can update these with specific failing types
@@ -73,14 +74,79 @@ using namespace hashable_support;
 //   perform the take and return SuccessViaTake.  If "take" is not cheap, you
 //   should copy and return SuccessViaCopy.  Top-level code will detect this
 //   and take care of destroying the source for you.
+// * Test success.  If destlocation is `nullptr`, this was a check, not
+//   a conversion request.  The conversion would have succeeded.
 //
 enum class DynamicCastResult {
   Failure,  /// The cast attempt "failed" (did nothing).
   SuccessViaCopy, /// Cast succeeded, source is still valid.
   SuccessViaTake, /// Cast succeeded, source is invalid
+  TestSuccess, /// Test succeeded, source is still valid
 };
 static bool isSuccess(DynamicCastResult result) {
   return result != DynamicCastResult::Failure;
+}
+
+/// A null `destLocation` flags this cast as a test-only call.
+/// This mostly serves to document that convention.
+static inline bool isTestOnlyCast(const OpaqueValue *destLocation) {
+  return destLocation == nullptr;
+}
+
+/// Use this to get the location for saving the cast result.
+/// It asserts if this is test-only.
+static inline OpaqueValue *destFor(OpaqueValue *destLocation) {
+  assert(destLocation &&
+         "test-only cast must return TestSuccess before writing a destination");
+  return destLocation;
+}
+
+/// Answer a test by conversion-casting into a temporary.
+///
+/// This is the fallback for cases where test-only behavior isn't fully
+/// supported (mostly bridging).  This basically replicates the old handling of
+/// `is` by allocating a temporary buffer, doing a conversion-cast into that
+/// buffer, then destroying the result if it succeeds.  But now we do that only
+/// for a few special cases (we used to do it for every `is` test).  Over time,
+/// we should continue to push true test-only behavior down the stack, with the
+/// goal of eventually eliminating all uses of this template.
+template <typename Produce>
+static DynamicCastResult
+testByProducingIntoTemporary(const Metadata *destType, Produce &&produce) {
+  auto *destVW = destType->getValueWitnesses();
+  auto size = destVW->getSize();
+  auto alignMask = destVW->getAlignmentMask();
+
+  // Object that frees the buffer when it goes out of scope. Mirrors
+  // tryCastFromObjCBridgeableToClass, which has the same need.
+  struct FreeBuffer {
+    void *Buffer = nullptr;
+    size_t size, alignMask;
+    FreeBuffer(size_t size, size_t alignMask)
+      : size(size), alignMask(alignMask) {}
+    ~FreeBuffer() {
+      if (Buffer)
+        swift_slowDealloc(Buffer, size, alignMask);
+    }
+  } freeBuffer{size, alignMask};
+
+  const std::size_t inlineValueSize = 4 * sizeof(void *);
+  alignas(MaximumAlignment) char inlineBuffer[inlineValueSize];
+  void *buffer;
+  if (destVW->getStride() <= inlineValueSize) {
+    buffer = inlineBuffer;
+  } else {
+    buffer = swift_slowAlloc(size, alignMask);
+    freeBuffer.Buffer = buffer;
+  }
+
+  auto *temporary = reinterpret_cast<OpaqueValue *>(buffer);
+  if (!produce(temporary))
+    return DynamicCastResult::Failure;
+
+  // The strategy produced a value we do not want.
+  destType->vw_destroy(temporary);
+  return DynamicCastResult::TestSuccess;
 }
 
 // All of our `tryCastXyz` functions have the following signature.
@@ -375,13 +441,20 @@ _tryCastFromClassToObjCBridgeable(
       destType, destType, destBridgeWitness);
   }
 
-  // If we succeeded, then take the value from the temp buffer.
-  if (success) {
-    destType->vw_initializeWithTake(destLocation, (OpaqueValue *)optDestBuffer);
+  if (!success) {
+    // Failed.
+    return DynamicCastResult::Failure;
+  } else if (isTestOnlyCast(destLocation)) {
+    // Test-only: Destroy the result and report only the success.
+    destType->vw_destroy((OpaqueValue *)optDestBuffer);
+    return DynamicCastResult::TestSuccess;
+  } else {
+    // Conversion cast: move the result into the real destination
+    destType->vw_initializeWithTake(destFor(destLocation),
+                                    (OpaqueValue *)optDestBuffer);
     // Bridge above is effectively a copy, so overall we're a copy.
     return DynamicCastResult::SuccessViaCopy;
   }
-  return DynamicCastResult::Failure;
 }
 
 static DynamicCastResult
@@ -444,8 +517,13 @@ tryCastFromObjCBridgeableToClass(
 
   // Dynamic cast the object to the resulting class type.
   if (auto cast = swift_dynamicCastUnknownClass(srcBridgedObject, destType)) {
-    *reinterpret_cast<const void **>(destLocation) = cast;
-    return DynamicCastResult::SuccessViaCopy;
+    if (isTestOnlyCast(destLocation)) {
+      swift_unknownObjectRelease(srcBridgedObject);
+      return DynamicCastResult::TestSuccess;
+    } else {
+      *reinterpret_cast<const void **>(destFor(destLocation)) = cast;
+      return DynamicCastResult::SuccessViaCopy;
+    }
   } else {
     // We don't need the object anymore.
     swift_unknownObjectRelease(srcBridgedObject);
@@ -509,7 +587,14 @@ tryCastUnwrappingSwiftValueSource(
   assert(srcType->getKind() == MetadataKind::Class);
 
   // unboxFromSwiftValueWithType is really just a recursive casting operation...
-  if (swift_unboxFromSwiftValueWithType(srcValue, destLocation, destType)) {
+  if (isTestOnlyCast(destLocation)) {
+    return testByProducingIntoTemporary(
+        destType, [&](OpaqueValue *temporary) {
+          return swift_unboxFromSwiftValueWithType(srcValue, temporary, destType);
+        });
+  }
+  if (swift_unboxFromSwiftValueWithType(srcValue, destFor(destLocation),
+                                       destType)) {
     return DynamicCastResult::SuccessViaCopy;
   } else {
     return DynamicCastResult::Failure;
@@ -541,8 +626,10 @@ tryCastToSwiftClass(
       return DynamicCastResult::Failure;
     }
     if (auto t = swift_dynamicCastClass(srcObject, destClassType)) {
+      if (isTestOnlyCast(destLocation))
+        return DynamicCastResult::TestSuccess;
       auto castObject = const_cast<void *>(t);
-      *(reinterpret_cast<void **>(destLocation)) = castObject;
+      *(reinterpret_cast<void **>(destFor(destLocation))) = castObject;
       if (takeOnSuccess) {
         return DynamicCastResult::SuccessViaTake;
       } else {
@@ -587,7 +674,7 @@ tryCastToObjectiveCClass(
     // class references but failed `as?` and `is`
     if (srcObject == nullptr) {
       if (mayDeferChecks) {
-        *reinterpret_cast<const void **>(destLocation) = nullptr;
+        *reinterpret_cast<const void **>(destFor(destLocation)) = nullptr;
         return DynamicCastResult::SuccessViaCopy;
       } else {
         return DynamicCastResult::Failure;
@@ -596,7 +683,9 @@ tryCastToObjectiveCClass(
     auto destObjCClass = destObjCType->Class;
     if (auto resultObject
         = swift_dynamicCastObjCClass(srcObject, destObjCClass)) {
-      *reinterpret_cast<const void **>(destLocation) = resultObject;
+      if (isTestOnlyCast(destLocation))
+        return DynamicCastResult::TestSuccess;
+      *reinterpret_cast<const void **>(destFor(destLocation)) = resultObject;
       if (takeOnSuccess) {
         return DynamicCastResult::SuccessViaTake;
       } else {
@@ -638,7 +727,7 @@ tryCastToForeignClass(
     // is why we no longer permit it.
     if (srcObject == nullptr) {
       if (mayDeferChecks) {
-        *reinterpret_cast<const void **>(destLocation) = nullptr;
+        *reinterpret_cast<const void **>(destFor(destLocation)) = nullptr;
         return DynamicCastResult::SuccessViaCopy;
       } else {
         // `as?` and `is` checks always fail on nil sources
@@ -647,7 +736,9 @@ tryCastToForeignClass(
     }
     if (auto resultObject
         = swift_dynamicCastForeignClass(srcObject, destClassType)) {
-      *reinterpret_cast<const void **>(destLocation) = resultObject;
+      if (isTestOnlyCast(destLocation))
+        return DynamicCastResult::TestSuccess;
+      *reinterpret_cast<const void **>(destFor(destLocation)) = resultObject;
       if (takeOnSuccess) {
         return DynamicCastResult::SuccessViaTake;
       } else {
@@ -924,12 +1015,17 @@ tryCastToAnyHashable(
       swift_conformsToProtocolCommon(srcType, &HashableProtocolDescriptor)
     );
   }
-  if (hashableConformance) {
-    _swift_convertToAnyHashableIndirect(srcValue, destLocation,
+  if (!hashableConformance) {
+    // Failed.
+    return DynamicCastResult::Failure;
+  } else if (isTestOnlyCast(destLocation)) {
+    // Test-only success
+    return DynamicCastResult::TestSuccess;
+  } else {
+    // Actually build the AnyHashable box
+    _swift_convertToAnyHashableIndirect(srcValue, destFor(destLocation),
                                         srcType, hashableConformance);
     return DynamicCastResult::SuccessViaCopy;
-  } else {
-    return DynamicCastResult::Failure;
   }
 }
 
@@ -951,13 +1047,22 @@ tryCastToArray(
     if (srcStructType->Description == &NOMINAL_TYPE_DESCR_SYM(Sa)) { // Array -> Array
       auto sourceArgs = srcType->getGenericArgs();
       auto destArgs = destType->getGenericArgs();
+      if (isTestOnlyCast(destLocation)) {
+        // Try building a new array in a temporary, then discard.
+        // TODO: Make array tests more efficient by avoiding the copy
+        return testByProducingIntoTemporary(
+            destType, [&](OpaqueValue *temporary) {
+              return _swift_arrayDownCastConditionalIndirect(
+                  srcValue, temporary, sourceArgs[0], destArgs[0]);
+            });
+      }
       if (mayDeferChecks) {
         _swift_arrayDownCastIndirect(
-          srcValue, destLocation, sourceArgs[0], destArgs[0]);
+          srcValue, destFor(destLocation), sourceArgs[0], destArgs[0]);
         return DynamicCastResult::SuccessViaCopy;
       } else {
         auto result = _swift_arrayDownCastConditionalIndirect(
-          srcValue, destLocation, sourceArgs[0], destArgs[0]);
+          srcValue, destFor(destLocation), sourceArgs[0], destArgs[0]);
         if (result) {
           return DynamicCastResult::SuccessViaCopy;
         }
@@ -991,14 +1096,25 @@ tryCastToDictionary(
     if (srcStructType->Description == &NOMINAL_TYPE_DESCR_SYM(SD)) { // Dictionary -> Dictionary
       auto sourceArgs = srcType->getGenericArgs();
       auto destArgs = destType->getGenericArgs();
+      if (isTestOnlyCast(destLocation)) {
+        // Try building a new dictionary to see if it is possible.
+        // If it is, discard the result.
+        // TODO: Someday, change this into a true test-only operation.
+        return testByProducingIntoTemporary(
+            destType, [&](OpaqueValue *temporary) {
+              return _swift_dictionaryDownCastConditionalIndirect(
+                  srcValue, temporary, sourceArgs[0], sourceArgs[1],
+                  destArgs[0], destArgs[1], sourceArgs[2], destArgs[2]);
+            });
+      }
       if (mayDeferChecks) {
         _swift_dictionaryDownCastIndirect(
-          srcValue, destLocation, sourceArgs[0], sourceArgs[1],
+          srcValue, destFor(destLocation), sourceArgs[0], sourceArgs[1],
           destArgs[0], destArgs[1], sourceArgs[2], destArgs[2]);
         return DynamicCastResult::SuccessViaCopy;
       } else {
         auto result = _swift_dictionaryDownCastConditionalIndirect(
-          srcValue, destLocation, sourceArgs[0], sourceArgs[1],
+          srcValue, destFor(destLocation), sourceArgs[0], sourceArgs[1],
           destArgs[0], destArgs[1], sourceArgs[2], destArgs[2]);
         if (result) {
           return DynamicCastResult::SuccessViaCopy;
@@ -1033,13 +1149,24 @@ tryCastToSet(
     if (srcStructType->Description == &NOMINAL_TYPE_DESCR_SYM(Sh)) { // Set -> Set
       auto sourceArgs = srcType->getGenericArgs();
       auto destArgs = destType->getGenericArgs();
+      if (isTestOnlyCast(destLocation)) {
+        // Try creating a new set.  If it succeeds, discard the result.
+        // TODO: Do a true test-only operation.
+        return testByProducingIntoTemporary(
+            destType, [&](OpaqueValue *temporary) {
+              return _swift_setDownCastConditionalIndirect(
+                  srcValue, temporary,
+                  sourceArgs[0], destArgs[0],
+                  sourceArgs[1], destArgs[1]);
+            });
+      }
       if (mayDeferChecks) {
-        _swift_setDownCastIndirect(srcValue, destLocation,
+        _swift_setDownCastIndirect(srcValue, destFor(destLocation),
           sourceArgs[0], destArgs[0], sourceArgs[1], destArgs[1]);
         return DynamicCastResult::SuccessViaCopy;
       } else {
         auto result = _swift_setDownCastConditionalIndirect(
-          srcValue, destLocation,
+          srcValue, destFor(destLocation),
           sourceArgs[0], destArgs[0],
           sourceArgs[1], destArgs[1]);
         if (result) {
@@ -1142,6 +1269,7 @@ tryCastToOptional(
 static void
 initializeToNilAtDepth(OpaqueValue *destLocation, const Metadata *destType, int depth) {
   assert(destType->getKind() == MetadataKind::Optional);
+  (void)destFor(destLocation); // never reached on a test-only cast
   auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
   if (depth > 0) {
     initializeToNilAtDepth(destLocation, destInnerType, depth - 1);
@@ -1197,17 +1325,8 @@ tryCastUnwrappingOptionalBoth(
   auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
   unsigned sourceEnumCase = srcInnerType->vw_getEnumTagSinglePayload(
     srcValue, /*emptyCases=*/1);
-  auto sourceIsNil = (sourceEnumCase != 0);
-  if (sourceIsNil) {
-    if (runtime::bincompat::useLegacyOptionalNilInjectionInCasting()) {
-      auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
-      // Set .none at the outer level
-      destInnerType->vw_storeEnumTagSinglePayload(destLocation, 1, 1);
-    } else {
-      copyNilPreservingDepth(destLocation, destType, srcType);
-    }
-    return DynamicCastResult::SuccessViaCopy; // nil was essentially copied to dest
-  } else {
+  if (sourceEnumCase == 0) {
+    // Not nil: unwrap and try casting the contents
     auto destEnumType = cast<EnumMetadata>(destType);
     const Metadata *destInnerType = destEnumType->getGenericArgs()[0];
     auto destInnerLocation = destLocation; // Single-payload enum layout
@@ -1215,13 +1334,26 @@ tryCastUnwrappingOptionalBoth(
       destInnerLocation, destInnerType, srcValue, srcInnerType,
       destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
       prohibitIsolatedConformances);
-    if (isSuccess(subcastResult)) {
+    // A test has no enum tag to set; the inner cast already answered, and its
+    // TestSuccess propagates out unchanged.
+    if (isSuccess(subcastResult) && !isTestOnlyCast(destLocation)) {
       destInnerType->vw_storeEnumTagSinglePayload(
-        destLocation, /*case*/ 0, /*emptyCases*/ 1);
+        destFor(destLocation), /*case*/ 0, /*emptyCases*/ 1);
     }
     return subcastResult;
+  } else if (isTestOnlyCast(destLocation)) {
+    // Test-only & nil:  We're done!
+    return DynamicCastResult::TestSuccess;
+  } else if (runtime::bincompat::useLegacyOptionalNilInjectionInCasting()) {
+    // Legacy nil handling: inject into outer level
+    auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
+    destInnerType->vw_storeEnumTagSinglePayload(destFor(destLocation), 1, 1);
+    return DynamicCastResult::SuccessViaCopy;
+  } else {
+    // New nil handling: Use depth-preserving semantics
+    copyNilPreservingDepth(destFor(destLocation), destType, srcType);
+    return DynamicCastResult::SuccessViaCopy;
   }
-  return DynamicCastResult::Failure;
 }
 
 // Try unwrapping just the destination optional.
@@ -1244,9 +1376,9 @@ tryCastUnwrappingOptionalDestination(
     destInnerLocation, destInnerType, srcValue, srcType,
     destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
     prohibitIsolatedConformances);
-  if (isSuccess(subcastResult)) {
+  if (isSuccess(subcastResult) && !isTestOnlyCast(destLocation)) {
     destInnerType->vw_storeEnumTagSinglePayload(
-      destLocation, /*case*/ 0, /*emptyCases*/ 1);
+      destFor(destLocation), /*case*/ 0, /*emptyCases*/ 1);
   }
   return subcastResult;
 }
@@ -1348,35 +1480,44 @@ tryCastToTuple(
     }
   }
 
-  if (typesMatch) {
-    // The actual element types are identical, so we can use the
-    // fast value-witness machinery for the whole tuple.
-    if (takeOnSuccess) {
-      srcType->vw_initializeWithTake(destLocation, srcValue);
-      return DynamicCastResult::SuccessViaTake;
-    } else {
-      srcType->vw_initializeWithCopy(destLocation, srcValue);
-      return DynamicCastResult::SuccessViaCopy;
-    }
-  } else {
-    // Slow path casts each item separately.
+  if (!typesMatch) {
+    // Slow path: Tuple type doesn't match, but maybe we can cast each element
+    // separately?
+    bool testOnly = isTestOnlyCast(destLocation);
     for (unsigned j = 0, n = srcTupleType->NumElements; j != n; ++j) {
       const auto &srcElt = srcTupleType->getElement(j);
       const auto &destElt = destTupleType->getElement(j);
-      auto subcastResult = tryCast(destElt.findIn(destLocation), destElt.Type,
+      auto destEltLocation =
+          testOnly ? nullptr : destElt.findIn(destFor(destLocation));
+      auto subcastResult = tryCast(destEltLocation, destElt.Type,
                                    srcElt.findIn(srcValue), srcElt.Type,
                                    destFailureType, srcFailureType,
                                    false, mayDeferChecks,
                                    prohibitIsolatedConformances);
       if (subcastResult == DynamicCastResult::Failure) {
-        for (unsigned k = 0; k != j; ++k) {
-          const auto &elt = destTupleType->getElement(k);
-          elt.Type->vw_destroy(elt.findIn(destLocation));
+        // Nothing is written when testing, so there is nothing to unwind.
+        if (!testOnly) {
+          for (unsigned k = 0; k != j; ++k) {
+            const auto &elt = destTupleType->getElement(k);
+            elt.Type->vw_destroy(elt.findIn(destFor(destLocation)));
+          }
         }
         return DynamicCastResult::Failure;
       }
     }
     // We succeeded by casting each item.
+    return testOnly ? DynamicCastResult::TestSuccess
+                    : DynamicCastResult::SuccessViaCopy;
+  } else if (isTestOnlyCast(destLocation)) {
+    // Types match, so test success
+    return DynamicCastResult::TestSuccess;
+  } else if (takeOnSuccess) {
+    // Types match, so use value witness to move the value
+    srcType->vw_initializeWithTake(destFor(destLocation), srcValue);
+    return DynamicCastResult::SuccessViaTake;
+  } else {
+    // Types match, so use value witness to copy the value
+    srcType->vw_initializeWithCopy(destFor(destLocation), srcValue);
     return DynamicCastResult::SuccessViaCopy;
   }
 
@@ -1437,11 +1578,13 @@ tryCastToFunction(
   }
 
   // Everything matches, so we can take/copy the function reference.
-  if (takeOnSuccess) {
-    srcType->vw_initializeWithTake(destLocation, srcValue);
+  if (isTestOnlyCast(destLocation)) {
+    return DynamicCastResult::TestSuccess;
+  } else if (takeOnSuccess) {
+    srcType->vw_initializeWithTake(destFor(destLocation), srcValue);
     return DynamicCastResult::SuccessViaTake;
   } else {
-    srcType->vw_initializeWithCopy(destLocation, srcValue);
+    srcType->vw_initializeWithCopy(destFor(destLocation), srcValue);
     return DynamicCastResult::SuccessViaCopy;
   }
 }
@@ -1480,6 +1623,17 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   return true;
 }
 
+/// Whether \p srcType can be stored in a plain (non-extended) existential.
+///
+/// `MetadataKind::Existential` -- `Any`, `AnyObject`, `any P`, `Error` -- has
+/// no room to record suppressed requirements, so such a container always
+/// requires its payload to be both `Copyable` and `Escapable`. An existential
+/// that suppresses either is `MetadataKind::ExtendedExistential` and is handled
+/// by tryCastToExtendedExistential, which checks its own requirement signature.
+static bool canInhabitPlainExistential(const Metadata *srcType) {
+  return !checkInvertibleRequirements(srcType, InvertibleProtocolSet());
+}
+
 // Cast to unconstrained `Any`
 static DynamicCastResult
 tryCastToUnconstrainedOpaqueExistential(
@@ -1492,8 +1646,21 @@ tryCastToUnconstrainedOpaqueExistential(
   assert(destType->getKind() == MetadataKind::Existential);
   assert(cast<ExistentialTypeMetadata>(destType)->getRepresentation()
          == ExistentialTypeRepresentation::Opaque);
+
+  // `Any` is Copyable, so cannot hold a noncopyable value.
+  if (!canInhabitPlainExistential(srcType)) {
+    srcFailureType = srcType;
+    destFailureType = destType;
+    return DynamicCastResult::Failure;
+  }
+
+  // Any value inhabits an unconstrained `Any`, so there is nothing left to
+  // decide -- a test is already answered.
+  if (isTestOnlyCast(destLocation)) {
+    return DynamicCastResult::TestSuccess;
+  }
   auto destExistential
-    = reinterpret_cast<OpaqueExistentialContainer *>(destLocation);
+    = reinterpret_cast<OpaqueExistentialContainer *>(destFor(destLocation));
 
   // Fill in the type and value.
   destExistential->Type = srcType;
@@ -1520,14 +1687,20 @@ tryCastToConstrainedOpaqueExistential(
   auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
   assert(destExistentialType->getRepresentation()
          == ExistentialTypeRepresentation::Opaque);
-  auto destExistential
-    = reinterpret_cast<OpaqueExistentialContainer *>(destLocation);
+  // When testing there is no container, so there is nowhere to record witness
+  // tables. `_conformsToProtocols` accepts a null list and only answers the
+  // question, which is all a test needs.
+  auto *destExistential =
+      isTestOnlyCast(destLocation)
+          ? nullptr
+          : reinterpret_cast<OpaqueExistentialContainer *>(destFor(destLocation));
 
   // Check for protocol conformances and fill in the witness tables.
   // TODO (rdar://17033499) If the source is an existential, we should
   // be able to compare the protocol constraints more efficiently than this.
   if (_conformsToProtocols(srcValue, srcType, destExistentialType,
-                           destExistential->getWitnessTables(),
+                           destExistential ? destExistential->getWitnessTables()
+                                           : nullptr,
                            prohibitIsolatedConformances)) {
     return tryCastToUnconstrainedOpaqueExistential(
       destLocation, destType, srcValue, srcType,
@@ -1550,8 +1723,13 @@ tryCastToClassExistential(
   auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
   assert(destExistentialType->getRepresentation()
          == ExistentialTypeRepresentation::Class);
-  auto destExistentialLocation
-    = reinterpret_cast<ClassExistentialContainer *>(destLocation);
+  // Null when testing: there is no container, so no witness tables to record
+  // and no Value to store. getWitnessTables() must not be reached through a
+  // null container -- it is pointer arithmetic.
+  auto *destExistentialLocation =
+      isTestOnlyCast(destLocation)
+          ? nullptr
+          : reinterpret_cast<ClassExistentialContainer *>(destFor(destLocation));
 
   MetadataKind srcKind = srcType->getKind();
   switch (srcKind) {
@@ -1586,8 +1764,12 @@ tryCastToClassExistential(
           reinterpret_cast<const ClassMetadata *>(object_getClass((id)tmp)));
 
       if (_conformsToProtocols(value, type, destExistentialType,
-                               destExistentialLocation->getWitnessTables(),
+                               destExistentialLocation
+                                   ? destExistentialLocation->getWitnessTables()
+                                   : nullptr,
                                prohibitIsolatedConformances)) {
+        if (isTestOnlyCast(destLocation))
+          return DynamicCastResult::TestSuccess;
         auto object = *(reinterpret_cast<HeapObject **>(value));
         destExistentialLocation->Value = object;
         if (takeOnSuccess) {
@@ -1613,9 +1795,9 @@ tryCastToClassExistential(
     memcpy(&srcObject, srcValue, sizeof(id));
     if (!runtime::bincompat::useLegacySwiftValueUnboxingInCasting()) {
       if (getAsSwiftValue(srcObject) != nullptr) {
-	// Do not directly cast a `__SwiftValue` box
-	// Return failure so our caller will unwrap and try again
-	return DynamicCastResult::Failure;
+        // Do not directly cast a `__SwiftValue` box
+        // Return failure so our caller will unwrap and try again
+        return DynamicCastResult::Failure;
       }
     }
 #endif
@@ -1628,7 +1810,7 @@ tryCastToClassExistential(
     // class references:
     if (srcObject == nullptr) {
       if (mayDeferChecks) {
-        *reinterpret_cast<const void **>(destLocation) = nullptr;
+        *reinterpret_cast<const void **>(destFor(destLocation)) = nullptr;
         return DynamicCastResult::SuccessViaCopy;
       } else {
         return DynamicCastResult::Failure;
@@ -1636,8 +1818,13 @@ tryCastToClassExistential(
     }
     if (_conformsToProtocols(srcValue, srcType,
                              destExistentialType,
-                             destExistentialLocation->getWitnessTables(),
+                             destExistentialLocation
+                                 ? destExistentialLocation->getWitnessTables()
+                                 : nullptr,
                              prohibitIsolatedConformances)) {
+      if (isTestOnlyCast(destLocation)) {
+        return DynamicCastResult::TestSuccess;
+      }
       destExistentialLocation->Value = srcObject;
       if (takeOnSuccess) {
         return DynamicCastResult::SuccessViaTake;
@@ -1671,8 +1858,11 @@ tryCastToClassExistentialViaSwiftValue(
   auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
   assert(destExistentialType->getRepresentation()
          == ExistentialTypeRepresentation::Class);
-  auto destExistentialLocation
-    = reinterpret_cast<ClassExistentialContainer *>(destLocation);
+  // Null when testing; see tryCastToClassExistential.
+  auto *destExistentialLocation =
+      isTestOnlyCast(destLocation)
+          ? nullptr
+          : reinterpret_cast<ClassExistentialContainer *>(destFor(destLocation));
 
   switch (srcType->getKind()) {
   case MetadataKind::Class:
@@ -1704,6 +1894,14 @@ tryCastToClassExistentialViaSwiftValue(
   }
 
   default: {
+    // `__SwiftValue` boxes are inherently Escapable and Copyable,
+    // so has the same restrictions as `Any`.
+    if (!canInhabitPlainExistential(srcType)) {
+      srcFailureType = srcType;
+      destFailureType = destType;
+      return DynamicCastResult::Failure;
+    }
+
     // We can always box when the destination is a simple
     // (unconstrained) `AnyObject`.
     if (destExistentialType->NumProtocols != 0) {
@@ -1718,8 +1916,13 @@ tryCastToClassExistentialViaSwiftValue(
       // true even when x does not in fact implement the requirements of
       // `NSCopying`.
 #if SWIFT_OBJC_INTEROP
+      // findSwiftValueConformances documents that it never writes the buffer,
+      // because __SwiftValue conforms to nothing needing a witness table, so a
+      // null buffer is fine here.
       if (!findSwiftValueConformances(
-            destExistentialType, destExistentialLocation->getWitnessTables())) {
+            destExistentialType,
+            destExistentialLocation ? destExistentialLocation->getWitnessTables()
+                                    : nullptr)) {
         return DynamicCastResult::Failure;
       }
 #else
@@ -1727,6 +1930,13 @@ tryCastToClassExistentialViaSwiftValue(
         return DynamicCastResult::Failure;
       }
 #endif
+    }
+
+    // Everything above has already decided the answer, and boxing is what
+    // produces the value. A test can stop here and skip allocating the box
+    // entirely.
+    if (isTestOnlyCast(destLocation)) {
+      return DynamicCastResult::TestSuccess;
     }
 
 #if SWIFT_OBJC_INTEROP
@@ -1761,7 +1971,11 @@ tryCastToErrorExistential(
   auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
   assert(destExistentialType->getRepresentation()
          == ExistentialTypeRepresentation::Error);
-  auto destBoxAddr = reinterpret_cast<SwiftError **>(destLocation);
+  // Null when testing, so a missed write below derefs null immediately rather
+  // than storing somewhere unexpected.
+  auto destBoxAddr = isTestOnlyCast(destLocation)
+                         ? nullptr
+                         : reinterpret_cast<SwiftError **>(destFor(destLocation));
 
   MetadataKind srcKind = srcType->getKind();
   switch (srcKind) {
@@ -1775,6 +1989,11 @@ tryCastToErrorExistential(
     if (_conformsToProtocols(
             srcValue, srcType, destExistentialType, &errorWitness,
             prohibitIsolatedConformances)) {
+      // Conforming to Error is the whole question. Everything below produces the
+      // box, so a test stops here -- and skips swift_allocError entirely.
+      if (isTestOnlyCast(destLocation)) {
+        return DynamicCastResult::TestSuccess;
+      }
 #if SWIFT_OBJC_INTEROP
       // If it already holds an NSError, just use that.
       if (auto embedded = getErrorEmbeddedNSErrorIndirect(
@@ -2059,12 +2278,18 @@ static DynamicCastResult tryCastToExtendedExistential(
       return DynamicCastResult::Failure;
   }
 
+  // The source is compatible with the target existential. Everything below
+  // merely assembles the container, so a test is finished here.
+  if (isTestOnlyCast(destLocation)) {
+    return DynamicCastResult::TestSuccess;
+  }
+
   OpaqueValue *destBox = nullptr;
   const WitnessTable **destWitnesses = nullptr;
   switch (destExistentialShape->Flags.getSpecialKind()) {
   case ExtendedExistentialTypeShape::SpecialKind::None: {
     auto destExistential =
-        reinterpret_cast<OpaqueExistentialContainer *>(destLocation);
+        reinterpret_cast<OpaqueExistentialContainer *>(destFor(destLocation));
 
     // Allocate a box and fill in the type information.
     destExistential->Type = srcType;
@@ -2074,14 +2299,14 @@ static DynamicCastResult tryCastToExtendedExistential(
   }
   case ExtendedExistentialTypeShape::SpecialKind::Class: {
     auto destExistential =
-        reinterpret_cast<ClassExistentialContainer *>(destLocation);
+        reinterpret_cast<ClassExistentialContainer *>(destFor(destLocation));
     destBox = reinterpret_cast<OpaqueValue *>(&destExistential->Value);
     destWitnesses = destExistential->getWitnessTables();
     break;
   }
   case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
     auto destExistential =
-        reinterpret_cast<ExistentialMetatypeContainer *>(destLocation);
+        reinterpret_cast<ExistentialMetatypeContainer *>(destFor(destLocation));
     destBox = reinterpret_cast<OpaqueValue *>(&destExistential->Value);
     destWitnesses = destExistential->getWitnessTables();
     break;
@@ -2171,8 +2396,12 @@ tryCastToMetatype(
     const Metadata *srcMetatype = *(const Metadata * const *) srcValue;
     if (auto result = swift_dynamicCastMetatype(
           srcMetatype, destMetatypeType->InstanceType)) {
-      *((const Metadata **) destLocation) = result;
-      return DynamicCastResult::SuccessViaCopy;
+      if (isTestOnlyCast(destLocation)) {
+        return DynamicCastResult::TestSuccess;
+      } else {
+        *((const Metadata **) destFor(destLocation)) = result;
+        return DynamicCastResult::SuccessViaCopy;
+      }
     }
     return DynamicCastResult::Failure;
   }
@@ -2214,6 +2443,10 @@ _dynamicCastMetatypeToExistentialMetatype(
 {
   // The instance type of an existential metatype must be either an
   // existential or an existential metatype.
+  //
+  // Null covers two cases that both want "do not write": a test-only cast, and
+  // the tail-recursion below, which passes null because it has already written
+  // the metatype.
   auto destMetatype
     = reinterpret_cast<ExistentialMetatypeContainer *>(destLocation);
 
@@ -2233,7 +2466,8 @@ _dynamicCastMetatypeToExistentialMetatype(
 
     if (destMetatype)
       destMetatype->Value = srcMetatype;
-    return DynamicCastResult::SuccessViaCopy;
+    return isTestOnlyCast(destLocation) ? DynamicCastResult::TestSuccess
+                                        : DynamicCastResult::SuccessViaCopy;
   }
 
   // Otherwise, we're casting to SomeProtocol.Type.Type.
@@ -2256,17 +2490,26 @@ _dynamicCastMetatypeToExistentialMetatype(
   // unless we've already done so.  There's no harm in doing this even if
   // the cast fails.
   if (destLocation)
-    *((const Metadata **) destLocation) = srcMetatype;
+    *((const Metadata **) destFor(destLocation)) = srcMetatype;
 
   // Recurse.
+  //
+  // This null is the "already written" case, not a test, so the recursion
+  // reports TestSuccess even when the caller asked for a real cast. Translate it
+  // back; otherwise a genuine `as?` to a nested existential metatype would
+  // surface a test-only result to swift_dynamicCastImpl().
   auto srcInstanceType = srcMetatypeMetatype->InstanceType;
-  return _dynamicCastMetatypeToExistentialMetatype(
+  auto result = _dynamicCastMetatypeToExistentialMetatype(
     nullptr,
     targetInstanceTypeAsMetatype,
     srcInstanceType,
     destFailureType,
     srcFailureType,
     takeOnSuccess, mayDeferChecks, prohibitIsolatedConformances);
+  if (result == DynamicCastResult::TestSuccess && !isTestOnlyCast(destLocation)) {
+    return DynamicCastResult::SuccessViaCopy;
+  }
+  return result;
 }
 
 // "ExistentialMetatype" is the metatype for an existential type.
@@ -2366,7 +2609,14 @@ static DynamicCastResult tryCastToCOMExistential(
   if (result < 0 || !resultInterface)
     return DynamicCastResult::Failure;
 
-  *reinterpret_cast<void **>(destLocation) = resultInterface;
+  if (isTestOnlyCast(destLocation)) {
+    // Release the no-longer-needed result. Release is slot 2 of IUnknown.
+    auto release = reinterpret_cast<_SwiftCOMLifetimeFunction>(vtable[2]);
+    release(resultInterface);
+    return DynamicCastResult::TestSuccess;
+  }
+
+  *reinterpret_cast<void **>(destFor(destLocation)) = resultInterface;
 
   // `QueryInterface` returns an owned (+1) interface pointer. Report a copy
   // even when the caller requested a take: the top-level cast driver will then
@@ -2496,11 +2746,13 @@ tryCast(
   // (The tryCastToXyz functions never see this trivial case.)
   //
   if (srcType == destType) {
+    if (isTestOnlyCast(destLocation))
+      return DynamicCastResult::TestSuccess;
     if (takeOnSuccess) {
-      destType->vw_initializeWithTake(destLocation, srcValue);
+      destType->vw_initializeWithTake(destFor(destLocation), srcValue);
       return DynamicCastResult::SuccessViaTake;
     } else {
-      destType->vw_initializeWithCopy(destLocation, srcValue);
+      destType->vw_initializeWithCopy(destFor(destLocation), srcValue);
       return DynamicCastResult::SuccessViaCopy;
     }
   }
@@ -2581,8 +2833,20 @@ tryCast(
 #if SWIFT_OBJC_INTEROP
     // Try unwrapping Obj-C NSError container
     auto innerFlags = DynamicCastFlags::Default;
-    if (tryDynamicCastNSErrorToValue(
-          destLocation, srcValue, srcType, destType, innerFlags)) {
+    if (isTestOnlyCast(destLocation)) {
+      // Unwrapping an NSError produces the value as part of deciding whether it
+      // can be produced, so this needs the temporary like the collection
+      // downcasts do.
+      auto testResult = testByProducingIntoTemporary(
+          destType, [&](OpaqueValue *temporary) {
+            return tryDynamicCastNSErrorToValue(
+                temporary, srcValue, srcType, destType, innerFlags);
+          });
+      if (isSuccess(testResult))
+        return testResult;
+    } else if (tryDynamicCastNSErrorToValue(
+                 destFor(destLocation), srcValue, srcType, destType,
+                 innerFlags)) {
       return DynamicCastResult::SuccessViaCopy;
     }
 #endif
@@ -2595,8 +2859,15 @@ tryCast(
 
     // Try unwrapping AnyHashable container
     if (srcStructDescription == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable)) {
+      if (isTestOnlyCast(destLocation)) {
+        return testByProducingIntoTemporary(
+            destType, [&](OpaqueValue *temporary) {
+              return _swift_anyHashableDownCastConditionalIndirect(
+                  srcValue, temporary, destType);
+            });
+      }
       if (_swift_anyHashableDownCastConditionalIndirect(
-            srcValue, destLocation, destType)) {
+            srcValue, destFor(destLocation), destType)) {
         return DynamicCastResult::SuccessViaCopy;
       }
     }
@@ -2750,10 +3021,15 @@ tryCast(
       if (auto srcErrorWitness = findErrorWitness(srcType)) {
         if (destType == getNSErrorMetadata()
             || destType == getNSObjectMetadata()) {
+          // Conforming to Error with an NSError/NSObject target is the whole
+          // question; the bridge below only produces the value. A test stops
+          // here and never allocates the NSError.
+          if (isTestOnlyCast(destLocation))
+            return DynamicCastResult::TestSuccess;
           auto flags = DynamicCastFlags::Default;
           auto error = dynamicCastValueToNSError(srcValue, srcType,
                                                  srcErrorWitness, flags);
-          *reinterpret_cast<id *>(destLocation) = error;
+          *reinterpret_cast<id *>(destFor(destLocation)) = error;
           return DynamicCastResult::SuccessViaCopy;
         }
       }
@@ -2821,6 +3097,23 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
   bool prohibitIsolatedConformances =
       flags & DynamicCastFlags::ProhibitIsolatedConformances;
 
+  // A null destination means "test only" to tryCast(), so a conversion must
+  // never reach it with one. It can: a zero-sized destination type has no
+  // storage, so `alloc_stack` lowers to a null pointer that IRGen passes here as
+  // an ordinary destination. `enum Stop: Error { case stop }` is the shape --
+  // size 0, and `as? Stop` really does want a value written.
+  //
+  // Point those at a scratch byte instead. Nothing can read more than zero bytes
+  // through it, since only a zero-sized type gets here, so one suitably aligned
+  // byte is always enough -- and giving the strategies a real address keeps the
+  // convention unambiguous without threading a flag through all of them.
+  alignas(MaximumAlignment) char zeroSizedScratch[1];
+  if (destLocation == nullptr) {
+    assert(destType->vw_size() == 0 &&
+           "null destination for a type that needs storage");
+    destLocation = reinterpret_cast<OpaqueValue *>(zeroSizedScratch);
+  }
+
   // Attempt the cast...
   const Metadata *destFailureType = destType;
   const Metadata *srcFailureType = srcType;
@@ -2846,163 +3139,62 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
     return true;
   case DynamicCastResult::SuccessViaTake:
     return true;
+  case DynamicCastResult::TestSuccess:
+    // Unreachable: the destination is non-null by the time tryCast() sees it,
+    // and only a null destination asks for a test.
+    swift_unreachable(
+        "dynamic cast with a destination reported a test-only result");
   }
+  swift_unreachable("unhandled DynamicCastResult");
 }
-
-#define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
-#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 /******************************************************************************/
 /**************************** Non-consuming Test ******************************/
 /******************************************************************************/
 
-// swift_dynamicCast always produces a value, so asking it whether a cast would
-// succeed costs either a copy or a take of the source. Neither is available for
-// a noncopyable value: the copy is what its type forbids, and the take is what
-// `is` and `case is T` must not do. The entry point below answers the same
-// question while only reading the source.
-//
-// TODO: Refactor tryCast() to accept a test_only mode so that we have
-// a common implementation behind both swift_dynamicCast and
-// swift_dynamicCastTest.
-//
-// Deferred until there is enough compiler support to exercise the nested shapes
-// end-to-end: today SILGen cannot emit a test against them, so any handling
-// added here would be untestable and therefore unverified.
+static bool
+swift_dynamicCastTestImpl(OpaqueValue *srcValue,
+                          const Metadata *srcType,
+                          const Metadata *targetType,
+                          DynamicCastFlags flags) {
+  // A test never takes the source and never destroys it on failure, so the
+  // corresponding flags are meaningless here. Unconditional is meaningless too:
+  // there is no value to produce, so there is nothing to defer checking on.
+  bool takeOnSuccess = false;
+  bool mayDeferChecks = false;
 
-/// Peel one layer of existential container off \p srcType / \p srcValue.
-///
-/// Returns false if \p srcType is not an existential, or is one whose payload
-/// we cannot reach, leaving both arguments untouched.
-///
-/// This only reads the container. The returned \p srcValue points into it, so
-/// it stays valid exactly as long as the caller's borrow of the original does.
-static bool unwrapExistentialForTest(const Metadata *&srcType,
-                                     OpaqueValue *&srcValue) {
-  if (srcType->getKind() != MetadataKind::Existential)
-    return false;
+  // Whether the compiler told us that we aren't allowed to use *any* isolated
+  // conformances, regardless of whether we are in that isolation domain. This
+  // one *is* meaningful: it decides whether the cast succeeds.
+  bool prohibitIsolatedConformances =
+      flags & DynamicCastFlags::ProhibitIsolatedConformances;
 
-  auto existentialType = cast<ExistentialTypeMetadata>(srcType);
-  switch (existentialType->getRepresentation()) {
-  case ExistentialTypeRepresentation::Class: {
-    auto classContainer =
-        reinterpret_cast<ClassExistentialContainer *>(srcValue);
-    srcType = swift_getObjectType((HeapObject *)classContainer->Value);
-    srcValue = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
-    return true;
-  }
-  case ExistentialTypeRepresentation::Opaque: {
-    auto opaqueContainer =
-        reinterpret_cast<OpaqueExistentialContainer *>(srcValue);
-    srcType = opaqueContainer->Type;
-    srcValue = existentialType->projectValue(srcValue);
-    return true;
-  }
-  case ExistentialTypeRepresentation::Error: {
-    const SwiftError *errorBox =
-        *reinterpret_cast<const SwiftError *const *>(srcValue);
-    srcValue = errorBox->isPureNSError()
-                   ? srcValue
-                   : const_cast<OpaqueValue *>(errorBox->getValue());
-    srcType = errorBox->getType();
-    return true;
-  }
-  case ExistentialTypeRepresentation::COM:
-    // As in tryCastUnwrappingExistentialSource: do not reinterpret a COM
-    // interface pointer as a Swift existential payload.
+  // Attempt the cast with a null destination, which every strategy reads as
+  // "answer the question, produce nothing".
+  const Metadata *destFailureType = targetType;
+  const Metadata *srcFailureType = srcType;
+  auto result = tryCast(
+    /*destLocation=*/nullptr, targetType,
+    srcValue, srcType,
+    destFailureType, srcFailureType,
+    takeOnSuccess, mayDeferChecks, prohibitIsolatedConformances);
+
+  switch (result) {
+  case DynamicCastResult::Failure:
     return false;
+  case DynamicCastResult::TestSuccess:
+    return true;
+  case DynamicCastResult::SuccessViaCopy:
+  case DynamicCastResult::SuccessViaTake:
+    // A strategy produced a value into a null destination, or claimed to. Either
+    // it wrote through null -- which would already have crashed -- or it
+    // returned the wrong result kind. Both are bugs in the strategy, not in the
+    // caller, and both mean the source may have been consumed.
+    swift_unreachable(
+        "test-only dynamic cast reported producing a value");
   }
-  return false;
+  swift_unreachable("unhandled DynamicCastResult");
 }
 
-/// Answer the cast relation for a noncopyable source value, reading only the
-/// metadata and (for Optional) the enum tag.
-///
-/// A noncopyable type reaches none of tryCast()'s value-producing conversions:
-/// ObjC bridging requires _ObjectiveCBridgeable, AnyHashable's init requires a
-/// Copyable H, __SwiftValue boxing requires a copy, and `any Error` requires
-/// Error, which is Copyable. Note that Hashable itself *is* ~Copyable, so a
-/// noncopyable type can conform to it -- but it still cannot be boxed into
-/// AnyHashable, which is what tryCastToAnyHashable would have to do. What is
-/// left is subtyping, which metadata decides, modulo Optional on either side.
-static bool dynamicCastTestNoncopyable(OpaqueValue *srcValue,
-                                       const Metadata *srcType,
-                                       const Metadata *targetType) {
-  // `T?.none` casts to any optional type, so remember whether the target was
-  // optional before unwrapping it (see tryCastUnwrappingOptionalBoth).
-  bool targetWasOptional = (targetType->getKind() == MetadataKind::Optional);
-  while (targetType->getKind() == MetadataKind::Optional)
-    targetType = cast<EnumMetadata>(targetType)->getGenericArgs()[0];
-
-  for (;;) {
-    if (swift_dynamicCastMetatype(srcType, targetType) != nullptr)
-      return true;
-
-    if (srcType->getKind() != MetadataKind::Optional)
-      return false;
-
-    // A single-payload Optional stores its payload at its own address, so
-    // unwrapping the type does not move the value pointer.
-    auto innerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
-    if (innerType->vw_getEnumTagSinglePayload(srcValue, /*emptyCases=*/1) != 0)
-      return targetWasOptional; // Source is nil.
-    srcType = innerType;
-  }
-}
-
-bool swift::swift_dynamicCastTest(OpaqueValue *srcValue,
-                                  const Metadata *srcType,
-                                  const Metadata *targetType,
-                                  DynamicCastFlags flags) {
-  // Peel existential containers here so that the copyability decision below is
-  // made about the value that would actually be cast, not about its box. The
-  // box of a `~Copyable` existential is itself noncopyable no matter what it
-  // holds, so testing the container would send copyable payloads -- which may
-  // still need bridging -- down the metadata-only path.
-  while (unwrapExistentialForTest(srcType, srcValue)) {
-  }
-
-  if (!srcType->getValueWitnesses()->flags.isCopyable())
-    return dynamicCastTestNoncopyable(srcValue, srcType, targetType);
-
-  // A copyable source can reach conversions whose outcome is not decidable
-  // from metadata, so defer to the real cast. Default flags mean copy on
-  // success and leave the source alone on failure, so srcValue is unchanged
-  // either way; the copy is legal precisely because we got here.
-  auto *targetVW = targetType->getValueWitnesses();
-  size_t targetSize = targetVW->getSize();
-  size_t targetAlignMask = targetVW->getAlignmentMask();
-
-  struct FreeBuffer {
-    void *Buffer = nullptr;
-    size_t size, alignMask;
-    FreeBuffer(size_t size, size_t alignMask)
-        : size(size), alignMask(alignMask) {}
-    ~FreeBuffer() {
-      if (Buffer)
-        swift_slowDealloc(Buffer, size, alignMask);
-    }
-  } freeBuffer{targetSize, targetAlignMask};
-
-  const size_t inlineValueSize = 3 * sizeof(void *);
-  alignas(MaximumAlignment) char inlineBuffer[inlineValueSize + 1];
-  void *scratch;
-  if (targetVW->getStride() <= inlineValueSize) {
-    scratch = inlineBuffer;
-  } else {
-    scratch = swift_slowAlloc(targetSize, targetAlignMask);
-    freeBuffer.Buffer = scratch;
-  }
-
-  auto castFlags = DynamicCastFlags::Default;
-  if (flags & DynamicCastFlags::ProhibitIsolatedConformances)
-    castFlags |= DynamicCastFlags::ProhibitIsolatedConformances;
-
-  if (!swift_dynamicCast((OpaqueValue *)scratch, srcValue, srcType, targetType,
-                         castFlags))
-    return false;
-
-  // We asked a question, not for a value; discard what the cast produced.
-  targetType->vw_destroy((OpaqueValue *)scratch);
-  return true;
-}
+#define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
