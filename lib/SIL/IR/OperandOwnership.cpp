@@ -661,6 +661,15 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
       return OperandOwnership::TrivialUse;
     }
 
+    if (i->isCalledOnce()) {
+      auto argConv = ApplySite(i).getArgumentConvention(op);
+      // Borrowed non-Copyable captures aren't owned by the closure.
+      if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
+        return OperandOwnership::Borrow;
+      // ... the rest of the operands are consumed.
+      return OperandOwnership::ForwardingConsume;
+    }
+
     return OperandOwnership::Borrow;
   }
   // All non-trivial types should be captured.

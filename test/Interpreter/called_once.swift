@@ -189,6 +189,49 @@ func testParameterCalled() {
 // CHECK-NEXT: Resource(paramCalled) deinit
 testParameterCalled()
 
+// Test non-escaping `@called(once)` that is stack promoted.
+
+struct BorrowableValue: ~Copyable {
+  let tag: String
+  init(_ tag: String) { self.tag = tag }
+  deinit { print("BorrowableValue(\(tag)) deinit") }
+  borrowing func peek() { print("BorrowableValue(\(tag)) peek") }
+}
+
+func testStackPromotedClassCaptureCalled() {
+  let t = Tracker("stackCalled")
+  callIt { print("using \(t.tag)") }
+}
+
+// CHECK-NEXT: using stackCalled
+// CHECK-NEXT: Tracker(stackCalled) deinit
+testStackPromotedClassCaptureCalled()
+
+func testStackPromotedClassCaptureNeverCalled() {
+  let t = Tracker("stackNeverCalled")
+  acceptsCalledOnce { print("using \(t.tag)") }
+}
+
+// CHECK-NEXT: Tracker(stackNeverCalled) deinit
+testStackPromotedClassCaptureNeverCalled()
+
+func testStackPromotedNoncopyableCaptureCalled() {
+  let v = BorrowableValue("stackCalled")
+  callIt { v.peek() }
+}
+
+// CHECK-NEXT: BorrowableValue(stackCalled) peek
+// CHECK-NEXT: BorrowableValue(stackCalled) deinit
+testStackPromotedNoncopyableCaptureCalled()
+
+func testStackPromotedNoncopyableCaptureNeverCalled() {
+  let v = BorrowableValue("stackNeverCalled")
+  acceptsCalledOnce { v.peek() }
+}
+
+// CHECK-NEXT: BorrowableValue(stackNeverCalled) deinit
+testStackPromotedNoncopyableCaptureNeverCalled()
+
 // Everything below duplicates the consuming-capture scenarios above for
 // `@escaping @called(once)` closures, to make sure escaping closures don't
 // behave any differently from noescape ones.
