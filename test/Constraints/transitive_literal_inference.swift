@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-disable-diagnose-valid-salvage
-// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -solver-disable-diagnose-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
 
 // All of the below should of course type check successfully.
 // FIXME: Once everything below is passing, we can gyb it.
@@ -112,22 +112,22 @@ let _: Float? = f(f(3.0, 3), nil)  // expected-error {{conflicting arguments to 
 
 let _: Float? = (b ? nil : (b ? 3 : 3.0))
 
-let _: Float? = (b ? nil : (b ? 3.0 : 3))  // expected-salvage-error {{failed to produce diagnostic for expression}}
+let _: Float? = (b ? nil : (b ? 3.0 : 3))
 
 let _: Float? = (b ? 3 : (b ? 3.0 : nil))
 let _: Float? = (b ? 3 : (b ? nil : 3.0))
 
-let _: Float? = (b ? 3.0 : (b ? nil : 3)) // expected-salvage-error {{failed to produce diagnostic for expression}}
-let _: Float? = (b ? 3.0 : (b ? 3 : nil)) // expected-salvage-error {{failed to produce diagnostic for expression}}
+let _: Float? = (b ? 3.0 : (b ? nil : 3))
+let _: Float? = (b ? 3.0 : (b ? 3 : nil))
 
 let _: Float? = (b ? (b ? nil : 3) : 3.0)
 
-let _: Float? = (b ? (b ? nil : 3.0) : 3) // expected-salvage-error {{failed to produce diagnostic for expression}}
+let _: Float? = (b ? (b ? nil : 3.0) : 3)
 
 let _: Float? = (b ? (b ? 3 : 3.0) : nil)
 let _: Float? = (b ? (b ? 3 : nil) : 3.0)
 
-let _: Float? = (b ? (b ? 3.0 : nil) : 3) // expected-salvage-error {{failed to produce diagnostic for expression}}
-let _: Float? = (b ? (b ? 3.0 : 3) : nil) // expected-salvage-error {{failed to produce diagnostic for expression}}
+let _: Float? = (b ? (b ? 3.0 : nil) : 3)
+let _: Float? = (b ? (b ? 3.0 : 3) : nil)
 
 // TODO: Add more tests.
