@@ -448,6 +448,27 @@ bool NormalProtocolConformance::isResilient() const {
   return getDeclContext()->getParentModule()->isResilient();
 }
 
+bool NormalProtocolConformance::isOriginallyInSameModuleAsProtocol() const {
+  auto *nominal = getDeclContext()->getSelfNominalTypeDecl();
+  auto *protocol = getProtocol();
+  auto *conformanceModule = getDeclContext()->getParentModule();
+
+  StringRef nominalMovedFrom = nominal->getAlternateModuleName();
+  StringRef protocolMovedFrom = protocol->getAlternateModuleName();
+
+  // If neither was moved with @_originallyDefinedIn, compare their current
+  // modules directly and skip the string comparison.
+  if (nominalMovedFrom.empty() && protocolMovedFrom.empty())
+    return conformanceModule == protocol->getParentModule();
+
+  auto originalModule = [](StringRef movedFrom,
+                           ModuleDecl *currentModule) -> StringRef {
+    return movedFrom.empty() ? currentModule->getName().str() : movedFrom;
+  };
+  return originalModule(nominalMovedFrom, conformanceModule) ==
+         originalModule(protocolMovedFrom, protocol->getParentModule());
+}
+
 std::optional<ArrayRef<Requirement>>
 ProtocolConformance::getConditionalRequirementsIfAvailable() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirementsIfAvailable, ());

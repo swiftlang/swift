@@ -1014,9 +1014,13 @@ bool IRGenModule::isResilientConformance(
   //
   // This is an optimization -- a conformance of a non-generic type cannot
   // resiliently become dependent.
-  if (!conformance->getDeclContext()->isGenericContext() &&
+  // Also check the @_originallyDefinedIn attribute to make sure the conforming
+  // type wasn't moved into the protocol's module. In that case, we need to keep
+  // the conformance resilient.
+  if (!disableOptimizations &&
+      !conformance->getDeclContext()->isGenericContext() &&
       conformanceModule == conformance->getProtocol()->getParentModule() &&
-      !disableOptimizations)
+      conformance->isOriginallyInSameModuleAsProtocol())
     return false;
 
   // We have a resilient conformance.
