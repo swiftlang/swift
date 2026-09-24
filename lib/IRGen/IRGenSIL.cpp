@@ -4072,6 +4072,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     } else {
       selfValue = getLoweredAddress(selfArg).getAddress();
     }
+
+    auto type = selfArg->getType().getASTType();
+    if (origCalleeType->getRepresentation() ==
+            SILFunctionTypeRepresentation::COMMethod &&
+        type->is<ArchetypeType>() && !type->is<ExistentialArchetypeType>()) {
+      auto *method = cast<COMMethodInst>(site.getCallee());
+      auto *protocol =
+          cast<ProtocolDecl>(method->getMember().getDecl()->getDeclContext());
+      selfValue =
+          emitGenericCOMInterfaceProjection(*this, selfValue, type, protocol);
+    }
   }
 
   // Extract the implicit isolated parameter so that we can mask it as
@@ -9301,6 +9312,11 @@ void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
   } else {
     interface = getLoweredSingletonExplosion(i->getOperand());
   }
+  auto type = i->getOperand()->getType().getASTType();
+  if (type->is<ArchetypeType>() && !type->is<ExistentialArchetypeType>())
+    interface =
+        emitGenericCOMInterfaceProjection(*this, interface, type, protocol);
+
   Address pUnk(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
   auto *vtable = Builder.CreateLoad(pUnk, "com.vtable");
   Address lpVtbl(vtable, IGM.Int8PtrTy, IGM.getPointerAlignment());

@@ -4621,6 +4621,17 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   return FunctionPointer::createSigned(fnType, fn, authInfo, signature);
 }
 
+llvm::Value *irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF,
+                                                      llvm::Value *value,
+                                                      CanType type,
+                                                      ProtocolDecl *protocol) {
+  assert(protocol->isCOMInterface());
+  auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
+  auto *adjustment = emitWitnessTableRef(IGF, type, conformance);
+  return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, value, adjustment,
+                                       "com.interface");
+}
+
 FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                                               llvm::Value *wtable,
                                               SILDeclRef member) {
