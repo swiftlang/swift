@@ -2283,7 +2283,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData) {
-      assert(!outType->isNoEscape() && "Trivial context must not be released");
+      assert(!outType->isTrivialNoEscape() &&
+             "Trivial closure context must not be released");
       destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
     }
 
@@ -2404,7 +2405,8 @@ static llvm::Value *emitPartialApplicationForwarder(
   
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime) {
-    assert(!outType->isNoEscape() && "Trivial context must not be released");
+    assert(!outType->isTrivialNoEscape() &&
+           "Trivial closure context must not be released");
     destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
   }
 
@@ -2705,6 +2707,34 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateElementBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();
+
+      // @called(once) closures always get a context even if they are
+      // stack promoted because they can have consuming captures.
+      if (outType->isCalledOnce()) {
+        assert(!outType->isTrivialNoEscape());
+
+        // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
+        // and so they cannot be destroyed.
+        llvm::BitVector unownedFields(argConventions.size());
+        for (unsigned i : indices(argConventions)) {
+          auto fieldTy = layout.getElementTypes()[i];
+          if (fieldTy &&
+              argConventions[i] == ParameterConvention::Direct_Guaranteed &&
+              fieldTy.isMoveOnly())
+            unownedFields.set(i);
+        }
+
+        auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
+                                                       substType, subs,
+                                                       layout);
+        auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
+        auto metadata = layout.getPrivateMetadata(
+            IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields,
+            /*isStackAllocated=*/true);
+        auto object = IGF.Builder.CreateBitCast(data, IGF.IGM.RefCountedPtrTy);
+        object = IGF.emitInitStackObjectCall(metadata, object, "closure");
+        data = IGF.Builder.CreateBitCast(object, IGF.IGM.OpaquePtrTy);
+      }
     } else {
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
