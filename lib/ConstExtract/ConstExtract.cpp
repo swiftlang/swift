@@ -491,7 +491,9 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto baseValue = extractCompileTimeValue(memberExpr->getBase(),
                                                declContext);
       if (!isa<RuntimeValue>(baseValue.get())) {
-        return std::make_shared<ChainedMemberReferenceValue>(label.str(),
+        auto stepValue = std::make_shared<MemberReferenceValue>(
+            memberExpr->getBase()->getType(), label.str());
+        return std::make_shared<ChainedMemberReferenceValue>(stepValue,
                                                              baseValue);
       }
       break;
@@ -980,13 +982,13 @@ void writeValue(llvm::json::OStream &JSON,
   }
 
   case CompileTimeValue::ValueKind::ChainedMemberReference: {
-    // Walk the chain collecting member labels.
-    std::vector<std::string> chain;
+    // Walk the chain collecting member steps.
+    std::vector<std::shared_ptr<CompileTimeValue>> chain;
     std::shared_ptr<CompileTimeValue> cursor = Value;
     while (cursor && cursor->getKind() ==
                          CompileTimeValue::ValueKind::ChainedMemberReference) {
       auto *cmr = cast<ChainedMemberReferenceValue>(cursor.get());
-      chain.push_back(cmr->getMemberLabel());
+      chain.push_back(cmr->getStepValue());
       cursor = cmr->getBaseValue();
     }
     std::reverse(chain.begin(), chain.end());
@@ -995,8 +997,8 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attributeObject("value", [&]() {
       JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor); });
       JSON.attributeArray("members", [&] {
-        for (auto &label : chain) {
-          JSON.value(label);
+        for (auto &step : chain) {
+          JSON.object([&] { writeValue(JSON, step); });
         }
       });
     });

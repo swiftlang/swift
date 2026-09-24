@@ -511,12 +511,12 @@ private:
 /// is a static member and `.property` is an instance property on its result.
 class ChainedMemberReferenceValue : public CompileTimeValue {
 public:
-  ChainedMemberReferenceValue(std::string MemberLabel,
+  ChainedMemberReferenceValue(std::shared_ptr<CompileTimeValue> StepValue,
                               std::shared_ptr<CompileTimeValue> BaseValue)
       : CompileTimeValue(ValueKind::ChainedMemberReference),
-        MemberLabel(MemberLabel), BaseValue(BaseValue) {}
+        StepValue(StepValue), BaseValue(BaseValue) {}
 
-  std::string getMemberLabel() const { return MemberLabel; }
+  std::shared_ptr<CompileTimeValue> getStepValue() const { return StepValue; }
   std::shared_ptr<CompileTimeValue> getBaseValue() const { return BaseValue; }
 
   static bool classof(const CompileTimeValue *T) {
@@ -524,7 +524,7 @@ public:
   }
 
 private:
-  std::string MemberLabel;
+  std::shared_ptr<CompileTimeValue> StepValue;
   std::shared_ptr<CompileTimeValue> BaseValue;
 };
 

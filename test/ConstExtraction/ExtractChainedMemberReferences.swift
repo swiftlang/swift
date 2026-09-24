@@ -89,9 +89,14 @@ struct Container: MyProto {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    "members": [
-// CHECK-NEXT:      "step"
-// CHECK-NEXT:    ]
-// CHECK-NEXT:  }
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "MemberReference",
+// CHECK-NEXT:        "value": {
+// CHECK:               "memberLabel": "step"
+// CHECK:             }
+// CHECK:           }
+// CHECK:         ]
+// CHECK:       }
 
 // CHECK:       "label": "prop2",
 // CHECK:       "valueKind": "InitCall",
@@ -106,9 +111,14 @@ struct Container: MyProto {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    "members": [
-// CHECK-NEXT:      "other"
-// CHECK-NEXT:    ]
-// CHECK-NEXT:  }
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "MemberReference",
+// CHECK-NEXT:        "value": {
+// CHECK:               "memberLabel": "other"
+// CHECK:             }
+// CHECK:           }
+// CHECK:         ]
+// CHECK:       }
 
 // CHECK:       "label": "prop3",
 // CHECK:       "valueKind": "InitCall",
@@ -123,7 +133,17 @@ struct Container: MyProto {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    "members": [
-// CHECK-NEXT:      "mid",
-// CHECK-NEXT:      "leaf"
-// CHECK-NEXT:    ]
-// CHECK-NEXT:  }
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "MemberReference",
+// CHECK-NEXT:        "value": {
+// CHECK:               "memberLabel": "mid"
+// CHECK:             }
+// CHECK:           },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "MemberReference",
+// CHECK-NEXT:        "value": {
+// CHECK:               "memberLabel": "leaf"
+// CHECK:             }
+// CHECK:           }
+// CHECK:         ]
+// CHECK:       }
