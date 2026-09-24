@@ -97,7 +97,6 @@ extension ExecutorJob {
   }
 }
 
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A wait queue is a specialised priority queue used to run a timer.
 @available(StdlibDeploymentTarget 6.3, *)
 struct WaitQueue {
@@ -153,17 +152,21 @@ struct WaitQueue {
     return nil
   }
 }
-#endif
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
+///
+/// Thread-safety: this executor is `@unchecked Sendable` only because every
+/// access to `runQueue` / `suspendingWaitQueue` / `continuousWaitQueue` happens
+/// on the single thread that drives `runUntil`. The delayed-enqueue helpers
+/// below are likewise only ever called synchronously from within that run loop
+/// (via the `swift_task_enqueueGlobalWith{Delay,Deadline}` runtime hooks).
+/// Driving this executor from multiple threads would race those collections.
 @available(StdlibDeploymentTarget 6.3, *)
 final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var suspendingWaitQueue = WaitQueue(clock: .suspending)
   var continuousWaitQueue = WaitQueue(clock: .continuous)
-  #endif
   var shouldStop: Bool = false
 
   /// Internal representation of a duration for CooperativeExecutor
@@ -223,8 +226,9 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
     static func + (lhs: Timestamp, rhs: Duration) -> Timestamp {
       var seconds = lhs.seconds + rhs.seconds
       var nanoseconds = lhs.nanoseconds + rhs.nanoseconds
-      // Normally will run only once
-      while nanoseconds > 1_000_000_000 {
+      // Normally will run only once. Use `>=` so a sum of exactly 1e9 normalizes
+      // to (seconds+1, 0) rather than leaving a denormalized (seconds, 1e9).
+      while nanoseconds >= 1_000_000_000 {
         seconds += 1
         nanoseconds -= 1_000_000_000
       }
@@ -239,6 +243,52 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
   public func enqueue(_ job: consuming ExecutorJob) {
     runQueue.push(UnownedJob(job))
   }
+
+#if $Embedded
+  // The two methods below deliberately mirror the names of the runtime entry
+  // points they back (`swift_task_enqueueGlobalWith{Delay,Deadline}`); see
+  // ExecutorImpl.swift. They are the Embedded scheduling path, which has no
+  // `Clock` value to dispatch on — the generic `enqueue(_:after:tolerance:clock:)`
+  // SchedulingExecutor conformance below covers the non-Embedded path.
+
+  /// Enqueue `job` after a raw nanosecond delay, measured on the suspending clock.
+  func enqueueGlobalWithDelay(_ job: consuming ExecutorJob, nanoseconds: UInt64) {
+    let delay = Duration(seconds: Int64(nanoseconds / 1_000_000_000),
+                         nanoseconds: Int64(nanoseconds % 1_000_000_000))
+    suspendingWaitQueue.enqueue(job, after: delay)
+  }
+
+  /// Enqueue `job` at a deadline given as clock-absolute `(seconds, nanoseconds)`
+  /// on `clock`. The deadline is converted to a delay relative to that clock's
+  /// current time and enqueued on the matching wait queue. This is equivalent in
+  /// observed wake time to `swift_task_enqueueGlobalWithDeadlineImpl` in
+  /// CooperativeGlobalExecutor.cpp, which instead re-anchors every clock onto a
+  /// single suspending timebase.
+  func enqueueGlobalWithDeadline(_ job: consuming ExecutorJob,
+                                 seconds: Int64, nanoseconds: Int64,
+                                 clock: _ClockID) {
+    var nowSeconds: Int64 = 0
+    var nowNanoseconds: Int64 = 0
+    unsafe _getTime(seconds: &nowSeconds, nanoseconds: &nowNanoseconds,
+                    clock: clock.rawValue)
+    var deltaSeconds = seconds - nowSeconds
+    var deltaNanoseconds = nanoseconds - nowNanoseconds
+    if deltaNanoseconds < 0 {
+      deltaSeconds -= 1
+      deltaNanoseconds += 1_000_000_000
+    }
+    if deltaSeconds < 0 {
+      deltaSeconds = 0
+      deltaNanoseconds = 0
+    }
+    let delay = Duration(seconds: deltaSeconds, nanoseconds: deltaNanoseconds)
+    if clock == .continuous {
+      continuousWaitQueue.enqueue(job, after: delay)
+    } else {
+      suspendingWaitQueue.enqueue(job, after: delay)
+    }
+  }
+#endif
 
   public var isMainExecutor: Bool { true }
 }
@@ -285,7 +335,6 @@ extension CooperativeExecutor: RunLoopExecutor {
   public func runUntil(_ condition: () -> Bool) throws {
     shouldStop = false
     while !shouldStop && !condition() {
-      #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Process the timer queues
       suspendingWaitQueue.forEachReadyJob {
         runQueue.push(UnownedJob($0))
@@ -293,7 +342,6 @@ extension CooperativeExecutor: RunLoopExecutor {
       continuousWaitQueue.forEachReadyJob {
         runQueue.push(UnownedJob($0))
       }
-      #endif
 
       // Now run any queued jobs
       var runQ = runQueue.take()
@@ -303,7 +351,6 @@ extension CooperativeExecutor: RunLoopExecutor {
         )
       }
 
-      #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Finally, wait until the next deadline
       var toWait: Duration? = suspendingWaitQueue.timeToNextJob
 
@@ -320,12 +367,6 @@ extension CooperativeExecutor: RunLoopExecutor {
         // Stop if no more jobs are available
         break
       }
-      #else // $Embedded || SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      if runQueue.isEmpty {
-        // Stop if no more jobs are available
-        break
-      }
-      #endif
     }
   }
 
