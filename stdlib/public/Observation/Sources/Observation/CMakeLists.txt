@@ -27,6 +27,7 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
     "-enable-experimental-feature" "Macros"
     "-enable-experimental-feature" "ExtensionMacros"
     -Xfrontend -disable-implicit-string-processing-module-import
+    -Xfrontend -enable-sil-opaque-values
 
   C_COMPILE_FLAGS
     ${swift_runtime_library_compile_flags}
