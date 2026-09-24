@@ -1971,12 +1971,10 @@ void IRGenModule::addLinkLibraries() {
     if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
       if (const auto *M = Context.getModuleByName("CxxStdlib"))
         hasStaticCxxStdlib = M->isStaticLibrary();
-    dependencies::registerCxxInteropLibraries(Context.LangOpts.Target,
-                                              getSwiftModule()->getName().str(),
-                                              hasStaticCxx,
-                                              hasStaticCxxStdlib,
-                                              Context.LangOpts.CXXStdlib,
-                                              registerLinkLibrary);
+    dependencies::registerCxxInteropLibraries(
+        Context.LangOpts.Target, getSwiftModule()->getName().str(),
+        hasStaticCxx, hasStaticCxxStdlib, Context.LangOpts.CXXStdlib,
+        Context.LangOpts.useCxxStdlibOverlay(), registerLinkLibrary);
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that

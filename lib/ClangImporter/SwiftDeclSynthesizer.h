@@ -59,11 +59,39 @@ class SwiftDeclSynthesizer {
 private:
   ClangImporter::Implementation &ImporterImpl;
 
+  AbstractFunctionDecl *
+  makeCxxExceptionBridge(const clang::FunctionDecl *clangDecl,
+                         AbstractFunctionDecl *importedDecl);
+
+  /// Diagnose synthesized C++ initialization whose native Swift body cannot
+  /// propagate exceptions from transferring its arguments or result.
+  bool checkSynthesizedCxxConstructor(ConstructorDecl *constructor,
+                                      NominalTypeDecl *record,
+                                      ArrayRef<VarDecl *> members);
+
 public:
   explicit SwiftDeclSynthesizer(ClangImporter::Implementation &Impl)
       : ImporterImpl(Impl) {}
   explicit SwiftDeclSynthesizer(ClangImporter *importer)
       : ImporterImpl(importer->Impl) {}
+
+  /// Whether a C++ value can pass through native Swift code without invoking a
+  /// potentially throwing copy, move, or destructor.
+  bool canTransferCxxValueWithoutThrowing(clang::QualType type,
+                                          const clang::Decl *diagnosticDecl);
+
+  /// Create a native throwing facade and a C++ adapter that catches exceptions
+  /// without changing the original declaration's calling convention.
+  FuncDecl *makeCxxThrowingFunction(const clang::FunctionDecl *clangDecl,
+                                  FuncDecl *importedDecl);
+
+  /// Whether the result can leave temporary construction storage without
+  /// invoking a potentially throwing copy, move, or destructor.
+  bool canBridgeCxxConstructor(const clang::CXXConstructorDecl *clangDecl);
+
+  ConstructorDecl *
+  makeCxxThrowingConstructor(const clang::CXXConstructorDecl *clangDecl,
+                             ConstructorDecl *importedDecl);
 
   /// Create a typedpattern(namedpattern(decl))
   static Pattern *createTypedNamedPattern(VarDecl *decl);

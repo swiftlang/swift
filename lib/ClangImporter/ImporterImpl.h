@@ -739,10 +739,16 @@ public:
   /// For virtual methods of foreign reference types, whenever a virtual thunk
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualOriginalToThunk;
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> inheritedMethodForForwarder;
 
   /// Accessors and operator functions synthesized around an imported function,
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
+
+  llvm::DenseMap<const AbstractFunctionDecl *, FuncDecl *> cxxExceptionBridges;
+  llvm::DenseMap<const FuncDecl *, AbstractFunctionDecl *>
+      cxxExceptionBridgeFacades;
 
 private:
   // Keep track of the decls that were already cloned for this specific class.
@@ -1425,6 +1431,10 @@ public:
 
   /// Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
+
+  /// Whether an explicit call must use the C++ exception bridge. This also
+  /// prevents nonthrowing conveniences from bypassing the selected policy.
+  bool shouldImportCxxFunctionAsThrowing(const clang::FunctionDecl *decl);
 
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
@@ -2187,6 +2197,12 @@ namespace importer {
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
+
+/// Whether a type exposes a callable whose C++ exception specification is not
+/// known to be nonthrowing, including through pointers, references, and arrays.
+/// The caller must determine whether the declaration has C++ language linkage;
+/// Clang function types do not distinguish C and C++ language linkage.
+bool hasPotentiallyThrowingCxxCallableType(clang::QualType type);
 
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.

@@ -1624,11 +1624,21 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().isLanguageModeAtLeast(LanguageMode::v6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
-        Invocation.getLangOptions()
-            .RequireCxxInteropToImportCxxInteropModule)
+        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule &&
+        (Invocation.getFrontendOptions().InputMode !=
+             FrontendOptions::ParseInputMode::SwiftModuleInterface ||
+         Invocation.getLangOptions().FormalCxxInteropMode))
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().EnableCXXInterop)
       MainModule->setCXXStdlibKind(Invocation.getLangOptions().CXXStdlib);
+    // Rebuilding a pure Swift interface can inherit C++ interop from its
+    // consumer. Only a module that itself enables interop has exception policy.
+    if (Invocation.getLangOptions().EnableCXXInterop &&
+        (Invocation.getFrontendOptions().InputMode !=
+             FrontendOptions::ParseInputMode::SwiftModuleInterface ||
+         Invocation.getLangOptions().FormalCxxInteropMode))
+      MainModule->setCxxExceptionMode(
+          Invocation.getLangOptions().CxxExceptionMode);
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)

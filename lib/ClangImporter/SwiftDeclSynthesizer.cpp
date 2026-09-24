@@ -12,6 +12,7 @@
 
 #include "SwiftDeclSynthesizer.h"
 #include "CXXMethodBridging.h"
+#include "ClangSynthesizedDecls.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -27,7 +28,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
-#include "ClangSynthesizedDecls.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attrs.inc"
 #include "clang/AST/DeclCXX.h"
@@ -37,16 +37,439 @@
 #include "clang/AST/Mangle.h"
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCXX.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/Specifiers.h"
+#include "clang/Basic/TypeTraits.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
 using namespace importer;
+
+namespace {
+struct CxxThrowingFunctionInfo {
+  FuncDecl *adapter;
+  FuncDecl *withCapture;
+};
+
+/// The facade is a native Swift function. In particular, its error result must
+/// never be added to the signature of the original C++ declaration.
+static std::pair<BraceStmt *, bool>
+synthesizeCxxThrowingFunctionBody(AbstractFunctionDecl *afd, void *context) {
+  auto *function = afd;
+  auto *constructor = dyn_cast<ConstructorDecl>(function);
+  auto &info = *static_cast<CxxThrowingFunctionInfo *>(context);
+  auto &ctx = function->getASTContext();
+
+  auto makeReference = [&](ValueDecl *decl) {
+    return new (ctx) DeclRefExpr(ConcreteDeclRef(decl), DeclNameLoc(),
+                                /*Implicit=*/true);
+  };
+
+  // The scoped helper owns the error storage. Its nonescaping closure borrows
+  // a context pointer only while the C++ adapter is running.
+  SmallVector<ParamDecl *, 3> captureParameters;
+  SmallVector<StringRef, 3> captureNames;
+  if (constructor)
+    captureNames.push_back("output");
+  captureNames.append({"context", "callback"});
+  for (StringRef name : captureNames) {
+    auto *parameter = new (ctx) ParamDecl(
+        SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+        ctx.getIdentifier(name), function);
+    parameter->setImplicit();
+    captureParameters.push_back(parameter);
+  }
+  auto *closure = new (ctx) ClosureExpr(
+      DeclAttributes(), SourceRange(), /*capturedSelfDecl=*/nullptr,
+      ParameterList::create(ctx, captureParameters), SourceLoc(), SourceLoc(),
+      /*thrownType=*/nullptr, SourceLoc(), SourceLoc(),
+      /*explicitResultType=*/nullptr, function);
+  closure->setImplicit();
+
+  SmallVector<Expr *, 8> arguments;
+  for (auto *parameter : *function->getParameters())
+    arguments.push_back(makeReference(parameter));
+  for (auto *parameter : captureParameters)
+    arguments.push_back(makeReference(parameter));
+  Expr *adapterReference = makeReference(info.adapter);
+  if (info.adapter->isInstanceMember()) {
+    adapterReference = new (ctx) MemberRefExpr(
+        makeReference(function->getImplicitSelfDecl()), SourceLoc(),
+        info.adapter, DeclNameLoc(), /*Implicit=*/true);
+  }
+  auto *adapterCall = CallExpr::createImplicit(
+      ctx, adapterReference,
+      ArgumentList::forImplicitCallTo(DeclNameRef(info.adapter->getName()),
+                                      arguments, ctx));
+  auto *closureReturn = ReturnStmt::createImplicit(
+      ctx, UnsafeExpr::createImplicit(ctx, SourceLoc(), adapterCall));
+  closure->setBody(BraceStmt::create(ctx, SourceLoc(), ASTNode(closureReturn),
+                                   SourceLoc(), /*implicit=*/true));
+
+  SmallVector<Expr *, 2> captureArguments;
+  if (constructor) {
+    auto *type =
+        TypeExpr::createImplicit(constructor->getResultInterfaceType(), ctx);
+    auto *metatype = new (ctx) DotSelfExpr(type, SourceLoc(), SourceLoc());
+    metatype->setImplicit();
+    captureArguments.push_back(metatype);
+  }
+  captureArguments.push_back(closure);
+  auto *captureCall = CallExpr::createImplicit(
+      ctx, makeReference(info.withCapture),
+      ArgumentList::forImplicitUnlabeled(ctx, captureArguments));
+  auto *tryCall = new (ctx) TryExpr(
+      SourceLoc(), UnsafeExpr::createImplicit(ctx, SourceLoc(), captureCall),
+      Type(), /*Implicit=*/true);
+  if (constructor) {
+    auto *assign = new (ctx) AssignExpr(
+        makeReference(constructor->getImplicitSelfDecl()), SourceLoc(), tryCall,
+        /*Implicit=*/true);
+    return {BraceStmt::create(ctx, SourceLoc(), ASTNode(assign), SourceLoc(),
+                              /*implicit=*/true),
+            /*isTypeChecked=*/false};
+  }
+  auto *result = ReturnStmt::createImplicit(ctx, tryCall);
+  return {BraceStmt::create(ctx, SourceLoc(), ASTNode(result), SourceLoc(),
+                           /*implicit=*/true),
+          /*isTypeChecked=*/false};
+}
+} // namespace
+
+bool SwiftDeclSynthesizer::canTransferCxxValueWithoutThrowing(
+    clang::QualType type, const clang::Decl *diagnosticDecl) {
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  auto &clangSema = ImporterImpl.getClangSema();
+  if (type->isDependentType() || type->isIncompleteType())
+    return false;
+  auto semantics = getCxxValueSemanticsKind(type.getTypePtr(), ImporterImpl);
+  if (semantics == CxxValueSemanticsKind::Unknown)
+    return false;
+
+  // Use Clang's overload resolution, access checking, and exception-specifier
+  // evaluation rather than inspecting whichever special member is present.
+  // A move expression may select a copy constructor, for example.
+  auto isNothrow = [&](clang::TypeTrait trait,
+                       ArrayRef<clang::QualType> types) {
+    SmallVector<clang::TypeSourceInfo *, 2> arguments;
+    for (auto type : types)
+      arguments.push_back(clangCtx.getTrivialTypeSourceInfo(type));
+    auto expression =
+        clangSema.BuildTypeTrait(trait, diagnosticDecl->getLocation(),
+                                 arguments, diagnosticDecl->getLocation());
+    return expression.isUsable() && !expression.get()->isValueDependent() &&
+           cast<clang::TypeTraitExpr>(expression.get())->getBoolValue();
+  };
+  if (!isNothrow(clang::UTT_IsNothrowDestructible, {type}) ||
+      !isNothrow(clang::TT_IsNothrowConstructible,
+                 {type, clangCtx.getRValueReferenceType(type)}))
+    return false;
+  // Swift may copy Copyable values while transferring them through native code.
+  // Move-only values do not need this operation, but both kinds require a safe
+  // move.
+  return semantics == CxxValueSemanticsKind::MoveOnly ||
+         isNothrow(clang::TT_IsNothrowConstructible,
+                   {type, clangCtx.getLValueReferenceType(type.withConst())});
+}
+
+FuncDecl *SwiftDeclSynthesizer::makeCxxThrowingFunction(
+    const clang::FunctionDecl *clangDecl, FuncDecl *importedDecl) {
+  return dyn_cast_or_null<FuncDecl>(
+      makeCxxExceptionBridge(clangDecl, importedDecl));
+}
+
+ConstructorDecl *SwiftDeclSynthesizer::makeCxxThrowingConstructor(
+    const clang::CXXConstructorDecl *clangDecl, ConstructorDecl *importedDecl) {
+  return dyn_cast_or_null<ConstructorDecl>(
+      makeCxxExceptionBridge(clangDecl, importedDecl));
+}
+
+bool SwiftDeclSynthesizer::canBridgeCxxConstructor(
+    const clang::CXXConstructorDecl *clangDecl) {
+  auto type =
+      ImporterImpl.getClangASTContext().getRecordType(clangDecl->getParent());
+  return canTransferCxxValueWithoutThrowing(type, clangDecl);
+}
+
+AbstractFunctionDecl *SwiftDeclSynthesizer::makeCxxExceptionBridge(
+    const clang::FunctionDecl *clangDecl, AbstractFunctionDecl *importedDecl) {
+  auto &ctx = ImporterImpl.SwiftContext;
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  auto &clangSema = ImporterImpl.getClangSema();
+  auto *constructor = dyn_cast<clang::CXXConstructorDecl>(clangDecl);
+
+  auto findValue = [&](ModuleDecl *module, StringRef name) -> ValueDecl * {
+    if (!module)
+      return nullptr;
+    SmallVector<ValueDecl *, 1> results;
+    ctx.lookupInModule(module, name, results);
+    return results.size() == 1 ? results.front() : nullptr;
+  };
+  auto *cxxModule = ctx.getModuleByName("Cxx");
+  auto *withCapture = dyn_cast_or_null<FuncDecl>(
+      findValue(cxxModule, constructor ? "_withCxxExceptionResult"
+                                       : "_withCxxExceptionCapture"));
+  auto *supportModule = ctx.getModuleByName("_SwiftCxxExceptionSupport");
+  auto *report = dyn_cast_or_null<FuncDecl>(
+      findValue(supportModule, "__swift_cxx_report_current_exception"));
+  auto *clangReport = report ? dyn_cast_or_null<clang::FunctionDecl>(
+                                  report->getClangDecl())
+                            : nullptr;
+  if (!withCapture || !clangReport)
+    return nullptr;
+
+  // The extra parameters belong exclusively to the generated adapter. The
+  // underlying C++ function keeps its original ABI and symbol.
+  SmallVector<clang::QualType, 8> parameterTypes;
+  for (auto *parameter : clangDecl->parameters())
+    parameterTypes.push_back(parameter->getType());
+  if (constructor)
+    parameterTypes.push_back(clangCtx.VoidPtrTy);
+  for (auto *parameter : clangReport->parameters())
+    parameterTypes.push_back(parameter->getType());
+  auto prototypeInfo = clangDecl->getType()
+                           ->castAs<clang::FunctionProtoType>()
+                           ->getExtProtoInfo();
+  prototypeInfo.ExceptionSpec = {};
+  prototypeInfo.ExceptionSpec.Type = clang::EST_BasicNoexcept;
+  // The facade owns a consuming receiver. Borrow that storage while its
+  // nonescaping closure calls the adapter, then form the required xvalue in
+  // C++. Consuming a captured Swift self here would require an extra copy (or
+  // fail for a noncopyable receiver) before reaching the catch handler.
+  if (prototypeInfo.RefQualifier == clang::RQ_RValue)
+    prototypeInfo.RefQualifier = clang::RQ_LValue;
+  // Parameter ABI annotations belong to the original signature. The adapter
+  // has additional capture parameters and is imported independently.
+  prototypeInfo.ExtParameterInfos = nullptr;
+  auto adapterType = clangCtx.getFunctionType(
+      clangDecl->getReturnType(), parameterTypes, prototypeInfo);
+
+  SmallString<128> mangledName;
+  llvm::raw_svector_ostream nameStream(mangledName);
+  static_cast<ClangImporter *>(ctx.getClangModuleLoader())
+      ->getMangledName(nameStream, clangDecl);
+  auto adapterName = "__swift_cxx_exception_" + llvm::toHex(mangledName);
+  auto *method = dyn_cast<clang::CXXMethodDecl>(clangDecl);
+  bool isInstanceMethod = method && !constructor && !method->isStatic();
+  clang::FunctionDecl *adapter;
+  if (isInstanceMethod) {
+    auto *methodAdapter = clang::CXXMethodDecl::Create(
+        clangCtx, const_cast<clang::CXXRecordDecl *>(method->getParent()),
+        clang::SourceLocation(),
+        clang::DeclarationNameInfo(&clangCtx.Idents.get(adapterName),
+                                   clang::SourceLocation()),
+        adapterType, clangCtx.getTrivialTypeSourceInfo(adapterType),
+        clang::SC_None, /*UsesFPIntrin=*/false, /*isInline=*/true,
+        clang::ConstexprSpecKind::Unspecified, clang::SourceLocation());
+    methodAdapter->setImplicit();
+    methodAdapter->setImplicitlyInline();
+    methodAdapter->setAccess(clang::AS_public);
+    adapter = methodAdapter;
+  } else {
+    adapter =
+        createClangFunctionDecl(clangCtx, clangCtx.getTranslationUnitDecl(),
+                                &clangCtx.Idents.get(adapterName), adapterType);
+  }
+  SmallVector<clang::ParmVarDecl *, 8> parameters;
+  for (auto [index, type] : llvm::enumerate(parameterTypes)) {
+    auto *parameter = createClangParmVarDecl(
+        clangCtx, adapter,
+        &clangCtx.Idents.get((Twine("arg") + Twine(index)).str()), type);
+    parameters.push_back(parameter);
+  }
+  adapter->setParams(parameters);
+  // Keep the native catch handler in a function with the C++ personality.
+  adapter->addAttr(clang::NoInlineAttr::CreateImplicit(clangCtx));
+
+  clang::Sema::SynthesizedFunctionScope scope(clangSema, adapter);
+  auto makeClangCall = [&](clang::FunctionDecl *callee,
+                          ArrayRef<clang::ParmVarDecl *> args) {
+    SmallVector<clang::Expr *, 8> expressions;
+    for (auto *parameter : args)
+      expressions.push_back(createClangDeclRefExpr(
+          clangCtx, parameter, parameter->getType(), clang::VK_LValue));
+    clang::Expr *reference;
+    if (callee == clangDecl && isInstanceMethod) {
+      auto *methodAdapter = cast<clang::CXXMethodDecl>(adapter);
+      clang::Expr *receiver = clang::CXXThisExpr::Create(
+          clangCtx, clang::SourceLocation(), methodAdapter->getThisType(),
+          /*IsImplicit=*/true);
+      bool isArrow = true;
+      if (method->getRefQualifier() == clang::RQ_RValue) {
+        auto dereference = clangSema.CreateBuiltinUnaryOp(
+            clang::SourceLocation(), clang::UO_Deref, receiver);
+        if (!dereference.isUsable())
+          return clang::ExprResult(clang::ExprError());
+        auto cast = clangSema.BuildCXXNamedCast(
+            clang::SourceLocation(), clang::tok::kw_static_cast,
+            clangCtx.getTrivialTypeSourceInfo(clangCtx.getRValueReferenceType(
+                methodAdapter->getThisType()->getPointeeType())),
+            dereference.get(), clang::SourceRange(), clang::SourceRange());
+        if (!cast.isUsable())
+          return clang::ExprResult(clang::ExprError());
+        receiver = cast.get();
+        isArrow = false;
+      }
+      // Match a direct imported method call, including static dispatch for
+      // value types and FRT super calls. The existing virtual-method thunk
+      // supplies dynamic dispatch for ordinary FRT calls.
+      clang::NestedNameSpecifierLocBuilder qualifier;
+      qualifier.MakeTrivial(
+          clangCtx,
+          clang::NestedNameSpecifier::Create(
+              clangCtx, nullptr,
+              clangCtx.getRecordType(method->getParent()).getTypePtr()),
+          clang::SourceRange());
+      reference = clangSema.BuildMemberExpr(
+          receiver, isArrow, clang::SourceLocation(),
+          qualifier.getWithLocInContext(clangCtx), clang::SourceLocation(),
+          callee, clang::DeclAccessPair::make(callee, clang::AS_public),
+          /*HadMultipleCandidates=*/false, method->getNameInfo(),
+          clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+    } else {
+      reference = createClangDeclRefExpr(clangCtx, callee, callee->getType(),
+                                         clang::VK_LValue);
+    }
+    return clangSema.BuildCallExpr(nullptr, reference, clang::SourceLocation(),
+                                  expressions, clang::SourceLocation());
+  };
+  clang::ExprResult originalCall;
+  if (constructor) {
+    auto resultType = clangCtx.getRecordType(constructor->getParent());
+    SmallVector<clang::Expr *, 8> arguments;
+    for (auto *parameter :
+         ArrayRef(parameters).take_front(clangDecl->getNumParams()))
+      arguments.push_back(createClangDeclRefExpr(
+          clangCtx, parameter, parameter->getType(), clang::VK_LValue));
+    SmallVector<clang::Expr *, 8> convertedArguments;
+    auto *mutableConstructor =
+        const_cast<clang::CXXConstructorDecl *>(constructor);
+    if (clangSema.CompleteConstructorCall(mutableConstructor, resultType,
+                                          arguments, constructor->getLocation(),
+                                          convertedArguments))
+      return nullptr;
+    auto construction = clangSema.BuildCXXConstructExpr(
+        constructor->getLocation(), resultType, mutableConstructor,
+        /*Elidable=*/false, convertedArguments,
+        /*HadMultipleCandidates=*/false, /*IsListInitialization=*/false,
+        /*IsStdInitListInitialization=*/false,
+        /*RequiresZeroInit=*/constructor->isDefaultConstructor() &&
+            !constructor->isUserProvided(),
+        clang::CXXConstructionKind::Complete, clang::SourceRange());
+    if (!construction.isUsable())
+      return nullptr;
+    auto *output = parameters[clangDecl->getNumParams()];
+    clang::Expr *placement = createClangDeclRefExpr(
+        clangCtx, output, output->getType(), clang::VK_LValue);
+    // Global placement new initializes the caller's uninitialized storage. It
+    // neither allocates a dummy result nor invokes class-specific allocation.
+    originalCall = clangSema.BuildCXXNew(
+        clang::SourceRange(), /*UseGlobal=*/true, clang::SourceLocation(),
+        {placement}, clang::SourceLocation(), clang::SourceRange(), resultType,
+        clangCtx.getTrivialTypeSourceInfo(resultType), std::nullopt,
+        constructor->getLocation(), construction.get());
+  } else {
+    originalCall = makeClangCall(
+        const_cast<clang::FunctionDecl *>(clangDecl),
+        ArrayRef(parameters).take_front(clangDecl->getNumParams()));
+  }
+  auto reportCall = makeClangCall(
+      const_cast<clang::FunctionDecl *>(clangReport),
+      ArrayRef(parameters).take_back(clangReport->getNumParams()));
+  if (!originalCall.isUsable() || !reportCall.isUsable())
+    return nullptr;
+
+  auto makeBlock = [&](ArrayRef<clang::Stmt *> statements) {
+    return clang::CompoundStmt::Create(
+        clangCtx, statements, clang::FPOptionsOverride(),
+        clang::SourceLocation(), clang::SourceLocation());
+  };
+  auto *tryBody =
+      constructor
+          ? makeBlock({originalCall.get()})
+          : makeBlock({createClangReturnStmt(clangCtx, originalCall.get())});
+  // Only scalar and void results are currently admitted. Value initialization
+  // supplies a placeholder on failure, which the Swift facade never returns.
+  clang::Expr *failedResult =
+      clangDecl->getReturnType()->isVoidType()
+          ? nullptr
+          : new (clangCtx) clang::ImplicitValueInitExpr(clangDecl->getReturnType());
+  auto *catchBody = makeBlock(
+      {reportCall.get(), createClangReturnStmt(clangCtx, failedResult)});
+  auto *handler = new (clangCtx) clang::CXXCatchStmt(
+      clang::SourceLocation(), /*exDecl=*/nullptr, catchBody);
+  auto *tryStatement = clang::CXXTryStmt::Create(
+      clangCtx, clang::SourceLocation(), tryBody, {handler});
+  adapter->setBody(makeBlock({tryStatement}));
+  ImporterImpl.registerSynthesizedClangDecl(adapter, clangDecl);
+  auto *importedAdapter = dyn_cast_or_null<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(adapter));
+  if (!importedAdapter)
+    return nullptr;
+
+  SmallVector<ParamDecl *, 8> swiftParameters;
+  for (auto [index, parameter] :
+       llvm::enumerate(*importedDecl->getParameters())) {
+    auto *clone = ParamDecl::clone(ctx, parameter);
+    // The closure must capture a local even when the C++ parameter is unnamed.
+    if (clone->getName().empty())
+      clone->setName(ctx.getIdentifier("__cxx_arg" + std::to_string(index)));
+    swiftParameters.push_back(clone);
+  }
+  AbstractFunctionDecl *facade;
+  if (constructor) {
+    facade = new (ctx) ConstructorDecl(
+        importedDecl->getName(), importedDecl->getLoc(), /*Failable=*/false,
+        SourceLoc(), /*Async=*/false, SourceLoc(), /*Throws=*/true, SourceLoc(),
+        TypeLoc(), ParameterList::create(ctx, swiftParameters),
+        /*GenericParams=*/nullptr, importedDecl->getDeclContext());
+    facade->setImplicit();
+  } else {
+    auto *function = cast<FuncDecl>(importedDecl);
+    auto *functionFacade = FuncDecl::createImplicit(
+        ctx, function->getStaticSpelling(), function->getName(),
+        function->getLoc(), /*Async=*/false, /*Throws=*/true,
+        /*ThrownType=*/Type(), /*GenericParams=*/nullptr,
+        ParameterList::create(ctx, swiftParameters),
+        function->getResultInterfaceType(), function->getDeclContext(),
+        /*isSynthesized=*/true);
+    functionFacade->setStatic(function->isStatic());
+    functionFacade->setSelfAccessKind(function->getSelfAccessKind());
+    // Preserve the importer's C++ override relationships. Recomputing these as
+    // native Swift overrides would reject the final entry points used for C++
+    // virtual dispatch.
+    functionFacade->setOverriddenDecls(function->getOverriddenDecls());
+    facade = functionFacade;
+  }
+  facade->copyFormalAccessFrom(importedDecl);
+  facade->setIsObjC(false);
+  facade->setIsDynamic(false);
+  facade->addAttribute(new (ctx) TransparentAttr(/*Implicit=*/true));
+  for (auto *attribute : importedDecl->getAttrs()) {
+    if (isa<EffectsAttr>(attribute))
+      continue;
+    // A consuming native facade owns self and lends its local storage to the
+    // adapter. It does not borrow the caller's addressable C++ receiver.
+    if (!constructor && isa<AddressableSelfAttr>(attribute) &&
+        cast<FuncDecl>(importedDecl)->getSelfAccessKind() ==
+            SelfAccessKind::Consuming)
+      continue;
+    facade->addAttribute(attribute->clone(ctx));
+  }
+  auto *info = ctx.Allocate<CxxThrowingFunctionInfo>();
+  *info = {importedAdapter, withCapture};
+  facade->setBodySynthesizer(synthesizeCxxThrowingFunctionBody, info);
+  ImporterImpl.cxxExceptionBridges[facade] = importedAdapter;
+  ImporterImpl.cxxExceptionBridgeFacades[importedAdapter] = facade;
+  ImporterImpl.recordForwardingSource(facade, importedDecl);
+  return facade;
+}
 
 ParamDecl *importer::createNewValueParam(ASTContext &ctx, Type type,
                                          DeclContext *dc) {
@@ -578,6 +1001,62 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   return {body, /*isTypeChecked*/ true};
 }
 
+bool SwiftDeclSynthesizer::checkSynthesizedCxxConstructor(
+    ConstructorDecl *constructor, NominalTypeDecl *record,
+    ArrayRef<VarDecl *> members) {
+  if (ImporterImpl.SwiftContext.LangOpts.CxxExceptionMode !=
+      CxxExceptionMode::Strict)
+    return true;
+  auto *clangRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(record->getClangDecl());
+  if (!clangRecord)
+    return true;
+
+  // An extern "C" context may contain C++ records with throwing transfers.
+  // Preserve C callable imports without exempting those transfers.
+  bool isInCLinkageContext = clangRecord->getDeclContext()->isExternCContext();
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  bool canTransfer = canTransferCxxValueWithoutThrowing(
+      clangCtx.getRecordType(clangRecord), clangRecord);
+  StringRef reason =
+      "synthesized C++ initializers require nonthrowing argument and result "
+      "transfers in strict C++ exception mode";
+
+  // These initializers write Swift storage rather than calling a C++
+  // constructor. Their argument and result transfers must still be safe:
+  // a union's noexcept copy constructor says nothing about copying the member
+  // supplied to one of its synthesized field initializers.
+  auto canTransferMember = [&](auto &&self, clang::QualType type,
+                               const clang::Decl *decl) -> bool {
+    if (!isInCLinkageContext && hasPotentiallyThrowingCxxCallableType(type)) {
+      reason = "potentially throwing C++ callable types are not supported in "
+               "strict C++ exception mode";
+      return false;
+    }
+    if (const auto *array = clangCtx.getAsArrayType(type))
+      return self(self, array->getElementType(), decl);
+    if (type->isScalarType())
+      return true;
+    return type->getAsCXXRecordDecl() &&
+           canTransferCxxValueWithoutThrowing(type, decl);
+  };
+  for (auto *member : members) {
+    // Match the fields used to build the initializer's parameter list.
+    if (member->isStatic() ||
+        isa_and_nonnull<clang::IndirectFieldDecl>(member->getClangDecl()))
+      continue;
+    auto *field = dyn_cast_or_null<clang::FieldDecl>(member->getClangDecl());
+    if (!field ||
+        !canTransferMember(canTransferMember, field->getType(), field)) {
+      canTransfer = false;
+      break;
+    }
+  }
+  if (!canTransfer)
+    ImporterImpl.markUnavailable(constructor, reason);
+  return canTransfer;
+}
+
 ConstructorDecl *
 SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   auto &context = ImporterImpl.SwiftContext;
@@ -595,6 +1074,9 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+
+  if (!checkSynthesizedCxxConstructor(constructor, structDecl, {}))
+    return constructor;
 
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
@@ -721,6 +1203,9 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+
+  if (!checkSynthesizedCxxConstructor(constructor, structDecl, members))
+    return constructor;
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
@@ -2989,7 +3474,7 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
   PrettyStackTraceDecl trace("creating a closure constructor", decl);
   assert(decl);
   ASTContext &ctx = decl->getASTContext();
-  
+
   auto callAsFunctionOverloads = decl->lookupDirect(ctx.Id_callAsFunction);
   if (callAsFunctionOverloads.size() != 1)
     return nullptr;
@@ -3017,6 +3502,15 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
       /*ThrownType*/ TypeLoc(), paramList, /*GenericParams*/ nullptr, decl);
   constructorDecl->setAccess(AccessLevel::Public);
   constructorDecl->setSynthesized();
+  // This convenience invokes a templated C++ constructor that can allocate.
+  // Keep its signature for diagnostics, but do not synthesize a body that
+  // could call that constructor without propagating its exception.
+  if (ctx.LangOpts.CxxExceptionMode == CxxExceptionMode::Strict) {
+    constructorDecl->addAttribute(AvailableAttr::createUniversallyUnavailable(
+        ctx, "constructing C++ function objects from Swift closures is not "
+             "supported in strict C++ exception mode"));
+    return constructorDecl;
+  }
   constructorDecl->setBodySynthesizer(synthesizeFunctionConstructorBody,
                                       callAsFunctionDecl);
   return constructorDecl;
@@ -3152,6 +3646,14 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     }
     synthCxxMethodDecl->setParams(synthParams);
 
+    // The generated factory must not hide the source constructor's exception
+    // annotation. Reference-type construction is not supported by the bridge
+    // yet, so importing this annotated factory will make the initializer
+    // unavailable instead of exposing a nonthrowing route to the constructor.
+    if (hasCxxThrowsAttr(selectedCtorDecl))
+      synthCxxMethodDecl->addAttr(
+          clang::SwiftAttrAttr::Create(clangCtx, "import_throws"));
+
     if (selectedCtorDecl->hasAttrs()) {
       auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);
       if (attrInfo.hasReturnsRetained)
@@ -3269,8 +3771,10 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
           /*OverrideExisting=*/true))
     return nullptr;
 
-  clang::QualType funcTy = clangCtx.getFunctionType(
-      basePtrTy, {derivedPtrTy}, clang::FunctionProtoType::ExtProtoInfo());
+  clang::FunctionProtoType::ExtProtoInfo prototypeInfo;
+  prototypeInfo.ExceptionSpec.Type = clang::EST_BasicNoexcept;
+  clang::QualType funcTy =
+      clangCtx.getFunctionType(basePtrTy, {derivedPtrTy}, prototypeInfo);
 
   // Build a deterministic, unique name from the mangled canonical types of the
   // derived and base classes, to avoid collisions in the SwiftLookupTable.

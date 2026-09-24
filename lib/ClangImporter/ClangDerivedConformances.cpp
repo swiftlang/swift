@@ -188,6 +188,11 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
   auto results = lookupDirectWithoutExtensions(decl, id);
   if (results.size() != 1)
     return nullptr;
+  if (results.front()->isUnavailable())
+    return nullptr;
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(results.front());
+      function && function->hasThrows())
+    return nullptr;
   return dyn_cast<Decl>(results.front());
 }
 
@@ -198,10 +203,14 @@ static ValueDecl *lookupOperator(
     NominalTypeDecl *decl, Identifier id,
     function_ref<bool(ValueDecl *)> isValidSwiftMember,
     function_ref<bool(const clang::FunctionDecl *)> isValidClangGlobal) {
+  auto isNonthrowingWitness = [](ValueDecl *decl) {
+    auto *function = dyn_cast_or_null<FuncDecl>(decl);
+    return function && !function->isUnavailable() && !function->hasThrows();
+  };
   // First look for operator declared as a member.
   auto memberResults = lookupDirectWithoutExtensions(decl, id);
   for (const auto &member : memberResults) {
-    if (isValidSwiftMember(member))
+    if (isNonthrowingWitness(member) && isValidSwiftMember(member))
       return member;
   }
 
@@ -216,7 +225,9 @@ static ValueDecl *lookupOperator(
   // Look up operators in the namespace context first.
   for (auto entry : lookupTable->lookupMemberOperators(DeclBaseName(id))) {
     if (isValidClangGlobal(dyn_cast<clang::FunctionDecl>(entry))) {
-      return cast_or_null<ValueDecl>(loader->importDeclDirectly(entry));
+      auto *imported = cast_or_null<ValueDecl>(loader->importDeclDirectly(entry));
+      if (isNonthrowingWitness(imported))
+        return imported;
     }
   }
   // Look up operators in the global namespace
@@ -229,7 +240,9 @@ static ValueDecl *lookupOperator(
     if (!decl)
       continue;
     if (isValidClangGlobal(decl)) {
-      return cast_or_null<ValueDecl>(loader->importDeclDirectly(decl));
+      auto *imported = cast_or_null<ValueDecl>(loader->importDeclDirectly(decl));
+      if (isNonthrowingWitness(imported))
+        return imported;
     }
   }
 
@@ -1080,7 +1093,8 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       impl.importDecl(beginConst, impl.CurrentVersion));
   auto *end = dyn_cast_or_null<FuncDecl>(
       impl.importDecl(endConst, impl.CurrentVersion));
-  if (!begin || !end)
+  if (!begin || !end || begin->isUnavailable() || end->isUnavailable() ||
+      begin->hasThrows() || end->hasThrows())
     return;
 
   // Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, begin() and end() are always
@@ -1629,6 +1643,9 @@ void swift::deriveAutomaticCxxConformances(
   conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxConvertibleToBoolIfNeeded(Impl, result);
+
+  if (!Impl.SwiftContext.LangOpts.useCxxStdlibOverlay())
+    return;
 
   // CxxStdlib conformances: these should only apply to known C++ stdlib types,
   // which we determine by name and membership in the std namespace.

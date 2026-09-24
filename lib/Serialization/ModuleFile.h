@@ -659,6 +659,14 @@ public:
     return Core->Bits.HasCxxInteroperability;
   }
 
+  bool hasCxxExceptionMode() const {
+    return Core->CxxExceptionPolicy.has_value();
+  }
+
+  CxxExceptionMode getCxxExceptionMode() const {
+    return Core->CxxExceptionPolicy.value_or(CxxExceptionMode::Annotated);
+  }
+
   /// The kind of the C++ stdlib that this module was built with.
   CXXStdlibKind getCXXStdlibKind() const {
     return static_cast<CXXStdlibKind>(Core->Bits.CXXStdlibKind);

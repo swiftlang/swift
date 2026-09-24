@@ -1770,6 +1770,25 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
 
+  if (const Arg *A = Args.getLastArg(OPT_cxx_exception_mode)) {
+    auto mode =
+        llvm::StringSwitch<std::optional<CxxExceptionMode>>(A->getValue())
+            .Case("annotated", CxxExceptionMode::Annotated)
+            .Case("strict", CxxExceptionMode::Strict)
+            .Default(std::nullopt);
+    if (mode)
+      Opts.CxxExceptionMode = *mode;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+  if (Opts.CxxExceptionMode == CxxExceptionMode::Strict) {
+    if (!Opts.EnableCXXInterop)
+      Diags.diagnose(SourceLoc(), diag::cxx_exception_mode_requires_interop);
+    if (!Opts.hasFeature(Feature::CxxExceptionBridging))
+      Diags.diagnose(SourceLoc(), diag::cxx_exception_mode_requires_feature);
+  }
+
   if (Args.hasArg(OPT_experimental_c_foreign_reference_types))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-experimental-c-foreign-reference-types");
