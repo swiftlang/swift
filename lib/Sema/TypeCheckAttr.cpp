@@ -6067,7 +6067,14 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     underlyingType = type;
 
   auto sig = var->getDeclContext()->getGenericSignatureOfContext();
-  if (!underlyingType->allowsOwnership(sig.getPointer())) {
+  if ((ownershipKind == ReferenceOwnership::Weak ||
+       ownershipKind == ReferenceOwnership::Unowned) &&
+      underlyingType->isCOMExistentialType()) {
+    Diags.diagnose(attr->getLocation(),
+                   diag::invalid_ownership_incompatible_class, underlyingType,
+                   ownershipKind);
+    attr->setInvalid();
+  } else if (!underlyingType->allowsOwnership(sig.getPointer())) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||
