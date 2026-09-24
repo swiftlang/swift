@@ -2661,7 +2661,8 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     }
 
     // Verify that the declaration is exposable.
-    auto repr = cxx_translation::getDeclRepresentation(VD, std::nullopt);
+    auto repr = cxx_translation::getDeclRepresentation(
+        VD, /*layoutQueries=*/nullptr);
     if (repr.isUnsupported())
       diagnose(attr->getLocation(),
                cxx_translation::diagnoseRepresenationError(*repr.error, VD));

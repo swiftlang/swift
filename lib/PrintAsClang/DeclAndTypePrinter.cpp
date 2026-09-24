@@ -569,6 +569,9 @@ private:
           associatedValueList->size() > 1) {
         return;
       }
+      // Projecting the payload out of a borrowed enum needs a copy of it.
+      if (cxx_translation::isNoncopyableValueTypeExposableToCxx(ED))
+        return;
       auto paramType = associatedValueList->front()->getInterfaceType();
 
       std::string declName, defName, name;
@@ -3100,6 +3103,10 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
       if (auto *params = elementDecl->getParameterList()) {
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
+          // A noncopyable payload would have to be moved into the case
+          // constructor and consumed back out of the enum.
+          if (!paramType->hasTypeParameter() && paramType->isNoncopyable())
+            return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
                   printer, enumDecl->getModuleContext(), paramType)
@@ -3128,9 +3135,7 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (outputLang == OutputLanguageMode::Cxx) {
     if (!isExposedToThisModule(M, VD, exposedModules))
       return false;
-    if (!cxx_translation::isExposableToCxx(
-            VD,
-            [this](const NominalTypeDecl *decl) { return isZeroSized(decl); }))
+    if (!cxx_translation::isExposableToCxx(VD, this))
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
@@ -3186,6 +3191,13 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
   if (sizeAndAlignment)
     return sizeAndAlignment->size == 0;
   return false;
+}
+
+bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
+  if (decl->isResilient() || decl->hasGenericParamList())
+    return true;
+  // The size and alignment are also unknown when a field is resilient.
+  return !interopContext.getIrABIDetails().getTypeSizeAlignment(decl);
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
