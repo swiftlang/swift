@@ -9,17 +9,18 @@
 
 // This test is specific to libstdc++ and only runs on platforms where libstdc++ is used.
 // REQUIRES: OS=linux-gnu
-// REQUIRES: rdar187794084
 
 // The RHS of basic_string's typealias value_type depends on how eagerly/lazily
-// we import type members
+// we import type members, and also seems to be libstdc++ version-dependent.
+// e.g., we on  Ubuntu 24.04 we have typealias value_type = CChar
+//       and on Ubuntu 26.04 we have typealias value_type = std.char_traits<CChar>.char_type
 
 // CHECK-STD: enum std {
 // CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection, CxxIterable {
-// CHECK-STRING:     typealias value_type = CChar
+// CHECK-STRING:     typealias value_type = {{CChar|std(.__cxx11)?.char_traits<CChar>.char_type}}
 // CHECK-STRING:   }
 // CHECK-STRING:   struct basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>> : CxxMutableRandomAccessCollection, CxxIterable {
-// CHECK-STRING:     typealias value_type = CWideChar
+// CHECK-STRING:     typealias value_type = {{CWideChar|std(.__cxx11)?.char_traits<CWideChar>.char_type}}
 // CHECK-STRING:   }
 
 // CHECK-TO-STRING:   static func to_string(_ __val: CInt) -> std{{(.__cxx11)?}}.string
