@@ -6817,8 +6817,21 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
     // base's parameters would reparent them and invalidate captures in a
     // synthesized throwing body on the base method.
     SmallVector<ParamDecl *, 8> parameters;
-    for (auto *parameter : *fn->getParameters())
-      parameters.push_back(ParamDecl::clone(context, parameter));
+    for (auto *parameter : *fn->getParameters()) {
+      auto *clonedParameter = ParamDecl::clone(context, parameter);
+      if (auto *defaultExpr = parameter->getTypeCheckedDefaultExpr()) {
+        // Imported defaults are calls to a shared C++ default-argument
+        // generator. Preserve that expression and its printed spelling, but
+        // let the clone create its own initializer context lazily after it
+        // belongs to the derived method.
+        clonedParameter->setTypeCheckedDefaultExpr(defaultExpr);
+        SmallString<32> scratch;
+        clonedParameter->setDefaultValueStringRepresentation(
+            context.AllocateCopy(
+                parameter->getDefaultValueStringRepresentation(scratch)));
+      }
+      parameters.push_back(clonedParameter);
+    }
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
         fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
