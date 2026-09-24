@@ -15,6 +15,9 @@ ___divti3
 ___modti3
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
+_flockfile
+_funlockfile
 _memmove
 _memset
 _putchar
@@ -24,9 +27,12 @@ __divti3
 __modti3
 __stack_chk_fail
 __stack_chk_guard
+flockfile
+funlockfile
 memmove
 memset
 putchar
+stdout
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-embedded-link %t/a.o %t/print.o -o %t/a.out
