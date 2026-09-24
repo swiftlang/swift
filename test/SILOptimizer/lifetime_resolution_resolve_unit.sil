@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-verify-none | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify | %FileCheck %s
 
 sil_stage raw
 
@@ -8,10 +8,16 @@ import Swift
 class Kl {}
 class Sub : Kl {}
 struct Wrapper { var k: Kl }
+struct NC: ~Copyable { var k: Kl }
 
 sil @getK : $@convention(thin) () -> @owned Kl
 sil @useK : $@convention(thin) (@guaranteed Kl) -> ()
 sil @consumeK : $@convention(thin) (@owned Kl) -> ()
+
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @useNC : $@convention(thin) (@guaranteed NC) -> ()
+sil @consumeNC : $@convention(thin) (@owned NC) -> ()
+
 sil @consumeTwoK : $@convention(thin) (@owned Kl, @owned Kl) -> ()
 sil @barrierK : $@convention(thin) () -> ()
 sil @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
@@ -34,6 +40,29 @@ bb0:
   specify_test "lifetime_resolution_resolve %0"
   apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
   apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_copy_before_interior_consume_noncopyable :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned NC
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: diagnose [unpermitted_copy] [[COPY]]
+// CHECK-NEXT: apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned NC) -> ()
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed NC) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_copy_before_interior_consume_noncopyable : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %useFn = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %consFn = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned NC
+  specify_test "lifetime_resolution_resolve %0"
+  apply %consFn(%0) : $@convention(thin) (@owned NC) -> ()
+  apply %useFn(%0) : $@convention(thin) (@guaranteed NC) -> ()
   destroy_value %0
   %t = tuple ()
   return %t
@@ -194,9 +223,11 @@ bb3:
 // CHECK: bb1:
 // CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
 // CHECK-NEXT: apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned Kl) -> ()
-// CHECK-NEXT: cond_br undef, bb1, bb2
+// CHECK-NEXT: cond_br undef, bb2, bb3
 
 // CHECK: bb2:
+
+// CHECK: bb3:
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK: } // end sil function
 sil [ossa] @test_consume_inside_loop : $@convention(thin) () -> () {
@@ -209,9 +240,12 @@ bb0:
 
 bb1:
   apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   destroy_value %0
   %t = tuple ()
   return %t

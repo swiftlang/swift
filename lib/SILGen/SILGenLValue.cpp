@@ -5005,6 +5005,17 @@ LValue SILGenLValue::visitLoadExpr(LoadExpr *e, SGFAccessKind accessKind,
 
 LValue SILGenLValue::visitConsumeExpr(ConsumeExpr *e, SGFAccessKind accessKind,
                                       LValueOptions options) {
+
+  // When using lifetime resolution, the consume expr just overrides the access
+  // kind under which we visit the sub expression.
+  if (SGF.getASTContext().SILOpts.EnableLifetimeResolution) {
+    auto loweredTy = SGF.getLoweredType(e->getSubExpr()->getType());
+    auto consumingAccess = loweredTy.isAddress()
+                               ? SGFAccessKind::OwnedAddressConsume
+                               : SGFAccessKind::OwnedObjectConsume;
+    return visitRec(e->getSubExpr(), consumingAccess, options);
+  }
+
   // Do formal evaluation of the base l-value.
   LValue baseLV = visitRec(e->getSubExpr(), SGFAccessKind::ReadWrite,
                            options.forComputedBaseLValue());

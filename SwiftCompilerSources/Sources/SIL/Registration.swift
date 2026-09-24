@@ -56,6 +56,7 @@ private func registerSILClasses() {
   register(HopToExecutorInst.self)
   register(MarkUninitializedInst.self)
   register(FixLifetimeInst.self)
+  register(DiagnoseInst.self)
   register(DebugValueInst.self)
   register(DebugStepInst.self)
   register(SpecifyTestInst.self)
