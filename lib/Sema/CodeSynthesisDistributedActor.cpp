@@ -631,15 +631,10 @@ bool swift::distributedThunkShouldBeNonisolatedNonsending(FuncDecl *func) {
 /// Attach the correct isolation attributes for a synthesized distributed thunk.
 ///
 /// If the concrete system's `remoteCall` witness is `nonisolated(nonsending)`,
-/// emit the thunk as `nonisolated(nonsending)` so the caller's actor
-/// isolation is threaded into `system.remoteCall` without a hop.
+/// emit the thunk as `nonisolated(nonsending)` so isolation is threaded
+/// through to `system.remoteCall` without a hop.
 ///
 /// Otherwise fall back to `nonisolated @concurrent`.
-///
-/// Accessor thunks cannot carry either attribute (neither `nonisolated` nor
-/// `@concurrent` may appear on an `AccessorDecl`); their isolation is instead
-/// hardcoded in `getInferredActorIsolation()`'s `AccessorDecl` case, which
-/// mirrors this same nonisolated(nonsending)-or-@concurrent choice.
 static void addDistributedThunkIsolationAttributes(FuncDecl *thunk,
                                                    FuncDecl *originalFunc) {
   if (isa<AccessorDecl>(thunk))

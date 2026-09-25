@@ -677,9 +677,6 @@ public:
 
   bool isDistributed() const { return IsDistributed; }
 
-  /// Whether the recorded distributed accessor takes an isolated
-  /// `(any Actor)?` parameter, and therefore must be invoked through
-  /// `swift_distributed_execute_target_with_isolation`
   bool hasLeadingImplicitActorIsolationParameter() const {
     return HasLeadingImplicitActorIsolationParameter;
   }

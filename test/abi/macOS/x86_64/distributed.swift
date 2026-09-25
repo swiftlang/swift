@@ -129,7 +129,7 @@ Added: _$s11Distributed0A11ActorSystemPAAE14resignRemoteIDyy0bF0QzF
 // Nonsending(nonisolated) thunks
 // Distributed runtime entry point for distributed accessors with a leading isolated parameter
 Added: _swift_distributed_execute_target_with_isolation
-// (extension in Distributed):Distributed.DistributedActorSystem._executeDistributedTargetImpl<A where A1: Distributed.DistributedActor>(on: A1, target: Distributed.RemoteCallTarget, invocationDecoder: inout A.InvocationDecoder, handler: A.ResultHandler) async throws -> ()
-Added: _$s11Distributed0A11ActorSystemPAAE08_executeA10TargetImpl2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lF
-// async function pointer to (extension in Distributed):Distributed.DistributedActorSystem._executeDistributedTargetImpl<A where A1: Distributed.DistributedActor>(on: A1, target: Distributed.RemoteCallTarget, invocationDecoder: inout A.InvocationDecoder, handler: A.ResultHandler) async throws -> ()
-Added: _$s11Distributed0A11ActorSystemPAAE08_executeA10TargetImpl2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lFTu
+// (extension in Distributed):Distributed.DistributedActorSystem._executeDistributedTargetNonsending<A where A1: Distributed.DistributedActor>(on: A1, target: Distributed.RemoteCallTarget, invocationDecoder: inout A.InvocationDecoder, handler: A.ResultHandler) async throws -> ()
+Added: _$s11Distributed0A11ActorSystemPAAE08_executeA16TargetNonsending2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lF
+// async function pointer to (extension in Distributed):Distributed.DistributedActorSystem._executeDistributedTargetNonsending<A where A1: Distributed.DistributedActor>(on: A1, target: Distributed.RemoteCallTarget, invocationDecoder: inout A.InvocationDecoder, handler: A.ResultHandler) async throws -> ()
+Added: _$s11Distributed0A11ActorSystemPAAE08_executeA16TargetNonsending2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lFTu

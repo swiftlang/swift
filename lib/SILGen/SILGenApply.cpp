@@ -6247,12 +6247,17 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
     if (auto target = call->isImplicitlyAsync()) {
       // ... unless the call is dispatched through a distributed thunk.
       //
-      // The thunk is 'nonisolated' or 'nonisolated(nonsending)' and decides for
-      // itself whether to hop. It only hops onto 'self' in its local branch,
-      // and its remote branch never executes on the target actor at all.
+      // The thunk is '@concurrent' or 'nonisolated(nonsending)'
+      // and never needs to run on the target actor: its local branch calls the
+      // actor-isolated target, which hops onto 'self' in its own prologue, and
+      // its remote branch never runs on the target actor at all.
       //
-      // For a nonisolated(nonsending) thunk, it would even be incorrect to hop here,
-      // as it defeats the no-hops guarantee the thunk aims to provide.
+      // For a 'nonisolated(nonsending)' thunk, hopping here would be unsound:
+      // the thunk receives the caller's isolation as its implicit argument, so
+      // it must actually be running on the caller's executor.
+      //
+      // Hopping back to the caller after the call is still handled by the
+      // executor breadcrumb emitted for async callees.
       if (!emission.callsDistributedThunk()) {
         emission.setImplicitlyAsync(target);
       }

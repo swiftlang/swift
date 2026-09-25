@@ -80,9 +80,9 @@ SWIFT_EXPORT_FROM(swiftDistributed)
 TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
 /// Same as `TargetExecutorSignature` but with additional leading
-/// `isolatedActor`/`isolatedActorWTable` parameters carrying the actor the
-/// distributed accessor should be isolated to (both null when there is
-/// none). Introduced in SwiftStdlib 6.5.
+/// `isolatedActor`/`isolatedActorWTable`.
+///
+/// Introduced in SwiftStdlib 6.5.
 using TargetExecutorWithIsolationSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
                         /*isolatedActor=*/HeapObject *,
