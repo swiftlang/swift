@@ -31,6 +31,8 @@
 #include "swift/Subsystems.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Basic/DiagnosticOptions.h"
+#include "clang/DependencyScanning/DependencyScanningUtils.h"
+#include "clang/DependencyScanning/DependencyScanningWorker.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -325,53 +327,58 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
 
+  // Capture any diagnostics the Clang scanner emits into a string so that we
+  // can surface them through the Swift diagnostic engine on failure. The
+  // by-name scanning API reports errors via a diagnostic consumer rather than
+  // returning them as an llvm::Error, matching the translation-unit scan below.
+  // FIXME: consider sending the diagnostics consumer owned by
+  // workerDiagnosticEngine instead of creating one here.
+  std::string errorStr;
+  llvm::raw_string_ostream errorOS(errorStr);
+  auto diagOpts = clang::dependencies::createScanningDiagOptions(
+      clangScanningModuleCommandLineArgs);
+  clang::TextDiagnosticPrinter diagConsumer(errorOS, *diagOpts);
+
   // The action controller drives module-output lookups for this query. It only
-  // needs to live for the duration of the scan below: the by-name context APIs
-  // consult it while building/reusing the shared compiler instance and clone it
-  // internally for each individual query.
+  // needs to live for the duration of the scan below: the by-name scan consults
+  // it while building the compiler instance and clones it internally for each
+  // individual query.
   auto controller =
       clangScanningTool.createActionController(lookupModuleOutput);
 
-  auto clangModuleDependencies =
-      [&]() -> llvm::Expected<clang::dependencies::TranslationUnitDeps> {
-    if (ShareClangCompilerInstance) {
-      // Lazily create the persistent by-name scanning context on the first
-      // query. Behind the scenes it maintains a single Clang compiler instance
-      // that is reused across all subsequent by-name lookups performed by this
-      // worker.
-      if (!clangScanningContext) {
-        auto context =
-            clang::tooling::CompilerInstanceWithContext::initializeOrError(
-                clangScanningTool, clangScanningWorkingDirectoryPath,
-                clangScanningModuleCommandLineArgs, *controller);
-        if (!context)
-          return context.takeError();
-        clangScanningContext.emplace(std::move(*context));
-      }
-      return clangScanningContext->computeDependenciesByNameOrError(
-          moduleName.str(), alreadySeenModules, *controller);
-    }
-    return clangScanningTool.getModuleDependencies(
-        moduleName.str(), clangScanningModuleCommandLineArgs,
-        clangScanningWorkingDirectoryPath, alreadySeenModules, *controller);
-  }();
-  if (!clangModuleDependencies) {
-    llvm::handleAllErrors(
-        clangModuleDependencies.takeError(),
-        [this, &moduleName](const llvm::StringError &E) {
-          auto &message = E.getMessage();
-          // Empty messages are cached clang loadModule failures whose
-          // diagnostic was already reported on the first lookup.
-          if (message.empty() ||
-              message.find("fatal error: module '" + moduleName.str().str() +
-                           "' not found") != std::string::npos)
-            return;
-          workerDiagnosticEngine->diagnose(
-              SourceLoc(), diag::clang_dependency_scan_error, message);
-        });
+  clang::dependencies::FullDependencyConsumer depConsumer(alreadySeenModules);
+
+  // The by-name API is a drain: it pulls names from the callback until the
+  // callback is exhausted, reusing one Clang compiler instance for all of them.
+  // Hand it exactly one name, which makes this a single query against a
+  // freshly-built compiler instance.
+  // FIXME: Revise the lamda so that a single call pulls a name from a
+  // concurrent queue till the queue is drained to re-enable Clang compiler
+  // instance sharing.
+  bool delivered = false;
+  auto getNextName = [&]() -> std::optional<std::string> {
+    if (delivered)
+      return std::nullopt;
+    delivered = true;
+    return moduleName.str().str();
+  };
+
+  if (!clangScanningTool.getByNameDependencies(
+          clangScanningWorkingDirectoryPath,
+          clangScanningModuleCommandLineArgs, diagConsumer, *controller,
+          getNextName, depConsumer)) {
+    auto message = errorOS.str();
+    // Empty messages are cached clang loadModule failures whose diagnostic was
+    // already reported on the first lookup.
+    if (!message.empty() &&
+        message.find("fatal error: module '" + moduleName.str().str() +
+                     "' not found") == std::string::npos)
+      workerDiagnosticEngine->diagnose(
+          SourceLoc(), diag::clang_dependency_scan_error, message);
     return std::nullopt;
   }
-  return clangModuleDependencies.get();
+
+  return depConsumer.takeTranslationUnitDeps();
 }
 
 std::optional<clang::dependencies::TranslationUnitDeps>
