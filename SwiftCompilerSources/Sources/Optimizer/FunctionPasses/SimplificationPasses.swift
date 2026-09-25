@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
+import OptimizerBridging
 
 //===--------------------------------------------------------------------===//
 //                        Instruction protocols
@@ -108,7 +109,7 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
 
 let debugReconstructionBlockSimplificationPass = FunctionPass(name: "debug-reconstruction-block-simplification") {
   (function: Function, context: FunctionPassContext) in
-  runDebugReconstructionBlockSimplification(on: function, context)
+  simplifyDebugReconstructionBlocks(in: function, context, useSubpasses: true)
 }
 
 //===--------------------------------------------------------------------===//
@@ -196,7 +197,39 @@ private func cleanupDeadBlocks(in function: Function,
 //          Debug Reconstruction Block Simplification
 //===--------------------------------------------------------------------===//
 
-private func runDebugReconstructionBlockSimplification(on function: Function, _ context: FunctionPassContext) {
+/// Simplifies the content of every debug reconstruction block of `function`, so that a block
+/// which reconstructs nothing but `undef` returns `undef` literally, and an `undef` which the
+/// reconstruction does not depend on leaves no trace. This is what makes it possible to tell
+/// a variable which is optimized away from one which is only partially described.
+///
+/// Dead operands are dropped and a reconstruction block which does nothing is removed. Both
+/// replace the debug value with a new instruction.
+///
+/// `useSubpasses` reports each step as a subpass. It must be false when this does not run as
+/// a pass of its own.
+func simplifyDebugReconstructionBlocks(in function: Function, _ context: FunctionPassContext,
+                                       useSubpasses: Bool) {
+  for inst in function.instructions {
+    guard let debugValue = inst as? DebugValueInst,
+          debugValue.debugReconstructionBlock != nil else {
+      continue
+    }
+    // Use a subpass for each debug_value (operand simplification) and for each instruction in the reconstruction block.
+    if useSubpasses, !context.continueWithNextSubpassRun(for: debugValue) {
+      return
+    }
+    _ = simplifyDebugReconstructionBlock(of: debugValue, context, useSubpasses: useSubpasses)
+  }
+}
+
+/// Simplifies the debug reconstruction block of `debugValue`, see
+/// `simplifyDebugReconstructionBlocks(in:_:useSubpasses:)`.
+/// Returns the debug value, which is a new instruction if it was replaced.
+func simplifyDebugReconstructionBlock(of debugValue: DebugValueInst, _ context: FunctionPassContext,
+                                      useSubpasses: Bool) -> DebugValueInst {
+  guard let debugBB = debugValue.debugReconstructionBlock else {
+    return debugValue
+  }
   var worklist = InstructionWorklist(context)
   defer { worklist.deinitialize() }
 
@@ -205,43 +238,32 @@ private func runDebugReconstructionBlockSimplification(on function: Function, _ 
     worklist.pushIfNotVisited($0)
   })
 
-  for inst in function.instructions {
-    guard let debugValue = inst as? DebugValueInst,
-          let debugBB = debugValue.debugReconstructionBlock else {
+  // Canonicalize the operand list first.
+  debugValue.mergeDuplicateOperands(context)
+  debugValue.propagateUndefOperands(context)
+
+  // Simplify the block's content.
+  for debugInst in debugBB.instructions.reversed() {
+    worklist.pushIfNotVisited(debugInst)
+  }
+  while let instruction = worklist.popAndForget() {
+    if instruction.isDeleted {
       continue
     }
-    // Use a subpass for each debug_value (operand simplification) and for each instruction in the reconstruction block.
-    if !context.continueWithNextSubpassRun(for: debugValue) {
-      return
-    }
-
-    // Canonicalize the operand list first.
-    debugValue.mergeDuplicateOperands(context)
-    debugValue.propagateUndefOperands(context)
-
-    // Simplify the block's content.
-    for debugInst in debugBB.instructions.reversed() {
-      worklist.pushIfNotVisited(debugInst)
-    }
-    while let instruction = worklist.popAndForget() {
-      if instruction.isDeleted {
-        continue
+    if let simplifiable = instruction as? DebugReconstructionBlockSimplifiable {
+      if useSubpasses, !context.continueWithNextSubpassRun(for: instruction) {
+        return debugValue
       }
-      if let simplifiable = instruction as? DebugReconstructionBlockSimplifiable {
-        if !context.continueWithNextSubpassRun(for: instruction) {
-          return
-        }
-        simplifiable.simplifyForDebugReconstructionBlock(simplifyCtxt)
-      }
+      simplifiable.simplifyForDebugReconstructionBlock(simplifyCtxt)
     }
-
-    // Cleanup dead instructions and operands.
-    for instruction in debugBB.instructions.reversed() where instruction.isTriviallyDead {
-      context.erase(instruction: instruction)
-    }
-    debugValue.eraseDeadOperands(context)
-              .collapseTrivialReconstruction(context)
   }
+
+  // Cleanup dead instructions and operands.
+  for instruction in debugBB.instructions.reversed() where instruction.isTriviallyDead {
+    context.erase(instruction: instruction)
+  }
+  return debugValue.eraseDeadOperands(context)
+                   .collapseTrivialReconstruction(context)
 }
 
 private extension DebugValueInst {
@@ -298,15 +320,16 @@ private extension DebugValueInst {
   }
 
   /// Drops a reconstruction block which does nothing.
+  /// Returns the debug value, which may be a new instruction if it was reallocated.
   ///
   /// ```
   ///   debug_value %0, ..., transform { bb0(%a): return %a }  ->  debug_value %0
   ///   debug_value (), ..., transform { bb0: return undef }   ->  debug_value undef
   /// ```
-  func collapseTrivialReconstruction(_ context: FunctionPassContext) {
+  func collapseTrivialReconstruction(_ context: FunctionPassContext) -> DebugValueInst {
     guard let debugBB = debugReconstructionBlock,
           let returnInst = debugBB.terminator as? ReturnInst else {
-      return
+      return self
     }
     if operands.count == 1, returnInst.returnedValue == debugBB.arguments[0] {
       // Remove the no-op reconstruction block.
@@ -314,7 +337,23 @@ private extension DebugValueInst {
     } else if operands.isEmpty, let undef = returnInst.returnedValue as? Undef {
       // This is just undef, no need for a reconstruction block.
       clearDebugReconstructionBlock(context)
-      _ = replaceOperands(with: [undef], context)
+      return replaceOperands(with: [undef], context)
     }
+    return self
   }
+}
+
+/// Lets the C++ side simplify debug reconstruction blocks outside of the simplification pass.
+func registerDebugReconstructionSimplification() {
+  BridgedOptimizerUtilities.registerDebugReconstructionSimplification(
+    { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) in
+      let context = FunctionPassContext(_bridged: bridgedCtxt)
+      simplifyDebugReconstructionBlocks(in: bridgedFunction.function, context, useSubpasses: false)
+    },
+    { (bridgedCtxt: BridgedContext, bridgedInst: BridgedInstruction) -> BridgedInstruction in
+      let context = FunctionPassContext(_bridged: bridgedCtxt)
+      let debugValue = bridgedInst.getAs(DebugValueInst.self)
+      return simplifyDebugReconstructionBlock(of: debugValue, context, useSubpasses: false).bridged
+    }
+  )
 }
