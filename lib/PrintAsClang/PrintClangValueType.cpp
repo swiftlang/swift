@@ -228,7 +228,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     }
   }
-  bool isOpaqueLayout = !typeSizeAlign.has_value();
+  bool isOpaqueLayout = declAndTypePrinter.isOpaqueLayout(typeDecl);
+  // A noncopyable type is exposed as a move-only C++ class. Because Swift's
+  // moves are destructive and C++'s are not, such a class carries a flag that
+  // records whether it was moved from, so that its destructor can be a no-op.
+  bool isNoncopyable =
+      cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
+  assert((!isNoncopyable || !isOpaqueLayout) &&
+         "noncopyable types with an opaque layout are not exposed to C++");
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
@@ -237,6 +244,16 @@ void ClangValueTypePrinter::printValueTypeDecl(
       interopContext.getIrABIDetails()
           .getTypeMetadataAccessFunctionGenericRequirementParameters(
               const_cast<NominalTypeDecl *>(typeDecl));
+  // Takes the stream explicitly, as the nested namespace printers shadow 'os'.
+  auto printVWTable = [&](raw_ostream &os) {
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+        Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+  };
+  std::string baseName;
+  {
+    llvm::raw_string_ostream baseNameOS(baseName);
+    ClangSyntaxPrinter(Context, baseNameOS).printBaseName(typeDecl);
+  }
 
   ClangSyntaxPrinter printer(Context, os);
   printer.printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &os) {
@@ -275,8 +292,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
                                         StringRef vwTableName = "vwTable",
                                         StringRef enumVWTableName =
                                             "enumVWTable") {
-      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-          os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+      printVWTable(os);
       os << "    const auto *" << enumVWTableName << " = reinterpret_cast<";
       ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
       os << "EnumValueWitnessTable";
@@ -299,50 +315,86 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
-    os << '~';
-    printer.printBaseName(typeDecl);
-    os << "() noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+    os << '~' << baseName << "() noexcept {\n";
+    if (isNoncopyable)
+      os << "    if (_isMovedFrom) return;\n";
+    printVWTable(os);
     os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
     os << "  }\n";
 
-    // copy constructor.
-    os << "  ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << "(const ";
-    printer.printBaseName(typeDecl);
-    os << " &other) noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
-    if (isOpaqueLayout) {
-      os << "    _storage = ";
-      printer.printSwiftImplQualifier();
-      os << cxx_synthesis::getCxxOpaqueStorageClassName()
-         << "(vwTable->size, vwTable->getAlignment());\n";
+    if (isNoncopyable) {
+      os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
+      os << "  " << baseName << " &operator =(const " << baseName
+         << " &) = delete;\n";
+
+      // move constructor.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(" << baseName << " &&other) noexcept {\n";
+      // The standard library moves from moved-from objects too, for example
+      // when a vector reallocates.
+      os << "    if (other._isMovedFrom) {\n";
+      os << "      _isMovedFrom = true;\n";
+      os << "      return;\n";
+      os << "    }\n";
+      printVWTable(os);
+      os << "    vwTable->initializeWithTake(_getOpaquePointer(), "
+            "const_cast<char *>(other._getOpaquePointer()), metadata._0);\n";
+      os << "    other._isMovedFrom = true;\n";
+      os << "  }\n";
+
+      // move assignment.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(" << baseName
+         << " &&other) noexcept {\n";
+      os << "    if (this == &other) return *this;\n";
+      printVWTable(os);
+      // The destination may itself be moved from, as in 'std::swap'. Destroy
+      // explicitly: 'assignWithTake' does not run a declared 'deinit'.
+      os << "    if (!_isMovedFrom)\n";
+      os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "    if (other._isMovedFrom) {\n";
+      os << "      _isMovedFrom = true;\n";
+      os << "      return *this;\n";
+      os << "    }\n";
+      os << "    vwTable->initializeWithTake(_getOpaquePointer(), "
+            "const_cast<char *>(other._getOpaquePointer()), metadata._0);\n";
+      os << "    _isMovedFrom = false;\n";
+      os << "    other._isMovedFrom = true;\n";
+      os << "  return *this;\n";
+      os << "  }\n";
+    } else {
+      // copy constructor.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(const " << baseName << " &other) noexcept {\n";
+      printVWTable(os);
+      if (isOpaqueLayout) {
+        os << "    _storage = ";
+        printer.printSwiftImplQualifier();
+        os << cxx_synthesis::getCxxOpaqueStorageClassName()
+           << "(vwTable->size, vwTable->getAlignment());\n";
+      }
+      os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+            "const_cast<char "
+            "*>(other._getOpaquePointer()), metadata._0);\n";
+      os << "  }\n";
+
+      // copy assignment.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(const " << baseName
+         << " &other) noexcept {\n";
+      printVWTable(os);
+      os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
+            "*>(other._getOpaquePointer()), metadata._0);\n";
+      os << "  return *this;\n";
+      os << "  }\n";
+
+      // FIXME: implement the move assignment.
+      // FIXME: implement the move constructor.
     }
-    os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-          "const_cast<char "
-          "*>(other._getOpaquePointer()), metadata._0);\n";
-    os << "  }\n";
-
-    // copy assignment.
-    os << "  ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " &operator =(const ";
-    printer.printBaseName(typeDecl);
-    os << " &other) noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
-    os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
-          "*>(other._getOpaquePointer()), metadata._0);\n";
-    os << "  return *this;\n";
-    os << "  }\n";
-
-    // FIXME: implement the move assignment.
-    // FIXME: implement the move constructor.
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
@@ -371,8 +423,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << " _make() noexcept {";
     if (isOpaqueLayout) {
       os << "\n";
-      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-          os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+      printVWTable(os);
       os << "    return ";
       printer.printBaseName(typeDecl);
       os << "(vwTable);\n  }\n";
@@ -431,6 +482,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "alignas(" << typeSizeAlign->alignment << ") ";
       os << "char _storage[" << typeSizeAlign->size << "];\n";
     }
+    // The moved-from flag has to come after the Swift value, so that the
+    // address of this class stays the address of the value itself.
+    if (isNoncopyable)
+      os << "  bool _isMovedFrom = false;\n";
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printCxxImplClassName(os, typeDecl);
@@ -489,8 +544,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
-          ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-              Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+          printVWTable(os);
           os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
                 "metadata._0);\n";
           os << "  }\n";
@@ -599,8 +653,13 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
           os << '>';
         },
         " && ");
-  } else
-    os << "true";
+  } else {
+    // A noncopyable argument would make the generic type conditionally
+    // noncopyable.
+    os << (cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl)
+               ? "false"
+               : "true");
+  }
   os << ";\n";
 
   os << "#pragma clang diagnostic pop\n";

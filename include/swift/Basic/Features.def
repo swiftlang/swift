@@ -545,6 +545,9 @@ LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inh
 /// Enable @cxx @implementation for implementing C++ functions in Swift.
 EXPERIMENTAL_FEATURE(CxxImplementation, true)
 
+/// Expose noncopyable Swift structs and enums to C++ as move-only C++ classes.
+EXPERIMENTAL_FEATURE(GenerateBindingsForNoncopyableTypesInCXX, true)
+
 /// Allow a Swift class to subclass a C++ foreign reference type.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 
