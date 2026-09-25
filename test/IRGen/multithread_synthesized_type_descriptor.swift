@@ -19,6 +19,9 @@
 // RUN:   -o %t/a_first.ll -o %t/def.ll
 // RUN: %FileCheck %s < %t/def.ll
 
+// rdar://188377218
+// UNSUPPORTED: OS=wasip1
+
 //--- a_first.swift
 // This file is first, so it is the "primary" IRGen output module. The nested
 // type's descriptor must NOT be pulled into here.
