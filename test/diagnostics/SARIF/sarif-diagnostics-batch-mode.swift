@@ -18,13 +18,14 @@
 // HELPER-NOT: mainUnused
 // HELPER-NOT: shouldNotShowUpInOutput
 
-// A primary cut short by an error in another primary still gets an empty log.
+// A primary cut short by an error in another primary gets a zero-byte log, which
+// is how the driver spots an incomplete compilation without parsing it.
 // RUN: echo 'let bad: Int = "oops"' > %t/bad.swift
 // RUN: not %target-swift-frontend -typecheck -serialize-diagnostics=sarif \
 // RUN:   -primary-file %t/bad.swift -serialize-diagnostics-path %t/bad.sarif \
 // RUN:   -primary-file %S/Inputs/sarif-diagnostics-batch-mode-helper.swift \
 // RUN:     -serialize-diagnostics-path %t/cutshort.sarif
-// RUN: %normalize_sarif %t/cutshort.sarif | %diff -U1 -b %S/Inputs/expected-sarif/sarif-diagnostics-empty.sarif -
+// RUN: test -e %t/cutshort.sarif -a ! -s %t/cutshort.sarif
 
 // REQUIRES: swift_sarif
 

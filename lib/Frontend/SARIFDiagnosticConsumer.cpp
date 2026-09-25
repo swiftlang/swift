@@ -75,26 +75,32 @@ public:
            "called finishProcessing() multiple times");
     CalledFinishProcessing = true;
 
-    // In batch mode, if any error occurs then no primaries can be compiled. The
-    // serialized diagnostics consumer still writes its file in that case, so
-    // that the driver can tell a primary that compiled cleanly from one whose
-    // job never ran, without parsing the file. Match that by dropping what was
-    // queued and writing an empty log. Dropping it also keeps the bridge from
-    // asserting over unflushed diagnostics on teardown.
-    if (!CompilationWasComplete)
-      Bridge.clearQueuedDiagnostics();
+    // Create the file before anything that can fail, as the
+    // SerializedDiagnosticsConsumer does.
+    std::error_code EC;
+    std::unique_ptr<llvm::raw_fd_ostream> OS;
+    OS.reset(new llvm::raw_fd_ostream(SARIFDiagnosticsPath, EC,
+                                      llvm::sys::fs::OF_None));
+    if (EC)
+      return reportFailure(EC.message());
 
+    // In batch mode, if any error occurs then no primaries can be compiled. In
+    // that case we match the existing behavior of serialized diagnostics
+    // consumer by leaving a zero-byte file so the driver can differentiate a
+    // primary that compiled cleanly from one that did not.
+    if (!CompilationWasComplete) {
+      Bridge.clearQueuedDiagnostics();
+      return false;
+    }
+
+    // 'take' empties the queue on success and failure alike.
     auto sarif =
         Bridge.takeQueuedDiagnosticsAsSARIF(version::getSwiftFullVersion());
     if (!sarif)
       return reportFailure(llvm::toString(sarif.takeError()));
 
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(SARIFDiagnosticsPath, EC, llvm::sys::fs::OF_None);
-    if (EC)
-      return reportFailure(EC.message());
-
-    OS << *sarif;
+    *OS << *sarif;
+    OS->flush();
 
     return false;
   }
