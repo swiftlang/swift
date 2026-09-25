@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -49,10 +50,13 @@ void DiagnosticBridge::addQueueDiagnostic(const DiagnosticInfo &info,
     fixIts.push_back(BridgedFixIt{ fixIt.getRange(), fixIt.getText() });
   }
 
+  StringRef diagnosticID = DiagnosticEngine::diagnosticIDStringFor(info.ID);
+
   swift_ASTGen_addQueuedDiagnostic(
       queuedDiagnostics, perFrontendState,
       text.str(),
       info.Kind, info.Loc,
+      diagnosticID,
       bridgedDiagGroupChain.data(), bridgedDiagGroupChain.size(),
       info.Ranges.data(), info.Ranges.size(),
       llvm::ArrayRef<BridgedFixIt>(fixIts));
@@ -108,7 +112,7 @@ void DiagnosticBridge::emitDiagnosticWithoutLocation(
 
 void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
                                          const DiagnosticInfo &Info,
-                                         unsigned innermostBufferID) {
+                                         std::optional<unsigned> innermostBufferID) {
   // If we didn't have per-frontend state before, create it now.
   if (!perFrontendState) {
     perFrontendState = swift_ASTGen_createPerFrontendDiagnosticState();
@@ -119,8 +123,63 @@ void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
   if (!queuedDiagnostics)
     queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
 
-  queueBuffer(SM, innermostBufferID);
+  // A diagnostic without a source location has no buffer to queue;
+  // addQueueDiagnostic records it without a location, which is how it reaches
+  // the serialized log.
+  if (innermostBufferID)
+    queueBuffer(SM, *innermostBufferID);
+
   addQueueDiagnostic(Info, SM);
+}
+
+llvm::Expected<std::string>
+DiagnosticBridge::takeQueuedDiagnosticsAsSARIF(StringRef compilerVersion) {
+  // The queue is consumed whether or not rendering succeeds, so release it on
+  // every path out of here; the destructor asserts nothing is left unflushed.
+  auto consumeQueue = llvm::make_scope_exit([&] { clearQueuedDiagnostics(); });
+
+#if !SWIFT_BUILD_SARIF
+  return llvm::createStringError(
+      llvm::inconvertibleErrorCode(),
+      "this compiler was built without SARIF support");
+#else
+  BridgedStringRef bridgedOutput{nullptr, 0};
+  BridgedStringRef bridgedError{nullptr, 0};
+
+  const bool result = swift_ASTGen_renderQueuedDiagnosticsAsSARIF(
+      queuedDiagnostics, compilerVersion, &bridgedOutput, &bridgedError);
+
+  if (!result) {
+    std::string errorMessage;
+
+    if (auto error = bridgedError.unbridged(); error.data()) {
+      errorMessage = error.str();
+      swift_ASTGen_freeBridgedString(error);
+    } else {
+      errorMessage = "could not serialize SARIF diagnostics";
+    }
+
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   errorMessage);
+  }
+
+  std::string output;
+  auto rendered = bridgedOutput.unbridged();
+  if (rendered.data()) {
+    output = rendered.str();
+    swift_ASTGen_freeBridgedString(rendered);
+  }
+  return output;
+#endif
+}
+
+void DiagnosticBridge::clearQueuedDiagnostics() {
+  if (!queuedDiagnostics)
+    return;
+
+  swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
+  queuedDiagnostics = nullptr;
+  queuedBuffers.clear();
 }
 
 void DiagnosticBridge::flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
@@ -137,9 +196,7 @@ void DiagnosticBridge::flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
     OS.write(renderedString.data(), renderedString.size());
     swift_ASTGen_freeBridgedString(renderedString);
   }
-  swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
-  queuedDiagnostics = nullptr;
-  queuedBuffers.clear();
+  clearQueuedDiagnostics();
 
   if (includeTrailingBreak)
     OS << "\n";

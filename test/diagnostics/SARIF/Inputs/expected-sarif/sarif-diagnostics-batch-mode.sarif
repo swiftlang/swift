@@ -1,0 +1,57 @@
+{
+  "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+        {
+          "location" : {
+            "uri" : "file:///TEST_DIR/sarif-diagnostics-batch-mode.swift"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        }
+      ],
+      "columnKind" : "utf16CodeUnits",
+      "results" : [
+        {
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 8,
+                  "endLine" : 32,
+                  "startColumn" : 7,
+                  "startLine" : 32
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "initialization of immutable value 'mainUnused' was never used; consider replacing with assignment to '_' or removing it"
+          },
+          "ruleId" : "pbd_never_used",
+          "ruleIndex" : 0
+        }
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "rules" : [
+            {
+              "id" : "pbd_never_used"
+            }
+          ],
+          "version" : "Swift version SWIFT_VERSION"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}
