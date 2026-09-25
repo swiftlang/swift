@@ -5020,8 +5020,10 @@ sil-instruction ::= 'unconditional_checked_cast'
 ```
 
 Performs a checked scalar conversion, causing a runtime failure if the
-conversion fails. Casts that require changing representation or
-ownership are unsupported.
+conversion fails. For reference values, the cast consumes an owned operand and
+produces an owned result. It may forward a guaranteed operand only when the
+conversion preserves reference counts. In particular, COM casts can return a
+different interface or native object and must acquire ownership of the result.
 
 ### unconditional_checked_cast_addr
 

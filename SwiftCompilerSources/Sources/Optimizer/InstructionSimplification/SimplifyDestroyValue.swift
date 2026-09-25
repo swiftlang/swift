@@ -176,13 +176,15 @@ private extension Value {
     // an infinite simplification loop in MandatoryPerformanceOptimizations because there we "split" such
     // destroys again when de-virtualizing deinits of non-copyable types.
     //
+    case let cast as UnconditionalCheckedCastInst:
+      return cast.preservesReferenceCounts ? cast : nil
+
     case is TupleInst,
          is RefToBridgeObjectInst,
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,
          is UpcastInst,
          is UncheckedRefCastInst,
-         is UnconditionalCheckedCastInst,
          is BridgeObjectToRefInst,
          is InitExistentialRefInst,
          is OpenExistentialRefInst:

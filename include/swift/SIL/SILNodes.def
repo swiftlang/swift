@@ -434,10 +434,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     // _ = Y
     // release X // This release cannot be reordered with the cast.
     //
-    // With Semantic SIL, this pattern of unbalanced retain/release
-    // should never happen.  Since unconditional_checked_cast is a
-    // scalar cast that doesn't affect the value's representation, its
-    // side effect can then be modeled as None.
+    // Casts that do not preserve ownership can execute foreign code and
+    // release their source. SILInstruction overrides these default effects
+    // for those casts.
     DYNAMICCAST_SINGLE_VALUE_INST(UnconditionalCheckedCastInst, unconditional_checked_cast,
                       SingleValueInstruction, MayRead, DoesNotRelease)
 
