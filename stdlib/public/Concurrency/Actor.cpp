@@ -365,10 +365,12 @@ SerialExecutorRef _swift_getActiveExecutor() {
     return executor;
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // If there's no tracking and we're on the main thread, then the main
   // executor is notionally active.
   if (isExecutingOnMainThread())
     return swift_getMainExecutor();
+#endif
 
   return SerialExecutorRef::generic();
 }
