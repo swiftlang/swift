@@ -47,3 +47,44 @@ func caller() {
   _ = greet(name: "World")
   // CHECK: function_ref @$s16objc_global_func5greet4nameS2S_tF
 }
+
+// The entry-point choice is based on the declaration's interface type, not a
+// concrete type substituted by a generic caller. Even though T is constrained
+// to NSObject, consumeAny still needs its native Swift entry point because Any
+// is bridged in the declared signature.
+// CHECK-LABEL: sil hidden [ossa] @$s16objc_global_func17directGenericCallyyxSo8NSObjectCRbzlF
+// CHECK: function_ref @$s16objc_global_func10consumeAnyyyypF
+// CHECK-NOT: function_ref @$s16objc_global_func10consumeAnyyyypFTo
+func directGenericCall<T: NSObject>(_ value: T) {
+  consumeAny(value)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s16objc_global_func10consumeAnyyyypF
+
+// The same rule applies when the function is used as a value and converted to
+// a function over the caller's generic parameter.
+// CHECK-LABEL: sil hidden [ossa] @$s16objc_global_func24indirectGenericReferenceyyxSo8NSObjectCRbzlF
+// CHECK: function_ref @$s16objc_global_func10consumeAnyyyypF
+// CHECK-NOT: function_ref @$s16objc_global_func10consumeAnyyyypFTo
+func indirectGenericReference<T: NSObject>(_ value: T) {
+  let function: (T) -> Void = consumeAny
+  function(value)
+}
+
+func applyGeneric<T>(_ function: (T) -> Void, to value: T) {
+  function(value)
+}
+
+// This contextually converts the reference to (NSObject) -> Void while
+// specializing applyGeneric with T == NSObject. The reference must still use
+// consumeAny's native entry point; the concrete substitution cannot switch it
+// to the foreign thunk.
+// CHECK-LABEL: sil hidden [ossa] @$s16objc_global_func24concreteGenericReferenceyySo8NSObjectCF
+// CHECK: function_ref @$s16objc_global_func10consumeAnyyyypF
+// CHECK-NOT: function_ref @$s16objc_global_func10consumeAnyyyypFTo
+func concreteGenericReference(_ value: NSObject) {
+  applyGeneric(consumeAny, to: value)
+}
+
+// CHECK-LABEL: sil hidden [thunk] [asmname "consumeAny"] [ossa] @$s16objc_global_func10consumeAnyyyypFTo
+@objc(consumeAny) func consumeAny(_ value: Any) {}

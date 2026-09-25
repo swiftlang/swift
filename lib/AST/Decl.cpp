@@ -11611,10 +11611,12 @@ std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
 bool AbstractFunctionDecl::signatureRequiresObjCBridging() const {
   auto *dc = getDeclContext();
 
-  // Check whether any type in the signature needs bridging when going from
-  // Swift to Objective-C. Types that are trivially representable in ObjC
-  // (e.g. Int, NSObject, pointers) don't need a thunk. Types that are
-  // bridged (e.g. String <-> NSString, Array <-> NSArray) do.
+  // Inspect interface types, not types substituted into a particular
+  // reference: a substitution cannot turn a bridged declaration into a
+  // single-C-entry-point declaration.
+  //
+  // Types trivially representable in ObjC (Int, NSObject, pointers) need no
+  // thunk; bridged types (String <-> NSString, Array <-> NSArray) do.
 
   // Check return type.
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
