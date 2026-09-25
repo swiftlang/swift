@@ -102,7 +102,11 @@ static bool findOverlayFilesInDirectory(ASTContext &ctx, StringRef path,
     if (lookupTypeForExtension(path::extension(file)) != TY_SwiftOverlayFile)
       continue;
 
-    callback(file);
+    // Construct the result from the input directory path because directory
+    // iterators may return an absolute entry for a relative directory.
+    SmallString<128> overlayPath{path};
+    path::append(overlayPath, path::filename(file));
+    callback(overlayPath);
   }
 
   // A CAS file list returns operation not permitted on directory iterations.
