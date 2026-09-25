@@ -1,0 +1,161 @@
+// RUN: %target-swift-frontend -parse-stdlib -enable-objc-interop -gnone %s -emit-ir -module-name test | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+// Blocks whose capture is a function with no context are emitted as global
+// blocks, using _NSConcreteGlobalBlock, rather than being formed on the stack
+// and copied to the heap.
+
+import Builtin
+
+// Global blocks have no copy/dispose helpers, and their flags are
+// BLOCK_IS_GLOBAL | BLOCK_HAS_SIGNATURE.
+// CHECK: [[GLOBAL_DESCRIPTOR:@block_descriptor[.0-9]*]] = internal constant { [[WORD:i32|i64]], [[WORD]], ptr } { [[WORD]] 0, [[WORD]] {{32|48}}, ptr {{@.*}} }
+// CHECK: @_NSConcreteGlobalBlock = external global %objc_class
+// CHECK: [[GLOBAL_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke, ptr [[GLOBAL_DESCRIPTOR]] }, %swift.function { ptr @callee, ptr null } }
+// CHECK: [[CONVERTED_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke, ptr {{@block_descriptor[.0-9]*}} }, %swift.function { ptr @sendable_callee, ptr null } }
+// CHECK: @_NSConcreteStackBlock = external global %objc_class
+// CHECK-NOT: _NSConcreteGlobalBlock
+
+sil @callee : $@convention(thin) () -> ()
+sil @other_callee : $@convention(thin) () -> ()
+sil @sendable_callee : $@convention(thin) @Sendable () -> ()
+sil @callee_with_context : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+sil @use_storage : $@convention(thin) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: define{{.*}} ptr @global_block()
+// CHECK-NOT:     _Block_copy
+// CHECK-NOT:     objc_retainBlock
+// CHECK:         ret ptr [[GLOBAL_BLOCK]]
+sil @global_block : $@convention(thin) () -> @owned @convention(block) () -> () {
+entry:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed () -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %thick to %capture
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  %load = load %capture
+  strong_release %load
+  dealloc_stack %storage
+  return %copy
+}
+
+// A block with the same invoke function and capture reuses the global block.
+// CHECK-LABEL: define{{.*}} ptr @same_global_block()
+// CHECK-NOT:     _Block_copy
+// CHECK-NOT:     objc_retainBlock
+// CHECK:         ret ptr [[GLOBAL_BLOCK]]
+sil @same_global_block : $@convention(thin) () -> @owned @convention(block) () -> () {
+entry:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed () -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %thick to %capture
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  destroy_addr %capture
+  dealloc_stack %storage
+  return %copy
+}
+
+// CHECK-LABEL: define{{.*}} ptr @converted_global_block()
+// CHECK-NOT:     _Block_copy
+// CHECK-NOT:     objc_retainBlock
+// CHECK:         ret ptr [[CONVERTED_BLOCK]]
+sil @converted_global_block : $@convention(thin) () -> @owned @convention(block) () -> () {
+entry:
+  %f = function_ref @sendable_callee : $@convention(thin) @Sendable () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed @Sendable () -> ()
+  %converted = convert_function %thick to $@callee_guaranteed () -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %converted to %capture
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  dealloc_stack %storage
+  return %copy
+}
+
+// A capture with a context needs a stack block.
+// CHECK-LABEL: define{{.*}} ptr @capturing_block(ptr %0)
+// CHECK:         store ptr @_NSConcreteStackBlock
+// CHECK:         call ptr @_Block_copy
+sil @capturing_block : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned @convention(block) () -> () {
+entry(%0 : $Builtin.NativeObject):
+  %f = function_ref @callee_with_context : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  strong_retain %0
+  %closure = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %closure to %capture
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  destroy_addr %capture
+  dealloc_stack %storage
+  return %copy
+}
+
+// Storing to the capture more than once needs a stack block.
+// CHECK-LABEL: define{{.*}} ptr @stored_twice()
+// CHECK:         store ptr @_NSConcreteStackBlock
+// CHECK:         call ptr @_Block_copy
+sil @stored_twice : $@convention(thin) () -> @owned @convention(block) () -> () {
+entry:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed () -> ()
+  %g = function_ref @other_callee : $@convention(thin) () -> ()
+  %other = thin_to_thick_function %g to $@callee_guaranteed () -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %thick to %capture
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  store %other to %capture
+  %copy = copy_block %block
+  dealloc_stack %storage
+  return %copy
+}
+
+// Storage whose address escapes needs a stack block.
+// CHECK-LABEL: define{{.*}} ptr @escaping_storage()
+// CHECK:         store ptr @_NSConcreteStackBlock
+// CHECK:         call ptr @_Block_copy
+sil @escaping_storage : $@convention(thin) () -> @owned @convention(block) () -> () {
+entry:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed () -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %thick to %capture
+  %use = function_ref @use_storage : $@convention(thin) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %r = apply %use(%storage) : $@convention(thin) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  dealloc_stack %storage
+  return %copy
+}
+
+// Block storage that isn't a local allocation needs a stack block.
+// CHECK-LABEL: define{{.*}} ptr @storage_argument(ptr
+// CHECK:         store ptr @_NSConcreteStackBlock
+// CHECK:         call ptr @_Block_copy
+sil @storage_argument : $@convention(thin) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> @owned @convention(block) () -> () {
+entry(%storage : $*@block_storage @callee_guaranteed () -> ()):
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %thick to %capture
+  %invoke = function_ref @invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  return %copy
+}
