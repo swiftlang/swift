@@ -24,6 +24,7 @@
 #include "SILGenDynamicCast.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
@@ -402,24 +403,64 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
   return ManagedValue::forOwnedAddressRValue(v, enterDestroyCleanup(v));
 }
 
+void SILGenFunction::emitBorrowInto(Expr *E, Initialization *I,
+                                    SILLocation loc) {
+  // The initializer of an implicit binding in a desugared for-each loop is an
+  // opaque placeholder for an expression of the original loop; borrow the
+  // expression it stands for.
+  if (auto *opaque = dyn_cast<OpaqueValueExpr>(E)) {
+    if (auto *underlying = OpaqueExprs.lookup(opaque))
+      E = underlying;
+  }
+
+  FormalEvaluationScope writeback(*this);
+  ManagedValue MV;
+  bool borrowsTemporary;
+  if (StorageRefResult::findStorageReferenceExprForBorrow(SGM.M, E)) {
+    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    borrowsTemporary = !lv.isPhysical();
+    MV = emitBorrowedLValue(E, std::move(lv));
+  } else {
+    // The initializer doesn't refer to storage, so there is nothing to borrow
+    // in place; materialize the value and borrow that.
+    MV = emitRValueAsSingleValue(E);
+    borrowsTemporary = true;
+  }
+
+  // A borrow of storage depends on the access to that storage, which must
+  // stay live for the lifetime of the binding. A temporary has no such
+  // access, so the binding's own borrow scope stands for its lifetime.
+  if (borrowsTemporary && MV.getType().isObject() &&
+      MV.getOwnershipKind() != OwnershipKind::None) {
+    auto *borrow = B.createBeginBorrow(loc, MV.getValue(), IsNotLexical,
+                                       DoesNotHavePointerEscape, IsFromVarDecl);
+    MV = emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+        loc, MV.getValue(), borrow);
+  } else if (MV.hasCleanup()) {
+    MV = MV.formalAccessBorrow(*this, loc);
+  }
+
+  I->copyOrInitValueInto(*this, loc, MV, /*isInit*/ true);
+  std::move(writeback).deferPop();
+}
+
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
                                   std::optional<SILLocation> L) {
   SILLocation loc = L ? *L : E;
+
+  // A borrow binding must not copy its initializer, so it is handled ahead of
+  // the lvalue copy below.
+  if (I->isBorrow()) {
+    emitBorrowInto(E, I, loc);
+    return;
+  }
+
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
     emitCopyLValueInto(loc, std::move(lv), I);
-    return;
-  }
-
-  if (I->isBorrow()) {
-    FormalEvaluationScope writeback(*this);
-    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
-    ManagedValue MV = emitBorrowedLValue(E, std::move(lv));
-    I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
-    std::move(writeback).deferPop();
     return;
   }
 

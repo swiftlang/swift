@@ -1885,6 +1885,9 @@ public:
   void emitExprInto(Expr *E, Initialization *I,
                     std::optional<SILLocation> L = std::nullopt);
 
+  /// Borrow the given expression into a borrow binding's Initialization.
+  void emitBorrowInto(Expr *E, Initialization *I, SILLocation loc);
+
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
 
