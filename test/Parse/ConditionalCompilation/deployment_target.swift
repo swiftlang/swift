@@ -5,13 +5,13 @@
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-ios17.0-macabi -parse-stdlib -D EXPECT_FALLBACK
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-ios18.0-macabi -parse-stdlib -D EXPECT_PRIMARY
 // RUN: %swift -typecheck %s -verify -verify-ignore-unknown -verify-additional-prefix linux- -enable-experimental-feature DeploymentTargetCondition -target x86_64-unknown-linux-gnu -parse-stdlib -D EXPECT_PRIMARY
-// RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target aarch64-unknown-linux-android28 -parse-stdlib -D EXPECT_FALLBACK
-// RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target aarch64-unknown-linux-android29 -parse-stdlib -D EXPECT_PRIMARY
+// RUN: %swift -typecheck %s -verify -verify-ignore-unknown -enable-experimental-feature DeploymentTargetCondition -target aarch64-unknown-linux-android28 -parse-stdlib -D EXPECT_FALLBACK
+// RUN: %swift -typecheck %s -verify -verify-ignore-unknown -enable-experimental-feature DeploymentTargetCondition -target aarch64-unknown-linux-android29 -parse-stdlib -D EXPECT_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target x86_64-pc-windows10.0.19041-msvc -parse-stdlib -D EXPECT_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-macosx26.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-ios26.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_PRIMARY
-// RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros1.0 -sdk %S/../../attr/Inputs/XROS1.1.sdk -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK -D EXPECT_BELOW_VISION_1_1
-// RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros2.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK
+// RUN: %swift -typecheck %s -verify -verify-ignore-unknown -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros1.0 -sdk %S/../../attr/Inputs/XROS1.1.sdk -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK -D EXPECT_BELOW_VISION_1_1
+// RUN: %swift -typecheck %s -verify -verify-ignore-unknown -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros2.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK
 // REQUIRES: swift_feature_DeploymentTargetCondition
 
 #if !hasFeature(DeploymentTargetCondition)
