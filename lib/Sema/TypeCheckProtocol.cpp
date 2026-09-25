@@ -5381,8 +5381,17 @@ static void diagnoseConformanceIsolationErrors(
     }
 
     // Suggest isolating the conformance, if possible.
+    auto sendableMetatypeProto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+    auto *explicitConformance = conformance;
+
+    while (explicitConformance->getSourceKind() == ConformanceEntryKind::Implied)
+      explicitConformance = explicitConformance->getImplyingConformance();
+
+    bool refinesSendableMetatype =
+        sendableMetatypeProto &&
+        explicitConformance->getProtocol()->inheritsFrom(sendableMetatypeProto);
     if (potentialIsolation && potentialIsolation->isGlobalActor() &&
-        !conformance->isIsolated()) {
+        !conformance->isIsolated() && !refinesSendableMetatype) {
       bool isMainActor = false;
       Type globalActorType = potentialIsolation->getGlobalActor();
       if (auto nominal = globalActorType->getAnyNominal())
