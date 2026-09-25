@@ -1,0 +1,65 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -sil-verify-all -enable-experimental-feature SplitContinuations | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: PTRSIZE=64
+// REQUIRES: swift_feature_SplitContinuations
+// The extern_weak checks below assert Darwin's back-deployment weak-linking
+// convention; Linux emits an ordinary declare for the same symbol.
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=xros
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @split_create()
+// CHECK:   call swiftcc ptr @swift_continuation_createSplit(ptr
+// CHECK: }
+// CHECK: declare extern_weak swiftcc ptr @swift_continuation_createSplit(ptr)
+sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+bb0:
+  %mt = metatype $@thin Builtin.Int32.Type
+  %tok = builtin "createSplitContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  return %tok : $Builtin.RawUnsafeContinuation
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @split_destroy(ptr %0)
+// CHECK:   call swiftcc void @swift_continuation_destroySplit(ptr %0)
+// CHECK: }
+// CHECK: declare extern_weak swiftcc void @swift_continuation_destroySplit(ptr)
+sil @split_destroy : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () {
+bb0(%continuation : $Builtin.RawUnsafeContinuation):
+  %d = builtin "destroySplitContinuation"(%continuation : $Builtin.RawUnsafeContinuation) : $()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: define{{.*}} swifttailcc void @split_await(ptr swiftasync %0, ptr %1)
+// CHECK:   [[CTXADDR:%.*]] = getelementptr inbounds nuw %swift.task, ptr %1, i32 0, i32 {{[0-9]+}}
+// CHECK:   [[CTX:%.*]] = load ptr, ptr [[CTXADDR]]
+// CHECK:   [[PARENT:%.*]] = getelementptr inbounds nuw %swift.continuation_context, ptr [[CTX]], i32 0, i32 0
+// CHECK:   [[PARENTFIELD:%.*]] = getelementptr inbounds nuw %swift.context, ptr [[PARENT]], i32 0, i32 0
+// CHECK:   store ptr {{%.*}}, ptr [[PARENTFIELD]]
+// CHECK:   [[RESUMEFIELD:%.*]] = getelementptr inbounds nuw %swift.context, ptr [[PARENT]], i32 0, i32 1
+// CHECK:   store ptr @split_awaitTQ0_, ptr [[RESUMEFIELD]]
+// CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1)
+// CHECK: }
+
+// CHECK-LABEL: define internal swifttailcc void @split_awaitTQ0_(ptr swiftasync %0)
+// CHECK:   [[RESULTADDR:%.*]] = getelementptr inbounds nuw %swift.continuation_context, ptr {{%.*}}, i32 0, i32 4
+// CHECK:   [[RESULT:%.*]] = load ptr, ptr [[RESULTADDR]]
+// CHECK:   [[VALUE:%.*]] = load i32, ptr [[RESULT]]
+// CHECK:   store i32 [[VALUE]]
+// CHECK: }
+// CHECK: declare extern_weak swifttailcc void @swift_continuation_awaitSplit(ptr)
+sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+entry(%continuation : $Builtin.RawUnsafeContinuation):
+  %a = alloc_stack $Builtin.Int32
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  %t = tuple ()
+  return %t : $()
+}

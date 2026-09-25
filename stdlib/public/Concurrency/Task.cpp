@@ -23,6 +23,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "Debug.h"
 #include "Error.h"
+#include "ExecutorTracking.h"
 #include "TaskGroupPrivate.h"
 #include "TaskLocal.h"
 #include "TaskPrivate.h"
@@ -2517,6 +2518,9 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
 
 SWIFT_CC(swift)
 static void swift_continuation_resumeImpl(AsyncTask *task) {
+  if (tryResumeSplitContinuation(task, /*error=*/nullptr))
+    return;
+
   continuationChecking::willResume(task);
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, false);
@@ -2525,6 +2529,9 @@ static void swift_continuation_resumeImpl(AsyncTask *task) {
 
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
+  if (tryResumeSplitContinuation(task, /*error=*/nullptr))
+    return;
+
   continuationChecking::willResume(task);
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, false);
@@ -2535,6 +2542,9 @@ static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
                                                 /* +1 */ SwiftError *error) {
+  if (tryResumeSplitContinuation(task, error))
+    return;
+
   continuationChecking::willResume(task);
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, true);
@@ -2688,6 +2698,7 @@ static void swift_task_removePriorityEscalationHandlerImpl(
   removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
 }
+
 
 SWIFT_CC(swift)
 static bool swift_task_cancellationShieldPushImpl() {
