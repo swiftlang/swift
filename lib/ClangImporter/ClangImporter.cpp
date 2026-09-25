@@ -7191,6 +7191,9 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
         if (name.isCompoundName() && isa<AbstractFunctionDecl>(vd) &&
             vd->getName() != name)
           continue;
+        // A member inherited from a base class belongs to another C++ class.
+        if (vd->getDeclContext()->getSelfNominalTypeDecl() != ty)
+          continue;
         results.insert(vd);
       }
     };

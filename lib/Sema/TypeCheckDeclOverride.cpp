@@ -1505,6 +1505,10 @@ bool swift::checkOverrides(ValueDecl *decl) {
   if (decl->getAttrs().hasAttribute<NonOverrideAttr>())
     return false;
 
+  // Neither does a @cxx implementation; see OverriddenDeclsRequest.
+  if (decl->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return false;
+
   // If we already computed overridden declarations and either succeeded
   // or invalidated the attribute, there's nothing more to do.
   if (decl->overriddenDeclsComputed()) {
@@ -2551,6 +2555,11 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     return abiOverriddenDecls;
   }
+
+  // A @cxx implementation is the body of a C++ method, whose C++ declaration
+  // says what it overrides; the Swift function overrides nothing.
+  if (decl->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return {};
 
   auto &ctx = decl->getASTContext();
   auto overridden = computeOverriddenDecls(decl, false);

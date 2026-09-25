@@ -3,6 +3,11 @@ module ForeignReference {
   requires cplusplus
 }
 
+module ForeignReferenceVirtual {
+  header "foreign-reference-virtual.h"
+  requires cplusplus
+}
+
 module Functions {
   header "functions.h"
   requires cplusplus
