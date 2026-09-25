@@ -48,10 +48,12 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
     Explosion temp;
     asDerived().Derived::loadAsCopy(IGF, src, temp);
-    asDerived().Derived::initialize(IGF, temp, dest, isOutlined);
+    asDerived().Derived::initialize(IGF, temp, dest,
+                                    suppressOutlinedValueOperationCalls);
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,

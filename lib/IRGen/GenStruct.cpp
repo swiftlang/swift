@@ -632,7 +632,8 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dst, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       emitCopyWithCopyFunction(IGF, T, src, dst);
     }
 
@@ -948,7 +949,7 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr, SILType T,
-                            bool isOutlined) const override {
+                            bool suppressOutlinedValueOperationCalls) const override {
       if (auto copyConstructor = findCopyConstructor()) {
         emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
                                           srcAddr.getAddress(),
@@ -958,7 +959,7 @@ namespace {
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                          ClangFieldInfo>::initializeWithCopy(IGF, destAddr,
                                                              srcAddr, T,
-                                                             isOutlined);
+                                                             suppressOutlinedValueOperationCalls);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,

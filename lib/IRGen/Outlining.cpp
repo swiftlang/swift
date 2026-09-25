@@ -292,8 +292,21 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
           env->getGenericSignature().getCanonicalSignature()};
 }
 
+bool TypeInfo::canUseOutlinedValueOperation(SILType T) const {
+  // Unimported Clang fields use opaque storage with an empty SILType, so there
+  // is no AST type with which to identify an outlined function or call a value
+  // witness.
+  if (!T)
+    return false;
+
+  // Handling a constrained existential through an outlined function or value
+  // witness could require swift_getExtendedExistentialTypeMetadata(), which is
+  // unavailable when back-deploying to older runtimes.
+  return !T.hasParameterizedExistential();
+}
+
 bool TypeInfo::withWitnessableMetadataCollector(
-    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t mayNeedLayout,
+    IRGenFunction &IGF, SILType T,
     DeinitIsNeeded_t needsDeinit,
     llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
   bool needsCollector = false;
@@ -307,7 +320,6 @@ bool TypeInfo::withWitnessableMetadataCollector(
   } else if (!T.hasArchetype()) {
     needsCollector = true;
     // The implementation will call vwt in this case.
-    needsLayout = LayoutIsNotNeeded;
   }
 
   if (needsCollector) {
@@ -328,7 +340,7 @@ void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
   if (withWitnessableMetadataCollector(
-          IGF, T, LayoutIsNeeded, DeinitIsNotNeeded, [&](auto collector) {
+          IGF, T, DeinitIsNotNeeded, [&](auto collector) {
             collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit,
                                              isTake);
           })) {
@@ -551,7 +563,7 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
     return;
 
   if (withWitnessableMetadataCollector(
-          IGF, T, LayoutIsNeeded, DeinitIsNeeded, [&](auto collector) {
+          IGF, T, DeinitIsNeeded, [&](auto collector) {
             collector.emitCallToOutlinedDestroy(addr, T, *this);
           })) {
     return;

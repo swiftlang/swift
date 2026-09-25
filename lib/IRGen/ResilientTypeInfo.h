@@ -93,7 +93,8 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
     emitInitializeWithCopyCall(IGF, T, dest, src);
   }
 
