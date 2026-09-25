@@ -1851,6 +1851,12 @@ bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
     offset += entry->fixedSize(IGM)->getValue();
   }
 
+  // Account for trailing padding.
+  uint64_t paddedSize = fixedSize(IGM)->getValue();
+  if (offset < paddedSize) {
+    B.addSkip(paddedSize - offset);
+  }
+
   return true;
 }
 
