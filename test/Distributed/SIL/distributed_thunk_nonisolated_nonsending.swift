@@ -39,7 +39,7 @@ distributed actor LessHopper {
 }
 
 // ==== ------------------------------------------------------------------------
-// MARK: A `@Resolvable protocol` with a concrete actor system`where ActorSystem == ...`.
+// MARK: A `@Resolvable protocol` with a concrete actor system `where ActorSystem == ...`.
 
 // Legacy @concurrency remoteCall
 // CHECK-DAG: sil hidden [thunk] [distributed] {{.*}}@$s{{.*}}9HopWorkerPAA11Distributed01_{{.*}}ActorStubRzrlE4workSSyYaKFTE : $@convention(method) @async <Self where

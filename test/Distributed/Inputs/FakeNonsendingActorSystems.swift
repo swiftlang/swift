@@ -13,33 +13,14 @@
 //===----------------------------------------------------------------------===//
 
 // Actor systems whose ad-hoc `remoteCall` requirements are declared
-// 'nonisolated(nonsending)'. They live apart from `FakeDistributedActorSystems`
-// on purpose: driving the recipient side from a caller-isolated witness means
-// handing generic conformances to `executeDistributedTarget`, which is
-// `@concurrent`, and that draws isolated-conformance warnings. Those are
-// inherent to mixing the two isolation conventions rather than a defect here,
-// but tests that run with `-verify` should not have to tolerate them, and most
-// of them import `FakeDistributedActorSystems` without needing any of this.
+// 'nonisolated(nonsending)'.
 
 import Distributed
 import FakeDistributedActorSystems
 
 // ==== -----------------------------------------------------------------------
 // MARK: 'nonisolated(nonsending)' actor systems
-//
-// A system may declare its ad-hoc `remoteCall` requirements
-// 'nonisolated(nonsending)'. The concrete actor system is statically known when
-// a distributed thunk is synthesized, so the thunk then inherits that isolation
-// too: instead of hopping to the generic executor before calling `remoteCall`,
-// it forwards the caller's isolation straight through. The two systems below
-// mirror `FakeActorSystem` and `FakeRoundtripActorSystem` so that a test can
-// pair a hopping and a non-sending system in one process.
 
-/// Minimal 'nonisolated(nonsending)' system, mirroring `FakeActorSystem`.
-///
-/// Its `remoteCall` bodies throw, so it is meant for compile-time tests
-/// (SILGen, IRGen, type checking). Use `FakeNonsendingRoundtripActorSystem`
-/// when the call has to actually execute.
 @available(SwiftStdlib 6.0, *)
 public struct FakeNonsendingActorSystem: DistributedActorSystem, CustomStringConvertible {
   public typealias ActorID = ActorAddress

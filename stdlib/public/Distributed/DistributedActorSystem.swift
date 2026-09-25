@@ -472,9 +472,11 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   ///
   /// ### Nonisolated nonsending witnesses
   /// It is possible to witness this requirement using a `nonisolated(nonsending)` function.
-  /// Doing so will result much of the generated code supporting remote call to also adopt
-  /// `nonisolated(nonsending)` resulting in improved latency due to less actor isolation
-  /// changes on remote call paths.
+  /// Doing so will result in less actor hops when distributed functions are invoked on remote targets,
+  /// as the `remoteCall` function is able to continue executing on the calling context.
+  /// This also implies that any "heavy" work should be performed asynchronously to not block the calling context
+  /// for an unnecessarily long amount of time, however it gives system implementations more flexibility
+  /// to carefully manage isolation/threading for optimal performance.
   ///
   /// > Tip: When writing a new `DistributedActorSystem` it is recommended to witness the
   /// >      `remoteCall` functions using `nonisolated(nonsending)` witnesses.
@@ -559,10 +561,6 @@ extension DistributedActorSystem {
   /// is that thanks to this approach it can avoid any existential boxing, and can serve the most
   /// latency sensitive-use-cases.
   ///
-  /// This method executes on the caller's isolation. When it is invoked from the actor system's
-  /// own executor, the distributed target is entered directly on the target actor, without first
-  /// switching to the global concurrent executor.
-  ///
   /// - Parameters:
   ///   - actor: actor on which the remote call should invoke the target
   ///   - target: the target (method) identifier that should be invoked
@@ -579,15 +577,9 @@ extension DistributedActorSystem {
   ///           does not resolve to a valid distributed function accessor, i.e. the
   ///           call identifier is incorrect, corrupted, or simply not present in this process.
 #if $Embedded
-  // Embedded Swift: Since there are no accessible-function records emitted in embedded,
-  // we forward the call to the synthesized `_executeDistributedTarget` on the target actor.
-  // `@_transparent` so the trivial forward is mandatory-inlined into the caller: that lets
-  // this be called even from a still-generic context (e.g. a system's `actorReady<Act>`
-  // witness closure), where a non-inlined reference to this generic function would have no
-  // valid monomorphic Embedded signature.
   @_transparent
   @available(SwiftStdlib 6.5, *)
-  public func executeDistributedTarget<Act>(
+  public nonisolated(nonsending) func executeDistributedTarget<Act>(
     on actor: Act,
     target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
@@ -600,17 +592,66 @@ extension DistributedActorSystem {
       resultHandler: handler)
   }
 #else
-  // `nonisolated(nonsending)` does not affect the mangled symbol name of a
-  // plain top-level function declaration (only of function *values*), so
-  // adding it here is purely a calling-convention change under the same,
-  // already-shipped ABI symbol. `@backDeployed` alone is sufficient: clients
-  // built against a deployment target below 6.5 get their own compiled copy
-  // of this body (which cannot yet observe the nonsending behavior since it
-  // never existed for them), while newer clients call straight into the
-  // exported symbol, which now runs on the caller's isolation.
   @available(SwiftStdlib 5.7, *)
-  @backDeployed(before: SwiftStdlib 6.5)
+  @export(implementation)
+  @abi(
+    nonisolated(nonsending) func executeDistributedTargetNonsending<Act>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocationDecoder: inout InvocationDecoder,
+      handler: Self.ResultHandler
+    ) async throws where Act: DistributedActor
+  )
   public nonisolated(nonsending) func executeDistributedTarget<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    handler: Self.ResultHandler
+  ) async throws where Act: DistributedActor {
+    // Must match `SwiftStdlib 6.5`; availability macros cannot be used in an
+    // '@export(implementation)' body
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+      try await _executeDistributedTargetNonsending(
+        on: actor,
+        target: target,
+        invocationDecoder: &invocationDecoder,
+        handler: handler)
+    } else {
+      try await __abi_executeDistributedTarget(
+        on: actor,
+        target: target,
+        invocationDecoder: &invocationDecoder,
+        handler: handler)
+    }
+  }
+
+  // Old version for ABI compatibility, always runs on the global concurrent executor
+  @available(SwiftStdlib 5.7, *)
+  @usableFromInline
+  @abi(
+    func executeDistributedTarget<Act>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocationDecoder: inout InvocationDecoder,
+      handler: Self.ResultHandler
+    ) async throws where Act: DistributedActor
+  )
+  internal func __abi_executeDistributedTarget<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    handler: Self.ResultHandler
+  ) async throws where Act: DistributedActor {
+    try await _executeDistributedTargetImpl(
+      on: actor,
+      target: target,
+      invocationDecoder: &invocationDecoder,
+      handler: handler)
+  }
+
+  @available(SwiftStdlib 6.5, *)
+  @usableFromInline
+  internal nonisolated(nonsending) func _executeDistributedTargetNonsending<Act>(
     on actor: Act,
     target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
@@ -624,7 +665,6 @@ extension DistributedActorSystem {
   }
 
   @available(SwiftStdlib 5.7, *)
-  @usableFromInline
   internal nonisolated(nonsending) func _executeDistributedTargetImpl<Act>(
     on actor: Act,
     target: RemoteCallTarget,

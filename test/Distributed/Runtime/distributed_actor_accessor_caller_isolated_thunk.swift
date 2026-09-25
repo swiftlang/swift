@@ -111,13 +111,13 @@ extension LessHopper {
     print("hop void ok")
 
     // ---- non-sending system: caller-isolated thunk ABI ------------------
-    let nsSys = FakeNonsendingRoundtripActorSystem()
-    nsSys.onRemoteCall = { _ in
+    let nonsendingSystem = FakeNonsendingRoundtripActorSystem()
+    nonsendingSystem.onRemoteCall = { _ in
       // The sending side must not have hopped away from the caller
       MainActor.preconditionIsolated("remoteCall lost the caller's isolation")
     }
-    let nsLocal = LessHopper(actorSystem: nsSys)
-    let ns = try LessHopper.resolve(id: nsLocal.id, using: nsSys)
+    let nsLocal = LessHopper(actorSystem: nonsendingSystem)
+    let ns = try LessHopper.resolve(id: nsLocal.id, using: nonsendingSystem)
 
     // zero-argument, non-void: the implicit actor parameter must not be
     // decoded as if it were an argument

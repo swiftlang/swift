@@ -329,10 +329,7 @@ private:
                            ArrayRef<ProtocolDecl *> protocols,
                            Explosion &witnessTables);
 
-  /// True when the accessor itself takes a leading isolated `(any Actor)?`
-  /// parameter, which is only the case when the target thunk is
-  /// `nonisolated(nonsending)` and the deployment target's runtime knows to
-  /// pass it. Otherwise the accessor has the legacy shape.
+  /// True when the accessor itself takes a leading `isolated (any Actor)?` parameter.
   bool hasIsolatedActorParameter() const {
     return AccessorType->maybeGetIsolatedParameter().has_value();
   }
@@ -346,8 +343,7 @@ private:
                         llvm::Value *isolatedActorWTable);
 
   /// Dynamically call `Actor.unownedExecutor` through the given witness
-  /// table, returning the resulting `Builtin.Executor` as a (identity,
-  /// implementation) pair.
+  /// table, returning the resulting `Builtin.Executor`.
   std::pair<llvm::Value *, llvm::Value *>
   emitLoadOfUnownedExecutor(llvm::Value *actor, llvm::Value *actorWTable);
 
@@ -383,14 +379,12 @@ private:
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed target.
 ///
-/// `hasIsolatedActorParameter` is true when the target thunk is
+/// `hasIsolatedActorParameter` is true when the distributed thunk is
 /// `nonisolated(nonsending)` and the deployment target's runtime has
 /// `swift_distributed_execute_target_with_isolation`. In that case the
-/// accessor's calling convention grows a leading isolated `(any Actor)?`
-/// parameter carrying the target actor when it is local (or `nil` when it is
-/// remote / unknown-local). After decoding the arguments, the accessor hops to
-/// that isolation and forwards it into the thunk's own leading
-/// `Builtin.ImplicitActor` slot.
+/// accessor has a leading isolated `(any Actor)?` parameter carrying the
+/// target actor when it is local (or `nil` when it is remote, since we
+/// cannot isolate to a remote ref).
 static CanSILFunctionType getAccessorType(IRGenModule &IGM,
                                           bool hasIsolatedActorParameter) {
   auto &Context = IGM.Context;
@@ -405,10 +399,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   //   <actor>,           <- self of the actor to invoke the target on
   //   isolated (any Actor)? <- same actor, erased to `any Actor` when local,
   //                           nil when remote; only present when the target
-  //                           is `nonisolated(nonsending)`; makes the
-  //                           accessor a genuinely isolated async function
-  //                           that hops to it (or to the generic executor,
-  //                           if nil) before calling the target
+  //                           distributed thunk is `nonisolated(nonsending)`
   // ) async throws
 
   SmallVector<GenericFunctionType::Param, 8> parameters;
@@ -439,15 +430,12 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   // number of witness tables
   parameters.push_back(GenericFunctionType::Param(Context.getUIntType()));
 
-  // actor
+  // actor (DistributedActor)
   auto actorTypeParam = Context.getAnyObjectType();
     parameters.push_back(
         GenericFunctionType::Param(actorTypeParam));
 
-  // isolated actor (only when the target is `nonisolated(nonsending)`):
-  // the same actor as above, but typed as `(any Actor)?` and marked
-  // `isolated` so the accessor genuinely hops to it (or to the generic
-  // executor, when nil) before calling the target
+  // isolated actor (same as `actor` but typed as `isolated (any Actor)?`)
   if (hasIsolatedActorParameter) {
     parameters.push_back(GenericFunctionType::Param(
         SILType::getOpaqueIsolationType(Context).getASTType(),
@@ -533,10 +521,8 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
     }
   }
 
-  // Determine whether the target thunk carries a leading isolated
-  // `Builtin.ImplicitActor` parameter (i.e. it is `nonisolated(nonsending)`).
-  // Accessors for such thunks grow a leading isolated `(any Actor)?`
-  // parameter carrying the isolation actor - see `getAccessorType`.
+  // Determine whether the target thunk has a leading isolated `Builtin.ImplicitActor`.
+  // If so, the accessor must gain an additional leading `isolated (any Actor)?` parameter.
   CanSILFunctionType targetTy;
   if (auto *thunk = target.dyn_cast<SILFunction *>()) {
     targetTy = (dispatchTo ? dispatchTo : thunk)->getLoweredFunctionType();
@@ -553,16 +539,13 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   }
 
   // Only runtimes that have `swift_distributed_execute_target_with_isolation`
-  // know to pass the isolated parameter; an older runtime would invoke the
-  // accessor with the legacy argument layout. When deploying to such runtimes
-  // the accessor keeps the legacy shape, and itself provides the thunk's
-  // isolation by switching to the generic executor.
+  // know to pass the isolated parameter;
   bool hasIsolatedActorParameter =
       targetHasIsolatedActorParameter &&
       isDistributedAccessorIsolationFeatureAvailable(Context);
 
-  auto *f = getAddrOfDistributedTargetAccessor(accessorRef, ForDefinition,
-                                               hasIsolatedActorParameter);
+  auto *f = getAddrOfDistributedTargetAccessor(
+    accessorRef, ForDefinition, hasIsolatedActorParameter);
 
   if (!f->isDeclaration())
     return;
@@ -889,16 +872,12 @@ DistributedAccessor::emitLoadOfUnownedExecutor(llvm::Value *actor,
       }
     }
   }
-  assert(unownedExecutorVar && "Concurrency library broken");
+  assert(unownedExecutorVar && "Can't find unownedExecutor of Actor");
 
   SILDeclRef getterRef(unownedExecutorVar->getAccessor(AccessorKind::Get));
   auto fnType = IGM.getSILTypes().getConstantFunctionType(
       IGM.getMaximalTypeExpansionContext(), getterRef);
 
-  // `Actor` is a resilient protocol in the Concurrency library, so its
-  // witness table layout isn't known statically - dispatch through the
-  // ABI-stable dispatch thunk instead of loading a witness slot directly
-  // (mirrors `AccessorTarget::getPointerToTarget`'s resilient branch).
   FunctionPointer witness;
   if (IGM.isResilient(actorProtocol, ResilienceExpansion::Maximal)) {
     auto *fnPtr = IGM.getAddrOfDispatchThunk(getterRef, NotForDefinition);
@@ -1100,10 +1079,7 @@ void DistributedAccessor::emit() {
   auto *numWitnessTables = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
-  // The same actor as above, erased to `(any Actor)?` - (instance pointer,
-  // witness table) pair, nil when the actor is remote. This is the
-  // accessor's own leading isolated parameter, only present when the target
-  // thunk is `nonisolated(nonsending)` and the runtime passes it.
+  // The same actor as above, erased to `(any Actor)?`; or nil when the actor is remote.
   llvm::Value *isolatedActor = nullptr;
   llvm::Value *isolatedActorWTable = nullptr;
   if (hasIsolatedActorParameter()) {
@@ -1138,12 +1114,6 @@ void DistributedAccessor::emit() {
     arguments.add(typedResultBuffer);
   }
 
-  // When the target thunk is `nonisolated(nonsending)` it expects a leading
-  // `Builtin.ImplicitActor` argument - a scalar pair (actorPointer,
-  // actorWitnessTable). The accessor with an isolated `(any Actor)?`
-  // parameter already has exactly that pair, so it is simply forwarded.
-  // A legacy-shaped accessor passes nil, it enters the target from the
-  // generic executor.
   if (Target.hasIsolatedActorParameter()) {
     if (hasIsolatedActorParameter()) {
       arguments.add(isolatedActor);
@@ -1154,11 +1124,11 @@ void DistributedAccessor::emit() {
     }
   }
 
-  // There is always at least one parameter associated with accessor - `self`
-  // of the distributed actor - plus any implicit leading parameters, none of
-  // which are encoded in the invocation.
-  if (targetTy->getNumParameters() >
-      1 + (Target.hasIsolatedActorParameter() ? 1 : 0)) {
+  // Parameters to skip in decoding:
+  auto numLeadingParamsToSkip =
+      1 + // self
+      (Target.hasIsolatedActorParameter() ? 1 : 0); // implicit leading isolation
+  if (targetTy->getNumParameters() > numLeadingParamsToSkip) {
     /// The argument decoder associated with the distributed actor
     /// this accessor belong to.
     ArgumentDecoderInfo decoder =
@@ -1203,10 +1173,8 @@ void DistributedAccessor::emit() {
                             expandedSignature.numWitnessTablePtrs, arguments);
   }
 
-  // A `nonisolated(nonsending)` target must be entered on the isolation that
-  // is passed to it. Only switch to it now, after decoding the arguments, so
-  // that decoding runs on the caller's executor rather than on the target
-  // actor.
+  // A `nonisolated(nonsending)` target must be entered on the expected isolation (it does not hop by itself).
+  // We make the hop after decoding was done.
   if (Target.hasIsolatedActorParameter())
     emitIsolationHop(isolatedActor, isolatedActorWTable);
 
