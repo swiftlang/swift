@@ -55,10 +55,10 @@ struct Statics: MyProto {
 // CHECK-NEXT:  }
 // CHECK:       "label": "baz1",
 // CHECK-NEXT:  "type": "ExtractStaticFunctions.Baz",
-// CHECK:       "valueKind": "MemberReference"
+// CHECK:       "valueKind": "InitCall",
 // CHECK-NEXT:  "value": {
-// CHECK-NEXT:    "baseType": "ExtractStaticFunctions.Baz",
-// CHECK-NEXT:    "memberLabel": "one"
+// CHECK-NEXT:    "type": "ExtractStaticFunctions.Baz",
+// CHECK-NEXT:    "arguments": []
 // CHECK-NEXT:  }
 // CHECK:       "label": "baz2",
 // CHECK-NEXT:  "type": "ExtractStaticFunctions.Baz",
