@@ -740,6 +740,20 @@ public:
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
+  /// The inverse of \c virtualThunkToOriginal.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualOriginalToThunk;
+
+  /// Functions created while synthesizing the body of a member inherited from
+  /// a C++ base class (e.g. `__synthesizedBaseCall_<name>`), mapped to the
+  /// first such member. Filled in lazily, when the body is synthesized.
+  llvm::DenseMap<const FuncDecl *, AbstractFunctionDecl *>
+      inheritedMemberForHelper;
+
+  /// Members inherited from a C++ base class, mapped to the function that
+  /// their synthesized body calls.
+  llvm::DenseMap<const AbstractFunctionDecl *, FuncDecl *>
+      helperForInheritedMember;
+
   /// Accessors and operator functions synthesized around an imported function,
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
