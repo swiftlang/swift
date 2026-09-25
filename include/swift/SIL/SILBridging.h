@@ -1250,13 +1250,11 @@ struct BridgedConstExprFunctionState {
   swift::ConstExprEvaluator * _Nonnull constantEvaluator;
   unsigned int * _Nonnull numEvaluatedSILInstructions;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  SWIFT_IMPORT_UNSAFE
   static BridgedConstExprFunctionState create();
 
-  BRIDGED_INLINE
   bool isConstantValue(BridgedValue value);
 
-  BRIDGED_INLINE
   void deinitialize();
 };
 
@@ -1710,7 +1708,7 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
-  static BRIDGED_INLINE void salvageDebugInfo(BridgedInstruction inst);
+  static void salvageDebugInfo(BridgedInstruction inst);
 
   // Sets
 
