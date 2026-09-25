@@ -34,10 +34,54 @@ class NotSendable {}
   }
 }
 
+@available(SwiftStdlib 6.5, *)
+@MainActor func testContinuationInitTypedThrows() {
+  _ = AsyncThrowingStream<Void, SomeError> { _ in }
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testUnfoldingInitTypedThrows() {
+  _ = AsyncThrowingStream<Void, SomeError>.init(unfolding: {})
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testMakeStreamTypedThrows() {
+  _ = AsyncThrowingStream.makeStream(of: Void.self, throwing: SomeError.self)
+  _ = AsyncThrowingStream<Void, SomeError>.makeStream()
+}
+
 @MainActor var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
+    if #available(SwiftStdlib 6.5, *) {
+      tests.test("continuation typed throws") {
+        let stream = AsyncThrowingStream<Void, SomeError> { continuation in
+          continuation.finish(throwing: SomeError())
+        }
+        do throws(SomeError) {
+          for try await _ in stream {}
+          expectUnreachable("stream should have thrown")
+        } catch {
+          // access member of `SomeError`
+          _ = error.value
+        }
+      }
+
+      tests.test("unfolding typed throws") {
+        let stream = AsyncThrowingStream { () throws(SomeError) in
+          throw SomeError()
+        }
+        do throws(SomeError) {
+          for try await _ in stream {}
+          expectUnreachable("stream should have thrown")
+        } catch {
+          // access member of `SomeError`
+          _ = error.value
+        }
+      }
+    }
+
     if #available(SwiftStdlib 6.2, *) {
       final class Expectation: @unchecked Sendable {
         var fulfilled = false
