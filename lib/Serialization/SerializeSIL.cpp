@@ -635,6 +635,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isRuntimeAccessible(),
       (unsigned)F.forceEnableLexicalLifetimes(), OnlyReferencedByDebugInfo,
       (unsigned)F.getFunctionStage(),
+      (unsigned)F.hasOwnershipForTrivialValues(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
       clangNodeOwnerID, parentModuleID, SemanticsIDs);
 

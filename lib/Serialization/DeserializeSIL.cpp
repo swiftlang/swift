@@ -826,7 +826,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, serializedStage;
+      onlyReferencedByDebugInfo, serializedStage,
+      hasOwnershipForTrivialValues;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -836,7 +837,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, serializedStage, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
+      funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
       parentModuleID, SemanticsIDs);
 
@@ -1020,6 +1022,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
     fn->setMarkedAsUsed(bool(markedAsUsed));
+    fn->setOwnershipForTrivialValues(bool(hasOwnershipForTrivialValues));
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
@@ -1454,8 +1457,9 @@ bool SILDeserializer::readBlockArgs(SILBasicBlock *CurrentBB, SILFunction *Fn,
       fArg->setFormalParameterPack(isFormalParameterPack);
       bool isInferredImmutable = (Args[I + 1] >> 18) & 0x1;
       fArg->setInferredImmutable(isInferredImmutable);
+      fArg->setOwnershipKind(OwnershipKind);
       Arg = fArg;
-    } else {
+    } else { f
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
                                          /*decl*/ nullptr, reborrow,
                                          pointerEscape);
@@ -4371,7 +4375,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, serializedStage;
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -4381,7 +4385,8 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, serializedStage, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
+      funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangOwnerID, parentModuleID,
       SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
