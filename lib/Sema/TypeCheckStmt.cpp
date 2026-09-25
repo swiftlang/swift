@@ -3784,7 +3784,6 @@ class DesugarForEachStmt {
   bool isAsync;
   bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
-  VarDecl *sequenceVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
   WhileStmt *innerLoop = nullptr;
@@ -3838,11 +3837,8 @@ public:
     }
 
     buildMakeIteratorVar();
-    buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 3> stmts;
-    if (auto *sequenceBinding = buildSequenceBinding())
-      stmts.push_back(sequenceBinding);
+    SmallVector<ASTNode, 2> stmts;
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
 
@@ -4002,65 +3998,12 @@ private:
     return nextCall;
   }
 
-  void buildOpaqueSequenceExpr() {
-    auto *sequence = stmt->getSequence();
-    auto *opaqueSeqExpr = new (ctx)
-        OpaqueValueExpr(sequence->getSourceRange(), sequence->getType());
-    stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
-  }
-
-  /// Whether the sequence expression reads a parameter directly.
-  bool sequenceReadsNoImplicitCopyBinding() const {
-    auto *expr = stmt->getSequence()->getSemanticsProvidingExpr();
-    // A mutable binding is loaded before it is used as an rvalue.
-    if (auto *load = dyn_cast<LoadExpr>(expr))
-      expr = load->getSubExpr()->getSemanticsProvidingExpr();
-
-    auto *declRef = dyn_cast<DeclRefExpr>(expr);
-    if (!declRef)
-      return false;
-
-    auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl());
-    return paramDecl;
-  }
-
-  /// Bind the sequence to an implicit local whose scope encloses the loop.
-  ///
-  /// Returns `nullptr` if no binding is needed.
-  PatternBindingDecl *buildSequenceBinding() {
-    // Only a borrowing iterator holds onto the sequence for the duration of
-    // the loop.
-    if (!isBorrowing)
-      return nullptr;
-
-    // A sequence read directly from a parameter needs no binding of its own:
-    // the parameter's scope already covers the loop.
-    if (sequenceReadsNoImplicitCopyBinding())
-      return nullptr;
-
-    std::string name;
-    {
-      if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
-        name = "$" + np->getBoundName().str().str();
-      name += "$sequence";
-    }
-
-    auto introducer = stmt->getSequence()->getType()->isNoncopyable()
-                          ? VarDecl::Introducer::Borrowing
-                          : VarDecl::Introducer::Let;
-    sequenceVar = new (ctx) VarDecl(/*isStatic=*/false, introducer,
-                                    stmt->getSequence()->getStartLoc(),
-                                    ctx.getIdentifier(name), dc);
-    sequenceVar->setImplicit();
-
-    Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
-    return PatternBindingDecl::createImplicit(
-        ctx, StaticSpellingKind::None, pattern, stmt->getOpaqueSequenceExpr(),
-        dc);
-  }
-
   PatternBindingDecl *buildMakeIterator() {
-    auto seqType = stmt->getSequence()->getType();
+    auto *sequence = stmt->getSequence();
+    auto seqType = sequence->getType();
+    auto *opaqueSeqExpr =
+        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
@@ -4076,18 +4019,8 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
-    // Call `makeIterator()` on the sequence binding when there is one, so that
-    // the iterator depends on that binding's scope rather than on a temporary.
-    Expr *base;
-    if (sequenceVar) {
-      base = new (ctx) DeclRefExpr(sequenceVar, DeclNameLoc(stmt->getForLoc()),
-                                   /*Implicit=*/true);
-    } else {
-      base = stmt->getOpaqueSequenceExpr();
-    }
-
     auto *makeIteratorRef = new (ctx)
-        MemberRefExpr(base, stmt->getForLoc(), witness,
+        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
                       DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
 
     Expr *makeIteratorCall =
