@@ -105,6 +105,15 @@ extension SwitchEnumInst : OnoneSimplifiable, SILCombineSimplifiable {
 
     let ownedEnum = beginBorrow.borrowedValue
     let switchBlock = parentBlock
+
+    // Erasing the borrow salvages its debug uses onto the owned enum. Those
+    // uses must not occur after the switch, which now consumes the enum.
+    if beginBorrow.uses.users(ofType: DebugValueInst.self).contains(where: {
+      $0.parentBlock != switchBlock
+    }) {
+      return false
+    }
+
     var caseBlocksWithLifetimeEnds = BasicBlockSet(context)
     defer { caseBlocksWithLifetimeEnds.deinitialize() }
 
