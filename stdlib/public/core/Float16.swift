@@ -31,8 +31,7 @@ public struct Float16 {
 
   @_transparent
   public init() {
-    let zero: Int64 = 0
-    self._value = Builtin.sitofp_Int64_FPIEEE16(zero._value)
+    self._value = Builtin.zeroInitializer()
   }
 
   @_transparent
@@ -696,7 +695,7 @@ extension Float16 {
 @available(SwiftStdlib 5.3, *)
 extension Float16 {
   @_transparent
-  public static prefix func - (x: Float16) -> Float16 {
+  public static prefix func -(x: Float16) -> Float16 {
     return Float16(Builtin.fneg_FPIEEE16(x._value))
   }
 }
@@ -711,18 +710,15 @@ extension Float16: Sendable { }
 // Construction from other concrete types.
 @available(SwiftStdlib 5.3, *)
 extension Float16 {
-
-  // We "shouldn't" need this, but the typechecker barfs on an expression
-  // in the test suite without it.
-  // If replaced with @inline(__always) the init no longer gets
-  // inlined in -Onone and this breaks the abi_v7k test in a subtle way.
   @_transparent
   public init(_ v: Int) {
+#if _pointerBitWidth(_64)
     _value = Builtin.sitofp_Int64_FPIEEE16(v._value)
+#else
+    _value = Builtin.sitofp_Int32_FPIEEE16(v._value)
+#endif
   }
 
-  // Fast-path for conversion when the source is representable as int,
-  // falling back on the generic _convert operation otherwise.
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<Source: BinaryInteger>(_ value: Source) {
@@ -742,8 +738,6 @@ extension Float16 {
     }
   }
 
-  // Fast-path for conversion when the source is representable as int,
-  // falling back on the generic _convert operation otherwise.
   @export(implementation) @inline(never)
   public init?<Source: BinaryInteger>(exactly value: Source) {
     if value.bitWidth <= 64 {
@@ -759,13 +753,13 @@ extension Float16 {
       // representable). For Float16, we also need to check for overflow to
       // -.infinity.
       if Source.isSigned {
-        let extended = Int(truncatingIfNeeded: value)
+        let extended = Int64(truncatingIfNeeded: value)
         _value = Builtin.sitofp_Int64_FPIEEE16(extended._value)
         guard self.isFinite && Int(self) == extended else {
           return nil
         }
       } else {
-        let extended = UInt(truncatingIfNeeded: value)
+        let extended = UInt64(truncatingIfNeeded: value)
         _value = Builtin.uitofp_Int64_FPIEEE16(extended._value)
         guard self.isFinite && UInt(self) == extended else {
           return nil
@@ -1015,28 +1009,28 @@ extension Float16 {
 @available(SwiftStdlib 5.3, *)
 extension Float16 {
   @_transparent
-  public static func + (lhs: Float16, rhs: Float16) -> Float16 {
+  public static func +(lhs: Float16, rhs: Float16) -> Float16 {
     var lhs = lhs
     lhs += rhs
     return lhs
   }
 
   @_transparent
-  public static func - (lhs: Float16, rhs: Float16) -> Float16 {
+  public static func -(lhs: Float16, rhs: Float16) -> Float16 {
     var lhs = lhs
     lhs -= rhs
     return lhs
   }
 
   @_transparent
-  public static func * (lhs: Float16, rhs: Float16) -> Float16 {
+  public static func *(lhs: Float16, rhs: Float16) -> Float16 {
     var lhs = lhs
     lhs *= rhs
     return lhs
   }
 
   @_transparent
-  public static func / (lhs: Float16, rhs: Float16) -> Float16 {
+  public static func /(lhs: Float16, rhs: Float16) -> Float16 {
     var lhs = lhs
     lhs /= rhs
     return lhs

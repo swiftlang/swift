@@ -21,7 +21,7 @@ public struct Double {
   @_transparent
   public init() {
     let zero: Int64 = 0
-    self._value = Builtin.sitofp_Int64_FPIEEE64(zero._value)
+    self._value = Builtin.zeroInitializer()
   }
 
   @_transparent
@@ -704,7 +704,11 @@ extension Double {
   // inlined in -Onone and this breaks the abi_v7k test in a subtle way.
   @_transparent
   public init(_ v: Int) {
+#if _pointerBitWidth(_64)
     _value = Builtin.sitofp_Int64_FPIEEE64(v._value)
+#else
+    _value = Builtin.sitofp_Int32_FPIEEE64(v._value)
+#endif
   }
 
   // Fast-path for conversion when the source is representable as int,
@@ -745,13 +749,13 @@ extension Double {
       // representable). For Float16, we also need to check for overflow to
       // -.infinity.
       if Source.isSigned {
-        let extended = Int(truncatingIfNeeded: value)
+        let extended = Int64(truncatingIfNeeded: value)
         _value = Builtin.sitofp_Int64_FPIEEE64(extended._value)
         guard self < 0x1.0p63 && Int(self) == extended else {
           return nil
         }
       } else {
-        let extended = UInt(truncatingIfNeeded: value)
+        let extended = UInt64(truncatingIfNeeded: value)
         _value = Builtin.uitofp_Int64_FPIEEE64(extended._value)
         guard self < 0x1.0p64 && UInt(self) == extended else {
           return nil
