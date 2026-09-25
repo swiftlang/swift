@@ -533,6 +533,15 @@ BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   return swift::SILType::getPrimitiveObjectType(newTy);
 }
 
+BridgedType BridgedType::getThickFunctionType(
+    BridgedArgumentConvention calleeConvention) const {
+  auto fnType = unbridged().getAs<swift::SILFunctionType>();
+  auto newTy =
+      fnType->getWithRepresentation(swift::SILFunctionTypeRepresentation::Thick)
+          ->getWithCalleeConvention(getParameterConvention(calleeConvention));
+  return swift::SILType::getPrimitiveObjectType(newTy);
+}
+
 BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
   return getArgumentConvention(fnType->getCalleeConvention());

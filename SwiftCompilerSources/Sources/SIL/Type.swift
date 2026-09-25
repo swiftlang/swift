@@ -145,6 +145,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
 
+  // Returns a new SILFunctionType with a thick representation and the given callee convention.
+  public func getThickFunctionType(calleeConvention: ArgumentConvention) -> Type {
+    bridged.getThickFunctionType(calleeConvention.bridged).type
+  }
+
   /// True if a function with this type can be code-generated in Embedded Swift.
   /// These are basically all non-generic functions. But also certain generic functions are supported:
   /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for
