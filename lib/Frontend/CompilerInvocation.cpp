@@ -2437,6 +2437,17 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                    options::OPT_no_warnings_as_errors, false))
     Opts.ExtraArgs.push_back("-Werror");
 
+  // @objcDirect is built on Clang's direct-method precondition-thunk ABI, and
+  // SILDeclRef::mangle() reads the Clang CodeGen option directly so the symbol
+  // Swift emits stays byte-identical to the reference a Clang caller emits.
+  // Derive the Clang flag from the Swift feature so the two can never
+  // disagree. This also makes a .swiftinterface self-describing: -Xcc is not a
+  // ModuleInterfaceOption and so is never written to swift-module-flags,
+  // whereas -enable-experimental-feature is, so recording only the feature is
+  // enough for an interface carrying @objcDirect to rebuild.
+  if (LangOpts.hasFeature(Feature::ObjCDirect))
+    Opts.ExtraArgs.push_back("-fobjc-direct-precondition-thunk");
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
 
   Opts.DisableSourceImport |=

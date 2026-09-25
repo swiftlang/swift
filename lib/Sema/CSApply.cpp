@@ -5130,6 +5130,19 @@ namespace {
         return E;
       }
 
+      // A direct method is absent from the class's Objective-C method list, so
+      // a selector naming it would fail to resolve at runtime rather than at
+      // build time. Clang rejects the equivalent @selector expression; match
+      // it. Unlike Clang we always know which declaration is meant -- #selector
+      // takes a declaration reference, not a bare selector name -- so there is
+      // no "potentially direct" case needing a warning.
+      if (method->isObjCDirectDispatched()) {
+        de.diagnose(E->getLoc(), diag::expr_selector_objc_direct, foundDecl)
+            .highlight(subExpr->getSourceRange());
+        de.diagnose(method, diag::note_objc_direct_no_selector);
+        return E;
+      }
+
       // Note which method we're referencing.
       E->setMethod(method);
       return E;

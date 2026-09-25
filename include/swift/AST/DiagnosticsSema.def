@@ -785,6 +785,12 @@ ERROR(expr_selector_not_objc,none,
       "argument of '#selector' refers to %kind0 that is not exposed to "
       "Objective-C",
       (const ValueDecl *))
+ERROR(expr_selector_objc_direct,none,
+      "argument of '#selector' refers to %kind0 that is a direct method",
+      (const ValueDecl *))
+NOTE(note_objc_direct_no_selector,none,
+     "a direct method is not added to its class's Objective-C method list, so "
+     "it cannot be found by selector at runtime", ())
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %kindonly0 to Objective-C",
      (const ValueDecl *))
@@ -2613,6 +2619,34 @@ ERROR(optional_attribute_missing_explicit_objc,none,
       ())
 ERROR(objcmembers_attribute_nonclass,none,
       "'@objcMembers' attribute can only be applied to a class", ())
+
+ERROR(objc_direct_not_final,none,
+      "'@objcDirect' methods must be 'final' to prevent overriding", ())
+ERROR(objc_direct_in_protocol,none,
+      "'@objcDirect' cannot be applied to protocol requirements", ())
+ERROR(objc_direct_access_level,none,
+      "'private' or 'fileprivate' methods cannot be '@objcDirect'", ())
+ERROR(objc_direct_with_async,none,
+      "'@objcDirect' is not supported with 'async' methods", ())
+ERROR(objc_direct_override,none,
+      "'@objcDirect' methods cannot override superclass methods", ())
+ERROR(objc_direct_on_deinit,none,
+      "'@objcDirect' cannot be applied to 'deinit'", ())
+ERROR(objc_direct_dynamic,none,
+      "'@objcDirect' cannot be applied to a 'dynamic' method; 'dynamic' "
+      "requires dispatch through the Objective-C runtime", ())
+ERROR(objc_direct_ibaction,none,
+      "'@objcDirect' cannot be applied to an '@IBAction' or '@IBSegueAction' "
+      "method; the action is invoked by selector", ())
+ERROR(witness_objc_direct,none,
+      "%kind0 cannot satisfy a requirement of '@objc' protocol %1 because it "
+      "is a direct method", (const ValueDecl *, Identifier))
+ERROR(objc_direct_required_init,none,
+      "'@objcDirect' cannot be applied to 'required' initializers", ())
+ERROR(objc_direct_not_in_class,none,
+      "'@objcDirect' can only be applied to members of a class", ())
+ERROR(objc_direct_in_generic_class,none,
+      "'@objcDirect' cannot be applied to members of a generic class", ())
 ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,none,
