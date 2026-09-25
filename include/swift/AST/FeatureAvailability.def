@@ -85,6 +85,7 @@ FEATURE(TaskPriorityEscalationHandlers,                 (6, 2))
 FEATURE(TypedCoroAlloc,                                 (6, 2))
 
 FEATURE(NoncopyableReflectionSafety,                    (6, 4))
+FEATURE(Borrowing,                                      (6, 4))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
