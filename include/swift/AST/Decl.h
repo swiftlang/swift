@@ -8725,6 +8725,8 @@ public:
   /// Whether this function's signature includes types that require Objective-C
   /// bridging (e.g. String <-> NSString). Used by @objc global functions to
   /// decide between the @c single-symbol model and the @_cdecl thunk model.
+  /// This always examines the declaration's interface types; substitutions at
+  /// a use site must not change the declaration's entry-point model.
   bool signatureRequiresObjCBridging() const;
 
   /// Determine whether the name of an argument is an API name by default

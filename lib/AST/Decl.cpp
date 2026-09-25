@@ -11526,6 +11526,11 @@ std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
 bool AbstractFunctionDecl::signatureRequiresObjCBridging() const {
   auto *dc = getDeclContext();
 
+  // The entry-point model is part of the declaration's ABI. Always inspect
+  // its interface types, never types substituted into a particular reference;
+  // a concrete substitution cannot turn a bridged declaration into a
+  // single-C-entry-point declaration.
+
   // Check whether any type in the signature needs bridging when going from
   // Swift to Objective-C. Types that are trivially representable in ObjC
   // (e.g. Int, NSObject, pointers) don't need a thunk. Types that are
