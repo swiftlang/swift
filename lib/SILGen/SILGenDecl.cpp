@@ -1664,13 +1664,28 @@ public:
       bindValue = bindValue.copy(SGF, loc);
     }
 
-    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        pattern, bindValue,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
-        MarkUnresolvedNonCopyableValueInst::IsStrict);
+    // mark_unresolved_non_copyable_value drives the move-only checker, which
+    // has nothing to check for a copyable value. It also has to own the value
+    // it checks; a guaranteed value cannot be consumed to begin with.
+    if (bindValue.getType().isMoveOnly() &&
+        (bindValue.getType().isAddress() || bindValue.isPlusOne(SGF))) {
+      bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          pattern, bindValue,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+          MarkUnresolvedNonCopyableValueInst::IsStrict);
+    }
 
     SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                               SILAccessEnforcement::Unknown);
+
+    // Rewind to the bound value's definition so the buffer's insertion-point
+    // marker dominates it, while its cleanup is still pushed after the value's.
+    {
+      SavedInsertionPointRAII savedIP(SGF.B);
+      if (auto *def = bindValue.getValue()->getDefiningInstruction())
+        SGF.B.setInsertionPoint(def);
+      SGF.enterLocalVariableAddressableBufferScope(var);
+    }
 
     // Emit debug info for the borrowed noncopyable binding.
     if (EmitDebugValueOnInit) {

@@ -3784,6 +3784,7 @@ class DesugarForEachStmt {
   bool isAsync;
   bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
+  VarDecl *sequenceVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
   WhileStmt *innerLoop = nullptr;
@@ -3837,8 +3838,11 @@ public:
     }
 
     buildMakeIteratorVar();
+    buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 2> stmts;
+    SmallVector<ASTNode, 3> stmts;
+    if (auto *sequenceBinding = buildSequenceBinding())
+      stmts.push_back(sequenceBinding);
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
 
@@ -3998,12 +4002,38 @@ private:
     return nextCall;
   }
 
-  PatternBindingDecl *buildMakeIterator() {
+  void buildOpaqueSequenceExpr() {
     auto *sequence = stmt->getSequence();
-    auto seqType = sequence->getType();
-    auto *opaqueSeqExpr =
-        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    auto *opaqueSeqExpr = new (ctx)
+        OpaqueValueExpr(sequence->getSourceRange(), sequence->getType());
     stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+  }
+
+  /// Borrow the sequence in an implicit local whose scope encloses the loop.
+  PatternBindingDecl *buildSequenceBinding() {
+    // Only a borrowing iterator holds onto the sequence for the duration of
+    // the loop.
+    if (!isBorrowing)
+      return nullptr;
+
+    std::string name;
+    if (auto *np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+      name = "$" + np->getBoundName().str().str();
+    name += "$sequence";
+
+    sequenceVar = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Borrowing,
+        stmt->getSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
+    sequenceVar->setImplicit();
+
+    Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
+    return PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, stmt->getOpaqueSequenceExpr(),
+        dc);
+  }
+
+  PatternBindingDecl *buildMakeIterator() {
+    auto seqType = stmt->getSequence()->getType();
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
@@ -4019,8 +4049,19 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
+    // Call `makeBorrowingIterator()` on the sequence binding when there is
+    // one, so that the iterator depends on the binding's scope.
+    Expr *base;
+    if (sequenceVar) {
+      base = new (ctx) DeclRefExpr(
+          sequenceVar, DeclNameLoc(stmt->getSequence()->getStartLoc()),
+          /*implicit=*/true);
+    } else {
+      base = stmt->getOpaqueSequenceExpr();
+    }
+
     auto *makeIteratorRef = new (ctx)
-        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+        MemberRefExpr(base, stmt->getForLoc(), witness,
                       DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
 
     Expr *makeIteratorCall =
