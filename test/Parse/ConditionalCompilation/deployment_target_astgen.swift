@@ -1,5 +1,6 @@
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -enable-experimental-feature ParserASTGen -target arm64-apple-xros1.0 -sdk %S/../../attr/Inputs/XROS1.1.sdk -parse-stdlib -D EXPECT_BELOW
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -enable-experimental-feature ParserASTGen -target arm64-apple-xros1.1 -sdk %S/../../attr/Inputs/XROS1.1.sdk -parse-stdlib -D EXPECT_AT_LEAST
+// REQUIRES: swift_feature_DeploymentTargetCondition
 // REQUIRES: swift_feature_ParserASTGen
 
 #if !deploymentTargetAtLeast(iOS 17.4, *)
