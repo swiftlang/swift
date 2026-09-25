@@ -3858,7 +3858,9 @@ public:
     }
 
     // If the function is exported to a foreign language, its signature must be
-    // representable in that language.
+    // representable in that language. This covers @c and @_cdecl (C) and
+    // @cxx (C++), as well as @objc on a top-level function (SE-0495), which
+    // is a C export accepting Objective-C types.
     DeclAttribute *foreignLangAttr =
         FD->getAttrs().getAttribute<swift::CDeclAttr>();
     if (!foreignLangAttr)
@@ -3867,6 +3869,13 @@ public:
       evaluateOrDefault(Ctx.evaluator,
                         TypeCheckForeignFunctionRequest{FD, foreignLangAttr},
                         {});
+    } else if (FD->getDeclContext()->isModuleScopeContext() &&
+               !isa<AccessorDecl>(FD)) {
+      if (auto objcAttr = FD->getAttrs().getAttribute<ObjCAttr>()) {
+        evaluateOrDefault(Ctx.evaluator,
+                          TypeCheckForeignFunctionRequest{FD, objcAttr},
+                          {});
+      }
     }
 
     TypeChecker::checkObjCImplementation(FD);
