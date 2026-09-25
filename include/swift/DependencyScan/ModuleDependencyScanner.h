@@ -195,12 +195,6 @@ private:
   std::unique_ptr<InterfaceSubContextDelegateImpl> scanningASTDelegate;
   // The Clang scanner tool used by this worker.
   clang::tooling::DependencyScanningTool clangScanningTool;
-  // A persistent by-name scanning context maintaining a single Clang compiler
-  // instance that is reused across all by-name lookups performed by this worker
-  // when \c ShareClangCompilerInstance is set. Lazily created on the first
-  // by-name query.
-  std::optional<clang::tooling::CompilerInstanceWithContext>
-      clangScanningContext;
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
 
@@ -223,7 +217,13 @@ private:
 
   // Flag to use a single clang compiler instance to do all
   // dependency queries during the life time of this worker.
-  bool ShareClangCompilerInstance = true;
+  //
+  // FIXME: Currently unread: Clang's by-name scanning API requires a function
+  // call to get the next name as input. As a first step to adopt the API, we
+  // just send one name per call to the scanner. This regresses clang compiler
+  // instance sharing, which we will turn on in a subsequent PR that sends the
+  // names to the scanner through a concurrent queue.
+  [[maybe_unused]] bool ShareClangCompilerInstance = true;
 
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
