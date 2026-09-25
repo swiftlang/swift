@@ -714,8 +714,10 @@ extension Float16 {
   public init(_ v: Int) {
 #if _pointerBitWidth(_64)
     _value = Builtin.sitofp_Int64_FPIEEE16(v._value)
-#else
+#elseif _pointerBitWidth(_32)
     _value = Builtin.sitofp_Int32_FPIEEE16(v._value)
+#else
+    _value = Builtin.sitofp_Int16_FPIEEE16(v._value)
 #endif
   }
 

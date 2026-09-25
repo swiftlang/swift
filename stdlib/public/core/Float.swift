@@ -19,7 +19,6 @@ public struct Float {
 
   @_transparent
   public init() {
-    let zero: Int64 = 0
     self._value = Builtin.zeroInitializer()
   }
 
@@ -702,17 +701,14 @@ extension Float: Sendable { }
 // Construction from other concrete types.
 
 extension Float {
-
-  // We "shouldn't" need this, but the typechecker barfs on an expression
-  // in the test suite without it.
-  // If replaced with @inline(__always) the init no longer gets
-  // inlined in -Onone and this breaks the abi_v7k test in a subtle way.
   @_transparent
   public init(_ v: Int) {
 #if _pointerBitWidth(_64)
     _value = Builtin.sitofp_Int64_FPIEEE32(v._value)
-#else
+#elseif _pointerBitWidth(_32)
     _value = Builtin.sitofp_Int32_FPIEEE32(v._value)
+#else
+    _value = Builtin.sitofp_Int16_FPIEEE32(v._value)
 #endif
   }
 
