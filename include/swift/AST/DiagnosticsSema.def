@@ -1040,6 +1040,9 @@ ERROR(need_cxx_interop_to_import_module,none,
       "module %0 was built with C++ interoperability enabled, but "
       "current compilation does not enable C++ interoperability",
       (Identifier))
+ERROR(need_cxx_exception_bridging_to_import_module,none,
+      "module %0 requires '-enable-experimental-feature CxxExceptionBridging'",
+      (Identifier))
 NOTE(enable_cxx_interop_docs,none,
      "visit https://www.swift.org/documentation/cxx-interop/project-build-setup to learn how to enable C++ interoperability", ())
 

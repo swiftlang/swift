@@ -57,7 +57,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1037; // ~Deinitable in protocol compositions
+const uint16_t SWIFTMODULE_VERSION_MINOR =
+    1038; // C++ exception bridge adapter references and required feature
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1023,6 +1024,7 @@ namespace options_block {
     OSLOG_STRING_SECTION_NAME,
     AGGRESSIVE_CMO,
     LIBRARY_LEVEL,
+    REQUIRES_CXX_EXCEPTION_BRIDGING,
     // Internal sentinel. MUST remain the last enumerator in this block.
     // Equal to one past the last real record kind. Used by
     // Serialization.cpp to statically assert that OPTIONS_BLOCK's
@@ -1110,6 +1112,10 @@ namespace options_block {
 
   using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
     HAS_CXX_INTEROPERABILITY_ENABLED
+  >;
+
+  using RequiresCxxExceptionBridgingLayout = BCRecordLayout<
+    REQUIRES_CXX_EXCEPTION_BRIDGING
   >;
 
   using CXXStdlibKindLayout = BCRecordLayout<
@@ -2314,6 +2320,11 @@ namespace decls_block {
   >;
   static_assert(std::is_same<AccessorKindField, OperatorKindField>::value,
                 "accessor kinds and operator kinds are not compatible");
+
+  // Select the native C++ adapter belonging to the preceding Swift facade.
+  using XRefCxxExceptionAdapterPathPieceLayout = BCRecordLayout<
+    XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE
+  >;
 
   using XRefGenericParamPathPieceLayout = BCRecordLayout<
     XREF_GENERIC_PARAM_PATH_PIECE,

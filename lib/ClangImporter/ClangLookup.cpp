@@ -698,6 +698,12 @@ static auto filterMethodOverloads(clang::LookupResult &R,
 static FuncDecl *importUnderlyingFunction(ClangImporter::Implementation &Impl,
                                           CXXOverload overload,
                                           NominalTypeDecl *Struct) {
+  // These synthesized properties and iterator conveniences cannot propagate
+  // errors through their nonthrowing accessors or protocol requirements.
+  if (importer::shouldImportCxxFunctionAsThrowing(Impl.SwiftContext,
+                                                  overload.method))
+    return nullptr;
+
   Decl *imported;
   if (auto *ftd = overload.method->getDescribedFunctionTemplate())
     imported = Impl.importDecl(ftd, Impl.CurrentVersion);
@@ -1084,8 +1090,9 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
     }
   }
 
-  if (!OpBool)
-    return nullptr; // Did not find suitable operator bool() const
+  if (!OpBool ||
+      importer::shouldImportCxxFunctionAsThrowing(SwiftContext, OpBool))
+    return nullptr; // No conversion usable by the nonthrowing Bool initializer.
 
   // N.B. At this point it is still possible to have an ambiguous OpBool due to
   // non-virtual diamond inheritance. That scenario will be handled by Clang,
