@@ -175,6 +175,11 @@ public class Instruction : CustomStringConvertible, Hashable {
       return true
 
     case let builtin as BuiltinInst:
+      // The assume builtin's conservative memory effects only exist to keep it from being
+      // moved or deleted. It does not access memory.
+      if builtin.id == .AssumeTrue {
+        return false
+      }
       // A memory accessing builtin can be an implicit load weak, a synchronization point or a
       // pointer access.
       return builtin.mayReadOrWriteMemory

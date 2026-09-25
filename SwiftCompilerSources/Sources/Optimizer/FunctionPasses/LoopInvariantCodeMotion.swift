@@ -136,6 +136,8 @@ private func analyzeInstructions(
       switch inst {
       case is FixLifetimeInst:
         continue // We can ignore the side effects of FixLifetimes
+      case let bi as BuiltinInst where bi.id == .AssumeTrue:
+        continue // An assume observes nothing, so nothing can conflict with it
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
         continue // Don't set `hasOtherMemReadingInsts`
