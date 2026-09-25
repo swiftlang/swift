@@ -185,6 +185,13 @@ public:
   void printValueWitnessTableAccessSequenceFromTypeMetadata(
       StringRef metadataVariable, StringRef vwTableVariable, int indent);
 
+  /// Print the set of statements to access the value witness table pointer
+  /// \p vwTableVariable from the given type metadata pointer, using
+  /// \p vwTableAddrVariable to hold the address of the table.
+  void printValueWitnessTableAccessSequenceFromTypeMetadataPointer(
+      StringRef metadataPointer, StringRef vwTableAddrVariable,
+      StringRef vwTableVariable, int indent);
+
   /// Print the metadata accessor function for the given type declaration.
   void printCTypeMetadataTypeFunction(
       const TypeDecl *typeDecl, StringRef typeMetadataFuncName,

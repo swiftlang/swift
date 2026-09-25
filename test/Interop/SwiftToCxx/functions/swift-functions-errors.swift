@@ -4,6 +4,12 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -Wno-unused-function)
 
+// RUN: %target-swift-frontend %s -module-name Functions -enable-experimental-cxx-interop \
+// RUN:   -clang-header-expose-decls=has-expose-attr-or-stdlib \
+// RUN:   -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX \
+// RUN:   -enable-library-evolution -typecheck -verify -emit-clang-header-path %t/functions-resilient.h
+// RUN: %FileCheck --check-prefix=RESILIENT %s < %t/functions-resilient.h
+
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
 // CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
@@ -175,6 +181,202 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }
+
+// Counts the live instances, to check that no Swift value is leaked or
+// destroyed twice when an error is thrown.
+final class Canary {
+  static var living = 0
+  init() { Canary.living += 1 }
+  deinit { Canary.living -= 1 }
+}
+
+@_expose(Cxx)
+public func livingCanaries() -> Int { Canary.living }
+
+@_expose(Cxx)
+public struct SmallResult {
+  public let value: Int
+  public init(_ value: Int, _ fail: Bool) throws {
+    try checkedVoid(fail)
+    self.value = value
+  }
+  public func doubled(_ fail: Bool) throws -> SmallResult {
+    try SmallResult(value * 2, fail)
+  }
+  public static func make(_ fail: Bool) throws -> SmallResult {
+    try SmallResult(42, fail)
+  }
+}
+
+@_expose(Cxx)
+public struct LargeResult {
+  public let a, b, c, d, e: Int
+  let canary: Canary
+  public init(_ fail: Bool) throws {
+    // A failing initializer must clean up the partially initialized value.
+    canary = Canary()
+    try checkedVoid(fail)
+    (a, b, c, d, e) = (1, 2, 3, 4, 5)
+  }
+}
+
+@_expose(Cxx)
+public final class RefResult {
+  public let value: Int
+  public init(_ fail: Bool) throws {
+    try checkedVoid(fail)
+    value = 42
+  }
+  public func small(_ fail: Bool) throws -> SmallResult {
+    try SmallResult(value, fail)
+  }
+}
+
+// The parameters are named like a local of other thunks, to check that the
+// locals of these thunks don't clash with them.
+@_expose(Cxx)
+public func throwingSmall(_ returnValue: Bool) throws -> SmallResult {
+  try SmallResult(42, returnValue)
+}
+
+@_expose(Cxx)
+public func throwingLarge(_ returnValue: Bool) throws -> LargeResult {
+  try LargeResult(returnValue)
+}
+
+@_expose(Cxx)
+public func throwingOptionalLarge(_ returnValue: Bool) throws -> LargeResult? {
+  try LargeResult(returnValue)
+}
+
+@_expose(Cxx)
+public func throwingRef(_ returnValue: Bool) throws -> RefResult {
+  try RefResult(returnValue)
+}
+
+@_expose(Cxx)
+public func throwingString(_ fail: Bool) throws -> String {
+  try checkedVoid(fail)
+  return "Hello"
+}
+
+@_expose(Cxx)
+public func throwingGeneric<T>(_ value: T, _ fail: Bool) throws -> T {
+  try checkedVoid(fail)
+  return value
+}
+
+// Every result kind is only materialized after the error check, so no Swift
+// value is constructed from, or destroyed in, uninitialized storage.
+// CHECK-LABEL: swift::ThrowingResult<T_0_0> throwingGeneric(const T_0_0& value, bool fail)
+// CHECK: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
+// CHECK-NEXT: void *returnValue;
+// CHECK-NEXT: Functions::_impl::$s9Functions15throwingGenericyxx_SbtKlF(reinterpret_cast<void *>(&returnValue), {{.*}}, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
+// CHECK-NEXT: } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
+// CHECK-NEXT: void *returnMetadata_ = swift::TypeMetadataTrait<T_0_0>::getTypeMetadata();
+// CHECK: swift::_impl::OpaqueStorage returnStorage_(returnVWTable_->size, returnVWTable_->getAlignment());
+// CHECK-NEXT: Functions::_impl::$s9Functions15throwingGenericyxx_SbtKlF(returnStorage_.getOpaquePointer(), {{.*}}, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT: return ::swift::_impl::implClassFor<T_0_0>::type::initializeWithTake(reinterpret_cast<char * _Nonnull>(returnValue), returnStorage_.getOpaquePointer());
+// CHECK: } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_0>) {
+// CHECK: Functions::_impl::$s9Functions15throwingGenericyxx_SbtKlF(storage, {{.*}}, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: T_0_0 result(static_cast<T_0_0 &&>(*storageObjectPtr));
+// CHECK: } else {
+// CHECK-NEXT: T_0_0 returnValue;
+// CHECK-NEXT: Functions::_impl::$s9Functions15throwingGenericyxx_SbtKlF(reinterpret_cast<void *>(&returnValue), {{.*}}, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return returnValue;
+
+// A fixed-layout value returned indirectly is written to stack storage.
+// CHECK-LABEL: swift::ThrowingResult<LargeResult> throwingLarge(bool returnValue)
+// CHECK: alignas(8) char returnStorage_[{{[0-9]+}}];
+// CHECK-NEXT: Functions::_impl::$s9Functions13throwingLargeyAA0C6ResultVSbKF(returnStorage_, returnValue, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK-NEXT: #ifdef __cpp_exceptions
+// CHECK-NEXT: throw (swift::Error(opaqueError));
+// CHECK-NEXT: #else
+// CHECK-NEXT: return swift::Expected<LargeResult>(swift::Error(opaqueError));
+// CHECK-NEXT: #endif
+// CHECK-NEXT: return Functions::_impl::_impl_LargeResult::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT: Functions::_impl::_impl_LargeResult::initializeWithTake(result, returnStorage_);
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+
+// With library evolution, the layout of the struct can change, so the storage
+// is sized at runtime, like the storage of the C++ class for the struct.
+// RESILIENT-LABEL: swift::ThrowingResult<LargeResult> throwingLarge(bool returnValue)
+// RESILIENT-NOT: char returnStorage_
+// RESILIENT: void *returnMetadata_ = swift::TypeMetadataTrait<LargeResult>::getTypeMetadata();
+// RESILIENT: swift::_impl::OpaqueStorage returnStorage_(returnVWTable_->size, returnVWTable_->getAlignment());
+// RESILIENT-NEXT: Functions::_impl::$s9Functions13throwingLargeyAA0C6ResultVSbKF(returnStorage_.getOpaquePointer(), returnValue, _ctx, &opaqueError);
+// RESILIENT-NEXT: if (opaqueError != nullptr)
+// RESILIENT: Functions::_impl::_impl_LargeResult::initializeWithTake(result, returnStorage_.getOpaquePointer());
+
+// A value whose layout isn't known statically is written to heap storage.
+// CHECK-LABEL: swift::ThrowingResult<swift::Optional<LargeResult>> throwingOptionalLarge(bool returnValue)
+// CHECK: void *returnMetadata_ = swift::TypeMetadataTrait<swift::Optional<LargeResult>>::getTypeMetadata();
+// CHECK: swift::_impl::OpaqueStorage returnStorage_(returnVWTable_->size, returnVWTable_->getAlignment());
+// CHECK-NEXT: Functions::_impl::$s9Functions21throwingOptionalLargeyAA0D6ResultVSgSbKF(returnStorage_.getOpaquePointer(), returnValue, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return swift::Expected<swift::Optional<LargeResult>>(swift::Error(opaqueError));
+// CHECK-NEXT: #endif
+// CHECK-NEXT: return swift::_impl::_impl_Optional<LargeResult>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT: swift::_impl::_impl_Optional<LargeResult>::initializeWithTake(result, returnStorage_.getOpaquePointer());
+
+// CHECK-LABEL: swift::ThrowingResult<RefResult> throwingRef(bool returnValue)
+// CHECK: void *returnValue_ = Functions::_impl::$s9Functions11throwingRefyAA0C6ResultCSbKF(returnValue, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return swift::Expected<RefResult>(swift::Error(opaqueError));
+// CHECK-NEXT: #endif
+// CHECK-NEXT: return _impl::_impl_RefResult::makeRetained(returnValue_);
+
+// CHECK-LABEL: swift::ThrowingResult<SmallResult> throwingSmall(bool returnValue)
+// CHECK: auto returnValue_ = Functions::_impl::$s9Functions13throwingSmallyAA0C6ResultVSbKF(returnValue, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return swift::Expected<SmallResult>(swift::Error(opaqueError));
+// CHECK-NEXT: #endif
+// CHECK-NEXT: return Functions::_impl::_impl_SmallResult::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT: Functions::_impl::swift_interop_returnDirect_Functions_{{.*}}(result, returnValue_);
+
+// CHECK-LABEL: swift::ThrowingResult<swift::String> throwingString(bool fail)
+// CHECK: auto returnValue_ = Functions::_impl::$s9Functions14throwingStringySSSbKF(fail, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return swift::_impl::_impl_String::returnNewValue(
+
+// CHECK-LABEL: swift::ThrowingResult<LargeResult> LargeResult::init(bool fail)
+// CHECK: char returnStorage_[
+// CHECK-NEXT: Functions::_impl::$s9Functions11LargeResultVyACSbKcfC(returnStorage_, fail, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: Functions::_impl::_impl_LargeResult::initializeWithTake(result, returnStorage_);
+
+// CHECK-LABEL: swift::ThrowingResult<RefResult> RefResult::init(bool fail)
+// CHECK: void *returnValue_ = Functions::_impl::$s9Functions9RefResultCyACSbKcfC(fail, {{.*}}, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: return _impl::_impl_RefResult::makeRetained(returnValue_);
+
+// CHECK-LABEL: swift::ThrowingResult<SmallResult> RefResult::small(bool fail)
+// CHECK: auto returnValue_ = Functions::_impl::$s9Functions9RefResultC5smallyAA05SmallC0VSbKF(fail, {{.*}}, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: Functions::_impl::swift_interop_returnDirect_Functions_{{.*}}(result, returnValue_);
+
+// CHECK-LABEL: swift::ThrowingResult<SmallResult> SmallResult::init(swift::Int value, bool fail)
+// CHECK: auto returnValue_ = Functions::_impl::$s9Functions11SmallResultVyACSi_SbtKcfC(value, fail, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: Functions::_impl::swift_interop_returnDirect_Functions_{{.*}}(result, returnValue_);
+
+// CHECK-LABEL: swift::ThrowingResult<SmallResult> SmallResult::doubled(bool fail) const
+// CHECK: auto returnValue_ = Functions::_impl::$s9Functions11SmallResultV7doubledyACSbKF(fail, {{.*}}, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: Functions::_impl::swift_interop_returnDirect_Functions_{{.*}}(result, returnValue_);
+
+// CHECK-LABEL: swift::ThrowingResult<SmallResult> SmallResult::make(bool fail)
+// CHECK: auto returnValue_ = Functions::_impl::$s9Functions11SmallResultV4makeyACSbKFZ(fail, _ctx, &opaqueError);
+// CHECK-NEXT: if (opaqueError != nullptr)
+// CHECK: Functions::_impl::swift_interop_returnDirect_Functions_{{.*}}(result, returnValue_);
 
 @_expose(Cxx)
 public final class VoidMethods {

@@ -161,15 +161,18 @@ public:
     ClangSyntaxPrinter(Context, os).printClangTypeReference(typeDecl);
   }
 
-  static void
-  printGenericReturnScaffold(raw_ostream &os, StringRef templateParamName,
-                             llvm::function_ref<void(StringRef)> bodyOfReturn) {
+  static void printGenericReturnScaffold(
+      raw_ostream &os, StringRef templateParamName,
+      llvm::function_ref<void(StringRef)> bodyOfReturn,
+      llvm::function_ref<void()> afterCallPrinter = nullptr) {
     printReturnScaffold(false, os, templateParamName, templateParamName,
-                        bodyOfReturn);
+                        bodyOfReturn, afterCallPrinter);
   }
 
-  void printReturnScaffold(ASTContext &Context, raw_ostream &os,
-                           llvm::function_ref<void(StringRef)> bodyOfReturn) {
+  void
+  printReturnScaffold(ASTContext &Context, raw_ostream &os,
+                      llvm::function_ref<void(StringRef)> bodyOfReturn,
+                      llvm::function_ref<void()> afterCallPrinter = nullptr) {
     std::string fullQualifiedType;
     std::string typeName;
     {
@@ -179,26 +182,33 @@ public:
       unqualTypeNameOS << typeDecl->getName();
     }
     printReturnScaffold(isTrivial(typeDecl), os, fullQualifiedType, typeName,
-                        bodyOfReturn);
+                        bodyOfReturn, afterCallPrinter);
   }
 
-  static void
-  printSIMDReturnScaffold(StringRef simdTypeName, raw_ostream &os,
-                          llvm::function_ref<void(StringRef)> bodyOfReturn) {
-    printReturnScaffold(true, os, simdTypeName, simdTypeName, bodyOfReturn);
+  static void printSIMDReturnScaffold(
+      StringRef simdTypeName, raw_ostream &os,
+      llvm::function_ref<void(StringRef)> bodyOfReturn,
+      llvm::function_ref<void()> afterCallPrinter = nullptr) {
+    printReturnScaffold(true, os, simdTypeName, simdTypeName, bodyOfReturn,
+                        afterCallPrinter);
   }
 
 private:
   static void
   printReturnScaffold(bool isTrivial, raw_ostream &os,
                       StringRef fullQualifiedType, StringRef typeName,
-                      llvm::function_ref<void(StringRef)> bodyOfReturn) {
+                      llvm::function_ref<void(StringRef)> bodyOfReturn,
+                      llvm::function_ref<void()> afterCallPrinter) {
     os << "alignas(alignof(" << fullQualifiedType << ")) char storage[sizeof("
        << fullQualifiedType << ")];\n";
     os << "auto * _Nonnull storageObjectPtr = reinterpret_cast<"
        << fullQualifiedType << " *>(storage);\n";
     bodyOfReturn("storage");
     os << ";\n";
+    // The error check has to run before the returned value is materialized,
+    // as the storage holds no valid value when the callee threw an error.
+    if (afterCallPrinter)
+      afterCallPrinter();
     if (isTrivial) {
       // Trivial object can be just copied and not destroyed.
       os << "return *storageObjectPtr;\n";
@@ -1270,10 +1280,43 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
   namePrinter();
 }
 
+/// Prints the declaration of `returnStorage_`, uninitialized storage for a
+/// value of type \p typeName that a throwing function returns indirectly, and
+/// returns the expression for its address. The storage is allocated on the
+/// stack when the type has a fixed \p layout (see
+/// \c ClangValueTypePrinter::getFixedTypeSizeAlignment), and on the heap
+/// otherwise.
+static StringRef printThrowingReturnStorage(
+    ASTContext &ctx, raw_ostream &os, StringRef typeName,
+    std::optional<IRABIDetailsProvider::SizeAndAlignment> layout) {
+  if (layout) {
+    os << "  alignas(" << layout->alignment << ") char returnStorage_["
+       << layout->size << "];\n";
+    return "returnStorage_";
+  }
+  ClangSyntaxPrinter printer(ctx, os);
+  os << "  void *returnMetadata_ = swift::TypeMetadataTrait<" << typeName
+     << ">::getTypeMetadata();\n";
+  printer.printValueWitnessTableAccessSequenceFromTypeMetadataPointer(
+      "returnMetadata_", "returnVWTableAddr_", "returnVWTable_",
+      /*indent=*/2);
+  os << "  ";
+  printer.printSwiftImplQualifier();
+  os << cxx_synthesis::getCxxOpaqueStorageClassName()
+     << " returnStorage_(returnVWTable_->size, "
+        "returnVWTable_->getAlignment());\n";
+  return "returnStorage_.getOpaquePointer()";
+}
+
 void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
     raw_ostream &os, const GenericTypeParamType *gtpt,
     llvm::function_ref<void(StringRef)> invocationPrinter,
-    std::optional<StringRef> initializeWithTakeFromValue) {
+    std::optional<StringRef> initializeWithTakeFromValue,
+    llvm::function_ref<void()> errorCheckPrinter) {
+  // The take-from-value mode reads an already-produced value, so there is no
+  // call that could throw; combining it with an error check is unsupported.
+  assert(!(errorCheckPrinter && initializeWithTakeFromValue) &&
+         "cannot check for a thrown error when taking from a value");
   std::string returnAddress;
   llvm::raw_string_ostream ros(returnAddress);
   ros << "reinterpret_cast<void *>(&returnValue)";
@@ -1294,6 +1337,8 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
          << *initializeWithTakeFromValue << ")";
     }
     os << ";\n";
+    if (errorCheckPrinter)
+      errorCheckPrinter();
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
        << ">::type::makeRetained(returnValue);\n";
@@ -1301,26 +1346,37 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
        << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
        << resultTyName << ">) {\n";
 
+    std::optional<StringRef> takeFromValue = initializeWithTakeFromValue;
+    if (errorCheckPrinter) {
+      // Only materialize the C++ value once the error check has passed, as
+      // the callee leaves the returned value uninitialized when it throws.
+      takeFromValue = printThrowingReturnStorage(
+          gtpt->getASTContext(), os, resultTyName, /*layout=*/std::nullopt);
+      os << "  ";
+      invocationPrinter(/*additionalParam=*/*takeFromValue);
+      os << ";\n";
+      errorCheckPrinter();
+    }
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
        << ">::type::returnNewValue([&](void * _Nonnull returnValue) "
           "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
-    if (!initializeWithTakeFromValue) {
+    if (!takeFromValue) {
       invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
     } else {
       os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
          << "::implClassFor<" << resultTyName
          << ">::type::initializeWithTake(reinterpret_cast<char * "
             "_Nonnull>(returnValue), "
-         << *initializeWithTakeFromValue << ")";
+         << *takeFromValue << ")";
     }
     os << ";\n  });\n";
     os << "  } else if constexpr (::swift::"
        << cxx_synthesis::getCxxImplNamespaceName()
        << "::isSwiftBridgedCxxRecord<" << resultTyName << ">) {\n";
     if (!initializeWithTakeFromValue) {
-      ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
-                                                   invocationPrinter);
+      ClangTypeHandler::printGenericReturnScaffold(
+          os, resultTyName, invocationPrinter, errorCheckPrinter);
     } else {
       // FIXME: support taking a C++ record type.
       os << "abort();\n";
@@ -1333,7 +1389,10 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
       os << "memcpy(&returnValue, " << *initializeWithTakeFromValue
          << ", sizeof(returnValue))";
     }
-    os << ";\n  return returnValue;\n";
+    os << ";\n";
+    if (errorCheckPrinter)
+      errorCheckPrinter();
+    os << "  return returnValue;\n";
     os << "  }\n";
   });
 }
@@ -1604,6 +1663,41 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << ')';
   };
 
+  // The C++ type the value returned from a throwing function is wrapped in
+  // (the `T` in `swift::ThrowingResult<T>`); used by the error propagation
+  // code below.
+  std::string throwsReturnTypeStr;
+  if (hasThrows) {
+    llvm::raw_string_ostream returnTypeOS(throwsReturnTypeStr);
+    OptionalTypeKind retKind;
+    Type objTy;
+    std::tie(objTy, retKind) =
+        DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
+    auto retTypeRepr = printClangFunctionReturnType(
+        returnTypeOS, objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+        OutputLanguageMode::Cxx);
+    assert(!retTypeRepr.isUnsupported());
+    (void)retTypeRepr;
+  }
+
+  // Emits the check that propagates a thrown Swift error to C++, either by
+  // throwing a `swift::Error` exception, or by returning it wrapped in
+  // `swift::Expected` when C++ exceptions are unavailable. This must run
+  // after the call to the native Swift function, but before the returned
+  // value is materialized in its C++ representation.
+  auto printThrowsErrorCheckImpl = [&]() {
+    os << "  if (opaqueError != nullptr)\n";
+    os << "#ifdef __cpp_exceptions\n";
+    os << "    throw (swift::Error(opaqueError));\n";
+    os << "#else\n";
+    os << "    return swift::Expected<" << throwsReturnTypeStr
+       << ">(swift::Error(opaqueError));\n";
+    os << "#endif\n";
+  };
+  llvm::function_ref<void()> printThrowsErrorCheck =
+      hasThrows ? llvm::function_ref<void()>(printThrowsErrorCheckImpl)
+                : llvm::function_ref<void()>(nullptr);
+
   // Values types are returned either direcly in their C representation, or
   // indirectly by a pointer.
   auto knownTypeKind =
@@ -1611,7 +1705,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (knownTypeKind != KnownTypeKind::Known &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
     if (const auto *gtpt = resultTy->getAs<GenericTypeParamType>()) {
-      printGenericReturnSequence(os, gtpt, printCallToCFunc);
+      printGenericReturnSequence(os, gtpt, printCallToCFunc,
+                                 /*initializeWithTakeFromValue=*/std::nullopt,
+                                 printThrowsErrorCheck);
       return;
     }
     if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
@@ -1620,6 +1716,17 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         os << "return ";
         printCallToCFunc(/*additionalParam=*/std::nullopt);
         os << ";\n";
+        return;
+      }
+      if (hasThrows) {
+        // Stash the returned opaque class pointer and check for a thrown
+        // error before wrapping it in its C++ representation.
+        os << "  void *returnValue_ = ";
+        printCallToCFunc(/*additionalParam=*/std::nullopt);
+        os << ";\n";
+        printThrowsErrorCheck();
+        ClangClassTypePrinter::printClassTypeReturnScaffold(
+            os, classDecl, moduleContext, [&]() { os << "returnValue_"; });
         return;
       }
       ClangClassTypePrinter::printClassTypeReturnScaffold(
@@ -1650,18 +1757,60 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                 dyn_cast<TypeAliasType>(resultTy.getPointer())) {
           auto info = getKnownTypeInfo(typeAliasType->getDecl(), typeMapping,
                                        OutputLanguageMode::Cxx);
-          ClangTypeHandler::printSIMDReturnScaffold(info->name, os,
-                                                    valueTypeReturnThunker);
+          ClangTypeHandler::printSIMDReturnScaffold(
+              info->name, os, valueTypeReturnThunker, printThrowsErrorCheck);
           return;
         }
       }
       if (decl->hasClangNode()) {
         ClangTypeHandler handler(decl->getClangDecl());
         assert(handler.isRepresentable());
-        handler.printReturnScaffold(moduleContext->getASTContext(), os, valueTypeReturnThunker);
+        handler.printReturnScaffold(moduleContext->getASTContext(), os,
+                                    valueTypeReturnThunker,
+                                    printThrowsErrorCheck);
         return;
       }
       ClangValueTypePrinter valueTypePrinter(os, cPrologueOS, interopContext);
+
+      if (hasThrows) {
+        // Only materialize the C++ value once the error check has passed, as
+        // the callee leaves the returned value uninitialized when it throws.
+        if (auto directResultType = signature.getDirectResultType()) {
+          std::string typeEncoding =
+              encodeTypeInfo(*directResultType, moduleContext, typeMapping);
+          os << "  auto returnValue_ = ";
+          printCallToCFunc(/*additionalParam=*/std::nullopt);
+          os << ";\n";
+          printThrowsErrorCheck();
+          valueTypePrinter.printValueTypeReturnScaffold(
+              decl, moduleContext,
+              [&]() { printTypeImplTypeSpecifier(resultTy, moduleContext); },
+              [&](StringRef resultPointerName) {
+                ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                    .printBaseName(moduleContext);
+                os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+                   << "::swift_interop_returnDirect_" << typeEncoding << '('
+                   << resultPointerName << ", returnValue_)";
+              });
+          return;
+        }
+        StringRef returnStorage = printThrowingReturnStorage(
+            moduleContext->getASTContext(), os, throwsReturnTypeStr,
+            valueTypePrinter.getFixedTypeSizeAlignment(decl));
+        os << "  ";
+        printCallToCFunc(/*additionalParam=*/returnStorage);
+        os << ";\n";
+        printThrowsErrorCheck();
+        valueTypePrinter.printValueTypeReturnScaffold(
+            decl, moduleContext,
+            [&]() { printTypeImplTypeSpecifier(resultTy, moduleContext); },
+            [&](StringRef resultPointerName) {
+              printTypeImplTypeSpecifier(resultTy, moduleContext);
+              os << "::initializeWithTake(" << resultPointerName << ", "
+                 << returnStorage << ")";
+            });
+        return;
+      }
 
       valueTypePrinter.printValueTypeReturnScaffold(
           decl, moduleContext,
@@ -1678,6 +1827,16 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       (classDecl && isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) ||
       nonOptResultType->isObjCExistentialType()) {
     assert(!classDecl || classDecl->hasClangNode());
+    if (hasThrows) {
+      os << "  void *returnValue_ = (__bridge void *)";
+      printCallToCFunc(/*additionalParam=*/std::nullopt);
+      os << ";\n";
+      printThrowsErrorCheck();
+      os << "  return (__bridge_transfer ";
+      declPrinter.withOutputStream(os).print(nonOptResultType);
+      os << ")returnValue_;\n";
+      return;
+    }
     os << "return (__bridge_transfer ";
     declPrinter.withOutputStream(os).print(nonOptResultType);
     os << ")(__bridge void *)";
@@ -1700,13 +1859,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
   // Create the condition and the statement to throw an exception.
   if (hasThrows) {
-    os << "  if (opaqueError != nullptr)\n";
-    os << "#ifdef __cpp_exceptions\n";
-    os << "    throw (swift::Error(opaqueError));\n";
-    os << "#else\n";
+    printThrowsErrorCheck();
     if (resultTy->isVoid()) {
-      os << "    return swift::Expected<void>(swift::Error(opaqueError));\n";
-      os << "#endif\n";
       const auto *funcDecl = dyn_cast<FuncDecl>(FD);
       if (funcDecl && funcDecl->getResultInterfaceType()->isUninhabited()) {
         os << "  abort();\n";
@@ -1716,34 +1870,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         os << "#endif\n";
       }
     } else {
-      auto directResultType = signature.getDirectResultType();
-      printDirectReturnOrParamCType(
-          *directResultType, resultTy, moduleContext, os, cPrologueOS,
-          typeMapping, interopContext, [&]() {
-            os << "    return swift::Expected<";
-            OptionalTypeKind retKind;
-            Type objTy;
-            std::tie(objTy, retKind) =
-                DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
-
-            auto s = printClangFunctionReturnType(
-                os, objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
-                OutputLanguageMode::Cxx);
-            os << ">(swift::Error(opaqueError));\n";
-            os << "#endif\n";
-
-            // Return the function result value if it doesn't throw.
-            if (!resultTy->isVoid() && hasThrows) {
-              os << "\n";
-              os << "  return SWIFT_RETURN_THUNK(";
-              printClangFunctionReturnType(
-                  os, objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
-                  OutputLanguageMode::Cxx);
-              os << ", returnValue);\n";
-            }
-
-            assert(!s.isUnsupported());
-          });
+      // Return the function result value if it doesn't throw.
+      os << "\n";
+      os << "  return SWIFT_RETURN_THUNK(" << throwsReturnTypeStr
+         << ", returnValue);\n";
     }
   }
 }
