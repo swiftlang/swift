@@ -6,6 +6,11 @@
 
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
+// swift::Error derives from std::exception.
+// CHECK: #if defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) && !defined(SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR)
+// CHECK-NEXT: #include <exception>
+// CHECK-NEXT: #endif
+
 // CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
@@ -70,6 +75,15 @@ public func testDestroyedError() throws { throw DestroyedError() }
 // CHECK: return swift::Expected<void>(swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
+
+@_expose(Cxx)
+public struct DescriptiveError : Error, CustomStringConvertible {
+  public let code: Int
+  public var description: String { "custom error: café ☕" }
+}
+
+@_expose(Cxx)
+public func throwDescriptiveError() throws { throw DescriptiveError(code: 7) }
 
 @_expose(Cxx)
 public func throwFunction() throws {
