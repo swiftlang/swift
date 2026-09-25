@@ -1794,6 +1794,11 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
+  /// Task pointers in a future's wait queue: the queue head in the future
+  /// fragment, and the link to the next waiter in a task dependency record.
+  const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
+  const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
+
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
 

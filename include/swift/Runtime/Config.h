@@ -300,6 +300,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_task_resume_context                                    \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::TaskResumeContext)
+#define __ptrauth_swift_task_next_waiting_task                                 \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TaskNextWaitingTask)
 #define __ptrauth_swift_async_context_parent                                   \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::AsyncContextParent)
@@ -377,6 +380,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_job_invoke_function
 #define __ptrauth_swift_task_resume_function
 #define __ptrauth_swift_task_resume_context
+#define __ptrauth_swift_task_next_waiting_task
 #define __ptrauth_swift_async_context_parent
 #define __ptrauth_swift_async_context_resume
 #define __ptrauth_swift_async_context_yield

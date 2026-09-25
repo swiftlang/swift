@@ -433,7 +433,7 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
   // When the dependency kind is waiting on Task, this pointer contains
   // the next link in the wait queue of the Task it is waiting on. This
   // pointer should only be used through the wait queue's functions.
-  AsyncTask *NextWaitingTask;
+  AsyncTask *__ptrauth_swift_task_next_waiting_task NextWaitingTask;
 
 public:
   TaskDependencyStatusRecord(AsyncTask *task)
@@ -473,7 +473,8 @@ public:
                                JobPriority newPriority);
 
   // Assumes that this record is of kind WaitingOnTask
-  AsyncTask *&getNextWaitingTask();
+  AsyncTask *getNextWaitingTask();
+  void setNextWaitingTask(AsyncTask *task);
 };
 
 #if !SWIFT_CONCURRENCY_EMBEDDED

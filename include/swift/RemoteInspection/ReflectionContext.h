@@ -2197,7 +2197,10 @@ private:
         // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
         const StoredPointer statusMask = 0x03;
         StoredPointer WaitingTaskPtr =
-            FutureFragmentObj->WaitQueue & ~statusMask;
+            stripSignedPointer(
+                RemoteAddress(FutureFragmentObj->WaitQueue & ~statusMask,
+                              RemoteAddress::DefaultAddressSpace))
+                .getRawAddress();
 
         // Walk the singly linked list of waiting tasks.
         unsigned WaitQueueLoopCount = 0;
