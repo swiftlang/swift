@@ -20,6 +20,7 @@ target_compile_options(swiftSwiftOnoneSupport PRIVATE
   # See also caa3dd4d291ec93c1a59f1db62604e703bff8468
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -validate-tbd-against-ir=none>"
 
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -check-onone-completeness>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-access-control>")
 
