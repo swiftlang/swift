@@ -133,3 +133,19 @@ func escapingLocal(_ other: Holder) -> Span<Int> {
   // expected-note @-2 {{it depends on the lifetime of variable 'local'}}
   // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
 }
+
+struct Composite: ~Copyable {
+  var items: UniqueArray<UniqueArray<Int>>
+
+  // Lifetime dependent value derived from a subscript implemented via borrow accessor with @guaranteed_address
+  @_lifetime(borrow self)
+  func check(at index: Int) -> Span<Int> {
+    self.items[index].span
+  }
+
+  // Lifetime dependent value derived from a subscript implemented via mutate accessor
+  @_lifetime(&self)
+  mutating func checkMutable(at index: Int) -> MutableSpan<Int> {
+    self.items[index].mutableSpan
+  }
+}
