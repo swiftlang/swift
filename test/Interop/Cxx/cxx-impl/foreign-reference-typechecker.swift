@@ -23,6 +23,32 @@ func takesNode(_ n: Node) -> Int32 { return n.value }
 @cxx @implementation
 func takesNullableNode(_ n: Node?) -> Int32 { return n?.value ?? -1 }
 
+// A C++ reference to a foreign reference type imports like the reference
+// type itself. The parameter carries the object, not the reference, so the
+// implementation need not be `@unsafe`.
+@cxx @implementation
+func takesNodeByRef(_ n: Node) -> Int32 { return n.value }
+
+// A C++ reference to a pointer to a foreign reference type is implemented by
+// an `inout` parameter of the reference type, a const one by a plain
+// parameter. The referent is the pointer, so the implementation must be
+// `@unsafe` as for any other reference parameter.
+@unsafe @cxx @implementation
+func reseatNode(_ p: inout Node, _ to: Node) { p = to }
+
+@unsafe @cxx @implementation
+func readNodePtr(_ p: Node) -> Int32 { return p.value }
+
+// expected-error@+2{{global function 'mismatchedNodePtrSpelling' of type '(UnsafeMutablePointer<Node>) -> ()' does not match type '(inout Node) -> Void' declared by the header}}
+@unsafe @cxx @implementation
+func mismatchedNodePtrSpelling(_ p: UnsafeMutablePointer<Node>) {}
+
+// expected-error@+2{{global function 'missingUnsafeNodePtr' must be marked '@unsafe' to implement C++ function 'missingUnsafeNodePtr'}}{{-1:1-1=@unsafe }}
+@cxx @implementation
+func missingUnsafeNodePtr(
+  _ p: Node // expected-note{{C++ callers may modify parameter 'p' through another reference during the call}}
+) -> Int32 { return p.value }
+
 @cxx @implementation
 func returnsRetainedNode(_ n: Node) -> Node { return n }
 
@@ -47,6 +73,10 @@ func returnsUnretainedNode(_ n: Node) -> Node { return n }
 // expected-error@+2{{global function 'returnsUnannotatedNode' cannot implement C++ function 'returnsUnannotatedNode' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
 @cxx @implementation
 func returnsUnannotatedNode(_ n: Node) -> Node { return n }
+
+// expected-error@+2{{global function 'returnsNodeByRef()' cannot implement C++ function 'returnsNodeByRef' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
+@cxx @implementation
+func returnsNodeByRef() -> Node { fatalError() }
 
 // expected-error@+2{{global function 'returnsLeaf' cannot implement C++ function 'returnsLeaf' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
 @cxx @implementation
