@@ -859,6 +859,11 @@ public:
   /// being consistent across versions of the framework.
   bool isResilient() const;
 
+  /// Whether the conforming type and the protocol were originally defined in
+  /// the same module, honoring @_originallyDefinedIn: a type moved into the
+  /// protocol's module is still considered cross-module.
+  bool isOriginallyInSameModuleAsProtocol() const;
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   TypeWitnessAndDecl
