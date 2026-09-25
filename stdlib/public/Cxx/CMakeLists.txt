@@ -10,6 +10,7 @@ set(SWIFT_CXX_SOURCES
     CxxConvertibleToBool.swift
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
+    CxxException.swift
     CxxPair.swift
     CxxOptional.swift
     CxxSet.swift
