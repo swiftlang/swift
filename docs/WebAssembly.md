@@ -9,7 +9,7 @@ available yet, specifically:
       triple with [Embedded Swift](https://docs.swift.org/embedded/documentation/embedded/), without
       [WASI-libc](https://github.com/WebAssembly/wasi-libc) you'll have to reimplement basic functionality
      like allocators, RNG, clocks, I/O etc on your own.
-  3. A preview of multi-threading and atomics is available in some browsers and stand-alone 
+  3. A preview of multi-threading and atomics is available in some browsers and stand-alone
   WebAssembly hosts. The multi-threading feature is available for `wasm32-unknown-wasip1-threads` triple, but it's not
     in the `wasm32-unknown-wasip1` triple.
   4. Dynamic linking is not formally specified for `wasip1` triples and tooling for it is not available yet.
@@ -42,6 +42,13 @@ Then run the compiler and stdlib test suite via `ninja` (assuming your host is a
 ```
 PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
+```
+
+The `wasm32-unknown-wasip1-threads` stdlib builds into a sibling directory:
+
+```
+PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
+  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasithreadsstdlib-macosx-arm64
 ```
 
 Filter to a subset of tests you'd like to run with `LIT_FILTER`. Here's an example to run only tests with `embedded` in their file path:
