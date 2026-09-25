@@ -69,6 +69,13 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   if (!pai->isOnStack()) {
     getConsumedPartialApplyArgs(pai, argsToHandle,
                                 /*includeTrivialAddrArgs*/ true);
+  } else if (pai->isCalledOnce()) {
+    // A `@called(once)` on-stack closure can own (consume)
+    // captures, so they have to be copied when possible.
+    for (Operand &argOp : pai->getArgumentOperands()) {
+      if (argOp.isConsuming())
+        argsToHandle.push_back(&argOp);
+    }
   }
 
   // Compute the set of endpoints, which will be used to insert destroys of
