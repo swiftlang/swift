@@ -184,6 +184,26 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
       SILAddressConventions::forFullyLoweredModule(call.getModule()));
 }
 
+/// Does \p call return a @guaranteed_address result of loadable type?
+///
+/// A @guaranteed_address result is an object before lowering and the address
+/// the callee returns after it. A loadable one has no storage in
+/// `valueStorageMap`, which only holds address-only values, so nothing would
+/// rewrite its uses: ApplyRewriter reloads it from the returned address
+/// instead, leaving those uses with the object they expect.
+///
+/// An address-only @guaranteed_address result needs none of this: it is mapped
+/// through `valueStorageMap` and rewritten by the DefRewriter.
+static bool hasLoadableGuaranteedAddressResult(ApplySite call,
+                                               SILFunction *function) {
+  if (!getLoweredCallConv(call).hasGuaranteedAddressResult())
+    return false;
+  auto fullApply = call.asFullApplySite();
+  if (!fullApply || fullApply.getKind() != FullApplySiteKind::ApplyInst)
+    return false;
+  return !fullApply.getResult()->getType().isAddressOnly(*function);
+}
+
 //===----------------------------------------------------------------------===//
 //                                Multi-Result
 //
@@ -860,7 +880,10 @@ void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
 
   if (applySite.getSubstCalleeType()->hasIndirectFormalResults() ||
       applySite.getSubstCalleeType()->hasIndirectFormalYields() ||
-      applySite.getSubstCalleeType()->hasIndirectErrorResult()) {
+      applySite.getSubstCalleeType()->hasIndirectErrorResult() ||
+      // A @guaranteed_address result is a *direct* address return rather than
+      // an indirect formal result, so it would otherwise be missed here.
+      hasLoadableGuaranteedAddressResult(applySite, pass.function)) {
     pass.indirectApplies.insert(applySite);
   }
 }
@@ -2486,6 +2509,8 @@ protected:
   SILValue materializeIndirectOutputAddress(ApplyOutput kind,
                                             SILValue oldResult, SILType argTy);
 
+  void reloadGuaranteedAddressResult(SILValue oldResult, SILValue resultAddr);
+
   void rewriteApply(ArrayRef<SILValue> newCallArgs);
 
   void rewriteTryApply(ArrayRef<SILValue> newCallArgs);
@@ -2773,8 +2798,12 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // address returned by the apply after lowering.
   if (guaranteedResult) {
     SILValue newResult = apply.getResult();
-    pass.valueStorageMap.setStorageAddress(guaranteedResult, newResult);
-    pass.valueStorageMap.getStorage(guaranteedResult).markRewritten();
+    if (guaranteedResult->getType().isAddressOnly(*pass.function)) {
+      pass.valueStorageMap.setStorageAddress(guaranteedResult, newResult);
+      pass.valueStorageMap.getStorage(guaranteedResult).markRewritten();
+    } else {
+      reloadGuaranteedAddressResult(guaranteedResult, newResult);
+    }
   }
 }
 
@@ -2788,6 +2817,63 @@ static void
 emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
                                             SILValue enclosingValue,
                                             AddressLoweringState &pass);
+
+/// Reload the loadable value that \p resultAddr, the address returned by the
+/// lowered call, points at and redirect the uses of \p oldResult to it.
+///
+/// The reload goes immediately after the call, ahead of the teardown of any
+/// temporary that was materialized for an argument: the returned address may
+/// point into one. Subscripting an InlineArray held in a register does exactly
+/// that -- self is materialized into a store_borrow temporary whose
+/// dealloc_stack follows the call, and the element address points into it.
+///
+/// So a non-trivial value cannot be borrowed in place; it has to be copied out
+/// of the address while that address is still valid. Uses that expect the
+/// guaranteed ownership of the original result get a borrow of the copy.
+void ApplyRewriter::reloadGuaranteedAddressResult(SILValue oldResult,
+                                                  SILValue resultAddr) {
+  if (oldResult->use_empty())
+    return;
+
+  auto reloadBuilder = pass.getBuilder(getResultInsertionPoint());
+
+  if (oldResult->getType().isTrivial(*pass.function)) {
+    auto *load = reloadBuilder.createLoad(callLoc, resultAddr,
+                                          LoadOwnershipQualifier::Trivial);
+    oldResult->replaceAllUsesWith(load);
+    return;
+  }
+
+  // A lone copy of the result is served by loading that copy directly.
+  if (auto *use = oldResult->getSingleUse()) {
+    if (auto *copy = dyn_cast<CopyValueInst>(use->getUser())) {
+      auto *load = reloadBuilder.createLoad(copy->getLoc(), resultAddr,
+                                            LoadOwnershipQualifier::Copy);
+      copy->replaceAllUsesWith(load);
+      pass.deleter.forceDelete(copy);
+      return;
+    }
+  }
+
+  // Otherwise the uses expect a guaranteed value. Borrow the copy for as long
+  // as they need it, then destroy it.
+  auto *load = reloadBuilder.createLoad(callLoc, resultAddr,
+                                        LoadOwnershipQualifier::Copy);
+  auto *borrow = reloadBuilder.createBeginBorrow(callLoc, load);
+  oldResult->replaceAllUsesWith(borrow);
+
+  emitEndBorrows(borrow, pass);
+
+  SmallVector<EndBorrowInst *, 4> scopeEnds;
+  for (auto *use : borrow->getUses()) {
+    if (auto *endBorrow = dyn_cast<EndBorrowInst>(use->getUser()))
+      scopeEnds.push_back(endBorrow);
+  }
+  for (auto *endBorrow : scopeEnds) {
+    pass.getBuilder(std::next(endBorrow->getIterator()))
+        .createDestroyValue(pass.genLoc(), load);
+  }
+}
 
 void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   // Avoid revisiting this apply.
@@ -4676,7 +4762,11 @@ static void rewriteIndirectApply(ApplySite anyApply,
   case FullApplySiteKind::TryApplyInst: {
     auto calleeFnTy = apply.getSubstCalleeType();
     if (!calleeFnTy->hasIndirectFormalResults() &&
-        !calleeFnTy->hasIndirectErrorResult()) {
+        !calleeFnTy->hasIndirectErrorResult() &&
+        // A @guaranteed_address result is a direct address return rather than
+        // an indirect formal result, but the call still has to be rewritten so
+        // that its result becomes the address the callee returns.
+        !hasLoadableGuaranteedAddressResult(apply, pass.function)) {
       return;
     }
     // If the call has indirect results and wasn't already rewritten, rewrite it
