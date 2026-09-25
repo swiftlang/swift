@@ -1207,8 +1207,6 @@ const void *const swift::_swift_concurrency_debug_jobMetadata =
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
 
-const size_t swift::_swift_concurrency_debug_asyncTaskSize = sizeof(AsyncTask);
-
 const size_t swift::_swift_concurrency_debug_asyncTaskNameOffset =
     sizeof(AsyncTask);
 
@@ -1246,6 +1244,9 @@ const HeapMetadata *swift::taskHeapMetadataPtr =
     (HeapMetadata *)(&taskHeapMetadata);
 
 #endif
+
+[[gnu::used, gnu::retain]]
+const size_t swift::_swift_concurrency_debug_asyncTaskSize = sizeof(AsyncTask);
 
 static void completeTaskImpl(AsyncTask *task,
                              AsyncContext *context,
