@@ -757,6 +757,10 @@ SWIFT_NAME("BridgedAvailabilitySpec.setMacroLoc(self:_:)")
 void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
                                          swift::SourceLoc loc);
 
+SWIFT_NAME("getter:BridgedAvailabilitySpec.macroLoc(self:)")
+swift::SourceLoc
+BridgedAvailabilitySpec_getMacroLoc(BridgedAvailabilitySpec spec);
+
 SWIFT_NAME("getter:BridgedAvailabilitySpec.domainOrIdentifier(self:)")
 BridgedAvailabilityDomainOrIdentifier
 BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec);
@@ -902,6 +906,9 @@ BridgedAvailableAttr_createUnavailableInEmbedded(BridgedASTContext cContext,
 
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupMember(self:)")
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr);
+SWIFT_NAME("BridgedAvailableAttr.setMacroLoc(self:_:)")
+void BridgedAvailableAttr_setMacroLoc(BridgedAvailableAttr cAttr,
+                                      swift::SourceLoc loc);
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupedWithWildcard(self:)")
 void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr);
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupTerminator(self:)")

@@ -142,6 +142,10 @@ BridgedAvailableAttr BridgedAvailableAttr_createUnavailableInEmbedded(
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupMember();
 }
+void BridgedAvailableAttr_setMacroLoc(BridgedAvailableAttr cAttr,
+                                      SourceLoc loc) {
+  cAttr.unbridged()->setMacroLoc(loc);
+}
 void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupedWithWildcard();
 }

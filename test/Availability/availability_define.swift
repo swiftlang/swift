@@ -81,14 +81,14 @@ public func doIt(_ closure: () -> ()) {
 
 @inlinable
 public func forbidMacrosInInlinableCode() {
-  if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
-  if #available(_iOS54, _macOS51_0, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
-  if #available(iOS 54.0, _macOS51_0, tvOS 54.0, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
-  if #unavailable(_iOS54Aligned) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
-  if #unavailable(_iOS54, _macOS51_0) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
-  if #unavailable(iOS 54.0, _macOS51_0, tvOS 54.0) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  if #available(_iOS54Aligned, *) { } // expected-error@:17 {{availability macro cannot be used in an '@inlinable' function}}
+  if #available(_iOS54, _macOS51_0, *) { } // expected-error@:17 {{availability macro cannot be used in an '@inlinable' function}}
+  if #available(iOS 54.0, _macOS51_0, tvOS 54.0, *) { } // expected-error@:27 {{availability macro cannot be used in an '@inlinable' function}}
+  if #unavailable(_iOS54Aligned) { } // expected-error@:19 {{availability macro cannot be used in an '@inlinable' function}}
+  if #unavailable(_iOS54, _macOS51_0) { } // expected-error@:19 {{availability macro cannot be used in an '@inlinable' function}}
+  if #unavailable(iOS 54.0, _macOS51_0, tvOS 54.0) { } // expected-error@:29 {{availability macro cannot be used in an '@inlinable' function}}
   doIt {
-    if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+    if #available(_iOS54Aligned, *) { } // expected-error@:19 {{availability macro cannot be used in an '@inlinable' function}}
   }
 }
 
