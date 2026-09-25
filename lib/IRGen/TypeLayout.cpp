@@ -2005,6 +2005,15 @@ void AlignedGroupEntry::assignWithCopy(IRGenFunction &IGF, Address dest,
 
 void AlignedGroupEntry::assignWithTake(IRGenFunction &IGF, Address dest,
                                        Address src) const {
+  // If the type has a deinit, the value being overwritten in the destination
+  // must be destroyed via that deinit; elementwise assignment would skip it.
+  // Destroy the old value first, then take-initialize.
+  if (auto *nominal = ty.getNominalOrBoundGenericNominal();
+      nominal && nominal->getValueTypeDestructor()) {
+    destroy(IGF, dest);
+    initWithTake(IGF, dest, src);
+    return;
+  }
   withEachEntry(
       IGF, dest, src,
       [&](TypeLayoutEntry *entry, Address entryDest, Address entrySrc) {
