@@ -261,7 +261,7 @@ public:
 /// TaskOptionRecord is used to provide the witnesses.
 struct ResultTypeInfo {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const Metadata *metadata = nullptr;
+  const Metadata *__ptrauth_swift_task_result_type_metadata metadata = nullptr;
   bool isNull() {
     return metadata == nullptr;
   }
