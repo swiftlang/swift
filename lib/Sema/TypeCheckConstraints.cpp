@@ -1990,6 +1990,19 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       toExistential)
     return failed();
 
+  // Casts from a concrete metatype of an existential to an existential
+  // metatype only succeed when the existential satisfies the constraint itself.
+  if (!fromExistentialMetatype &&
+      toExistentialMetatype &&
+      fromExistential &&
+      toExistential) {
+    auto toLayout = toType->getExistentialLayout();
+    if (!llvm::all_of(toLayout.getProtocols(), [&](ProtocolDecl *proto) {
+          return bool(checkConformance(fromType, proto));
+        }))
+      return failed();
+  }
+
   // Casts to or from generic types can't be statically constrained in most
   // cases, because there may be protocol conformances we don't statically
   // know about.
