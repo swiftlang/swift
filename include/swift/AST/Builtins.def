@@ -1024,6 +1024,17 @@ BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
 /// memory that was allocated by startAsyncLetWithLocalBuffer.
 BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
 
+/// initializeForeignReferenceSubclass<T>(T, BaseCtor, Args...) -> T
+///
+/// Constructs the C++ base subobject of a Swift class that subclasses a C++
+/// foreign reference type, into storage previously allocated for the subclass.
+/// Emitted in place of the call for `super.init(...)` on such a subclass. Takes
+/// `self`, a reference to the base constructor that `super.init` resolved to,
+/// and that constructor's arguments, each passed as that entry point's
+/// parameter convention dictates. Forwards `self` through as its result.
+BUILTIN_MISC_OPERATION(InitializeForeignReferenceSubclass,
+                       "initializeForeignReferenceSubclass", "", Special)
+
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
 /// Marks the end of an async-let's lifetime.
