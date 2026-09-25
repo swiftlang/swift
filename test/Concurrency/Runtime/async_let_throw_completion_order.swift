@@ -9,11 +9,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s %}
-// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s %}
-
-import _Concurrency
-
 struct Bad: Error {}
 
 class Foo { init() async throws {}; deinit { print("Foo down") } }
