@@ -72,8 +72,8 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
   # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
   set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+  # There is no stable ABI on Windows.
+  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
   # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
   set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
