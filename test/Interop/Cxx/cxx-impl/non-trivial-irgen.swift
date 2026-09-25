@@ -115,6 +115,30 @@ extension Box {
 }
 
 
+// References
+
+// int readTracked(const Tracked &t);
+// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z11readTrackedRK7Tracked(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} i32 @"?readTracked@@YAHAEBUTracked@@@Z"(ptr %0)
+// CHECK: getelementptr inbounds{{.*}} %TSo7TrackedV, ptr %0
+@unsafe @cxx @implementation
+public func readTracked(_ t: Tracked) -> Int32 { return t.value }
+
+// void bumpTracked(Tracked &t);
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z11bumpTrackedR7Tracked(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} void @"?bumpTracked@@YAXAEAUTracked@@@Z"(ptr %0)
+@unsafe @cxx @implementation
+public func bumpTracked(_ t: inout Tracked) { t.value += 1 }
+
+// void assignTracked(Tracked &dst, const Tracked &src);
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z13assignTrackedR7TrackedRKS_(ptr %0, ptr %1)
+// CHECK-WIN-LABEL: define{{.*}} void @"?assignTracked@@YAXAEAUTracked@@AEBU1@@Z"(ptr %0, ptr %1)
+@unsafe @cxx @implementation
+public func assignTracked(_ dst: inout Tracked, _ src: Tracked) {
+  dst = src
+}
+
+
 // Swift-side calls
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s{{.*}}19callNonTrivialFuncsyyF"
@@ -128,8 +152,11 @@ extension Box {
 // CHECK-SYSV:   invoke i32 @_ZN3Box3addE7Tracked
 // CHECK-SYSV:   invoke void @_ZNK3Box7produceEv
 // CHECK-SYSV:   invoke void @_ZN3Box4wrapEi
+// CHECK-SYSV:   invoke i32 @_Z11readTrackedRK7Tracked
+// CHECK-SYSV:   invoke void @_Z11bumpTrackedR7Tracked
+// CHECK-SYSV:   invoke void @_Z13assignTrackedR7TrackedRKS_
 public func callNonTrivialFuncs() {
-  let t = Tracked(1)
+  var t = Tracked(1)
   _ = takesTracked(t)
   _ = takesTwoTracked(t, t)
   _ = returnsTracked(2)
@@ -142,4 +169,9 @@ public func callNonTrivialFuncs() {
   _ = box.add(t)
   _ = box.produce()
   _ = Box.wrap(5)
+
+  let u = Tracked(6)
+  _ = readTracked(t)
+  bumpTracked(&t)
+  assignTracked(&t, u)
 }

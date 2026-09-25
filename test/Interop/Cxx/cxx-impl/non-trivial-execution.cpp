@@ -159,6 +159,20 @@ int main() {
   }
   // CHECK-NEXT: live=0
   printf("live=%d\n", Tracked::liveCount);
+  Tracked::copyCount = 0;
+
+  {
+    Tracked a(5), b(9);
+    int read = readTracked(a);
+    bumpTracked(a);
+    int bumped = a.value;
+    assignTracked(a, b);
+    int assigned = a.value;
+    // CHECK-NEXT: references: read=5 bumped=6 assigned=9
+    printf("references: read=%d bumped=%d assigned=%d\n", read, bumped, assigned);
+  }
+  // CHECK-NEXT: live=0
+  printf("live=%d\n", Tracked::liveCount);
 
   return 0;
 }
