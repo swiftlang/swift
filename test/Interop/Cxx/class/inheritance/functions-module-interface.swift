@@ -151,6 +151,14 @@
 // CHECK-NEXT:   public func getX() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func unnamedParam(_: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public mutating func unnamedParamMut(_: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func mixedNamedParams(_: CInt, _ y: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func unnamedRefParam(_: inout CInt) -> CInt
 // CHECK-NOT:    public
 // CHECK:      }
 
@@ -161,6 +169,14 @@
 // CHECK-NEXT:   public func getX() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func unnamedParam(_: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public mutating func unnamedParamMut(_: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func mixedNamedParams(_: CInt, _ y: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func unnamedRefParam(_: inout CInt) -> CInt
 // CHECK-NEXT:   public init(_ x: CInt)
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getDerivedX() -> CInt
@@ -181,6 +197,14 @@
 // CHECK-NEXT:   public func getX() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func unnamedParam(_: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public mutating func unnamedParamMut(_: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func mixedNamedParams(_: CInt, _ y: CInt) -> CInt
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   public func unnamedRefParam(_: inout CInt) -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getDerivedX() -> CInt
 // CHECK-NEXT:   @discardableResult

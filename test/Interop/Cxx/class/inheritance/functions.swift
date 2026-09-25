@@ -108,4 +108,19 @@ FunctionsTestSuite.test("non-initializer function renamed to init()") {
   expectEqual(freeFuncRenamedToInit(), 42)
 }
 
+FunctionsTestSuite.test("base members with unnamed parameters") {
+  let derived = CopyTrackedDerivedClass(42)
+  expectEqual(derived.unnamedParam(1), 42)
+  expectEqual(derived.mixedNamedParams(1, 2), 44)
+
+  var mutDerived = CopyTrackedDerivedClass(7)
+  expectEqual(mutDerived.unnamedParamMut(1), 7)
+
+  var r: CInt = 5
+  expectEqual(derived.unnamedRefParam(&r), 42)
+
+  let derivedDerived = CopyTrackedDerivedDerivedClass(-5)
+  expectEqual(derivedDerived.unnamedParam(1), -5)
+}
+
 runAllTests()

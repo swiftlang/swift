@@ -13,6 +13,16 @@ struct Struct {
 
   template <typename T>
   static void templateTypeParamNotUsedInSignatureStatic() {}
+
+  template <typename T>
+  int unnamedParamNotUsedInSignature(int) const {
+    return 42;
+  }
+
+  template <typename T>
+  static int unnamedParamNotUsedInSignatureStatic(int) {
+    return 42;
+  }
 };
 
 template <typename T>
@@ -56,5 +66,18 @@ void templateTypeParamNotUsedInSignatureWithVarargsAndUnrelatedParam(int x, ...)
 
 template <typename T, int N>
 void templateTypeParamNotUsedInSignatureWithNonTypeParam() {}
+
+template <typename T>
+int unnamedParamNotUsedInSignature(int) { return 42; }
+
+template <typename T>
+int mixedNamedParamsNotUsedInSignature(int x, int) {
+  return x;
+}
+
+template <typename T, typename U>
+U unnamedAndDeducedParamsNotUsedInSignature(int, U u) {
+  return u;
+}
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_TEMPLATE_TYPE_PARAMETER_NOT_IN_SIGNATURE_H

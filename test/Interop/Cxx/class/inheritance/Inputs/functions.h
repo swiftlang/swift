@@ -137,6 +137,19 @@ public:
     int getXMut() {
         return x;
     }
+
+    int unnamedParam(int) const {
+        return x;
+    }
+    int unnamedParamMut(int) {
+        return x;
+    }
+    int mixedNamedParams(int, int y) const {
+        return x + y;
+    }
+    int unnamedRefParam(int &) const {
+        return x;
+    }
 private:
     int x;
 };
