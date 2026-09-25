@@ -1102,8 +1102,11 @@ public:
         continue;
 
       adjArgs.push_back(origArg);
-      afterTryApplyPbBB->createPhiArgument(origArg->getType(),
-                                           OwnershipKind::Owned);
+      auto bbArg = afterTryApplyPbBB->createPhiArgument(
+          getRemappedTangentType(origArg->getType()), OwnershipKind::Owned);
+
+      activeValuePullbackBBArgumentMap[{originalBB, origArg}] = bbArg;
+      recordTemporary(bbArg);
     }
 
     {
@@ -1112,7 +1115,10 @@ public:
       SmallVector<SILValue> outAdjArgs;
       for (auto arg : adjArgs) {
         auto argAdj = getAdjointValue(originalBB, arg);
-        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
+        auto adjVal = materializeAdjointDirect(argAdj, loc);
+        auto adjValCopy = builder.emitCopyValueOperation(loc, adjVal);
+
+        outAdjArgs.push_back(adjValCopy);
       }
 
       cleanUpTemporariesForBlock(errorPbBB, loc);
@@ -1126,7 +1132,9 @@ public:
       SmallVector<SILValue> outAdjArgs;
       for (auto arg : adjArgs) {
         auto argAdj = getAdjointValue(originalBB, arg);
-        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
+        auto adjVal = materializeAdjointDirect(argAdj, loc);
+        auto adjValCopy = builder.emitCopyValueOperation(loc, adjVal);
+        outAdjArgs.push_back(adjValCopy);
       }
 
       cleanUpTemporariesForBlock(normalPbBB, loc);
