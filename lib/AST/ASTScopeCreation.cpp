@@ -293,12 +293,14 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
       scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
-
     if (SF->Kind == SourceFileKind::DefaultArgument ||
         SF->Kind == SourceFileKind::SyntheticMacro) {
       auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
           SF->getBufferID());
-      parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
+      parentLoc =
+          SF->Kind == SourceFileKind::SyntheticMacro
+              ? genInfo.originalSourceRange.getStart()
+              : ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
       if (auto parentScope =
               findStartingScopeForLookup(enclosingSF, parentLoc)) {
         parentAndWasExpanded.setPointer(
