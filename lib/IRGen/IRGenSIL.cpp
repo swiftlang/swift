@@ -6406,9 +6406,15 @@ visitMarkDependenceAddrInst(swift::MarkDependenceAddrInst *i) {
 
 void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  llvm::Value *copied = emitBlockCopyCall(lowered.claimNext());
+  llvm::Value *block = lowered.claimNext();
+
+  // Copying a global block produces the same block, so skip the copy.
+  if (!(isa<InitBlockStorageHeaderInst>(i->getOperand()) &&
+        isa<llvm::Constant>(block)))
+    block = emitBlockCopyCall(block);
+
   Explosion result;
-  result.add(copied);
+  result.add(block);
   setLoweredExplosion(i, result);
 }
 
@@ -8650,6 +8656,56 @@ void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
   setLoweredAddress(i, capture);
 }
 
+/// If the block storage initialized by the given instruction only ever holds
+/// a single constant, context-free function value, return that value.
+/// A block formed from such storage can be emitted as a global block.
+static SILValue getConstantBlockCapture(InitBlockStorageHeaderInst *i) {
+  auto *storage = dyn_cast<AllocStackInst>(i->getBlockStorage());
+  if (!storage)
+    return SILValue();
+
+  // Find the single store to the capture. Anything else that could write
+  // to or escape the storage prevents the optimization.
+  StoreInst *captureStore = nullptr;
+  for (auto *use : storage->getUses()) {
+    auto *user = use->getUser();
+    if (isa<InitBlockStorageHeaderInst>(user) ||
+        isa<DeallocStackInst>(user) || user->isDebugInstruction())
+      continue;
+
+    auto *projection = dyn_cast<ProjectBlockStorageInst>(user);
+    if (!projection)
+      return SILValue();
+
+    for (auto *projectionUse : projection->getUses()) {
+      auto *projectionUser = projectionUse->getUser();
+      if (isa<LoadInst>(projectionUser) ||
+          isa<DestroyAddrInst>(projectionUser) ||
+          projectionUser->isDebugInstruction())
+        continue;
+
+      auto *store = dyn_cast<StoreInst>(projectionUser);
+      if (!store || store->getDest() != projection || captureStore)
+        return SILValue();
+      captureStore = store;
+    }
+  }
+
+  if (!captureStore)
+    return SILValue();
+
+  // The captured value must be a reference to a function with no context.
+  SILValue capture = captureStore->getSrc();
+  SILValue fn = capture;
+  while (auto *convert = dyn_cast<ConvertFunctionInst>(fn))
+    fn = convert->getOperand();
+  auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(fn);
+  if (!thinToThick || !isa<FunctionRefInst>(thinToThick->getCallee()))
+    return SILValue();
+
+  return capture;
+}
+
 void IRGenSILFunction::visitInitBlockStorageHeaderInst(
                                                InitBlockStorageHeaderInst *i) {
   auto addr = getLoweredAddress(i->getBlockStorage());
@@ -8669,11 +8725,25 @@ void IRGenSILFunction::visitInitBlockStorageHeaderInst(
 
   assert(foreignInfo.ClangInfo && "no clang info for block function?");
 
+  auto storageTy =
+      i->getBlockStorage()->getType().castTo<SILBlockStorageType>();
+  auto invokeTy = i->getInvokeFunction()->getType().castTo<SILFunctionType>();
+
+  // If the block doesn't capture any context, emit it as a global block.
+  if (invokeFn && canEmitGlobalBlocks(IGM)) {
+    if (auto capture = getConstantBlockCapture(i)) {
+      auto *block = emitGlobalBlock(
+          IGM, storageTy, invokeFn, invokeTy, foreignInfo,
+          emitConstantValue(IGM, capture).claimNextConstant());
+      Explosion e;
+      e.add(block);
+      setLoweredExplosion(i, e);
+      return;
+    }
+  }
+
   // Initialize the header.
-  emitBlockHeader(*this, addr,
-          i->getBlockStorage()->getType().castTo<SILBlockStorageType>(),
-          invokeFn, i->getInvokeFunction()->getType().castTo<SILFunctionType>(),
-          foreignInfo);
+  emitBlockHeader(*this, addr, storageTy, invokeFn, invokeTy, foreignInfo);
 
   // Cast the storage to the block type to produce the result value.
   llvm::Value *asBlock = Builder.CreateBitCast(addr.getAddress(),

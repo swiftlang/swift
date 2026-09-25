@@ -1363,6 +1363,10 @@ public:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+  /// Global blocks, keyed by their invoke function and constant capture.
+  llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
+                 llvm::Constant *> GlobalBlocks;
+
 private:
   using CopyAddrHelperGenerator =
     llvm::function_ref<void(IRGenFunction &IGF, Address dest, Address src,

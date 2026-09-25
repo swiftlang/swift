@@ -12,8 +12,12 @@
 
 import SIL
 
-extension PartialApplyInst : OnoneSimplifiable {
+extension PartialApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if tryReplaceWithThinToThickFunction(context) {
+      return
+    }
+
     let optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
     if optimizedApplyOfPartialApply {
       context.notifyInvalidatedStackNesting()
@@ -30,5 +34,25 @@ extension PartialApplyInst : OnoneSimplifiable {
     if context.tryDeleteDeadClosure(closure: self, needKeepArgsAlive: !optimizedApplyOfPartialApply) {
       context.notifyInvalidatedStackNesting()
     }
+  }
+}
+
+private extension PartialApplyInst {
+  /// A partial_apply without any substitutions or arguments is just a thin_to_thick_function.
+  func tryReplaceWithThinToThickFunction(_ context: SimplifyContext) -> Bool {
+    guard numArguments == 0,
+          !hasSubstitutions,
+          callee.type.functionTypeRepresentation == .thin,
+          // Make sure the only difference is that the result is thick.
+          type == callee.type.getThickFunctionType(calleeConvention: calleeConvention)
+                             .getFunctionType(withNoEscape: type.isNoEscapeFunction)
+    else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let thinToThick = builder.createThinToThickFunction(thinFunction: callee, resultType: type)
+    context.erase(instructions: uses.users(ofType: DeallocStackInst.self))
+    replace(with: thinToThick, context)
+    return true
   }
 }

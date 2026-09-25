@@ -649,6 +649,11 @@ extension FunctionWorklist {
         if let callee = apply.referencedFunction {
           pushIfNotVisited(callee)
         }
+      case let thinToThick as ThinToThickFunctionInst:
+        // A closure without a context.
+        if let fri = thinToThick.operand.value as? FunctionRefInst {
+          pushIfNotVisited(fri.referencedFunction)
+        }
       case let kpi as KeyPathInst:
         // A key path pattern's accessor thunks are referenced by the pattern
         // rather than by a `function_ref`, so they are invisible to the cases

@@ -170,6 +170,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })
   registerForSILCombine(AllocStackInst.self,        { run(AllocStackInst.self, $0) })
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
+  registerForSILCombine(PartialApplyInst.self,      { run(PartialApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
   registerForSILCombine(InitBorrowAddrInst.self,    { run(InitBorrowAddrInst.self, $0) })
