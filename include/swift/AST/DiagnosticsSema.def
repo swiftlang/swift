@@ -2269,6 +2269,14 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_override_attr_not_override,none,
+      "%kind0 cannot be marked 'override' because its C++ declaration does not "
+      "override a base class method",
+      (const ValueDecl *))
+ERROR(cxx_override_attr_not_superclass,none,
+      "%kind0 cannot be marked 'override' because the C++ method it overrides "
+      "belongs to %1, which is not a superclass of %2 in Swift",
+      (const ValueDecl *, const clang::NamedDecl *, const ValueDecl *))
 ERROR(cxx_self_ownership_unsupported,none,
       "%kindonly0 cannot be marked '@cxx' because 'self' is "
       "'%select{borrowing|consuming}1'; a C++ method receives 'this' from its "

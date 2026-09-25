@@ -4305,21 +4305,27 @@ private:
     return matchesImpl(req, cand, explicitObjCName);
   }
 
+  /// A virtual method of a foreign reference type imports as a synthesized
+  /// `__synthesizedVirtualCall_` thunk. Returns the underlying virtual method
+  /// for such a thunk, and \p decl otherwise.
+  static const ValueDecl *getCxxInterface(const ValueDecl *decl) {
+    if (const auto *thunk = dyn_cast<FuncDecl>(decl))
+      if (const auto *original = decl->getASTContext()
+                                     .getClangModuleLoader()
+                                     ->getOriginalForVirtualThunk(thunk))
+        return original;
+    return decl;
+  }
+
   /// Extra validity checks for a successfully matched `@cxx @implementation`
   /// pair. Returns true if an error was diagnosed (the match is invalid).
   bool diagnoseInvalidCxxMatch(ValueDecl *req, ValueDecl *cand) {
     if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
       return false;
 
-    // A virtual method of a foreign reference type matches the importer's
-    // synthesized `__synthesizedVirtualCall_` thunk. Every check below is
-    // about the underlying virtual method the implementation will provide the
-    // body of.
-    const Decl *interface = req;
-    if (auto *thunk = dyn_cast<FuncDecl>(req))
-      if (auto *original = req->getASTContext().getClangModuleLoader()
-                               ->getOriginalForVirtualThunk(thunk))
-        interface = original;
+    // Every check below is about the underlying virtual method the
+    // implementation will provide the body of.
+    const Decl *interface = getCxxInterface(req);
     const auto *clangFD =
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
@@ -4442,17 +4448,44 @@ private:
     return false;
   }
 
+  /// A matched `@cxx @implementation` is marked `override` exactly when the
+  /// C++ method it implements overrides a method of a Swift superclass.
+  void diagnoseCxxOverrideKeyword(ValueDecl *req, ValueDecl *cand) {
+    if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
+      return;
+
+    auto *loader = cand->getASTContext().getClangModuleLoader();
+    auto *overridden = loader->getOverriddenSuperclassMember(req);
+    auto *overrideAttr = cand->getAttrs().getAttribute<OverrideAttr>();
+
+    if (overridden && !overrideAttr) {
+      diagnose(cand, diag::missing_override)
+          .fixItInsert(cand->getStartLoc(), "override ");
+      diagnose(getCxxInterface(overridden), diag::overridden_here);
+      return;
+    }
+
+    if (!overridden && overrideAttr) {
+      const auto *method = dyn_cast_or_null<clang::CXXMethodDecl>(
+          getCxxInterface(req)->getClangDecl());
+      if (method && method->size_overridden_methods() > 0)
+        diagnose(cand, diag::cxx_override_attr_not_superclass, cand,
+                 (*method->begin_overridden_methods())->getParent(),
+                 cand->getDeclContext()->getSelfNominalTypeDecl())
+            .fixItRemove(overrideAttr->getRange());
+      else
+        diagnose(cand, diag::cxx_override_attr_not_override, cand)
+            .fixItRemove(overrideAttr->getRange());
+      overrideAttr->setInvalid();
+    }
+  }
+
   /// Reject a matched `@c` or `@cxx @implementation` pair whose C or C++
   /// declaration returns a reference-counted foreign reference type at +0.
   /// Returns true if an error was diagnosed (the match is invalid).
   bool diagnoseUnretainedForeignResult(ValueDecl *req, ValueDecl *cand) {
-    // A virtual method of a foreign reference type matches the importer's
-    // synthesized thunk. The check is about the underlying virtual method.
-    const Decl *interface = req;
-    if (auto *thunk = dyn_cast<FuncDecl>(req))
-      if (auto *original = req->getASTContext().getClangModuleLoader()
-                               ->getOriginalForVirtualThunk(thunk))
-        interface = original;
+    // The check is about the underlying virtual method.
+    const Decl *interface = getCxxInterface(req);
     const auto *clangFD =
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     const auto *candFD = dyn_cast<FuncDecl>(cand);
@@ -4505,6 +4538,7 @@ private:
       if (diagnoseInvalidCxxMatch(req, cand) ||
           diagnoseUnretainedForeignResult(req, cand))
         return;
+      diagnoseCxxOverrideKeyword(req, cand);
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
       // The storage matched, but its accessors may not have.
