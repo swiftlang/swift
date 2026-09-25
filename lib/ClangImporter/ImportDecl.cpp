@@ -4906,6 +4906,7 @@ namespace {
                            Impl.SwiftContext.getIdentifier(staticCallName),
                            funcDecl->getName().getArgumentNames()));
               Impl.virtualThunkToOriginal[result] = funcDecl;
+              Impl.virtualOriginalToThunk[funcDecl] = result;
 
               // Propagate availability attributes from the original Swift
               // funcDecl.

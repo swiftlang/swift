@@ -2417,6 +2417,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
   case XREF_GENERIC_PARAM_PATH_PIECE:
   case XREF_INITIALIZER_PATH_PIECE:
+  case XREF_CXX_SYNTHESIZED_ENTRY_POINT_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
 
   default:
@@ -2477,6 +2478,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       case XREF_EXTENSION_PATH_PIECE:
       case XREF_CXX_EXCEPTION_ADAPTER_PATH_PIECE:
       case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE:
+      case XREF_CXX_SYNTHESIZED_ENTRY_POINT_PATH_PIECE:
         break;
 
       case XREF_GENERIC_PARAM_PATH_PIECE:
@@ -3002,6 +3004,35 @@ giveUpFastPath:
       if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
       }
+      break;
+    }
+
+    case XREF_CXX_SYNTHESIZED_ENTRY_POINT_PATH_PIECE: {
+      uint8_t rawKind;
+      XRefCxxSynthesizedEntryPointPathPieceLayout::readRecord(scratch, rawKind);
+
+      auto *importer =
+          static_cast<ClangImporter *>(getContext().getClangModuleLoader());
+      auto *anchor = values.size() == 1
+                         ? dyn_cast<AbstractFunctionDecl>(values.front())
+                         : nullptr;
+      FuncDecl *entryPoint = nullptr;
+      if (importer && anchor) {
+        switch (static_cast<CxxSynthesizedEntryPointKind>(rawKind)) {
+        case CxxSynthesizedEntryPointKind::StaticVirtualCall:
+          if (auto *thunk = dyn_cast<FuncDecl>(anchor))
+            entryPoint = importer->getOriginalForVirtualThunk(thunk);
+          break;
+        case CxxSynthesizedEntryPointKind::InheritedMemberHelper:
+          entryPoint = importer->getHelperForInheritedMember(anchor);
+          break;
+        }
+      }
+      if (!entryPoint)
+        return llvm::make_error<XRefError>(
+            "missing synthesized C++ entry point", pathTrace,
+            getXRefDeclNameForError());
+      values.assign(1, entryPoint);
       break;
     }
 
