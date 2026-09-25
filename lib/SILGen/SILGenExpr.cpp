@@ -1550,6 +1550,14 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
     return RValue(SGF, E,
                   ManagedValue::forObjectRValueWithoutOwnership(metaBase));
 
+  // An upcast is a bitcast of one scalar, so it cannot produce a thin metatype;
+  // materialize a fresh one instead, which carries no runtime state anyway.
+  if (loweredResultTy.castTo<AnyMetatypeType>()->getRepresentation() ==
+      MetatypeRepresentation::Thin) {
+    auto meta = SGF.B.createMetatype(E, loweredResultTy);
+    return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(meta));
+  }
+
   auto upcast = SGF.B.createUpcast(E, metaBase, loweredResultTy);
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
