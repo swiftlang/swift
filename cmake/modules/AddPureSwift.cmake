@@ -13,6 +13,32 @@ function(force_add_dependencies TARGET)
   endforeach()
 endfunction()
 
+# Workaround for swift-syntax targets being rebuilt on every build.
+#
+# With CMP0157 OLD, the object files and the swiftmodule are outputs of the
+# single build step which compiles and links a Swift target. The frontend
+# doesn't re-write such files if their content did not change. Their mtime is
+# then older than the inputs and ninja considers the target (and everything
+# which depends on it) as dirty on every build.
+# swift-syntax itself doesn't handle this anymore, because it assumes that
+# CMP0157 is NEW. Remove this once the Swift language is enabled with CMP0157
+# NEW in the top-level CMakeLists.txt.
+#
+# This macro must be called in the scope which adds swift-syntax with
+# FetchContent_MakeAvailable. Targets use the rule variables of the scope in
+# which they are defined.
+macro(_swift_syntax_workaround_stale_outputs)
+  if(NOT CMAKE_Swift_COMPILATION_MODE_DEFAULT)
+    # Always write the object files.
+    string(APPEND CMAKE_Swift_FLAGS " -Xfrontend -disable-incremental-llvm-codegen")
+    # Touch the swiftmodule.
+    list(APPEND CMAKE_Swift_CREATE_SHARED_LIBRARY
+      "\"${CMAKE_COMMAND}\" -E touch_nocreate <SWIFT_MODULE>")
+    list(APPEND CMAKE_Swift_CREATE_STATIC_LIBRARY
+      "\"${CMAKE_COMMAND}\" -E touch_nocreate <SWIFT_MODULE>")
+  endif()
+endmacro()
+
 function(force_target_link_libraries TARGET)
   target_link_libraries(${TARGET} ${ARGN})
 
