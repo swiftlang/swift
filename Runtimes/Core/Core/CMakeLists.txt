@@ -6,9 +6,6 @@ gyb_expand(AtomicInt.swift.gyb AtomicInt.swift
 gyb_expand(FloatingPointParsing.swift.gyb FloatingPointParsing.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
-gyb_expand(FloatingPointTypes.swift.gyb FloatingPointTypes.swift
-  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
-
 gyb_expand(IntegerTypes.swift.gyb IntegerTypes.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
@@ -68,6 +65,7 @@ add_library(swiftCore
   DictionaryStorage.swift
   DictionaryVariant.swift
   DiscontiguousSlice.swift
+  Double.swift
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -79,6 +77,9 @@ add_library(swiftCore
   Filter.swift
   FlatMap.swift
   Flatten.swift
+  Float.swift
+  Float16.swift
+  Float80.swift
   FloatingPoint.swift
   FloatingPointFromString.swift
   FloatingPointToString.swift
@@ -280,7 +281,6 @@ add_library(swiftCore
   "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c"
   "${CMAKE_CURRENT_BINARY_DIR}/AtomicInt.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/FloatingPointParsing.swift"
-  "${CMAKE_CURRENT_BINARY_DIR}/FloatingPointTypes.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/IntegerTypes.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeRawBufferPointer.swift"

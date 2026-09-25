@@ -78,6 +78,7 @@ split_embedded_sources(
   EMBEDDED DictionaryVariant.swift
   EMBEDDED Diffing.swift
   EMBEDDED DiscontiguousSlice.swift
+  EMBEDDED Double.swift
   EMBEDDED DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED Duration.swift
@@ -91,6 +92,9 @@ split_embedded_sources(
   EMBEDDED Filter.swift
   EMBEDDED FlatMap.swift
   EMBEDDED Flatten.swift
+  EMBEDDED Float.swift
+  EMBEDDED Float16.swift
+  EMBEDDED Float80.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED FloatingPointRandom.swift
   EMBEDDED FullyInhabited.swift
@@ -288,7 +292,6 @@ split_embedded_sources(
   EMBEDDED FloatingPointFromString.swift
   EMBEDDED FloatingPointParsing.swift.gyb
   EMBEDDED FloatingPointToString.swift
-  EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED UnsafeBufferPointer.swift.gyb
   EMBEDDED UnsafeRawBufferPointer.swift.gyb
