@@ -74,6 +74,13 @@ entry(%arg : $Builtin.Int32):
   return undef : $()
 }
 
+// CHECK: sil [ownership_for_trivial] [ossa] @ownership_for_trivial
+sil [ossa] [ownership_for_trivial] @ownership_for_trivial : $@convention(thin) (Int) -> () {
+entry(%0 : @owned $Int):
+  destroy_value %0
+  return undef : $()
+}
+
 sil [ossa] @strong_copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
