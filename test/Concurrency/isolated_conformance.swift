@@ -235,14 +235,14 @@ extension HasAssociatedType where Self: Sendable {
 
 func testIsolatedConformancesOnAssociatedTypes(hc: HoldsC, c: C) {
   acceptHasAssocWithP(hc)
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
   acceptSendableHasAssocWithP(hc) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter }}
 
-  HoldsC.acceptAliased(C.self) // okay
+  HoldsC.acceptAliased(C.self)
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
 
-  // FIXME: the following should produce an error, because the isolated
-  // conformance of C: P can cross isolation boundaries via the Sendable Self's
-  // associated type.
   HoldsC.acceptSendableAliased(C.self)
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
 }
 
 
@@ -597,4 +597,54 @@ func testEnumElementPatternParentType(_ x: Any) {
   default:
     break
   }
+}
+
+// https://github.com/swiftlang/swift/issues/91755
+// A nonisolated conformance must not stop the walk short of the isolated
+// conformances among its substitutions.
+
+struct GenericP<T: P>: P {
+  func f() { }
+}
+
+struct PairP<T: P, U: P>: P {
+  func f() { }
+}
+
+struct NonIsolatedP: P {
+  func f() { }
+}
+
+func testErasureOfSpecializedConformance(_ g: GenericP<C>) {
+  _ = g as any P
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  _ = GenericP<C>.self as any P.Type
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+}
+
+// Order among siblings must not matter.
+func testErasureOfSiblingConformances(_ a: PairP<C, NonIsolatedP>,
+                                      _ b: PairP<NonIsolatedP, C>) {
+  _ = a as any P
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  _ = b as any P
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+}
+
+// Same isolation domain: no diagnostic.
+@MainActor
+func testErasureFromMatchingIsolation(_ g: GenericP<C>) {
+  _ = g as any P
+}
+
+// A conditional conformance's requirement conformances live only in its own
+// substitution map, so only the walk can reach them.
+struct Conditional<T> { }
+extension Conditional: P where T: P {
+  func f() { }
+}
+
+func testErasureOfConditionalConformance(_ c: Conditional<C>) {
+  _ = c as any P
+  // expected-warning@-1 {{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
 }
