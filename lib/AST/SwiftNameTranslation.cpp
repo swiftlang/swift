@@ -379,9 +379,11 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
   if (const auto *storageDecl = dyn_cast<AbstractStorageDecl>(VD)) {
-    // Throwing property and subscript accessors are not supported yet.
+    // Accessors follow the same rules as async and throwing functions.
     for (const auto *accessor : storageDecl->getAllAccessors()) {
-      if (accessor->hasThrows())
+      if (accessor->hasAsync())
+        return {Unsupported, UnrepresentableAsync};
+      if (isUnrepresentableThrowingFunction(accessor))
         return {Unsupported, UnrepresentableThrows};
     }
   }

@@ -53,6 +53,30 @@ int main() {
     Functions::testDestroyedError();
   } catch(const swift::Error &e) { }
 
+  auto accessors = Functions::ThrowingAccessors::init(false);
+  printf("value: %d\n", static_cast<int>(accessors.getValue()));
+  printf("isReady: %d\n", static_cast<int>(accessors.isReady()));
+  printf("subscript: %d\n", static_cast<int>(accessors[4]));
+  auto failingAccessors = Functions::ThrowingAccessors::init(true);
+  try {
+    (void)failingAccessors.getValue();
+  } catch (swift::Error &e) {
+    printf("Getter exception\n");
+  }
+  try {
+    (void)failingAccessors[4];
+  } catch (swift::Error &e) {
+    printf("Subscript exception\n");
+  }
+  try {
+    (void)Functions::ThrowingAccessors::getStaticValue();
+  } catch (swift::Error &e) {
+    auto errorOpt = e.as<Functions::NaiveErrors>();
+    assert(errorOpt.isSome());
+    assert(errorOpt.get() == Functions::NaiveErrors::returnError);
+    printf("Static getter exception\n");
+  }
+
   return 0;
 }
 
@@ -64,3 +88,9 @@ int main() {
 // CHECK-NEXT: passThrowFunctionWithNeverReturn
 // CHECK-NEXT: Exception
 // CHECK-NEXT: Test destroyed
+// CHECK-NEXT: value: 42
+// CHECK-NEXT: isReady: 1
+// CHECK-NEXT: subscript: 8
+// CHECK-NEXT: Getter exception
+// CHECK-NEXT: Subscript exception
+// CHECK-NEXT: Static getter exception
