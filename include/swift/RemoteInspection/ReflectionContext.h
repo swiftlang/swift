@@ -2203,16 +2203,26 @@ private:
         unsigned WaitQueueLoopCount = 0;
         while (WaitingTaskPtr && WaitQueueLoopCount++ < ChildTaskLimit) {
           Info.WaitingTasks.push_back(WaitingTaskPtr);
-          // The next waiting task is stored in SchedulerPrivate[0] of the
-          // waiting task.
-          // See Job::NextWaitingTaskIndex and AsyncTask::getNextWaitingTask()
-          // in include/swift/ABI/Task.h.
+          // The next waiting task is linked from the waiting task's dependency
+          // record. See AsyncTask::getNextWaitingTask() in
+          // stdlib/public/Concurrency/Task.cpp.
           RemoteAddress WaitingTaskAddress =
               RemoteAddress(WaitingTaskPtr, RemoteAddress::DefaultAddressSpace);
           auto WaitingTaskObj = readObj<AsyncTaskType>(WaitingTaskAddress);
           if (!WaitingTaskObj)
             break;
-          WaitingTaskPtr = WaitingTaskObj->SchedulerPrivate[0];
+          auto DependencyObj = readObj<TaskDependencyStatusRecord<Runtime>>(
+              RemoteAddress(WaitingTaskObj->PrivateStorage.DependencyRecord,
+                            RemoteAddress::DefaultAddressSpace));
+          if (!DependencyObj ||
+              DependencyObj->DependencyKind !=
+                  TaskDependencyStatusRecord<Runtime>::WaitingOnTask)
+            break;
+          WaitingTaskPtr =
+              stripSignedPointer(
+                  RemoteAddress(DependencyObj->NextWaitingTask,
+                                RemoteAddress::DefaultAddressSpace))
+                  .getRawAddress();
         }
       }
     }
