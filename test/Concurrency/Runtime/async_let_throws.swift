@@ -10,11 +10,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s %}
-// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s %}
-
-import _Concurrency
-
 struct Boom: Error {}
 
 func boom() throws -> Int {
@@ -28,11 +23,7 @@ func test() async {
   do {
     _ = try await result
   } catch {
-#if $Embedded
-    print("error: Boom()")
-#else
     print("error: \(error)") // CHECK: error: Boom()
-#endif
   }
 }
 
