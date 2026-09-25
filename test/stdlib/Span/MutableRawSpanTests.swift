@@ -17,11 +17,6 @@
 // Blocked by rdar://181604244 (opaque values borrow accessors)
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
-// Crash when passing a `Span` as a `borrowing some Iterable`
-// https://github.com/swiftlang/swift/issues/92448
-// XFAIL: swift_test_mode_optimize && !swift_stdlib_asserts
-// XFAIL: swift_test_mode_optimize_size && !swift_stdlib_asserts
-
 import StdlibUnittest
 
 var suite = TestSuite("MutableRawSpan Tests")
