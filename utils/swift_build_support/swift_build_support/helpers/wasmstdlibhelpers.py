@@ -123,7 +123,7 @@ def build_stdlib(args, toolchain, source_dir, build_dir, host_target,
     opts.define('SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL', 'TRUE')
     opts.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE:PATH',
                 os.path.join(source_dir, '..',
-                             'swift-experimental-string-processing'))
+                             'swift-string-processing'))
     opts.define('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL', 'TRUE')
     opts.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
     opts.define('SWIFT_ENABLE_VOLATILE:BOOL', 'TRUE')
