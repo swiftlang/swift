@@ -5366,8 +5366,11 @@ function Test-SourceKitLSP {
     # CI doesn't contain any sensitive information. Log everything.
     $env:SOURCEKIT_LSP_LOG_PRIVACY_LEVEL="sensitive"
 
-    # Log with the highest log level to simplify debugging of CI failures.
-    $env:SOURCEKIT_LSP_LOG_LEVEL="debug"
+    # Investigating https://github.com/swiftlang/sourcekit-lsp/issues/2766. `swift test --parallel` prints the output it
+    # captured for a test only when that test fails, so compiler diagnostics from a test that stalls but still passes
+    # are discarded. Pass `--verbose` below to print the output of passing tests as well, restricted to the tests that
+    # stall, and log at `info` rather than `debug` because the debug-level log of every test is far too large to keep.
+    $env:SOURCEKIT_LSP_LOG_LEVEL="info"
 
     # The Windows build doesn't build the SourceKit plugins into the SwiftPM build directory (it builds them using CMake).
     # Tell the tests where to find the just-built plugins.
@@ -5378,6 +5381,7 @@ function Test-SourceKitLSP {
       -Src "$SourceCache\sourcekit-lsp" `
       -Bin "$BinaryCache\$($HostPlatform.Triple)\SourceKitLSPTests" `
       -Platform $BuildPlatform `
+      --verbose --filter BackgroundIndexingTests `
       @SwiftPMArguments
   }
 }
