@@ -878,6 +878,12 @@ function set_build_options_for_host() {
         # Limit the number of parallel tests
         lldb_lit_args+=" -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ m = int($2/3); if (m < 1) m = 1; print (m < N) ? m : N }')"
     fi
+    if [[ "$(sw_vers -productVersion 2>/dev/null)" =~ ^26(\.|$) ]]; then
+        # Work around a problem where macOS 26 unpredictably denies a bunch of
+        # concurrently running debugserver instances the permission to attach
+        # to a process, by running the entire test suite in series.
+        lldb_lit_args+=" -j 1"
+    fi
     lldb_cmake_options+=(
         -DLLVM_LIT_ARGS="${lldb_lit_args}"
     )
