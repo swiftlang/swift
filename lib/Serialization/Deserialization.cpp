@@ -7557,6 +7557,17 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                   .withAsync(async)
                   .build();
 
+  // If we have no Clang function type, and `UseClangFunctionTypes` is
+  // enabled, construct one from the Swift type signature.
+  if (MF.getContext().LangOpts.UseClangFunctionTypes && !clangFunctionType &&
+      shouldStoreClangType(*representation)) {
+    clangFunctionType = MF.getContext().getClangFunctionType(
+        params, resultTy.get(), *representation);
+    if (!clangFunctionType)
+      return MF.diagnoseFatal();
+    info = info.intoBuilder().withClangFunctionType(clangFunctionType).build();
+  }
+
   auto resultTy = MF.getTypeChecked(resultID);
   if (!resultTy)
     return resultTy.takeError();
