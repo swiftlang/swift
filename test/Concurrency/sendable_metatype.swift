@@ -149,6 +149,29 @@ func acceptSendingAnyObjectR(_ s: sending AnyObject & R) { }
   acceptSendingAnyObjectR(w)
 }
 
+@MainActor func returnSendingExistential() -> sending any P {
+  S() // expected-warning{{returning a main actor-isolated 'any P' value as a 'sending' result risks causing data races}}
+  // expected-note@-1{{isolated conformance to protocol 'P' can be introduced here}}
+  // expected-note@-2{{returning a main actor-isolated 'any P' value risks causing races}}
+  // expected-note@-3{{type 'any P' does not conform to the 'Sendable' protocol}}
+}
+
+@MainActor func returnSendingClassExistential() -> sending any P {
+  SC() // expected-warning{{returning a main actor-isolated 'any P' value as a 'sending' result risks causing data races}}
+  // expected-note@-1{{isolated conformance to protocol 'P' can be introduced here}}
+  // expected-note@-2{{returning a main actor-isolated 'any P' value risks causing races}}
+  // expected-note@-3{{type 'any P' does not conform to the 'Sendable' protocol}}
+}
+
+@MainActor func returnSendingAnyObjectP() -> sending AnyObject & P {
+  SC() // expected-warning{{task or actor-isolated value cannot be sent}}
+  // expected-note@-1{{isolated conformance to protocol 'P' can be introduced here}}
+}
+
+@MainActor func returnSendingR() -> sending any R {
+  S()
+}
+
 func dynamicCastingExistential(
   _ s1: sending Any,
   _ s2: sending Any
