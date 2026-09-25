@@ -409,6 +409,16 @@ getModuleInfoFromOpaqueModule(clang::index::writer::OpaqueModule mod,
   return info;
 }
 
+/// Whether \p mod should be recorded as a system (non-user) module. Binary
+/// modules indexed because of -index-binary-modules are not user code either,
+/// so mark them like SDK modules; clients then present their declarations the
+/// same way (e.g. as a generated interface rather than the raw textual
+/// interface).
+static bool isNonUserModuleForIndex(ModuleDecl *mod, bool indexBinaryModules) {
+  return mod->isNonUserModule() ||
+         (indexBinaryModules && mod->isBuiltFromInterface());
+}
+
 static bool
 emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
@@ -555,8 +565,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           SmallString<64> unitName;
           if (!withoutUnitName)
             unitWriter.getUnitNameForOutputFile(F->getName(), unitName);
-          unitWriter.addUnitDependency(unitName.str(), *F,
-                                       mod->isNonUserModule(), opaqMod);
+          unitWriter.addUnitDependency(
+              unitName.str(), *F,
+              isNonUserModuleForIndex(mod, indexBinaryModules), opaqMod);
         }
 
         break;
@@ -713,7 +724,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   }
 
   auto &fileMgr = clangCI.getFileManager();
-  bool isSystem = module->isNonUserModule();
+  bool isSystem = isNonUserModuleForIndex(module, indexBinaryModules);
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;

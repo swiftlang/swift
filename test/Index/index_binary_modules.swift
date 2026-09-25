@@ -1,8 +1,9 @@
 // Binary frameworks ship a .swiftinterface and are never built from source by
 // their clients, so without index data for them index-based navigation cannot
 // find their declarations. -index-binary-modules indexes modules built from a
-// textual interface outside the SDK. Modules compiled from source are still
-// left to be indexed by their own build.
+// textual interface outside the SDK, and records them as non-user (system)
+// modules like SDK modules. Modules compiled from source are still left to be
+// indexed by their own build.
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK)
@@ -40,8 +41,8 @@
 // DEFAULT-NOT: module-name: BinaryFramework
 // DEFAULT-NOT: module-name: SourceModule
 
-/// With -index-binary-modules the binary framework is indexed, but the module
-/// compiled from source is not.
+/// With -index-binary-modules the binary framework is indexed as a system
+/// module, but the module compiled from source is not.
 // RUN: %target-swift-frontend -typecheck -parse-stdlib -swift-version 5 \
 // RUN:     -index-system-modules -index-binary-modules \
 // RUN:     -index-store-path %t/idx \
@@ -51,13 +52,14 @@
 // RUN:     -module-cache-path %t/modulecache \
 // RUN:     %t/Client.swift
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=CLIENT %s
-/// The client now links to a unit for the binary framework.
-// CLIENT-DAG: Unit | user | BinaryFramework | {{.*}}.swiftinterface | {{.+}}
+/// The client now links to a unit for the binary framework, marked as system.
+// CLIENT-DAG: Unit | system | BinaryFramework | {{.*}}.swiftinterface | {{.+}}
 // CLIENT-DAG: Unit | user | SourceModule | {{.*}}SourceModule.swiftmodule{{$}}
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=MODULE-UNIT %s
-// MODULE-UNIT: is-module: 1
+// MODULE-UNIT: is-system: 1
+// MODULE-UNIT-NEXT: is-module: 1
 // MODULE-UNIT-NEXT: module-name: BinaryFramework
-// MODULE-UNIT: Record | user | BinaryFramework |
+// MODULE-UNIT: Record | system | BinaryFramework |
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=NO-SOURCE-UNIT %s
 // NO-SOURCE-UNIT-NOT: module-name: SourceModule
 // RUN: c-index-test core -print-record %t/idx | %FileCheck -check-prefix=RECORD %s
