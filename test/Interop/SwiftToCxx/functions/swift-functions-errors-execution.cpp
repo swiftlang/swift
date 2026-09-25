@@ -15,9 +15,10 @@
 // rdar://102167469
 // UNSUPPORTED: CPU=arm64e
 
+#include "functions.h"
 #include <cassert>
 #include <cstdio>
-#include "functions.h"
+#include <utility>
 
 int main() {
   static_assert(!noexcept(Functions::emptyThrowFunction()), "noexcept function");
@@ -53,6 +54,46 @@ int main() {
     Functions::testDestroyedError();
   } catch(const swift::Error &e) { }
 
+  static_assert(std::is_base_of<std::exception, swift::Error>::value,
+                "swift::Error is not a std::exception");
+  static_assert(noexcept(std::declval<const swift::Error &>().what()),
+                "what() is not noexcept");
+
+  swift::Error empty;
+  printf("empty: %s\n", empty.what());
+
+  swift::Error naive;
+  try {
+    Functions::throwFunction();
+  } catch (const std::exception &e) {
+    printf("what: %s\n", e.what());
+    naive = static_cast<const swift::Error &>(e);
+  }
+  printf("copy-assigned: %s\n", naive.what());
+
+  try {
+    Functions::throwDescriptiveError();
+  } catch (const swift::Error &e) {
+    const char *description = e.what();
+    printf("what: %s\n", description);
+    assert(description == e.what());
+    assert(e.as<Functions::DescriptiveError>().get().getCode() == 7);
+
+    swift::Error copy(e);
+    printf("copy: %s\n", copy.what());
+    swift::Error moved(std::move(copy));
+    printf("moved: %s\n", moved.what());
+    printf("moved-from: %s\n", copy.what());
+
+    swift::Error assigned(naive);
+    printf("assigned: %s\n", assigned.what());
+    assigned = std::move(moved);
+    printf("move-assigned: %s\n", assigned.what());
+    printf("moved-from: %s\n", moved.what());
+    assigned = naive;
+    printf("copy-assigned: %s\n", assigned.what());
+  }
+
   return 0;
 }
 
@@ -64,3 +105,15 @@ int main() {
 // CHECK-NEXT: passThrowFunctionWithNeverReturn
 // CHECK-NEXT: Exception
 // CHECK-NEXT: Test destroyed
+// CHECK-NEXT: empty: swift::Error: no error value
+// CHECK-NEXT: passThrowFunction
+// CHECK-NEXT: what: throwError
+// CHECK-NEXT: copy-assigned: throwError
+// CHECK-NEXT: what: custom error: café ☕
+// CHECK-NEXT: copy: custom error: café ☕
+// CHECK-NEXT: moved: custom error: café ☕
+// CHECK-NEXT: moved-from: swift::Error: no error value
+// CHECK-NEXT: assigned: throwError
+// CHECK-NEXT: move-assigned: custom error: café ☕
+// CHECK-NEXT: moved-from: swift::Error: no error value
+// CHECK-NEXT: copy-assigned: throwError
