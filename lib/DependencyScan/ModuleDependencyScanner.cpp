@@ -726,6 +726,17 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
     if (ScanASTContext.LangOpts.EnableCXXInterop) {
       StringRef mainModuleName = mainModule->getName().str();
+      // Throwing C++ facades call this private Clang module even though the
+      // source file does not import it. Explicit builds need its PCM before
+      // the importer synthesizes those facades.
+      if (importer::getCxxExceptionBridgingUnavailableReason(
+              ScanASTContext.LangOpts, ScanASTContext.getClangModuleLoader()
+                                           ->getClangInstance()
+                                           .getLangOpts())
+              .empty())
+        mainDependencies.addModuleImport(
+            "_SwiftCxxExceptionSupport",
+            /*isExported=*/false, AccessLevel::Internal, &alreadyAddedModules);
       if (mainModuleName != CXX_MODULE_NAME)
         mainDependencies.addModuleImport(CXX_MODULE_NAME, /* isExported */ false,
                                          AccessLevel::Public,

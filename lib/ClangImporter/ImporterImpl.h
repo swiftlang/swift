@@ -744,6 +744,13 @@ public:
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
 
+  /// Maps the throwing Swift facade of a SWIFT_THROWS function to the
+  /// imported C++ adapter that it calls.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> cxxExceptionBridges;
+
+  /// The inverse of \c cxxExceptionBridges.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> cxxExceptionBridgeFacades;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -2187,6 +2194,13 @@ namespace importer {
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
+
+/// Whether an explicit call to \p decl must use the C++ exception bridge. This
+/// also prevents nonthrowing conveniences and protocol witnesses from calling
+/// it without a catch boundary. Without CxxExceptionBridging, SWIFT_THROWS has
+/// no effect and this is always false.
+bool shouldImportCxxFunctionAsThrowing(ASTContext &ctx,
+                                       const clang::FunctionDecl *decl);
 
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.

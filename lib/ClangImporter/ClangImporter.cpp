@@ -588,6 +588,13 @@ void importer::getNormalInvocationArguments(
     llvm::append_values(invocationArgStrs, "-D__swift_embedded__");
   }
 
+  // Tells <swift/bridging> that SWIFT_THROWS is understood. Without it, the
+  // header makes annotated declarations unavailable, because older compilers
+  // would silently import them as nonthrowing.
+  if (LangOpts.EnableCXXInterop &&
+      LangOpts.hasFeature(Feature::CxxExceptionBridging))
+    llvm::append_values(invocationArgStrs, "-D__swift_cxx_throws__=1");
+
   // Swift generates position-independent code by default, so establish `-fPIC`
   // as the baseline for any code Clang emits (e.g. inline functions). `-fPIC`
   //
@@ -8722,6 +8729,47 @@ bool importer::hasSwiftAttribute(const clang::Decl *decl,
   }
 
   return false;
+}
+
+StringRef importer::getCxxExceptionBridgingUnavailableReason(
+    const LangOptions &langOpts, const clang::LangOptions &clangOpts) {
+  if (!langOpts.EnableCXXInterop)
+    return "SWIFT_THROWS requires C++ interoperability";
+  if (!langOpts.hasFeature(Feature::CxxExceptionBridging))
+    return "SWIFT_THROWS requires '-enable-experimental-feature "
+           "CxxExceptionBridging'";
+  if (!clangOpts.CXXExceptions || clangOpts.IgnoreExceptions)
+    return "SWIFT_THROWS requires C++ exceptions to be enabled";
+  // Bridging has only been tested on these targets. The support module checks
+  // separately that the C++ runtime handles foreign exceptions as expected.
+  if ((!langOpts.Target.isOSDarwin() && !langOpts.Target.isOSLinux()) ||
+      langOpts.Target.isAndroid() || langOpts.hasFeature(Feature::Embedded))
+    return "SWIFT_THROWS is not supported for this compilation target";
+  if (langOpts.Target.isOSDarwin() &&
+      (!langOpts.EnableObjCInterop || !clangOpts.ObjCExceptions))
+    return "SWIFT_THROWS requires Objective-C interoperability and exception "
+           "handling on Darwin";
+  return {};
+}
+
+bool ClangImporter::isCxxExceptionBridge(const FuncDecl *decl) const {
+  return Impl.cxxExceptionBridges.contains(decl);
+}
+
+FuncDecl *
+ClangImporter::getCxxExceptionBridgeAdapter(const FuncDecl *facade) const {
+  return Impl.cxxExceptionBridges.lookup(facade);
+}
+
+FuncDecl *
+ClangImporter::getCxxExceptionBridgeFacade(const FuncDecl *adapter) const {
+  return Impl.cxxExceptionBridgeFacades.lookup(adapter);
+}
+
+bool importer::shouldImportCxxFunctionAsThrowing(
+    ASTContext &ctx, const clang::FunctionDecl *decl) {
+  return ctx.LangOpts.hasFeature(Feature::CxxExceptionBridging) &&
+         hasCxxThrowsAttr(decl);
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {
