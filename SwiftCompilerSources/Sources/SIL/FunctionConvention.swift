@@ -134,6 +134,16 @@ public struct FunctionConvention : CustomStringConvertible {
     return resultsWithError[0].convention == .guaranteed || resultsWithError[0].convention == .guaranteedAddress
   }
 
+  public var hasGuaranteedAddressResult: Bool {
+    if resultsWithError.count != 1 {
+      return false
+    }
+    if hasLoweredAddresses {
+      return resultsWithError[0].convention == .guaranteedAddress
+    }
+    return false
+  }
+
   public var hasAddressResult: Bool {
     if resultsWithError.count != 1 {
       return false

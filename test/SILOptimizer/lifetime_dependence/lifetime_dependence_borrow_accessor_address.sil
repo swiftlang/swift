@@ -1,0 +1,124 @@
+// RUN: %target-sil-opt %s \
+// RUN:   -lifetime-dependence-diagnostics \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -verify \
+// RUN:   -o /dev/null
+
+// REQUIRES: swift_feature_Lifetimes
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+struct Composite: ~Copyable {
+  let items: UniqueArray<UniqueArray<Int>>
+}
+
+sil @$ss11UniqueArrayVsRi_zrlEyxSicib : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed UniqueArray<τ_0_0>) -> @guaranteed_address τ_0_0
+sil @$ss11UniqueArrayVsRi_zrlE4spans4SpanVyxGvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed UniqueArray<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+sil @$ss11UniqueArrayVsRi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout UniqueArray<τ_0_0>) -> @inout τ_0_0
+sil @$ss11UniqueArrayVsRi_zrlE11mutableSpans07MutableD0VyxGvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout UniqueArray<τ_0_0>) -> @lifetime(borrow 0) @owned MutableSpan<τ_0_0>
+
+sil hidden [ossa] @$s6borrow9CompositeV5check2ats4SpanVySiGSi_tF : $@convention(method) (Int, @guaranteed Composite) -> @lifetime(borrow 1) @owned Span<Int> {
+bb0(%0 : $Int, %1 : @guaranteed $Composite):
+  debug_value %0, let, name "index", argno 1
+  debug_value %1, let, name "self", argno 2
+  %4 = function_ref @$ss11UniqueArrayVsRi_zrlEyxSicib : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed UniqueArray<τ_0_0>) -> @guaranteed_address τ_0_0
+  %6 = struct_extract %1, #Composite.items
+  %7 = apply %4<UniqueArray<Int>>(%0, %6) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed UniqueArray<τ_0_0>) -> @guaranteed_address τ_0_0
+  %9 = load_borrow %7
+  // function_ref UniqueArray<>.span.getter
+  %10 = function_ref @$ss11UniqueArrayVsRi_zrlE4spans4SpanVyxGvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed UniqueArray<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+  %11 = apply %10<Int>(%9) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed UniqueArray<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+  %12 = mark_dependence [unresolved] %11 on %7
+  end_borrow %9
+  return %12
+}
+
+sil hidden [ossa] @$s6borrow9CompositeV11checkMutable2ats07MutableD0VySiGSi_tF : $@convention(method) (Int, @inout Composite) -> @lifetime(borrow 1) @owned MutableSpan<Int> {
+bb0(%0 : $Int, %1 : $*Composite):
+  debug_value %0, let, name "index", argno 1
+  debug_value %1, var, name "self", argno 2, expr op_deref
+  %6 = struct_element_addr %1, #Composite.items
+  %4 = function_ref @$ss11UniqueArrayVsRi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout UniqueArray<τ_0_0>) -> @inout τ_0_0
+  %7 = apply %4<UniqueArray<Int>>(%0, %6) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout UniqueArray<τ_0_0>) -> @inout τ_0_0
+  %10 = function_ref @$ss11UniqueArrayVsRi_zrlE11mutableSpans07MutableD0VyxGvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout UniqueArray<τ_0_0>) -> @lifetime(borrow 0) @owned MutableSpan<τ_0_0>
+  %11 = apply %10<Int>(%7) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout UniqueArray<τ_0_0>) -> @lifetime(borrow 0) @owned MutableSpan<τ_0_0>
+  %12 = mark_dependence [unresolved] %11 on %7
+  return %12
+}
+
+// The remaining functions cover a two-deep chain of `borrow` accessors feeding
+// the span, across every combination of `@guaranteed` (value) and
+// `@guaranteed_address` result conventions.
+
+struct Leaf: ~Copyable {
+}
+
+struct Mid: ~Copyable {
+}
+
+struct Root: ~Copyable {
+}
+
+sil @acc1_G : $@convention(method) (@guaranteed Root) -> @guaranteed Mid
+sil @acc1_GA : $@convention(method) (@guaranteed Root) -> @guaranteed_address Mid
+sil @acc2_G_fromG : $@convention(method) (@guaranteed Mid) -> @guaranteed Leaf
+sil @acc2_G_fromGA : $@convention(method) (@in_guaranteed Mid) -> @guaranteed Leaf
+sil @acc2_GA_fromG : $@convention(method) (@guaranteed Mid) -> @guaranteed_address Leaf
+sil @acc2_GA_fromGA : $@convention(method) (@in_guaranteed Mid) -> @guaranteed_address Leaf
+sil @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+
+sil hidden [ossa] @combo_addr_addr : $@convention(method) (@guaranteed Root) -> @lifetime(borrow 0) @owned Span<Int> {
+bb0(%0 : @guaranteed $Root):
+  %1 = function_ref @acc1_GA : $@convention(method) (@guaranteed Root) -> @guaranteed_address Mid
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Root) -> @guaranteed_address Mid
+  %3 = function_ref @acc2_GA_fromGA : $@convention(method) (@in_guaranteed Mid) -> @guaranteed_address Leaf
+  %4 = apply %3(%2) : $@convention(method) (@in_guaranteed Mid) -> @guaranteed_address Leaf
+  %5 = load_borrow %4
+  %6 = function_ref @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %8 = mark_dependence [unresolved] %7 on %4
+  end_borrow %5
+  return %8
+}
+
+sil hidden [ossa] @combo_addr_value : $@convention(method) (@guaranteed Root) -> @lifetime(borrow 0) @owned Span<Int> {
+bb0(%0 : @guaranteed $Root):
+  %1 = function_ref @acc1_GA : $@convention(method) (@guaranteed Root) -> @guaranteed_address Mid
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Root) -> @guaranteed_address Mid
+  %3 = function_ref @acc2_G_fromGA : $@convention(method) (@in_guaranteed Mid) -> @guaranteed Leaf
+  %4 = apply %3(%2) : $@convention(method) (@in_guaranteed Mid) -> @guaranteed Leaf
+  %5 = function_ref @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %7 = mark_dependence [unresolved] %6 on %4
+  return %7
+}
+
+sil hidden [ossa] @combo_value_addr : $@convention(method) (@guaranteed Root) -> @lifetime(borrow 0) @owned Span<Int> {
+bb0(%0 : @guaranteed $Root):
+  %1 = function_ref @acc1_G : $@convention(method) (@guaranteed Root) -> @guaranteed Mid
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Root) -> @guaranteed Mid
+  %3 = function_ref @acc2_GA_fromG : $@convention(method) (@guaranteed Mid) -> @guaranteed_address Leaf
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Mid) -> @guaranteed_address Leaf
+  %5 = load_borrow %4
+  %6 = function_ref @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %8 = mark_dependence [unresolved] %7 on %4
+  end_borrow %5
+  return %8
+}
+
+sil hidden [ossa] @combo_value_value : $@convention(method) (@guaranteed Root) -> @lifetime(borrow 0) @owned Span<Int> {
+bb0(%0 : @guaranteed $Root):
+  %1 = function_ref @acc1_G : $@convention(method) (@guaranteed Root) -> @guaranteed Mid
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Root) -> @guaranteed Mid
+  %3 = function_ref @acc2_G_fromG : $@convention(method) (@guaranteed Mid) -> @guaranteed Leaf
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Mid) -> @guaranteed Leaf
+  %5 = function_ref @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
+  %7 = mark_dependence [unresolved] %6 on %4
+  return %7
+}
+
