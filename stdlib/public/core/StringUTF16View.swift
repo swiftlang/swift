@@ -415,11 +415,11 @@ extension String.UTF16View: BidirectionalCollection {
   ///     print("First character's UTF-16 code unit: \(greeting.utf16[i])")
   ///     // Prints "First character's UTF-16 code unit: 72"
   ///
-  /// - Parameter idx: A valid index of the view. `idx` must be
+  /// - Parameter position: A valid index of the view. `position` must be
   ///   less than the view's end index.
   @inlinable @inline(__always)
-  public subscript(idx: Index) -> UTF16.CodeUnit {
-    let idx = _guts.ensureMatchingEncoding(idx)
+  public subscript(position: Index) -> UTF16.CodeUnit {
+    let idx = _guts.ensureMatchingEncoding(position)
     _precondition(idx._encodedOffset < _guts.count,
       "String index is out of bounds")
     return self[_unchecked: idx]

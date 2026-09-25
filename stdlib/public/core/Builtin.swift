@@ -55,7 +55,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 /// Returns the bits of the given instance, interpreted as having the specified
 /// type.
 ///
-/// Use this function only to convert the instance passed as `x` to a
+/// Use this function only to convert the instance passed as `instance` to a
 /// layout-compatible type when conversion through other means is not
 /// possible. Common conversions supported by the Swift standard library
 /// include the following:
@@ -84,18 +84,18 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 /// The programmer must ensure that the resulting reference has already been
 /// manually retained.
 ///
-/// Parameters:
-///   - x: The instance to cast to `type`.
-///   - type: The type to cast `x` to. `type` and the type of `x` must have the
+/// - Parameters:
+///   - instance: The instance to cast to `type`.
+///   - type: The type to cast `instance` to. `type` and the type of `instance` must have the
 ///     same size of memory representation and compatible memory layout.
-/// Returns: A new instance of type `U`, cast from `x`.
+/// - Returns: A new instance of type `U`, cast from `instance`.
 @inlinable // unsafe-performance
 @_transparent
 @unsafe
-public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
+public func unsafeBitCast<T, U>(_ instance: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
     "Can't unsafeBitCast between types of different sizes")
-  return Builtin.reinterpretCast(x)
+  return Builtin.reinterpretCast(instance)
 }
 
 /// Returns `x` as its concrete type `U`.
