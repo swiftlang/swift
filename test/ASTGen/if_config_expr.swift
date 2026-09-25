@@ -18,6 +18,8 @@ struct MyStruct {
     func methodTwo() -> TwoResult { TwoResult() }
 }
 
+class MyClass {}
+
 func globalFunc<T>(_ arg: T) -> T { arg }
 
 func testBasic(baseExpr: MyStruct) {
@@ -127,4 +129,16 @@ func ifconfigExprInExpr(baseExpr: MyStruct) {
       .methodTwo()
 #endif
   )
+}
+
+func ifconfigNoUsage() {
+  #if true
+  var x = 0 // expected-warning {{initialization of variable 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  weak var y: MyClass? // expected-warning {{variable 'y' was never used; consider replacing with '_' or removing it}}
+  let z = 0       // expected-warning {{initialization of immutable value 'z' was never used; consider replacing with assignment to '_' or removing it}}
+  #else
+  var x = 0
+  weak var y: MyClass?
+  let z = 0
+  #endif
 }
