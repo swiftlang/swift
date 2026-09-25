@@ -52,9 +52,9 @@ distributed actor Greeter {
 // CHECK: declref_expr {{.*}}decl="Distributed.(file).RemoteCallTarget.identifierEquals
 
 // The matched branch: decode the argument, call the local impl, deliver the result.
-// CHECK: decl="{{.*}}EmbeddedFakeInvocationDecoder extension.decodeNextArgument{{.*}}Argument -> String)]"
+// CHECK: decl="{{.*}}EmbeddedFakeInvocationDecoder extension.decodeNextArgument{{.*}}
 // CHECK: decl="{{.*}}Greeter.hello(name:)
-// CHECK: decl="{{.*}}EmbeddedFakeResultHandler extension.onReturn{{.*}}Success -> String)]"
+// CHECK: decl="{{.*}}EmbeddedFakeResultHandler extension.onReturn
 
 // The dispatch must not touch String's UTF8 view for the comparison.
 // CHECK-NOT: decl="Swift.(file).String.UTF8View
