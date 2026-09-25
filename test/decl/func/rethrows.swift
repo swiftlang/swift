@@ -24,10 +24,10 @@ protocol P {
 
 struct T0 : P { // expected-error {{type 'T0' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func tf() throws {}
-  func nf() throws {} // expected-note {{candidate throws, but protocol does not allow it}}
+  func nf() throws {} // expected-note {{candidate throws, but protocol does not allow it}}{{13-20=}}
 
   func thf(_ f: () throws -> ()) throws {}
-  func nhf(_ f: () throws -> ()) throws {} // expected-note {{candidate throws, but protocol does not allow it}}
+  func nhf(_ f: () throws -> ()) throws {} // expected-note {{candidate throws, but protocol does not allow it}}{{34-41=}}
   func rhf(_ f: () throws -> ()) throws {} // expected-note {{candidate is not 'rethrows', but protocol requires it}}
 }
 
@@ -45,7 +45,7 @@ struct T2 : P { // expected-error {{type 'T2' does not conform to protocol 'P'}}
   func nf() {}
 
   func thf(_ f: () throws -> ()) rethrows {}
-  func nhf(_ f: () throws -> ()) rethrows {} // expected-note {{candidate throws, but protocol does not allow it}}
+  func nhf(_ f: () throws -> ()) rethrows {} // expected-note {{candidate throws, but protocol does not allow it}}{{34-43=}}
   func rhf(_ f: () throws -> ()) rethrows {}
 }
 
