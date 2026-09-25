@@ -57,17 +57,29 @@ public struct HasTypedThrowsMembers {
     public subscript(index: Int) -> Int {
         get throws(MyError) { index }
     }
+
+    // Async accessors stay unsupported, even with untyped `throws`.
+    @_expose(Cxx) // expected-error {{async property 'asyncComputed' can not be exposed to C++}}
+    public var asyncComputed: Int {
+        get async throws { 42 }
+    }
+
+    public subscript(delayed index: Int) -> Int {
+        get async throws { index }
+    }
 }
 
 // CHECK: class SWIFT_SYMBOL("s:9Functions21HasTypedThrowsMembersV") HasTypedThrowsMembers final {
 // CHECK-NOT: {{ }}typedThrowsMethod(
 // CHECK-NOT: init(
 // CHECK-NOT: getComputed(
+// CHECK-NOT: getAsyncComputed(
 // CHECK-NOT: operator [](
 // CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<void> untypedThrowsMethod() const SWIFT_SYMBOL("s:9Functions21HasTypedThrowsMembersV07untypedD6MethodyyKF");
 // CHECK-NOT: {{ }}typedThrowsMethod(
 // CHECK-NOT: init(
 // CHECK-NOT: getComputed(
+// CHECK-NOT: getAsyncComputed(
 // CHECK-NOT: operator [](
 // CHECK: };
 
@@ -77,6 +89,7 @@ public struct HasTypedThrowsMembers {
 // CHECK-NOT: HasTypedThrowsMembers::typedThrowsMethod(
 // CHECK-NOT: HasTypedThrowsMembers::init(
 // CHECK-NOT: HasTypedThrowsMembers::getComputed(
+// CHECK-NOT: HasTypedThrowsMembers::getAsyncComputed(
 // CHECK-NOT: HasTypedThrowsMembers::operator [](
 
 // CHECK: // Unavailable in C++: Swift global function 'neverThrowsFunction()'. {{.*}}can not yet be represented in C++ as it may throw an error.

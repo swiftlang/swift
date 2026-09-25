@@ -10,4 +10,14 @@ public struct Value {
   public func read() throws -> Int { number }
   public mutating func update() throws {}
   public static func make() throws -> Int { 42 }
+  public var computed: Int { get throws { number } }
+  public var isPositive: Bool { get throws { number > 0 } }
+  public static var answer: Int { get throws { 42 } }
+  public subscript(index: Int) -> Int { get throws { number + index } }
+}
+
+public class Reference {
+  public init() {}
+  public var computed: Int { get throws { 0 } }
+  public subscript(index: Int) -> Int { get throws { index } }
 }

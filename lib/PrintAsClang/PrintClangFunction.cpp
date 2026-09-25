@@ -1862,8 +1862,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   // FIXME: should it be objTy for resultTy?
   printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
                     accessor->getModuleContext(), resultTy,
-                    accessor->getParameters(),
-                    /*hasThrows=*/false, nullptr, isStatic, dispatchInfo);
+                    accessor->getParameters(), accessor->hasThrows(), nullptr,
+                    isStatic, dispatchInfo);
   os << "  }\n";
   if (result.isObjCxxOnly())
     os << "#endif\n";
@@ -1902,10 +1902,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(
-      accessor, signature, swiftSymbolName, typeDeclContext,
-      accessor->getModuleContext(), resultTy, accessor->getParameters(),
-      /*hasThrows=*/false, nullptr, /*isStatic=*/false, dispatchInfo);
+  printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
+                    accessor->getModuleContext(), resultTy,
+                    accessor->getParameters(), accessor->hasThrows(), nullptr,
+                    /*isStatic=*/false, dispatchInfo);
   os << "  }\n";
   if (result.isObjCxxOnly())
     os << "#endif\n";
