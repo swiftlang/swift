@@ -1653,6 +1653,10 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
   if (suppressErrorPath) {
+    // A boxed error arrives as an owned phi argument, and OSSA rejects an owned
+    // value that reaches `unreachable` without a lifetime-ending use.
+    if (errorValue->getOwnershipKind() == OwnershipKind::Owned)
+      B.createDestroyValue(loc, errorValue, IsDeadEnd);
     B.createUnreachable(loc);
     return destBB;
   }
