@@ -10,7 +10,32 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && !os(WASI) && !os(Emscripten)
+#if $Embedded
+
+import _Concurrency
+
+@_silgen_name("swift_dispatchEnqueueMain")
+private func _embeddedDispatchEnqueueMain(_ job: UnownedJob)
+
+private final class DispatchMainExecutor: SerialExecutor,
+  @unchecked Sendable {
+  static let shared = DispatchMainExecutor()
+
+  func enqueue(_ job: consuming ExecutorJob) {
+    _embeddedDispatchEnqueueMain(UnownedJob(job))
+  }
+
+  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    unsafe UnownedSerialExecutor(ordinary: self)
+  }
+}
+
+@_silgen_name("swift_embedded_dispatch_getMainExecutor")
+public func _embeddedDispatchGetMainExecutor() -> UnownedSerialExecutor {
+  DispatchMainExecutor.shared.asUnownedSerialExecutor()
+}
+
+#elseif !os(WASI) && !os(Emscripten)
 
 import Swift
 
@@ -169,4 +194,4 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
                                UnownedJob(job))
 }
 
-#endif // !$Embedded && !os(WASI) && !os(Emscripten)
+#endif // $Embedded
