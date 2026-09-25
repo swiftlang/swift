@@ -42,8 +42,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
-#include "swift/SILOptimizer/Utils/ConstExpr.h"
-#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SIL/SILConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -2692,32 +2690,6 @@ BridgedWitnessTableEntry BridgedDefaultWitnessTable::getEntry(SwiftInt index) co
 }
 
 //===----------------------------------------------------------------------===//
-//                         ConstExprFunctionState
-//===----------------------------------------------------------------------===//
-BridgedConstExprFunctionState BridgedConstExprFunctionState::create() {
-  auto allocator = new swift::SymbolicValueBumpAllocator();
-  auto evaluator = new swift::ConstExprEvaluator(*allocator, 0);
-  auto numEvaluatedSILInstructions = new unsigned int(0);
-  auto state = new swift::ConstExprFunctionState(*evaluator, nullptr, {},
-                                                 *numEvaluatedSILInstructions, true);
-  return {state, allocator, evaluator, numEvaluatedSILInstructions};
-}
-
-bool BridgedConstExprFunctionState::isConstantValue(BridgedValue bridgedValue) {
-  auto value = bridgedValue.getSILValue();
-  auto symbolicValue = state->getConstantValue(value);
-  return symbolicValue.isConstant();
-}
-
-void BridgedConstExprFunctionState::deinitialize() {
-  delete state;
-  delete numEvaluatedSILInstructions;
-  delete constantEvaluator;
-  delete allocator;
-}
-
-
-//===----------------------------------------------------------------------===//
 //                                BridgedBuilder
 //===----------------------------------------------------------------------===//
 
@@ -3789,10 +3761,6 @@ void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstr
 
 void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   inst.unbridged()->clone(beforeInst.unbridged());
-}
-
-void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
-  swift::salvageDebugInfo(inst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
