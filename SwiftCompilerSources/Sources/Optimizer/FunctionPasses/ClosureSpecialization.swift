@@ -608,8 +608,9 @@ private struct SpecializationInfo {
       let closureConvention = partialApply.functionConvention
       let unappliedArgumentCount = partialApply.unappliedArgumentCount - closureConvention.indirectSILResultCount
 
-      for paramInfo in closureConvention.parameters[unappliedArgumentCount...] {
-        let newParamInfo = paramInfo.withSpecializedConvention(for: partialApply, in: callee)
+      for (argOp, paramInfo) in zip(partialApply.argumentOperands,
+                                     closureConvention.parameters[unappliedArgumentCount...]) {
+        let newParamInfo = paramInfo.withSpecializedConvention(for: argOp, in: partialApply, callee: callee)
         specializedParamInfoList.append(newParamInfo)
       }
     }
@@ -743,17 +744,28 @@ private struct SpecializationInfo {
 
   private func getNewApplyArguments(_ context: FunctionPassContext) -> [Value] {
     let newCapturedArguments = rootClosures.flatMap { partialApply in
-      partialApply.arguments.map { capturedArg in
+      partialApply.argumentOperands.map { argOp -> Value in
+        let capturedArg = argOp.value
+        if partialApply.isCalledOnce {
+          // A `@called(once)` closure can consume its captures and always gets a destructor even
+          // if it's stack-promoted. So all of the arguments that are consumed have to be passed
+          // the same way to the specialized version.
+          if capturedArg.ownership != .none &&
+              (argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume) {
+            return capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
+          }
+          return capturedArg
+        }
         if partialApply.isOnStack || capturedArg.ownership == .none {
           // Non-escaping closures don't consume their captures. Therefore we pass them also as "guaranteed"
           // arguments to the specialized function.
           // Note that because the non-escaping closure was passed to the original function, this guarantees
           // that the lifetime of the captured arguments also extend to at least the apply of the function.
-          capturedArg
+          return capturedArg
         } else {
           // Escaping closures consume their captures. Therefore we pass them as "owned" arguments to the
           // specialized function.
-          capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
+          return capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
         }
       }
     }
@@ -942,10 +954,18 @@ private func findValuesWhichNeedDestroyRecursively(value: Value, needDestroy: in
 }
 
 private extension ParameterInfo {
-  func withSpecializedConvention(for partialApply: PartialApplyInst, in callee: Function) -> Self {
+  func withSpecializedConvention(for argOp: Operand, in partialApply: PartialApplyInst, callee: Function) -> Self {
     let argType = type.loweredType(in: partialApply.parentFunction)
     let specializedParamConvention = if self.convention.isIndirect {
       self.convention
+    } else if partialApply.isCalledOnce {
+      if argType.isTrivial(in: callee) {
+        ArgumentConvention.directUnowned
+      } else if argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume {
+        ArgumentConvention.directOwned
+      } else {
+        ArgumentConvention.directGuaranteed
+      }
     } else {
       if argType.isTrivial(in: callee) {
         ArgumentConvention.directUnowned
