@@ -105,10 +105,10 @@ extension Unicode.UTF8 {
   public struct ValidationError: Error, Sendable, Hashable
   {
     /// The kind of encoding error
-    public var kind: Unicode.UTF8.ValidationError.Kind
+    public let kind: Unicode.UTF8.ValidationError.Kind
 
     /// The range of offsets into our input containing the error
-    public var byteOffsets: Range<Int>
+    public let byteOffsets: Range<Int>
 
     @export(implementation)
     public init(
@@ -123,15 +123,15 @@ extension Unicode.UTF8 {
         _precondition(byteOffsets.count == 1)
       }
 
-      self.kind = kind
-      self.byteOffsets = byteOffsets
+      self = unsafe unsafeBitCast((kind, byteOffsets), to: Self.self)
     }
 
     @export(implementation)
     public init(
       _ kind: Unicode.UTF8.ValidationError.Kind, at byteOffset: Int
     ) {
-      self.init(kind, byteOffset..<(byteOffset+1))
+      let bounds = unsafe Range(uncheckedBounds: (byteOffset, byteOffset+1))
+      self.init(kind, bounds)
     }
   }
 }
@@ -143,9 +143,8 @@ extension UTF8.ValidationError {
   @frozen
   public struct Kind: Error, Sendable, Hashable, RawRepresentable
    {
-    public var rawValue: UInt8
+    public let rawValue: UInt8
 
-    @inlinable
     public init?(rawValue: UInt8) {
       guard rawValue <= 4 else { return nil }
       self.rawValue = rawValue
@@ -180,6 +179,63 @@ extension UTF8.ValidationError {
     @export(implementation)
     public static var truncatedScalar: Self {
       .init(rawValue: 4)!
+    }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension UTF8.ValidationError {
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_kind: Kind {
+    get { kind }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvs")
+    set { self = Self(newValue, byteOffsets) }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvM")
+    _modify {
+      var kind = self.kind
+      defer {
+        self = Self(kind, byteOffsets)
+      }
+      yield &kind
+    }
+  }
+
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_byteOffsets: Range<Int> {
+    get { byteOffsets }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvs")
+    set { self = Self(kind, newValue) }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvM")
+    _modify {
+      var byteOffsets = self.byteOffsets
+      defer {
+        self = Self(kind, byteOffsets)
+      }
+      yield &byteOffsets
+    }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension UTF8.ValidationError.Kind {
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_rawValue: UInt8 {
+    get { rawValue }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvs")
+    set { self = Self(rawValue: newValue)! }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvM")
+    _modify {
+      var newValue = rawValue
+      defer {
+        self = Self(rawValue: newValue)!
+      }
+      yield &newValue
     }
   }
 }
