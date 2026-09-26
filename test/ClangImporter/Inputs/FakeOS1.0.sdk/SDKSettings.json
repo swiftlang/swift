@@ -1,0 +1,27 @@
+{
+  "CanonicalName": "fakeos1.0",
+  "Version": "1.0",
+  "IsBaseSDK": "YES",
+  "DisplayName": "fakeOS 1.0",
+  "MinimalDisplayName": "1.0",
+  "SupportedTargets": {
+    "fakeos": {
+      "PlatformFamilyName": "fakeOS",
+      "PlatformFamilyDisplayName": "fakeOS",
+      "Archs": ["arm64e", "arm64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "",
+      "BuildVersionPlatformID": "11",
+      "ClangRuntimeLibraryPlatformName": "ios",
+      "SystemPrefix": "",
+      "DefaultDeploymentTarget": "1.0",
+      "RecommendedDeploymentTarget": "1.0",
+      "MinimumDeploymentTarget": "1.0", "MaximumDeploymentTarget": "1.0.99",
+      "ValidDeploymentTargets": ["1.0"]
+    }
+  },
+  "VersionMap": {
+    "fakeOS_iOS": {"1.0": "26.0"},
+    "iOS_fakeOS": {"26.0": "1.0"}
+  },
+  "DefaultDeploymentTarget": "1.0",
+  "MaximumDeploymentTarget": "1.0.99"
+}
