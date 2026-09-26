@@ -263,6 +263,12 @@ public:
 
   CanSILFunctionType getType() const { return Type; }
 
+  /// True when the target function has a leading `Builtin.ImplicitActor` argument.
+  bool hasIsolatedActorParameter() const {
+    auto isolated = Type->maybeGetIsolatedParameter();
+    return isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
   bool isGeneric() const {
     auto sig = Type->getInvocationGenericSignature();
     return sig && !sig->areAllParamsConcrete();
@@ -323,6 +329,24 @@ private:
                            ArrayRef<ProtocolDecl *> protocols,
                            Explosion &witnessTables);
 
+  /// True when the accessor itself takes a leading `isolated (any Actor)?` parameter.
+  bool hasIsolatedActorParameter() const {
+    return AccessorType->maybeGetIsolatedParameter().has_value();
+  }
+
+  /// Emit the accessor's hop to the isolation it passes to a
+  /// `nonisolated(nonsending)` target. When \p isolatedActor is a null value
+  /// at runtime, or there is no isolated parameter at all (\p isolatedActor
+  /// is nullptr), this hops to the generic executor, otherwise it hops to
+  /// that actor's executor.
+  void emitIsolationHop(llvm::Value *isolatedActor,
+                        llvm::Value *isolatedActorWTable);
+
+  /// Dynamically call `Actor.unownedExecutor` through the given witness
+  /// table, returning the resulting `Builtin.Executor`.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitLoadOfUnownedExecutor(llvm::Value *actor, llvm::Value *actorWTable);
+
   /// Load witness table addresses (if any) from the given buffer
   /// into the given argument explosion.
   ///
@@ -354,7 +378,15 @@ private:
 
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed target.
-static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
+///
+/// `hasIsolatedActorParameter` is true when the distributed thunk is
+/// `nonisolated(nonsending)` and the deployment target's runtime has
+/// `swift_distributed_execute_target_with_isolation`. In that case the
+/// accessor has a leading isolated `(any Actor)?` parameter carrying the
+/// target actor when it is local (or `nil` when it is remote, since we
+/// cannot isolate to a remote ref).
+static CanSILFunctionType getAccessorType(IRGenModule &IGM,
+                                          bool hasIsolatedActorParameter) {
   auto &Context = IGM.Context;
 
   // func __accessor__<D: DistributedTargetInvocationDecoder>(
@@ -364,15 +396,16 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   //   UnsafeRawPointer?, <- generic parameter substitutions
   //   UnsafeRawPointer?, <- witness tables
   //   UInt,              <- number of witness tables
-  //   <actor>
+  //   <actor>,           <- self of the actor to invoke the target on
+  //   isolated (any Actor)? <- same actor, erased to `any Actor` when local,
+  //                           nil when remote; only present when the target
+  //                           distributed thunk is `nonisolated(nonsending)`
   // ) async throws
 
   SmallVector<GenericFunctionType::Param, 8> parameters;
 
-  // A generic parameter that represents instance of invocation decoder.
-  auto decoderType = Context.TheSelfType;
-
   // decoder
+  auto decoderType = Context.TheSelfType;
   parameters.push_back(GenericFunctionType::Param(
       decoderType,
       /*label=*/Identifier(),
@@ -397,11 +430,18 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   // number of witness tables
   parameters.push_back(GenericFunctionType::Param(Context.getUIntType()));
 
-  // actor
-
+  // actor (DistributedActor)
   auto actorTypeParam = Context.getAnyObjectType();
     parameters.push_back(
         GenericFunctionType::Param(actorTypeParam));
+
+  // isolated actor (same as `actor` but typed as `isolated (any Actor)?`)
+  if (hasIsolatedActorParameter) {
+    parameters.push_back(GenericFunctionType::Param(
+        SILType::getOpaqueIsolationType(Context).getASTType(),
+        /*label=*/Identifier(),
+        /*flags=*/ParameterTypeFlags().withIsolated(true)));
+  }
 
   auto decoderProtocolTy =
       Context
@@ -427,20 +467,25 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
                                       ExpandDefaults);
   }
 
+  auto extInfoBuilder = ASTExtInfoBuilder()
+                            .withRepresentation(FunctionTypeRepresentation::Thin)
+                            .withAsync()
+                            .withThrows();
+  if (hasIsolatedActorParameter)
+    extInfoBuilder = extInfoBuilder.withIsolation(
+        FunctionTypeIsolation::forParameter());
+
   auto accessorTy = GenericFunctionType::get(
       signature, parameters, /* yields */ {}, Context.TheEmptyTupleType,
-      ASTExtInfoBuilder()
-          .withRepresentation(FunctionTypeRepresentation::Thin)
-          .withAsync()
-          .withThrows()
-          .build());
+      extInfoBuilder.build());
 
   return IGM.getLoweredType(accessorTy).castTo<SILFunctionType>();
 }
 
 llvm::Function *
-IRGenModule::getAddrOfDistributedTargetAccessor(LinkEntity accessor,
-                                                ForDefinition_t forDefinition) {
+IRGenModule::getAddrOfDistributedTargetAccessor(
+    LinkEntity accessor, ForDefinition_t forDefinition,
+    bool hasIsolatedActorParameter) {
   llvm::Function *&entry = GlobalFuncs[accessor];
   if (entry) {
     if (forDefinition)
@@ -448,7 +493,8 @@ IRGenModule::getAddrOfDistributedTargetAccessor(LinkEntity accessor,
     return entry;
   }
 
-  Signature signature = getSignature(getAccessorType(*this));
+  Signature signature = getSignature(
+      getAccessorType(*this, hasIsolatedActorParameter));
   LinkInfo link = LinkInfo::get(*this, accessor, forDefinition);
 
   return createFunction(*this, link, signature);
@@ -460,11 +506,6 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
     return;
 
   LinkEntity accessorRef = getAccessorLinking(target);
-  auto *f = getAddrOfDistributedTargetAccessor(accessorRef,
-                                               ForDefinition);
-
-  if (!f->isDeclaration())
-    return;
 
   // Pick the SIL function to dispatch through. Default = the linked thunk;
   // if the target has a `@Resolvable` 'resolvable proxy adapter' thunk
@@ -480,9 +521,39 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
     }
   }
 
+  // Determine whether the target thunk has a leading isolated `Builtin.ImplicitActor`.
+  // If so, the accessor must gain an additional leading `isolated (any Actor)?` parameter.
+  CanSILFunctionType targetTy;
+  if (auto *thunk = target.dyn_cast<SILFunction *>()) {
+    targetTy = (dispatchTo ? dispatchTo : thunk)->getLoweredFunctionType();
+  } else {
+    auto *requirement = cast<AbstractFunctionDecl *>(target);
+    targetTy = getSILTypes().getConstantFunctionType(
+        getMaximalTypeExpansionContext(),
+        SILDeclRef(requirement).getDistributedThunkDeclRef());
+  }
+  bool targetHasIsolatedActorParameter = false;
+  if (auto isolated = targetTy->maybeGetIsolatedParameter()) {
+    targetHasIsolatedActorParameter =
+        isolated->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
+  // Only runtimes that have `swift_distributed_execute_target_with_isolation`
+  // know to pass the isolated parameter;
+  bool hasIsolatedActorParameter =
+      targetHasIsolatedActorParameter &&
+      isDistributedAccessorIsolationFeatureAvailable(Context);
+
+  auto *f = getAddrOfDistributedTargetAccessor(
+    accessorRef, ForDefinition, hasIsolatedActorParameter);
+
+  if (!f->isDeclaration())
+    return;
+
   IRGenFunction IGF(*this, f);
-  auto accessor =
-      DistributedAccessor(IGF, target, dispatchTo, getAccessorType(*this));
+  auto accessor = DistributedAccessor(
+      IGF, target, dispatchTo,
+      getAccessorType(*this, hasIsolatedActorParameter));
   accessor.emit();
 
   // Mark the accessor function and its async function pointer as used
@@ -498,7 +569,7 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   addAccessibleFunction(AccessibleFunction::forDistributed(
       /*recordName=*/mangler.mangleDistributedThunkRecord(targetDecl),
       /*accessorName=*/mangler.mangleDistributedThunk(targetDecl),
-      accessor.getTargetType(),
+      hasIsolatedActorParameter, accessor.getTargetType(),
       getAddrOfAsyncFunctionPointer(accessorRef)));
 }
 
@@ -519,8 +590,12 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
                                           Explosion &arguments) {
   auto fnType = Target.getType();
 
-  // Cover all of the arguments except to `self` of the actor.
-  auto parameters = fnType->getParameters().drop_back();
+  // Cover all of the arguments except:
+  auto parameters = fnType->getParameters()
+    // - the `self` of the actor:
+    .drop_back()
+    // -  the implicit leading isolation parameter, when the func is `nonisolated(nonsending)`:
+    .drop_front(Target.hasIsolatedActorParameter() ? 1 : 0);
 
   // If there are no parameters to extract, we are done.
   if (parameters.empty())
@@ -782,6 +857,117 @@ static llvm::Value *lookupWitnessTable(IRGenFunction &IGF, llvm::Value *witness,
   return witnessTable;
 }
 
+std::pair<llvm::Value *, llvm::Value *>
+DistributedAccessor::emitLoadOfUnownedExecutor(llvm::Value *actor,
+                                               llvm::Value *actorWTable) {
+  auto &ctx = IGM.Context;
+  auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+
+  VarDecl *unownedExecutorVar = nullptr;
+  for (auto *member : actorProtocol->getAllMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (var->getName() == ctx.Id_unownedExecutor) {
+        unownedExecutorVar = var;
+        break;
+      }
+    }
+  }
+  assert(unownedExecutorVar && "Can't find unownedExecutor of Actor");
+
+  SILDeclRef getterRef(unownedExecutorVar->getAccessor(AccessorKind::Get));
+  auto fnType = IGM.getSILTypes().getConstantFunctionType(
+      IGM.getMaximalTypeExpansionContext(), getterRef);
+
+  FunctionPointer witness;
+  if (IGM.isResilient(actorProtocol, ResilienceExpansion::Maximal)) {
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(getterRef, NotForDefinition);
+    auto signature = IGM.getSignature(fnType);
+    witness = FunctionPointer::forDirect(fnType, fnPtr,
+                                         /*secondaryValue=*/nullptr, signature,
+                                         true);
+  } else {
+    witness = emitWitnessMethodValue(IGF, actorWTable, getterRef);
+  }
+
+  WitnessMetadata witnessMetadata;
+  witnessMetadata.SelfMetadata =
+      emitHeapMetadataRefForUnknownHeapObject(IGF, actor);
+  witnessMetadata.SelfWitnessTable = actorWTable;
+
+  CalleeInfo info(fnType, fnType, SubstitutionMap());
+  Callee callee(std::move(info), witness, actor);
+
+  auto emission =
+      getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
+
+  emission->begin();
+  Explosion noArgs;
+  emission->setArgs(noArgs, /*isOutlined=*/false, &witnessMetadata);
+
+  Explosion result;
+  emission->emitToExplosion(result, /*isOutlined=*/false);
+  emission->end();
+
+  llvm::Value *identity = result.claimNext();
+  llvm::Value *impl = result.claimNext();
+  return {identity, impl};
+}
+
+void DistributedAccessor::emitIsolationHop(llvm::Value *isolatedActor,
+                                           llvm::Value *isolatedActorWTable) {
+  // A nil identity represents the generic executor, matching how a plain
+  // `nonisolated` function's unconditional hop is lowered.
+  auto *genericExecutorIdentity =
+      llvm::ConstantInt::get(IGM.ExecutorFirstTy, 0);
+  auto *genericExecutorImpl = llvm::ConstantInt::get(IGM.ExecutorSecondTy, 0);
+
+  // Legacy-shaped accessor: there is no isolation to hop to, the target is
+  // entered as if called from a `nonisolated` context.
+  if (!isolatedActor) {
+    llvm::Value *resumeFn =
+        IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+    Explosion executor;
+    executor.add(genericExecutorIdentity);
+    executor.add(genericExecutorImpl);
+    IGF.emitSuspensionPoint(executor, resumeFn);
+    return;
+  }
+
+  auto *hasActorBB = IGF.createBasicBlock("distributed-accessor-has-isolation");
+  auto *noActorBB = IGF.createBasicBlock("distributed-accessor-no-isolation");
+  auto *contBB = IGF.createBasicBlock("distributed-accessor-executor");
+
+  llvm::Value *isNoActor = IGF.Builder.CreateIsNull(isolatedActor);
+  IGF.Builder.CreateCondBr(isNoActor, noActorBB, hasActorBB);
+
+  IGF.Builder.emitBlock(hasActorBB);
+  llvm::Value *actorExecutorIdentity, *actorExecutorImpl;
+  std::tie(actorExecutorIdentity, actorExecutorImpl) =
+      emitLoadOfUnownedExecutor(isolatedActor, isolatedActorWTable);
+  IGF.Builder.CreateBr(contBB);
+  auto *hasActorBBEnd = IGF.Builder.GetInsertBlock();
+
+  IGF.Builder.emitBlock(noActorBB);
+  IGF.Builder.CreateBr(contBB);
+
+  IGF.Builder.emitBlock(contBB);
+  auto *identityPHI = IGF.Builder.CreatePHI(IGM.ExecutorFirstTy, 2);
+  identityPHI->addIncoming(actorExecutorIdentity, hasActorBBEnd);
+  identityPHI->addIncoming(genericExecutorIdentity, noActorBB);
+
+  auto *implPHI = IGF.Builder.CreatePHI(IGM.ExecutorSecondTy, 2);
+  implPHI->addIncoming(actorExecutorImpl, hasActorBBEnd);
+  implPHI->addIncoming(genericExecutorImpl, noActorBB);
+
+  llvm::Value *resumeFn =
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+
+  Explosion executor;
+  executor.add(identityPHI);
+  executor.add(implPHI);
+  IGF.emitSuspensionPoint(executor, resumeFn);
+}
+
 void DistributedAccessor::lookupWitnessTables(
     llvm::Value *value, ArrayRef<ProtocolDecl *> protocols,
     Explosion &witnessTables) {
@@ -893,6 +1079,13 @@ void DistributedAccessor::emit() {
   auto *numWitnessTables = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
+  // The same actor as above, erased to `(any Actor)?`; or nil when the actor is remote.
+  llvm::Value *isolatedActor = nullptr;
+  llvm::Value *isolatedActorWTable = nullptr;
+  if (hasIsolatedActorParameter()) {
+    isolatedActor = params.claimNext();
+    isolatedActorWTable = params.claimNext();
+  }
   // Metadata that represents passed in the invocation decoder.
   auto *decoderType = params.claimNext();
 
@@ -921,9 +1114,21 @@ void DistributedAccessor::emit() {
     arguments.add(typedResultBuffer);
   }
 
-  // There is always at least one parameter associated with accessor - `self`
-  // of the distributed actor.
-  if (targetTy->getNumParameters() > 1) {
+  if (Target.hasIsolatedActorParameter()) {
+    if (hasIsolatedActorParameter()) {
+      arguments.add(isolatedActor);
+      arguments.add(isolatedActorWTable);
+    } else {
+      arguments.add(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+      arguments.add(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+    }
+  }
+
+  // Parameters to skip in decoding:
+  auto numLeadingParamsToSkip =
+      1 + // self
+      (Target.hasIsolatedActorParameter() ? 1 : 0); // implicit leading isolation
+  if (targetTy->getNumParameters() > numLeadingParamsToSkip) {
     /// The argument decoder associated with the distributed actor
     /// this accessor belong to.
     ArgumentDecoderInfo decoder =
@@ -967,6 +1172,11 @@ void DistributedAccessor::emit() {
     emitLoadOfWitnessTables(witnessTables, numWitnessTables,
                             expandedSignature.numWitnessTablePtrs, arguments);
   }
+
+  // A `nonisolated(nonsending)` target must be entered on the expected isolation (it does not hop by itself).
+  // We make the hop after decoding was done.
+  if (Target.hasIsolatedActorParameter())
+    emitIsolationHop(isolatedActor, isolatedActorWTable);
 
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.

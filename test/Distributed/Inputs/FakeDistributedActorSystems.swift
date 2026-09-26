@@ -582,7 +582,7 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
   let storeReturn: (any Any) -> Void
   let storeError: (any Error) -> Void
-  init(_ storeReturn: @escaping (Any) -> Void, onError storeError: @escaping (Error) -> Void) {
+  public init(_ storeReturn: @escaping (Any) -> Void, onError storeError: @escaping (Error) -> Void) {
     self.storeReturn = storeReturn
     self.storeError = storeError
   }

@@ -72,6 +72,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DevirtualizeProtocolComposition
+    single-source/DistributedThunkHop
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
