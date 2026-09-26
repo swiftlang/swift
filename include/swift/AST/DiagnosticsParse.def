@@ -2012,6 +2012,25 @@ ERROR(unsupported_conditional_compilation_integer,none,
       (StringRef, StringRef))
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
+ERROR(deployment_target_condition_disabled,none,
+      "'deploymentTargetAtLeast' is an experimental feature that is currently "
+      "disabled", ())
+ERROR(deployment_target_expected_platform_version,none,
+      "'deploymentTargetAtLeast' expects platform-version pairs followed by "
+      "'*'", ())
+ERROR(deployment_target_missing_wildcard,none,
+      "'deploymentTargetAtLeast' must handle potential future platforms with "
+      "'*'", ())
+ERROR(deployment_target_wildcard_must_be_last,none,
+      "'*' must be the last argument to 'deploymentTargetAtLeast'", ())
+ERROR(deployment_target_duplicate_platform,none,
+      "deployment target for platform '%0' was already specified", (StringRef))
+WARNING(deployment_target_unknown_platform,none,
+        "unknown deployment target platform '%0'", (StringRef))
+WARNING(deployment_target_invalid_any_apple_os_version,none,
+        "'%0' is not a valid version number for any Apple OS", (StringRef))
+ERROR(deployment_target_condition_unavailable,none,
+      "deployment target version is unavailable for platform '%0'", (StringRef))
 WARNING(compiler_version_too_many_components,none,
       "trailing components of version '%0' are ignored",
       (StringRef))

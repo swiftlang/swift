@@ -65,6 +65,17 @@ BridgedLangOptions_getCompilerVersion(BridgedLangOptions cLangOpts,
   return convertArray(theVersion, cComponents);
 }
 
+SwiftInt
+BridgedLangOptions_getDeploymentTargetVersion(BridgedLangOptions cLangOpts,
+                                              SwiftInt **cComponents) {
+  auto deploymentTarget = cLangOpts.unbridged().getDeploymentTargetVersion();
+  if (!deploymentTarget) {
+    *cComponents = nullptr;
+    return 0;
+  }
+  return convertArray(version::Version(*deploymentTarget), cComponents);
+}
+
 SwiftInt BridgedLangOptions_getTargetAtomicBitWidths(
     BridgedLangOptions cLangOpts, SwiftInt *_Nullable *_Nonnull cElements) {
   return convertArray(cLangOpts.unbridged().getAtomicBitWidthValues(),

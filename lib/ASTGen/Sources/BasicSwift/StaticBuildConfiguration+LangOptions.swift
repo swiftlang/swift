@@ -80,6 +80,9 @@ extension StaticBuildConfiguration {
 
     let languageVersion = getVersionTuple { langOptions.getLanguageVersion(&$0) }
     let compilerVersion = getVersionTuple { langOptions.getCompilerVersion(&$0) }
+    let deploymentTargetVersion = getOptionalVersionTuple {
+      langOptions.getDeploymentTargetVersion(&$0)
+    }
     self.init(
       customConditions: entries.customConditions,
       features: entries.features,
@@ -93,6 +96,7 @@ extension StaticBuildConfiguration {
       targetPointerBitWidth: targetPointerBitWidth,
       targetAtomicBitWidths: targetAtomicBitWidths,
       endianness: endianness,
+      deploymentTargetVersion: deploymentTargetVersion,
       languageVersion: languageVersion,
       compilerVersion: compilerVersion
     )
@@ -110,6 +114,21 @@ private func getVersionTuple(
   )
   deallocateIntBuffer(componentsBuf);
   return version
+}
+
+/// Get an optional version tuple from C++.
+private func getOptionalVersionTuple(
+  body: (inout UnsafeMutablePointer<SwiftInt>?) -> Int
+) -> VersionTuple? {
+  var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
+  let count = body(&componentsBuf)
+  defer { deallocateIntBuffer(componentsBuf) }
+  guard count > 0 else {
+    return nil
+  }
+  return VersionTuple(
+    components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
+  )
 }
 
 @_cdecl("swift_ASTGen_printStaticBuildConfiguration")

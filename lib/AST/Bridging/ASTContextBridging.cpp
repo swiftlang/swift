@@ -15,7 +15,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Bridging/BasicSwift.h"
+#include "swift/Basic/Version.h"
 
 using namespace swift;
 
@@ -143,4 +145,15 @@ void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
   }
 
   return staticBuildConfiguration;
+}
+
+bool BridgedASTContext_isDeploymentTargetAtLeast(
+    BridgedASTContext cContext, BridgedStringRef platform,
+    BridgedStringRef version) {
+  llvm::VersionTuple requiredVersion;
+  if (requiredVersion.tryParse(version.unbridged()))
+    return false;
+
+  return isDeploymentTargetAtLeast(cContext.unbridged(), platform.unbridged(),
+                                   version::Version(requiredVersion));
 }

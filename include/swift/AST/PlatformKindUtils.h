@@ -27,6 +27,10 @@
 namespace swift {
 
 class LangOptions;
+class ASTContext;
+namespace version {
+class Version;
+}
 
 /// Returns the short string representing the platform, suitable for
 /// use in availability specifications (e.g., "OSX").
@@ -95,6 +99,16 @@ platformForTriple(const llvm::Triple &triple, bool enableAppExtensionRestriction
 /// should also apply to the "child" platform for declarations without
 /// an explicit attribute for the child.
 bool inheritsAvailabilityFromPlatform(PlatformKind Child, PlatformKind Parent);
+
+/// Whether a deployment-target requirement applies to the current target
+/// under runtime availability platform matching.
+bool isDeploymentTargetPlatformActive(const LangOptions &LangOpts,
+                                      StringRef platform);
+
+/// Compare a deployment target against an applicable platform requirement
+/// using the platform's availability version rules.
+bool isDeploymentTargetAtLeast(const ASTContext &Ctx, StringRef platform,
+                               const version::Version &requiredVersion);
 
 /// Returns the LLVM triple OS type for the given platform, if there is one.
 std::optional<llvm::Triple::OSType>
