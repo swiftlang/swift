@@ -65,6 +65,11 @@ public:
   explicit SwiftDeclSynthesizer(ClangImporter *importer)
       : ImporterImpl(importer->Impl) {}
 
+  /// Whether a C++ value can pass through native Swift code without invoking a
+  /// potentially throwing copy, move, or destructor.
+  bool canTransferCxxValueWithoutThrowing(clang::QualType type,
+                                          const clang::Decl *diagnosticDecl);
+
   /// Create a native throwing facade and a C++ adapter that catches exceptions
   /// without changing the original declaration's calling convention.
   FuncDecl *makeCxxThrowingFunction(const clang::FunctionDecl *clangDecl,

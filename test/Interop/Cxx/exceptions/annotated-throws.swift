@@ -305,7 +305,7 @@ func check() throws {
   _ = operators[1] // expected-error {{value of type 'UnsupportedOperators' has no subscripts}}
   _ = Bool(fromCxx: operators) // expected-error {{initializer 'init(fromCxx:)' requires that 'UnsupportedOperators' conform to 'CxxConvertibleToBool'}}
   var unsupported = Unsupported()
-  _ = unsupported.instance() // expected-error {{'instance()' is unavailable: SWIFT_THROWS on instance methods is not yet supported}}
+  _ = try unsupported.instance()
 }
 
 func checkDeclarationVariants() throws {
