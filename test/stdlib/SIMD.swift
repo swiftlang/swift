@@ -89,4 +89,25 @@ SIMDCodableTests.test("roundTrip") {
   */
 }
 
+// Ensure comparisons with unqualified `.zero` or `.one` will typecheck.
+// See https://github.com/swiftlang/swift/pull/82686.
+func zeroComparisonsAreNotAmbiguous(
+  _ i: SIMD4<Int32>, _ u: SIMD3<UInt8>, _ f: SIMD4<Float>
+) {
+  _ = i .== .zero
+  _ = i .!= .zero
+  _ = i .< .zero
+  _ = i .<= .zero
+  _ = i .> .zero
+  _ = i .>= .zero
+  _ = u .== .zero
+  _ = u .> .zero
+  _ = f .< .zero
+  _ = f .>= .zero
+  _ = .zero .< i
+  _ = .zero .<= f
+  _ = i .== .one
+  _ = f .< .one
+}
+
 runAllTests()
