@@ -690,8 +690,10 @@ void TypeTreeLeafTypeRange::get(
     return;
   }
 
-  // An `inject_enum_addr` only initializes the enum tag.
-  if (isa<InjectEnumAddrInst>(op->getUser())) {
+  // An `inject_enum_addr` of a case with a payload only initializes the enum
+  // tag: the payload was already initialized via `init_enum_data_addr`.
+  if (auto *ieai = dyn_cast<InjectEnumAddrInst>(op->getUser());
+      ieai && ieai->getElement()->hasAssociatedValues()) {
     // Subtract the deinit bit, if any: the discriminator bit is before it:
     //
     // [ case1 bits ..., case2 bits, ..., discriminator bit, deinit bit ]
