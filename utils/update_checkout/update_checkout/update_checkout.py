@@ -595,7 +595,7 @@ def check_missing_clones(
     """
 
     missing = []
-    for repo in scheme_map:
+    for repo in scheme_map or config["repos"]:
         if should_skip_repo(args, config, repo):
             continue
         if not args.source_root.joinpath(repo).exists():
@@ -621,7 +621,7 @@ def _check_git_config(
         "core.autocrlf": "false",
     }
 
-    for repo in scheme_map:
+    for repo in scheme_map or config["repos"]:
         if should_skip_repo(args, config, repo):
             continue
 
