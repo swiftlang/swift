@@ -549,7 +549,8 @@ EXPERIMENTAL_FEATURE(CxxImplementation, true)
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 
 /// Generate C++ bindings for Swift APIs with direct `Hashable` generic
-/// requirements in the C++ section of the generated Clang header.
+/// requirements, and expose `Dictionary` in the C++ section of the generated
+/// Clang header.
 EXPERIMENTAL_FEATURE(GenerateBindingsForHashableRequirementsInCXX, false)
 
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors

@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -762,13 +763,30 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       SwiftToClangInteropContext interopContext(
           *M->getASTContext().getStdlibModule(), irGenOpts);
       auto macroGuard = computeMacroGuard(M->getASTContext().getStdlibModule());
+      // Only the first generated header that a C++ file includes prints the
+      // standard library bindings. `swift::Dictionary` is only in them if that
+      // header was generated with GenerateBindingsForHashableRequirementsInCXX.
+      bool exposesDictionary =
+          cxx_translation::canLookUpHashableConformances(M->getASTContext());
+      StringRef dictionaryMacro = "SWIFT_STDLIB_EXPOSES_DICTIONARY";
       os << "#ifndef " << macroGuard << "\n";
       os << "#define " << macroGuard << "\n";
+      if (exposesDictionary)
+        os << "#define " << dictionaryMacro << "\n";
       printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(),
                                interopContext, AccessLevel::Public,
                                /*requiresExposedAttribute=*/true,
                                exposedModules);
       os << "#endif // " << macroGuard << "\n";
+      if (exposesDictionary) {
+        os << "#ifndef " << dictionaryMacro << "\n";
+        os << "#error \"the Swift standard library bindings were printed by a "
+              "header generated without "
+              "GenerateBindingsForHashableRequirementsInCXX; enable the "
+              "feature for all Swift modules whose headers are included, or "
+              "include this header first\"\n";
+        os << "#endif\n";
+      }
     }
 
       os << moduleContents.str();

@@ -13,7 +13,8 @@
 // REQUIRES: swift_feature_GenerateBindingsForHashableRequirementsInCXX
 
 // A C++ type whose Hashable conformance is declared in Swift can be passed to
-// a Swift API with a Hashable requirement from C++.
+// a Swift API with a Hashable requirement from C++, and be used as a
+// swift::Dictionary key.
 
 //--- header.h
 
@@ -60,6 +61,16 @@ public func printKey(_ key: Key) {
   print("Key(\(key.id))")
 }
 
+public func makeDictionary() -> [Key: CInt] {
+  return [Key(1): 10, Key(2): 20]
+}
+
+public func printDictionary(_ dict: [Key: CInt]) {
+  for key in dict.keys.sorted(by: { $0.id < $1.id }) {
+    print("Key(\(key.id))=\(dict[key]!)")
+  }
+}
+
 public func printSharedKey(_ key: SharedKey) {
   print("SharedKey(\(key.id))")
 }
@@ -77,6 +88,22 @@ int main() {
     UseCxx::printKey(one);
   }
 // CHECK: Key(1)
+  {
+    auto dict = UseCxx::makeDictionary();
+    assert(dict[Key(1)].get() == 10);
+    assert(!dict[Key(3)]);
+    dict.updateValueForKey(30, Key(3));
+    UseCxx::printDictionary(dict);
+
+    auto newDict = swift::Dictionary<Key, int>::init();
+    newDict.updateValueForKey(40, Key(4));
+    assert(newDict[Key(4)].get() == 40);
+    UseCxx::printDictionary(newDict);
+  }
+// CHECK-NEXT: Key(1)=10
+// CHECK-NEXT: Key(2)=20
+// CHECK-NEXT: Key(3)=30
+// CHECK-NEXT: Key(4)=40
   {
     // A foreign reference type is passed as a pointer.
     SharedKey *one = new SharedKey(1);
