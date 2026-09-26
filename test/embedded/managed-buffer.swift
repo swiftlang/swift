@@ -8,5 +8,4 @@
 // EXIST: @"$e4main8MyBufferCN" = {{.*}}alias
 // EXIST-NOT: @"$es13ManagedBufferCySis5UInt8VGN" = {{.*}}alias
 
-final public class MyBuffer: ManagedBuffer<Int, UInt8> {
-}
+final public class MyBuffer: ManagedBuffer<Int, UInt8> {}
