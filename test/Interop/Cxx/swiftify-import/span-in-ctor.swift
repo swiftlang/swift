@@ -22,7 +22,7 @@ public:
    Foo();
 // expected-expansion@+7:18{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
 //   expected-remark@3{{macro content: |public init(_ sp: Span<CInt>) {|}}
 //   expected-remark@4{{macro content: |    unsafe self.init(IntSpan(sp))|}}
 //   expected-remark@5{{macro content: |}|}}

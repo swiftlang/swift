@@ -942,21 +942,31 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   var nullableCountAccessNeedsUnsafe: Bool { !generateSpan }
 
   func checkBound() -> StmtSyntax {
+    let actual: ExprSyntax
+    let condition: String
     if nullable {
       let local = TokenSyntax("_\(name.withoutBackticks)Count").escapeIfNeeded
       let unsafeKw = nullableCountAccessNeedsUnsafe ? "unsafe " : ""
-      return
-        """
-        if let \(local) = \(raw: unsafeKw)\(name)?.\(raw: countLabel), \(local) != \(countExpr) {
-          fatalError("bounds check failure in \(funcDecl.name): expected \\(\(countExpr)) but got \\(\(local))")
-        }
-        """
+      actual = ExprSyntax("\(local)")
+      condition = "let \(local) = \(unsafeKw)\(name)?.\(countLabel), \(local) != \(countExpr)"
+    } else {
+      actual = ExprSyntax("\(name).\(raw: countLabel)")
+      condition = "\(actual) != \(countExpr)"
     }
-    let actual = ExprSyntax("\(name).\(raw: countLabel)")
+    // Build the message in a local function that is never inlined: this keeps
+    // the wrapper small enough to be inlined, and its fast path frame-less.
+    // `_fail` takes the function name as an argument so that its body is the
+    // same in every wrapper, which lets optimized builds merge them.
     return
       """
-      if \(actual) != \(countExpr) {
-        fatalError("bounds check failure in \(funcDecl.name): expected \\(\(countExpr)) but got \\(\(actual))")
+      if \(raw: condition) {
+        @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+          @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+            fatalError("bounds check failure in \\(function): expected \\(expected) but got \\(actual)")
+          }
+          _fail("\(raw: funcDecl.name.withoutBackticks.text)", expected, actual)
+        }
+        _boundsCheckFailure(\(countExpr), \(actual))
       }
       """
   }
@@ -1883,7 +1893,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     ]
   // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
   let droppedAttrs: Set<String> = [
-    "_SwiftifyImport", "_alwaysEmitIntoClient", "_lifetime", "lifetime",
+    "_SwiftifyImport", "_alwaysEmitIntoClient", "inline", "_lifetime", "lifetime",
   ]
   var attributes =
     funcComponents.attributes.filter { e in
@@ -1895,7 +1905,10 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
       .attribute(
         AttributeSyntax(
           atSign: .atSignToken(),
-          attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
+          attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient"))),
+      // Wrappers are thin shims around the unsafe call: inlining them lets the
+      // bounds checks fold into the caller and removes the extra call.
+      .attribute(AttributeSyntax("@inline(always)"))
     ]
   attributes +=
     (availabilityAttr

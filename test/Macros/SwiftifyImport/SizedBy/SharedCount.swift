@@ -16,11 +16,17 @@ public func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CI
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer) {
     let size = CInt(exactly: ptr2.count)!
     if ptr.count != size {
-      fatalError("bounds check failure in myFunc: expected \(size) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("myFunc", expected, actual)
+      }
+      _boundsCheckFailure(size, ptr.count)
     }
     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, size)
 }
