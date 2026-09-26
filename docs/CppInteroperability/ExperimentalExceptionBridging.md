@@ -50,17 +50,36 @@ then throws the copied error through its normal error-handling path. C++ stack
 cleanup completes inside the adapter, and Swift `defer` blocks run when the Swift
 error propagates. The original C++ function keeps its ABI and symbol.
 
-The current slice supports free functions, namespace functions, and static
-methods with arithmetic or enum parameters and arithmetic or `void` results.
-Other annotated declarations are unavailable. In particular, instance methods,
-constructors, operators, function templates, Objective-C methods, default
-arguments, variadic functions, functions with aggregate, pointer or reference
-parameters, and functions with enum, aggregate or pointer results need
-additional support. Enum results are not bridged yet because the adapter returns
-a zero placeholder after an exception, and zero need not be a valid value of
-the enum. Annotated members are never used
-to derive conformances such as `CxxSequence` or `UnsafeCxxInputIterator`,
-because those protocol requirements cannot throw.
+The current slice supports free functions, namespace functions, and static and
+ordinary instance methods with arithmetic or enum parameters and arithmetic or
+`void` results. Instance methods preserve their const and reference qualifiers,
+mutating behavior, and existing C++ virtual dispatch rules, including calls to
+`super` on foreign reference types. Mutations made before an exception remain
+visible to Swift. Captured method values also throw. Methods annotated with
+`SWIFT_THROWS` never become nonthrowing computed properties, whether they are
+bridged or unavailable.
+
+A virtual method is imported as throwing when its own declaration is annotated.
+Calls through a base class use the base declaration: if the base method is not
+annotated, an exception from a throwing override terminates, as it does without
+this feature.
+
+Consuming methods require a receiver whose move construction and destruction
+cannot throw, and whose copy construction also cannot throw when it is
+`Copyable`. These operations may run in Swift-generated code around the adapter.
+This permits consuming methods on nontrivial and noncopyable receivers while
+keeping throwing implicit lifetime operations outside the supported scope.
+Inherited rvalue-qualified methods retain the importer's existing limitations.
+
+Other annotated declarations are unavailable. In particular, constructors,
+operators, function templates, Objective-C methods, default arguments, variadic
+functions, functions with aggregate, pointer or reference parameters, and
+functions with enum, aggregate or pointer results need additional support. Enum
+results are not bridged yet because the adapter returns a zero placeholder after
+an exception, and zero need not be a valid value of the enum. Explicit object
+member functions (C++23 "deducing this") are not imported at all. Annotated
+members are never used to derive conformances such as `CxxSequence` or
+`UnsafeCxxInputIterator`, because those protocol requirements cannot throw.
 
 The annotation takes precedence over `noexcept` for the imported Swift function
 type. A C++ violation of `noexcept` still terminates according to C++ rules.

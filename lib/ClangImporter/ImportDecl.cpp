@@ -4262,9 +4262,19 @@ namespace {
             unavailableReason =
                 "SWIFT_THROWS is not supported on this kind of declaration";
           } else if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
-                     method && !method->isStatic()) {
+                     method && !method->isStatic() &&
+                     cast<FuncDecl>(result)->getSelfAccessKind() ==
+                         SelfAccessKind::Consuming &&
+                     !result->getDeclContext()
+                          ->getDeclaredInterfaceType()
+                          ->hasReferenceSemantics() &&
+                     !synthesizer.canTransferCxxValueWithoutThrowing(
+                         Impl.getClangASTContext().getRecordType(
+                             method->getParent()),
+                         method)) {
             unavailableReason =
-                "SWIFT_THROWS on instance methods is not yet supported";
+                "SWIFT_THROWS on consuming methods requires nonthrowing "
+                "receiver transfer and destruction";
           } else if ((!resultType->isVoidType() &&
                       !resultType->isIntegerType() &&
                       !resultType->isRealFloatingType()) ||
@@ -4928,6 +4938,12 @@ namespace {
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
         if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
+          // A method that is imported as throwing must not become a
+          // nonthrowing accessor, whether it is bridged or unavailable.
+          if (funcDecl->hasThrows() ||
+              importer::shouldImportCxxFunctionAsThrowing(Impl.SwiftContext,
+                                                          decl))
+            return method;
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {

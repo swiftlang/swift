@@ -2494,10 +2494,14 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   }
 
   case DeclContextKind::AbstractFunctionDecl: {
+    auto *importer =
+        static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+    // The throwing facade of a SWIFT_THROWS method takes the place of the
+    // imported method, but has no Clang node of its own.
     if (auto *entryPoint = dyn_cast<FuncDecl>(DC);
-        entryPoint && entryPoint->hasClangNode()) {
-      auto *importer =
-          static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+        entryPoint &&
+        (entryPoint->hasClangNode() ||
+         (importer && importer->isCxxExceptionBridge(entryPoint)))) {
       const AbstractFunctionDecl *anchor = nullptr;
       auto kind = CxxSynthesizedEntryPointKind::StaticVirtualCall;
       if (importer) {

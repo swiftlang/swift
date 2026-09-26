@@ -6087,6 +6087,11 @@ static const clang::CXXMethodDecl *
 getCalledBaseCxxMethod(const FuncDecl *baseMember) {
   if (baseMember->getClangDecl())
     return dyn_cast<clang::CXXMethodDecl>(baseMember->getClangDecl());
+  auto *importer = static_cast<ClangImporter *>(
+      baseMember->getASTContext().getClangModuleLoader());
+  if (importer->isCxxExceptionBridge(baseMember))
+    return getCalledBaseCxxMethod(
+        cast<FuncDecl>(importer->getForwardingSource(baseMember)));
   // Another synthesized derived thunk is used as a base member here,
   // so extract its synthesized C++ method.
   auto body = baseMember->getBody();
@@ -6097,6 +6102,8 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
   if (!returnStmt)
     return nullptr;
   Expr *returnExpr = returnStmt->getResult();
+  if (auto *tryExpr = dyn_cast<TryExpr>(returnExpr))
+    returnExpr = tryExpr->getSubExpr();
   // Look through a potential 'reinterpretCast' that can be used
   // to cast UnsafeMutablePointer to UnsafePointer in the synthesized
   // Swift body for `.pointee`.
@@ -6124,9 +6131,10 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
     cv = orig;
   if (!cv)
     return nullptr;
-  if (!cv->getClangDecl())
-    return nullptr;
-  return dyn_cast<clang::CXXMethodDecl>(cv->getClangDecl());
+  if (auto *function = dyn_cast<FuncDecl>(cv);
+      function && importer->isCxxExceptionBridge(function))
+    return getCalledBaseCxxMethod(function);
+  return dyn_cast_or_null<clang::CXXMethodDecl>(cv->getClangDecl());
 }
 
 // Construct a Swift method that represents the synthesized C++ method
@@ -6213,9 +6221,16 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto *baseMemberCallExpr = CallExpr::createImplicit(
       ctx, baseMemberDotCallExpr, argList);
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
-  baseMemberCallExpr->setThrows(nullptr);
+  auto thrownType = forwardedFunc->getEffectiveThrownErrorType();
+  baseMemberCallExpr->setThrows(ThrownErrorDestination::forMatchingContextType(
+      thrownType.value_or(Type())));
 
-  auto *returnStmt = ReturnStmt::createImplicit(ctx, baseMemberCallExpr);
+  Expr *result = baseMemberCallExpr;
+  if (thrownType)
+    result = new (ctx)
+        TryExpr(SourceLoc(), result, baseMember->getResultInterfaceType(),
+                /*Implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, result);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
@@ -6761,6 +6776,8 @@ static void handleAmbiguousOverrides(ClangImporter::Implementation &Impl,
                                      ValueDecl *clonedDecl) {
   if (auto *original = Impl.getOriginalForVirtualThunk(baseFunc))
     baseFunc = original;
+  if (Impl.cxxExceptionBridges.count(baseFunc))
+    baseFunc = cast<FuncDecl>(Impl.getForwardingSource(baseFunc));
 
   const auto *baseCxxMethod =
       dyn_cast_or_null<clang::CXXMethodDecl>(baseFunc->getClangDecl());
@@ -6792,19 +6809,32 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
     if (fn->isStatic() ||
         isa_and_nonnull<clang::FunctionTemplateDecl>(fn->getClangDecl()))
       return nullptr;
+    bool isCxxExceptionBridge = Impl.cxxExceptionBridges.count(fn);
+    auto *source = isCxxExceptionBridge ? Impl.getForwardingSource(fn) : fn;
     if (auto cxxMethod =
-            dyn_cast_or_null<clang::CXXMethodDecl>(fn->getClangDecl())) {
+            dyn_cast_or_null<clang::CXXMethodDecl>(source->getClangDecl())) {
       // FIXME: if this function has rvalue this, we won't be able to synthesize
       // the accessor correctly (https://github.com/apple/swift/issues/69745).
       if (cxxMethod->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
         return nullptr;
     }
 
+    // The body of a C++ exception bridge captures its parameters in a closure.
+    // Sharing them with the derived method would reparent them and break those
+    // captures, so the derived method gets its own copies.
+    auto *parameters = fn->getParameters();
+    if (isCxxExceptionBridge) {
+      // Annotated functions with default arguments are not bridged, and
+      // ParamDecl::clone does not copy a default expression.
+      for (auto *parameter : *parameters)
+        ASSERT(!parameter->isDefaultArgument());
+      parameters = ParameterList::clone(context, parameters);
+    }
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
         fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
-        fn->getGenericParams(), fn->getParameters(),
-        fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
+        fn->getGenericParams(), parameters, fn->getResultInterfaceType(),
+        newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
     auto markedUnavailable = inheritance.setUnavailableIfNecessary(decl, out);
