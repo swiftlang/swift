@@ -63,6 +63,14 @@ public let benchmarks = [
     name: "MutableSpanBubbleSort",
     runFunction: run_MutableSpanBubbleSort,
     tags: t),
+  BenchmarkInfo(
+    name: "StringToSpanSmall",
+    runFunction: run_StringToSpanSmall,
+    tags: t),
+  BenchmarkInfo(
+    name: "StringToSpanLarge",
+    runFunction: run_StringToSpanLarge,
+    tags: t),
 ]
 
 let spanSize = 10000
@@ -303,5 +311,45 @@ public func run_MutableSpanBubbleSort(_ n: Int) {
       }
     }
     check(isSorted(span))
+  }
+}
+
+// Converting a String to a Span. A small (inline) string stores its UTF-8 bytes inside the
+// String value itself, so the resulting Span depends on the address of that value and the
+// conversion goes through an addressable lifetime dependence. That path is where a dead
+// release can survive; see https://github.com/swiftlang/swift/issues/91665.
+
+@inline(never)
+func sumSpanBytes(_ span: Span<UInt8>) -> UInt64 {
+  var acc: UInt64 = 0
+  for i in span.indices {
+    acc &+= UInt64(span[i])
+  }
+  return acc
+}
+
+let largeUTF8String = "a string comfortably longer than fifteen utf8 bytes"
+
+@inline(never)
+public func run_StringToSpanSmall(_ n: Int) {
+  if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
+    for _ in 0..<n {
+      for _ in 0..<1_000 {
+        var s = "[::1]"
+        blackHole(sumSpanBytes(s.utf8Span.span))
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_StringToSpanLarge(_ n: Int) {
+  if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
+    for _ in 0..<n {
+      for _ in 0..<1_000 {
+        var s = largeUTF8String
+        blackHole(sumSpanBytes(s.utf8Span.span))
+      }
+    }
   }
 }
