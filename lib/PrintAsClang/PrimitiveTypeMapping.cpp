@@ -17,6 +17,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/ASTContext.h"
+#include "llvm/ADT/StringSwitch.h"
 #include <optional>
 
 using namespace swift;
@@ -244,6 +246,49 @@ PrimitiveTypeMapping::getKnownCxxTypeInfo(const TypeDecl *typeDecl) {
                            typeInfo->simd};
   }
   return std::nullopt;
+}
+
+std::optional<clang::TargetInfo::IntType>
+PrimitiveTypeMapping::getKnownCxxIntegerType(const TypeDecl *typeDecl) {
+  // The C++ spellings of `Int` and `UInt` are `swift::Int` and `swift::UInt`,
+  // which are aliases of their C spellings, `ptrdiff_t` and `size_t`.
+  auto typeInfo = getKnownCTypeInfo(typeDecl);
+  if (!typeInfo)
+    return std::nullopt;
+  auto &targetInfo = typeDecl->getASTContext()
+                         .getClangModuleLoader()
+                         ->getClangASTContext()
+                         .getTargetInfo();
+  using IntType = clang::TargetInfo::IntType;
+  // Resolve the typedefs the same way as the target's C headers do.
+  auto intType =
+      llvm::StringSwitch<IntType>(typeInfo->name)
+          .Case("int8_t", targetInfo.getIntTypeByWidth(8, /*IsSigned=*/true))
+          .Case("uint8_t", targetInfo.getIntTypeByWidth(8, /*IsSigned=*/false))
+          .Case("int16_t", targetInfo.getIntTypeByWidth(16, /*IsSigned=*/true))
+          .Case("uint16_t",
+                targetInfo.getIntTypeByWidth(16, /*IsSigned=*/false))
+          .Case("int32_t", targetInfo.getIntTypeByWidth(32, /*IsSigned=*/true))
+          .Case("uint32_t",
+                targetInfo.getIntTypeByWidth(32, /*IsSigned=*/false))
+          .Case("int64_t", targetInfo.getInt64Type())
+          .Case("uint64_t", targetInfo.getUInt64Type())
+          .Case("ptrdiff_t", targetInfo.getPtrDiffType(clang::LangAS::Default))
+          .Case("size_t", targetInfo.getSizeType())
+          .Case("signed char", IntType::SignedChar)
+          .Case("unsigned char", IntType::UnsignedChar)
+          .Case("short", IntType::SignedShort)
+          .Case("unsigned short", IntType::UnsignedShort)
+          .Case("int", IntType::SignedInt)
+          .Case("unsigned int", IntType::UnsignedInt)
+          .Case("long", IntType::SignedLong)
+          .Case("unsigned long", IntType::UnsignedLong)
+          .Case("long long", IntType::SignedLongLong)
+          .Case("unsigned long long", IntType::UnsignedLongLong)
+          .Default(IntType::NoInt);
+  if (intType == IntType::NoInt)
+    return std::nullopt;
+  return intType;
 }
 
 std::optional<PrimitiveTypeMapping::ClangTypeInfo>
