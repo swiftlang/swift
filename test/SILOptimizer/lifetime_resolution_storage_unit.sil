@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-print-types -sil-disable-input-verify | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -sil-print-types -sil-disable-input-verify | %FileCheck %s  --implicit-check-not diagnose
 
 sil_stage raw
 
@@ -22,7 +22,13 @@ sil @consumeTwo : $@convention(thin) (@owned Two) -> ()
 sil @getNC : $@convention(thin) () -> @owned NC
 sil @useNC : $@convention(thin) (@guaranteed NC) -> ()
 sil @consumeNC : $@convention(thin) (@owned NC) -> ()
+sil @getNC_addr : $@convention(thin) () -> @out NC
+sil @consumeNC_addr : $@convention(thin) (@in NC) -> ()
 sil @barrier : $@convention(thin) () -> ()
+sil @useC_addr : $@convention(thin) (@in_guaranteed C) -> ()
+sil @consumeC_addr : $@convention(thin) (@in C) -> ()
+sil @consumeK_addr : $@convention(thin) (@in K) -> ()
+sil @produceC : $@convention(thin) () -> @out C
 
 // CHECK-LABEL: sil [ossa] @basic_take_of_uninit_box :
 // CHECK:          [[ROOT:%.*]] = project_box {{.*}} : ${ var K }, 0
@@ -30,7 +36,7 @@ sil @barrier : $@convention(thin) () -> ()
 // CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown] [[ROOT]]
 // CHECK-NEXT:     [[LD:%.*]] = load [copy] [[BA]]
 // CHECK-NEXT:     diagnose [unpermitted_copy] [[LD]]
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @basic_take_of_uninit_box : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var K }, var, name "a"
@@ -57,7 +63,7 @@ bb0:
 // CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown] [[ROOT]]
 // CHECK-NEXT:     load [take] [[BA]]
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @basic_take_of_uninit : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $K, var, name "x", type $K
@@ -86,7 +92,7 @@ bb0:
 // CHECK-NEXT:     ignored_use [[LD]]
 // CHECK:          load [take]
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @basic_double_take : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned K
@@ -123,7 +129,7 @@ bb0:
 // CHECK-NEXT:     end_access [[BA]] : $*K
 // CHECK-NEXT:     ignored_use [[LD]]
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @basic_last_use_is_copy : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned K
@@ -168,7 +174,7 @@ bb0:
 // CHECK:          load [take]
 // CHECK-NOT:      destroy_addr
 
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @nc_borrow_within_access_before_consume : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $NC, var, name "a", type $NC
@@ -225,7 +231,7 @@ bb0:
 // CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
 // CHECK-NEXT:     load [take] [[AB]] : $*K
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_independent_field_takes : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
@@ -264,7 +270,7 @@ bb0:
 // CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
 // CHECK-NEXT:     load [take] [[AB]] : $*K
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_use_after_consume_same_field : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
@@ -306,7 +312,7 @@ bb0:
 // CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
 // CHECK-NEXT:     load [take] [[AB]] : $*K
 // CHECK:          destroy_addr [[ROOT]] : $*Two
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_take_whole_then_field : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
@@ -343,7 +349,7 @@ bb0:
 // CHECK-NEXT:     diagnose [unpermitted_copy] [[LA]] : $K
 // CHECK:          load [take] [[ROOT]] : $*Two
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_take_field_then_whole : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
@@ -380,9 +386,8 @@ bb0:
 // CHECK:          [[E1:%.*]] = tuple_element_addr [[ROOT]] : $*(K, K), 1
 // CHECK-NEXT:     load [take] [[E1]] : $*K
 // CHECK-NOT:      load [copy]
-// CHECK-NOT:      diagnose
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_tuple_independent_takes : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $(K, K), var, name "t", type $(K, K)
@@ -424,9 +429,8 @@ bb0:
 // CHECK:          struct_element_addr [[ROOT]] : $*Nested, #Nested.k
 // CHECK-NEXT:     load [take]
 // CHECK-NOT:      load [copy]
-// CHECK-NOT:      diagnose
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_nested_leaves : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Nested, var, name "n", type $Nested
@@ -473,9 +477,8 @@ bb0:
 // CHECK:          end_borrow [[LB]] : $K
 // CHECK:          [[AB2:%.*]] = struct_element_addr [[ROOT]] : $*NCTwo, #NCTwo.b
 // CHECK-NEXT:     load [take] [[AB2]] : $*K
-// CHECK-NOT:      diagnose
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_nc_take_field_borrow_other : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $NCTwo, var, name "t", type $NCTwo
@@ -521,9 +524,8 @@ bb0:
 // CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
 // CHECK-NEXT:     load [take] [[AB]] : $*K
 // CHECK-NOT:      load [copy]
-// CHECK-NOT:      diagnose
 // CHECK-NOT:      destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_field_access_scope : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
@@ -561,7 +563,7 @@ bb0:
 // CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
 // CHECK-NEXT:     load [take] [[AB]] : $*K
 // CHECK:          destroy_addr [[ROOT]] : $*Two
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @fs_partial_use_before_init : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t", type $Two
@@ -595,7 +597,7 @@ bb0:
 // CHECK-LABEL: sil [ossa] @stack_final_take_deletes_destroy_addr :
 // CHECK:         load [take] {{.*}} : $*C
 // CHECK-NOT:     destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @stack_final_take_deletes_destroy_addr : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
@@ -620,7 +622,7 @@ bb0:
 // CHECK-LABEL: sil [ossa] @stack_take_dominates_branch_destroys :
 // CHECK:         load [take] {{.*}} : $*C
 // CHECK-NOT:     destroy_addr
-// CHECK-LABEL: } // end sil function
+// CHECK:       } // end sil function
 sil [ossa] @stack_take_dominates_branch_destroys : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
@@ -649,4 +651,531 @@ bb3:
   dealloc_stack %0 : $*C
   %t = tuple ()
   return %t
+}
+
+//===----------------------------------------------------------------------===//
+// copy_addr: a copy out of the source is a use demanding ownership, so a final
+// such use becomes a [take]. The destination address views this as a def.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @cpa_last_use_becomes_take :
+// CHECK:       bb0([[OUT:%.*]] : $*C, [[ARG:%.*]] : $*C):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK-NEXT:    copy_addr [[ARG]] to [init] [[ROOT]] : $*C
+// CHECK-NEXT:    copy_addr [take] [[ROOT]] to [init] [[OUT]] : $*C
+// CHECK-NEXT:    dealloc_stack [[ROOT]]
+// CHECK:       } // end sil function
+sil [ossa] @cpa_last_use_becomes_take : $@convention(thin) (@in_guaranteed C) -> @out C {
+bb0(%out : $*C, %arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %0 : $*C
+  copy_addr %0 to [init] %out : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @cpa_interior_copy_stays_copy :
+// CHECK:       bb0([[OUT:%.*]] : $*C, [[ARG:%.*]] : $*C):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:         copy_addr [[ROOT]] to [init] [[OUT]] : $*C
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $C
+// CHECK-NEXT:    copy_addr [take] [[ROOT]] to [init] [[TMP]] : $*C
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_interior_copy_stays_copy : $@convention(thin) (@in_guaranteed C) -> @out C {
+bb0(%out : $*C, %arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %0 : $*C
+  copy_addr %0 to [init] %out : $*C
+  %tmp = alloc_stack $C
+  copy_addr %0 to [init] %tmp : $*C
+  %f = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+  apply %f(%tmp) : $@convention(thin) (@in C) -> ()
+  dealloc_stack %tmp : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// An `@in_guaranteed` argument is not yet understood, so it conservatively demands
+// the storage: the copy before it stays a copy, and the destroy is kept.
+// CHECK-LABEL: sil [ossa] @cpa_unknown_use_keeps_copy_and_destroy :
+// CHECK:       bb0([[OUT:%.*]] : $*C, [[ARG:%.*]] : $*C):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:         copy_addr [[ROOT]] to [init] [[OUT]] : $*C
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK-NEXT:    destroy_addr [[ROOT]] : $*C
+// CHECK:       } // end sil function
+sil [ossa] @cpa_unknown_use_keeps_copy_and_destroy : $@convention(thin) (@in_guaranteed C) -> @out C {
+bb0(%out : $*C, %arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %0 : $*C
+  copy_addr %0 to [init] %out : $*C
+  %f = function_ref @useC_addr : $@convention(thin) (@in_guaranteed C) -> ()
+  apply %f(%0) : $@convention(thin) (@in_guaranteed C) -> ()
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// An `@out` argument initializes the storage.
+// CHECK-LABEL: sil [ossa] @cpa_indirect_out_apply_is_def :
+// CHECK:       bb0([[OUT:%.*]] : $*C):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) () -> @out C
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK-NEXT:    copy_addr [take] [[ROOT]] to [init] [[OUT]] : $*C
+// CHECK-NOT:     assign undef
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_indirect_out_apply_is_def : $@convention(thin) () -> @out C {
+bb0(%out : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  %f = function_ref @produceC : $@convention(thin) () -> @out C
+  apply %f(%0) : $@convention(thin) () -> @out C
+  %u = function_ref @useC_addr : $@convention(thin) (@in_guaranteed C) -> ()
+  apply %u(%0) : $@convention(thin) (@in_guaranteed C) -> ()
+  copy_addr %0 to [init] %out : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// An `@in` argument takes the storage.
+// CHECK-LABEL: sil [ossa] @cpa_indirect_in_apply_is_take :
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) () -> @out C
+// CHECK-NEXT:    apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in C) -> ()
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_indirect_in_apply_is_take : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  %gen = function_ref @produceC : $@convention(thin) () -> @out C
+  %take = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+
+  apply %gen(%0) : $@convention(thin) () -> @out C
+
+  apply %take(%0) : $@convention(thin) (@in C) -> ()
+
+  destroy_addr %0 : $*C
+
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// For an @in use that has subsequent demand, we introduce a copy.
+//
+// CHECK-LABEL: sil [ossa] @cpa_indirect_in_apply_is_take_twice :
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) () -> @out C
+// CHECK:         [[ALLOC:%.*]] = alloc_stack $C
+// CHECK-NEXT:    copy_addr [[ROOT]] to [init] [[ALLOC]] : $*C
+// CHECK-NEXT:    apply {{%.*}}([[ALLOC]]) : $@convention(thin) (@in C) -> ()
+// CHECK-NEXT:    dealloc_stack [[ALLOC]]
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in C) -> ()
+// CHECK-NOT:     destroy_addr
+// CHECK:         dealloc_stack [[ROOT]]
+// CHECK:       } // end sil function
+sil [ossa] @cpa_indirect_in_apply_is_take_twice : $@convention(thin) () -> () {
+bb0:
+  %x = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %x"
+  %genC = function_ref @produceC : $@convention(thin) () -> @out C
+  %takeC = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+
+  apply %genC(%x) : $@convention(thin) () -> @out C
+
+  apply %takeC(%x) : $@convention(thin) (@in C) -> ()
+  apply %takeC(%x) : $@convention(thin) (@in C) -> ()
+
+  destroy_addr %x : $*C
+
+  dealloc_stack %x : $*C
+  %t = tuple ()
+  return %t
+}
+// CHECK-LABEL: sil [ossa] @cpa_indirect_in_apply_is_take_twice_nc :
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $NC
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) () -> @out NC
+// CHECK:         [[ALLOC:%.*]] = alloc_stack $NC
+// CHECK-NEXT:    copy_addr [[ROOT]] to [init] [[ALLOC]] : $*NC
+// CHECK-NEXT:    diagnose [unpermitted_copy] [[ROOT]]
+// CHECK-NEXT:    apply {{%.*}}([[ALLOC]]) : $@convention(thin) (@in NC) -> ()
+// CHECK-NEXT:    dealloc_stack [[ALLOC]]
+// CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in NC) -> ()
+// CHECK-NOT:     destroy_addr
+// CHECK:         dealloc_stack [[ROOT]]
+// CHECK:       } // end sil function
+sil [ossa] @cpa_indirect_in_apply_is_take_twice_nc : $@convention(thin) () -> () {
+bb0:
+  %y = alloc_stack [lexical] [var_decl] $NC, let, name "y"
+  specify_test "lifetime_resolution_resolve %y"
+  %genNC = function_ref @getNC_addr : $@convention(thin) () -> @out NC
+  %takeNC = function_ref @consumeNC_addr : $@convention(thin) (@in NC) -> ()
+
+  apply %genNC(%y) : $@convention(thin) () -> @out NC
+
+  apply %takeNC(%y) : $@convention(thin) (@in NC) -> ()
+  apply %takeNC(%y) : $@convention(thin) (@in NC) -> ()
+
+  destroy_addr %y : $*NC
+
+  dealloc_stack %y : $*NC
+  %t = tuple ()
+  return %t
+}
+
+// SILGen's shape for a generic argument `var x = t; consume(x); x = t; return x`.
+// when not using opaque values.
+//
+// CHECK-LABEL: sil [ossa] @cpa_reassign_kills_demand :
+// CHECK:       bb0([[OUT:%.*]] : $*C, [[ARG:%.*]] : $*C):
+// CHECK:         [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK-NEXT:    copy_addr [[ARG]] to [init] [[ROOT]] : $*C
+// CHECK:         [[R1:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*C
+// CHECK-NEXT:    copy_addr [take] [[R1]] to [init] {{%.*}} : $*C
+// CHECK:         [[M:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
+// CHECK-NEXT:    copy_addr [take] {{%.*}} to [[M]] : $*C
+// CHECK:         [[R2:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*C
+// CHECK-NEXT:    copy_addr [take] [[R2]] to [init] [[OUT]] : $*C
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_reassign_kills_demand : $@convention(thin) (@in_guaranteed C) -> @out C {
+bb0(%out : $*C, %arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, var, name "x"
+  %mu = mark_uninitialized [var] %0 : $*C
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %mu : $*C
+
+  %tmp = alloc_stack $C
+  %r = begin_access [read] [unknown] %mu : $*C
+  copy_addr %r to [init] %tmp : $*C
+  end_access %r : $*C
+  %f = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+  apply %f(%tmp) : $@convention(thin) (@in C) -> ()
+  dealloc_stack %tmp : $*C
+
+  %tmp2 = alloc_stack $C
+  copy_addr %arg to [init] %tmp2 : $*C
+  %m = begin_access [modify] [unknown] %mu : $*C
+  copy_addr [take] %tmp2 to %m : $*C
+  end_access %m : $*C
+  dealloc_stack %tmp2 : $*C
+
+  %r2 = begin_access [read] [unknown] %mu : $*C
+  copy_addr %r2 to [init] %out : $*C
+  end_access %r2 : $*C
+  destroy_addr %mu : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// Consumed on every path, so the destroy in the merge block is deleted.
+// CHECK-LABEL: sil [ossa] @cpa_consume_both_branches :
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:       bb1:
+// CHECK-NEXT:    copy_addr [take] [[ROOT]] to [init] {{%.*}} : $*C
+// CHECK:       bb2:
+// CHECK-NEXT:    copy_addr [take] [[ROOT]] to [init] {{%.*}} : $*C
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_consume_both_branches : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %0 : $*C
+  %f = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+  %tmp = alloc_stack $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  copy_addr %0 to [init] %tmp : $*C
+  br bb3
+
+bb2:
+  copy_addr %0 to [init] %tmp : $*C
+  br bb3
+
+bb3:
+  apply %f(%tmp) : $@convention(thin) (@in C) -> ()
+  dealloc_stack %tmp : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// The next iteration still demands the storage, so the copy in the loop stays a copy.
+// CHECK-LABEL: sil [ossa] @cpa_loop_consume_stays_copy :
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:       bb1:
+// CHECK:         copy_addr [[ROOT]] to [init] {{%.*}} : $*C
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_addr [[ROOT]] : $*C
+// CHECK:       } // end sil function
+sil [ossa] @cpa_loop_consume_stays_copy : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %0 : $*C
+  %f = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+  br bb1
+
+bb1:
+  %tmp = alloc_stack $C
+  copy_addr %0 to [init] %tmp : $*C
+  apply %f(%tmp) : $@convention(thin) (@in C) -> ()
+  dealloc_stack %tmp : $*C
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// Reinitializing within the loop body permits the copy before it to be a take.
+// CHECK-LABEL: sil [ossa] @cpa_loop_reinit_is_take :
+// CHECK:       bb0([[ARG:%.*]] : $*C):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $C
+// CHECK:       bb1:
+// CHECK:         copy_addr [take] [[ROOT]] to [init] {{%.*}} : $*C
+// CHECK:         copy_addr [[ARG]] to [init] [[ROOT]] : $*C
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_addr [[ROOT]] : $*C
+// CHECK:       } // end sil function
+sil [ossa] @cpa_loop_reinit_is_take : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%arg : $*C):
+  %0 = alloc_stack [lexical] [var_decl] $C, var, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  copy_addr %arg to [init] %0 : $*C
+  %f = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+  br bb1
+
+bb1:
+  %tmp = alloc_stack $C
+  copy_addr %0 to [init] %tmp : $*C
+  apply %f(%tmp) : $@convention(thin) (@in C) -> ()
+  dealloc_stack %tmp : $*C
+  copy_addr %arg to [init] %0 : $*C
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %t = tuple ()
+  return %t
+}
+
+// A copy_addr of a single field is tracked independently of its sibling.
+// CHECK-LABEL: sil [ossa] @cpa_field_source :
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $Two
+// CHECK:         [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:    copy_addr [take] [[AA]] to [init] {{%.*}} : $*K
+// CHECK:         [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:    load [take] [[AB]] : $*K
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_field_source : $@convention(thin) (@owned Two) -> () {
+bb0(%w : @owned $Two):
+  %0 = alloc_stack [lexical] [var_decl] $Two, let, name "t"
+  specify_test "lifetime_resolution_resolve %0"
+  store %w to [init] %0 : $*Two
+
+  %kt = alloc_stack $K
+  %aa = struct_element_addr %0 : $*Two, #Two.a
+  copy_addr %aa to [init] %kt : $*K
+  %f = function_ref @consumeK_addr : $@convention(thin) (@in K) -> ()
+  apply %f(%kt) : $@convention(thin) (@in K) -> ()
+  dealloc_stack %kt : $*K
+
+  %ab = struct_element_addr %0 : $*Two, #Two.b
+  %lb = load [copy] %ab : $*K
+  %c = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %c(%lb) : $@convention(thin) (@owned K) -> ()
+
+  destroy_addr %0 : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// A whole-value copy_addr demands every field, so an earlier take of a field is
+// legalized into a copy.
+// CHECK-LABEL: sil [ossa] @cpa_field_take_then_whole :
+// CHECK:       bb0([[OUT:%.*]] : $*Two, {{%.*}} : @owned $Two):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $Two
+// CHECK:         [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:    [[LA:%.*]] = load [copy] [[AA]] : $*K
+// CHECK-NEXT:    diagnose [unpermitted_copy] [[LA]] : $K
+// CHECK:         copy_addr [take] [[ROOT]] to [init] [[OUT]] : $*Two
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_field_take_then_whole : $@convention(thin) (@owned Two) -> @out Two {
+bb0(%out : $*Two, %w : @owned $Two):
+  %0 = alloc_stack [lexical] [var_decl] $Two, let, name "t"
+  specify_test "lifetime_resolution_resolve %0"
+  store %w to [init] %0 : $*Two
+
+  %aa = struct_element_addr %0 : $*Two, #Two.a
+  %la = load [take] %aa : $*K
+  %c = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %c(%la) : $@convention(thin) (@owned K) -> ()
+
+  copy_addr %0 to [init] %out : $*Two
+  destroy_addr %0 : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// Initializing each field separately, one of them with a copy_addr, defines the whole.
+// CHECK-LABEL: sil [ossa] @cpa_field_defs_then_whole :
+// CHECK:       bb0([[OUT:%.*]] : $*Two, [[KA:%.*]] : $*K, {{%.*}} : @owned $K):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $Two
+// CHECK-NEXT:    [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:    copy_addr [[KA]] to [init] [[AA]] : $*K
+// CHECK:         copy_addr [take] [[ROOT]] to [init] [[OUT]] : $*Two
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_field_defs_then_whole : $@convention(thin) (@in_guaranteed K, @owned K) -> @out Two {
+bb0(%out : $*Two, %ka : $*K, %kb : @owned $K):
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t"
+  specify_test "lifetime_resolution_resolve %0"
+  %aa = struct_element_addr %0 : $*Two, #Two.a
+  copy_addr %ka to [init] %aa : $*K
+  %ab = struct_element_addr %0 : $*Two, #Two.b
+  store %kb to [init] %ab : $*K
+  copy_addr %0 to [init] %out : $*Two
+  destroy_addr %0 : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// A copy_addr whose source and destination are both fields of the storage: `b` is
+// consumed then reinitialized from `a`, which the whole-value copy_addr still demands.
+// CHECK-LABEL: sil [ossa] @cpa_field_to_field_same_root :
+// CHECK:       bb0([[OUT:%.*]] : $*Two, {{%.*}} : @owned $Two):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $Two
+// CHECK:         [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:    load [take] [[AB]] : $*K
+// CHECK:         [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
+// CHECK-NEXT:    [[AB2:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:    copy_addr [[AA]] to [init] [[AB2]] : $*K
+// CHECK-NEXT:    copy_addr [take] [[ROOT]] to [init] [[OUT]] : $*Two
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_field_to_field_same_root : $@convention(thin) (@owned Two) -> @out Two {
+bb0(%out : $*Two, %w : @owned $Two):
+  %0 = alloc_stack [lexical] [var_decl] $Two, var, name "t"
+  specify_test "lifetime_resolution_resolve %0"
+  store %w to [init] %0 : $*Two
+
+  %ab = struct_element_addr %0 : $*Two, #Two.b
+  %lb = load [take] %ab : $*K
+  %c = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %c(%lb) : $@convention(thin) (@owned K) -> ()
+
+  %aa = struct_element_addr %0 : $*Two, #Two.a
+  %ab2 = struct_element_addr %0 : $*Two, #Two.b
+  copy_addr %aa to [init] %ab2 : $*K
+
+  copy_addr %0 to [init] %out : $*Two
+  destroy_addr %0 : $*Two
+  dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @cpa_nc_last_use :
+// CHECK:       bb0([[OUT:%.*]] : $*NC, {{%.*}} : @owned $NC):
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $NC
+// CHECK:         copy_addr [take] [[ROOT]] to [init] [[OUT]] : $*NC
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @cpa_nc_last_use : $@convention(thin) (@owned NC) -> @out NC {
+bb0(%out : $*NC, %v : @owned $NC):
+  %0 = alloc_stack [lexical] [var_decl] $NC, let, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  store %v to [init] %0 : $*NC
+  copy_addr %0 to [init] %out : $*NC
+  destroy_addr %0 : $*NC
+  dealloc_stack %0 : $*NC
+  %t = tuple ()
+  return %t
+}
+
+// The box's own lifetime end conservatively demands its contents.
+// CHECK-LABEL: sil [ossa] @cpa_box_copy_stays_copy :
+// CHECK:       bb0([[OUT:%.*]] : $*C, {{%.*}} : $*C):
+// CHECK:         [[PB:%.*]] = project_box {{%.*}} : ${ var C }, 0
+// CHECK:         [[R:%.*]] = begin_access [read] [unknown] [[PB]] : $*C
+// CHECK-NEXT:    copy_addr [[R]] to [init] [[OUT]] : $*C
+// CHECK:       } // end sil function
+sil [ossa] @cpa_box_copy_stays_copy : $@convention(thin) (@in_guaranteed C) -> @out C {
+bb0(%out : $*C, %arg : $*C):
+  %b = alloc_box ${ var C }, var, name "x"
+  %bb = begin_borrow [lexical] [var_decl] %b : ${ var C }
+  %pb = project_box %bb : ${ var C }, 0
+  specify_test "lifetime_resolution_resolve %b"
+  copy_addr %arg to [init] %pb : $*C
+  %r = begin_access [read] [unknown] %pb : $*C
+  copy_addr %r to [init] %out : $*C
+  end_access %r : $*C
+  end_borrow %bb : ${ var C }
+  destroy_value %b : ${ var C }
+  %t = tuple ()
+  return %t
+}
+
+// `var a = ...; var b = a; return b`: resolving both `a` and `b` turns this into all takes.
+// CHECK-LABEL: sil [ossa] @cpa_chain_two_roots :
+// CHECK:         [[A:%.*]] = alloc_stack [lexical] [var_decl] $C, var, name "a"
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [lexical] [var_decl] $C, var, name "b"
+// CHECK:         [[RA:%.*]] = begin_access [read] [unknown] [[A]] : $*C
+// CHECK-NEXT:    copy_addr [take] [[RA]] to [init] [[B]] : $*C
+// CHECK:         [[RB:%.*]] = begin_access [read] [unknown] [[B]] : $*C
+// CHECK-NEXT:    [[L:%.*]] = load [take] [[RB]] : $*C
+// CHECK-NOT:     destroy_addr
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function
+sil [ossa] @cpa_chain_two_roots : $@convention(thin) (@owned C) -> @owned C {
+bb0(%v : @owned $C):
+  %0 = alloc_stack [lexical] [var_decl] $C, var, name "a"
+  %1 = alloc_stack [lexical] [var_decl] $C, var, name "b"
+  specify_test "lifetime_resolution_resolve %1"
+  specify_test "lifetime_resolution_resolve %0"
+  store %v to [init] %0 : $*C
+  %r = begin_access [read] [unknown] %0 : $*C
+  copy_addr %r to [init] %1 : $*C
+  end_access %r : $*C
+  %r2 = begin_access [read] [unknown] %1 : $*C
+  %l = load [copy] %r2 : $*C
+  end_access %r2 : $*C
+  destroy_addr %1 : $*C
+  dealloc_stack %1 : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  return %l
 }
