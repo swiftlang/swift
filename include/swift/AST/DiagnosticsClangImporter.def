@@ -432,6 +432,9 @@ ERROR(redundant_conformance_protocol,none,
      "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
+NOTE(cxx_exception_mode_callable_type, none,
+     "potentially throwing C++ callable types are not supported in strict C++ "
+     "exception mode", ())
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(record_method_not_imported, none, "method %0 unavailable (cannot import)", (const clang::NamedDecl*))
