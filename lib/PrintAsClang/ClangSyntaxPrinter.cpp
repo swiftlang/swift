@@ -519,3 +519,14 @@ void ClangSyntaxPrinter::printSwiftMangledNameForDebugger(
   });
   os << "#pragma clang diagnostic pop\n";
 }
+
+void ClangSyntaxPrinter::printUnavailableInCxxComment(const ValueDecl *VD,
+                                                      StringRef reason) {
+  os << "// Unavailable in C++: Swift "
+     << Decl::getDescriptiveKindName(VD->getDescriptiveKind()) << " '";
+  VD->getName().print(os);
+  os << "'.";
+  if (!reason.empty())
+    os << " " << reason << ".";
+  os << "\n";
+}

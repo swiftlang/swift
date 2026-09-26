@@ -88,6 +88,11 @@ private:
 
   Implementation getImpl();
 
+  /// Returns the module that declares \p ty or one of its generic arguments,
+  /// if it is a Swift module that isn't exposed to this header and the
+  /// declaration would otherwise be included.
+  const ModuleDecl *getUnexposedModule(Type ty);
+
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
                      raw_ostream &outOfLineDefinitionsOS,
@@ -127,7 +132,15 @@ public:
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
-  bool shouldInclude(const ValueDecl *VD);
+  ///
+  /// In C++ mode, \p VD must also be representable in C++ and come from a
+  /// module that is exposed to C++, unless \p ignoreCxxRepresentation is true.
+  bool shouldInclude(const ValueDecl *VD, bool ignoreCxxRepresentation = false);
+
+  /// Returns why \p VD can't be represented in C++, as described by
+  /// \c cxx_translation::getDeclRepresentation, or an empty string if it
+  /// doesn't give a reason.
+  std::string getUnsupportedDeclReason(const ValueDecl *VD);
 
   bool isZeroSized(const NominalTypeDecl *decl);
 
