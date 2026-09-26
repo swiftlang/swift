@@ -63,6 +63,12 @@ private:
   makeCxxExceptionBridge(const clang::FunctionDecl *clangDecl,
                          AbstractFunctionDecl *importedDecl);
 
+  /// Diagnose synthesized C++ initialization whose native Swift body cannot
+  /// propagate exceptions from transferring its arguments or result.
+  bool checkSynthesizedCxxConstructor(ConstructorDecl *constructor,
+                                      NominalTypeDecl *record,
+                                      ArrayRef<VarDecl *> members);
+
 public:
   explicit SwiftDeclSynthesizer(ClangImporter::Implementation &Impl)
       : ImporterImpl(Impl) {}

@@ -1011,6 +1011,62 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   return {body, /*isTypeChecked*/ true};
 }
 
+bool SwiftDeclSynthesizer::checkSynthesizedCxxConstructor(
+    ConstructorDecl *constructor, NominalTypeDecl *record,
+    ArrayRef<VarDecl *> members) {
+  if (!ImporterImpl.SwiftContext.LangOpts.hasFeature(
+          Feature::CxxExceptionBridgingStrict))
+    return true;
+  auto *clangRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(record->getClangDecl());
+  if (!clangRecord)
+    return true;
+
+  // An extern "C" context may contain C++ records with throwing transfers.
+  // Preserve C callable imports without exempting those transfers.
+  bool isInCLinkageContext = importer::hasCLanguageLinkage(clangRecord);
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  bool canTransfer = canTransferCxxValueWithoutThrowing(
+      clangCtx.getRecordType(clangRecord), clangRecord);
+  StringRef reason =
+      "synthesized C++ initializers require nonthrowing argument and result "
+      "transfers in strict C++ exception mode";
+
+  // These initializers write Swift storage rather than calling a C++
+  // constructor. Their argument and result transfers must still be safe:
+  // a union's noexcept copy constructor says nothing about copying the member
+  // supplied to one of its synthesized field initializers.
+  auto canTransferMember = [&](auto &&self, clang::QualType type,
+                               const clang::Decl *decl) -> bool {
+    if (!isInCLinkageContext && hasPotentiallyThrowingCxxCallableType(type)) {
+      reason = importer::CxxThrowingCallableTypeReason;
+      return false;
+    }
+    if (const auto *array = clangCtx.getAsArrayType(type))
+      return self(self, array->getElementType(), decl);
+    // Copying a scalar or vector value can't throw.
+    if (type->isScalarType() || type->isVectorType())
+      return true;
+    return type->getAsCXXRecordDecl() &&
+           canTransferCxxValueWithoutThrowing(type, decl);
+  };
+  for (auto *member : members) {
+    // Match the fields used to build the initializer's parameter list.
+    if (member->isStatic() ||
+        isa_and_nonnull<clang::IndirectFieldDecl>(member->getClangDecl()))
+      continue;
+    auto *field = dyn_cast_or_null<clang::FieldDecl>(member->getClangDecl());
+    if (!field ||
+        !canTransferMember(canTransferMember, field->getType(), field)) {
+      canTransfer = false;
+      break;
+    }
+  }
+  if (!canTransfer)
+    ImporterImpl.markUnavailable(constructor, reason);
+  return canTransfer;
+}
+
 ConstructorDecl *
 SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   auto &context = ImporterImpl.SwiftContext;
@@ -1028,6 +1084,9 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+
+  if (!checkSynthesizedCxxConstructor(constructor, structDecl, {}))
+    return constructor;
 
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
@@ -1154,6 +1213,9 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+
+  if (!checkSynthesizedCxxConstructor(constructor, structDecl, members))
+    return constructor;
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
