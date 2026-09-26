@@ -748,6 +748,40 @@ suite.test("MutableSpan from UnsafeMutableBufferPointer")
   expectTrue(b.elementsEqual((0..<capacity).reversed()))
 }
 
+suite.test("MutableSpan init(ofOne:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var inline: InlineArray<5, UInt8> = [UInt8.zero, 1, 2, 3, 4]
+  let count = inline.count
+
+  var span = MutableSpan(ofOne: &inline)
+  expectEqual(span.count, 1)
+  var bytes = span.mutableBytes
+  expectEqual(bytes.byteCount, count)
+  for o in bytes.byteOffsets {
+    let b = bytes.unsafeLoad(fromByteOffset: o, as: UInt8.self)
+    bytes.storeBytes(of: b&+1, toByteOffset: o, as: UInt8.self)
+  }
+  _ = consume span // access through `span` formally ends here
+
+  for i in inline.indices {
+    expectEqual(Int(inline[i]), i+1)
+  }
+}
+
+suite.test("MutableSpan init(ofOne:) integer")
+.xfail(.always("https://github.com/swiftlang/swift/issues/92562"))
+.require(.stdlib_6_5).code {
+  var value = 42
+
+  var span = MutableSpan(ofOne: &value)
+  expectEqual(span.count, 1)
+  span[0] += 1
+
+  expectEqual(value, 43)
+}
+
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
