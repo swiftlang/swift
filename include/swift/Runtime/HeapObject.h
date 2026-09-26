@@ -384,7 +384,6 @@ public:
   SwiftRAII(const SwiftRAII &other) {
     swift_retain(*other);
     object = *other;
-    ;
   }
   SwiftRAII(SwiftRAII &&other) : object(*other) {
     other.object = nullptr;
