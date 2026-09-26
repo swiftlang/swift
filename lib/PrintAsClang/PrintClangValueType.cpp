@@ -194,6 +194,18 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
   }
 }
 
+std::optional<IRABIDetailsProvider::SizeAndAlignment>
+ClangValueTypePrinter::getFixedTypeSizeAlignment(
+    const NominalTypeDecl *typeDecl) const {
+  // FIXME: Can we make some better layout than opaque layout for generic
+  // types.
+  if (typeDecl->hasGenericParamList() || typeDecl->isResilient())
+    return std::nullopt;
+  // This can still be null if this is not a fixed-layout type, e.g. it has
+  // resilient fields.
+  return interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
+}
+
 void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl, llvm::function_ref<void(void)> bodyPrinter,
     DeclAndTypePrinter &declAndTypePrinter) {
@@ -213,20 +225,13 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (typeDecl->hasGenericParamList()) {
     genericSignature = typeDecl->getGenericSignature();
     assert(cxx_translation::isExposableToCxx(genericSignature));
-
-    // FIXME: Can we make some better layout than opaque layout for generic
-    // types.
-  } else if (!typeDecl->isResilient()) {
-    typeSizeAlign =
-        interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    // typeSizeAlign can be null if this is not a fixed-layout type,
-    // e.g. it has resilient fields.
-    if (typeSizeAlign && typeSizeAlign->size == 0) {
-      // FIXME: How to represent 0 sized structs?
-      declAndTypePrinter.getCxxDeclEmissionScope()
-          .additionalUnrepresentableDeclarations.insert({typeDecl, ""});
-      return;
-    }
+  }
+  typeSizeAlign = getFixedTypeSizeAlignment(typeDecl);
+  if (typeSizeAlign && typeSizeAlign->size == 0) {
+    // FIXME: How to represent 0 sized structs?
+    declAndTypePrinter.getCxxDeclEmissionScope()
+        .additionalUnrepresentableDeclarations.insert({typeDecl, ""});
+    return;
   }
   bool isOpaqueLayout = !typeSizeAlign.has_value();
 

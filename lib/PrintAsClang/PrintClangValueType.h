@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IRGen/GenericRequirement.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/STLExtras.h"
 
 namespace swift {
@@ -43,6 +44,13 @@ public:
   void printValueTypeDecl(const NominalTypeDecl *typeDecl,
                           llvm::function_ref<void(void)> bodyPrinter,
                           DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Returns the size and alignment of a value of the given type when the C++
+  /// class that represents it stores the value inline, or \c std::nullopt
+  /// when that class uses opaque storage that is sized at runtime from the
+  /// type's value witness table (e.g. for generic or resilient types).
+  std::optional<IRABIDetailsProvider::SizeAndAlignment>
+  getFixedTypeSizeAlignment(const NominalTypeDecl *typeDecl) const;
 
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
