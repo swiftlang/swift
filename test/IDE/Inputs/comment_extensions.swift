@@ -30,6 +30,15 @@ struct Invariant {
   let x: Int!
 }
 
+/// - keyword: subscript
+func keyword() {}
+
+/// - mutatingvariant: sort()
+func mutatingvariant() {}
+
+/// - nonmutatingvariant: sorted()
+func nonmutatingvariant() {}
+
 /// - note: This function is very hip and exciting.
 func note() {}
 
@@ -40,6 +49,12 @@ func postcondition(_ x: inout Int) {}
 func precondition(_ x: Int) {
   assert(x < 100)
 }
+
+/// - recommended: sorted()
+func recommended() {}
+
+/// - recommendedover: sort()
+func recommendedover() {}
 
 /// - remark: Always, no, never forget to check your references.
 func remark() {}
