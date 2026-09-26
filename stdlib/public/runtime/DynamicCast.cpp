@@ -1387,6 +1387,8 @@ tryCastToTuple(
 /******************************************************************************/
 
 // The only thing that can be legally cast to a function is another function.
+// Note that this logic must be aligned with with swift::classifyDynamicCast()
+// in lib/SIL/Utils/DynamicCast.cpp
 
 static DynamicCastResult
 tryCastToFunction(
