@@ -308,6 +308,31 @@ bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
                        }));
 }
 
+/// Returns true if \p AFD throws in a way that the C++ bindings cannot
+/// represent yet.
+///
+/// Throwing functions are only exposed when
+/// GenerateBindingsForThrowingFunctionsInCXX is enabled, and even then only
+/// untyped `throws` (whose thrown type is `any Error`) is supported: the
+/// generated thunks pass an error slot and wrap a non-null value in it into a
+/// `swift::Error`. Typed throws (SE-0413) uses a different convention: the
+/// concrete error value is returned alongside the normal result or through an
+/// extra indirect argument, and the error slot only signals that an error was
+/// thrown. `throws(Never)` has no error result at all. Both are rejected.
+static bool isUnrepresentableThrowingFunction(const AbstractFunctionDecl *AFD) {
+  if (!AFD->hasThrows())
+    return false;
+  auto &ctx = AFD->getASTContext();
+  if (!ctx.LangOpts.hasFeature(
+          Feature::GenerateBindingsForThrowingFunctionsInCXX))
+    return true;
+  // `throws(Never)` has no effective thrown error type.
+  auto thrownType = AFD->getEffectiveThrownErrorType();
+  if (!thrownType)
+    return true;
+  return !(*thrownType)->isEqual(ctx.getErrorExistentialType());
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
@@ -327,9 +352,7 @@ swift::cxx_translation::getDeclRepresentation(
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())
       return {Unsupported, UnrepresentableAsync};
-    if (AFD->hasThrows() &&
-        !AFD->getASTContext().LangOpts.hasFeature(
-            Feature::GenerateBindingsForThrowingFunctionsInCXX))
+    if (isUnrepresentableThrowingFunction(AFD))
       return {Unsupported, UnrepresentableThrows};
     if (AFD->hasGenericParamList())
       genericSignature = AFD->getGenericSignature();
@@ -355,10 +378,12 @@ swift::cxx_translation::getDeclRepresentation(
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
-  if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
-    // Check if any property accessor throws, do not expose it in that case.
-    for (const auto *accessor : varDecl->getAllAccessors()) {
-      if (accessor->hasThrows())
+  if (const auto *storageDecl = dyn_cast<AbstractStorageDecl>(VD)) {
+    // Accessors follow the same rules as async and throwing functions.
+    for (const auto *accessor : storageDecl->getAllAccessors()) {
+      if (accessor->hasAsync())
+        return {Unsupported, UnrepresentableAsync};
+      if (isUnrepresentableThrowingFunction(accessor))
         return {Unsupported, UnrepresentableThrows};
     }
   }
