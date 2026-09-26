@@ -1629,6 +1629,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().EnableCXXInterop)
       MainModule->setCXXStdlibKind(Invocation.getLangOptions().CXXStdlib);
+    // Strict C++ exception mode changes imported C++ function types, so the
+    // module's clients must use the same mode.
+    if (Invocation.getLangOptions().EnableCXXInterop &&
+        Invocation.getLangOptions().hasFeature(
+            Feature::CxxExceptionBridgingStrict))
+      MainModule->setCxxExceptionBridgingStrict();
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)

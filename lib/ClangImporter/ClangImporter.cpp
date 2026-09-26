@@ -2451,6 +2451,11 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
   auto topModule = modulePath.front();
   auto realModuleName =
       Impl.SwiftContext.getRealModuleName(topModule.Item).str();
+  // In strict C++ exception mode, `import CxxStdlib` loads the Clang std
+  // module instead of the Swift overlay. Answer canImport the same way.
+  if (!Impl.SwiftContext.LangOpts.useCxxStdlibOverlay() &&
+      realModuleName == Impl.SwiftContext.Id_CxxStdlib.str())
+    realModuleName = "std";
   clang::Module *clangModule = Impl.lookupModule(realModuleName);
   if (!clangModule) {
     return false;
@@ -4810,6 +4815,10 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     return nullptr;
 
   if (owner.DisableOverlayModules)
+    return nullptr;
+
+  if (importer::isCxxStdModule(clangModule) &&
+      !getParentModule()->getASTContext().LangOpts.useCxxStdlibOverlay())
     return nullptr;
 
   if (!isTopLevel()) {

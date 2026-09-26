@@ -443,6 +443,10 @@ EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 /// Import explicitly annotated C++ functions with Swift error handling.
 EXPERIMENTAL_FEATURE(CxxExceptionBridging, false)
 
+/// With CxxExceptionBridging, import every C++ function whose exception
+/// specification allows exceptions as throwing, not only annotated ones.
+EXPERIMENTAL_FEATURE(CxxExceptionBridgingStrict, false)
+
 /// Enable reference bindings.
 EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 

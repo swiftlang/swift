@@ -877,6 +877,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
   BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
   BLOCK_RECORD(options_block, REQUIRES_CXX_EXCEPTION_BRIDGING);
+  BLOCK_RECORD(options_block, CXX_EXCEPTION_BRIDGING_STRICT);
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
@@ -1223,6 +1224,14 @@ void Serializer::writeHeader() {
       {
         options_block::CodeGenerationModelLayout codeGenModel(Out);
         codeGenModel.emit(ScratchRecord, static_cast<unsigned>(M->codeGenerationModel()));
+      }
+
+      // Strict C++ exception mode is part of imported function types, even
+      // when the producer opts out of requiring C++ interop in its consumers.
+      if (M->isCxxExceptionBridgingStrict()) {
+        options_block::CxxExceptionBridgingStrictLayout
+            CxxExceptionBridgingStrict(Out);
+        CxxExceptionBridgingStrict.emit(ScratchRecord);
       }
 
       if (M->hasCxxInteroperability()) {

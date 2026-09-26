@@ -115,3 +115,28 @@ when the producer or consumer opts out of the usual C++ interoperability import
 requirement. The importer needs C++ interoperability to reconstruct the
 exception adapters and their throwing function types from serialized bodies,
 including when a module exposes only Swift types in its public API.
+
+## Strict import policy
+
+`-enable-experimental-feature CxxExceptionBridgingStrict` opts a compilation
+into a strict import policy, which will import supported C++ functions as
+throwing whenever their exception specification permits exceptions. It
+requires C++ interoperability and `CxxExceptionBridging`. The import policy
+itself is not implemented yet. So far, the mode only affects the modules that
+a compilation can use.
+
+Strict mode imports the raw Clang standard library through the existing
+`import CxxStdlib` spelling. It omits the Swift `CxxStdlib` overlay, whose APIs
+and conformances currently assume nonthrowing C++ calls. The `Cxx` support
+module remains available.
+
+A binary module built in strict mode records it, and the feature is printed
+into textual interfaces. Strict mode also participates in dependency scanning
+and interface cache keys. Modules built without strict mode record nothing, so
+nothing changes for them. Swift modules built with C++ interoperability in
+different modes cannot be mixed. A compilation rebuilds textual interfaces in
+its own mode, so an interface built without strict mode can still be used if
+its inlinable code type-checks under strict mode. Modules compiled without C++
+interoperability and the mode-independent `Cxx` support module can be used in
+either mode. Disabling the usual C++ import requirement does not remove the
+record from a strict module.

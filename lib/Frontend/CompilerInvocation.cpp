@@ -1770,6 +1770,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
 
+  if (Opts.hasFeature(Feature::CxxExceptionBridgingStrict)) {
+    if (!Opts.EnableCXXInterop)
+      Diags.diagnose(SourceLoc(), diag::cxx_exception_mode_requires_interop);
+    if (!Opts.hasFeature(Feature::CxxExceptionBridging))
+      Diags.diagnose(SourceLoc(), diag::cxx_exception_mode_requires_feature);
+  }
+
   if (Args.hasArg(OPT_experimental_c_foreign_reference_types))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-experimental-c-foreign-reference-types");

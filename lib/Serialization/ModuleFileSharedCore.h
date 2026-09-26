@@ -438,6 +438,9 @@ private:
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
+  /// Whether this module was built in strict C++ exception mode.
+  bool IsCxxExceptionBridgingStrict = false;
+
   bool hasError() const {
     return Bits.HasError;
   }
@@ -676,6 +679,10 @@ public:
 
   bool requiresCxxExceptionBridging() const {
     return Bits.RequiresCxxExceptionBridging;
+  }
+
+  bool isCxxExceptionBridgingStrict() const {
+    return IsCxxExceptionBridgingStrict;
   }
 
   llvm::VersionTuple getUserModuleVersion() const {
