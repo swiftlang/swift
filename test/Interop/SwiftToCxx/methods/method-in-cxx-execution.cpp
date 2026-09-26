@@ -80,5 +80,27 @@ int main() {
   }
 // CHECK-NEXT: ClassWithNonFinalMethods.classClassMethod;
 // CHECK-NEXT: ClassWithNonFinalMethods.staticClassMethod;
+
+  {
+    auto object = ClassUsingGenericTypes::init();
+    auto genericStruct = object.returnStruct(42);
+    assert(genericStruct.getValue() == 42);
+    object.takeStruct(genericStruct);
+    // CHECK-NEXT: ClassUsingGenericTypes.takeStruct 42;
+    object.takeEnum(object.returnEnum(7));
+    object.takeEnum(object.returnEnum(-1));
+    // CHECK-NEXT: ClassUsingGenericTypes.takeEnum value(7);
+    // CHECK-NEXT: ClassUsingGenericTypes.takeEnum empty;
+    auto optionalStruct = object.returnOptionalStruct(3);
+    assert(optionalStruct);
+    assert(optionalStruct.get().getValue() == 3);
+    assert(!object.returnOptionalStruct(-3));
+    auto enumArray = object.returnEnumArray(5);
+    assert(enumArray.getCount() == 2);
+    assert(enumArray[0].getValue() == 5);
+    assert(enumArray[1].isEmpty());
+    object.setStoredStruct(genericStruct);
+    assert(object.getStoredStruct().getValue() == 42);
+  }
   return 0;
 }

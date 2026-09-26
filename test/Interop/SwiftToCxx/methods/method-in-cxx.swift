@@ -95,6 +95,67 @@ public final class PassStructInClassMethod {
 // CHECK: SWIFT_EXTERN void $s7Methods23PassStructInClassMethodC03retC0yAA05LargeC0VSiF(SWIFT_INDIRECT_RESULT void * _Nonnull, ptrdiff_t x, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // retStruct(_:)
 // CHECK: SWIFT_EXTERN void $s7Methods23PassStructInClassMethodC06updateC0yySi_AA05LargeC0VtF(ptrdiff_t x, const void * _Nonnull y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // updateStruct(_:_:)
 
+public struct GenericStruct<T> {
+    public var value: T
+
+    public init(_ value: T) {
+        self.value = value
+    }
+}
+
+public enum GenericEnum<T> {
+    case value(T)
+    case empty
+}
+
+// Printed before GenericEnum and GenericStruct.
+public final class ClassUsingGenericTypes {
+    public var storedStruct: GenericStruct<Int>
+
+    public init() {
+        storedStruct = GenericStruct(0)
+    }
+
+    public func returnStruct(_ x: Int) -> GenericStruct<Int> {
+        return GenericStruct(x)
+    }
+
+    public func takeStruct(_ x: GenericStruct<Int>) {
+        print("ClassUsingGenericTypes.takeStruct \(x.value);")
+    }
+
+    public func returnEnum(_ x: Int) -> GenericEnum<Int> {
+        return x < 0 ? .empty : .value(x)
+    }
+
+    public func takeEnum(_ x: GenericEnum<Int>) {
+        print("ClassUsingGenericTypes.takeEnum \(x);")
+    }
+
+    public func returnOptionalStruct(_ x: Int) -> GenericStruct<Int>? {
+        return x < 0 ? nil : GenericStruct(x)
+    }
+
+    public func returnEnumArray(_ x: Int) -> [GenericEnum<Int>] {
+        return [.value(x), .empty]
+    }
+}
+
+// CHECK: class SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC") ClassUsingGenericTypes final : public swift::_impl::RefCountedClass {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   using RefCountedClass::RefCountedClass;
+// CHECK-NEXT:   using RefCountedClass::operator=;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK GenericStruct<swift::Int> getStoredStruct() noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC12storedStructAA0dG0VySiGvp");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void setStoredStruct(const GenericStruct<swift::Int>& value) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC12storedStructAA0dG0VySiGvp");
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK ClassUsingGenericTypes init() noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesCACycfc");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK GenericStruct<swift::Int> returnStruct(swift::Int x) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC12returnStructyAA0dG0VySiGSiF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void takeStruct(const GenericStruct<swift::Int>& x) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC10takeStructyyAA0dG0VySiGF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK GenericEnum<swift::Int> returnEnum(swift::Int x) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC10returnEnumyAA0dG0OySiGSiF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void takeEnum(const GenericEnum<swift::Int>& x) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC8takeEnumyyAA0dG0OySiGF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Optional<GenericStruct<swift::Int>> returnOptionalStruct(swift::Int x) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC20returnOptionalStructyAA0dH0VySiGSgSiF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Array<GenericEnum<swift::Int>> returnEnumArray(swift::Int x) noexcept SWIFT_SYMBOL("s:7Methods22ClassUsingGenericTypesC15returnEnumArrayySayAA0dG0OySiGGSiF");
+// CHECK-NEXT: protected:
+
 // CHECK: class SWIFT_SYMBOL("s:7Methods09ClassWithA0C") ClassWithMethods final : public swift::_impl::RefCountedClass {
 // CHECK:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
