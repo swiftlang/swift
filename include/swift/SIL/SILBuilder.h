@@ -1103,6 +1103,13 @@ public:
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
+  /// Create a debug_value for an undef empty tuple. Used when the type of the
+  /// variable cannot be represented.
+  DebugValueInst *createVoidVariableDebugValue(
+      SILLocation Loc, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
+
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
   }

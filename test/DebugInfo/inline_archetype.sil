@@ -1,0 +1,142 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -inline %s | %FileCheck %s
+
+// A debug reconstruction block may mention a generic parameter. Inlining
+// substitutes it, and if the substituted type contains an opened archetype, the
+// cloned instruction needs type dependent operands on the
+// open_existential_metatype instruction defining it, which lives outside the block.
+// This is not supported, so the variable becomes an empty tuple placeholder.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Base {}
+class Box<T> : Base {}
+class Concrete {}
+
+// The block casts to a type using the generic type T.
+// This salvage is valid.
+//
+// CHECK-LABEL: sil [always_inline] [ossa] @generic_callee :
+// CHECK:         debug_value %0 : $Base, let, name "boxed", transform {
+// CHECK:           %1 = unchecked_ref_cast %0 : $Base to $Box<T>
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'generic_callee'
+sil [ossa] [always_inline] @generic_callee : $@convention(thin) <T> (@guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Base):
+  debug_value %0 : $Base, let, name "boxed", transform {
+  bb0(%0 : $Base):
+    %1 = unchecked_ref_cast %0 : $Base to $Box<T>
+    return %1 : $Box<T>
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The debug_value here, upon inlining, would be rewritten to use the
+// type-dependent value %2 within the reconstruction block, which would
+// crash the verifier.
+//
+// CHECK-LABEL: sil [ossa] @caller_opened_archetype :
+// CHECK:         debug_value undef : $(), let, name "boxed"
+// CHECK-NOT:     transform
+// CHECK-NOT:     @opened
+// CHECK-LABEL: } // end sil function 'caller_opened_archetype'
+sil [ossa] @caller_opened_archetype : $@convention(thin) (@guaranteed Base, @thick Any.Type) -> () {
+bb0(%0 : @guaranteed $Base, %1 : $@thick Any.Type):
+  %2 = open_existential_metatype %1 : $@thick Any.Type to $@thick (@opened(1, Any) Self).Type
+  %f = function_ref @generic_callee : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %c = apply %f<@opened(1, Any) Self>(%0) : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// If there is no existential, the debug_value gets inlined with the correct
+// replacement type.
+//
+// CHECK-LABEL: sil [ossa] @caller_concrete :
+// CHECK:         debug_value %0 : $Base, let, name "boxed", transform {
+// CHECK:           %1 = unchecked_ref_cast %0 : $Base to $Box<Concrete>
+// CHECK:           return %1 : $Box<Concrete>
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'caller_concrete'
+sil [ossa] @caller_concrete : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Base):
+  %f = function_ref @generic_callee : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %c = apply %f<Concrete>(%0) : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @use_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
+
+// The callees are unchanged.
+
+// CHECK-LABEL: sil [always_inline] [ossa] @killed_metatype_callee :
+// CHECK:         debug_value undef : $@thick T.Type, let, name "meta", argno 1
+// CHECK-LABEL: } // end sil function 'killed_metatype_callee'
+sil [ossa] [always_inline] @killed_metatype_callee : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  debug_value undef : $@thick T.Type, let, name "meta", argno 1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [always_inline] [ossa] @live_metatype_callee :
+// CHECK:         debug_value %0 : $@thick T.Type, let, name "meta", argno 1
+// CHECK-LABEL: } // end sil function 'live_metatype_callee'
+sil [ossa] [always_inline] @live_metatype_callee : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  debug_value %0 : $@thick T.Type, let, name "meta", argno 1
+  %r = tuple ()
+  return %r : $()
+}
+
+// T is substituted with a local archetype. The variable type is voided.
+//
+// CHECK-LABEL: sil [ossa] @caller_opened_metatype :
+// CHECK:         open_existential_metatype %0 : $@thick any Any.Type to $@thick (@opened({{[0-9]+}}, Any) Self).Type
+// CHECK:         debug_value undef : $(), let, name "meta", argno 1
+// CHECK-LABEL: } // end sil function 'caller_opened_metatype'
+sil [ossa] @caller_opened_metatype : $@convention(thin) (@thick Any.Type) -> () {
+bb0(%0 : $@thick Any.Type):
+  %1 = open_existential_metatype %0 : $@thick Any.Type to $@thick (@opened(1, Any) Self).Type
+  %f = function_ref @killed_metatype_callee : $@convention(thin) <T> (@thick T.Type) -> ()
+  %c = apply %f<@opened(1, Any) Self>(%1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %g = function_ref @use_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
+  %d = apply %g<@opened(1, Any) Self>(%1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// T is substituted with a concrete type.
+//
+// CHECK-LABEL: sil [ossa] @caller_concrete_metatype :
+// CHECK:         debug_value undef : $@thick Concrete.Type, let, name "meta", argno 1
+// CHECK-LABEL: } // end sil function 'caller_concrete_metatype'
+sil [ossa] @caller_concrete_metatype : $@convention(thin) () -> () {
+bb0:
+  %m = metatype $@thick Concrete.Type
+  %f = function_ref @killed_metatype_callee : $@convention(thin) <T> (@thick T.Type) -> ()
+  %c = apply %f<Concrete>(%m) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// The debug_value is a live operand with a local archetype. It is voided anyway.
+//
+// CHECK-LABEL: sil [ossa] @caller_opened_metatype_live :
+// CHECK:         open_existential_metatype %0 : $@thick any Any.Type to $@thick (@opened({{[0-9]+}}, Any) Self).Type
+// CHECK:         debug_value undef : $(), let, name "meta", argno 1
+// CHECK-LABEL: } // end sil function 'caller_opened_metatype_live'
+sil [ossa] @caller_opened_metatype_live : $@convention(thin) (@thick Any.Type) -> () {
+bb0(%0 : $@thick Any.Type):
+  %1 = open_existential_metatype %0 : $@thick Any.Type to $@thick (@opened(2, Any) Self).Type
+  %f = function_ref @live_metatype_callee : $@convention(thin) <T> (@thick T.Type) -> ()
+  %c = apply %f<@opened(2, Any) Self>(%1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %g = function_ref @use_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
+  %d = apply %g<@opened(2, Any) Self>(%1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %r = tuple ()
+  return %r : $()
+}
