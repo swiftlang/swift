@@ -42,6 +42,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <utility>
 
 using namespace swift;
@@ -1013,6 +1014,12 @@ public:
     declsToWrite.assign(decls.begin(), decls.end());
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
+      // `declsToWrite` is a stack, so temporarily put it in emission order
+      // while arranging potential overload collisions.
+      std::reverse(declsToWrite.begin(), declsToWrite.end());
+      printer.orderCxxOverloadsForEmission(declsToWrite);
+      std::reverse(declsToWrite.begin(), declsToWrite.end());
+
       for (const Decl *D : declsToWrite) {
         if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
           const auto *type = ED->getExtendedNominal();

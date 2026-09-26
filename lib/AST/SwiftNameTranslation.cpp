@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -308,6 +310,21 @@ bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
                        }));
 }
 
+/// Returns the number of generic arguments that the type metadata accessor of a
+/// type with the given generic signature takes: one for each generic
+/// parameter, and one for each conformance that needs a witness table.
+static unsigned getMetadataAccessorArgumentCount(GenericSignature genericSig) {
+  unsigned count = genericSig.getGenericParams().size();
+  for (const auto &req : genericSig.getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    auto *proto = req.getProtocolDecl();
+    if (!proto->isMarkerProtocol() && !proto->isObjC())
+      ++count;
+  }
+  return count;
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
@@ -320,7 +337,12 @@ swift::cxx_translation::getDeclRepresentation(
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
-  GenericSignature genericSignature;
+  // A declaration can be contextually generic without declaring generic
+  // parameters of its own, e.g. a method with a 'where' clause or a property
+  // in a constrained extension. Validate the generic signature of its context
+  // too, so that such requirements cannot bypass the checks below.
+  GenericSignature genericSignature =
+      VD->getInnermostDeclContext()->getGenericSignatureOfContext();
   // Don't expose decls with definitions that are emitted into the client.
   if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
@@ -331,8 +353,6 @@ swift::cxx_translation::getDeclRepresentation(
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    if (AFD->hasGenericParamList())
-      genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl)) {
@@ -347,11 +367,12 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
-    if (typeDecl->hasGenericParamList()) {
-      if (isa<ClassDecl>(VD))
-        return {Unsupported, UnrepresentableGeneric};
-      genericSignature = typeDecl->getGenericSignature();
-    }
+    // The C++ class for a nested type does not know the generic arguments of
+    // its context, which its type metadata accessor needs.
+    if (typeDecl->getDeclContext()->isGenericContext())
+      return {Unsupported, UnrepresentableNestedInGenericContext};
+    if (isa<ClassDecl>(VD) && genericSignature)
+      return {Unsupported, UnrepresentableGeneric};
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
@@ -390,10 +411,19 @@ swift::cxx_translation::getDeclRepresentation(
     }
   }
 
-  // Generic requirements are not yet supported in C++.
+  // Reject generic requirements that the generated C++ binding cannot
+  // instantiate.
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
+
+  // The generated bindings call the direct form of a type metadata accessor,
+  // which takes a limited number of generic arguments.
+  // FIXME: Support the indirect form, which passes them in a buffer.
+  if (isa<NominalTypeDecl>(VD) && genericSignature &&
+      getMetadataAccessorArgumentCount(genericSignature) >
+          NumDirectGenericTypeMetadataAccessFunctionArgs)
+    return {Unsupported, UnrepresentableTooManyGenericParameters};
 
   if (isObjCxxOnly(VD))
     return {ObjCxxOnly, std::nullopt};
@@ -420,6 +450,13 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
   return false;
 }
 
+bool swift::cxx_translation::canLookUpHashableConformances(
+    const ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(
+             Feature::GenerateBindingsForHashableRequirementsInCXX) &&
+         !ctx.LangOpts.hasFeature(Feature::Embedded);
+}
+
 bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   // If there's no generic signature, it's fine.
   if (!genericSig)
@@ -431,21 +468,37 @@ bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   //
   // For now, we use the inverse transform as a quick way to
   // check for the "default" generic signature where each
-  // generic parameter is Copyable and Escapable, but not
-  // subject to any other requirements; that's exactly the
-  // generic signature that C++ interop supports today.
+  // generic parameter is Copyable and Escapable, and is only
+  // subject to the conformance requirements accepted below.
   SmallVector<Requirement, 2> reqs;
   SmallVector<InverseRequirement, 2> inverseReqs;
   genericSig->getRequirementsWithInverses(reqs, inverseReqs);
   if (!reqs.empty()) {
-    // Conformance requirements to marker protocols are okay.
     for (const auto &req: reqs) {
       if (req.getKind() != RequirementKind::Conformance)
         return false;
 
+      // Conformance requirements to marker protocols and Objective-C
+      // protocols are okay, as they need no witness table.
       auto proto = req.getProtocolDecl();
-      if (!proto->isMarkerProtocol() && !proto->hasClangNode())
-        return false;
+      if (proto->isMarkerProtocol() || proto->hasClangNode())
+        continue;
+
+      // A `Hashable` requirement directly on a generic parameter is okay if
+      // the generated binding can look up the witness table at runtime. This
+      // is the minimum that `Dictionary<Key: Hashable, Value>` needs. A
+      // dependent member type has no type metadata that the binding could
+      // use, and a parameter pack would need a witness table pack.
+      // Supporting another protocol needs its protocol descriptor in
+      // _SwiftCxxInteroperability.h, or, for a protocol outside the standard
+      // library, in the generated header of the module that defines it.
+      if (canLookUpHashableConformances(proto->getASTContext()) &&
+          proto->isSpecificProtocol(KnownProtocolKind::Hashable) &&
+          req.getFirstType()->is<GenericTypeParamType>() &&
+          !req.getFirstType()->isParameterPack())
+        continue;
+
+      return false;
     }
   }
 
@@ -481,6 +534,18 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_generic_decl_to_cxx, vd);
   case UnrepresentableGenericRequirements:
     return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
+  case UnrepresentableNestedInGenericContext:
+    return Diagnostic(diag::expose_nested_in_generic_context_to_cxx, vd);
+  case UnrepresentableTooManyGenericParameters: {
+    // Witness tables count toward the limit too, so mention the requirements
+    // when there are any.
+    auto genericSig =
+        vd->getInnermostDeclContext()->getGenericSignatureOfContext();
+    bool countsRequirements = getMetadataAccessorArgumentCount(genericSig) >
+                              genericSig.getGenericParams().size();
+    return Diagnostic(diag::expose_too_many_generic_params_to_cxx, vd,
+                      countsRequirements);
+  }
   case UnrepresentableThrows:
     return Diagnostic(diag::expose_throwing_to_cxx, vd);
   case UnrepresentableIndirectEnum:
