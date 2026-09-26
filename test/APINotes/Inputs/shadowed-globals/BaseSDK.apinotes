@@ -1,0 +1,7 @@
+---
+Name: BaseSDK
+Globals:
+- Name: FILE_SHARE_READ
+  Type: DWORD
+- Name: FILE_SHARE_WRITE
+  Type: DWORD
