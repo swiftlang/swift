@@ -92,10 +92,11 @@ struct Main {
 // CHECK-IR-NEXT:   call {{.*}}@swift_setDeallocating
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
-// CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
 // CHECK-IR-NEXT:   call {{.*}}@swift_initStackObject
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main8MyStructVyAcA0B10FinalClassCcfC"
-// CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
+//   The two stack-promoted objects get no lifetime markers: the operand of the
+//   marker would be the result of swift_initStackObject rather than a static
+//   alloca, and lifetime markers are only valid on allocas.
 // CHECK-IR-NEXT:   ret
 // CHECK-IR-NEXT: }

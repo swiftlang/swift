@@ -22,10 +22,11 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/UUID.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/Basic/UUID.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -58,6 +59,8 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LLVMRemarkStreamer.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -785,6 +788,18 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 }
 
 IRGenModule::~IRGenModule() {
+  // If we still own the LLVM context (i.e. it was not handed off to a
+  // GeneratedModule by intoGeneratedModule), finalize its main remark streamer
+  // before the context destroys it. Finalization flushes the remark string
+  // table to the end of the remarks file and releases the serializer, which
+  // llvm::remarks::RemarkStreamer's destructor asserts has happened. This is
+  // the last chance to do so for pipelines that install a remark streamer but
+  // never reach performLLVM, such as sil-opt running a command-line-selected
+  // pass pipeline with -save-optimization-record. Note that RemarkStream, the
+  // file the serializer writes to, is a member and thus still alive here.
+  if (LLVMContext && LLVMContext->getMainRemarkStreamer())
+    llvm::finalizeLLVMOptimizationRemarks(*LLVMContext);
+
   destroyMetadataLayoutMap();
   destroyPointerAuthCaches();
   delete &Types;
@@ -801,6 +816,8 @@ namespace RuntimeConstants {
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
   const auto InaccessibleMemOnly = llvm::MemoryEffects::inaccessibleMemOnly();
+  const auto InaccessibleOrArgMemOnly =
+      llvm::MemoryEffects::inaccessibleOrArgMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
@@ -2537,6 +2554,14 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
   if (GenModules.size() == 1 || !ctxt) {
     return getPrimaryIGM();
   }
+
+  // Emit synthesized declarations into their parent source file's IGM so that,
+  // under multi-threaded WMO, their metadata is co-located with the records
+  // that reference it via a direct relative reference.
+  if (auto *synthFU =
+          dyn_cast<SynthesizedFileUnit>(ctxt->getModuleScopeContext()))
+    return getGenModule(&synthFU->getFileUnit());
+
   SourceFile *SF = ctxt->getOutermostParentSourceFile();
   if (!SF) {
     return getPrimaryIGM();

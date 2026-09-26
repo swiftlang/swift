@@ -399,9 +399,8 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
 
     // Setup the CAS instance from scanning service if applicable.
     if (Invocation->requiresCAS())
-      Instance->setSharedCASInstances(
-          ScanningService->getClangScanningService().getCAS(),
-          ScanningService->getClangScanningService().getActionCache());
+      Instance->setSharedCASInstances(ScanningService->getCAS(),
+                                      ScanningService->getActionCache());
 
     // Setup the instance
     std::string InstanceSetupError;
@@ -409,10 +408,6 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
       return std::make_error_code(std::errc::not_supported);
 
     Invocation->getFrontendOptions().LLVMArgs.clear();
-
-    // Setup the caching service after the instance finishes setup.
-    if (ScanningService->setupCachingDependencyScanningService(*Instance))
-      return std::make_error_code(std::errc::invalid_argument);
 
     (void)Instance->getMainModule();
   }

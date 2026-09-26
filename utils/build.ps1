@@ -127,6 +127,11 @@ Build the MSI installers and packaging.
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
 
+.PARAMETER ContinueOnTestFailure
+Keep running the remaining test suites/targets after a test failure instead of
+stopping immediately. Failures are accumulated and reported in a summary at
+the end, and the script still exits with an error if any test failed.
+
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
 This component is currently only supported in Android builds.
@@ -223,6 +228,7 @@ param
   # Incremental Build Support
   [switch] $Clean,
   [string[]] $Test = @(),
+  [switch] $ContinueOnTestFailure = $true,
 
   [switch] $IncludeDS2 = $false,
   [ValidateSet("none", "full", "thin")]
@@ -256,6 +262,10 @@ $CustomWinSDKRoot = $null # Overwritten if we download a Windows SDK from nuget
 
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
+
+# Accumulates the names of test targets/suites that failed when
+# -ContinueOnTestFailure is set, so a summary can be reported at the end.
+$Script:TestFailures = [System.Collections.Generic.List[string]]::new()
 
 ## Cleanup build arguments.
 
@@ -463,39 +473,70 @@ $KnownPythons = @{
 }
 
 $PythonModules = @{
+  # One SHA256 per architecture. Most modules are pinned to an architecture
+  # independent source distribution and have the same hashes.
   "packaging" = @{
     Version = "24.1";
-    SHA256 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+    SHA256 = @{
+      AMD64 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+      ARM64 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+    };
     Dependencies = @();
   };
   "setuptools" = @{
     Version = "75.1.0";
-    SHA256 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+    SHA256 = @{
+      AMD64 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+      ARM64 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+    };
     Dependencies = @();
   };
   "psutil" = @{
     Version = "6.1.0";
-    SHA256 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+    SHA256 = @{
+      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+    };
+    Dependencies = @();
+  };
+  "cryptography" = @{
+    Version = "46.0.3";
+    SHA256 = @{
+      AMD64 = "416260257577718c05135c55958b674000baef9a1c7d9e8f306ec60d71db850f";
+      ARM64 = "d89c3468de4cdc4f08a57e214384d0471911a3830fcdaf7a8cc587e42a866372";
+    };
     Dependencies = @();
   };
   "argparse" = @{
     Version = "1.4.0";
-    SHA256 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+    SHA256 = @{
+      AMD64 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+      ARM64 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+    };
     Dependencies = @();
   };
   "six" = @{
     Version = "1.17.0";
-    SHA256 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+    SHA256 = @{
+      AMD64 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+      ARM64 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+    };
     Dependencies = @();
   };
   "traceback2" = @{
     Version = "1.4.0";
-    SHA256 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+    SHA256 = @{
+      AMD64 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+      ARM64 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+    };
     Dependencies = @();
   };
   "linecache2" = @{
     Version = "1.0.0";
-    SHA256 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+    SHA256 = @{
+      AMD64 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+      ARM64 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+    };
     Dependencies = @();
   };
 }
@@ -882,6 +923,30 @@ function Invoke-BuildStep {
 
   Record-OperationTime $Platform $Name {
     & $Name $Platform @SplatArgs
+  }
+}
+
+function Invoke-TestStep {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position=0, Mandatory)]
+    [string] $Name,
+    [Parameter(Position=1, Mandatory)]
+    [Hashtable] $Platform,
+    [Parameter(ValueFromRemainingArguments)]
+    [Object[]] $RemainingArgs
+  )
+
+  try {
+    Invoke-BuildStep $Name $Platform @RemainingArgs
+  } catch {
+    if ($ContinueOnTestFailure) {
+      Write-Warning "Test suite '$Name' failed; continuing due to -ContinueOnTestFailure.`n$_"
+      $Script:TestFailures.Add($Name)
+    } else {
+      throw
+    }
   }
 }
 
@@ -1725,15 +1790,18 @@ function Get-Dependencies {
       }
 
       $TempRequirementsTxt = New-TemporaryFile
+      $ArchName = $BuildPlatform.Architecture.CMakeName
 
       $Module = $PythonModules[$ModuleName]
-      "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
+      "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256[$ArchName])`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
       foreach ($Dependency in $Module.Dependencies) {
-        $Module = $PythonModules[$Dependency]
-        "$Dependency==$($Dependency.Version) --hash=`"sha256:$($Module.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
+        $DependencyModule = $PythonModules[$Dependency]
+        "$Dependency==$($DependencyModule.Version) --hash=`"sha256:$($DependencyModule.SHA256[$ArchName])`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
       }
 
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
+      # Dependencies are pinned above; --require-hashes rejects anything else
+      # pip would resolve on its own.
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-deps --disable-pip-version-check
 
       Write-Success "$ModuleName"
     }
@@ -1743,7 +1811,8 @@ function Get-Dependencies {
       Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
       if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
-        Install-PythonModule "psutil"   # Required for testing LLDB
+        Install-PythonModule "psutil"       # Required for testing LLDB
+        Install-PythonModule "cryptography" # Required for testing LLDB
       }
     }
 
@@ -2533,10 +2602,20 @@ function Build-CMakeProject {
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
+      $IsTestTarget = $Target -match '^(check-|test-)' -or $Target -eq "ExperimentalTest"
+      try {
+        if ($Target -eq "default") {
+          Invoke-Program $CMakeBin --build $Bin
+        } else {
+          Invoke-Program $CMakeBin --build $Bin --target $Target
+        }
+      } catch {
+        if ($ContinueOnTestFailure -and $IsTestTarget) {
+          Write-Warning "Test target '$Target' failed in '$Bin'; continuing due to -ContinueOnTestFailure.`n$_"
+          $Script:TestFailures.Add("$Target ($Bin)")
+        } else {
+          throw
+        }
       }
     }
 
@@ -4909,7 +4988,7 @@ function Build-LLBuild([Hashtable] $Platform,
     }
 }
 
-function Test-LLBuild {
+function Test-LLBuild([Hashtable] $Platform) {
   # Build additional llvm executables needed by tests
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $BuildPlatform
@@ -4926,12 +5005,15 @@ function Test-LLBuild {
       -Src $SourceCache\llbuild `
       -Bin (Get-ProjectBinaryCache $BuildPlatform LLBuild) `
       -Platform $Platform `
-      -CXXCompiler $Compilers.Host.CXX `
+      -CXXCompiler $Compilers.Stage1.CXX `
       -SwiftCompiler $Compilers.Stage1.Swift `
       -SwiftSDK (Get-SwiftSDK -OS $BuildPlatform.OS) `
       -BuildTargets default,test-llbuild `
       -Defines @{
         BUILD_SHARED_LIBS = "YES";
+        # Build-LLBuild configures this same directory with BUILD_TESTING=NO,
+        # which drops the tests subdirectory and the test-llbuild target.
+        BUILD_TESTING = "YES";
         FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin", "FileCheck.exe"));
         LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
@@ -6253,19 +6335,19 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+    Invoke-TestStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
   # functions hardcode their platform needs.
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
-  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
-  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
-  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
-  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
-  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
-  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
+  if ($Test -contains "dispatch") { Invoke-TestStep Test-Dispatch $BuildPlatform }
+  if ($Test -contains "foundation") { Invoke-TestStep Test-Foundation $BuildPlatform }
+  if ($Test -contains "xctest") { Invoke-TestStep Test-XCTest $BuildPlatform }
+  if ($Test -contains "testing") { Invoke-TestStep Test-Testing $BuildPlatform }
+  if ($Test -contains "llbuild") { Invoke-TestStep Test-LLBuild $BuildPlatform }
+  if ($Test -contains "swiftpm") { Invoke-TestStep Test-PackageManager $BuildPlatform }
+  if ($Test -contains "swift-format") { Invoke-TestStep Test-Format $BuildPlatform }
+  if ($Test -contains "sourcekit-lsp") { Invoke-TestStep Test-SourceKitLSP $BuildPlatform}
 
   # TODO: restore Android Swift runtime tests against the new Runtimes/* layout.
   # The previous `Test-Runtime` reconfigured the in-tree stdlib build (built by
@@ -6278,6 +6360,14 @@ if (-not $IsCrossCompiling) {
   # for Android is silently a no-op here.
   if ($Test -contains "swift" -and $Android) {
     Write-Warning "Android Swift runtime tests are not currently wired up to the new SDK layout; skipping."
+  }
+
+  if ($Script:TestFailures.Count -gt 0) {
+    Write-Host -ForegroundColor Red "`nERROR: The following test suite(s)/target(s) failed:"
+    foreach ($Failure in $Script:TestFailures) {
+      Write-Host -ForegroundColor Red "  - $Failure"
+    }
+    throw "$($Script:TestFailures.Count) test suite(s)/target(s) failed."
   }
 }
 

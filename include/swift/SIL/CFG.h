@@ -46,7 +46,14 @@ template <> struct GraphTraits<swift::SILBasicBlock *> {
     return N->succblock_begin();
   }
   static ChildIteratorType child_end(NodeRef N) { return N->succblock_end(); }
+
+  static unsigned getNumber(const swift::SILBasicBlock *BB) {
+    return BB->getNumber();
+  }
 };
+
+static_assert(GraphHasNodeNumbers<swift::SILBasicBlock *>,
+              "GraphTraits getNumber() not detected");
 
 template <> struct GraphTraits<const swift::SILBasicBlock*> {
   using ChildIteratorType = swift::SILBasicBlock::const_succblock_iterator;
@@ -59,7 +66,14 @@ template <> struct GraphTraits<const swift::SILBasicBlock*> {
     return N->succblock_begin();
   }
   static ChildIteratorType child_end(NodeRef N) { return N->succblock_end(); }
+
+  static unsigned getNumber(const swift::SILBasicBlock *BB) {
+    return BB->getNumber();
+  }
 };
+
+static_assert(GraphHasNodeNumbers<const swift::SILBasicBlock *>,
+              "GraphTraits getNumber() not detected");
 
 template <> struct GraphTraits<Inverse<swift::SILBasicBlock*> > {
   using ChildIteratorType = swift::SILBasicBlock::pred_iterator;
@@ -74,7 +88,14 @@ template <> struct GraphTraits<Inverse<swift::SILBasicBlock*> > {
   static inline ChildIteratorType child_end(NodeRef N) {
     return N->pred_end();
   }
+
+  static unsigned getNumber(const swift::SILBasicBlock *BB) {
+    return BB->getNumber();
+  }
 };
+
+static_assert(GraphHasNodeNumbers<Inverse<swift::SILBasicBlock *>>,
+              "GraphTraits getNumber() not detected");
 
 template <> struct GraphTraits<Inverse<const swift::SILBasicBlock*> > {
   using ChildIteratorType = swift::SILBasicBlock::pred_iterator;
@@ -90,7 +111,14 @@ template <> struct GraphTraits<Inverse<const swift::SILBasicBlock*> > {
   static inline ChildIteratorType child_end(NodeRef N) {
     return N->pred_end();
   }
+
+  static unsigned getNumber(const swift::SILBasicBlock *BB) {
+    return BB->getNumber();
+  }
 };
+
+static_assert(GraphHasNodeNumbers<Inverse<const swift::SILBasicBlock *>>,
+              "GraphTraits getNumber() not detected");
 
 template <>
 struct GraphTraits<swift::SILFunction *>
@@ -108,6 +136,38 @@ struct GraphTraits<swift::SILFunction *>
     return nodes_iterator(F->end());
   }
   static unsigned size(GraphType F) { return F->size(); }
+
+  static unsigned getMaxNumber(const swift::SILFunction *F) {
+    return F->getMaxBlockNumber();
+  }
+  static unsigned getNumberEpoch(const swift::SILFunction *F) {
+    return F->getBlockNumberEpoch();
+  }
+};
+
+template <>
+struct GraphTraits<const swift::SILFunction *>
+    : public GraphTraits<const swift::SILBasicBlock *> {
+  using GraphType = const swift::SILFunction *;
+  using NodeRef = const swift::SILBasicBlock *;
+
+  static NodeRef getEntryNode(GraphType F) { return &F->front(); }
+
+  using nodes_iterator = pointer_iterator<swift::SILFunction::const_iterator>;
+  static nodes_iterator nodes_begin(GraphType F) {
+    return nodes_iterator(F->begin());
+  }
+  static nodes_iterator nodes_end(GraphType F) {
+    return nodes_iterator(F->end());
+  }
+  static unsigned size(GraphType F) { return F->size(); }
+
+  static unsigned getMaxNumber(const swift::SILFunction *F) {
+    return F->getMaxBlockNumber();
+  }
+  static unsigned getNumberEpoch(const swift::SILFunction *F) {
+    return F->getBlockNumberEpoch();
+  }
 };
 
 template <> struct GraphTraits<Inverse<swift::SILFunction*> >
@@ -125,6 +185,13 @@ template <> struct GraphTraits<Inverse<swift::SILFunction*> >
     return nodes_iterator(F.Graph->end());
   }
   static unsigned size(GraphType F) { return F.Graph->size(); }
+
+  static unsigned getMaxNumber(const swift::SILFunction *F) {
+    return F->getMaxBlockNumber();
+  }
+  static unsigned getNumberEpoch(const swift::SILFunction *F) {
+    return F->getBlockNumberEpoch();
+  }
 };
 
 #ifdef SWIFT_LLVM_HAS_CFGTRAITS_H
