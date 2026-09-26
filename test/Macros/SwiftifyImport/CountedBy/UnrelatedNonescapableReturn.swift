@@ -12,14 +12,16 @@
 public enum NonescapableEnum: ~Escapable {
   case foo
 }
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
-@_lifetime(borrow ptr)
-public func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) -> NonescapableEnum {
+// The result depends on a ~Escapable parameter, not on the pointer, so the
+// hand-written dependence is identical to the generated one.
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .lifetimeDependence(dependsOn: .param(3), pointer: .return, type: .copy))
+@_lifetime(copy ne)
+public func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt, _ ne: NonescapableEnum) -> NonescapableEnum {
   return .foo
 }
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .lifetimeDependence(dependsOn: .param(3), pointer: .return, type: .copy))
-@_lifetime(extraNE: copy extraNE) @_lifetime(borrow ptr, copy extraNE)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .lifetimeDependence(dependsOn: .param(3), pointer: .return, type: .copy))
+@_lifetime(extraNE: copy extraNE) @_lifetime(copy extraNE)
 public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
   return .foo
 }
@@ -27,9 +29,11 @@ public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt, _ extraNE: i
 //--- expansions.expected
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
+// The result depends on a ~Escapable parameter, not on the pointer, so the
+// hand-written dependence is identical to the generated one.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
-public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
+@_alwaysEmitIntoClient @_lifetime(copy ne) @_disfavoredOverload
+public func myFunc(_ ptr: Span<CInt>, _ ne: NonescapableEnum) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
@@ -37,13 +41,13 @@ public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
     defer {
         _fixLifetime(ptr)
     }
-    return unsafe _swiftifyOverrideLifetime(unsafe myFunc(_ptrPtr.baseAddress!, len), copying: ())
+    return unsafe _swiftifyOverrideLifetime(unsafe myFunc(_ptrPtr.baseAddress!, len, ne), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test7myFunc215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr, copy extraNE) @_lifetime(ptr: copy ptr) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
+@_alwaysEmitIntoClient @_lifetime(copy extraNE) @_lifetime(ptr: copy ptr) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableSpan<CInt>, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {

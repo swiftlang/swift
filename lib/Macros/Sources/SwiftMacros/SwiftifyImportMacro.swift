@@ -1605,26 +1605,6 @@ func getAvailability(_ newSignature: FunctionSignatureSyntax, _ spanAvailability
   return [.attribute(AttributeSyntax("@available(\(raw: spanAvailability), *)"))]
 }
 
-func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSyntax) -> Bool {
-  for elem in attrs {
-    guard let attr = elem.as(AttributeSyntax.self) else {
-      continue
-    }
-    if attr.attributeName != "_lifetime" {
-      continue
-    }
-    guard let args = attr.arguments?.as(LabeledExprListSyntax.self) else {
-      continue
-    }
-    for arg in args {
-      if arg.label == paramName {
-        return true
-      }
-    }
-  }
-  return false
-}
-
 // Mutable[Raw]Span parameters need explicit @_lifetime annotations since they are inout
 func paramLifetimes(_ newSignature: FunctionSignatureSyntax) -> [LabeledExprSyntax] {
   var defaultLifetimes: [LabeledExprSyntax] = []
@@ -1642,20 +1622,42 @@ func paramLifetimes(_ newSignature: FunctionSignatureSyntax) -> [LabeledExprSynt
   return defaultLifetimes
 }
 
-func getDependedValue(_ expr: ExprSyntax) -> String? {
-  if let borrowed = expr.as(BorrowExprSyntax.self) {
-    return borrowed.expression.trimmed.description
+// Whether two dependences have the same kind (`copy x`, `borrow x`, `&x` or a
+// bare `x`) and depend on the same value. Compared structurally, because the
+// generated expressions carry no trivia.
+func isSameDependence(_ a: ExprSyntax, _ b: ExprSyntax) -> Bool {
+  func dependedValue(_ expr: ExprSyntax) -> String {
+    let value = expr.as(BorrowExprSyntax.self)?.expression
+      ?? expr.as(CopyExprSyntax.self)?.expression
+      ?? expr.as(InOutExprSyntax.self)?.expression
+      ?? expr
+    return value.trimmed.description
   }
-  if let copied = expr.as(CopyExprSyntax.self) {
-    return copied.expression.trimmed.description
+  return a.kind == b.kind && dependedValue(a) == dependedValue(b)
+}
+
+// Order lifetime attributes by dependent: return value first, then self, then
+// parameters in declaration order. Names that are neither (which would be
+// invalid in the generated code anyway) sort last instead of trapping.
+func lifetimeDependentRank(
+  _ parameterList: FunctionParameterListSyntax, _ dependent: String?
+) -> Int {
+  guard let dependent else {
+    return -2  // the return value, spelled without a label
   }
-  return nil
+  if dependent == "self" {
+    return -1
+  }
+  return getParameterIndexForParamName(parameterList, dependent) ?? Int.max
 }
 
 func mergeLifetimeAttrs(
   _ oldAttrs: AttributeListSyntax, _ addedArgs: [LabeledExprSyntax],
-  _ parameterList: FunctionParameterListSyntax
+  _ parameterList: FunctionParameterListSyntax, _ renamedParams: [String: String]
 ) -> [AttributeListSyntax.Element] {
+  // Hand-written attributes refer to the parameter names as spelled in the
+  // original declaration, so they have to follow renameParameterNamesIfNeeded.
+  let renamer = ParamRenamer(renamedParams)
   var dependentsToDependencies: [String?:[ExprSyntax]] = [:]
   for attr in oldAttrs {
     guard let attr = attr.as(AttributeSyntax.self) else {
@@ -1672,26 +1674,31 @@ func mergeLifetimeAttrs(
       continue
     }
 
-    dependentsToDependencies[first.label?.trimmed.text] = args.map { $0.expression }
+    let oldDependent = first.label?.trimmed.text
+    let dependent = oldDependent.map { renamedParams[$0] ?? $0 }
+    let dependencies = args.map { renamer.visit($0.expression) }
+    dependentsToDependencies[dependent, default: []] += dependencies
   }
 
   for addedArg in addedArgs {
+    // Hand-written dependences are never removed. A generated one is added
+    // unless an identical one is already there, so a conflicting pair, like
+    // `borrow b` next to a generated `copy b`, is rejected by the compiler.
     let label = addedArg.label?.trimmed.text
-    dependentsToDependencies[label] = (dependentsToDependencies[label]?.filter { oldArg in
-      let oldDependence = getDependedValue(oldArg)
-      let addedDependence = getDependedValue(addedArg.expression)
-      // Even if we have e.g. lifetime(a: borrow b) and lifetime(a: copy b) we
-      // want the new lifetime to replace the old one since `b` has gone from
-      // pointer/std::span to Swift Span.
-      return oldDependence != addedDependence
-    } ?? []) + [addedArg.expression]
+    if !dependentsToDependencies[label, default: []].contains(where: {
+      isSameDependence($0, addedArg.expression)
+    }) {
+      dependentsToDependencies[label, default: []].append(addedArg.expression)
+    }
   }
 
-  let sorted = dependentsToDependencies.sorted(by: { (a, b) in
-    let indexA = a.key.map { aKey in getParameterIndexForParamName(parameterList, aKey)! } ?? -1
-    let indexB = b.key.map { bKey in getParameterIndexForParamName(parameterList, bKey)! } ?? -1
-    return indexA < indexB
-  })
+  // Ties are only possible between dependents that aren't in the signature.
+  // Dictionary iteration order varies per process, so break ties by name to
+  // keep expansions reproducible.
+  let sorted = dependentsToDependencies.sorted {
+    (lifetimeDependentRank(parameterList, $0.key), $0.key ?? "")
+      < (lifetimeDependentRank(parameterList, $1.key), $1.key ?? "")
+  }
 
   var newLifetimes: [AttributeListSyntax.Element] = []
   for (dependent, dependencies) in sorted {
@@ -1715,7 +1722,9 @@ func mergeLifetimeAttrs(
   return newLifetimes
 }
 
-class CountExprRewriter: SyntaxRewriter {
+// Renames parameter references to match renameParameterNamesIfNeeded, leaving
+// everything else (`self`, `immortal`, ...) untouched.
+class ParamRenamer: SyntaxRewriter {
   public let nameMap: [String: String]
 
   init(_ renamedParams: [String: String]) {
@@ -1730,6 +1739,17 @@ class CountExprRewriter: SyntaxRewriter {
           .identifier(
             newName, leadingTrivia: node.baseName.leadingTrivia,
             trailingTrivia: node.baseName.trailingTrivia)))
+    }
+    return ExprSyntax(node)
+  }
+}
+
+// Like ParamRenamer, but also backtick-escapes references that need it, for use
+// in the count expressions parsed out of the macro's string literals.
+class CountExprRewriter: ParamRenamer {
+  override func visit(_ node: DeclReferenceExprSyntax) -> ExprSyntax {
+    if nameMap[node.baseName.trimmed.text] != nil {
+      return super.visit(node)
     }
     return escapeIfNeeded(node)
   }
@@ -1872,7 +1892,8 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   let returnLifetimeAttribute = getReturnLifetimes(funcComponents, lifetimeDependencies)
   let lifetimes = returnLifetimeAttribute + paramLifetimes(newSignature)
   let newLifetimeAttr = mergeLifetimeAttrs(
-    funcComponents.attributes, lifetimes, funcComponents.signature.parameterClause.parameters)
+    funcComponents.attributes, lifetimes, funcComponents.signature.parameterClause.parameters,
+    rewriter.nameMap)
   let availabilityAttr = try getAvailability(newSignature, spanAvailability)
   let disfavoredOverload: [AttributeListSyntax.Element] =
     [
