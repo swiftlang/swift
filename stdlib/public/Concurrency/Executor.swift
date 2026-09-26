@@ -603,15 +603,18 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 @_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol ExecutorFactory {
+  associatedtype MainExecutorType: MainExecutor
+  associatedtype DefaultExecutorType: TaskExecutor
+
   #if os(WASI) || os(Emscripten) || !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
-  static var mainExecutor: any MainExecutor { get }
+  static var mainExecutor: MainExecutorType { get }
   #endif // os(WASI) || os(Emscripten) || !$Embedded
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
-  static var defaultExecutor: any TaskExecutor { get }
+  static var defaultExecutor: DefaultExecutorType { get }
 }
 
 @available(StdlibDeploymentTarget 6.3, *)
