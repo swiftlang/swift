@@ -5328,7 +5328,15 @@ namespace {
       auto kpDecl = ctx.getKeyPathDecl();
       auto keyPathTy =
           BoundGenericType::get(kpDecl, nullptr, { baseTy, kpResultTy });
-      E->setType(keyPathTy);
+      bool isSendable = exprType->castTo<FunctionType>()->isSendable();
+      Type captureTy = keyPathTy;
+      if (isSendable) {
+        auto *sendable = ctx.getProtocol(KnownProtocolKind::Sendable);
+        captureTy = ExistentialType::get(ProtocolCompositionType::get(
+            ctx, {keyPathTy, sendable->getDeclaredInterfaceType()},
+            /*inverses=*/{}, /*hasExplicitAnyObject=*/false));
+      }
+      E->setType(captureTy);
       cs.cacheType(E);
 
       // To ensure side effects of the key path expression (mainly indices in
@@ -5339,6 +5347,7 @@ namespace {
       //     return "{ [$kp$ = \(E)] in $0[keyPath: $kp$] }"
 
       FunctionType::ExtInfo closureInfo;
+      closureInfo = closureInfo.withSendable(isSendable);
       auto closureTy =
           FunctionType::get({FunctionType::Param(baseTy)},
                             /* yields */ {}, kpResultTy, closureInfo);
@@ -5365,10 +5374,10 @@ namespace {
                                           ctx.getIdentifier("$kp$"),
                                           dc);
       outerParam->setImplicit();
-      outerParam->setInterfaceType(keyPathTy->mapTypeOutOfEnvironment());
+      outerParam->setInterfaceType(captureTy->mapTypeOutOfEnvironment());
 
       auto *outerParamPat =
-          NamedPattern::createImplicit(ctx, outerParam, keyPathTy);
+          NamedPattern::createImplicit(ctx, outerParam, captureTy);
 
       solution.setExprTypes(E);
       auto *outerParamDecl = PatternBindingDecl::createImplicit(
@@ -5386,10 +5395,12 @@ namespace {
       cs.cacheType(paramRef);
 
       // let outerParamRef = "$kp$"
-      auto outerParamRef = new (ctx)
+      Expr *outerParamRef = new (ctx)
           DeclRefExpr(outerParam, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
-      outerParamRef->setType(keyPathTy);
+      outerParamRef->setType(captureTy);
       cs.cacheType(outerParamRef);
+      outerParamRef = coerceToType(outerParamRef, keyPathTy,
+                                  cs.getConstraintLocator(E));
 
       // let application = "\(paramRef)[keyPath: \(outerParamRef)]"
       auto *application = new (ctx)
