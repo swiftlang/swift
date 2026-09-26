@@ -248,6 +248,10 @@ public:
   /// is the aforementioned typedef, and whose name is known to the debugger.
   void printSwiftMangledNameForDebugger(const NominalTypeDecl *typeDecl);
 
+  /// Print a comment saying that the given Swift declaration is not available
+  /// in C++, followed by the reason, if there is one.
+  void printUnavailableInCxxComment(const ValueDecl *VD, StringRef reason);
+
 protected:
   raw_ostream &os;
   swift::Mangle::ASTMangler mangler;

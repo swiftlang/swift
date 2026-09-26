@@ -61,6 +61,7 @@ public struct S0 {
 
 // CHECK: class SWIFT_SYMBOL("s:4main2C2C") C2 :
 // CHECK:   SWIFT_INLINE_THUNK swift::Int getItem()
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'getItem()'. An overload with the same C++ parameter types already exists.
 // CHECK-NOT: getItem()
 // CHECK:};
 
@@ -71,6 +72,7 @@ public struct S0 {
 
 // CHECK: class SWIFT_SYMBOL("s:4main2C4C") C4 :
 // CHECK:   SWIFT_INLINE_THUNK swift::Int getItem()
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'getItem()'. An overload with the same C++ parameter types already exists.
 // CHECK-NOT: getItem()
 // CHECK:};
 

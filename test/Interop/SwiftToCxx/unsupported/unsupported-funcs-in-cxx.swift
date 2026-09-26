@@ -40,9 +40,21 @@ public struct HasMethods {
     public var unsupportedAEICProp: Bool {
         return false
     }
+
+    // Operators aren't printed as members yet, so they aren't mentioned.
+    public static func +(lhs: HasMethods, rhs: HasMethods) throws -> HasMethods {
+        return lhs
+    }
 }
 
-// CHECK: HasMethods
+// CHECK: class SWIFT_SYMBOL("s:9Functions10HasMethodsV") HasMethods final {
+// CHECK:        return *this;
+// CHECK-NEXT:   }
+// CHECK-NEXT:   // Unavailable in C++: Swift instance method 'unsupportedThrowsMethod()'. instance method 'unsupportedThrowsMethod()' can not yet be represented in C++ as it may throw an error.
+// CHECK-NEXT:   // Unavailable in C++: Swift initializer 'init()'. initializer 'init()' can not yet be represented in C++ as it may throw an error.
+// CHECK-NEXT:   // Unavailable in C++: Swift property 'unsupportedProp'. property 'unsupportedProp' can not yet be represented in C++ as it may throw an error.
+// CHECK-NEXT:   // Unavailable in C++: Swift property 'unsupportedAEICProp'. property 'unsupportedAEICProp' can not be exposed to C++ as it requires code to be emitted into client.
+// CHECK-NEXT: private:
 // CHECK: supported
 
 // CHECK: // Unavailable in C++: Swift global function 'unsupportedAEIC()'.{{.*}}can not be exposed to C++ as it requires code to be emitted into client.

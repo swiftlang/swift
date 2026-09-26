@@ -68,6 +68,7 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK-NEXT: public:
 // CHECK-NEXT:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
+// CHECK-NEXT:   // Unavailable in C++: Swift property 'index1'. Return type 'Struct1<UInt32>' is not representable in C++.
 // CHECK-NEXT: protected:
 
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {

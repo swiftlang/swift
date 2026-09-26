@@ -45,6 +45,11 @@ extension MO {
     public __consuming func legacyConsumeSelf() -> Int { return x }
 }
 
+// CHECK: class SWIFT_SYMBOL("s:7Consume2MOV") MO final {
+// CHECK: // Unavailable in C++: Swift instance method 'consumeSelf()'.
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'legacyConsumeSelf()'.
+// CHECK-NEXT: private:
+
 // CHECK: SWIFT_INLINE_THUNK void consumeCopyable(const Copyable1& s) noexcept
 
 // CHECK: SWIFT_INLINE_THUNK void consumeMO(MO&& s) noexcept
@@ -64,7 +69,7 @@ extension MO {
 // A getter would have to copy the property out of a borrowed 'self'.
 // NOSELF-NOT: getValue
 
-// Neither consuming-'self' method is exposed, under either spelling. Checked
-// under its own prefix, so that it covers the whole header.
-// NOSELF-NOT: consumeSelf
-// NOSELF-NOT: legacyConsumeSelf
+// Neither consuming-'self' method gets a C++ thunk or Swift ABI declaration.
+// Checked under its own prefix, so that it covers the whole header.
+// NOSELF-NOT: {{(SWIFT_INLINE_THUNK|SWIFT_EXTERN).*}}consumeSelf
+// NOSELF-NOT: {{(SWIFT_INLINE_THUNK|SWIFT_EXTERN).*}}legacyConsumeSelf
