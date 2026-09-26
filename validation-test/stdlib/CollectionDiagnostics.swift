@@ -213,6 +213,235 @@ struct IncompleteRangeReplaceableCollection: RangeReplaceableCollection {
   init() { startIndex = 0; endIndex = 0 }
  }
 
+//
+// Check that the constraints on the associated types of the Collection
+// protocol hierarchy are enforced, i.e. that invalid collections violating
+// one of them are rejected.
+// https://github.com/swiftlang/swift/issues/47401
+//
+
+// A valid forward-only collection, used as a SubSequence/Indices type below.
+// Its SubSequence is itself, and its Element is the same as its Index, so it
+// satisfies the constraints on both the `SubSequence` and `Indices`
+// associated types of `Collection`.
+struct ForwardOnlyCollection: Collection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  subscript(bounds: Range<Int>) -> ForwardOnlyCollection { fatalError() }
+  typealias SubSequence = ForwardOnlyCollection
+}
+
+// A valid bidirectional-but-not-random-access collection.
+struct BidirectionalOnlyCollection: BidirectionalCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  func index(before i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  subscript(bounds: Range<Int>) -> BidirectionalOnlyCollection { fatalError() }
+  typealias SubSequence = BidirectionalOnlyCollection
+}
+
+//
+// Check that Collection.Index is constrained to Comparable.
+//
+
+struct NonComparableIndex {}
+
+// expected-error@+1 {{type 'CollectionWithNonComparableIndex' does not conform to protocol 'Collection'}}
+struct CollectionWithNonComparableIndex: Collection {
+  // expected-note@+1 {{candidate would match and infer 'Index' = 'NonComparableIndex' if 'NonComparableIndex' conformed to 'Comparable'}}
+  var startIndex: NonComparableIndex { fatalError() }
+  // expected-note@+1 {{candidate would match and infer 'Index' = 'NonComparableIndex' if 'NonComparableIndex' conformed to 'Comparable'}}
+  var endIndex: NonComparableIndex { fatalError() }
+  // expected-note@+1 {{candidate would match and infer 'Index' = 'NonComparableIndex' if 'NonComparableIndex' conformed to 'Comparable'}}
+  func index(after i: NonComparableIndex) -> NonComparableIndex { fatalError() }
+  // expected-note@+1 {{candidate would match and infer 'Index' = 'NonComparableIndex' if 'NonComparableIndex' conformed to 'Comparable'}}
+  subscript(position: NonComparableIndex) -> Int { fatalError() }
+}
+
+//
+// Check that Collection.SubSequence.Element is constrained to Element.
+//
+
+// expected-error@+1 {{type 'CollectionWithMismatchedSubSequenceElement' does not conform to protocol 'Collection'}}
+struct CollectionWithMismatchedSubSequenceElement: Collection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> String { fatalError() }
+  // expected-note@+1 {{candidate would match and infer 'Index' = 'Range<Int>' if 'Range<Int>' conformed to 'Comparable'}}
+  subscript(bounds: Range<Int>) -> ForwardOnlyCollection { fatalError() }
+  typealias SubSequence = ForwardOnlyCollection
+}
+
+//
+// Check that Collection.SubSequence.Index is constrained to Index.
+//
+
+// expected-error@+1 {{type 'CollectionWithMismatchedSubSequenceIndex' does not conform to protocol 'Collection'}}
+struct CollectionWithMismatchedSubSequenceIndex: Collection {
+  var startIndex: UInt { fatalError() }
+  var endIndex: UInt { fatalError() }
+  func index(after i: UInt) -> UInt { fatalError() }
+  subscript(position: UInt) -> Int { fatalError() }
+  // expected-note@+1 {{candidate would match and infer 'Index' = 'Range<UInt>' if 'Range<UInt>' conformed to 'Comparable'}}
+  subscript(bounds: Range<UInt>) -> ForwardOnlyCollection { fatalError() }
+  typealias SubSequence = ForwardOnlyCollection
+}
+
+//
+// Check that Collection.Indices is constrained to Collection.
+//
+
+struct NotACollection {}
+
+// expected-error@+1 {{type 'CollectionWithNonCollectionIndices' does not conform to protocol 'Collection'}}
+struct CollectionWithNonCollectionIndices: Collection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  // expected-note@+1 {{possibly intended match 'CollectionWithNonCollectionIndices.Indices' (aka 'NotACollection') does not conform to 'Collection'}}
+  typealias Indices = NotACollection
+  var indices: NotACollection { fatalError() }
+}
+
+//
+// Check that Collection.Indices.Element and Collection.Indices.Index are
+// constrained to Index.
+//
+
+// expected-error@+1 {{type 'CollectionWithMismatchedIndices' does not conform to protocol 'Collection'}}
+struct CollectionWithMismatchedIndices: Collection {
+  var startIndex: UInt { fatalError() }
+  var endIndex: UInt { fatalError() }
+  func index(after i: UInt) -> UInt { fatalError() }
+  subscript(position: UInt) -> Int { fatalError() }
+  typealias Indices = Range<Int>
+  var indices: Range<Int> { fatalError() }
+}
+
+//
+// Check that MutableCollection.SubSequence is constrained to
+// MutableCollection.
+//
+
+// expected-error@+2 {{type 'MutableCollectionWithImmutableSubSequence' does not conform to protocol 'MutableCollection'}}
+// expected-note@+1 {{add stubs for conformance}}
+struct MutableCollectionWithImmutableSubSequence: MutableCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(bounds: Range<Int>) -> ForwardOnlyCollection {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  // expected-note@+1 {{possibly intended match 'MutableCollectionWithImmutableSubSequence.SubSequence' (aka 'ForwardOnlyCollection') does not conform to 'MutableCollection'}}
+  typealias SubSequence = ForwardOnlyCollection
+}
+
+//
+// Check that BidirectionalCollection.SubSequence is constrained to
+// BidirectionalCollection.
+//
+
+// expected-error@+2 {{type 'BidirectionalCollectionWithForwardSubSequence' does not conform to protocol 'BidirectionalCollection'}}
+// expected-note@+1 {{add stubs for conformance}}
+struct BidirectionalCollectionWithForwardSubSequence: BidirectionalCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  func index(before i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  subscript(bounds: Range<Int>) -> ForwardOnlyCollection { fatalError() }
+  // expected-note@+1 {{possibly intended match 'BidirectionalCollectionWithForwardSubSequence.SubSequence' (aka 'ForwardOnlyCollection') does not conform to 'BidirectionalCollection'}}
+  typealias SubSequence = ForwardOnlyCollection
+}
+
+//
+// Check that BidirectionalCollection.Indices is constrained to
+// BidirectionalCollection.
+//
+
+// expected-error@+2 {{type 'BidirectionalCollectionWithForwardIndices' does not conform to protocol 'BidirectionalCollection'}}
+// expected-note@+1 {{add stubs for conformance}}
+struct BidirectionalCollectionWithForwardIndices: BidirectionalCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  func index(before i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  // expected-note@+1 {{possibly intended match 'BidirectionalCollectionWithForwardIndices.Indices' (aka 'ForwardOnlyCollection') does not conform to 'BidirectionalCollection'}}
+  typealias Indices = ForwardOnlyCollection
+  var indices: ForwardOnlyCollection { fatalError() }
+}
+
+//
+// Check that RandomAccessCollection.SubSequence is constrained to
+// RandomAccessCollection.
+//
+
+// expected-error@+2 {{type 'RandomAccessCollectionWithBidirectionalSubSequence' does not conform to protocol 'RandomAccessCollection'}}
+// expected-note@+1 {{add stubs for conformance}}
+struct RandomAccessCollectionWithBidirectionalSubSequence: RandomAccessCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  func index(before i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  subscript(bounds: Range<Int>) -> BidirectionalOnlyCollection { fatalError() }
+  // expected-note@+1 {{possibly intended match 'RandomAccessCollectionWithBidirectionalSubSequence.SubSequence' (aka 'BidirectionalOnlyCollection') does not conform to 'RandomAccessCollection'}}
+  typealias SubSequence = BidirectionalOnlyCollection
+}
+
+//
+// Check that RandomAccessCollection.Indices is constrained to
+// RandomAccessCollection.
+//
+
+// expected-error@+2 {{type 'RandomAccessCollectionWithBidirectionalIndices' does not conform to protocol 'RandomAccessCollection'}}
+// expected-note@+1 {{add stubs for conformance}}
+struct RandomAccessCollectionWithBidirectionalIndices: RandomAccessCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  func index(before i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  // expected-note@+1 {{possibly intended match 'RandomAccessCollectionWithBidirectionalIndices.Indices' (aka 'BidirectionalOnlyCollection') does not conform to 'RandomAccessCollection'}}
+  typealias Indices = BidirectionalOnlyCollection
+  var indices: BidirectionalOnlyCollection { fatalError() }
+}
+
+//
+// Check that RangeReplaceableCollection.SubSequence is constrained to
+// RangeReplaceableCollection.
+//
+
+// expected-error@+2 {{type 'RangeReplaceableCollectionWithBadSubSequence' does not conform to protocol 'RangeReplaceableCollection'}}
+// expected-note@+1 {{add stubs for conformance}}
+struct RangeReplaceableCollectionWithBadSubSequence: RangeReplaceableCollection {
+  init() {}
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+  func index(after i: Int) -> Int { fatalError() }
+  subscript(position: Int) -> Int { fatalError() }
+  subscript(bounds: Range<Int>) -> ForwardOnlyCollection { fatalError() }
+  // expected-note@+1 {{possibly intended match 'RangeReplaceableCollectionWithBadSubSequence.SubSequence' (aka 'ForwardOnlyCollection') does not conform to 'RangeReplaceableCollection'}}
+  typealias SubSequence = ForwardOnlyCollection
+  mutating func replaceSubrange<C: Collection>(
+    _ subrange: Range<Int>, with newElements: C
+  ) where C.Element == Int {
+    fatalError()
+  }
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: possibly intended match
 // <unknown>:0: error: unexpected note produced: possibly intended match
