@@ -20,7 +20,7 @@
 - ``Swift/TaskGroup/next()``
 - ``Swift/TaskGroup/next(isolation:)``
 - ``Swift/TaskGroup/isEmpty``
-- ``Swift/TaskGroup/waitForAll(isolation:)``
+- ``Swift/TaskGroup/waitForAll()``
 
 ### Accessing an Asynchronous Sequence of Results
 
@@ -64,3 +64,4 @@
 - ``Swift/TaskGroup/asyncUnlessCancelled(priority:operation:)``
 - ``Swift/TaskGroup/spawn(priority:operation:)``
 - ``Swift/TaskGroup/spawnUnlessCancelled(priority:operation:)``
+- ``Swift/TaskGroup/waitForAll(isolation:)``
