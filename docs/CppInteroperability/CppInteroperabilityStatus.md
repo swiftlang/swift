@@ -205,11 +205,26 @@ Swift functions can be called from C++, with some restrictions. See this table f
 
 | **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
 |------------------------------|----------------------------------------------------------|
-| Generic functions            | Partially, only without generic constraints              |
-| Generic methods              | Partially, only without generic constraints              |
-| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
-| Generic `enum` types         | Partially, only without generic constraints and less than 4 generic parameters |
+| Generic functions            | Partially, only without generic constraints. Direct `Hashable` requirements are supported with `GenerateBindingsForHashableRequirementsInCXX` (see below) |
+| Generic methods              | Partially, only without generic constraints. Direct `Hashable` requirements are supported with `GenerateBindingsForHashableRequirementsInCXX` (see below) |
+| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters. With `GenerateBindingsForHashableRequirementsInCXX`, direct `Hashable` requirements are supported, and each of them counts as a generic parameter |
+| Generic `enum` types         | Partially, only without generic constraints and less than 4 generic parameters. With `GenerateBindingsForHashableRequirementsInCXX`, direct `Hashable` requirements are supported, and each of them counts as a generic parameter |
 | Generic `class` types        | No |
+
+With `-enable-experimental-feature GenerateBindingsForHashableRequirementsInCXX`,
+a `Hashable` requirement directly on a generic parameter is supported outside
+Embedded Swift. C++ templates cannot enforce Swift protocol conformances, so the
+generated binding looks up the `Hashable` conformance from the type metadata at
+runtime, once for each C++ type. This works for Swift types and for C++ types
+whose `Hashable` conformance is declared in Swift. Using such an API with a
+type that does not conform to `Hashable` is a fatal error. When the runtime
+supports isolated conformances, the binding also checks on every call that an
+isolated conformance is only used on its global actor. Older Apple runtimes
+cannot perform this check. The conformance has to be in a loaded
+image when it is looked up: if it is defined only in an otherwise unreferenced
+member of a static archive, the linker has to be told to load that member.
+Other protocols, and existential or opaque types such as `any Hashable` or
+`some Hashable`, are still not supported.
 
 ### Swift standard library
 
