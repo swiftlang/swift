@@ -220,7 +220,6 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class _impl_GenericPair;
 // CHECK-EMPTY:
-// CHECK-NEXT: static_assert(2 <= 3, "unsupported generic requirement list for metadata func");
 // CHECK-NEXT: // Type metadata accessor for GenericPair
 // CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s8Generics11GenericPairVMa(swift::_impl::MetadataRequestTy, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;
 

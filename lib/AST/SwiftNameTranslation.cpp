@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -308,6 +309,21 @@ bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
                        }));
 }
 
+/// Returns the number of generic arguments that the type metadata accessor of a
+/// type with the given generic signature takes: one for each generic
+/// parameter, and one for each conformance that needs a witness table.
+static unsigned getMetadataAccessorArgumentCount(GenericSignature genericSig) {
+  unsigned count = genericSig.getGenericParams().size();
+  for (const auto &req : genericSig.getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    auto *proto = req.getProtocolDecl();
+    if (!proto->isMarkerProtocol() && !proto->isObjC())
+      ++count;
+  }
+  return count;
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
@@ -399,6 +415,14 @@ swift::cxx_translation::getDeclRepresentation(
     return {Unsupported, UnrepresentableGenericRequirements};
   }
 
+  // The generated bindings call the direct form of a type metadata accessor,
+  // which takes a limited number of generic arguments.
+  // FIXME: Support the indirect form, which passes them in a buffer.
+  if (isa<NominalTypeDecl>(VD) && genericSignature &&
+      getMetadataAccessorArgumentCount(genericSignature) >
+          NumDirectGenericTypeMetadataAccessFunctionArgs)
+    return {Unsupported, UnrepresentableTooManyGenericParameters};
+
   if (isObjCxxOnly(VD))
     return {ObjCxxOnly, std::nullopt};
 
@@ -487,6 +511,8 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
   case UnrepresentableNestedInGenericContext:
     return Diagnostic(diag::expose_nested_in_generic_context_to_cxx, vd);
+  case UnrepresentableTooManyGenericParameters:
+    return Diagnostic(diag::expose_too_many_generic_params_to_cxx, vd);
   case UnrepresentableThrows:
     return Diagnostic(diag::expose_throwing_to_cxx, vd);
   case UnrepresentableIndirectEnum:

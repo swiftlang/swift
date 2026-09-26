@@ -80,6 +80,7 @@ enum RepresentationError {
   UnrepresentableGeneric,
   UnrepresentableGenericRequirements,
   UnrepresentableNestedInGenericContext,
+  UnrepresentableTooManyGenericParameters,
   UnrepresentableThrows,
   UnrepresentableIndirectEnum,
   UnrepresentableEnumCaseType,

@@ -109,6 +109,18 @@ extension ContextuallyGeneric where T: Proto {
     public var inConstrainedExtensionVar: Int { 0 }
 }
 
+// The generated bindings call the direct form of the type metadata accessor,
+// which takes at most three generic arguments.
+@_expose(Cxx) // expected-error {{generic struct 'FourGenericParams' can not yet be represented in C++ as it has more than 3 generic parameters}}
+public struct FourGenericParams<A, B, C, D> {
+    var a: A
+    var b: B
+    var c: C
+    var d: D
+}
+
+public func takesFourGenericParams(_ x: FourGenericParams<Int, Int, Int, Int>) {}
+
 // CHECK: supported
 
 // CHECK: class SWIFT_SYMBOL("s:5Decls6Class1C") Class1 : public swift::_impl::RefCountedClass {
@@ -125,6 +137,12 @@ extension ContextuallyGeneric where T: Proto {
 // CHECK: };
 // CHECK: SWIFT_INLINE_THUNK void supportedFunc(const T_0_0& x) noexcept SWIFT_SYMBOL("s:5Decls13supportedFuncyyxlF") {
 // CHECK: SWIFT_INLINE_THUNK void ContextuallyGeneric<T_0_0>::requiresSendable() const noexcept {
+
+// CHECK: template<class T_0_0, class T_0_1, class T_0_2, class T_0_3>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1> && swift::isUsableInGenericContext<T_0_2> && swift::isUsableInGenericContext<T_0_3>
+// CHECK-NEXT: #endif // __cpp_concepts
+// CHECK-NEXT: class FourGenericParams { } SWIFT_UNAVAILABLE_MSG("generic struct 'FourGenericParams' can not yet be represented in C++ as it has more than 3 generic parameters");
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
