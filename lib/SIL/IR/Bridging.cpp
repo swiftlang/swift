@@ -25,7 +25,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace swift::Lowering;
@@ -165,10 +167,24 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
       return getObjCBoolType();
     }
 
-    // Otherwise, always assume ObjC methods should use ObjCBool.
+    // Otherwise, always assume ObjC methods should use ObjCBool. If the
+    // ObjectiveC module isn't available, fall back to the C _Bool type. That
+    // is only ABI-compatible with BOOL on targets where BOOL is _Bool, so
+    // diagnose on Darwin targets where BOOL is signed char.
+    //
+    // Embedded Swift always uses _Bool here, even where BOOL is signed char.
     if (bridging != Bridgeability::None &&
-        rep == SILFunctionTypeRepresentation::ObjCMethod)
-      return getObjCBoolType();
+        rep == SILFunctionTypeRepresentation::ObjCMethod &&
+        !Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (auto objcBoolTy = getObjCBoolType())
+        return objcBoolTy;
+
+      auto &clangCtx = Context.getClangModuleLoader()->getClangASTContext();
+      if (Context.LangOpts.Target.isOSDarwin() &&
+          clangCtx.getTargetInfo().useSignedCharForObjCBool())
+        Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
+                               t);
+    }
 
     return t;
   }
