@@ -8,7 +8,7 @@ import redundant_conformance_A
 import redundant_conformance_B
 
 extension ConformsToP
-  : P1 { // expected-warning{{conformance of 'ConformsToP' to protocol 'P1' was already stated in the type's module 'redundant_conformance_A'}}
+  : P1 { // expected-warning{{conformance of 'ConformsToP' to protocol 'P1' was already stated in the type's module 'redundant_conformance_A'}} {{10:22-11:7=}}
   typealias A = Double // expected-note{{type alias 'A' will not be used to satisfy the conformance to 'P1'}}
 
   func f() -> Double { return 0.0 } // expected-note{{instance method 'f()' will not be used to satisfy the conformance to 'P1'}}
@@ -16,10 +16,10 @@ extension ConformsToP
 }
 
 extension ConformsToP
-  : P2 { // expected-warning{{conformance of 'ConformsToP' to protocol 'P2' was already stated in the protocol's module 'redundant_conformance_B'}}
+  : P2 { // expected-warning{{conformance of 'ConformsToP' to protocol 'P2' was already stated in the protocol's module 'redundant_conformance_B'}} {{18:22-19:7=}}
 }
 
-extension OtherConformsToP : P1 { // expected-error{{redundant conformance of 'OtherConformsToP' to protocol 'P1'}}
+extension OtherConformsToP : P1 { // expected-error{{redundant conformance of 'OtherConformsToP' to protocol 'P1'}} {{27-32=}}
   func f() -> Int { return 0 }
 }
 
@@ -44,7 +44,7 @@ extension GenericConformsToP: P2 where T: P1 {
 }
 
 extension OtherGenericConformsToP: P1 where T: P1 {
-// expected-error@-1{{conflicting conformance of 'OtherGenericConformsToP<T>' to protocol 'P1'; there cannot be more than one conformance, even with different conditional bounds}}
+// expected-error@-1{{conflicting conformance of 'OtherGenericConformsToP<T>' to protocol 'P1'; there cannot be more than one conformance, even with different conditional bounds}} {{none}}
     typealias A = Double
     func f() -> Double { return 0.0 }
 }
@@ -61,7 +61,7 @@ extension GenericConditionalConformsToP: P2 {
 }
 
 extension OtherGenericConditionalConformsToP: P1 {
-// expected-error@-1{{conflicting conformance of 'OtherGenericConditionalConformsToP<T>' to protocol 'P1'; there cannot be more than one conformance, even with different conditional bounds}}
+// expected-error@-1{{conflicting conformance of 'OtherGenericConditionalConformsToP<T>' to protocol 'P1'; there cannot be more than one conformance, even with different conditional bounds}} {{none}}
     typealias A = Double
     func f() -> Double { return 0.0 }
 }
@@ -91,5 +91,5 @@ class SomeMockClass: Class3.ProviderThree { // okay
 class ImplicitCopyable {}
 
 class InheritImplicitCopyable: ImplicitCopyable, Copyable {}
-// expected-warning@-1 {{redundant conformance of 'InheritImplicitCopyable' to protocol 'Copyable'}}
+// expected-warning@-1 {{redundant conformance of 'InheritImplicitCopyable' to protocol 'Copyable'}} {{48-58=}}
 // expected-note@-2 {{'InheritImplicitCopyable' inherits conformance to protocol 'Copyable' from superclass here}}
