@@ -716,6 +716,13 @@ public:
   /// something of incorrect type.
   bool diagnoseYieldByReferenceMismatch() const;
 
+  /// If \p fromType and \p toType are function types that are otherwise
+  /// identical but disagree about the Clang type attached to their
+  /// representation, attach a note to \p parentDiag naming the Clang types
+  /// involved.
+  void noteClangFunctionTypeMismatch(InFlightDiagnostic parentDiag,
+                                     Type fromType, Type toType) const;
+
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
 
