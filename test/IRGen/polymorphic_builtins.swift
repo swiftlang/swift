@@ -2,12 +2,14 @@
 // into traps.
 //
 // RUN: %target-swift-frontend  -enable-builtin-module -emit-ir -parse-as-library -Xllvm -sil-disable-pass=Simplification %s | %FileCheck %s
+// RUN: %target-swift-frontend  -enable-builtin-module -emit-ir -parse-as-library -Xllvm -sil-disable-pass=Simplification -enable-sil-opaque-values %s | %FileCheck %s
 
 // Make sure we are not eliminating these builtins before IRGen runs. As part of
 // the builtin's contract, we expect IRGen to convert them to traps, not
 // anything before.
 //
 // RUN: %target-swift-frontend  -enable-builtin-module -Xllvm -sil-print-types -emit-sil -parse-as-library -Xllvm -sil-disable-pass=Simplification %s | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend  -enable-builtin-module -Xllvm -sil-print-types -emit-sil -parse-as-library -Xllvm -sil-disable-pass=Simplification -enable-sil-opaque-values %s | %FileCheck --check-prefix=SIL %s
 
 import Builtin
 

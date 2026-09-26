@@ -1381,7 +1381,7 @@ static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   BuiltinFunctionBuilder builder(C, 1, true);
   auto T = makeGenericParam();
   builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
-  builder.addParameter(T);
+  builder.addParameter(T, ParamSpecifier::LegacyOwned);
   builder.setResult(T);
   return builder.build(Id);
 }
