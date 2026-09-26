@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -308,6 +309,21 @@ bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
                        }));
 }
 
+/// Returns the number of generic arguments that the type metadata accessor of a
+/// type with the given generic signature takes: one for each generic
+/// parameter, and one for each conformance that needs a witness table.
+static unsigned getMetadataAccessorArgumentCount(GenericSignature genericSig) {
+  unsigned count = genericSig.getGenericParams().size();
+  for (const auto &req : genericSig.getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    auto *proto = req.getProtocolDecl();
+    if (!proto->isMarkerProtocol() && !proto->isObjC())
+      ++count;
+  }
+  return count;
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
@@ -320,7 +336,12 @@ swift::cxx_translation::getDeclRepresentation(
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
-  GenericSignature genericSignature;
+  // A declaration can be contextually generic without declaring generic
+  // parameters of its own, e.g. a method with a 'where' clause or a property
+  // in a constrained extension. Validate the generic signature of its context
+  // too, so that such requirements cannot bypass the checks below.
+  GenericSignature genericSignature =
+      VD->getInnermostDeclContext()->getGenericSignatureOfContext();
   // Don't expose decls with definitions that are emitted into the client.
   if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
@@ -331,8 +352,6 @@ swift::cxx_translation::getDeclRepresentation(
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    if (AFD->hasGenericParamList())
-      genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl)) {
@@ -347,11 +366,12 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
-    if (typeDecl->hasGenericParamList()) {
-      if (isa<ClassDecl>(VD))
-        return {Unsupported, UnrepresentableGeneric};
-      genericSignature = typeDecl->getGenericSignature();
-    }
+    // The C++ class for a nested type does not know the generic arguments of
+    // its context, which its type metadata accessor needs.
+    if (typeDecl->getDeclContext()->isGenericContext())
+      return {Unsupported, UnrepresentableNestedInGenericContext};
+    if (isa<ClassDecl>(VD) && genericSignature)
+      return {Unsupported, UnrepresentableGeneric};
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
@@ -394,6 +414,14 @@ swift::cxx_translation::getDeclRepresentation(
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
+
+  // The generated bindings call the direct form of a type metadata accessor,
+  // which takes a limited number of generic arguments.
+  // FIXME: Support the indirect form, which passes them in a buffer.
+  if (isa<NominalTypeDecl>(VD) && genericSignature &&
+      getMetadataAccessorArgumentCount(genericSignature) >
+          NumDirectGenericTypeMetadataAccessFunctionArgs)
+    return {Unsupported, UnrepresentableTooManyGenericParameters};
 
   if (isObjCxxOnly(VD))
     return {ObjCxxOnly, std::nullopt};
@@ -481,6 +509,10 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_generic_decl_to_cxx, vd);
   case UnrepresentableGenericRequirements:
     return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
+  case UnrepresentableNestedInGenericContext:
+    return Diagnostic(diag::expose_nested_in_generic_context_to_cxx, vd);
+  case UnrepresentableTooManyGenericParameters:
+    return Diagnostic(diag::expose_too_many_generic_params_to_cxx, vd);
   case UnrepresentableThrows:
     return Diagnostic(diag::expose_throwing_to_cxx, vd);
   case UnrepresentableIndirectEnum:
