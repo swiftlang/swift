@@ -2653,6 +2653,39 @@ SourceLoc ContextualFailure::getLoc() const {
   return FailureDiagnostic::getLoc();
 }
 
+void ContextualFailure::noteClangFunctionTypeMismatch(
+    InFlightDiagnostic parentDiag, Type fromType, Type toType) const {
+  // Are we printing the C type anyway? If so, this note is redundant.
+  if (getASTContext().TypeCheckerOpts.PrintFullConvention)
+    return;
+
+  // Are they both function types?
+  auto *fromFnType = fromType->getAs<FunctionType>();
+  auto *toFnType = toType->getAs<FunctionType>();
+  if (!fromFnType || !toFnType)
+    return;
+
+  // Do they have different clang types in their ExtInfo?
+  auto fromClangTypeInfo = fromFnType->getExtInfo().getClangTypeInfo();
+  auto toClangTypeInfo = toFnType->getExtInfo().getClangTypeInfo();
+  if (fromClangTypeInfo == toClangTypeInfo)
+    return;
+
+  // If you strip out those clang types, are the Swift types otherwise equal?
+  auto withoutClangType = [](FunctionType *fnType) {
+    return fnType->withExtInfo(fnType->getExtInfo().intoBuilder()
+                                    .withClangFunctionType(nullptr)
+                                    .build());
+  };
+  if (!withoutClangType(fromFnType)->isEqual(withoutClangType(toFnType)))
+    return;
+
+  getASTContext().Diags.diagnoseWithNotes(std::move(parentDiag), [&] {
+    emitDiagnostic(diag::note_differing_clang_function_types,
+                   fromClangTypeInfo.getType(), toClangTypeInfo.getType());
+  });
+}
+
 bool ContextualFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto path = getLocator()->getPath();
@@ -2940,6 +2973,8 @@ bool ContextualFailure::diagnoseAsError() {
   diag.highlight(getSourceRange());
 
   (void)tryFixIts(diag);
+  noteClangFunctionTypeMismatch(std::move(diag), fromType, toType);
+
   return true;
 }
 
@@ -7862,6 +7897,8 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   }
 
   tryFixIts(diag);
+  noteClangFunctionTypeMismatch(std::move(diag), argType, paramType);
+
   return true;
 }
 

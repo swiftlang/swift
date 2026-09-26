@@ -1237,9 +1237,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::ClangType:
     assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
-    Out << FormatOpts.OpeningQuotationMark;
-    printClangTypeName(Arg.getAsClangType(), Out);
-    Out << FormatOpts.ClosingQuotationMark;
+    if (Arg.getAsClangType()) {
+      Out << FormatOpts.OpeningQuotationMark;
+      printClangTypeName(Arg.getAsClangType(), Out);
+      Out << FormatOpts.ClosingQuotationMark;
+    } else {
+      Out << "none";
+    }
     break;
   }
 }
