@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
+extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable, DebugReconstructionBlockSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:

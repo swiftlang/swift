@@ -84,7 +84,7 @@ private extension AllocStackInst {
           dv.salvageEnumPayload(index: use.index, caseIndex: caseIndex, enumType: oldAllocType.objectType, context)
         } else {
           // Kill the operand, and fix the type to be the enum type rather than the payload type.
-          dv.killOperand(index: use.index, withType: oldAllocType)
+          dv.killOperand(index: use.index, withType: oldAllocType, context)
         }
       case is DestroyAddrInst, is DeallocStackInst, is StoreInst:
         break
@@ -434,7 +434,7 @@ private extension AllocStackInst {
           // specialization suffix (prior art exists in
           // SILCloner::remapFunction()).
           // For now, just remove affected inlined variables.
-          dv.killOperand(index: use.index)
+          dv.killOperand(index: use.index, context)
         } else {
           use.set(to: newAlloc, context)
         }
@@ -566,7 +566,7 @@ private extension DebugValueInst {
     guard operandType.objectType.isLoadable(in: self.parentFunction),
           enumType.isLoadable(in: self.parentFunction) else {
       // Kill the operand, and fix the type to be the enum type rather than the payload type.
-      self.killOperand(index: index, withType: enumType)
+      self.killOperand(index: index, withType: enumType, context)
       return
     }
 
