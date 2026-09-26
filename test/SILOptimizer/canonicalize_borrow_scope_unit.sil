@@ -9,6 +9,10 @@ class D : C {}
 struct S {
   @_hasStorage var guts: SGuts
 }
+struct Box {
+  @_hasStorage var guts: SGuts
+  @_hasStorage var ptr: Builtin.RawPointer
+}
 class SGuts {}
 
 sil @getD : $() -> (@owned D)
@@ -146,6 +150,86 @@ right:
   br exit
 
 exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// MARK: Interior Pointer Address Uses
+//
+// The base of a 'mark_dependence [nonescaping]' with an address result has
+// AnyInteriorPointer ownership. When that base is an intermediate copy, the use
+// is rewritten like any other, but the address uses that the interior pointer
+// places on its base decide *what* it is rewritten to. Here they are all within
+// the borrow scope, so the in-scope def works and the copy is removed.
+//
+// CHECK-LABEL: begin {{.*}} on interior_pointer_base_in_scope: ossa_canonicalize_guaranteed
+// CHECK-LABEL: sil [ossa] @interior_pointer_base_in_scope : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[BOX:%[^,]+]] :
+// CHECK:         [[OUTER_COPY:%[^,]+]] = copy_value [[BOX]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[PTR:%[^,]+]] = struct_extract [[BORROW]] : $Box, #Box.ptr
+// CHECK:         [[ADR:%[^,]+]] = pointer_to_address [[PTR]] : $Builtin.RawPointer to [strict] $*SGuts
+//                No inner copy: the base is the in-scope def.
+// CHECK-NOT:     copy_value
+// CHECK:         [[MD:%[^,]+]] = mark_dependence [nonescaping] [[ADR]] : $*SGuts on [[BORROW]]
+// CHECK:         apply undef([[MD]])
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         apply undef([[OUTER_COPY]])
+// CHECK-LABEL: } // end sil function 'interior_pointer_base_in_scope'
+// CHECK-LABEL: end {{.*}} on interior_pointer_base_in_scope: ossa_canonicalize_guaranteed
+sil [ossa] @interior_pointer_base_in_scope : $@convention(thin) (@owned Box) -> () {
+bb0(%box : @owned $Box):
+  specify_test "ossa_canonicalize_guaranteed @instruction"
+  %borrow = begin_borrow %box : $Box
+  %copy = copy_value %borrow : $Box
+  %ptr = struct_extract %borrow : $Box, #Box.ptr
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*SGuts
+  %md = mark_dependence [nonescaping] %adr : $*SGuts on %copy : $Box
+  apply undef(%md) : $@convention(thin) (@in_guaranteed SGuts) -> ()
+  destroy_value %copy : $Box
+  // An outer use, so that the RewriteOuterBorrowUses path is taken.
+  %outer = copy_value %borrow : $Box
+  end_borrow %borrow : $Box
+  apply undef(%outer) : $@convention(thin) (@owned Box) -> ()
+  destroy_value %box : $Box
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Same shape, but the dependent address is used after the end_borrow. Narrowing
+// the base to the begin_borrow would put that use outside the base's lifetime,
+// so the interior pointer counts as an outer use and takes the outer copy
+// instead, whose lifetime is extended to cover the address use.
+//
+// CHECK-LABEL: begin {{.*}} on interior_pointer_base_outer_use: ossa_canonicalize_guaranteed
+// CHECK-LABEL: sil [ossa] @interior_pointer_base_outer_use : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[BOX:%[^,]+]] :
+// CHECK:         [[OUTER_COPY:%[^,]+]] = copy_value [[BOX]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[PTR:%[^,]+]] = struct_extract [[BORROW]] : $Box, #Box.ptr
+// CHECK:         [[ADR:%[^,]+]] = pointer_to_address [[PTR]] : $Builtin.RawPointer to [strict] $*SGuts
+//                The base is the outer copy, not [[BORROW]].
+// CHECK:         [[MD:%[^,]+]] = mark_dependence [nonescaping] [[ADR]] : $*SGuts on [[OUTER_COPY]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         apply undef([[MD]])
+// CHECK:         apply undef([[OUTER_COPY]])
+// CHECK-LABEL: } // end sil function 'interior_pointer_base_outer_use'
+// CHECK-LABEL: end {{.*}} on interior_pointer_base_outer_use: ossa_canonicalize_guaranteed
+sil [ossa] @interior_pointer_base_outer_use : $@convention(thin) (@owned Box) -> () {
+bb0(%box : @owned $Box):
+  specify_test "ossa_canonicalize_guaranteed @instruction"
+  %borrow = begin_borrow %box : $Box
+  %copy = copy_value %borrow : $Box
+  %ptr = struct_extract %borrow : $Box, #Box.ptr
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*SGuts
+  %md = mark_dependence [nonescaping] %adr : $*SGuts on %copy : $Box
+  // An outer use, so that the RewriteOuterBorrowUses path is taken.
+  %outer = copy_value %borrow : $Box
+  end_borrow %borrow : $Box
+  apply undef(%md) : $@convention(thin) (@in_guaranteed SGuts) -> ()
+  destroy_value %copy : $Box
+  apply undef(%outer) : $@convention(thin) (@owned Box) -> ()
+  destroy_value %box : $Box
   %retval = tuple ()
   return %retval : $()
 }
