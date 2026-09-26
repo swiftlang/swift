@@ -733,6 +733,14 @@ public:
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
+              // In C++ the class body only declares its members, and a
+              // forward declaration of the class template is enough for that.
+              // The member definitions are printed out of line after all
+              // types.
+              if (outputLangMode == OutputLanguageMode::Cxx) {
+                forwardDeclareType(TD);
+                return;
+              }
               needsToBeIndividuallyDelayed = true;
               hadAnyDelayedMembers = true;
             }
