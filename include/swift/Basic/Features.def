@@ -538,6 +538,9 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 /// Do not import non-field C++ record members until requested from Swift.
 LANGUAGE_FEATURE(ImportCxxMembersLazily, 0, "import C++ members lazily")
 
+/// Import C structs with ARC pointer members (__strong, __weak).
+EXPERIMENTAL_FEATURE(ImportCStructsWithArcFields, false)
+
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
 LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inheritance hierarchy")

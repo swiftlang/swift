@@ -15,3 +15,52 @@ struct StrongsInAStruct { // expected-note {{record 'StrongsInAStruct' is not tr
 struct WeaksInAStruct { // expected-note {{record 'WeaksInAStruct' is not trivial to copy or destroy}}
   __weak NSString *nsstr;
 };
+
+// Types used when ImportCStructsWithArcFields is enabled.
+@interface MYObject : NSObject
+@end
+
+struct StrongsInAStructArc {
+  __strong MYObject *_Nonnull myobj;
+};
+
+void takeStrongArcStruct(struct StrongsInAStructArc s);
+struct StrongsInAStructArc returnStrongArcStruct(void);
+
+struct WeaksInAStructArc {
+  __weak MYObject *_Nullable myobj;
+};
+
+struct WeakAndNonnull {
+  __weak MYObject *_Nonnull myobj;
+};
+
+struct ConstWeakInAStruct {
+  __weak MYObject *_Nullable const myobj;
+};
+
+struct MixedStrongWeakArc {
+  __strong MYObject *_Nonnull strong;
+  __weak MYObject *_Nullable weak;
+  int tag;
+};
+
+void takeMixedArcStruct(struct MixedStrongWeakArc s);
+
+struct StrongNSStringArc {
+  __strong NSString *_Nonnull name;
+  int tag;
+};
+
+struct WeakNSStringArc {
+  __weak NSString *_Nullable name;
+  int tag;
+};
+
+struct UnavailableArcStruct {
+  __strong MYObject *_Nonnull myobj;
+} NS_SWIFT_UNAVAILABLE("Use MySwiftType instead");
+
+struct CNameForRenamedArcStruct {
+  __strong MYObject *_Nonnull myobj;
+} __attribute__((swift_name("RenamedArcStruct")));
