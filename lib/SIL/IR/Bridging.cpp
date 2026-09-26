@@ -171,8 +171,11 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     // ObjectiveC module isn't available, fall back to the C _Bool type. That
     // is only ABI-compatible with BOOL on targets where BOOL is _Bool, so
     // diagnose on Darwin targets where BOOL is signed char.
+    //
+    // Embedded Swift always uses _Bool here, even where BOOL is signed char.
     if (bridging != Bridgeability::None &&
-        rep == SILFunctionTypeRepresentation::ObjCMethod) {
+        rep == SILFunctionTypeRepresentation::ObjCMethod &&
+        !Context.LangOpts.hasFeature(Feature::Embedded)) {
       if (auto objcBoolTy = getObjCBoolType())
         return objcBoolTy;
 
