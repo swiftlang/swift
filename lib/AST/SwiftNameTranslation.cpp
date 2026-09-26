@@ -320,7 +320,12 @@ swift::cxx_translation::getDeclRepresentation(
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
-  GenericSignature genericSignature;
+  // A declaration can be contextually generic without declaring generic
+  // parameters of its own, e.g. a method with a 'where' clause or a property
+  // in a constrained extension. Validate the generic signature of its context
+  // too, so that such requirements cannot bypass the checks below.
+  GenericSignature genericSignature =
+      VD->getInnermostDeclContext()->getGenericSignatureOfContext();
   // Don't expose decls with definitions that are emitted into the client.
   if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
@@ -331,8 +336,6 @@ swift::cxx_translation::getDeclRepresentation(
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    if (AFD->hasGenericParamList())
-      genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl)) {
@@ -347,11 +350,12 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
-    if (typeDecl->hasGenericParamList()) {
-      if (isa<ClassDecl>(VD))
-        return {Unsupported, UnrepresentableGeneric};
-      genericSignature = typeDecl->getGenericSignature();
-    }
+    // The C++ class for a nested type does not know the generic arguments of
+    // its context, which its type metadata accessor needs.
+    if (typeDecl->getDeclContext()->isGenericContext())
+      return {Unsupported, UnrepresentableNestedInGenericContext};
+    if (isa<ClassDecl>(VD) && genericSignature)
+      return {Unsupported, UnrepresentableGeneric};
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
@@ -481,6 +485,8 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_generic_decl_to_cxx, vd);
   case UnrepresentableGenericRequirements:
     return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
+  case UnrepresentableNestedInGenericContext:
+    return Diagnostic(diag::expose_nested_in_generic_context_to_cxx, vd);
   case UnrepresentableThrows:
     return Diagnostic(diag::expose_throwing_to_cxx, vd);
   case UnrepresentableIndirectEnum:
