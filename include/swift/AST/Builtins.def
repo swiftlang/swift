@@ -325,6 +325,11 @@ BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
+/// TakeFromRawPointer has type (Builtin.RawPointer) -> T.
+/// T must be a single reference supported by SILGen. The pointer carries an
+/// existing +1 reference, which the result takes without retaining it.
+BUILTIN_SIL_OPERATION(TakeFromRawPointer, "takeFromRawPointer", Special)
+
 /// castReference has type T -> U.
 /// T and U must be convertible to AnyObject.
 BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
