@@ -1384,7 +1384,7 @@ static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
                               OptionalCxxStdLibDep.value()->isStaticLibrary();
     registerCxxInteropLibraries(langOpts.Target, mainModuleName, hasStaticCxx,
                                 hasStaticCxxStdlib, langOpts.CXXStdlib,
-                                addLinkLibrary);
+                                langOpts.useCxxStdlibOverlay(), addLinkLibrary);
   }
 
   if (!irGenOpts.UseJIT && !langOpts.hasFeature(Feature::Embedded))

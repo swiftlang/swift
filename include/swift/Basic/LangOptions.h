@@ -367,6 +367,12 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
+    /// The current CxxStdlib overlay has nonthrowing APIs and conformances,
+    /// which strict C++ exception mode can't provide.
+    bool useCxxStdlibOverlay() const {
+      return !hasFeature(Feature::CxxExceptionBridgingStrict);
+    }
+
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
     std::optional<version::Version> FormalCxxInteropMode;
@@ -873,6 +879,10 @@ namespace swift {
     /// contribute to a Swift Dependency Scanning hash.
     llvm::hash_code getModuleScanningHashComponents() const {
       auto hashValue = getPCHHashComponents();
+      // Strict C++ exception mode changes imported C++ function types.
+      if (hasFeature(Feature::CxxExceptionBridgingStrict))
+        hashValue = llvm::hash_combine(hashValue,
+                                       StringRef("CxxExceptionBridgingStrict"));
       if (TargetVariant.has_value())
         hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
       if (ClangTarget.has_value())

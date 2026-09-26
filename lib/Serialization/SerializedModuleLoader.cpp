@@ -741,6 +741,9 @@ bool SerializedModuleLoaderBase::findModule(
   // and a source file has 'import Foo', a module called Bar (real name)
   // should be searched.
   StringRef moduleNameRef = Ctx.getRealModuleName(moduleID.Item).str();
+  if (!Ctx.LangOpts.useCxxStdlibOverlay() &&
+      moduleNameRef == Ctx.Id_CxxStdlib.str())
+    return false;
   SmallString<32> moduleName(moduleNameRef);
   SerializedModuleBaseName genericBaseName(moduleName);
 
@@ -933,6 +936,14 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     bool isFramework) {
   assert(moduleInputBuffer);
 
+  // A source import of CxxStdlib resolves to the raw Clang module in strict
+  // mode. An explicitly supplied Swift overlay still must not be loaded.
+  if (!Ctx.LangOpts.useCxxStdlibOverlay() && M.getName() == Ctx.Id_CxxStdlib) {
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::cxx_exception_mode_stdlib_overlay);
+    return nullptr;
+  }
+
   // The buffers are moved into the shared core, so grab their IDs now in case
   // they're needed for diagnostics later.
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -981,6 +992,23 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
                            M.getName());
         Ctx.Diags.diagnose(*diagLoc, diag::enable_cxx_interop_docs);
       }
+      return nullptr;
+    }
+
+    // Strict C++ exception mode changes imported function types, including
+    // references in serialized bodies, so a module built with C++ interop can
+    // only be used in the mode it was built in. Only strict modules record
+    // their mode. Cxx contains compiler support APIs that don't depend on it.
+    bool isStrictModule = loadedModuleFileCore->isCxxExceptionBridgingStrict();
+    bool isStrictClient =
+        Ctx.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict);
+    if (Ctx.LangOpts.EnableCXXInterop && M.getName() != Ctx.Id_Cxx &&
+        isStrictModule != isStrictClient &&
+        (isStrictModule || loadedModuleFileCore->isBuiltWithCxxInterop())) {
+      if (diagLoc)
+        Ctx.Diags.diagnose(*diagLoc,
+                           diag::cxx_exception_bridging_strict_mismatch,
+                           M.getName(), isStrictModule);
       return nullptr;
     }
 

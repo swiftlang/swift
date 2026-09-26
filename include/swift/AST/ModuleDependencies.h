@@ -173,6 +173,7 @@ void registerBackDeployLibraries(
 void registerCxxInteropLibraries(
     const llvm::Triple &Target, StringRef mainModuleName, bool hasStaticCxx,
     bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
+    bool useCxxStdlibOverlay,
     std::function<void(const LinkLibrary &)> RegistrationCallback);
 } // namespace dependencies
 
