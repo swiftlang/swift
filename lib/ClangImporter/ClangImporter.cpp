@@ -536,6 +536,37 @@ getClangSupportedSanitizers(const llvm::Triple &triple) {
   return compilation->getDefaultToolChain().getSupportedSanitizers();
 }
 
+static bool sdkIsOlderThan(const clang::DarwinSDKInfo *sdkInfo,
+                           llvm::VersionTuple macOSVersion,
+                           llvm::VersionTuple iOSVersion,
+                           llvm::VersionTuple tvOSVersion,
+                           llvm::VersionTuple watchOSVersion,
+                           llvm::VersionTuple visionOSVersion) {
+  // If there's no SDK info, assume an old SDK.
+  if (!sdkInfo)
+    return true;
+
+  llvm::VersionTuple sdkVersion = sdkInfo->getVersion();
+  llvm::Triple::EnvironmentType environment = sdkInfo->getEnvironment();
+  bool noEnvironment = environment == llvm::Triple::UnknownEnvironment;
+  bool simulator = environment == llvm::Triple::Simulator;
+  switch (sdkInfo->getOS()) {
+  case llvm::Triple::MacOSX:
+    return noEnvironment && (sdkVersion < macOSVersion);
+  case llvm::Triple::IOS:
+    return (noEnvironment || simulator) && (sdkVersion < iOSVersion);
+  case llvm::Triple::TvOS:
+    return (noEnvironment || simulator) && (sdkVersion < tvOSVersion);
+  case llvm::Triple::WatchOS:
+    return (noEnvironment || simulator) && (sdkVersion < watchOSVersion);
+  case llvm::Triple::XROS:
+    return (noEnvironment || simulator) && (sdkVersion < visionOSVersion);
+  default:
+    // Assume this is a new platform that's newer than the passed versions.
+    return false;
+  }
+}
+
 void importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx,
     bool ignoreClangTarget) {
@@ -848,14 +879,37 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.push_back(path.str().str());
   }
 
-  // Fallback to "legacy" `-resource-dir` paths.
-  {
+  auto addResourceDirAPINotesPath = [&](StringRef directoryName) {
     llvm::SmallString<261> path{searchPathOpts.RuntimeResourcePath};
-    llvm::sys::path::append(path, "apinotes");
+    llvm::sys::path::append(path, directoryName);
 
     invocationArgStrs.push_back("-iapinotes-modules");
     invocationArgStrs.push_back(path.str().str());
-  }
+  };
+
+  // Fallback to "legacy" `-resource-dir` paths.
+  addResourceDirAPINotesPath("apinotes");
+
+  // The Dispatch and os API notes were added to the SDKs in the versions below,
+  // and take precedent over the resource directory ones. However, the Dispatch
+  // API notes have since been converted to attributes in the headers themselves.
+  // Allow them to be deleted from newer SDKs by not falling back on the legacy
+  // ones if the SDK is new enough.
+  auto *sdkInfo = ctx.getDarwinSDKInfo();
+  if (sdkIsOlderThan(sdkInfo,
+                     /*macOSVersion=*/llvm::VersionTuple(14, 0),
+                     /*iOSVersion=*/llvm::VersionTuple(17, 0),
+                     /*tvOSVersion=*/llvm::VersionTuple(17, 0),
+                     /*watchOSVersion=*/llvm::VersionTuple(10, 0),
+                     /*visionOSVersion=*/llvm::VersionTuple(1, 0)))
+    addResourceDirAPINotesPath("apinotes-dispatch");
+  if (sdkIsOlderThan(sdkInfo,
+                     /*macOSVersion=*/llvm::VersionTuple(15, 2),
+                     /*iOSVersion=*/llvm::VersionTuple(18, 2),
+                     /*tvOSVersion=*/llvm::VersionTuple(18, 2),
+                     /*watchOSVersion=*/llvm::VersionTuple(11, 2),
+                     /*visionOSVersion=*/llvm::VersionTuple(2, 2)))
+    addResourceDirAPINotesPath("apinotes-os");
 
   if (importerOpts.LoadVersionIndependentAPINotes)
     llvm::append_values(invocationArgStrs,
