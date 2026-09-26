@@ -2025,6 +2025,53 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   return false;
 }
 
+/// Performing an `is` test or an `as?` or `as!` casting conversion requires
+/// updated runtime support if non-copyable values are involved.  In the older
+/// runtimes:
+/// * `is` testing was implemented via `as?` (new runtime has a separate entry point)
+/// * `as?`/`as!` could implicitly copy the value out of the existential box
+///
+/// \param srcType the source type of the cast
+/// \param targetType the target type of the cast
+/// \param refLoc source location of the cast
+/// \param refDC decl context in which the cast occurs
+/// \return true if diagnosed
+static bool
+checkNoncopyableExistentialCastingAvailability(Type srcType, Type targetType,
+                                               SourceRange refLoc,
+                                               const DeclContext *refDC) {
+  if (!srcType || !targetType)
+    return false;
+
+  auto type = srcType->getCanonicalType();
+  // Not a problem if source isn't a non-copyable existential
+  if (!type->isAnyExistentialType() || !type->isNoncopyable())
+    return false;
+
+  // When the target is a concrete `Copyable` type, a successful cast proves the
+  // payload was that type, so the copy an older runtime performs is legal; and
+  // a failed cast copies nothing.
+  //
+  // Existential targets stay gated even where they are themselves `Copyable`:
+  // `AnyObject` accepts any payload at all by boxing it in `__SwiftValue`, which
+  // copies.
+  auto target = targetType->getCanonicalType();
+  if (!target->isNoncopyable() && !target->isAnyExistentialType())
+    return false;
+
+  // Don't bother checking if NoncopyableCasting isn't enabled
+  auto &ctx = refDC->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableCasting))
+    return false;
+
+  // Check whether the new runtime support is present
+  return TypeChecker::checkAvailability(
+      refLoc,
+      ctx.getDynamicCastTestAvailability(),
+      diag::availability_noncopyable_existential_casting_only_version_newer,
+      refDC);
+}
+
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
                                                   SourceRange refLoc,
                                                   const DeclContext *refDC) {
@@ -2452,6 +2499,9 @@ public:
                                       Where.getDeclContext());
         checkTypeMetadataAvailabilityForConverted(CE->getSubExpr()->getType(),
                                                   loc, Where.getDeclContext());
+        checkNoncopyableExistentialCastingAvailability(
+            CE->getSubExpr()->getType(), CE->getCastType(), loc,
+            Where.getDeclContext());
       }
 
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
@@ -3148,6 +3198,12 @@ public:
       auto where = ExportContext::forFunctionBody(DC, P->getLoc());
       diagnoseTypeAvailability(IP->getCastTypeRepr(), IP->getCastType(),
                                P->getLoc(), where, std::nullopt);
+      // The subject type is absent when the pattern is malformed, as in
+      // `x is _`, where the placeholder is diagnosed on its own.
+      if (IP->hasType()) {
+        checkNoncopyableExistentialCastingAvailability(
+            IP->getType(), IP->getCastType(), P->getLoc(), DC);
+      }
     }
 
     return Action::Continue(P);
