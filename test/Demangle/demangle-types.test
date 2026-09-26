@@ -7,3 +7,12 @@ MULTI-NODE-ERROR: <<invalid type>>
 RUN: %swift-demangle -type SSIeAghrx_ | %FileCheck %s --check-prefix=PARSE-ERROR
 PARSE-ERROR: <<invalid type>>
 
+RUN: %swift-demangle -type '$2147483648_' | %FileCheck %s --check-prefix=LARGE-INT
+LARGE-INT: 2147483649
+
+RUN: %swift-demangle -type '$n2147483648_' | %FileCheck %s --check-prefix=LARGE-NEG-INT
+LARGE-NEG-INT: -2147483649
+
+RUN: %swift-demangle -type '$9223372036854775806_' | %FileCheck %s --check-prefix=INT64-MAX
+INT64-MAX: 9223372036854775807
+
