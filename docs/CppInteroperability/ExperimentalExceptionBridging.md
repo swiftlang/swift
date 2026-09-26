@@ -138,8 +138,12 @@ throwing default expression. Supply the argument explicitly. Potentially
 throwing C++ callable values in function signatures, globals, and fields are
 also unavailable, because Swift C function pointers and blocks cannot carry an
 error result. Function pointers with a resolved nonthrowing specification
-remain usable. Implicit copies, moves, destructors, and retain/release
-operations still have the limits described above.
+remain usable. Synthesized zero, memberwise, and union-field initializers are
+unavailable unless their generated argument and result transfers are
+nonthrowing. This check covers both the enclosing value and the supplied
+fields; a union's own copy constructor does not determine whether copying a
+particular field can throw. Other implicit copies, moves, destructors, and
+retain/release operations still have the limits described above.
 
 Synthesized properties, subscripts, `Bool(fromCxx:)` and protocol conformances
 that require nonthrowing operations are omitted when their C++ implementation
