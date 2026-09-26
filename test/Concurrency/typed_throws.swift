@@ -22,6 +22,19 @@ func testAsyncFor<S: AsyncSequence>(seq: S) async throws(MyError)
   }
 }
 
+@available(SwiftStdlib 6.0, *)
+func testAsyncLet<V, E: Error>(action: () async throws(E) -> V) async throws(MyError) -> V {
+  async let value = try await action()
+  // expected-error@+1{{thrown expression type 'E' cannot be converted to error type 'MyError'}}
+  return try await value
+}
+
+@available(SwiftStdlib 6.0, *)
+func testAsyncLet<V>(action: () async throws(MyError) -> V) async throws(MyError) -> V {
+  async let value = try await action()
+  return try await value
+}
+
 do {
   struct Test {
     func compute(_: () async throws -> Void) async rethrows {} // expected-note {{found this candidate}}

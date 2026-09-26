@@ -9,6 +9,7 @@ import _Concurrency
 func getInt() async -> Int { 0 }
 func getString() async -> String { "" }
 func getStringThrowingly() async throws -> String { "" }
+func getStringWithTypedThrows() async throws(SomeError) -> String { "" }
 func getIntAndString() async -> (Int, String) { (5, "hello") }
 
 enum SomeError: Error {
@@ -47,6 +48,22 @@ func testAsyncLetThrows() async throws -> String {
 
   // CHECK: [[ASYNC_LET_GET_THROWING:%.*]] = function_ref @swift_asyncLet_get_throwing
   // CHECK: try_apply [[ASYNC_LET_GET_THROWING]]
+  return try await s
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A19AsyncLetTypedThrowsSSyYaAA9SomeErrorOYKF : $@convention(thin) @async () -> (@owned String, @error SomeError) {
+func testAsyncLetTypedThrows() async throws(SomeError) -> String {
+  async let s = try await getStringWithTypedThrows()
+
+  // CHECK: [[ASYNC_LET_GET_THROWING:%.*]] = function_ref @swift_asyncLet_get_throwing
+  // CHECK: try_apply [[ASYNC_LET_GET_THROWING]]
+  // CHECK: bb{{[0-9]+}}([[ERASED_ERROR:%.*]] : @owned $any Error):
+  // CHECK: [[ERASED_ERROR_BUFFER:%.*]] = alloc_stack $any Error
+  // CHECK: store [[ERASED_ERROR]] to [init] [[ERASED_ERROR_BUFFER]] : $*any Error
+  // CHECK: [[TYPED_ERROR_BUFFER:%.*]] = alloc_stack $SomeError
+  // CHECK: unconditional_checked_cast_addr any Error in [[ERASED_ERROR_BUFFER]] : $*any Error to SomeError in [[TYPED_ERROR_BUFFER]] : $*SomeError
+  // CHECK: [[TYPED_ERROR:%.*]] = load [trivial] [[TYPED_ERROR_BUFFER]] : $*SomeError
+  // CHECK: throw [[TYPED_ERROR]] : $SomeError
   return try await s
 }
 
