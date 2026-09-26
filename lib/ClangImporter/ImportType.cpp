@@ -58,6 +58,41 @@
 using namespace swift;
 using namespace importer;
 
+bool importer::hasPotentiallyThrowingCxxCallableType(clang::QualType type) {
+  if (type.isNull())
+    return false;
+  type = type.getCanonicalType();
+
+  if (const auto *function = type->getAs<clang::FunctionProtoType>()) {
+    // Do not query canThrow() on an unresolved specification. Only an
+    // explicitly resolved nonthrowing specification can be represented by a
+    // Swift C function pointer without losing the exception effect.
+    switch (function->getExceptionSpecType()) {
+    case clang::EST_DynamicNone:
+    case clang::EST_BasicNoexcept:
+    case clang::EST_NoexceptTrue:
+    case clang::EST_NoThrow:
+      break;
+    default:
+      return true;
+    }
+    if (hasPotentiallyThrowingCxxCallableType(function->getReturnType()))
+      return true;
+    for (auto parameter : function->param_types())
+      if (hasPotentiallyThrowingCxxCallableType(parameter))
+        return true;
+    return false;
+  }
+  if (type->isFunctionNoProtoType())
+    return true;
+  if (type->isPointerType() || type->isReferenceType() ||
+      type->isBlockPointerType())
+    return hasPotentiallyThrowingCxxCallableType(type->getPointeeType());
+  if (const auto *array = dyn_cast<clang::ArrayType>(type.getTypePtr()))
+    return hasPotentiallyThrowingCxxCallableType(array->getElementType());
+  return false;
+}
+
 // XXX: This is to resolve the build dependency with Clang. Remove it once these
 // types actually land in Clang.
 namespace clang {
@@ -2322,6 +2357,15 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
 
+  if (SwiftContext.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict) &&
+      !hasCLanguageLinkage(clangDecl) &&
+      hasPotentiallyThrowingCxxCallableType(clangDecl->getReturnType())) {
+    addImportDiagnostic(clangDecl,
+                        Diagnostic(diag::cxx_exception_mode_callable_type),
+                        clangDecl->getLocation());
+    return {Type(), false};
+  }
+
   // Hardcode handling of certain result types for builtins.
   if (auto builtinID = clangDecl->getBuiltinID()) {
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
@@ -2614,6 +2658,17 @@ ClangImporter::Implementation::importParameterType(
     std::optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
+  // The C++ exception adapters' own callback parameter has a noexcept type,
+  // so it passes this check.
+  if (auto *function = dyn_cast<clang::FunctionDecl>(parent);
+      function &&
+      SwiftContext.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict) &&
+      !hasCLanguageLinkage(function) &&
+      hasPotentiallyThrowingCxxCallableType(param->getType())) {
+    addImportDiagnosticFn(Diagnostic(diag::cxx_exception_mode_callable_type));
+    return std::nullopt;
+  }
+
   auto paramTy = desugarIfElaborated(param->getType());
   paramTy = desugarIfBoundsAttributed(paramTy);
 
@@ -2934,9 +2989,12 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // TODO: support default arguments of constructors
   // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
-  if (param->hasDefaultArg() && !isInOut &&
-      impl->isDefaultArgSafeToImport(param) &&
-      !param->isTemplated()) {
+  // A noexcept callee may still have a throwing default expression. Until
+  // default argument generators can report that error, strict mode requires
+  // callers to supply every argument explicitly.
+  if (!ASTContext.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict) &&
+      param->hasDefaultArg() && !isInOut &&
+      impl->isDefaultArgSafeToImport(param) && !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {

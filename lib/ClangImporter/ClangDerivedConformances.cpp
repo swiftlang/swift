@@ -528,6 +528,22 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
     return false;
   auto underlyingCall = underlyingCallResult.get();
 
+  // Strict C++ exception mode treats a function without a nonthrowing
+  // exception specification as throwing, so don't let this wrapper hide a
+  // nonthrowing underlying operator. Only strict mode needs this, so other
+  // modes don't resolve the operator's exception specification here.
+  if (impl.SwiftContext.LangOpts.hasFeature(
+          Feature::CxxExceptionBridgingStrict) &&
+      clangSema.canThrow(underlyingCall) == clang::CT_Cannot) {
+    clang::FunctionProtoType::ExtProtoInfo prototypeInfo;
+    prototypeInfo.ExceptionSpec.Type = clang::EST_BasicNoexcept;
+    auto noexceptTy =
+        clangCtx.getFunctionType(returnTy, {lhsTy, rhsTy}, prototypeInfo);
+    equalEqualDecl->setType(noexceptTy);
+    equalEqualDecl->setTypeSourceInfo(
+        clangCtx.getTrivialTypeSourceInfo(noexceptTy));
+  }
+
   equalEqualDecl->setBody(createClangReturnStmt(clangCtx, underlyingCall));
 
   impl.registerSynthesizedClangDecl(equalEqualDecl, classDecl);
@@ -1651,6 +1667,15 @@ void swift::deriveAutomaticCxxConformances(
   conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxConvertibleToBoolIfNeeded(Impl, result);
+
+  // The CxxStdlib protocols below require nonthrowing members that strict
+  // C++ exception mode imports as throwing, such as the value constructor of
+  // std::optional or push_back and insert of the containers. Skip them
+  // instead of synthesizing conformances that can't be satisfied. Checking
+  // each witness would allow the few types whose members are all nonthrowing.
+  if (Impl.SwiftContext.LangOpts.hasFeature(
+          Feature::CxxExceptionBridgingStrict))
+    return;
 
   // CxxStdlib conformances: these should only apply to known C++ stdlib types,
   // which we determine by name and membership in the std namespace.

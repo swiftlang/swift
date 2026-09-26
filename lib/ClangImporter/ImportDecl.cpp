@@ -4245,7 +4245,9 @@ namespace {
                 Impl.SwiftContext.LangOpts,
                 Impl.getClangASTContext().getLangOpts());
         if (unavailableReason.empty()) {
-          if (llvm::any_of(decl->parameters(), [](const auto *parameter) {
+          if (!Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::CxxExceptionBridgingStrict) &&
+              llvm::any_of(decl->parameters(), [](const auto *parameter) {
                 return parameter->hasDefaultArg();
               })) {
             unavailableReason =
@@ -4309,9 +4311,15 @@ namespace {
         }
 
         if (!unavailableReason.empty()) {
-          Impl.markUnavailable(result, unavailableReason);
+          // Strict mode also bridges functions without SWIFT_THROWS. Don't
+          // name an annotation the user didn't write.
+          std::string message = unavailableReason.str();
+          if (!importer::hasCxxThrowsAttr(decl) &&
+              unavailableReason.consume_front("SWIFT_THROWS"))
+            message = ("C++ exception bridging" + unavailableReason).str();
+          Impl.markUnavailable(result, message);
           if (auto *accessor = dyn_cast<AccessorDecl>(result))
-            Impl.markUnavailable(accessor->getStorage(), unavailableReason);
+            Impl.markUnavailable(accessor->getStorage(), message);
         } else {
           AbstractFunctionDecl *facade;
           if (auto *constructor = dyn_cast<clang::CXXConstructorDecl>(decl))
@@ -10424,22 +10432,35 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   auto finalizeDecl = [&](Decl *result) {
     importAttributes(ClangDecl, result);
 
+    // A C++ function pointer has no Swift error result. Reject values that
+    // could expose a throwing call through a nonthrowing Swift function type.
+    // C APIs retain their existing import rules.
+    if (SwiftContext.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict) &&
+        isa<clang::VarDecl, clang::FieldDecl>(ClangDecl) &&
+        !importer::hasCLanguageLinkage(ClangDecl) &&
+        importer::hasPotentiallyThrowingCxxCallableType(
+            cast<clang::ValueDecl>(ClangDecl)->getType()))
+      if (auto *value = dyn_cast<ValueDecl>(result))
+        markUnavailable(value, importer::CxxThrowingCallableTypeReason);
+
     // Alternate declarations (such as operator conveniences) and special
     // initializer imports must not provide a nonthrowing route around an
-    // unsupported exception annotation.
+    // unsupported throwing import.
     if (auto *clangFunction = dyn_cast<clang::FunctionDecl>(ClangDecl);
         clangFunction && importer::shouldImportCxxFunctionAsThrowing(
                              SwiftContext, clangFunction)) {
       if (auto *function = dyn_cast<AbstractFunctionDecl>(result);
           function && !function->isUnavailable() &&
           !cxxExceptionBridges.contains(function)) {
-        markUnavailable(function,
-                        "SWIFT_THROWS is not supported on this kind of "
-                        "declaration");
+        StringRef reason =
+            importer::hasCxxThrowsAttr(clangFunction)
+                ? "SWIFT_THROWS is not supported on this kind of "
+                  "declaration"
+                : "C++ exception bridging is not supported on "
+                  "this kind of declaration";
+        markUnavailable(function, reason);
         if (auto *accessor = dyn_cast<AccessorDecl>(function))
-          markUnavailable(accessor->getStorage(),
-                          "SWIFT_THROWS is not supported on this kind of "
-                          "declaration");
+          markUnavailable(accessor->getStorage(), reason);
       }
     }
 

@@ -8834,10 +8834,36 @@ ClangImporter::getCxxExceptionBridgeFacade(const FuncDecl *adapter) const {
   return Impl.cxxExceptionBridgeFacades.lookup(adapter);
 }
 
+bool importer::hasCLanguageLinkage(const clang::Decl *decl) {
+  // A member function never has C language linkage, even when its class is
+  // declared in an extern "C" block.
+  if (isa<clang::CXXMethodDecl>(decl))
+    return false;
+  if (auto *function = dyn_cast<clang::FunctionDecl>(decl))
+    return function->isExternC() ||
+           function->getCanonicalDecl()->isInExternCContext();
+  if (auto *variable = dyn_cast<clang::VarDecl>(decl))
+    return variable->isExternC() ||
+           variable->getCanonicalDecl()->isInExternCContext();
+  // Fields and records follow the context they are declared in.
+  return decl->getDeclContext()->isExternCContext();
+}
+
 bool importer::shouldImportCxxFunctionAsThrowing(
     ASTContext &ctx, const clang::FunctionDecl *decl) {
-  return ctx.LangOpts.hasFeature(Feature::CxxExceptionBridging) &&
-         hasCxxThrowsAttr(decl);
+  if (!ctx.LangOpts.hasFeature(Feature::CxxExceptionBridging))
+    return false;
+  if (hasCxxThrowsAttr(decl))
+    return true;
+  if (!ctx.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict) ||
+      hasCLanguageLinkage(decl))
+    return false;
+
+  // Resolve dependent and implicitly computed exception specifications using
+  // Clang's call semantics. Only a proven nonthrowing specification opts out.
+  return clang::Sema::canCalleeThrow(ctx.getClangModuleLoader()->getClangSema(),
+                                     nullptr, decl,
+                                     decl->getLocation()) != clang::CT_Cannot;
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {

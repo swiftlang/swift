@@ -119,11 +119,35 @@ including when a module exposes only Swift types in its public API.
 ## Strict import policy
 
 `-enable-experimental-feature CxxExceptionBridgingStrict` opts a compilation
-into a strict import policy, which will import supported C++ functions as
-throwing whenever their exception specification permits exceptions. It
-requires C++ interoperability and `CxxExceptionBridging`. The import policy
-itself is not implemented yet. So far, the mode only affects the modules that
-a compilation can use.
+into importing supported C++ functions as throwing whenever their exception
+specification permits exceptions. It requires C++ interoperability and
+`CxxExceptionBridging`. Without it, the annotation-based behavior above applies.
+`SWIFT_THROWS` continues to take precedence over a nonthrowing exception
+specification in either mode.
+
+The importer asks Clang to resolve exception specifications, including
+conditional `noexcept` and implicitly computed specifications. A proven
+nonthrowing function retains a nonthrowing Swift type. Other functions either
+receive a throwing facade or become unavailable if their declaration or
+signature is not supported. Declarations with C language linkage retain their
+existing import rules.
+
+This prototype omits all imported default arguments in strict mode. A default
+argument is evaluated by the caller, so even a `noexcept` function can have a
+throwing default expression. Supply the argument explicitly. Potentially
+throwing C++ callable values in function signatures, globals, and fields are
+also unavailable, because Swift C function pointers and blocks cannot carry an
+error result. Function pointers with a resolved nonthrowing specification
+remain usable. Implicit copies, moves, destructors, and retain/release
+operations still have the limits described above.
+
+Synthesized properties, subscripts, `Bool(fromCxx:)` and protocol conformances
+that require nonthrowing operations are omitted when their C++ implementation
+can throw. The conformances of standard library types such as `std::vector`
+and `std::optional` to `CxxVector`, `CxxOptional` and similar protocols are
+omitted, because each of them needs members that strict mode imports as
+throwing. The `std::function` initializer that accepts a Swift closure is also
+unavailable until its internal C++ construction can propagate errors.
 
 Strict mode imports the raw Clang standard library through the existing
 `import CxxStdlib` spelling. It omits the Swift `CxxStdlib` overlay, whose APIs

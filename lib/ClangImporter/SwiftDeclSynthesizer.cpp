@@ -3450,6 +3450,15 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
       /*ThrownType*/ TypeLoc(), paramList, /*GenericParams*/ nullptr, decl);
   constructorDecl->setAccess(AccessLevel::Public);
   constructorDecl->setSynthesized();
+  // This convenience invokes a templated C++ constructor that can allocate.
+  // Keep its signature for diagnostics, but do not synthesize a body that
+  // could call that constructor without propagating its exception.
+  if (ctx.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict)) {
+    constructorDecl->addAttribute(AvailableAttr::createUniversallyUnavailable(
+        ctx, "constructing C++ function objects from Swift closures is not "
+             "supported in strict C++ exception mode"));
+    return constructorDecl;
+  }
   constructorDecl->setBodySynthesizer(synthesizeFunctionConstructorBody,
                                       callAsFunctionDecl);
   return constructorDecl;

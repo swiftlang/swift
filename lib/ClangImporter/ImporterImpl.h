@@ -2210,12 +2210,32 @@ namespace importer {
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
 
+/// Whether \p decl has C language linkage. Strict C++ exception mode keeps
+/// the existing import of C APIs, and Clang function types don't record the
+/// language linkage, so the declaration decides.
+bool hasCLanguageLinkage(const clang::Decl *decl);
+
+/// Why strict C++ exception mode makes a declaration unavailable when its type
+/// contains a C++ callable that may throw. The
+/// cxx_exception_mode_callable_type note uses the same text.
+inline constexpr llvm::StringLiteral CxxThrowingCallableTypeReason =
+    "potentially throwing C++ callable types are not supported in strict C++ "
+    "exception mode";
+
 /// Whether an explicit call to \p decl must use the C++ exception bridge. This
 /// also prevents nonthrowing conveniences and protocol witnesses from calling
 /// it without a catch boundary. Without CxxExceptionBridging, SWIFT_THROWS has
-/// no effect and this is always false.
+/// no effect and this is always false. In strict C++ exception mode, it is
+/// also true for a function whose exception specification allows exceptions.
 bool shouldImportCxxFunctionAsThrowing(ASTContext &ctx,
                                        const clang::FunctionDecl *decl);
+
+/// Whether a type exposes a callable whose C++ exception specification is not
+/// known to be nonthrowing, including through pointers, references, blocks and
+/// arrays. Member pointers aren't handled, because Swift doesn't import them.
+/// The caller must determine whether the declaration has C++ language linkage;
+/// Clang function types do not distinguish C and C++ language linkage.
+bool hasPotentiallyThrowingCxxCallableType(clang::QualType type);
 
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.
