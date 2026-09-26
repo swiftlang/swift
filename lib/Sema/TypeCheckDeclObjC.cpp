@@ -386,8 +386,9 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    // Swift inout parameters are not representable in Objective-C.
-    if (param->isInOut()) {
+    // Swift inout parameters are not representable in Objective-C or C. In
+    // C++, an inout parameter is representable as a mutable reference.
+    if (param->isInOut() && language != ForeignLanguage::Cxx) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                        AFD, getObjCDiagnosticAttrKind(Reason),
@@ -740,7 +741,9 @@ bool swift::isRepresentableInLanguage(
     return false;
 
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
-  if (AFD->isOperator()) {
+  // C++ has operator functions; a `@cxx` implementation of one may be a Swift
+  // operator function.
+  if (AFD->isOperator() && language != ForeignLanguage::Cxx) {
     AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
                     ? diag::objc_operator_proto
                     : diag::objc_operator))
@@ -4191,11 +4194,45 @@ private:
   }
 
   static Type getMemberType(ValueDecl *decl) {
+    Type type;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
       if (fn->hasImplicitSelfDecl())
         // Strip off the uncurried `self` parameter.
-        return fn->getMethodInterfaceType();
-    return decl->getInterfaceType();
+        type = fn->getMethodInterfaceType();
+    if (!type)
+      type = decl->getInterfaceType();
+
+    // The importer drops the `T &` result of a compound assignment operator,
+    // which conventionally returns `*this`; the implementation must still
+    // produce it, as a pointer, like any reference result.
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (!clangFD || !clangFD->isOverloadedOperator() ||
+        !clangFD->getReturnType()->isLValueReferenceType())
+      return type;
+    const auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy || !fnTy->getResult()->isVoid())
+      return type;
+    auto *record = clangFD->getReturnType()->getPointeeCXXRecordDecl();
+    auto *referent = record ? dyn_cast_or_null<NominalTypeDecl>(
+                                  decl->getASTContext()
+                                      .getClangModuleLoader()
+                                      ->importDeclDirectly(record))
+                            : nullptr;
+    if (!referent)
+      return type;
+    // A reference to a foreign reference type is the type itself.
+    Type result = referent->getDeclaredInterfaceType();
+    if (!result->isForeignReferenceType()) {
+      auto kind = clangFD->getReturnType()->getPointeeType().isConstQualified()
+                      ? PTK_UnsafePointer
+                      : PTK_UnsafeMutablePointer;
+      result = result->wrapInPointer(kind);
+      if (!result)
+        return type;
+    }
+    return FunctionType::get(fnTy->getParams(), {}, result,
+                             fnTy->getExtInfo());
   }
 
   /// Describes an availability mismatch between a requirement and a candidate
@@ -4218,6 +4255,13 @@ private:
     auto &ctx = cand->getASTContext();
     if (ctx.LangOpts.DisableAvailabilityChecking)
       return std::nullopt;
+
+    // The importer marks a member operator unavailable in favor of the Swift
+    // operator it synthesizes for it; that says nothing about the C++ operator.
+    if (const auto *clangFD =
+            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl()))
+      if (clangFD->isOverloadedOperator() && req->isUnavailable())
+        return std::nullopt;
 
     std::optional<AvailabilityContext> baseRequirementAvailability;
 
@@ -4364,6 +4408,7 @@ private:
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
+    StringRef cxxName = cast<ValueDecl>(interface)->getCDeclName();
 
     // A @cxx implementation must be the C++ function's one and only
     // definition. Reject a match to a function that is already defined in the
@@ -4379,7 +4424,7 @@ private:
       unsigned reason = clangFD->isDefined()     ? 0
                         : clangFD->isConstexpr() ? 2
                                                  : 1;
-      diagnose(cand, diag::cxx_func_defined, cand, clangFD->getName(), reason);
+      diagnose(cand, diag::cxx_func_defined, cand, cxxName, reason);
       return true;
     }
 
@@ -4437,14 +4482,57 @@ private:
       }
     }
 
-    // TODO: Not supported yet, ban C++ references for now.
-    bool usesReferences = clangFD->getReturnType()->isReferenceType();
-    for (const auto *param : clangFD->parameters())
-      usesReferences |= param->getType()->isReferenceType();
-    if (usesReferences) {
-      diagnose(cand, diag::cxx_references_unsupported, cand,
-               clangFD->getName());
+    // RValue references are not supported: a `T &&` parameter imports as
+    // `consuming`, but the C++ caller destroys the referent after the call
+    // anyway, so a Swift body consuming the value would double-destroy it.
+    bool usesRValueReferences =
+        clangFD->getReturnType()->isRValueReferenceType() ||
+        llvm::any_of(clangFD->parameters(), [](const auto *param) {
+          return param->getType()->isRValueReferenceType();
+        });
+    if (usesRValueReferences) {
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand, cxxName);
       return true;
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a by-value
+    // parameter. C++ callers may pass aliasing references, which `inout` and
+    // by-value parameters let the optimizer assume away, so the implementation
+    // must be marked `@unsafe`. A reference to a foreign reference type is
+    // exempt: the parameter carries the object, not the reference.
+    if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
+      auto *loader = cand->getASTContext().getClangModuleLoader();
+      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+      bool diagnosed = false;
+      for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
+        const auto *clangParam = clangFD->getParamDecl(i);
+        const auto *refType =
+            clangParam->getType()->getAs<clang::LValueReferenceType>();
+        if (!refType)
+          continue;
+        auto *param = params->get(i);
+        if (refType->getPointeeType()->isRecordType() &&
+            param->getInterfaceType()->isForeignReferenceType())
+          continue;
+
+        if (!diagnosed) {
+          diagnose(cand, diag::cxx_references_require_unsafe, cand, cxxName)
+              .fixItInsert(
+                  cand->getAttributeInsertionLoc(/*forModifier=*/false),
+                  "@unsafe ");
+          diagnosed = true;
+        }
+        diagnose(param, diag::cxx_reference_param_aliasing, param,
+                 param->isInOut());
+        diagnose(loader->importSourceLocation(clangParam->getLocation()),
+                 diag::cxx_reference_param_declared_here,
+                 clangParam->getIdentifier() != nullptr, clangParam)
+            .highlight(SourceRange(
+                loader->importSourceLocation(clangParam->getBeginLoc()),
+                loader->importSourceLocation(clangParam->getEndLoc())));
+      }
+      if (diagnosed)
+        return true;
     }
 
     // The symbol this implementation will be emitted under must not be one the
@@ -4502,7 +4590,7 @@ private:
     unsigned reason =
         importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
     diagnose(cand, diag::cdecl_unretained_result_unsupported, cand, isCxx,
-             clangFD->getName(), reason);
+             cast<ValueDecl>(interface)->getCDeclName(), reason);
     return true;
   }
 
