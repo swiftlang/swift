@@ -128,6 +128,7 @@ public struct WrapOverloadedMethods {
 // CHECK: WrapOverloadedMethods final {
 // CHECK: SWIFT_INLINE_THUNK void method(swift::Int x) const
 // CHECK: SWIFT_INLINE_THUNK void method(float x) const
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'method(argLabel:)'. An overload with the same C++ parameter types already exists.
 // CHECK-NEXT: private:
 
 public struct WrapOverloadedMethodsSibling {

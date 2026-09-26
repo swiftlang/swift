@@ -1130,13 +1130,8 @@ public:
       assert(!vd->isObjC());
       os << "\n";
       auto emitStubComment = [&](StringRef reason = "") {
-        os << "// Unavailable in C++: Swift "
-           << Decl::getDescriptiveKindName(vd->getDescriptiveKind()) << " '";
-        vd->getName().print(os);
-        os << "'.";
-        if (!reason.empty())
-          os << " " << reason << ".";
-        os << "\n";
+        ClangSyntaxPrinter(M.getASTContext(), os)
+            .printUnavailableInCxxComment(vd, reason);
       };
 
       // Do not emit a C++ declaration with a specific C++ name more than once.
@@ -1192,23 +1187,7 @@ public:
           !reasonIt->second.empty()) {
         emitStubComment(reasonIt->second);
       } else {
-        auto representation = cxx_translation::getDeclRepresentation(
-            vd, [this](const NominalTypeDecl *decl) {
-              return printer.isZeroSized(decl);
-            });
-        std::string reasonStr;
-        if (representation.isUnsupported() &&
-            representation.error.has_value()) {
-          auto diag = cxx_translation::diagnoseRepresenationError(
-              *representation.error, const_cast<ValueDecl *>(vd));
-          auto diagString =
-              M.getASTContext().Diags.getFormatStringForDiagnostic(
-                  diag.getID());
-          llvm::raw_string_ostream reasonOS(reasonStr);
-          DiagnosticEngine::formatDiagnosticText(
-              reasonOS, diagString, diag.getArgs(), DiagnosticFormatOptions());
-        }
-        emitStubComment(reasonStr);
+        emitStubComment(printer.getUnsupportedDeclReason(vd));
       }
     }
   }

@@ -92,6 +92,8 @@ public final class ExposedClass {
 // CHECK-NEXT: void setRenamedProp(swift::Int value) noexcept SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: swift::Int getProp3() const noexcept SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: void renamedMethod() const noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'getNonExposedStruct()'. Return type 'NotExposedStruct' is not representable in C++.
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'passNonExposedStruct(_:)'. Parameter 'x' of type 'NotExposedStruct' is not representable in C++.
 // CHECK-NEXT: private:
 
 // CHECK: SWIFT_INLINE_THUNK void exposed1() noexcept SWIFT_SYMBOL("{{.*}}") {
