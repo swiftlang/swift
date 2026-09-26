@@ -539,12 +539,6 @@ namespace llvm {
 template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
   using ImportNameVersion = swift::importer::ImportNameVersion;
   using DMIU = DenseMapInfo<unsigned>;
-  static inline ImportNameVersion getEmptyKey() {
-    return (ImportNameVersion)DMIU::getEmptyKey();
-  }
-  static inline ImportNameVersion getTombstoneKey() {
-    return (ImportNameVersion)DMIU::getTombstoneKey();
-  }
   static unsigned getHashValue(const ImportNameVersion &Val) {
     return DMIU::getHashValue(Val.rawValue);
   }

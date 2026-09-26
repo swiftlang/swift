@@ -464,13 +464,6 @@ private:
   // Doesn't require a module name like the public constructor.
   // Only used for getEmptyKey() and getTombstoneKey().
   ImportPath(Raw raw, UnsafePrivateConstructorTag tag) : ImportPathBase(raw) {}
-public:
-  static ImportPath getEmptyKey() {
-    return swift::ImportPath(llvm::DenseMapInfo<Raw>::getEmptyKey(), UnsafePrivateConstructorTag{});
-  }
-  static ImportPath getTombstoneKey() {
-    return swift::ImportPath(llvm::DenseMapInfo<Raw>::getTombstoneKey(), UnsafePrivateConstructorTag{});
-  }
 };
 
 // MARK: - Abstractions of imports
@@ -745,12 +738,6 @@ struct DenseMapInfo<swift::ImportOptions> {
 
   using UnsignedDMI = DenseMapInfo<uint8_t>;
 
-  static inline ImportOptions getEmptyKey() {
-    return ImportOptions(UnsignedDMI::getEmptyKey());
-  }
-  static inline ImportOptions getTombstoneKey() {
-    return ImportOptions(UnsignedDMI::getTombstoneKey());
-  }
   static inline unsigned getHashValue(ImportOptions options) {
     return UnsignedDMI::getHashValue(options.toRaw());
   }
@@ -764,13 +751,6 @@ class DenseMapInfo<swift::ImportedModule> {
   using ImportedModule = swift::ImportedModule;
   using ModuleDecl = swift::ModuleDecl;
 public:
-  static ImportedModule getEmptyKey() {
-    return {{}, llvm::DenseMapInfo<ModuleDecl *>::getEmptyKey()};
-  }
-  static ImportedModule getTombstoneKey() {
-    return {{}, llvm::DenseMapInfo<ModuleDecl *>::getTombstoneKey()};
-  }
-
   static unsigned getHashValue(const ImportedModule &val) {
     auto pair = std::make_pair(val.accessPath.size(), val.importedModule);
     return llvm::DenseMapInfo<decltype(pair)>::getHashValue(pair);
@@ -794,18 +774,6 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   // We can't include spiGroups in the hash because ArrayRef<Identifier> is not
   // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
-  static inline AttributedImport getEmptyKey() {
-    return AttributedImport(
-        ModuleInfoDMI::getEmptyKey(), SourceLocDMI::getEmptyKey(),
-        ImportOptionsDMI::getEmptyKey(), StringRefDMI::getEmptyKey(), {}, {},
-        std::nullopt, swift::AccessLevel::Public, {});
-  }
-  static inline AttributedImport getTombstoneKey() {
-    return AttributedImport(
-        ModuleInfoDMI::getTombstoneKey(), SourceLocDMI::getEmptyKey(),
-        ImportOptionsDMI::getTombstoneKey(), StringRefDMI::getTombstoneKey(),
-        {}, {}, std::nullopt, swift::AccessLevel::Public, {});
-  }
   static inline unsigned getHashValue(const AttributedImport &import) {
     return detail::combineHashValue(
         ModuleInfoDMI::getHashValue(import.module),
@@ -829,13 +797,6 @@ template <>
 class DenseMapInfo<swift::ImportPath> {
   using ImportPath = swift::ImportPath;
 public:
-  static ImportPath getEmptyKey() {
-    return swift::ImportPath::getEmptyKey();
-  }
-  static ImportPath getTombstoneKey() {
-    return swift::ImportPath::getTombstoneKey();
-  }
-
   static unsigned getHashValue(const ImportPath &val) {
     return llvm::DenseMapInfo<ImportPath::Raw>::getHashValue(val.getRaw());
   }
