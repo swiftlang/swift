@@ -146,9 +146,35 @@ extension ContentEquivalenceTestCase {
         expectStart(&utf8SpanIter)
       }
 
-      // TODO: test reset variants
-      // TODO: test prefix/suffix
+      // Test prefix/suffix across all positions
+      var scalarPrefixSuffixIter = utf8Span.makeUnicodeScalarIterator()
+      while true {
+        let p = scalarPrefixSuffixIter.prefix()
+        let s = scalarPrefixSuffixIter.suffix()
+        expectEqual(utf8Span.count, p.count + s.count, stackTrace: loc)
+        expectEqual(scalarPrefixSuffixIter.currentCodeUnitOffset, p.count, stackTrace: loc)
+        p._withUnsafeBufferPointer { pBuf in
+          s._withUnsafeBufferPointer { sBuf in
+            var combined: [UInt8] = []
+            combined.append(contentsOf: pBuf)
+            combined.append(contentsOf: sBuf)
+            expectEqualSequence(str.utf8, combined, stackTrace: loc)
+          }
+        }
+        guard scalarPrefixSuffixIter.next() != nil else { break }
+      }
 
+      // Test reset variants
+      for offset in 0...utf8Span.count {
+        var iter = utf8Span.makeUnicodeScalarIterator()
+        iter.reset(roundingBackwardsFrom: offset)
+        expectTrue(iter.currentCodeUnitOffset <= offset, stackTrace: loc)
+        expectTrue(iter.currentCodeUnitOffset >= 0, stackTrace: loc)
+
+        iter.reset(roundingForwardsFrom: offset)
+        expectTrue(iter.currentCodeUnitOffset >= offset, stackTrace: loc)
+        expectTrue(iter.currentCodeUnitOffset <= utf8Span.count, stackTrace: loc)
+      }
     }
   }
 
@@ -195,8 +221,35 @@ extension ContentEquivalenceTestCase {
         expectStart(&utf8SpanIter)
       }
 
-      // TODO: test reset variants
-      // TODO: test prefix/suffix
+      // Test prefix/suffix across all positions
+      var charPrefixSuffixIter = utf8Span.makeCharacterIterator()
+      while true {
+        let p = charPrefixSuffixIter.prefix()
+        let s = charPrefixSuffixIter.suffix()
+        expectEqual(utf8Span.count, p.count + s.count, stackTrace: loc)
+        expectEqual(charPrefixSuffixIter.currentCodeUnitOffset, p.count, stackTrace: loc)
+        p._withUnsafeBufferPointer { pBuf in
+          s._withUnsafeBufferPointer { sBuf in
+            var combined: [UInt8] = []
+            combined.append(contentsOf: pBuf)
+            combined.append(contentsOf: sBuf)
+            expectEqualSequence(str.utf8, combined, stackTrace: loc)
+          }
+        }
+        guard charPrefixSuffixIter.next() != nil else { break }
+      }
+
+      // Test reset variants
+      for offset in 0...utf8Span.count {
+        var iter = utf8Span.makeCharacterIterator()
+        iter.reset(roundingBackwardsFrom: offset)
+        expectTrue(iter.currentCodeUnitOffset <= offset, stackTrace: loc)
+        expectTrue(iter.currentCodeUnitOffset >= 0, stackTrace: loc)
+
+        iter.reset(roundingForwardsFrom: offset)
+        expectTrue(iter.currentCodeUnitOffset >= offset, stackTrace: loc)
+        expectTrue(iter.currentCodeUnitOffset <= utf8Span.count, stackTrace: loc)
+      }
     }
   }
 
