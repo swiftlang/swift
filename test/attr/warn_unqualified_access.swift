@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Other1.swiftmodule -module-name Other1 %S/Inputs/warn_unqualified_access_other.swift
 // RUN: %target-swift-frontend -emit-module-path %t/Other2.swiftmodule -module-name Other2 %S/Inputs/warn_unqualified_access_other.swift
-// RUN: %target-swift-frontend -I %t -typecheck %s -verify
+// RUN: %target-swift-frontend -I %t -typecheck %s -verify -swift-version 5
+// RUN: %target-swift-frontend -I %t -typecheck %s -verify -swift-version 6
 
 import Other1
 import Other2
@@ -80,4 +81,23 @@ class Recovery {
     // expected-note@-2 {{use 'Other1.' to reference the global function in module 'Other1'}} {{5-5=Other1.}}
     // expected-note@-3 {{use 'Other2.' to reference the global function in module 'Other2'}} {{5-5=Other2.}}
   }
+}
+
+@MainActor
+protocol WarnUnqualifiedActorProtocol {}
+
+extension WarnUnqualifiedActorProtocol {
+  @warn_unqualified_access
+  func actorIsolatedMethod() -> some WarnUnqualifiedActorProtocol { self } // expected-note {{declared here}}
+}
+
+struct WarnUnqualifiedActorConformance: WarnUnqualifiedActorProtocol {
+  func testUnqualifiedAccess() {
+    _ = actorIsolatedMethod() // expected-warning {{use of 'actorIsolatedMethod' treated as a reference to instance method in protocol 'WarnUnqualifiedActorProtocol'}} expected-note {{use 'self.' to silence this warning}} {{9-9=self.}}
+  }
+}
+
+@MainActor
+func testQualifiedActorAccess() {
+  _ = WarnUnqualifiedActorConformance().actorIsolatedMethod()
 }
