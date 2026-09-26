@@ -685,7 +685,16 @@ private struct SpecializationInfo {
 
     for rootClosure in rootClosures {
       let clonedRootClosure = cloner.getClonedValue(of: rootClosure) as! PartialApplyInst
-      let _ = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
+      let argsAreKeptAlive = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
+      // Unlike a regular closure (which only ever borrows, or independently copies, its captures),
+      // a `@called(once)` closure can have consuming captures. When the fold above transfers a
+      // non-Copyable capture to the new direct call, it can't copy it, so it leaves `Undef` in
+      // `clonedRootClosure`'s own operand instead. Leaving such a closure's `partial_apply` behind
+      // would still run its destructor at runtime, which would release whatever garbage is left
+      // in that now-`Undef`'d capture slot.
+      if clonedRootClosure.isCalledOnce {
+        _ = cloner.context.tryDeleteDeadClosure(closure: clonedRootClosure, needKeepArgsAlive: !argsAreKeptAlive)
+      }
     }
   }
 

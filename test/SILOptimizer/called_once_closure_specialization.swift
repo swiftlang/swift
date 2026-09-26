@@ -32,9 +32,8 @@ func testLocalVariableClass(_ t: Tracker, _ y: Int) {
 // CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@guaranteed Tracker, Int) -> ()
-// CHECK: [[TRACKER_COPY:%.*]] = copy_value [[TRACKER]]
-// CHECK: partial_apply [on_stack] [called_once] [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
-// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER_COPY]], [[Y]])
+// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
+// CHECK: destroy_value [[TRACKER]]
 // CHECK: }
 
 // Mixed owned Copyable + borrowed ~Copyable captures
@@ -48,9 +47,8 @@ func testMixedCaptures(_ t: Tracker, _ v: borrowing BorrowableValue, _ delta: In
 // CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@owned Tracker, @guaranteed BorrowableValue, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[V:%.*]] : @guaranteed $BorrowableValue, [[DELTA:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed BorrowableValue, Int) -> ()
-// CHECK: [[TRACKER_COPY:%.*]] = copy_value [[TRACKER]]
-// CHECK: partial_apply [on_stack] [called_once] [[CLOSURE_IMPL]]([[TRACKER]], [[V]], [[DELTA]])
-// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER_COPY]], [[V]], [[DELTA]])
+// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[V]], [[DELTA]])
+// CHECK: destroy_value [[TRACKER]]
 // CHECK: }
 
 @inline(never)
@@ -63,9 +61,8 @@ func testEscapingCapture(_ t: Tracker, _ y: Int) {
 // CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnceEscaping{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}} : $@convention(thin) (@guaranteed Tracker, Int) -> ()
-// CHECK: [[TRACKER_COPY:%.*]] = copy_value [[TRACKER]]
-// CHECK: partial_apply [called_once] [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
-// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER_COPY]], [[Y]])
+// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
+// CHECK: destroy_value [[TRACKER]]
 // CHECK: }
 
 @inline(never)
@@ -96,10 +93,9 @@ func testNestedClosureCapture(_ t: Tracker, _ y: Int) {
 // CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}} : $@convention(thin) (@owned Tracker, @owned @callee_guaranteed (Int) -> Int, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[INNER:%.*]] : @owned $@callee_guaranteed (Int) -> Int, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed @callee_guaranteed (Int) -> Int, Int) -> ()
-// CHECK: [[TRACKER_COPY:%.*]] = copy_value [[TRACKER]]
-// CHECK: [[INNER_COPY:%.*]] = copy_value [[INNER]]
-// CHECK: partial_apply [on_stack] [called_once] [[CLOSURE_IMPL]]([[TRACKER]], [[INNER]], [[Y]])
-// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER_COPY]], [[INNER_COPY]], [[Y]])
+// CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[INNER]], [[Y]])
+// CHECK: destroy_value [[TRACKER]]
+// CHECK: destroy_value [[INNER]]
 // CHECK: }
 
 // Trigger specialization
