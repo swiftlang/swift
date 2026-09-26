@@ -728,7 +728,7 @@ extension FunctionWorklist {
       switch entry {
       case .invalid, .associatedType:
         break
-      case .method(_, let witness):
+      case .method(_, let witness, _):
         if let method = witness,
            // A witness table can still contain a generic function, even though it's not actually
            // callable through the witness table.

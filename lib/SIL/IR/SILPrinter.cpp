@@ -4711,6 +4711,11 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
     } else {
       out << "nil";
     }
+    if (methodWitness.InterfaceEntry) {
+      out << ", com ";
+      methodWitness.InterfaceEntry->printName(out);
+      out << "\t// " << demangleSymbol(methodWitness.InterfaceEntry->getName());
+    }
     break;
   }
   case WitnessKind::AssociatedType: {

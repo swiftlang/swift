@@ -164,3 +164,17 @@ public protocol Native {}
 public func native(_ source: Any) -> (any Native)? {
   source as? any Native
 }
+
+// A `switch` with an `is` pattern lowers the COM cast through the same
+// copy-on-success path as an `is` expression.
+// CHECK-LABEL: sil [ossa] @$s1M7pattern
+// CHECK: checked_cast_addr_br copy_on_success any ISource in
+// CHECK-SAME: to any ITarget in
+public func pattern(_ source: borrowing any ISource) -> Bool {
+  switch source {
+  case is any ITarget:
+    return true
+  default:
+    return false
+  }
+}
