@@ -4446,6 +4446,60 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+#if SWIFT_IDE_TEST_HAS_SWIFT_DRIVER
+extern "C" {
+  typedef enum {
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_ERROR = 0,
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_WARNING = 1,
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_REMARK = 2,
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_NOTE = 3
+  } swiftdriver_tooling_diagnostic_kind;
+  bool swift_getSingleFrontendInvocationFromDriverArgumentsV3(
+      const char *, int, const char **, bool(int, const char **),
+      void(swiftdriver_tooling_diagnostic_kind, const char *), bool, bool);
+}
+
+static bool displayFrontendArgs(int FrontendArgC, const char **FrontendArgV) {
+  llvm::outs() << "SwiftDriver (new) Frontend Arguments BEGIN\n";
+  for (int i = 0; i < FrontendArgC; ++i) {
+    llvm::outs() << FrontendArgV[i] << "\n";
+  }
+  llvm::outs() << "SwiftDriver (new) Frontend Arguments END\n";
+
+  ArrayRef<const char *> SubArgs(FrontendArgV, FrontendArgC);
+  if (!SubArgs.empty() &&
+      llvm::sys::path::stem(SubArgs.front()) == "swift-frontend")
+    SubArgs = SubArgs.drop_front();
+  if (!SubArgs.empty() && StringRef(SubArgs.front()) == "-frontend")
+    SubArgs = SubArgs.drop_front();
+
+  CompilerInvocation CI;
+  PrintingDiagnosticConsumer PDC;
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  Diags.addConsumer(PDC);
+  return CI.parseArgs(SubArgs, Diags);
+}
+
+static void handleDiagnostic(swiftdriver_tooling_diagnostic_kind diagKind,
+                             const char *diagMessage) {
+  switch (diagKind) {
+  case SWIFTDRIVER_TOOLING_DIAGNOSTIC_ERROR:
+    llvm::errs() << "<swift-driver>: error: " << diagMessage << "\n";
+    break;
+  case SWIFTDRIVER_TOOLING_DIAGNOSTIC_WARNING:
+    llvm::errs() << "<swift-driver>: warning: " << diagMessage << "\n";
+    break;
+  case SWIFTDRIVER_TOOLING_DIAGNOSTIC_REMARK:
+    llvm::errs() << "<swift-driver>: remark: " << diagMessage << "\n";
+    break;
+  case SWIFTDRIVER_TOOLING_DIAGNOSTIC_NOTE:
+    llvm::errs() << "<swift-driver>: note: " << diagMessage << "\n";
+    break;
+  }
+}
+#endif // SWIFT_IDE_TEST_HAS_SWIFT_DRIVER
+
 static int doTestCreateCompilerInvocation(StringRef DriverPath,
                                           ArrayRef<const char *> Args,
                                           bool ForceNoOutputs) {
@@ -4469,8 +4523,25 @@ static int doTestCreateCompilerInvocation(StringRef DriverPath,
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
-    return 1;
   }
+
+#if SWIFT_IDE_TEST_HAS_SWIFT_DRIVER
+  SmallVector<const char *, 16> argList(Args.begin(), Args.end());
+  std::string driverPathStr = DriverPath.str();
+  bool NewHadError = swift_getSingleFrontendInvocationFromDriverArgumentsV3(
+      driverPathStr.c_str(), argList.size(), argList.data(),
+      &displayFrontendArgs, &handleDiagnostic,
+      /*compilerIntegratedTooling=*/true, ForceNoOutputs);
+  if (NewHadError) {
+    llvm::errs()
+        << "error: unable to create a CompilerInvocation (new driver)\n";
+  }
+#else
+  const bool NewHadError = false;
+#endif
+
+  if (HadError || NewHadError)
+    return 1;
 
   return 0;
 }
