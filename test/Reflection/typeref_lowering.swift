@@ -10,7 +10,8 @@
 // UNSUPPORTED: CPU=arm64e
 
 // rdar://188082318
-// XFAIL: OS=linux-android, OS=linux-androideabi
+// XFAIL: OS=linux-android && CPU=aarch64
+// XFAIL: OS=linux-androideabi && CPU=aarch64
 
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypeLowering -o %t/TypesToReflect
