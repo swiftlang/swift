@@ -304,6 +304,11 @@ extension CooperativeExecutor: RunLoopExecutor {
       }
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+      // Run any jobs enqueued by the batch above before waiting on a timer
+      if !runQueue.isEmpty {
+        continue
+      }
+
       // Finally, wait until the next deadline
       var toWait: Duration? = suspendingWaitQueue.timeToNextJob
 
@@ -316,7 +321,7 @@ extension CooperativeExecutor: RunLoopExecutor {
       if let toWait {
         _sleep(seconds: toWait.seconds,
                nanoseconds: toWait.nanoseconds)
-      } else if runQueue.isEmpty {
+      } else {
         // Stop if no more jobs are available
         break
       }
