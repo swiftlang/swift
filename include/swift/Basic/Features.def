@@ -548,6 +548,10 @@ EXPERIMENTAL_FEATURE(CxxImplementation, true)
 /// Allow a Swift class to subclass a C++ foreign reference type.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 
+/// Generate C++ bindings for Swift APIs with direct `Hashable` generic
+/// requirements in the C++ section of the generated Clang header.
+EXPERIMENTAL_FEATURE(GenerateBindingsForHashableRequirementsInCXX, false)
+
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
 // * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp

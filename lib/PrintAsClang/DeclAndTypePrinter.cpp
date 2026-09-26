@@ -122,6 +122,50 @@ struct CxxEmissionScopeRAII {
   ~CxxEmissionScopeRAII() { printer.setCxxDeclEmissionScope(prevScope); }
 };
 
+static StringRef getCxxOverloadName(const ValueDecl *valueDecl) {
+  if (isa<SubscriptDecl>(valueDecl))
+    return "operator []";
+  return cxx_translation::getNameForCxx(valueDecl);
+}
+
+static bool isCxxOverloadCandidate(const ValueDecl *valueDecl) {
+  // Destructors are emitted as the C++ destructor of the type they belong to,
+  // so they never participate in an overload set. They are also named by a
+  // special base name that has no C++ spelling.
+  if (isa<DestructorDecl>(valueDecl))
+    return false;
+  return isa<SubscriptDecl>(valueDecl) ||
+         (isa<AbstractFunctionDecl>(valueDecl) &&
+          !isa<AccessorDecl>(valueDecl));
+}
+
+/// Returns how many conformance requirements \p valueDecl has, not counting
+/// the implicit Copyable and Escapable requirements: first the ones that need
+/// a witness table, which the C++ binding looks up at runtime and which fail
+/// for a type that does not conform, then the others, like marker protocol
+/// requirements.
+static std::pair<unsigned, unsigned>
+getConformanceRequirementCounts(const ValueDecl *valueDecl) {
+  auto *genericContext = valueDecl->getAsGenericContext();
+  if (!genericContext)
+    return {0, 0};
+  unsigned witnessTableCount = 0;
+  unsigned otherCount = 0;
+  for (const auto &req :
+       genericContext->getGenericSignature().getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    auto *proto = req.getProtocolDecl();
+    if (proto->getInvertibleProtocolKind())
+      continue;
+    if (proto->isMarkerProtocol() || proto->isObjC())
+      ++otherCount;
+    else
+      ++witnessTableCount;
+  }
+  return {witnessTableCount, otherCount};
+}
+
 class DeclAndTypePrinter::Implementation
     : private DeclVisitor<DeclAndTypePrinter::Implementation>,
       private TypeVisitor<DeclAndTypePrinter::Implementation, void,
@@ -252,9 +296,11 @@ private:
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
+    auto orderedMembers = llvm::to_vector_of<const Decl *, 32>(members);
+
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
-      for (const Decl *member : members) {
+      for (const Decl *member : orderedMembers) {
         if (member->getModuleContext()->isStdlibModule())
           break;
         auto VD = dyn_cast<ValueDecl>(member);
@@ -263,9 +309,10 @@ private:
         if (const auto *TD = dyn_cast<NominalTypeDecl>(member))
           printUsingForNestedType(TD, TD->getModuleContext());
       }
+      owningPrinter.orderCxxOverloadsForEmission(orderedMembers);
     }
     bool protocolMembersOptional = false;
-    for (const Decl *member : members) {
+    for (const Decl *member : orderedMembers) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
         continue;
@@ -420,6 +467,34 @@ private:
     os << "@end\n";
   }
 
+  /// Prints the members of a struct or enum and of its extensions that can be
+  /// exposed to C++.
+  void printValueTypeMembers(const NominalTypeDecl *nominal) {
+    auto extensions =
+        owningPrinter.interopContext.getExtensionsForNominalType(nominal);
+    // With bindings for Hashable requirements, a constrained member can
+    // collide with an unconstrained one from another extension or from the
+    // type itself. Print all members as one list, so that the overload
+    // ordering in printMembers sees all of them.
+    if (cxx_translation::canLookUpHashableConformances(
+            nominal->getASTContext())) {
+      auto members =
+          llvm::to_vector_of<const Decl *, 32>(nominal->getAllMembers());
+      for (const auto *ext : extensions) {
+        if (cxx_translation::isExposableToCxx(ext->getGenericSignature()))
+          llvm::append_range(members, ext->getAllMembers());
+      }
+      printMembers(members);
+      return;
+    }
+
+    printMembers(nominal->getAllMembers());
+    for (const auto *ext : extensions) {
+      if (cxx_translation::isExposableToCxx(ext->getGenericSignature()))
+        printMembers(ext->getAllMembers());
+    }
+  }
+
   void visitStructDecl(StructDecl *SD) {
     if (outputLang != OutputLanguageMode::Cxx)
       return;
@@ -430,14 +505,7 @@ private:
         SD, /*bodyPrinter=*/
         [&]() {
           CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
-          printMembers(SD->getAllMembers());
-          for (const auto *ed :
-               owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
-            if (!cxx_translation::isExposableToCxx(ed->getGenericSignature()))
-              continue;
-
-            printMembers(ed->getAllMembers());
-          }
+          printValueTypeMembers(SD);
         },
         owningPrinter);
     recordEmittedDeclInCurrentCxxLexicalScope(SD);
@@ -939,15 +1007,7 @@ private:
           os << "\n";
 
           CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
-          printMembers(ED->getAllMembers());
-
-          for (const auto *ext :
-               owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
-            if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
-              continue;
-
-            printMembers(ext->getAllMembers());
-          }
+          printValueTypeMembers(ED);
         },
         owningPrinter);
     recordEmittedDeclInCurrentCxxLexicalScope(ED);
@@ -3040,6 +3100,21 @@ bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
 }
 } // namespace swift
 
+/// Returns true if \p ED adds a `Hashable` requirement to the generic
+/// signature of the type it extends.
+static bool addsHashableRequirement(const ExtensionDecl *ED) {
+  auto extendedSig = ED->getExtendedNominal()->getGenericSignature();
+  for (const auto &req : ED->getGenericSignature().getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getProtocolDecl()->isSpecificProtocol(
+            KnownProtocolKind::Hashable) &&
+        !(extendedSig && extendedSig->requiresProtocol(req.getFirstType(),
+                                                       req.getProtocolDecl())))
+      return true;
+  }
+  return false;
+}
+
 static bool hasExposeAttr(const ValueDecl *VD) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
     if (VD == VD->getASTContext().getStringDecl())
@@ -3062,6 +3137,14 @@ static bool hasExposeAttr(const ValueDecl *VD) {
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+    // Do not expose standard library members that require an extra
+    // `Hashable` conformance, such as `hashValue` from `extension Array:
+    // Hashable where Element: Hashable`. With
+    // GenerateBindingsForHashableRequirementsInCXX, they would be
+    // representable, but using them with a non-Hashable element type would be
+    // a fatal error at runtime.
+    if (VD->getModuleContext()->isStdlibModule() && addsHashableRequirement(ED))
+      return false;
     // FIXME: Do not expose 'index' methods as the overloads are conflicting.
     // this should either be prohibited in the stdlib module, or the overloads
     // should be renamed automatically or using the expose attribute.
@@ -3268,6 +3351,53 @@ void DeclAndTypePrinter::printTypeName(raw_ostream &os, Type ty,
 
 void DeclAndTypePrinter::printAvailability(raw_ostream &os, const Decl *D) {
   getImpl().printAvailability(os, D);
+}
+
+// Swift generic requirements are erased from C++ function signatures, so
+// overloads with different requirements can collide. Marker protocol
+// requirements already collide without
+// GenerateBindingsForHashableRequirementsInCXX, but the choice only matters
+// with it: the thunk for a Hashable-constrained overload aborts at runtime for
+// a type that does not conform. Keep the header unchanged without the feature.
+//
+// Collisions are not predicted here: computing the final C++ parameter
+// spellings can emit supporting stubs, and ABI representability is checked
+// later. The overload tracker used while printing still decides which
+// declaration is printed. Reordering all same-named candidates, rather than
+// picking one, lets a later candidate claim the signature if the preferred
+// declaration turns out to be unprintable.
+void DeclAndTypePrinter::orderCxxOverloadsForEmission(
+    MutableArrayRef<const Decl *> declarations) {
+  if (!cxx_translation::canLookUpHashableConformances(M.getASTContext()))
+    return;
+
+  struct OverloadGroup {
+    SmallVector<size_t, 2> positions;
+    SmallVector<const Decl *, 2> declarations;
+  };
+
+  llvm::StringMap<OverloadGroup> groupsByName;
+  for (size_t index = 0; index < declarations.size(); ++index) {
+    auto *valueDecl = dyn_cast<ValueDecl>(declarations[index]);
+    if (!valueDecl || !isCxxOverloadCandidate(valueDecl) ||
+        !shouldInclude(valueDecl))
+      continue;
+
+    auto &group = groupsByName[getCxxOverloadName(valueDecl)];
+    group.positions.push_back(index);
+    group.declarations.push_back(declarations[index]);
+  }
+
+  for (auto &nameAndGroup : groupsByName) {
+    auto &group = nameAndGroup.second;
+    llvm::stable_sort(group.declarations, [](const Decl *lhs, const Decl *rhs) {
+      return getConformanceRequirementCounts(cast<ValueDecl>(lhs)) <
+             getConformanceRequirementCounts(cast<ValueDecl>(rhs));
+    });
+    for (auto [position, declaration] :
+         llvm::zip_equal(group.positions, group.declarations))
+      declarations[position] = declaration;
+  }
 }
 
 void DeclAndTypePrinter::printAdHocCategory(

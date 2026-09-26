@@ -410,10 +410,25 @@ void ClangSyntaxPrinter::printGenericSignatureParams(
 
 void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
     const GenericRequirement &requirement) {
-  assert(requirement.isAnyMetadata() &&
-         "protocol requirements not supported yet!");
+  assert((requirement.isAnyMetadata() || requirement.isAnyWitnessTable()) &&
+         "unsupported generic requirement");
   auto *gtpt = requirement.getTypeParameter()->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
+  if (requirement.isAnyWitnessTable()) {
+    // Look up the witness table for the required protocol conformance via the
+    // Swift runtime. _SwiftCxxInteroperability.h only declares the protocol
+    // descriptor for Hashable (see cxx_translation::isExposableToCxx).
+    ASSERT(requirement.getProtocol()->isSpecificProtocol(
+               KnownProtocolKind::Hashable) &&
+           "no protocol descriptor declared for this protocol");
+    printSwiftImplQualifier();
+    os << "getConformanceWitnessTable<";
+    printGenericTypeParamTypeName(gtpt);
+    os << ", ";
+    printSwiftImplQualifier();
+    os << "HashableProtocolDescriptor>()";
+    return;
+  }
   os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);
   os << ">::getTypeMetadata()";

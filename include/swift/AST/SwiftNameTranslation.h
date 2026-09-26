@@ -123,6 +123,12 @@ bool isObjCxxOnly(const clang::Decl *D, const ASTContext &ctx);
 bool isVisibleToCxx(const ValueDecl *VD, AccessLevel minRequiredAccess,
                     bool checkParent = true);
 
+/// Returns true if the generated C++ bindings can satisfy a `Hashable` generic
+/// requirement by looking up the conformance at runtime. This needs
+/// GenerateBindingsForHashableRequirementsInCXX, and is not available in
+/// Embedded Swift, which has no runtime conformance lookup.
+bool canLookUpHashableConformances(const ASTContext &ctx);
+
 /// Determine whether the given generic signature can be exposed to C++.
 bool isExposableToCxx(GenericSignature genericSig);
 

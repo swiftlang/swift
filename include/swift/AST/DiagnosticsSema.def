@@ -2503,7 +2503,7 @@ ERROR(expose_generic_requirement_to_cxx,none,
 ERROR(expose_nested_in_generic_context_to_cxx,none,
       "%kind0 nested in a generic context can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_too_many_generic_params_to_cxx,none,
-      "%kind0 can not yet be represented in C++ as it has more than 3 generic parameters", (ValueDecl *))
+      "%kind0 can not yet be represented in C++ as it has more than 3 generic parameters%select{| and 'Hashable' requirements combined}1", (ValueDecl *, bool))
 ERROR(expose_throwing_to_cxx,none,
       "%kind0 can not yet be represented in C++ as it may throw an error", (ValueDecl *))
 ERROR(expose_indirect_enum_cxx,none,

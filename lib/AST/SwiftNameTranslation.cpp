@@ -21,6 +21,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -410,7 +411,8 @@ swift::cxx_translation::getDeclRepresentation(
     }
   }
 
-  // Generic requirements are not yet supported in C++.
+  // Reject generic requirements that the generated C++ binding cannot
+  // instantiate.
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
@@ -448,6 +450,13 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
   return false;
 }
 
+bool swift::cxx_translation::canLookUpHashableConformances(
+    const ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(
+             Feature::GenerateBindingsForHashableRequirementsInCXX) &&
+         !ctx.LangOpts.hasFeature(Feature::Embedded);
+}
+
 bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   // If there's no generic signature, it's fine.
   if (!genericSig)
@@ -459,21 +468,37 @@ bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   //
   // For now, we use the inverse transform as a quick way to
   // check for the "default" generic signature where each
-  // generic parameter is Copyable and Escapable, but not
-  // subject to any other requirements; that's exactly the
-  // generic signature that C++ interop supports today.
+  // generic parameter is Copyable and Escapable, and is only
+  // subject to the conformance requirements accepted below.
   SmallVector<Requirement, 2> reqs;
   SmallVector<InverseRequirement, 2> inverseReqs;
   genericSig->getRequirementsWithInverses(reqs, inverseReqs);
   if (!reqs.empty()) {
-    // Conformance requirements to marker protocols are okay.
     for (const auto &req: reqs) {
       if (req.getKind() != RequirementKind::Conformance)
         return false;
 
+      // Conformance requirements to marker protocols and Objective-C
+      // protocols are okay, as they need no witness table.
       auto proto = req.getProtocolDecl();
-      if (!proto->isMarkerProtocol() && !proto->hasClangNode())
-        return false;
+      if (proto->isMarkerProtocol() || proto->hasClangNode())
+        continue;
+
+      // A `Hashable` requirement directly on a generic parameter is okay if
+      // the generated binding can look up the witness table at runtime. This
+      // is the minimum that `Dictionary<Key: Hashable, Value>` needs. A
+      // dependent member type has no type metadata that the binding could
+      // use, and a parameter pack would need a witness table pack.
+      // Supporting another protocol needs its protocol descriptor in
+      // _SwiftCxxInteroperability.h, or, for a protocol outside the standard
+      // library, in the generated header of the module that defines it.
+      if (canLookUpHashableConformances(proto->getASTContext()) &&
+          proto->isSpecificProtocol(KnownProtocolKind::Hashable) &&
+          req.getFirstType()->is<GenericTypeParamType>() &&
+          !req.getFirstType()->isParameterPack())
+        continue;
+
+      return false;
     }
   }
 
@@ -511,8 +536,16 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
   case UnrepresentableNestedInGenericContext:
     return Diagnostic(diag::expose_nested_in_generic_context_to_cxx, vd);
-  case UnrepresentableTooManyGenericParameters:
-    return Diagnostic(diag::expose_too_many_generic_params_to_cxx, vd);
+  case UnrepresentableTooManyGenericParameters: {
+    // Witness tables count toward the limit too, so mention the requirements
+    // when there are any.
+    auto genericSig =
+        vd->getInnermostDeclContext()->getGenericSignatureOfContext();
+    bool countsRequirements = getMetadataAccessorArgumentCount(genericSig) >
+                              genericSig.getGenericParams().size();
+    return Diagnostic(diag::expose_too_many_generic_params_to_cxx, vd,
+                      countsRequirements);
+  }
   case UnrepresentableThrows:
     return Diagnostic(diag::expose_throwing_to_cxx, vd);
   case UnrepresentableIndirectEnum:
