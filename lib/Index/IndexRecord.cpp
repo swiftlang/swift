@@ -409,11 +409,22 @@ getModuleInfoFromOpaqueModule(clang::index::writer::OpaqueModule mod,
   return info;
 }
 
+/// Whether \p mod should be recorded as a system (non-user) module. Binary
+/// modules indexed because of -index-binary-modules are not user code either,
+/// so mark them like SDK modules; clients then present their declarations the
+/// same way (e.g. as a generated interface rather than the raw textual
+/// interface).
+static bool isNonUserModuleForIndex(ModuleDecl *mod, bool indexBinaryModules) {
+  return mod->isNonUserModule() ||
+         (indexBinaryModules && mod->isBuiltFromInterface());
+}
+
 static bool
 emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
                                  bool indexClangModules,
                                  bool indexSystemModules,
+                                 bool indexBinaryModules,
                                  bool skipStdlib,
                                  bool includeLocals,
                                  bool compress,
@@ -429,6 +440,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   StringRef indexStorePath,
                                   bool indexClangModules,
                                   bool indexSystemModules,
+                                  bool indexBinaryModules,
                                   bool skipStdlib,
                                   bool includeLocals,
                                   bool compress,
@@ -506,15 +518,22 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           }
         } else {
           // Serialized AST file.
-          // Only index distributed system modules, and the stdlib.
-          // We don't officially support binary swift modules, so normally
-          // the index data for user modules would get generated while
-          // building them.
-          if (mod->isNonUserModule() && indexSystemModules &&
+          // By default only index distributed system modules, and the stdlib.
+          // Index data for user modules normally gets generated while
+          // building them from source. Modules built from a textual interface
+          // outside the SDK (binary frameworks) have no such build, so index
+          // them too when requested.
+          bool isSystemModule = mod->isNonUserModule();
+          bool shouldIndexBinaryModule = indexBinaryModules &&
+                                         !isSystemModule &&
+                                         mod->isBuiltFromInterface();
+          if (((isSystemModule && indexSystemModules) ||
+               shouldIndexBinaryModule) &&
               (!skipStdlib || !mod->isStdlibModule())) {
             emitDataForSwiftSerializedModule(mod, indexStorePath,
                                              indexClangModules,
-                                             indexSystemModules, skipStdlib,
+                                             indexSystemModules,
+                                             indexBinaryModules, skipStdlib,
                                              includeLocals,
                                              compress,
                                              explicitModuleBuild,
@@ -546,8 +565,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           SmallString<64> unitName;
           if (!withoutUnitName)
             unitWriter.getUnitNameForOutputFile(F->getName(), unitName);
-          unitWriter.addUnitDependency(unitName.str(), *F,
-                                       mod->isNonUserModule(), opaqMod);
+          unitWriter.addUnitDependency(
+              unitName.str(), *F,
+              isNonUserModuleForIndex(mod, indexBinaryModules), opaqMod);
         }
 
         break;
@@ -563,6 +583,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
                                  bool indexClangModules,
                                  bool indexSystemModules,
+                                 bool indexBinaryModules,
                                  bool skipStdlib,
                                  bool includeLocals,
                                  bool compress,
@@ -703,7 +724,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   }
 
   auto &fileMgr = clangCI.getFileManager();
-  bool isSystem = module->isNonUserModule();
+  bool isSystem = isNonUserModuleForIndex(module, indexBinaryModules);
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
@@ -733,7 +754,8 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                        ModuleDecl::ImportFilterKind::Default});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, includeLocals, compress,
+                        indexSystemModules, indexBinaryModules, skipStdlib,
+                        includeLocals, compress,
                         explicitModuleBuild,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, pathRemapper, initialFile);
@@ -749,7 +771,8 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 static bool
 recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexClangModules,
-                     bool indexSystemModules, bool skipStdlib,
+                     bool indexSystemModules,
+                     bool indexBinaryModules, bool skipStdlib,
                      bool includeLocals, bool compress, bool isDebugCompilation,
                      bool isExplicitModuleBuild, StringRef targetTriple,
                      ArrayRef<clang::FileEntryRef> fileDependencies,
@@ -780,7 +803,8 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                                         ModuleDecl::getImportFilterLocal());
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, includeLocals, compress,
+                        indexSystemModules, indexBinaryModules, skipStdlib,
+                        includeLocals, compress,
                         isExplicitModuleBuild, targetTriple, clangCI, diags,
                         unitWriter, moduleNameScratch, pathRemapper,
                         primarySourceFile);
@@ -836,6 +860,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            StringRef indexStorePath,
                            bool indexClangModules,
                            bool indexSystemModules,
+                           bool indexBinaryModules,
                            bool skipStdlib,
                            bool includeLocals,
                            bool compress,
@@ -856,7 +881,9 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
 
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
-                              indexSystemModules, skipStdlib, includeLocals, compress,
+                              indexSystemModules,
+                              indexBinaryModules, skipStdlib,
+                              includeLocals, compress,
                               isDebugCompilation, isExplicitModuleBuild,
                               targetTriple, {},
                               clangCI, pathRemapper, diags);
@@ -868,6 +895,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            StringRef indexStorePath,
                            bool indexClangModules,
                            bool indexSystemModules,
+                           bool indexBinaryModules,
                            bool skipStdlib,
                            bool includeLocals,
                            bool compress,
@@ -896,7 +924,9 @@ bool index::indexAndRecord(ModuleDecl *module,
       }
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
                                indexStorePath, indexClangModules,
-                               indexSystemModules, skipStdlib, includeLocals, compress,
+                               indexSystemModules,
+                               indexBinaryModules, skipStdlib,
+                               includeLocals, compress,
                                isDebugCompilation, isExplicitModuleBuild,
                                targetTriple, {},
                                clangCI, pathRemapper, diags))
