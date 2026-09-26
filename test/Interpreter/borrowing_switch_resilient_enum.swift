@@ -5,7 +5,7 @@
 // RUN: %target-build-swift -target %target-swift-5.1-abi-triple %s -lEnumLib -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
-// RUN: %target-run %t/main %t/%target-library-name(EnumLib)
+// RUN: %target-run %t/main %t/%target-library-name(EnumLib) | %FileCheck %s
 
 // REQUIRES: executable_test
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
