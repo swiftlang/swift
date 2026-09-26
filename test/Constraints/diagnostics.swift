@@ -407,6 +407,16 @@ enum Color {
   static var svar: Color { return .Red }
 }
 
+struct ContextualMemberWithDefaultArguments {
+  static func foo(x: Int = 0, y: String) -> Self { Self() }
+  static func bar(x: Int = 0, y: Double = 0, z: String) -> Self { Self() }
+}
+
+let _: ContextualMemberWithDefaultArguments = .foo
+// expected-error@-1 {{member 'foo(x:y:)' expects argument of type 'String'}}
+let _: ContextualMemberWithDefaultArguments = .bar
+// expected-error@-1 {{member 'bar(x:y:z:)' expects argument of type 'String'}}
+
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
 // expected-error@-1 {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
 // expected-error@-2 {{cannot infer contextual base in reference to member 'Unknown'}}
