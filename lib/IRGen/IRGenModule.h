@@ -78,6 +78,7 @@ namespace clang {
   class CodeGenerator;
   class CXXDestructorDecl;
   class Decl;
+  class FunctionDecl;
   class GlobalDecl;
   class Type;
   class ObjCProtocolDecl;
@@ -1362,6 +1363,10 @@ public:
 
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
+
+  llvm::Function *
+  getAddrOfClangInlineBuiltinClone(const clang::FunctionDecl *fd,
+                                   ForDefinition_t forDefinition);
 
 private:
   using CopyAddrHelperGenerator =

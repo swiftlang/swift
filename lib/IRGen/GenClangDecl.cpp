@@ -27,6 +27,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/IR/Module.h"
 
 using namespace swift;
 using namespace irgen;
@@ -359,6 +360,41 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
     emitClangDecl(decl);
 
   return ClangCodeGen->GetAddrOfGlobal(global, (bool) forDefinition);
+}
+
+/// Detect the unusual situation where an inline builtin is shadowed by a
+/// non-inline declaration. In that case the external one should be used
+/// everywhere, which is also GCC's behavior.
+static bool onlyHasInlineBuiltinDeclaration(const clang::FunctionDecl *fd) {
+  for (auto *pd = fd; pd; pd = pd->getPreviousDecl())
+    if (!pd->isInlineBuiltinDeclaration())
+      return false;
+  return true;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfClangInlineBuiltinClone(const clang::FunctionDecl *fd,
+                                              ForDefinition_t forDefinition) {
+  if (!fd->isInlineBuiltinDeclaration() || !onlyHasInlineBuiltinDeclaration(fd))
+    return nullptr;
+
+  auto *addr = getAddrOfClangGlobalDecl(clang::GlobalDecl(fd), forDefinition);
+  auto *fn = dyn_cast<llvm::Function>(addr->stripPointerCasts());
+  if (!fn)
+    return nullptr;
+
+  llvm::SmallString<64> cloneName{fn->getName()};
+  cloneName += ".inline";
+  if (auto *clone = Module.getFunction(cloneName))
+    return clone;
+
+  // The clone may not exist yet if the body hasn't been emitted. We can declare
+  // it ahead of time in that case.
+  auto *clone = llvm::Function::Create(
+      fn->getFunctionType(), llvm::GlobalValue::InternalLinkage,
+      fn->getAddressSpace(), cloneName, &Module);
+  clone->addFnAttr(llvm::Attribute::AlwaysInline);
+  return clone;
 }
 
 void IRGenModule::finalizeClangCodeGen() {
