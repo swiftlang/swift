@@ -3188,6 +3188,9 @@ static bool hasExposeAttr(const ValueDecl *VD) {
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
+    if (VD == VD->getASTContext().getDictionaryDecl())
+      return cxx_translation::canLookUpHashableConformances(
+          VD->getASTContext());
     if (VD == VD->getASTContext().getOptionalDecl())
       return true;
     if (isStringNestedType(VD, "UTF8View") || isStringNestedType(VD, "Index"))

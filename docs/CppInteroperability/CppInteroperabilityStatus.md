@@ -235,3 +235,12 @@ This status table describes which of the following Swift standard library APIs h
 | `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++. Conversion between `std.string` is not yet supported   |
 | `Array<T>`   | Can be used as a type in C++. Ranged for loops are supported. Limited set of APIs in some extensions are exposed to C++. |
 | `Optional<T>`   | Can be used as a type in C++. Can be constructed. `get` extracts the optional value and it's also implicitly castable to `bool`.  |
+| `Dictionary<K, V>`   | With `GenerateBindingsForHashableRequirementsInCXX`, can be used as a type in C++ outside Embedded Swift. Can be constructed. Key lookup via `operator []` returns an `Optional`, mutation via `updateValueForKey` / `removeValueForKey`. Iteration over keys/values is not yet supported. |
+
+The standard library bindings are printed by the first generated header that a
+C++ file includes. If that header was generated without
+`GenerateBindingsForHashableRequirementsInCXX`, they do not contain
+`Dictionary`, and a header generated with the feature that is included after it
+reports an error. Enable the feature for all Swift modules whose headers are
+included in the same C++ file, or include a header generated with the feature
+first.
