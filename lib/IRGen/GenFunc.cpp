@@ -227,6 +227,13 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "ThinFuncTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -263,6 +270,13 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "ObjCFuncTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -292,6 +306,13 @@ namespace {
                                       IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "FuncTypeInfo");
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -494,6 +515,13 @@ namespace {
                      align),
         FuncSignatureInfo(ty) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "BlockTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -531,6 +559,13 @@ namespace {
                          IsFixedSize, IsABIAccessible),
         CaptureOffset(captureOffset)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "BlockStorageTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(

@@ -13,6 +13,7 @@
 #include "Serialization.h"
 #include "ModuleFormat.h"
 #include "SILFormat.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -4959,17 +4960,6 @@ public:
 
     unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
-    // If Sema marked this stored property's type as one to hide on emission
-    // swap in a HiddenType placeholder carrying just the mangled name. Clients of
-    // the emitted .swiftmodule will deserialize the HiddenType instead of the
-    // real type, breaking the link to the internal bridging-header dependency.
-    auto &ctx = var->getASTContext();
-    if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
-            ty->getCanonicalType())) {
-      ty = HiddenType::get(ctx, *mangledName,
-                           var->getDeclContext()->getParentModule(), nullptr,
-                           CanType());
-    }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
@@ -6549,17 +6539,12 @@ public:
 
   void visitHiddenType(const HiddenType *hidden) {
     using namespace decls_block;
-    if (auto *layoutDecl = hidden->getLayoutInfoDecl()) {
-      unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
-      NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                    S.addDeclRef(layoutDecl),
-                                    S.addTypeRef(hidden->getParent()));
-      return;
-    }
-
-    unsigned abbrCode = S.DeclTypeAbbrCodes[HiddenTypeLayout::Code];
-    HiddenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                 hidden->getMangledName());
+    auto *layoutDecl = hidden->getLayoutInfoDecl();
+    assert(layoutDecl && "HiddenType must carry an abstract layout");
+    unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
+    NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  S.addDeclRef(layoutDecl),
+                                  S.addTypeRef(hidden->getParent()));
   }
 };
 
@@ -6996,7 +6981,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
   registerDeclTypeAbbr<IntegerTypeLayout>();
-  registerDeclTypeAbbr<HiddenTypeLayout>();
   registerDeclTypeAbbr<InlineArrayTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
@@ -7938,25 +7922,6 @@ void SerializerBase::writeToStream(raw_ostream &os) {
   os.flush();
 }
 
-void Serializer::writeHiddenTypeLayoutsBlock() {
-  auto layouts = M->getSortedHiddenTypeLayouts();
-  if (layouts.empty())
-    return;
-
-  BCBlockRAII block(Out, HIDDEN_TYPE_LAYOUTS_BLOCK_ID, /*abbrev width=*/3);
-  hidden_type_layouts_block::HiddenTypeLayoutLayout HiddenTypeLayoutRecord(Out);
-  for (auto &entry : layouts) {
-    StringRef name = entry.first;
-    const AbstractTypeLayout &layout = entry.second;
-    HiddenTypeLayoutRecord.emit(
-        ScratchRecord,
-        layout.size, layout.alignment, layout.stride,
-        layout.bitwiseCopyable ? 1u : 0u,
-        layout.isOpaque ? 1u : 0u,
-        name);
-  }
-}
-
 SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
                                ModuleOrSourceFile DC) {
   for (unsigned char byte : signature)
@@ -7982,7 +7947,6 @@ void Serializer::writeToStream(
     S.writeInputBlock();
     S.writeSIL(SILMod);
     S.writeAST(DC);
-    S.writeHiddenTypeLayoutsBlock();
 
     if (S.hadError)
       S.getASTContext().Diags.diagnose(SourceLoc(), diag::serialization_failed,

@@ -58,6 +58,13 @@ namespace {
                          IsCopyable_t copyable)
       : ResilientTypeInfo(T, copyable, IsABIAccessible) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "DynamicTupleTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -277,6 +284,13 @@ namespace {
                           alwaysFixedSize, isABIAccessible)
       {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation,
+                                            "LoadableTupleTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -345,6 +359,13 @@ namespace {
                           isTriviallyDestroyable, isBT, isCopyable,
                           alwaysFixedSize, isABIAccessible)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation,
+                                            "FixedTupleTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -419,6 +440,13 @@ namespace {
                           T, minAlign, isTriviallyDestroyable, isBT, isCopyable,
                           tupleAccessible) {
       }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation,
+                                            "NonFixedTupleTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(

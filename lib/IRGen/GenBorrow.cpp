@@ -50,6 +50,13 @@ public:
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowByPointer);
   }
 
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                    "BorrowByPointerTypeInfo");
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -125,6 +132,13 @@ public:
       ReferentTI(referentTI)
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowInline);
+  }
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                    "BorrowInlineTypeInfo");
   }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -274,6 +288,13 @@ public:
                            IsABIAccessible)
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowNonFixed);
+  }
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                    "BorrowNonFixedTypeInfo");
   }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>

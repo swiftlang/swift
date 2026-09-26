@@ -123,6 +123,11 @@ protected:
       IRGenModule &IGM,
       SerializableHiddenTypeInfoRepresentation &representation) const;
 
+  void printForAbstractTypeLayoutInfoBase(IRGenModule &IGM,
+                                       llvm::raw_ostream &OS,
+                                       unsigned indentation,
+                                       llvm::StringRef concreteTypeName) const;
+
   [[noreturn]] void unsupportedSerializableHiddenTypeInfoRepresentation() const;
 
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
@@ -160,6 +165,11 @@ private:
 
 public:
   virtual ~TypeInfo();
+
+  /// Print the IRGen-level properties that affect abstract type lowering.
+  virtual void printForAbstractTypeLayoutInfo(IRGenModule &IGM,
+                                           llvm::raw_ostream &OS,
+                                           unsigned indentation = 0) const = 0;
 
   virtual std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const = 0;

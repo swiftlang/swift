@@ -615,6 +615,10 @@ public:
 
   TypeInfoDumpFilter TypeInfoFilter;
 
+  /// Dump compiler-facing layout information for hidden types when their
+  /// abstract layouts are serialized or recovered.
+  bool DumpAbstractTypeLayoutInfo = false;
+
   /// Pull in runtime compatibility shim libraries by autolinking.
   std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   std::optional<llvm::VersionTuple>

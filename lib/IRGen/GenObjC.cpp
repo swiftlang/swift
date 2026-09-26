@@ -196,6 +196,13 @@ namespace {
                      align) {
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "UnknownTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -230,6 +237,13 @@ namespace {
                  SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(ReferenceCounting::Bridge, storageType, size, spareBits,
                      align) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "BridgeObjectTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(

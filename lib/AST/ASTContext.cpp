@@ -286,6 +286,8 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
+  llvm::SmallSetVector<CanType, 4> RecoveredHiddenTypes;
+
   /// The map from a module's name to a vector of modules that share that name.
   /// The name can be either the module's real name of the module's ABI name.
   llvm::DenseMap<Identifier, llvm::SmallVector<ModuleDecl *, 1>> NameToModules;
@@ -679,7 +681,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
   llvm::FoldingSet<HiddenType> HiddenTypes;
-  llvm::DenseMap<CanType, StringRef> TypesToHideWhenEmittingModule;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -937,6 +938,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
                                 << llvm::capacity_in_bytes(Name) << "\n"
 
   SIZE(LoadedModules);
+  SIZE(RecoveredHiddenTypes);
   SIZE(NameToModules);
   SIZE(IdentifierTable);
   SIZE(Cleanups);
@@ -2721,6 +2723,15 @@ ASTContext::getLoadedModules() const {
   return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
 }
 
+void ASTContext::recordRecoveredHiddenType(CanType type) {
+  assert(isa<HiddenType>(type));
+  getImpl().RecoveredHiddenTypes.insert(type);
+}
+
+ArrayRef<CanType> ASTContext::getRecoveredHiddenTypes() const {
+  return getImpl().RecoveredHiddenTypes.getArrayRef();
+}
+
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
   // Look up a loaded module using an actual module name (physical name
   // on disk). If the -module-alias option is used, the module name that
@@ -4125,11 +4136,10 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 }
 
 HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
-                            ModuleDecl *definingModule,
                             HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                             CanType parent) {
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName, definingModule, layoutInfoDecl, parent);
+  HiddenType::Profile(id, mangledName, layoutInfoDecl, parent);
 
   void *insertPos;
   if (auto *hidden =
@@ -4140,32 +4150,10 @@ HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
   auto nameCopy = ctx.AllocateCopy(mangledName);
 
   auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, definingModule, layoutInfoDecl, parent, ctx);
+      HiddenType(nameCopy, layoutInfoDecl, parent, ctx);
 
   ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
   return hidden;
-}
-
-void ASTContext::recordTypeToHideWhenEmittingModule(CanType type,
-                                                    StringRef mangledName) {
-  // Allocate a stable copy so the StringRef survives even if the caller's
-  // storage for the mangled name is later moved or freed.
-  auto nameCopy = AllocateCopy(mangledName);
-  auto result =
-      getImpl().TypesToHideWhenEmittingModule.try_emplace(type, nameCopy);
-  if (!result.second) {
-    ASSERT(result.first->second == nameCopy &&
-           "conflicting hide-on-emit mangled names for the same type");
-  }
-}
-
-std::optional<StringRef>
-ASTContext::lookupTypeToHideWhenEmittingModule(CanType type) const {
-  auto &map = getImpl().TypesToHideWhenEmittingModule;
-  auto it = map.find(type);
-  if (it == map.end())
-    return std::nullopt;
-  return it->second;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

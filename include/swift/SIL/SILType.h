@@ -32,6 +32,8 @@ namespace swift {
 class ASTContext;
 class VarDecl;
 class SILFunction;
+class SILModule;
+class TypeExpansionContext;
 
 namespace Lowering {
   class AbstractionPattern;
@@ -240,7 +242,7 @@ public:
   }
 
   /// Whether the type is an enum, struct, or tuple.
-  bool isAggregate() {
+  bool isAggregate() const {
     return is<TupleType>() || is<StructType>() ||
            is<BoundGenericStructType>() || is<EnumType>() ||
            is<BoundGenericEnumType>();
@@ -1118,6 +1120,10 @@ public:
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions::printSIL()) const;
+
+  /// Print SIL type properties used by abstract type lowering.
+  void printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
+                                   TypeExpansionContext expansion) const;
 
   std::string getDebugDescription() const;
 };
