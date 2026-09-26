@@ -994,6 +994,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE_DELIMITER);
   BLOCK_RECORD(sil_block, SIL_EXTRA_STRING);
+  BLOCK_RECORD(sil_block, SIL_STAGE);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);

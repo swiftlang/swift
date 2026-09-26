@@ -22,8 +22,8 @@ var MyVar = 3
 // CHECK: let MyConst: Int
 // CHECK: var MyVar: Int
 
-// CHECK-DAG: sil [global_init] [canonical] @$s11global_init7MyConstSivau : $@convention(thin) () -> Builtin.RawPointer
-// CHECK-DAG: sil [global_init] [canonical] @$s11global_init5MyVarSivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-DAG: sil [global_init] [canonical] [stage=canonical] @$s11global_init7MyConstSivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-DAG: sil [global_init] [canonical] [stage=canonical] @$s11global_init5MyVarSivau : $@convention(thin) () -> Builtin.RawPointer
 
 @inlinable
 @usableFromInline

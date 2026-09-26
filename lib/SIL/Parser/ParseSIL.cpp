@@ -770,6 +770,7 @@ struct DeclSILOptional {
     ValueDecl **ClangDecl = nullptr;
     EffectsKind *MRK = nullptr;
     ActorIsolation *actorIsolation = nullptr;
+    std::optional<SILStage> *functionStage = nullptr;
 };
 } // end anonymous namespace
 
@@ -908,6 +909,32 @@ static bool parseDeclSILOptional(
       }
       *options.actorIsolation = *optIsolation;
       SP.P.consumeToken(tok::string_literal);
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    } else if (options.functionStage && SP.P.Tok.getText() == "stage") {
+      SP.P.consumeToken(tok::identifier);
+      if (SP.P.parseToken(tok::equal, diag::expected_in_attribute_list))
+        return true;
+      if (SP.P.Tok.isNot(tok::identifier)) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_sil_stage_name);
+        return true;
+      }
+
+      SourceLoc stageLoc = SP.P.Tok.getLoc();
+      auto stage = getSILStageByName(SP.P.Tok.getText());
+      if (!stage) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_sil_stage_name);
+        return true;
+      }
+
+      if (*stage < M.getStageFloor()) {
+        SP.P.diagnose(stageLoc, diag::sil_function_stage_below_module_stage,
+                      getSILStageName(*stage),
+                      getSILStageName(M.getStageFloor()));
+        return true;
+      }
+      *options.functionStage = stage;
+      SP.P.consumeToken(tok::identifier);
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     } else if (options.asmName && SP.P.Tok.getText() == "asmname") {
@@ -7806,6 +7833,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SILFunction *AdHocWitnessFunction = nullptr;
   Identifier objCReplacementFor;
   ActorIsolation actorIsolation;
+  std::optional<SILStage> functionStage;
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional({
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
@@ -7819,7 +7847,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
           &availability, &isWithoutActuallyEscapingThunk,
           &hasOwnershipForTrivial, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation}, FunctionState, M) ||
+          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage},
+          FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_function_name) ||
@@ -7845,6 +7874,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setSerializedKind(SerializedKind_t(isSerialized));
     FunctionState.F->setWasDeserializedCanonical(isCanonical);
+    if (functionStage)
+      FunctionState.F->setFunctionStage(*functionStage);
     if (!hasOwnershipSSA)
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setHasLoweredAddresses(hasLoweredAddresses);
@@ -7987,14 +8018,8 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
     return true;
   }
   SILStage stage;
-  if (P.Tok.isContextualKeyword("raw")) {
-    stage = SILStage::Raw;
-    P.consumeToken();
-  } else if (P.Tok.isContextualKeyword("canonical")) {
-    stage = SILStage::Canonical;
-    P.consumeToken();
-  } else if (P.Tok.isContextualKeyword("lowered")) {
-    stage = SILStage::Lowered;
+  if (auto parsed = getSILStageByName(P.Tok.getText())) {
+    stage = *parsed;
     P.consumeToken();
   } else {
     P.diagnose(P.Tok, diag::expected_sil_stage_name);
@@ -8007,7 +8032,7 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
     return false;
   }
 
-  M.setStage(stage);
+  M.commitStage(stage);
   DidParseSILStage = true;
   return false;
 }
