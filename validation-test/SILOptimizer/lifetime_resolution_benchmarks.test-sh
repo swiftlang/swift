@@ -1,0 +1,337 @@
+#! /usr/bin/env python3
+# -*- python -*-
+# RUN: %empty-directory(%t)
+# RUN: %{python} %s '%swift_src_root' %t "%target-build-swift" "%target-clang" "%target-codesign" "%target-run"
+# REQUIRES: executable_test
+# REQUIRES: OS=macosx
+# ALLOW_RETRIES: 1
+
+# Builds every single-source benchmark with -enable-lifetime-resolution, runs
+# it, and checks that neither the compiler nor the benchmark fails.
+#
+# The benchmarks are run by a minimal driver rather than DriverUtils, which
+# refuses to run against a stdlib with assertions enabled.
+#
+# To run a subset by hand, append benchmark names to the arguments above.
+
+import concurrent.futures
+import os
+import pathlib
+import shlex
+import signal
+import subprocess
+import sys
+
+
+# Files that are expected to fail to compile or run. Listing a file that
+# passes is an error.
+EXCEPTIONAL_FILES = [
+    # Compiler crash in LifetimeResolution
+    pathlib.Path("benchmark/single-source/ToddCoxeter.swift"),
+    pathlib.Path("benchmark/utils/DriverUtils.swift"),
+    # Compiler crash in DiagnoseInvalidEscapingCaptures
+    pathlib.Path("benchmark/single-source/Exclusivity.swift"),
+    # SIL memory lifetime verification failure
+    pathlib.Path("benchmark/single-source/DictOfArraysToArrayOfDicts.swift"),
+    pathlib.Path("benchmark/single-source/DictTest.swift"),
+    pathlib.Path("benchmark/single-source/DiffingMyers.swift"),
+    pathlib.Path("benchmark/single-source/Hash.swift"),
+    pathlib.Path("benchmark/single-source/LinkedList.swift"),
+    pathlib.Path("benchmark/single-source/MapReduce.swift"),
+    pathlib.Path("benchmark/single-source/RomanNumbers.swift"),
+    pathlib.Path("benchmark/single-source/SubstringTest.swift"),
+    # Spurious use-before-init / use-after-consume errors
+    pathlib.Path("benchmark/single-source/DictionaryBridge.swift"),
+    pathlib.Path("benchmark/single-source/DictionaryKeysContains.swift"),
+    pathlib.Path("benchmark/single-source/NSDictionaryCastToSwift.swift"),
+    pathlib.Path("benchmark/single-source/NSStringConversion.swift"),
+    pathlib.Path("benchmark/single-source/ObjectiveCBridging.swift"),
+    pathlib.Path("benchmark/single-source/ObjectiveCNoBridgingStubs.swift"),
+    # Spurious 'copy of noncopyable typed value' errors
+    pathlib.Path("benchmark/single-source/Concurrency/TaskIsCancelledCancellationScopes.swift"),
+    pathlib.Path("benchmark/single-source/SpanTests.swift"),
+    # Crashes at runtime
+    pathlib.Path("benchmark/single-source/NIOChannelPipeline.swift"),
+    pathlib.Path("benchmark/single-source/ObjectAllocation.swift"),
+    pathlib.Path("benchmark/single-source/RandomTree.swift"),
+]
+
+# Benchmarks that are not built by the benchmark suite at all.
+UNSUPPORTED_FILES = [
+    # Depends on the disabled SimpleArray module.
+    pathlib.Path("benchmark/single-source/SimpleArraySpecialization.swift"),
+]
+
+# Tags skipped by DriverUtils by default in a -DDEBUG build.
+SKIPPED_TAGS = ["skip", "unstable", "long"]
+
+BENCHMARK_DIRS = [
+    pathlib.Path("benchmark/single-source"),
+    pathlib.Path("benchmark/single-source/Concurrency"),
+]
+
+EXTRA_FLAGS = {
+    "ObjectiveCNoBridgingStubs": ["-Xfrontend", "-disable-swift-bridge-attr"],
+}
+
+BASE_FLAGS = ["-Onone", "-DDEBUG"]
+LR_FLAGS = BASE_FLAGS + ["-Xfrontend", "-enable-lifetime-resolution"]
+
+TIMEOUT_SECONDS = 600
+OUTPUT_CONTEXT_LINES = 20
+
+
+class StageFailure(Exception):
+    def __init__(self, stage, cmd, status, output):
+        self.stage = stage
+        self.cmd = cmd
+        self.status = status
+        self.output = output
+
+
+def describe_returncode(code):
+    if code < 0:
+        try:
+            return f"signal {signal.Signals(-code).name}"
+        except ValueError:
+            return f"signal {-code}"
+    return f"exit code {code}"
+
+
+def run_stage(stage, cmd, env=None):
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            timeout=TIMEOUT_SECONDS,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as e:
+        output = e.output or ""
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        raise StageFailure(stage, cmd, f"timed out after {TIMEOUT_SECONDS}s", output)
+    if proc.returncode != 0:
+        raise StageFailure(stage, cmd, describe_returncode(proc.returncode), proc.stdout)
+
+
+class Tools:
+    def __init__(self, src_root, tmp, build_swift, clang, codesign, run):
+        self.src_root = src_root
+        self.tmp = tmp
+        self.build_swift = shlex.split(build_swift)
+        self.clang = shlex.split(clang)
+        self.codesign = shlex.split(codesign)
+        self.run = shlex.split(run)
+        self.utils = src_root / "benchmark" / "utils"
+        self.include_flags = [
+            "-I", str(tmp),
+            "-I", str(self.utils / "ObjectiveCTests"),
+            "-I", str(self.utils / "LibProc"),
+        ]
+        self.util_objects = [
+            str(tmp / "TestsUtils.o"),
+            str(tmp / "ObjectiveCTests.o"),
+            "-framework", "Foundation",
+        ]
+
+    def build_module(self, stage, module_name, sources, out_dir, extra=(),
+                     flags=LR_FLAGS):
+        run_stage(
+            stage,
+            self.build_swift
+            + flags
+            + self.include_flags
+            + list(extra)
+            + [
+                "-parse-as-library",
+                "-wmo",
+                "-no-link-objc-runtime",
+                "-module-name", module_name,
+                "-emit-module",
+                "-emit-module-path", str(out_dir / f"{module_name}.swiftmodule"),
+                "-c",
+                "-o", str(out_dir / f"{module_name}.o"),
+            ]
+            + [str(s) for s in sources],
+        )
+
+    def build_utils(self, results):
+        # Every benchmark links against TestsUtils, so if it is expected to
+        # fail, fall back to building it without lifetime resolution.
+        sources = [self.utils / "TestsUtils.swift"]
+        rel = sources[0].relative_to(self.src_root)
+        try:
+            self.build_module("compile", "TestsUtils", sources, self.tmp)
+            results[rel] = None
+        except StageFailure as f:
+            results[rel] = f
+            if rel not in EXCEPTIONAL_FILES:
+                return False
+            self.build_module(
+                "compile without lifetime resolution", "TestsUtils", sources,
+                self.tmp, flags=BASE_FLAGS)
+        run_stage(
+            "compile ObjectiveCTests",
+            self.clang
+            + [
+                "-fobjc-arc",
+                "-O3",
+                "-I", str(self.utils / "ObjectiveCTests"),
+                "-c", str(self.utils / "ObjectiveCTests" / "ObjectiveCTests.m"),
+                "-o", str(self.tmp / "ObjectiveCTests.o"),
+            ],
+        )
+        return True
+
+    def build_driver_utils(self):
+        out_dir = self.tmp / "DriverUtils"
+        out_dir.mkdir()
+        self.build_module(
+            "compile", "DriverUtils",
+            [self.utils / "DriverUtils.swift", self.utils / "ArgParse.swift"],
+            out_dir)
+
+    def build_and_run(self, source):
+        name = source.stem
+        out_dir = self.tmp / name
+        out_dir.mkdir()
+
+        self.build_module(
+            "compile", name, [source], out_dir,
+            ["-swift-version", "4"] + EXTRA_FLAGS.get(name, []))
+
+        main = out_dir / "main.swift"
+        skipped = ", ".join(f".{t}" for t in SKIPPED_TAGS)
+        main.write_text(
+            "import TestsUtils\n"
+            f"import {name}\n"
+            "func all(_ b: BenchmarkInfo) -> [BenchmarkInfo] { [b] }\n"
+            "func all<S: Sequence<BenchmarkInfo>>(_ s: S) -> [BenchmarkInfo] { Array(s) }\n"
+            f"let skipped: Set<BenchmarkCategory> = [{skipped}]\n"
+            f"for b in all({name}.benchmarks) where b.tags.isDisjoint(with: skipped) {{\n"
+            "  guard let run = b.runFunction else { continue }\n"
+            "  b.setUpFunction?()\n"
+            "  await run(1)\n"
+            "  b.tearDownFunction?()\n"
+            "}\n"
+        )
+        exe = out_dir / name
+        run_stage(
+            "link",
+            self.build_swift
+            + LR_FLAGS
+            + self.include_flags
+            + ["-module-name", "BenchmarkMain", "-I", str(out_dir)]
+            + [str(main), str(out_dir / f"{name}.o")]
+            + self.util_objects
+            + ["-o", str(exe)],
+        )
+        run_stage("codesign", self.codesign + [str(exe)])
+
+        env = dict(os.environ, SWIFT_DETERMINISTIC_HASHING="1")
+        run_stage(
+            "run",
+            self.run + [str(exe)],
+            env=env,
+        )
+
+
+def find_benchmarks(src_root, only):
+    benchmarks = []
+    for d in BENCHMARK_DIRS:
+        for path in sorted((src_root / d).glob("*.swift")):
+            rel = path.relative_to(src_root)
+            if rel in UNSUPPORTED_FILES:
+                continue
+            if only and path.stem not in only:
+                continue
+            benchmarks.append(rel)
+    return benchmarks
+
+
+def print_failure(label, failure):
+    print(f"{label}: error: {failure.stage} failed ({failure.status})")
+    print("  command: " + shlex.join(failure.cmd))
+    lines = failure.output.rstrip().splitlines()
+    if len(lines) > 2 * OUTPUT_CONTEXT_LINES:
+        omitted = len(lines) - 2 * OUTPUT_CONTEXT_LINES
+        lines = (lines[:OUTPUT_CONTEXT_LINES]
+                 + [f"... ({omitted} lines omitted)"]
+                 + lines[-OUTPUT_CONTEXT_LINES:])
+    for line in lines:
+        print("  | " + line)
+
+
+def report(src_root, results):
+    had_error = False
+    for rel, failure in sorted(results.items()):
+        expected_failure = rel in EXCEPTIONAL_FILES
+        if failure and not expected_failure:
+            print_failure(rel, failure)
+            had_error = True
+        elif not failure and expected_failure:
+            print(f"{rel}: error: unexpectedly passed; remove it from "
+                  "EXCEPTIONAL_FILES")
+            had_error = True
+
+    for rel in EXCEPTIONAL_FILES:
+        if not (src_root / rel).exists():
+            print(f"{rel}: error: listed in EXCEPTIONAL_FILES but does not exist")
+            had_error = True
+
+    num_failed = sum(1 for f in results.values() if f)
+    num_expected = sum(1 for rel in results if rel in EXCEPTIONAL_FILES)
+    print(f"{len(results)} files: {len(results) - num_failed} passed, "
+          f"{num_failed} failed, {num_expected} expected to fail")
+    return had_error
+
+
+def main():
+    if len(sys.argv) < 7:
+        print("Invalid number of arguments.")
+        sys.exit(1)
+
+    src_root = pathlib.Path(sys.argv[1])
+    tmp = pathlib.Path(sys.argv[2])
+    tools = Tools(src_root, tmp, *sys.argv[3:7])
+    only = set(sys.argv[7:])
+
+    benchmarks = find_benchmarks(src_root, only)
+    if only and len(benchmarks) != len(only):
+        found = {b.stem for b in benchmarks}
+        print(f"error: unknown benchmarks: {sorted(only - found)}")
+        sys.exit(1)
+
+    results = {}
+    try:
+        utils_ok = tools.build_utils(results)
+    except StageFailure as f:
+        print_failure("benchmark/utils", f)
+        sys.exit(1)
+
+    if utils_ok:
+        with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
+            futures = {
+                pool.submit(tools.build_and_run, src_root / b): b
+                for b in benchmarks
+            }
+            if not only:
+                driver_utils = pathlib.Path("benchmark/utils/DriverUtils.swift")
+                futures[pool.submit(tools.build_driver_utils)] = driver_utils
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                    results[futures[future]] = None
+                except StageFailure as f:
+                    results[futures[future]] = f
+
+    if report(src_root, results) or not utils_ok:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
