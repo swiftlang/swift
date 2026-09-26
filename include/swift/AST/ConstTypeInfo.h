@@ -44,7 +44,8 @@ public:
     InterpolatedString,
     NilLiteral,
     Runtime,
-    MemberFunctionCall
+    MemberFunctionCall,
+    ChainedMemberReference
   };
 
   ValueKind getKind() const { return Kind; }
@@ -502,6 +503,27 @@ public:
 private:
   swift::Type BaseType;
   std::string MemberLabel;
+};
+
+/// A chained instance property access, e.g. `.member.property` where `.member`
+/// is a static member and `.property` is an instance property on its result.
+class ChainedMemberReferenceValue : public CompileTimeValue {
+public:
+  ChainedMemberReferenceValue(std::shared_ptr<CompileTimeValue> StepValue,
+                              std::shared_ptr<CompileTimeValue> BaseValue)
+      : CompileTimeValue(ValueKind::ChainedMemberReference),
+        StepValue(StepValue), BaseValue(BaseValue) {}
+
+  std::shared_ptr<CompileTimeValue> getStepValue() const { return StepValue; }
+  std::shared_ptr<CompileTimeValue> getBaseValue() const { return BaseValue; }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::ChainedMemberReference;
+  }
+
+private:
+  std::shared_ptr<CompileTimeValue> StepValue;
+  std::shared_ptr<CompileTimeValue> BaseValue;
 };
 
 /// A representation of an Interpolated String Literal
