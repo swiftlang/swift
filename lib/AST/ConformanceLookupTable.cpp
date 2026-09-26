@@ -353,11 +353,44 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         if (classDecl == superclassDecl)
           break;
 
-        // Resolve the conformances of the superclass.
+        // Resolve the conformances of the superclass. If this class directly
+        // states Sendable (or a protocol that refines it), first demand the
+        // superclass's implicit Sendable conformance. An inherited result from
+        // that request is not registered in the superclass table, so record an
+        // equivalent inherited source here before resolving this table.
         superclassDecl->prepareConformanceTable();
-        superclassDecl->ConformanceTable->updateLookupTable(
-          superclassDecl,
-          ConformanceStage::Resolved);
+        auto *superclassTable = superclassDecl->ConformanceTable;
+
+        if (auto *sendable = nominal->getASTContext().getProtocol(
+                KnownProtocolKind::Sendable)) {
+          bool needsSendable =
+              llvm::any_of(Conformances, [&](const auto &conformances) {
+                auto *protocol = conformances.first;
+                return protocol == sendable || protocol->inheritsFrom(sendable);
+              });
+          if (needsSendable) {
+            // Preserve extension-macro expansion and evaluator cycle guards by
+            // going through the normal lookup entry point.
+            auto conformance = swift::lookupConformance(
+                superclassDecl->getDeclaredInterfaceType(), sendable,
+                /*allowMissing=*/false);
+            if (conformance.isConcrete()) {
+              auto known = superclassTable->Conformances.find(sendable);
+              bool hasRecordedSource =
+                  known != superclassTable->Conformances.end() &&
+                  !known->second.empty();
+              if (!hasRecordedSource) {
+                auto *inherited = cast<InheritedProtocolConformance>(
+                    nominal->getASTContext().getInheritedConformance(
+                        classDecl->getDeclaredInterfaceType(),
+                        conformance.getConcrete()));
+                registerImplicitInheritedConformance(classDecl, inherited);
+              }
+            }
+          }
+        }
+        superclassTable->updateLookupTable(superclassDecl,
+                                           ConformanceStage::Resolved);
         
         // Expand inherited conformances from all superclasses.
         // We may have circular inheritance in ill-formed classes, so keep an
@@ -1057,6 +1090,40 @@ void ConformanceLookupTable::addSynthesizedConformance(
               ConformanceSource::forSynthesized(conformanceDC));
 }
 
+void ConformanceLookupTable::registerImplicitInheritedConformance(
+    ClassDecl *classDecl, InheritedProtocolConformance *conformance) {
+  auto *protocol = conformance->getProtocol();
+  auto &classConformances = AllConformances[classDecl];
+
+  // Another subclass may already have forced this implicit conformance. Reuse
+  // the existing inherited source rather than adding duplicate entries.
+  for (auto *entry : classConformances) {
+    if (entry->isSuperseded() || entry->getProtocol() != protocol ||
+        entry->getKind() != ConformanceEntryKind::Inherited)
+      continue;
+
+    assert(!entry->getConformance() || entry->getConformance() == conformance);
+    entry->Conformance = conformance;
+    return;
+  }
+
+  ASTContext &ctx = classDecl->getASTContext();
+  auto *entry =
+      new (ctx) ConformanceEntry(classDecl->getLoc(), protocol,
+                                 ConformanceSource::forInherited(classDecl));
+  entry->Conformance = conformance;
+  Conformances[protocol].push_back(entry);
+  classConformances.push_back(entry);
+
+  // This source can be discovered after an earlier query advanced the table.
+  // Revisit the nominal in the stages that expand and rank its conformances.
+  auto &lastProcessed = LastProcessed[classDecl];
+  lastProcessed[static_cast<unsigned>(ConformanceStage::ExpandedImplied)]
+      .setInt(false);
+  lastProcessed[static_cast<unsigned>(ConformanceStage::Resolved)].setInt(
+      false);
+}
+
 void ConformanceLookupTable::registerProtocolConformance(
        DeclContext *dc, ProtocolConformance *conformance,
        bool synthesized) {
@@ -1112,7 +1179,8 @@ bool ConformanceLookupTable::lookupConformance(
 
   // Look for conformances to this protocol.
   auto known = Conformances.find(protocol);
-  if (known == Conformances.end() || hasUnexpanded(known->second)) {
+  if (known == Conformances.end() || known->second.empty() ||
+      hasUnexpanded(known->second)) {
     // If we didn't find anything, or have unexpanded macro conformances, expand
     // implied conformances. We can run into the latter case when we expand a
     // macro that introduces a conformance that implies another conformance --
@@ -1122,7 +1190,7 @@ bool ConformanceLookupTable::lookupConformance(
     known = Conformances.find(protocol);
 
     // We didn't find anything.
-    if (known == Conformances.end())
+    if (known == Conformances.end() || known->second.empty())
       return false;
   }
 
