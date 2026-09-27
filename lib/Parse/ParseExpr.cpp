@@ -473,6 +473,24 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     return sub;
   }
 
+  // 'nowait <call>' is a fire-and-forget alternative to 'await'.
+  // Recognize it only when it is followed by something that can start a call
+  // expression, so that 'nowait' remains usable as an identifier elsewhere
+  if (Context.LangOpts.hasFeature(Feature::OnewayNowait) &&
+      Tok.isContextualKeyword("nowait") &&
+      peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                        tok::code_complete) &&
+      !peekToken().isAtStartOfLine()) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc nowaitLoc = consumeToken();
+    ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_nowait, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) NowaitExpr(nowaitLoc, sub.get()));
+    }
+    return sub;
+  }
+
   if (Context.LangOpts.hasFeature(Feature::OldOwnershipOperatorSpellings)) {
     if (Tok.isContextualKeyword("_move")) {
       Tok.setKind(tok::contextual_keyword);

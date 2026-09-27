@@ -1421,6 +1421,8 @@ ERROR(expected_expr_after_move, none,
       "expected expression after 'consume'", ())
 ERROR(expected_expr_after_copy, none,
       "expected expression after 'copy'", ())
+ERROR(expected_expr_after_nowait, none,
+      "expected function call after 'nowait'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
 ERROR(expected_expr_after_each, none,
@@ -2208,6 +2210,15 @@ ERROR(requires_experimental_feature, none,
       "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
       "%2 is enabled",
       (StringRef, bool, StringRef))
+
+ERROR(oneway_requires_experimental_feature, none,
+      "'oneway' modifier is only valid when experimental feature "
+      "%0 is enabled",
+      (StringRef))
+
+ERROR(oneway_repeated, none,
+      "'oneway' modifier cannot be applied more than once",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime dependence

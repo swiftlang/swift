@@ -488,6 +488,40 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
             Err: Error
 #endif
 
+#if $Embedded
+  /// Invoked by the Swift runtime when making a fire-and-forget remote call to
+  /// a `oneway` distributed function with a synchronous body, e.g.
+  /// `try nowait greeter.greet(name)`.
+  ///
+  /// Unlike ``remoteCallVoid(on:target:invocation:throwing:)`` this method is
+  /// synchronous. The distributed thunk of such a function calls it without
+  /// `await`, so neither the thunk nor its callers need any async suspension
+  /// points. Implementations should encode the invocation and hand it to the
+  /// transport without waiting for a reply from the peer. They may throw if
+  /// that fails, and the error is rethrown to the caller of the thunk. The
+  /// `target` has ``RemoteCallTarget/isOnewayRemoteCall`` set.
+  ///
+  /// A default implementation is provided. It starts a `Task.immediate` that
+  /// awaits ``remoteCallVoid(on:target:invocation:throwing:)`` and drops any
+  /// error thrown by it, since a `oneway` call has no way to report a remote
+  /// error to its caller. The default keeps actor systems that do not
+  /// implement this method working, but it creates a task for every call and
+  /// emits async code once per `Act` and `Err` combination. Implement this
+  /// method to get fully synchronous sends.
+  ///
+  /// ### Embedded Swift
+  /// This requirement only exists in Embedded Swift
+  func remoteCallVoidOneway<Act, Err>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type
+  ) throws
+      where Act: DistributedActor,
+            Act.ActorSystem == Self,
+            Err: Error
+#endif
+
 #if !$Embedded
   // Implementation notes:
   // The `metatype` must be the type of `Value`, and it must conform to
@@ -514,6 +548,87 @@ extension DistributedActorSystem {
   public func resignRemoteID(_ id: ActorID) {}
 }
 #endif // !$Embedded
+
+#if $Embedded
+extension DistributedActorSystem {
+  /// Default implementation, which forwards to
+  /// ``remoteCallVoid(on:target:invocation:throwing:)`` from a
+  /// `Task.immediate` and drops any error thrown by it.
+  ///
+  /// A `oneway` call has no way to report a remote error to its caller, so
+  /// there is nothing to forward the error to. Actor systems that can send
+  /// synchronously should implement this requirement directly instead, which
+  /// avoids the task and its async code entirely
+  public func remoteCallVoidOneway<Act, Err>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type
+  ) throws
+      where Act: DistributedActor,
+            Act.ActorSystem == Self,
+            Err: Error
+  {
+    // The escaping task closure cannot capture the 'inout' encoder, so move
+    // it into a local. The thunk does not use it again after this call returns
+    nonisolated(unsafe) let movedInvocation = invocation
+    // 'RemoteCallTarget' is non-escapable, so copy the identifier bytes into
+    // owned storage and re-create the target inside the task
+    let identifierBytes = target.identifier.withUnsafeBytes { unsafe [UInt8]($0) }
+    let isOnewayRemoteCall = target.isOnewayRemoteCall
+    Task.immediate {
+      var invocation = movedInvocation
+      var target = RemoteCallTarget(identifierBytes.span.bytes)
+      target.isOnewayRemoteCall = isOnewayRemoteCall
+      do {
+        try await self.remoteCallVoid(
+            on: actor, target: target, invocation: &invocation,
+            throwing: throwing)
+      } catch {
+        // A 'oneway' call cannot observe remote errors, drop it
+      }
+    }
+  }
+}
+
+/// Run the synchronous `body` on the local distributed actor `actor` from a
+/// new discarding task, without waiting for it.
+///
+/// The task copies the task locals of the caller and starts on the actor's
+/// executor, so calls enqueued on the same actor run in the order they were
+/// enqueued.
+///
+/// SPI: used by the compiler in the distributed thunk and the Embedded
+/// receive dispatcher of synchronous `oneway` distributed functions. Do not
+/// use
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func _enqueueOnewayDistributed<DA: DistributedActor>(
+  on actor: DA,
+  _ body: @escaping (isolated DA) -> Void
+) {
+  // The body only ever runs on the actor's executor, so it is safe to drop
+  // the 'isolated' from its parameter. See '_enqueueOneway(on:_:)'
+  let unisolatedBody: (DA) -> Void = Builtin.reinterpretCast(body)
+  unsafe _enqueueOnewayUnchecked(
+    on: actor.unownedExecutor, actor, unisolatedBody)
+}
+
+/// Returns `value`, which the caller asserts is not referenced by anything
+/// else, as a disconnected value.
+///
+/// SPI: used by the compiler in the Embedded receive dispatcher of synchronous
+/// `oneway` distributed functions, whose decoded arguments are captured by the
+/// call enqueued on the actor. Do not use
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func _onewayDecodedArgument<Value>(
+  _ value: consuming Value
+) -> sending Value {
+  nonisolated(unsafe) let decoded = value
+  return decoded
+}
+#endif // $Embedded
 
 // ==== ----------------------------------------------------------------------------------------------------------------
 // MARK: Execute Distributed Methods
@@ -871,13 +986,62 @@ internal func _validateMatchingResultHandler<
 public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   private let _identifier: String
 
+  // Backing storage for 'isOnewayRemoteCall'
+  private var _isOnewayRemoteCall: Bool
+
   public init(_ identifier: String) {
     self._identifier = identifier
+    self._isOnewayRemoteCall = false
   }
 
   /// The underlying identifier of the target, returned as-is.
   public var identifier: String {
     return _identifier
+  }
+
+  /// Whether this target is the remote call of a `oneway` distributed function.
+  ///
+  /// This is a runtime hint for the distributed actor system that the remote
+  /// call is fire-and-forget: no peer reply is expected, and the actor system
+  /// is free to complete the local side of the call without awaiting one.
+  ///
+  /// The synthesized thunk still invokes ``remoteCallVoid`` as `try await`, so
+  /// the actor system is allowed to suspend the caller until an outgoing write
+  /// completes and to throw on send failure. It just must not depend on a
+  /// reply from the peer.
+  ///
+  /// In Embedded Swift the thunk of a `oneway` function with a synchronous
+  /// body is itself synchronous, and invokes the synchronous
+  /// `remoteCallVoidOneway` requirement instead, without `await`
+  ///
+  /// Outside of Embedded Swift a `oneway` distributed function requires
+  /// Swift 6.5 availability, because an older recipient cannot demangle the
+  /// `oneway` remote call target identifier
+  @available(SwiftStdlib 6.5, *)
+  public var isOnewayRemoteCall: Bool {
+    get { _isOnewayRemoteCall }
+    set { _isOnewayRemoteCall = newValue }
+  }
+
+  /// Marks this target as the remote call of a `oneway` distributed function
+  ///
+  /// Called by the synthesized distributed thunk of a `oneway` function
+  /// Synthesized code is not availability checked, and this is emitted into
+  /// the client, so it only sets ``isOnewayRemoteCall`` when running on a
+  /// runtime which has it. The flag is only a hint to the actor system, so
+  /// this is a no-op on older runtimes
+  ///
+  /// A `oneway` distributed function itself requires Swift 6.5 availability
+  /// outside of Embedded Swift, so the check is normally redundant, but it is
+  /// kept since it is harmless and the thunk is not availability checked
+  @available(SwiftStdlib 5.7, *)
+  @export(implementation)
+  public mutating func _markOnewayRemoteCall() {
+    // This is SwiftStdlib 6.5, but an availability macro can't be used in an
+    // @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      self.isOnewayRemoteCall = true
+    }
   }
 
   /// Attempts to pretty format the underlying target identifier.
@@ -888,6 +1052,16 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     } else {
       return "\(_identifier)"
     }
+  }
+
+  // A target's identity is its identifier, the 'oneway' flag does not
+  // participate in equality and hashing
+  public static func ==(lhs: RemoteCallTarget, rhs: RemoteCallTarget) -> Bool {
+    lhs._identifier == rhs._identifier
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_identifier)
   }
 }
 #else
@@ -913,6 +1087,27 @@ private let _immortalStaticStorage: Int = 0
 @available(SwiftStdlib 6.5, *)
 public struct RemoteCallTarget: ~Escapable {
   @usableFromInline internal let _identifier: RawSpan
+
+  // Backing storage for 'isOnewayRemoteCall'
+  @usableFromInline internal var _isOnewayRemoteCall: Bool = false
+
+  /// Whether this target is the remote call of a `oneway` distributed function.
+  ///
+  /// The synthesized distributed thunk sets this for `oneway` functions. The
+  /// actor system must not wait for, or depend on, a reply from the peer for
+  /// such a call
+  public var isOnewayRemoteCall: Bool {
+    get { _isOnewayRemoteCall }
+    set { _isOnewayRemoteCall = newValue }
+  }
+
+  /// Marks this target as the remote call of a `oneway` distributed function
+  ///
+  /// Called by the synthesized distributed thunk of a `oneway` function
+  @export(implementation)
+  public mutating func _markOnewayRemoteCall() {
+    _isOnewayRemoteCall = true
+  }
 
   /// Create a target from a compile-time constant mangled name.
   ///

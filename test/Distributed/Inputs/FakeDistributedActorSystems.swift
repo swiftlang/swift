@@ -422,6 +422,9 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
           Act.ID == ActorID,
           Err: Error {
     print("  >> remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType))")
+    if #available(SwiftStdlib 6.5, *), target.isOnewayRemoteCall {
+      print("  >> remoteCallVoid: is oneway call")
+    }
     guard let targetActor = activeActors[actor.id] else {
       fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
     }

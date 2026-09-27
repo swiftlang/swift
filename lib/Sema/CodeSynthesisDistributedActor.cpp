@@ -83,6 +83,72 @@ static Expr *createDistributedResolveCall(ASTContext &C,
 }
 
 
+/// Build the implicit member reference `<base>.<func>` to exactly \p func
+///
+/// Synthesized code must not look the function up by name: a 'oneway' and a
+/// non-'oneway' function with the same name are distinct overloads, so a
+/// lookup by name would be ambiguous
+static Expr *createExactMemberRef(ASTContext &C, Expr *base,
+                                  AbstractFunctionDecl *func) {
+  // An invalid 'distributed static func' was already diagnosed, keep the
+  // lookup by name so that its thunk fails to type-check gracefully
+  if (func->isStatic())
+    return UnresolvedDotExpr::createImplicit(C, base, func->getBaseName());
+
+  return new (C) MemberRefExpr(base, /*dotLoc=*/SourceLoc(),
+                               ConcreteDeclRef(func), DeclNameLoc(),
+                               /*implicit=*/true);
+}
+
+/// Build `_enqueueOnewayDistributed(on: <actorExpr>) { __isolatedSelf in
+/// __isolatedSelf.<func>(<args>) }`.
+///
+/// This schedules a call to the synchronous 'oneway' function \p func on the
+/// local actor's executor without awaiting it: a discarding task which copies
+/// the caller's task locals and starts on the actor's executor, so there is
+/// no async code at the call site. Used for 'oneway' functions for which
+/// \c FuncDecl::isSynchronouslyEnqueuedOneway() is true
+static Expr *createEnqueueOnewayCall(ASTContext &C, DeclContext *parentDC,
+                                     Expr *actorExpr, FuncDecl *func,
+                                     ArrayRef<Argument> args) {
+  const SourceLoc sloc = SourceLoc();
+  const DeclNameLoc dloc = DeclNameLoc();
+  const bool implicit = true;
+
+  auto *closure = new (C) ClosureExpr(
+      DeclAttributes(), /*bracketRange=*/SourceRange(),
+      /*capturedSelfDecl=*/nullptr, /*params=*/nullptr,
+      /*asyncLoc=*/sloc, /*throwsLoc=*/sloc, /*thrownType=*/nullptr,
+      /*arrowLoc=*/sloc, /*inLoc=*/sloc, /*explicitResultType=*/nullptr,
+      parentDC);
+  closure->setImplicit();
+
+  // The closure's single parameter is inferred as 'isolated Act' from the
+  // '_enqueueOnewayDistributed' parameter type, so the call in its body is a
+  // plain, synchronous, same-actor call
+  auto *isolatedSelfParam = new (C) ParamDecl(
+      sloc, sloc, Identifier(), sloc, C.getIdentifier("__isolatedSelf"),
+      closure);
+  isolatedSelfParam->setImplicit();
+  isolatedSelfParam->setSpecifier(ParamSpecifier::Default);
+  closure->setParameterList(ParameterList::create(C, {isolatedSelfParam}));
+
+  auto *funcRef = createExactMemberRef(
+      C, new (C) DeclRefExpr(ConcreteDeclRef(isolatedSelfParam), dloc,
+                             implicit),
+      func);
+  auto *call = CallExpr::createImplicit(
+      C, funcRef, ArgumentList::createImplicit(C, args));
+  closure->setBody(BraceStmt::createImplicit(C, {ASTNode(call)}));
+
+  auto *enqueueRef = UnresolvedDeclRefExpr::createImplicit(
+      C, DeclName(C.getIdentifier("_enqueueOnewayDistributed")));
+  auto *enqueueArgs = ArgumentList::createImplicit(
+      C, {Argument(sloc, C.Id_on, actorExpr),
+          Argument::unlabeled(closure)});
+  return CallExpr::createImplicit(C, enqueueRef, enqueueArgs);
+}
+
 /// Mangle the target thunk in a way that we can look up the appropriate record.
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
@@ -122,6 +188,13 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   Type returnTy = func->getResultInterfaceType();
   auto isVoidReturn = returnTy->isVoid();
 
+  // A synchronous 'oneway' function gets a synchronous thunk (see
+  // 'createSameSignatureDistributedThunkDecl'), which enqueues local calls
+  // and uses the synchronous 'remoteCallVoidOneway' for remote calls
+  const bool isSyncOneway = !thunk->hasAsync();
+  assert((!isSyncOneway || func->isSynchronouslyEnqueuedOneway()) &&
+         "only synchronous 'oneway' functions get a synchronous thunk");
+
   // === Type:
   StructDecl *RCT = C.getRemoteCallTargetDecl();
   assert(RCT && "Missing RemoteCalLTarget declaration");
@@ -159,6 +232,32 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         ReturnStmt::createImplicit(C, sloc, localPropertyAccess);
     localBranchStmt =
         BraceStmt::create(C, sloc, {returnLocalPropertyAccess}, sloc, implicit);
+  } else if (isSyncOneway) {
+    // A synchronous 'oneway' function: enqueue the call on the local actor
+    // without awaiting it, so the thunk does not need to be 'async'
+    //
+    // TODO: Omit this branch for a '$P' stub, which is remote-only, so its
+    // local branch is unreachable
+    //
+    //   _enqueueOnewayDistributed(on: self) { __isolatedSelf in
+    //     __isolatedSelf.<func>(<params>)
+    //   }
+    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+
+    SmallVector<Expr*, 4> forwardingParams;
+    forwardParameters(thunk, forwardingParams);
+    SmallVector<Argument, 4> forwardingArgs;
+    auto *thunkParams = thunk->getParameters();
+    for (unsigned i : indices(forwardingParams)) {
+      forwardingArgs.push_back(
+          Argument(sloc, thunkParams->get(i)->getArgumentName(),
+                   forwardingParams[i]));
+    }
+
+    Expr *enqueueCall = createEnqueueOnewayCall(
+        C, thunk, selfRefExpr, func, forwardingArgs);
+    localBranchStmt =
+        BraceStmt::create(C, sloc, {enqueueCall}, sloc, implicit);
   } else {
     // normal function
     auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
@@ -166,10 +265,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     // -- forward arguments
     SmallVector<Expr*, 4> forwardingParams;
     forwardParameters(thunk, forwardingParams);
-    auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
-    auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
-    auto funcDeclRef =
-        UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+    auto forwardingArgList = ArgumentList::forImplicitCallTo(
+        DeclNameRef(func->getName()), forwardingParams, C);
+    auto funcDeclRef = createExactMemberRef(C, selfRefExpr, func);
 
     Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
     localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
@@ -468,9 +566,16 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  VarDecl *targetVar = VarDeclBuilder(thunk, C.Id_target)
-                           .introducer(VarDecl::Introducer::Let)
-                           .type(remoteCallTargetTy);
+  // 'oneway' is a trailing modifier on the function itself (never on an
+  // accessor / computed property), so read it straight off 'func'. When set it
+  // flags the freshly constructed 'RemoteCallTarget', which requires the target
+  // to be introduced as a 'var'
+  bool isOneway = func->isOneway();
+  VarDecl *targetVar =
+      VarDeclBuilder(thunk, C.Id_target)
+          .introducer(isOneway ? VarDecl::Introducer::Var
+                               : VarDecl::Introducer::Let)
+          .type(remoteCallTargetTy);
 
   {
     // --- Mangle the thunk name
@@ -481,7 +586,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         new (C) StringLiteralExpr(mangledAccessorRecordName,
                                   SourceRange(), implicit);
 
-    // --- let target = RemoteCallTarget(<mangled name>)
+    // --- let/var target = RemoteCallTarget(<mangled name>)
     Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
 
     auto remoteCallTargetInitDecl =
@@ -503,12 +608,33 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     remoteBranchStmts.push_back(targetPB);
     remoteBranchStmts.push_back(targetVar);
+
+    // --- Mark the target as a 'oneway' (fire-and-forget) remote call
+    //
+    //   target._markOnewayRemoteCall()
+    //
+    // Synthesized code is not availability checked, so do not set
+    // 'isOnewayRemoteCall' (available since Swift 6.5) directly: the helper is
+    // emitted into the client and only sets the flag when running on a
+    // runtime which has it, which makes it a no-op when back deployed
+    if (isOneway) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      auto *markRef = UnresolvedDotExpr::createImplicit(
+          C, targetRef, C.Id_markOnewayRemoteCall, ArrayRef<Identifier>());
+      remoteBranchStmts.push_back(CallExpr::createImplicitEmpty(C, markRef));
+    }
   }
 
   // === Make the 'remoteCall(Void)(...)'
   {
     DeclName remoteCallName;
-    if (isVoidReturn) {
+    if (isSyncOneway) {
+      remoteCallName =
+          DeclName(C, C.Id_remoteCallVoidOneway,
+                   {C.Id_on, C.Id_target, C.Id_invocation, C.Id_throwing});
+    } else if (isVoidReturn) {
       remoteCallName =
           DeclName(C, C.Id_remoteCallVoid,
                    {C.Id_on, C.Id_target, C.Id_invocation, C.Id_throwing});
@@ -579,7 +705,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     Expr *remoteCallExpr =
         CallExpr::createImplicit(C, systemRemoteCallRef, remoteCallArgs);
-    remoteCallExpr = AwaitExpr::createImplicit(C, sloc, remoteCallExpr);
+    // 'remoteCallVoidOneway' is synchronous
+    if (!isSyncOneway)
+      remoteCallExpr = AwaitExpr::createImplicit(C, sloc, remoteCallExpr);
     remoteCallExpr = TryExpr::createImplicit(C, sloc, remoteCallExpr);
 
     auto returnRemoteCall =
@@ -662,13 +790,22 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
     // Let's use the name of a 'distributed func'
     DeclName thunkName = func->getName();
 
+    // The thunk of a synchronous 'oneway' function never awaits: it enqueues
+    // local calls and sends remote ones synchronously, so it is not 'async'
+    bool isAsync = !func->isSynchronouslyEnqueuedOneway();
+
     thunk = FuncDecl::createImplicit(
         C, swift::StaticSpellingKind::None,
         thunkName, SourceLoc(),
-        /*async=*/true, /*throws=*/true, // since it's a distributed thunk
+        /*async=*/isAsync, /*throws=*/true, // since it's a distributed thunk
         /*thrownType=*/Type(),
         genericParamList,
         params, func->getResultInterfaceType(), DC);
+
+    // The thunk of a 'oneway' function is 'oneway' as well, so that its type
+    // and thus its mangled name (the 'Yo' operator) and its remote call target
+    // identifier differ from the thunk of a non-'oneway' overload
+    thunk->setOneway(func->isOneway());
   }
   thunk->setSynthesized(true);
 
@@ -684,7 +821,10 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
   //                    this way we would not hop off the caller when calling system.remoteCall;
   //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
-  if (DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent, thunk))
+  // '@concurrent' only applies to 'async' functions; a synchronous 'oneway'
+  // thunk runs on the caller's executor and never hops
+  if (thunk->hasAsync() &&
+      DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent, thunk))
     thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
 
   return thunk;
@@ -774,11 +914,9 @@ deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
     } else {
       SmallVector<Expr *, 4> forwardingParams;
       forwardParameters(thunk, forwardingParams);
-      auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
       auto forwardingArgList = ArgumentList::forImplicitCallTo(
-          funcRef->getName(), forwardingParams, C);
-      auto funcDeclRef =
-          UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+          DeclNameRef(func->getName()), forwardingParams, C);
+      auto funcDeclRef = createExactMemberRef(C, selfRefExpr, func);
 
       Expr *localFuncCall =
           CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
@@ -915,6 +1053,8 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
       /*async=*/true, /*throws=*/true,
       /*thrownType=*/Type(), genericParamList, params, resultTy, DC);
   thunk->setSynthesized(true);
+  // Keep the adapters of a 'oneway' and a non-'oneway' overload distinct
+  thunk->setOneway(func->isOneway());
 
   if (isa<ClassDecl>(DC))
     thunk->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
@@ -1067,6 +1207,18 @@ struct EmbeddedDispatchContext {
 ///     }
 ///     return
 ///   }
+///
+/// For a synchronous 'oneway' function (see
+/// \c FuncDecl::isSynchronouslyEnqueuedOneway()) the call is enqueued
+/// instead, and no result is reported to the result handler:
+///
+///   if target.identifier.utf8.elementsEqual("$e_..._TE".utf8) {
+///     let p1: T1 = try invocationDecoder.decodeNextArgument()
+///     _enqueueOnewayDistributed(on: self) { __isolatedSelf in
+///       __isolatedSelf.distFunc(p1)
+///     }
+///     return
+///   }
 static IfStmt *buildEmbeddedDispatchBranch(
     ASTContext &C, AbstractFunctionDecl *thunk,
     VarDecl *targetVar, VarDecl *invocationDecoderVar,
@@ -1132,6 +1284,21 @@ static IfStmt *buildEmbeddedDispatchBranch(
                                 implicit, AccessSemantics::Ordinary),
             C.Id_decodeNextArgument),
         decodeArgs);
+
+    // The arguments of a synchronous 'oneway' function are captured by the
+    // closure which is enqueued on the actor, which sends them to the actor.
+    // A decoded argument is a fresh value that nothing else refers to, but
+    // the region checker cannot tell, since it comes out of the caller's
+    // 'inout' decoder, so mark it as disconnected
+    //
+    //   _onewayDecodedArgument(invocationDecoder.decodeNextArgument())
+    if (cast<FuncDecl>(distFunc)->isSynchronouslyEnqueuedOneway()) {
+      decodeCall = CallExpr::createImplicit(
+          C,
+          UnresolvedDeclRefExpr::createImplicit(
+              C, DeclName(C.getIdentifier("_onewayDecodedArgument"))),
+          ArgumentList::createImplicit(C, {Argument::unlabeled(decodeCall)}));
+    }
     decodeCall = TryExpr::createImplicit(C, sloc, decodeCall);
 
     auto *paramPB = PatternBindingDecl::createImplicit(
@@ -1160,10 +1327,30 @@ static IfStmt *buildEmbeddedDispatchBranch(
                                      implicit)));
   }
 
-  auto *selfDotFunc =
-      UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(selfDecl, dloc, implicit),
-          funcDecl->getBaseName());
+  // --- A synchronous 'oneway' function: enqueue the call without awaiting it
+  //     and without reporting any result; no reply is sent for a 'oneway'
+  //     call. Errors thrown while decoding the arguments above still
+  //     propagate out of the dispatch as usual.
+  //
+  //       _enqueueOnewayDistributed(on: self) { __isolatedSelf in
+  //         __isolatedSelf.<distFunc>(arg0, arg1, ...)
+  //       }
+  //       return
+  if (funcDecl->isSynchronouslyEnqueuedOneway()) {
+    thenStmts.push_back(createEnqueueOnewayCall(
+        C, thunk, new (C) DeclRefExpr(selfDecl, dloc, implicit), funcDecl,
+        callArgs));
+    thenStmts.push_back(
+        ReturnStmt::createImplicit(C, sloc, /*Result=*/nullptr));
+
+    auto *thenBody = BraceStmt::create(C, sloc, thenStmts, sloc, implicit);
+    return new (C) IfStmt(sloc, /*Cond=*/eqCheck, /*Then=*/thenBody,
+                          /*ElseLoc=*/SourceLoc(), /*Else=*/nullptr,
+                          implicit, C);
+  }
+
+  auto *selfDotFunc = createExactMemberRef(
+      C, new (C) DeclRefExpr(selfDecl, dloc, implicit), funcDecl);
   Expr *funcCall = CallExpr::createImplicit(
       C, selfDotFunc,
       ArgumentList::createImplicit(C, callArgs));

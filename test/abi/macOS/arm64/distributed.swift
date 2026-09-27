@@ -125,3 +125,14 @@ Added: _$s11Distributed0A11ActorSystemP14resignRemoteIDyy0bF0QzFTj
 Added: _$s11Distributed0A11ActorSystemP14resignRemoteIDyy0bF0QzFTq
 // (extension in Distributed):Distributed.DistributedActorSystem.resignRemoteID(_: Self.ActorID) -> ()
 Added: _$s11Distributed0A11ActorSystemPAAE14resignRemoteIDyy0bF0QzF
+
+
+// New 'isOnewayRemoteCall' hint on RemoteCallTarget, set for targets carrying the 'oneway' modifier
+// Distributed.RemoteCallTarget.isOnewayRemoteCall.getter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0Sbvg
+// Distributed.RemoteCallTarget.isOnewayRemoteCall.setter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0Sbvs
+// Distributed.RemoteCallTarget.isOnewayRemoteCall.modify : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0SbvM
+// property descriptor for Distributed.RemoteCallTarget.isOnewayRemoteCall : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0SbvpMV

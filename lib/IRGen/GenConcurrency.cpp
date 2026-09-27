@@ -856,9 +856,12 @@ struct InitialTaskExecutorOwnedRecordTraits {
   static TaskOptionRecordFlags getRecordFlags() {
     return TaskOptionRecordFlags(TaskOptionRecordKind::InitialTaskExecutorOwned);
   }
+  // The payload type, i.e. 'any TaskExecutor'. 'maybeAddOptionRecord' wraps
+  // it in an optional itself; returning '(any TaskExecutor)?' here made it
+  // switch over a double optional and treat a nil executor as present
   static CanType getValueType(ASTContext &ctx) {
-    return OptionalType::get(ctx.getProtocol(KnownProtocolKind::TaskExecutor)
-                                 ->getDeclaredInterfaceType())
+    return ctx.getProtocol(KnownProtocolKind::TaskExecutor)
+        ->getDeclaredExistentialType()
         ->getCanonicalType();
   }
 

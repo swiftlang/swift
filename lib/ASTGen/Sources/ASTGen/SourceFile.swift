@@ -97,6 +97,7 @@ extension Parser.LanguageFeatures {
     mapFeature(.LiteralExpressions, to: .literalExpressions)
     mapFeature(.CalledAttribute, to: .calledAttribute)
     mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
+    mapFeature(.OnewayNowait, to: .onewayModifier)
   }
 }
 

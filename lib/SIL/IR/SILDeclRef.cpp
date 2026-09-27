@@ -2060,8 +2060,12 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
 }
 
 bool SILDeclRef::hasAsync() const {
-  if (isDistributedThunk())
+  if (isDistributedThunk()) {
+    // A synchronous 'oneway' function (Embedded) gets a synchronous thunk
+    if (auto *thunk = getDistributedThunk())
+      return thunk->hasAsync();
     return true;
+  }
 
   if (hasDecl()) {
     if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {

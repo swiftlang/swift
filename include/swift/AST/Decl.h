@@ -318,6 +318,9 @@ struct OverloadSignature {
   /// Whether this is an distributed function.
   unsigned IsDistributed : 1;
 
+  /// Whether this is a 'oneway' function
+  unsigned IsOneway : 1;
+
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
@@ -346,10 +349,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), IsEnumElement(false), IsNominal(false),
-        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
-        InProtocolExtension(false), InExtensionOfGenericType(false),
-        HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsOneway(false), IsEnumElement(false),
+        IsNominal(false), IsTypeAlias(false), IsMacro(false),
+        IsGenericArg(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -8879,6 +8882,9 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
+  /// Whether this FuncDecl carries the trailing 'oneway' modifier
+  unsigned IsOneway : 1;
+
   TypeLoc FnRetType;
 
 protected:
@@ -8909,6 +8915,7 @@ protected:
     Bits.FuncDecl.IsStatic = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
     Bits.FuncDecl.HasSendingResult = false;
+    IsOneway = false;
   }
 
   void setResultInterfaceType(Type type);
@@ -8972,6 +8979,25 @@ public:
                                   DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;
+
+  /// Whether this function carries the trailing 'oneway' modifier
+  bool isOneway() const { return IsOneway; }
+
+  /// Record whether this function was written with a trailing 'oneway'
+  /// modifier
+  void setOneway(bool value) {
+    IsOneway = value;
+  }
+
+  /// Whether fire-and-forget calls to this 'oneway' function are lowered
+  /// without any async code.
+  ///
+  /// This is the case for a 'oneway' function with a synchronous body when
+  /// compiling for Embedded Swift with the 'OnewayNowait' feature: a
+  /// 'nowait' call enqueues the call on the target actor without any async
+  /// code at the call site, and the distributed thunk of a 'distributed'
+  /// function is synchronous ('throws', but not 'async')
+  bool isSynchronouslyEnqueuedOneway() const;
 
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {

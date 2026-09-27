@@ -1145,6 +1145,14 @@ protected:
         ++firstChildIdx;
       }
 
+      // The 'oneway' modifier is an AST-only function flavor. It is not
+      // represented in runtime metadata flags, since SIL lowering drops it,
+      // so just skip the annotation node if present
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::OnewayFunctionType) {
+        ++firstChildIdx;
+      }
+
       bool isAsync = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::AsyncAnnotation) {

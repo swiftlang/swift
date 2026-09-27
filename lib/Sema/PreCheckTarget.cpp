@@ -1460,6 +1460,55 @@ public:
       transformForExpression(SVE);
     }
 
+    // 'nowait <call>' runs its operand fire-and-forget. Wrap the operand in an
+    // implicit 'async throws' operation closure now, so the operand is
+    // type-checked and actor-isolation-checked inside an async context (a
+    // cross-actor call becomes an implicit 'await'). The closure's own
+    // effects are contained here. CSApply validates that the wrapped call is
+    // Void-returning and non-throwing, and replaces the closure for a
+    // synchronous 'oneway' callee in Embedded Swift
+    if (auto *NE = dyn_cast<NowaitExpr>(expr)) {
+      Expr *operand = NE->getSubExpr();
+      SourceLoc loc = NE->getNowaitLoc();
+      // 'nowait' may only be applied to a function call
+      auto *operandCall =
+          dyn_cast<ApplyExpr>(operand->getSemanticsProvidingExpr());
+      if (!operandCall) {
+        diags.diagnose(loc, diag::nowait_requires_call);
+        return finish(false, new (Ctx) ErrorExpr(NE->getSourceRange()));
+      }
+      // Let overload resolution prefer a 'oneway' callee for this call
+      operandCall->setIsNowaitOperand();
+      // Wrap the operand as 'try await <call>' inside an
+      // 'async throws(any Error)' operation closure. 'await' handles the
+      // cross-actor hop; the explicit thrown type (via a repr-backed
+      // TypeExpr) plus the implicit 'try' let the operand type-check
+      Expr *awaited = AwaitExpr::createImplicit(Ctx, loc, operand);
+      Expr *tried = TryExpr::createImplicit(Ctx, loc, awaited);
+      auto *body = BraceStmt::createImplicit(Ctx, {ASTNode(tried)});
+      auto *params = ParameterList::createEmpty(Ctx);
+      TypeExpr *thrownTypeExpr = nullptr;
+      if (Type errorTy = Ctx.getErrorExistentialType()) {
+        // Use 'createImplicitHack' so the TypeExpr carries a TypeRepr: the
+        // constraint solver reads a closure's explicit thrown type from the
+        // repr, and without one it would fall back to an inferred 'Never'
+        thrownTypeExpr = TypeExpr::createImplicitHack(loc, errorTy, Ctx);
+      }
+      auto *closure = new (Ctx) ClosureExpr(
+          DeclAttributes(), /*bracketRange=*/SourceRange(),
+          /*capturedSelfDecl=*/nullptr, params, /*asyncLoc=*/loc,
+          /*throwsLoc=*/loc, /*thrownType=*/thrownTypeExpr,
+          /*arrowLoc=*/SourceLoc(), /*inLoc=*/SourceLoc(),
+          /*explicitResultType=*/nullptr, /*parent=*/DC);
+      closure->setImplicit();
+      // The user wrote a plain call, so 'self' does not need to be spelled
+      // out in it, just like in the operation closure of a 'Task'
+      closure->setAllowsImplicitSelfCapture();
+      closure->setBody(body);
+      NE->setSubExpr(closure);
+      return finish(true, NE);
+    }
+
     return finish(true, expr);
   }
 

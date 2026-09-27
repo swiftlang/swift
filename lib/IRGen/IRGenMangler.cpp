@@ -188,6 +188,9 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
 
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
       AllowMarkerProtocols, false);
+  // 'oneway' is not part of the runtime type, and older runtimes cannot
+  // demangle it
+  llvm::SaveAndRestore<bool> savedAllowOneway(AllowOneway, false);
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty, Sig);
   });
@@ -203,6 +206,7 @@ IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
 
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
       AllowMarkerProtocols, false);
+  llvm::SaveAndRestore<bool> savedAllowOneway(AllowOneway, false);
 
   // We don't make the substitution adjustments above because they're
   // target-specific and so would break the goal of getting a unique

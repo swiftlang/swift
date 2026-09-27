@@ -3768,6 +3768,35 @@ public:
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
 
+    // Validate the trailing 'oneway' modifier. It is legal on a 'distributed'
+    // function, an actor instance method, or a global-actor-isolated method,
+    // i.e. anywhere the fire-and-forget call has a serial executor to be
+    // enqueued on. It must return 'Void' (the caller never observes a reply)
+    // and must not be 'throws' (a fire-and-forget call has no caller to
+    // receive an error)
+    if (FD->isOneway()) {
+      bool isActorInstanceMethod = false;
+      if (auto *nominal = FD->getDeclContext()->getSelfNominalTypeDecl())
+        isActorInstanceMethod = nominal->isActor() && !FD->isStatic();
+
+      bool isGlobalActorIsolated = getActorIsolation(FD).isGlobalActor();
+
+      if (!FD->isDistributed() && !isActorInstanceMethod &&
+          !isGlobalActorIsolated) {
+        FD->diagnose(diag::oneway_requires_distributed_or_actor);
+        FD->setOneway(false);
+      } else if (auto resultTy = FD->getResultInterfaceType();
+                 !resultTy || !resultTy->isVoid()) {
+        FD->diagnose(diag::oneway_requires_void_result, FD);
+        FD->setOneway(false);
+      } else if (FD->hasThrows()) {
+        FD->diagnose(diag::oneway_requires_nonthrowing, FD);
+        FD->setOneway(false);
+      } else {
+        TypeChecker::checkDistributedOnewayAvailability(FD);
+      }
+    }
+
     // Untyped throws might need to be diagnosed.
     SourceLoc throwsLoc = FD->getThrowsLoc();
     if (throwsLoc.isValid() && !FD->getThrownTypeRepr() &&

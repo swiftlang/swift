@@ -4181,6 +4181,23 @@ namespace {
       bool requiresAsync =
           callOptions.contains(ActorReferenceResult::Flags::AsyncPromotion);
 
+      // A call of a synchronous 'oneway' distributed function (which must be
+      // spelled 'nowait') always goes through the function's synchronous
+      // distributed thunk, which enqueues local calls and sends remote calls
+      // without awaiting either. Such a call throws, like any distributed
+      // call, but it is not implicitly async, so it can be made from a
+      // synchronous context
+      bool isSyncOnewayDistributedCall = false;
+      if (unsatisfiedIsolation->isDistributedActor()) {
+        if (auto *calleeFunc = dyn_cast_or_null<FuncDecl>(calleeDecl)) {
+          if (calleeFunc->isDistributed() &&
+              calleeFunc->isSynchronouslyEnqueuedOneway()) {
+            isSyncOnewayDistributedCall = true;
+            requiresAsync = false;
+          }
+        }
+      }
+
       // If we need to mark the call as implicitly asynchronous, make sure
       // we're in an asynchronous context.
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
@@ -4235,12 +4252,20 @@ namespace {
           return true;
 
         std::tie(setThrows, usesDistributedThunk) = *distributedAccess;
+
+        // Even a call on a known-local actor goes through the synchronous
+        // thunk, so that it is enqueued rather than run inline
+        if (isSyncOnewayDistributedCall) {
+          setThrows = true;
+          usesDistributedThunk = true;
+        }
       }
 
       // Mark as implicitly async/throws/distributed thunk as needed.
       if (requiresAsync || setThrows || usesDistributedThunk) {
         markNearestCallAsImplicitly(
-            unsatisfiedIsolation, setThrows, usesDistributedThunk);
+            isSyncOnewayDistributedCall ? std::nullopt : unsatisfiedIsolation,
+            setThrows, usesDistributedThunk);
       }
 
       // Sendable checking for arguments and results are deferred to region

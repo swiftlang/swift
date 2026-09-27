@@ -1119,6 +1119,10 @@ void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 /// Returns `true` if there was an error.
 bool checkDistributedFunc(FuncDecl *func);
 
+/// Diagnose a 'distributed' 'oneway' func whose availability context is lower
+/// than the runtime that can demangle its remote call target identifier
+void checkDistributedOnewayAvailability(FuncDecl *func);
+
 /// If `LangOptions::DebugForbidTypecheckPrefixes` is set and the given decl
 /// name starts with any of those prefixes, an llvm fatal error is triggered.
 /// This is for testing purposes.

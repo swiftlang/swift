@@ -6740,6 +6740,31 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
       "access to %kind0 from outside the distributed actor %1 must be asynchronous",
       (const ValueDecl *, DeclName))
 
+ERROR(oneway_requires_void_result,none,
+      "'oneway' %kind0 must return 'Void'",
+      (const ValueDecl *))
+
+ERROR(oneway_requires_nonthrowing,none,
+      "'oneway' %kind0 must not be 'throws'",
+      (const ValueDecl *))
+
+ERROR(oneway_requires_distributed_or_actor,none,
+      "'oneway' can only be applied to an actor isolated method", ())
+
+ERROR(oneway_distributed_only_version_newer,none,
+      "'oneway' %kind0 is only available in %1 %2 or newer",
+      (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+
+ERROR(nowait_requires_call,none,
+      "'nowait' can only be applied to a function call", ())
+ERROR(nowait_call_returns_value,none,
+      "'nowait' can only be applied to Void returning calls", ())
+ERROR(nowait_call_can_throw,none,
+      "'nowait' cannot be applied to a call that can throw", ())
+ERROR(oneway_call_requires_nowait,none,
+      "call to 'oneway' %kind0 must use 'nowait'",
+      (const ValueDecl *))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))

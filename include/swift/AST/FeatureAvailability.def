@@ -92,6 +92,8 @@ FEATURE(TaskDeadline,                                   (6, 5))
 FEATURE(CancellationHandlerWithReason,                  (6, 5))
 FEATURE(DistributedActorResignRemoteID,                 (6, 5))
 FEATURE(EmbeddedDistributedSwift,                       (6, 5))
+// Older runtimes can't demangle the 'Yo' of a 'oneway' remote call target
+FEATURE(DistributedOnewayFunction,                      (6, 5))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
