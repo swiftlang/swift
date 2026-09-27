@@ -173,7 +173,14 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
       // `reason` reports the deadline expiration instead of `.unspecified`.
       unsafe TaskCancellationScope(record: scopeRecord).cancel(reason: .deadlineExpired)
     }
-    defer { timer.cancel() }
+    defer {
+      // Cancelling the timer is not enough. If it already woke up from
+      // `clock.sleep`, it may be about to cancel the scope. The scope record
+      // is deallocated once we return, so we must wait for the timer to
+      // finish before that.
+      timer.cancel()
+      await timer.value
+    }
     return try await operation()
   }
 #else

@@ -28,6 +28,25 @@ struct StringIdClock: Clock, Identifiable {
   }
 }
 
+// A clock whose `sleep` ignores cancellation. Used to make sure that the
+// deadline timer can wake up after `withDeadline` already cancelled it.
+@available(StdlibDeploymentTarget 6.5, *)
+struct CancellationIgnoringClock: Clock, Identifiable {
+  typealias Instant = ContinuousClock.Instant
+  typealias Duration = Swift.Duration
+
+  let id: String
+
+  var now: Instant { ContinuousClock.now }
+  var minimumResolution: Swift.Duration { .nanoseconds(1) }
+
+  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
+    await withTaskCancellationShield {
+      try? await ContinuousClock().sleep(until: deadline, tolerance: tolerance)
+    }
+  }
+}
+
 // A class type used as an Instant payload to verify that the record's tail
 // storage participates correctly in ARC: push retains +1 into the record,
 // pop drops that +1, and `_findNearestDeadline` returns a properly-owned
@@ -639,6 +658,23 @@ struct ClassInstantClock: Clock, Identifiable {
       } catch {
         expectUnreachableCatch(error)
       }
+    }
+
+    tests.test("deadline timer does not cancel a scope after withDeadline returned") {
+      // The operation returns right away, long before the deadline. The clock
+      // ignores the cancellation of the timer, so the timer still wakes up at
+      // the deadline and tries to cancel the scope. This must not happen after
+      // `withDeadline` returned, since the scope record is already deallocated
+      // at that point and its memory is reused by the next scope.
+      await withDeadline(in: .milliseconds(10), clock: CancellationIgnoringClock(id: "ignoring")) {}
+
+      // Nothing should ever cancel this scope. Its records are allocated at
+      // the same addresses as the ones of the previous `withDeadline`.
+      let reason = await withDeadline(in: .seconds(60)) { () -> CancellationError.Reason? in
+        try? await Task.sleep(for: .milliseconds(200))
+        return Task.cancellationReason
+      }
+      expectEqual(nil, reason)
     }
 
     await runAllTestsAsync()
