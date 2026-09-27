@@ -192,3 +192,103 @@ FRTMixedAvailabilityCtors {
   __attribute__((deprecated("don't construct from three ints")))
   FRTMixedAvailabilityCtors(int, int, int) : refs(1) {}
 };
+
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTCtorWithDefaultPointerArg {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  FRTCtorWithDefaultPointerArg *parent;
+
+  __attribute__((swift_attr("returns_retained")))
+  FRTCtorWithDefaultPointerArg(FRTCtorWithDefaultPointerArg *parent = nullptr)
+      : parent(parent) {}
+};
+
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTCtorWithDefaultIntArgs {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  int value;
+
+  __attribute__((swift_attr("returns_retained")))
+  // expected-note@+1 {{'init(_:_:_:)' declared here}}
+  FRTCtorWithDefaultIntArgs(int a, int b = 456, int c = 123)
+      : value(a + b + c) {}
+};
+
+struct FRTCtorArgView {
+  int *ptr;
+};
+
+// Swift can't guarantee the lifetime of the pointee of a view type, so this
+// constructor imports without its default argument.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTCtorWithDefaultViewArg {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  bool isNull;
+
+  __attribute__((swift_attr("returns_retained")))
+  // expected-note@+1 {{'init(_:)' declared here}}
+  FRTCtorWithDefaultViewArg(FRTCtorArgView view = {nullptr})
+      : isNull(view.ptr == nullptr) {}
+};
+
+// Marking the parameter import_unsafe imports the default argument anyway.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTCtorWithUnsafeDefaultViewArg {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  bool isNull;
+
+  __attribute__((swift_attr("returns_retained")))
+  FRTCtorWithUnsafeDefaultViewArg(
+      __attribute__((swift_attr("import_unsafe"))) FRTCtorArgView view = {nullptr})
+      : isNull(view.ptr == nullptr) {}
+};
+
+// Like constructors of value type class templates, this constructor imports
+// without its default argument.
+template <typename T>
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTTemplateCtorWithDefaultArg {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  T value;
+
+  __attribute__((swift_attr("returns_retained")))
+  // expected-note@+1 {{'init(_:)' declared here}}
+  FRTTemplateCtorWithDefaultArg(T value = T(42)) : value(value) {}
+};
+
+using FRTTemplateCtorWithDefaultArgInt = FRTTemplateCtorWithDefaultArg<int>;
