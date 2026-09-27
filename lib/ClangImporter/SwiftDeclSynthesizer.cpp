@@ -3269,8 +3269,12 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
           /*OverrideExisting=*/true))
     return nullptr;
 
-  clang::QualType funcTy = clangCtx.getFunctionType(
-      basePtrTy, {derivedPtrTy}, clang::FunctionProtoType::ExtProtoInfo());
+  // The cast can't throw, so say so in its type. Otherwise every call to it
+  // from Swift needs an exception landing pad.
+  clang::FunctionProtoType::ExtProtoInfo prototypeInfo;
+  prototypeInfo.ExceptionSpec.Type = clang::EST_BasicNoexcept;
+  clang::QualType funcTy =
+      clangCtx.getFunctionType(basePtrTy, {derivedPtrTy}, prototypeInfo);
 
   // Build a deterministic, unique name from the mangled canonical types of the
   // derived and base classes, to avoid collisions in the SwiftLookupTable.
