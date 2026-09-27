@@ -141,7 +141,33 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // === local branch ----------------------------------------------------------
   BraceStmt *localBranchStmt;
-  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+  if (isDistributedActorStubMember(func)) {
+    // A distributed thunk in a "stub" type will never execute the 'local' branch
+    // so don't generate code for it, and just immediately fatal error
+    FuncDecl *stubFatalErrorFn =
+        isEmbeddedSystem ? nullptr : C.getDistributedStubFatalError();
+    Identifier trapFnName = stubFatalErrorFn
+                                ? stubFatalErrorFn->getBaseIdentifier()
+                                : C.getIdentifier("fatalError");
+    // An implicit '#function' default argument would be empty here, so pass
+    // the name that '#function' gives inside the stub body
+    SmallVector<Argument, 1> trapArgs;
+    if (stubFatalErrorFn) {
+      auto *accessor = dyn_cast<AccessorDecl>(func);
+      DeclName functionName =
+          accessor ? accessor->getStorage()->getName() : func->getName();
+      SmallString<32> functionNameBuf;
+      StringRef functionNameStr = C.AllocateCopy(
+          functionName.getString(functionNameBuf));
+      trapArgs.push_back(Argument(
+          sloc, C.getIdentifier("function"),
+          new (C) StringLiteralExpr(functionNameStr, SourceRange(), implicit)));
+    }
+    auto trapCall = CallExpr::createImplicit(
+        C, UnresolvedDeclRefExpr::createImplicit(C, trapFnName),
+        ArgumentList::createImplicit(C, trapArgs));
+    localBranchStmt = BraceStmt::create(C, sloc, {trapCall}, sloc, implicit);
+  } else if (auto accessor = dyn_cast<AccessorDecl>(func)) {
     auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
 
     auto var = accessor->getStorage();
