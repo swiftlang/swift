@@ -1911,20 +1911,15 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
           cancelledScope = scope;
     }
     if (parentStatus.isCancelled()) {
-      // Whole-task cancellation on the parent (visible past any shield):
-      // propagate the parent's reason verbatim.
+      // Whole-task cancellation on the parent: propagate the parent's reason
+      // verbatim. A child created inside a cancellation shield is not
+      // cancelled, since `isCancelled` respects the shield.
       swift_task_cancelWithFlags(task, parentStatus.getCancellationReason());
-    } else if ((group && group->isCancelled()) ||
-               parentStatus.isCancelledIgnoringShield() ||
-               cancelledScope) {
-      // Either the enclosing group is cancelled, or the parent is
-      // whole-task cancelled behind a shield, or an active
-      // TaskCancellationScope in the parent is cancelled. Pick the
-      // reason from whichever source applies (task bit wins over scope).
-      size_t reason = parentStatus.isCancelledIgnoringShield()
-                          ? parentStatus.getCancellationReason()
-                          : (cancelledScope ? cancelledScope->getReason()
-                                            : group->getCancellationReason());
+    } else if ((group && group->isCancelled()) || cancelledScope) {
+      // Either the enclosing group is cancelled, or an active
+      // TaskCancellationScope in the parent is cancelled.
+      size_t reason = cancelledScope ? cancelledScope->getReason()
+                                     : group->getCancellationReason();
       swift_task_cancelWithFlags(task, reason);
     }
 
