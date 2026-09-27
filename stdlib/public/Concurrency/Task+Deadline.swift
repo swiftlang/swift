@@ -174,10 +174,14 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
       unsafe TaskCancellationScope(record: scopeRecord).cancel(reason: .deadlineExpired)
     }
     defer {
-      // Cancelling the timer is not enough. If it already woke up from
-      // `clock.sleep`, it may be about to cancel the scope. The scope record
-      // is deallocated once we return, so we must wait for the timer to
-      // finish before that.
+      // We must both cancel and then await the unstructured task to
+      // guarantee it is finished before we are leaving the scope. This
+      // is important to uphold structured concurrency guarantees where
+      // any scope must ensure all resources are cleaned up before
+      // leaving it. In this case, not waiting for the unstructured task
+      // to finish could result in a use-after-free bug since it cancels
+      // the scope which is deallocated when leaving the
+      // `withTaskCancellationScope`.
       timer.cancel()
       await timer.value
     }
