@@ -887,6 +887,29 @@ void AsyncTask::inheritDeadlineFrom(AsyncTask *parent) {
 /************************** CANCELLATION SCOPES **************************/
 /**************************************************************************/
 
+/// Returns the cancellation reason of the innermost cancellation scope in
+/// `status`. Stops at any cancellation shield. The caller must hold the status
+/// record lock.
+static std::optional<size_t>
+getScopeCancellationReasonLocked(ActiveTaskStatus status) {
+  assert(status.isStatusRecordLocked());
+  for (auto record : status.records()) {
+    switch (record->getKind()) {
+    case TaskStatusRecordKind::CancellationShield:
+      return std::nullopt;
+    case TaskStatusRecordKind::TaskCancellationScope: {
+      auto scope = cast<TaskCancellationScopeRecord>(record);
+      if (!scope->isCancelled())
+        return std::nullopt;
+      return scope->getReason();
+    }
+    default:
+      break;
+    }
+  }
+  return std::nullopt;
+}
+
 SWIFT_CC(swift)
 static TaskCancellationScopeRecord *
 swift_task_pushCancellationScopeImpl() {
@@ -902,7 +925,27 @@ swift_task_pushCancellationScopeImpl() {
   SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Create scope record:%p for task:%p",
                        record, task);
 
-  addStatusRecord(task, record,
+  // Nested scopes need to inherit the cancellation state of the outer scope. So
+  // we first check if the task has a cancellation scope.
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  if (status.hasTaskCancellationScope()) {
+    // There was a cancellation scope so we have to take the lock
+    // to avoid a concurrent cancellation racing with installing the record.
+    ::withStatusRecordLock(
+        task,
+        [&](ActiveTaskStatus status) {
+          if (auto reason = getScopeCancellationReasonLocked(status))
+            record->cancel(*reason);
+        },
+        [&](ActiveTaskStatus, ActiveTaskStatus &newStatus) {
+          record->resetParent(newStatus.getInnermostRecord());
+          newStatus = newStatus.withInnermostRecord(record);
+        });
+    return record;
+  }
+
+  // There was no cancellation scope so we can just add the record.
+  addStatusRecord(task, record, status,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
                     // Set the "has cancellation scope" flag so isCancelled()
                     // can bail out without walking the record chain when

@@ -30,6 +30,8 @@ import Dispatch
     await test_scope_outer_cancel_cascades_to_inner()
     await test_scope_structured_children_are_cascaded()
     await test_scope_async_let_child_is_cancelled()
+    await test_scope_created_inside_cancelled_scope()
+    await test_scope_created_inside_cancelled_scope_behind_shield()
     print("done")
   }
 }
@@ -446,6 +448,66 @@ func test_scope_async_let_child_is_cancelled() async {
     // CHECK: async let (before cancel) isCancelled=true
     print("async let (after cancel) isCancelled=\(b)")
     // CHECK: async let (after cancel) isCancelled=true
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_created_inside_cancelled_scope() async {
+  print("--- test_scope_created_inside_cancelled_scope")
+  // CHECK: --- test_scope_created_inside_cancelled_scope
+
+  // A scope created inside an already cancelled scope must start out
+  // cancelled. Same applies to child tasks and async lets.
+  await __withTaskCancellationScope { outer in
+    outer.cancel(reason: .deadlineExpired)
+
+    await __withTaskCancellationScope { inner in
+      print("inner scope isCancelled=\(inner.isCancelled)")
+      // CHECK: inner scope isCancelled=true
+      print("Task.isCancelled=\(Task.isCancelled)")
+      // CHECK: Task.isCancelled=true
+      print("Task.cancellationReason=\(String(describing: Task.cancellationReason))")
+      // CHECK: Task.cancellationReason=Optional(CancellationError.Reason.deadlineExpired)
+
+      var handlerFired = false
+      await withTaskCancellationHandler {
+      } onCancel: {
+        handlerFired = true
+      }
+      print("handler fired=\(handlerFired)")
+      // CHECK: handler fired=true
+
+      async let asyncLetChild = Task.isCancelled
+      print("async let isCancelled=\(await asyncLetChild)")
+      // CHECK: async let isCancelled=true
+
+      let groupChild = await withTaskGroup(of: Bool.self) { group in
+        group.addTask { Task.isCancelled }
+        return await group.next()!
+      }
+      print("group child isCancelled=\(groupChild)")
+      // CHECK: group child isCancelled=true
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_created_inside_cancelled_scope_behind_shield() async {
+  print("--- test_scope_created_inside_cancelled_scope_behind_shield")
+  // CHECK: --- test_scope_created_inside_cancelled_scope_behind_shield
+
+  // A shield between the cancelled scope and the new scope prevents the cancellation.
+  await __withTaskCancellationScope { outer in
+    outer.cancel()
+
+    await withTaskCancellationShield {
+      await __withTaskCancellationScope { inner in
+        print("inner scope isCancelled=\(inner.isCancelled)")
+        // CHECK: inner scope isCancelled=false
+        print("Task.isCancelled=\(Task.isCancelled)")
+        // CHECK: Task.isCancelled=false
+      }
+    }
   }
 }
 

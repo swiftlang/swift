@@ -35,6 +35,7 @@
 #include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
 #include <new>
+#include <optional>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
