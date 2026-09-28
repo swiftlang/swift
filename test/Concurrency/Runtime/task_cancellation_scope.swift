@@ -46,6 +46,7 @@ import Synchronization
     await test_scope_created_inside_cancelled_scope()
     await test_scope_created_inside_cancelled_scope_behind_shield()
     await test_task_group_created_inside_cancelled_scope()
+    await test_task_group_child_added_inside_scope()
     print("done")
   }
 }
@@ -976,6 +977,40 @@ func test_task_group_created_inside_cancelled_scope() async {
       print("child reason=\(describe(await group.next()!))")
       // CHECK: child reason=deadlineExpired
     }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_group_child_added_inside_scope() async {
+  print("--- test_task_group_child_added_inside_scope")
+  // CHECK: --- test_task_group_child_added_inside_scope
+
+  // A child task belongs to its task group, even if it is added inside a scope
+  // that doesn't contain the group. The child can outlive the scope, so
+  // cancelling the scope doesn't cancel it, no matter if it was added before or
+  // after the scope got cancelled.
+  await withTaskGroup(of: String.self) { group in
+    let proceed = CancellationIgnoringSignal()
+    await __withTaskCancellationScope { scope in
+      group.addTask {
+        await proceed.wait()
+        return "added before cancel: isCancelled=\(Task.isCancelled)"
+      }
+      scope.cancel()
+      group.addTask {
+        "added after cancel: isCancelled=\(Task.isCancelled)"
+      }
+    }
+    proceed.signal()
+    var results: [String] = []
+    for await result in group {
+      results.append(result)
+    }
+    for result in results.sorted() {
+      print(result)
+    }
+    // CHECK: added after cancel: isCancelled=false
+    // CHECK: added before cancel: isCancelled=false
   }
 }
 
