@@ -32,6 +32,9 @@ import Synchronization
     await test_scope_structured_children_are_cascaded()
     await test_scope_async_let_child_is_cancelled()
     await test_task_handle_does_not_observe_scope_cancellation()
+    await test_task_cancel_cancels_scopes()
+    await test_scope_created_inside_cancelled_task()
+    await test_task_cancel_does_not_cancel_scope_inside_shield()
     print("done")
   }
 }
@@ -507,6 +510,67 @@ func test_task_handle_does_not_observe_scope_cancellation() async {
 
   checked.signal()
   await task.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_cancel_cancels_scopes() async {
+  print("--- test_task_cancel_cancels_scopes")
+  // CHECK: --- test_task_cancel_cancels_scopes
+
+  // Cancelling a task also cancels all of its scopes, the same as cancelling a
+  // task cancels its child tasks.
+  await Task {
+    await __withTaskCancellationScope { outer in
+      await __withTaskCancellationScope { inner in
+        withUnsafeCurrentTask { $0?.cancel() }
+        print("outer scope isCancelled=\(outer.isCancelled)")
+        // CHECK: outer scope isCancelled=true
+        print("inner scope isCancelled=\(inner.isCancelled)")
+        // CHECK: inner scope isCancelled=true
+      }
+    }
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_created_inside_cancelled_task() async {
+  print("--- test_scope_created_inside_cancelled_task")
+  // CHECK: --- test_scope_created_inside_cancelled_task
+
+  // A scope created inside a cancelled task starts out cancelled.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel() }
+    await __withTaskCancellationScope { outer in
+      print("scope isCancelled=\(outer.isCancelled)")
+      // CHECK: scope isCancelled=true
+      await __withTaskCancellationScope { inner in
+        print("nested scope isCancelled=\(inner.isCancelled)")
+        // CHECK: nested scope isCancelled=true
+      }
+    }
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_cancel_does_not_cancel_scope_inside_shield() async {
+  print("--- test_task_cancel_does_not_cancel_scope_inside_shield")
+  // CHECK: --- test_task_cancel_does_not_cancel_scope_inside_shield
+
+  // A shield prevents the cancellation of the task from scopes inside of it, no
+  // matter if they are created before or after the task got cancelled.
+  await Task {
+    await withTaskCancellationShield {
+      await __withTaskCancellationScope { scope in
+        withUnsafeCurrentTask { $0?.cancel() }
+        print("scope in shield isCancelled=\(scope.isCancelled)")
+        // CHECK: scope in shield isCancelled=false
+      }
+      await __withTaskCancellationScope { scope in
+        print("scope created in shield isCancelled=\(scope.isCancelled)")
+        // CHECK: scope created in shield isCancelled=false
+      }
+    }
+  }.value
 }
 
 // CHECK: done
