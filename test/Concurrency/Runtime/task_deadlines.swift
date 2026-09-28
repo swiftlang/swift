@@ -72,6 +72,50 @@ final class CounterBox: @unchecked Sendable {
   let value = Atomic<Int>(0)
 }
 
+final class Trigger: Sendable {
+  let fired = Atomic<Bool>(false)
+}
+
+// A clock whose `sleep` returns once the trigger fired.
+@available(StdlibDeploymentTarget 6.5, *)
+struct TriggeredClock: Clock, Identifiable {
+  typealias Instant = ContinuousClock.Instant
+  typealias Duration = Swift.Duration
+
+  let trigger: Trigger
+
+  var id: String { "triggered" }
+  var now: Instant { ContinuousClock.now }
+  var minimumResolution: Swift.Duration { .nanoseconds(1) }
+
+  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
+    // Busy wait so that the timer reacts right away once the trigger fired.
+    while !trigger.fired.load(ordering: .acquiring) {
+      try Task.checkCancellation()
+    }
+  }
+}
+
+// Creates `count` nested `async let` children and fires `trigger` while doing
+// so. Returns how many children never observed the cancellation.
+@available(StdlibDeploymentTarget 6.5, *)
+func spawnAsyncLetChildren(_ count: Int, firing trigger: Trigger, at fireCount: Int) async -> Int {
+  guard count > 0 else { return 0 }
+  if count == fireCount {
+    trigger.fired.store(true, ordering: .releasing)
+  }
+  async let observedCancellation: Bool = {
+    // Wait up to 10ms for the cancellation.
+    for _ in 0..<10 {
+      if Task.isCancelled { return true }
+      try? await Task.sleep(for: .milliseconds(1))
+    }
+    return Task.isCancelled
+  }()
+  let missed = await spawnAsyncLetChildren(count - 1, firing: trigger, at: fireCount)
+  return missed + (await observedCancellation ? 0 : 1)
+}
+
 @available(StdlibDeploymentTarget 6.5, *)
 struct ClassInstantClock: Clock, Identifiable {
   typealias Duration = Swift.Duration
@@ -688,6 +732,20 @@ struct ClassInstantClock: Clock, Identifiable {
         return Task.cancellationReason
       }
       expectEqual(nil, reason)
+    }
+
+    tests.test("async let children created while the deadline expires are cancelled") {
+      // The timer cancels the scope from another thread while we are creating
+      // `async let` children. Every child must observe the cancellation, no
+      // matter at which point of its creation the scope got cancelled.
+      var missed = 0
+      for _ in 0..<500 {
+        let trigger = Trigger()
+        missed += await withDeadline(in: .seconds(60), clock: TriggeredClock(trigger: trigger)) {
+          await spawnAsyncLetChildren(200, firing: trigger, at: 150)
+        }
+      }
+      expectEqual(0, missed)
     }
 
     tests.test("nested deadline inside an expired deadline is cancelled") {

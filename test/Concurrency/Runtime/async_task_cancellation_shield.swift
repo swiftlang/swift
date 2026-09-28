@@ -570,6 +570,27 @@ func test_task_cancel_skips_running_children_inside_shield() async {
   }.value
 }
 
+@available(SwiftStdlib 6.5, *)
+func test_task_group_child_added_inside_shield() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_task_group_child_added_inside_shield
+
+  // A child task belongs to its task group, so a shield around `addTask`
+  // doesn't prevent its cancellation. It gets the reason of the group.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    await withTaskGroup(of: String.self) { group in
+      withTaskCancellationShield {
+        group.addTask {
+          "child: isCancelled:\(Task.isCancelled) reason:\(Task.cancellationReason.map { "\($0)" } ?? "nil")"
+        }
+      }
+      print(await group.next()!)
+      // CHECK: child: isCancelled:true reason:deadlineExpired
+    }
+  }.value
+}
+
 @available(SwiftStdlib 6.4, *)
 @main struct Main {
   static func main() async {
@@ -588,6 +609,7 @@ func test_task_cancel_skips_running_children_inside_shield() async {
     await test_unsafe_current_task_ignores_shield()
     await test_task_cancel_fires_handler_outside_shield()
     await test_task_cancel_skips_running_children_inside_shield()
+    await test_task_group_child_added_inside_shield()
     print("DONE")
   }
 }

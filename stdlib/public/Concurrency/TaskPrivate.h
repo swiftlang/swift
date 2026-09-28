@@ -373,11 +373,12 @@ void updateStatusRecord(
         nullptr);
 
 /// A helper function for updating a new child task that is created with
-/// information from the parent or the group that it was going to be added to.
+/// information from the parent. The child starts out cancelled with
+/// `cancellationReason`, if there is one.
 SWIFT_CC(swift)
-void updateNewChildWithParentAndGroupState(AsyncTask *child,
-                                           ActiveTaskStatus parentStatus,
-                                           TaskGroup *group);
+void updateNewChildWithParentState(AsyncTask *child,
+                                   ActiveTaskStatus parentStatus,
+                                   std::optional<size_t> cancellationReason);
 
 // ==== ------------------------------------------------------------------------
 

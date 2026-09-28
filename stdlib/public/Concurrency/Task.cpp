@@ -1888,13 +1888,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   // Perform additional linking between parent and child task.
   if (parent) {
-    // A child task starts out cancelled if the code that creates it observes a
-    // cancellation, or if its task group is cancelled.
-    if (auto reason = getObservedCancellation(parent))
-      swift_task_cancelWithFlags(task, *reason);
-    else if (group && group->isCancelled())
-      swift_task_cancelWithFlags(task, group->getCancellationReason());
-
     task->inheritDeadlineFrom(parent);
 
     // Inside a task group, we may have to perform some defensive copying,

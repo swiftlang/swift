@@ -1272,15 +1272,12 @@ AsyncTask::getTaskName() {
 // ==== Child tasks ------------------------------------------------------------
 
 /// Called in the path of linking a child into a parent/group synchronously with
-/// the parent task.
-//
-/// When called to link a child into a parent directly, this does not hold the
-/// parent's task status record lock. When called to link a child into a task
-/// group, this holds the parent's task status record lock.
+/// the parent task. The caller makes sure that computing `cancellationReason`
+/// and linking the child is atomic with the cancellation of the parent.
 SWIFT_CC(swift)
-void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
-                                                  ActiveTaskStatus parentStatus,
-                                                  TaskGroup *group) {
+void swift::updateNewChildWithParentState(
+    AsyncTask *child, ActiveTaskStatus parentStatus,
+    std::optional<size_t> cancellationReason) {
   // We can take the fast path of just modifying the ActiveTaskStatus in the
   // child task since we know it cannot be accessed by anyone else yet -- it
   // hasn't been linked in. There should be no status records yet: the task
@@ -1293,9 +1290,8 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
 
   auto newChildTaskStatus = oldChildTaskStatus;
 
-  if (parentStatus.isCancelled() || (group && group->isCancelled())) {
-    newChildTaskStatus = newChildTaskStatus.withCancelled();
-  }
+  if (cancellationReason)
+    newChildTaskStatus = newChildTaskStatus.withCancelled(*cancellationReason);
 
   // Propagate max priority of parent to child task's active status
   JobPriority pri = parentStatus.getStoredPriority();
@@ -1320,15 +1316,15 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
   withStatusRecordLock(parent, [&](ActiveTaskStatus parentStatus) {
     group->addChildTask(child);
 
-    // After getting parent's status record lock, do some soundness checks to
-    // see if parent task or group has state changes that need to be
-    // propagated to the child.
-    //
-    // This is the same logic that we would do if we were adding a child
-    // task status record - see also asyncLet_addImpl. Since we attach a
-    // child task to a TaskGroupRecord instead, we synchronize on the
-    // parent's task status and then update the child.
-    updateNewChildWithParentAndGroupState(child, parentStatus, group);
+    // A child task belongs to its task group, no matter where it is added to
+    // the group. So it starts out cancelled if the group is cancelled. The
+    // cancellation of the task or of a scope reaches the child through the
+    // group. We hold the lock of the parent, so a concurrent cancellation
+    // either already cancelled the group or reaches the new child.
+    std::optional<size_t> cancellationReason;
+    if (group->isCancelled())
+      cancellationReason = group->getCancellationReason();
+    updateNewChildWithParentState(child, parentStatus, cancellationReason);
   });
 }
 
