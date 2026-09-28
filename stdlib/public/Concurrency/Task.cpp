@@ -1923,7 +1923,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       // reason from whichever source applies (task bit wins over scope).
       size_t reason = parentStatus.isCancelledIgnoringShield()
                           ? parentStatus.getCancellationReason()
-                          : (cancelledScope ? cancelledScope->getReason() : 0);
+                          : (cancelledScope ? cancelledScope->getReason()
+                                            : group->getCancellationReason());
       swift_task_cancelWithFlags(task, reason);
     }
 

@@ -375,6 +375,19 @@ struct ClassInstantClock: Clock, Identifiable {
       }.value
     }
 
+    // A child task added to a task group after `cancelAll(reason:)` inherits
+    // the reason of the group.
+    tests.test("task group child added after cancelAll inherits cancellationReason") {
+      await withTaskGroup(of: CancellationError.Reason?.self) { group in
+        group.cancelAll(reason: .deadlineExpired)
+        group.addTask {
+          return Task.cancellationReason
+        }
+        let childReason = await group.next() ?? nil
+        expectEqual(.deadlineExpired, childReason)
+      }
+    }
+
     // Detached tasks are unstructured; a detached task started inside
     // a cancelled parent must NOT inherit the parent's cancellation.
     // `Task.cancellationReason` on the detached task should be nil
