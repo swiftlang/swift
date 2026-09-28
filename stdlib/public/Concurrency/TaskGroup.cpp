@@ -1174,14 +1174,15 @@ static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGro
   assert(record->getKind() == swift::TaskStatusRecordKind::TaskGroup);
 
   // ok, now that the group actually is initialized: attach it to the task
-  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
-    // If the task has already been cancelled, reflect that immediately in
-    // the group's status.
-    if (oldStatus.isCancelled()) {
-      impl->statusCancel(oldStatus.getCancellationReason());
-    }
-    return true;
-  });
+  addStatusRecordObservingCancellation(
+      swift_task_getCurrent(), record,
+      [&](std::optional<size_t> reason, ActiveTaskStatus &newStatus) {
+        // If the code that creates the group observes a cancellation of the
+        // task or of a scope, reflect that immediately in the group's status.
+        if (reason)
+          impl->statusCancel(*reason);
+        return true;
+      });
 }
 
 // =============================================================================

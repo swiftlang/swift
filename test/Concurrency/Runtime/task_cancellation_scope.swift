@@ -45,6 +45,7 @@ import Synchronization
     await test_reason_inside_shield_of_cancelled_task()
     await test_scope_created_inside_cancelled_scope()
     await test_scope_created_inside_cancelled_scope_behind_shield()
+    await test_task_group_created_inside_cancelled_scope()
     print("done")
   }
 }
@@ -952,6 +953,28 @@ func test_scope_created_inside_cancelled_scope_behind_shield() async {
         print("Task.isCancelled=\(Task.isCancelled)")
         // CHECK: Task.isCancelled=false
       }
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_group_created_inside_cancelled_scope() async {
+  print("--- test_task_group_created_inside_cancelled_scope")
+  // CHECK: --- test_task_group_created_inside_cancelled_scope
+
+  // A task group that is created inside a cancelled scope starts out
+  // cancelled, the same as inside a cancelled task.
+  await __withTaskCancellationScope { scope in
+    scope.cancel(reason: .deadlineExpired)
+    await withTaskGroup(of: CancellationError.Reason?.self) { group in
+      print("group isCancelled=\(group.isCancelled)")
+      // CHECK: group isCancelled=true
+      let added = group.addTaskUnlessCancelled { Task.cancellationReason }
+      print("addTaskUnlessCancelled=\(added)")
+      // CHECK: addTaskUnlessCancelled=false
+      group.addTask { Task.cancellationReason }
+      print("child reason=\(describe(await group.next()!))")
+      // CHECK: child reason=deadlineExpired
     }
   }
 }
