@@ -74,19 +74,32 @@ public final class MySystem: DistributedActorSystem, @unchecked Sendable {
 
   public func makeInvocationEncoder() -> InvocationEncoder { .init() }
 
+  // Embedded inlines these generic methods into the generic stub thunks, so
+  // they call a non-generic marker that shows the remote call reached the system
   public func remoteCall<Act, Err, Res>(
     on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder,
     throwing: Err.Type, returning: Res.Type
   ) async throws -> Res
       where Act: DistributedActor, Act.ID == ActorID,
-            Err: Error, Res: MySerializationRequirement { fatalError() }
+            Err: Error, Res: MySerializationRequirement {
+    systemRemoteCall(target)
+    fatalError()
+  }
 
   public func remoteCallVoid<Act, Err>(
     on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder,
     throwing: Err.Type
   ) async throws
-      where Act: DistributedActor, Act.ID == ActorID, Err: Error { fatalError() }
+      where Act: DistributedActor, Act.ID == ActorID, Err: Error {
+    systemRemoteCallVoid(target)
+  }
 }
+
+@inline(never)
+public func systemRemoteCall(_ target: RemoteCallTarget) {}
+
+@inline(never)
+public func systemRemoteCallVoid(_ target: RemoteCallTarget) {}
 
 @Resolvable
 public protocol Greeter: DistributedActor where ActorSystem == MySystem {
@@ -120,7 +133,7 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tF
 // SIL: function_ref @$es31_embeddedReportFatalErrorInFile
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tF
-// SIL: function_ref @$e4main8MySystemC10remoteCall2on
+// SIL: function_ref @$e4main16systemRemoteCallyy11Distributed0cD6TargetVF
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tF
 // SIL: } // end sil function '$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tYaKFTE{{.*}}'
 
@@ -129,7 +142,7 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyF
 // SIL: function_ref @$es31_embeddedReportFatalErrorInFile
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyF
-// SIL: function_ref @$e4main8MySystemC14remoteCallVoid2on
+// SIL: function_ref @$e4main20systemRemoteCallVoidyy11Distributed0cD6TargetVF
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyF
 // SIL: } // end sil function '$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyYaKFTE{{.*}}'
 
