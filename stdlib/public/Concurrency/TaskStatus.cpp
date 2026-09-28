@@ -912,19 +912,20 @@ swift_task_pushCancellationScopeImpl() {
   SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Create scope record:%p for task:%p",
                        record, task);
 
-  // The scope needs to inherit the cancellation of the task. Checking this
-  // when adding the record makes sure that a concurrent cancellation of the
-  // task either reaches the new record or is observed here.
-  addStatusRecord(task, record,
-                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-                    if (oldStatus.isCancelled())
-                      record->cancel(oldStatus.getCancellationReason());
-                    // Set the "has cancellation scope" flag so isCancelled()
-                    // can bail out without walking the record chain when
-                    // there are no scopes installed.
-                    newStatus = newStatus.withTaskCancellationScope();
-                    return true; // always add the record
-                  });
+  // The scope inherits the cancellation that the code creating it observes,
+  // i.e. the cancellation of the enclosing scope or of the task. Checking this
+  // when adding the record makes sure that a concurrent cancellation either
+  // reaches the new record or is observed here.
+  addStatusRecordObservingCancellation(
+      task, record,
+      [&](std::optional<size_t> reason, ActiveTaskStatus &newStatus) {
+        if (reason)
+          record->cancel(*reason);
+        // Set the "has cancellation scope" flag so isCancelled() can bail out
+        // without walking the record chain when there are no scopes installed.
+        newStatus = newStatus.withTaskCancellationScope();
+        return true; // always add the record
+      });
 
   return record;
 }
