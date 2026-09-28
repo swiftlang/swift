@@ -272,12 +272,14 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
   const uint64_t SILLoopUnrollThreshold = Loop->getBlocks().empty() ? 0 : 
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
 
+  // Pack loops must be unrolled to specialize the body. This is critical for
+  // performance, they should always be unrolled if possible.
   const bool isPackLoop = isPackIterationLoop(Loop);
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
       if (!canDuplicateLoopInstruction(Loop, &Inst, deb))
         return false;
-      if (instructionInlineCost(Inst) != InlineCost::Free)
+      if (!isPackLoop && instructionInlineCost(Inst) != InlineCost::Free)
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
@@ -290,7 +292,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
         if (!Callee && !isPackLoop) {
           return false;
         }
-        if (Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
+        if (!isPackLoop && Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
           // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
