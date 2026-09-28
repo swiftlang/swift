@@ -721,20 +721,16 @@ public:
   }
 
   // IsCancelled
-  /// Is the task currently cancelled?
-  /// This does take into account cancellation shields, i.e. while a shield is
-  /// active this function will always return 'false'.
-  bool isCancelled(bool ignoreShield = false) const {
-    return (Flags & IsCancelled) &&
-           (ignoreShield || !(Flags & HasActiveTaskCancellationShield));
-  }
-  bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
-  ActiveTaskStatus withCancelled() const {
-    return withFlags(Flags | IsCancelled);
-  }
+  /// Is the task itself cancelled?
+  ///
+  /// Cancellation shields and cancellation scopes only affect the code that
+  /// runs inside of them, so they are not taken into account. See
+  /// `getObservedCancellation` for the cancellation that the code of the task
+  /// observes.
+  bool isTaskCancelled() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled(size_t reason) const {
     // Reasons are set only once, when transitioning from not-cancelled to
-    // cancelled. Callers should have checked `!isCancelled()` first.
+    // cancelled. Callers should have checked `!isTaskCancelled()` first.
     uintptr_t reasonBits = 0;
     switch (CancellationReason(reason)) {
     case CancellationReason::Unspecified:
@@ -747,8 +743,8 @@ public:
   }
 
   // CancellationReason
-  /// Read the cancellation-reason bit. Meaningful only when `isCancelled()`
-  /// (or `isCancelledIgnoringShield()`) returns true. Returns the raw
+  /// Read the cancellation-reason bit. Meaningful only when
+  /// `isTaskCancelled()` returns true. Returns the raw
   /// value of `CancellationError.Reason`.
   ///
   /// The explicit `switch` below is exhaustive on purpose,
@@ -991,7 +987,7 @@ public:
   void traceStatusChanged(AsyncTask *task, ActiveTaskStatus oldStatus,
                           bool isStarting) {
     uint8_t maxPriority = static_cast<uint8_t>(getStoredPriority());
-    bool cancelled = isCancelled();
+    bool cancelled = isTaskCancelled();
     bool escalated = isStoredPriorityEscalated();
     bool running = isRunning();
     bool enqueued = isDirectlyEnqueued();
@@ -999,7 +995,7 @@ public:
 
     if (!isStarting &&
         maxPriority == static_cast<uint8_t>(oldStatus.getStoredPriority()) &&
-        cancelled == oldStatus.isCancelled() &&
+        cancelled == oldStatus.isTaskCancelled() &&
         escalated == oldStatus.isStoredPriorityEscalated() &&
         running == wasRunning && enqueued == oldStatus.isDirectlyEnqueued())
       return;
