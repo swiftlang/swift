@@ -5013,6 +5013,23 @@ private:
     return false;
   }
 
+  /// Whether the given anchor was synthesized by the compiler. Implicit
+  /// conversions, existential openings, and optional chains wrap user-written
+  /// code, so look through them.
+  static bool isSynthesizedAnchor(const Expr *anchor) {
+    while (anchor) {
+      if (auto conversion = dyn_cast<ImplicitConversionExpr>(anchor))
+        anchor = conversion->getSubExpr();
+      else if (auto open = dyn_cast<OpenExistentialExpr>(anchor))
+        anchor = open->getSubExpr();
+      else if (auto optEval = dyn_cast<OptionalEvaluationExpr>(anchor))
+        anchor = optEval->getSubExpr();
+      else
+        return anchor->isImplicit();
+    }
+    return false;
+  }
+
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
     bool strictSafety = Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
@@ -5023,7 +5040,7 @@ private:
     // which keeps it out of the way unless strict memory safety checking asked
     // to hear about unsafe code at all.
     bool isSynthesized =
-        (anchor && anchor->isImplicit()) || isSynthesizedContext();
+        isSynthesizedAnchor(anchor) || isSynthesizedContext();
     if (isSynthesized && !strictSafety)
       return;
 
