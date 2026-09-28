@@ -690,6 +690,20 @@ struct ClassInstantClock: Clock, Identifiable {
       expectEqual(nil, reason)
     }
 
+    tests.test("nested deadline inside an expired deadline is cancelled") {
+      // The inner deadline uses a different clock, so it creates its own scope.
+      await withDeadline(in: .seconds(-1)) {
+        await withDeadline(in: .seconds(60), clock: StringIdClock(id: "inner")) {
+          expectTrue(Task.isCancelled)
+          expectEqual(.deadlineExpired, Task.cancellationReason)
+
+          let start = ContinuousClock.now
+          try? await Task.sleep(for: .seconds(5))
+          expectLT(ContinuousClock.now - start, .seconds(2))
+        }
+      }
+    }
+
     await runAllTestsAsync()
   }
 }
