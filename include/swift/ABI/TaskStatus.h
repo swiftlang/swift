@@ -596,12 +596,19 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
   static constexpr uintptr_t CancelledBit = 1;
   static constexpr uintptr_t ReasonMask = 0b111;
 
+  /// Whether this is the outermost scope of the task. When it is popped, the
+  /// task has no scope anymore.
+  bool IsOutermostScope = false;
+
 public:
   explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
       : TaskStatusRecord(TaskStatusRecordKind::TaskCancellationScope),
         OwningTask(owningTask) {}
 
   AsyncTask *getOwningTask() const { return OwningTask; }
+
+  bool isOutermostScope() const { return IsOutermostScope; }
+  void setIsOutermostScope(bool isOutermost) { IsOutermostScope = isOutermost; }
 
   bool isCancelled() const {
     return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
@@ -640,9 +647,18 @@ public:
 /// Its position in the records list relative to any `TaskCancellationScopeRecord`
 /// determines whether a scope's cancellation is masked at a given call site.
 class TaskCancellationShieldRecord : public TaskStatusRecord {
+  /// Whether this is the outermost shield of the task. When it is popped, the
+  /// task has no shield anymore.
+  bool IsOutermostShield = false;
+
 public:
   TaskCancellationShieldRecord()
       : TaskStatusRecord(TaskStatusRecordKind::CancellationShield) {}
+
+  bool isOutermostShield() const { return IsOutermostShield; }
+  void setIsOutermostShield(bool isOutermost) {
+    IsOutermostShield = isOutermost;
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::CancellationShield;

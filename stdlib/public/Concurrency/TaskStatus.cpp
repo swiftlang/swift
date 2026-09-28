@@ -973,6 +973,9 @@ swift_task_pushCancellationScopeImpl() {
           record->cancel(*reason);
         // Set the "has cancellation scope" flag so isCancelled() can bail out
         // without walking the record chain when there are no scopes installed.
+        // Remember if this is the outermost scope, so that the matching pop can
+        // clear the flag again without walking the chain.
+        record->setIsOutermostScope(!newStatus.hasTaskCancellationScope());
         newStatus = newStatus.withTaskCancellationScope();
         return true; // always add the record
       });
@@ -990,25 +993,13 @@ swift_task_popCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Remove scope record:%p from task:%p",
                        record, task);
 
-  // Track how many scope records are still installed after removing the
-  // target one, so we can clear the fast-path flag once none remain.
-  int remainingScopes = 0;
-  removeStatusRecordWhere(
-      task,
-      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
-        assert(status.hasTaskCancellationScope() && "does not have record!");
-        if (cur->getKind() != TaskStatusRecordKind::TaskCancellationScope)
-          return false;
-
-        if (cur == record)
-          return true; // remove this record
-
-        remainingScopes += 1;
-        return false;
-      },
-      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
-                            ActiveTaskStatus &newStatus) {
-        if (remainingScopes == 0) {
+  // If we're removing the outermost scope, clear the "has cancellation scope"
+  // flag, since no other scope remains.
+  bool clearHasScopeFlag = record->isOutermostScope();
+  removeStatusRecord(
+      task, record,
+      [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+        if (clearHasScopeFlag) {
           assert(oldStatus.hasTaskCancellationScope());
           newStatus = newStatus.withoutTaskCancellationScope();
         }
@@ -1021,16 +1012,13 @@ swift_task_popCancellationScopeImpl(TaskCancellationScopeRecord *record) {
 
 bool AsyncTask::cancellationShieldPush() {
   // Always install a fresh shield record. The record's position in the
-  // LIFO records order is what the scope search consults, so nested and
-  // interleaved shields (e.g. `scope { shield { scope { shield { ... } } } }`)
-  // must each get their own record even when an outer shield's bit is
-  // already set. The `HasActiveTaskCancellationShield` bit remains a
-  // fast-path signal for "any shield present" and is only cleared once
-  // every shield record has popped (see `cancellationShieldPop`).
-  //
-  // Status records are only ever pushed/popped by the owning task itself,
-  // so no CAS retry loop is needed for the bit toggle - `addStatusRecord`
-  // takes the record lock for us.
+  // LIFO records order is what the cancellation of the task and of its scopes
+  // consults, so nested and interleaved shields (e.g.
+  // `scope { shield { scope { shield { ... } } } }`) must each get their own
+  // record even when an outer shield's bit is already set. The
+  // `HasActiveTaskCancellationShield` bit remains a fast-path signal for "any
+  // shield present" and is only cleared once the outermost shield record has
+  // popped (see `cancellationShieldPop`).
   void *allocation =
       _swift_task_alloc_specific(this, sizeof(class TaskCancellationShieldRecord));
   auto record = ::new (allocation) TaskCancellationShieldRecord();
@@ -1040,8 +1028,8 @@ bool AsyncTask::cancellationShieldPush() {
   addStatusRecord(
       this, record,
       [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-        if (!oldStatus.hasCancellationShield())
-          newStatus = newStatus.withCancellationShield();
+        record->setIsOutermostShield(!oldStatus.hasCancellationShield());
+        newStatus = newStatus.withCancellationShield();
         return true; // always add the record
       });
 
@@ -1049,33 +1037,26 @@ bool AsyncTask::cancellationShieldPush() {
 }
 
 void AsyncTask::cancellationShieldPop() {
-  // Remove the innermost shield record. If it was the last one, clear the
-  // `HasActiveTaskCancellationShield` fast-path bit; otherwise leave the
-  // bit set so nested shields keep the bit active.
-  int remainingShields = 0;
-  TaskCancellationShieldRecord *toDealloc = nullptr;
-  removeStatusRecordWhere(
-      this,
-      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
-        if (cur->getKind() != TaskStatusRecordKind::CancellationShield)
-          return false;
-        if (toDealloc == nullptr) {
-          toDealloc = cast<TaskCancellationShieldRecord>(cur);
-          return true; // remove this innermost shield record
-        }
-        remainingShields += 1;
-        return false;
-      },
-      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
-                            ActiveTaskStatus &newStatus) {
-        if (remainingShields == 0) {
+  // Everything inside of the shield ended before the shield, so the shield is
+  // the innermost record. Only the task itself adds records while it runs, so
+  // we can read it without the lock.
+  auto status = _private()._status().load(std::memory_order_relaxed);
+  auto record =
+      cast<TaskCancellationShieldRecord>(status.getInnermostRecord());
+
+  // If we're removing the outermost shield, clear the
+  // `HasActiveTaskCancellationShield` bit, since no other shield remains.
+  bool clearShieldFlag = record->isOutermostShield();
+  removeStatusRecord(
+      this, record, status,
+      [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+        if (clearShieldFlag) {
           assert(oldStatus.hasCancellationShield());
           newStatus = newStatus.withoutCancellationShield();
         }
       });
 
-  if (toDealloc)
-    swift_task_dealloc(toDealloc);
+  swift_task_dealloc(record);
 }
 
 
