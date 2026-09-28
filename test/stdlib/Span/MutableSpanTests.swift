@@ -517,6 +517,34 @@ suite.test("updateElements(from:copying:)")
   expectEqual(a, [-1, -1, 0, 1, 2, 3, 8, 9])
 }
 
+struct IterableSequence: Sequence, Iterable {
+  typealias Element = Int
+
+  let bound: Int
+  init(capacity: Int) {
+    bound = capacity
+  }
+  func makeIterator() -> Range<Int>.Iterator {
+    (0..<bound).makeIterator()
+  }
+}
+
+suite.test("updateElements(from:copying:), with Sequence as Iterable")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let capacity = 8
+  let sequence = IterableSequence(capacity: capacity)
+
+  var a = ContiguousArray(repeating: -1, count: capacity)
+  var span = a.mutableSpan
+
+  let end = span.updateElements(from: 0, copying: sequence)
+  expectEqual(end, capacity)
+  expectEqual(a.elementsEqual(0..<capacity), true)
+}
+
 suite.test("updateElements(from:copying:), Iterable overflows source")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
