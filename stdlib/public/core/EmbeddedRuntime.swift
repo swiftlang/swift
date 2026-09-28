@@ -1457,6 +1457,7 @@ func weakReleaseNonZero(object: WeakReference?) {
   // If we decremented from zero then we'd be deallocating the object, which
   // must not happen in this NonZero case.
   let oldValue = unsafe addRelaxed(refcount, n: -HeapObject.weakRefcountOne)
+  checkWeakRefcountOverflow(oldValue)
   if (oldValue & HeapObject.weakRefcountMask) == 0 {
     fatalError("weakReleaseNonZero reached zero weak refcount")
   }
@@ -1475,6 +1476,7 @@ func weakRetain(object: WeakReference?) {
   }
 
   let oldValue = unsafe addRelaxed(refcount, n: HeapObject.weakRefcountOne)
+  checkWeakRefcountOverflow(oldValue)
   if (oldValue & HeapObject.weakRefcountMask) == HeapObject.weakRefcountMax {
     fatalError("weak reference count overflow")
   }
@@ -1545,6 +1547,7 @@ func weakRelease(object: WeakReference?, allocatedSize: Int? = nil, allocatedAli
   } else {
     oldValue = unsafe addRelaxed(refcount, n: -HeapObject.weakRefcountOne)
   }
+  checkWeakRefcountOverflow(oldValue)
 
   // If the old weak refcount was 0, then this is the last weak reference and
   // it's time to free the object. The subtraction above underflowed and
@@ -1615,6 +1618,15 @@ func refcountValueIsLiveForWeakReference(_ refcountValue: Int) -> Bool {
   // A heap object is live until its deinit runs, which swift_release_n_ marks
   // by storing immortalRefCount.
   return (refcountValue & HeapObject.refcountMask) != HeapObject.immortalRefCount
+}
+
+// The weak refcount overflows into doNotFreeBit. Weak refcount operations check
+// doNotFreeBit before doing anything, so if it's set in the value the atomic
+// operation saw, it was set by an overflow.
+func checkWeakRefcountOverflow(_ oldValue: Int) {
+  if (oldValue & HeapObject.doNotFreeBit) != 0 {
+    fatalError("weak reference count overflow")
+  }
 }
 
 #endif // _pointerBitWidth(_64)
