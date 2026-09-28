@@ -799,7 +799,7 @@ void AsyncTask::PrivateStorage::complete(AsyncTask *task) {
 
 bool AsyncTask::isTaskCancelled() const {
   auto status = _private()._status().load(std::memory_order_relaxed);
-  return status.isCancelledIgnoringShield();
+  return status.isTaskCancelled();
 }
 
 bool AsyncTask::isCancelledInCurrentContext() const {
@@ -812,7 +812,7 @@ std::optional<size_t> AsyncTask::getCancellationReasonInCurrentContext() const {
   // concurrently.
   if (this != swift_task_getCurrent()) {
     auto status = _private()._status().load(std::memory_order_relaxed);
-    if (status.isCancelled())
+    if (status.isTaskCancelled() && !status.hasCancellationShield())
       return status.getCancellationReason();
     return std::nullopt;
   }
@@ -2536,7 +2536,7 @@ size_t swift::swift_task_getIsCancelledWithReasonWithFlags(
   std::optional<size_t> reason;
   if (flags & swift_task_is_cancelled_flag_TaskOnly) {
     auto status = task->_private()._status().load(std::memory_order_relaxed);
-    if (status.isCancelledIgnoringShield())
+    if (status.isTaskCancelled())
       reason = status.getCancellationReason();
   } else {
     reason = task->getCancellationReasonInCurrentContext();

@@ -971,8 +971,9 @@ swift_task_pushCancellationScopeImpl() {
       [&](std::optional<size_t> reason, ActiveTaskStatus &newStatus) {
         if (reason)
           record->cancel(*reason);
-        // Set the "has cancellation scope" flag so isCancelled() can bail out
-        // without walking the record chain when there are no scopes installed.
+        // Set the "has cancellation scope" flag so `getObservedCancellation`
+        // can bail out without walking the record chain when there are no
+        // scopes installed.
         // Remember if this is the outermost scope, so that the matching pop can
         // clear the flag again without walking the chain.
         record->setIsOutermostScope(!newStatus.hasTaskCancellationScope());
@@ -1127,7 +1128,7 @@ std::optional<size_t> swift::getObservedCancellation(ActiveTaskStatus status) {
       }
     }
   }
-  if (status.isCancelled())
+  if (status.isTaskCancelled() && !status.hasCancellationShield())
     return status.getCancellationReason();
   return std::nullopt;
 }
@@ -1452,9 +1453,8 @@ static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
     return;
   }
 
-  // Task groups need their children to be cancelled.  Note that we do
-  // not want to formally cancel the task group itself; that property is
-  // under the synchronous control of the task that owns the group.
+  // Task groups need their children to be cancelled. This also cancels the
+  // group itself, so that child tasks added later start out cancelled.
   case TaskStatusRecordKind::TaskGroup: {
     auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
     _swift_taskGroup_cancel(groupRecord->getGroup(), reason);
@@ -1562,7 +1562,7 @@ static void swift_task_cancelWithFlagsImpl(AsyncTask *task, size_t flags) {
     // Are we already cancelled? A task is only cancelled once, even if a
     // cancellation shield is active. Otherwise a second cancellation would
     // change the reason of the first one.
-    if (oldStatus.isCancelledIgnoringShield()) {
+    if (oldStatus.isTaskCancelled()) {
       return;
     }
 
