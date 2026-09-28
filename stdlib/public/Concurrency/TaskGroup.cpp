@@ -413,12 +413,23 @@ protected:
 
   ResultTypeInfo successType;
 
+  /// The reason of the first cancellation of the group.
+  ///
+  /// bit 0:          whether the reason is set;
+  /// bits 1-3:       the reason (same shape as swift_task_cancelWithFlags).
+  /// remaining bits: reserved for future use.
+  std::atomic<uint8_t> cancellationReason;
+
+  static constexpr uint8_t CancellationReasonSetBit = 1;
+  static constexpr uint8_t CancellationReasonMask = 0b111;
+
   explicit TaskGroupBase(ResultTypeInfo T, uint64_t initialStatus)
     : TaskGroupTaskStatusRecord(),
       status(initialStatus),
       waitQueue(nullptr),
       readyQueue(),
-      successType(T) {}
+      successType(T),
+      cancellationReason(0) {}
 
   TaskGroupBase(const TaskGroupBase &) = delete;
 
@@ -546,8 +557,14 @@ public:
   ///
   /// Prefer calling cancelAll if the intent is to cancel the group and all of its children.
   ///
+  /// The first cancellation of the group decides its reason.
+  ///
   /// \return true, if the group was already cancelled before, and false if it wasn't cancelled before (but now is).
-  bool statusCancel();
+  bool statusCancel(size_t reason);
+
+  /// The reason of the first cancellation of the group. Only meaningful if
+  /// the group is cancelled.
+  size_t getCancellationReason() const;
 
   /// Cancel the group and all of its child tasks recursively.
   /// This also sets the cancelled bit in the group status.
@@ -876,7 +893,14 @@ TaskGroupStatus TaskGroupBase::statusRemoveWaitingRelease() {
   return TaskGroupStatus{old};
 }
 
-bool TaskGroupBase::statusCancel() {
+bool TaskGroupBase::statusCancel(size_t reason) {
+  // The first cancellation of the group decides its reason.
+  uint8_t notSet = 0;
+  uint8_t newReason =
+      ((reason & CancellationReasonMask) << 1) | CancellationReasonSetBit;
+  cancellationReason.compare_exchange_strong(notSet, newReason,
+                                             std::memory_order_relaxed);
+
   /// The cancelled bit is always the same, the first one, between all task group implementations:
   const uint64_t cancelled = TaskGroupStatus::cancelled;
   auto old = status.fetch_or(cancelled, std::memory_order_relaxed);
@@ -886,6 +910,11 @@ bool TaskGroupBase::statusCancel() {
 
   // return if the status was already cancelled before we flipped it or not
   return old & cancelled;
+}
+
+size_t TaskGroupBase::getCancellationReason() const {
+  return (cancellationReason.load(std::memory_order_relaxed) >> 1) &
+         CancellationReasonMask;
 }
 
 /******************************************************************************/
@@ -1149,7 +1178,7 @@ static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGro
     // If the task has already been cancelled, reflect that immediately in
     // the group's status.
     if (oldStatus.isCancelled()) {
-      impl->statusCancel();
+      impl->statusCancel(oldStatus.getCancellationReason());
     }
     return true;
   });
@@ -1252,8 +1281,12 @@ bool TaskGroup::isCancelled() {
   return asBaseImpl(this)->isCancelled();
 }
 
-bool TaskGroup::statusCancel() {
-  return asBaseImpl(this)->statusCancel();
+bool TaskGroup::statusCancel(size_t reason) {
+  return asBaseImpl(this)->statusCancel(reason);
+}
+
+size_t TaskGroup::getCancellationReason() {
+  return asBaseImpl(this)->getCancellationReason();
 }
 
 // =============================================================================
@@ -2252,7 +2285,7 @@ bool TaskGroupBase::cancelAll(AsyncTask *owningTask, size_t reason) {
   // done, any existing child tasks should already have been cancelled,
   // and cancellation should automatically flow to any new child tasks,
   // so there's nothing else for us to do.
-  auto wasCancelledBefore = statusCancel();
+  auto wasCancelledBefore = statusCancel(reason);
   if (wasCancelledBefore) {
     return false;
   }

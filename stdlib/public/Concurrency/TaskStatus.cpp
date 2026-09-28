@@ -1341,7 +1341,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
 void swift::_swift_taskGroup_cancel(TaskGroup *group, size_t reason) {
-  (void) group->statusCancel();
+  (void) group->statusCancel(reason);
 
   // Because only the owning task of the task group can modify the
   // child list of a task group status record, and it can only do so
