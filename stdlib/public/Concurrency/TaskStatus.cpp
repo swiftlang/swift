@@ -902,8 +902,13 @@ swift_task_pushCancellationScopeImpl() {
   SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Create scope record:%p for task:%p",
                        record, task);
 
+  // The scope needs to inherit the cancellation of the task. Checking this
+  // when adding the record makes sure that a concurrent cancellation of the
+  // task either reaches the new record or is observed here.
   addStatusRecord(task, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    if (oldStatus.isCancelled())
+                      record->cancel(oldStatus.getCancellationReason());
                     // Set the "has cancellation scope" flag so isCancelled()
                     // can bail out without walking the record chain when
                     // there are no scopes installed.
@@ -1450,11 +1455,11 @@ static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
   case TaskStatusRecordKind::Deadline:
     break;
 
-  // Whole-task cancellation must not implicitly cancel independent
-  // cancellation scopes; scopes are only cancelled via their own
-  // `TaskCancellationScope.cancel()`.
+  // Scopes are cancelled together with their task. A scope that got cancelled
+  // before keeps its own reason.
   case TaskStatusRecordKind::TaskCancellationScope:
-    break;
+    cast<TaskCancellationScopeRecord>(record)->cancel(reason);
+    return;
 
   // Shield records take no cancellation action. The walk skips the records
   // inside of a shield.
