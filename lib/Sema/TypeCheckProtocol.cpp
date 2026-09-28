@@ -5248,14 +5248,24 @@ static bool couldApplyNonisolated(WitnessIsolationError const &witnessError) {
     return false;
   if (auto *var = dyn_cast<VarDecl>(witnessError.witness)) {
     if (var->hasStorage()) {
+      // TODO: consider supporting patterns? Fix-it that can rewrite them to
+      // only isolate part? Skip them to avoid over isolating.
+      auto *PBD = var->getParentPatternBinding();
+      if (!PBD || PBD->getSingleVar() != var)
+        return false;
+      if (var->isLet())
+        return var->getTypeInContext()->isSendableType();
       // Mutable VarDecl with storage, for an immutable requirement, can be
       // converted to 'let nonisolated'.
-      return !var->isLet() && isa<VarDecl>(witnessError.requirement) &&
+      return isa<VarDecl>(witnessError.requirement) &&
              !cast<VarDecl>(witnessError.requirement)
                   ->isSettable(/*useDC=*/nullptr);
     }
-    // Computed VarDecl can be converted if no property wrapper is present.
-    return !var->hasAttachedPropertyWrapper();
+    // Computed VarDecl can be converted if no property wrapper, lazy, or
+    // override with observer is present.
+    return !var->hasAttachedPropertyWrapper() &&
+           !var->getAttrs().hasAttribute<LazyAttr>() &&
+           !(var->hasObservers() && var->getOverriddenDecl());
   }
   return isa<AbstractFunctionDecl, SubscriptDecl>(witnessError.witness);
 }
@@ -5435,8 +5445,7 @@ static void diagnoseConformanceIsolationErrors(
     if (!hasIsolatedConformances) {
       for (auto witness : potentialNonisolated) {
         auto var = dyn_cast<VarDecl>(witness);
-        // Not a variable, or a computed property.
-        if (!var || !var->hasStorage()) {
+        if (!var || !var->hasStorage() || var->isLet()) {
           ctx.Diags
               .diagnose(witness, diag::note_make_witness_nonisolated, witness)
               .fixItInsert(
@@ -5444,8 +5453,7 @@ static void diagnoseConformanceIsolationErrors(
                   "nonisolated ");
           continue;
         }
-        // Mutable variables (since we didn't add let witnesses), which can be
-        // converted to 'nonisolated let'.
+        // Mutable variables, which can be converted to 'nonisolated let'.
         auto loc = getFixItLocForVarToLet(var);
         if (loc.isValid()) {
           ctx.Diags.diagnose(var, diag::note_make_witness_immutable, var)
