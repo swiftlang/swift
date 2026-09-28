@@ -480,15 +480,18 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   // Escaping closures don't need attention beyond what we already perform.
   if (!inst->isOnStack())
     return false;
-  
-  // A nonescaping closure borrows its captures, but now that we've lowered
+
+  // A nonescaping closure borrows its captures (note that `@called(once)`,
+  // is allowed to also consume its captures), but now that we've lowered
   // those borrows away, we need to make those dependence relationships explicit
   // so that the optimizer continues respecting them.
+  ApplySite applySite(inst);
   MarkDependenceInst *firstNewMDI = nullptr;
   auto newValue = withBuilder<SILValue>(inst->getNextInstruction(),
                                         [&](SILBuilder &b, SILLocation loc) {
     SILValue newValue = inst;
-    for (auto op : inst->getArguments()) {
+    for (auto &argOp : inst->getArgumentOperands()) {
+      SILValue op = argOp.get();
       // Trivial types have infinite lifetimes already.
       if (op->getType().isTrivial(*inst->getFunction())) {
         break;
@@ -498,7 +501,16 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       if (op->getType().isAddress()) {
         break;
       }
-      
+
+      // In `@called(once)` case, consumed captures don't need the dependence
+      // but the borrowed ones still do i.e. a non-Copyable borrowed value.
+      if (inst->isCalledOnce()) {
+        auto argConv = applySite.getArgumentConvention(argOp);
+        if (!(op->getType().isMoveOnly() &&
+              !argConv.isOwnedConventionInCaller()))
+          continue;
+      }
+
       // If this is a nontrivial value argument, insert the mark_dependence.
       auto mdi = b.createMarkDependence(loc, newValue, op,
                                         MarkDependenceKind::Escaping);
