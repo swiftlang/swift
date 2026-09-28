@@ -434,6 +434,23 @@ func test_outer_task_cancelled_inner_shielded_group() async {
   await task.value
 }
 
+@available(SwiftStdlib 6.5, *)
+func test_task_cancel_again_inside_shield_keeps_reason() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_task_cancel_again_inside_shield_keeps_reason
+
+  // A task is only cancelled once. Cancelling it again inside a shield doesn't
+  // change the reason of the first cancellation.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel() }
+    await withTaskCancellationShield {
+      withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    }
+    print("reason:\(Task.cancellationReason.map { "\($0)" } ?? "nil")")
+    // CHECK: reason:unspecified
+  }.value
+}
+
 @available(SwiftStdlib 6.4, *)
 @main struct Main {
   static func main() async {
@@ -448,6 +465,7 @@ func test_outer_task_cancelled_inner_shielded_group() async {
     await test_hasActiveCancellationShield()
     await test_task_isCancelled_instance_vs_static()
     await test_outer_task_cancelled_inner_shielded_group()
+    await test_task_cancel_again_inside_shield_keeps_reason()
     print("DONE")
   }
 }
