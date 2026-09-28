@@ -4676,9 +4676,9 @@ namespace {
     /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
     ///
     /// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, the method keeps its original
-    /// name (it is marked '@unsafe(always)' by importAttributes instead), and
-    /// the renamed spelling is imported a second time as a deprecated migration
-    /// stub, which is only '@unsafe'.
+    /// name and is marked '@unsafe(always)' here instead, and the renamed
+    /// spelling is imported a second time as a deprecated migration stub, which
+    /// is only '@unsafe'.
     void renameToUnsafeIfNeeded(
         const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
         const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
@@ -4705,9 +4705,22 @@ namespace {
       if (currentName == unsafeName)
         return;
 
-      if (!keepsNameWhenImportedAsUnsafe(clangDecl, Impl.SwiftContext)) {
+      if (!Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
         swiftDecl->setName(unsafeName);
         return;
+      }
+
+      // Keeping the original name means every use has to be acknowledged. A
+      // method template is left alone: calls refer to its specialization, which
+      // is imported, and promoted, as a method of its own.
+      auto *unsafeAttr = swiftDecl->getAttrs().getAttribute<UnsafeAttr>();
+      if (!funcTemplate && (!unsafeAttr || !unsafeAttr->isAlways())) {
+        bool implicit = !unsafeAttr || unsafeAttr->isImplicit();
+        if (unsafeAttr)
+          swiftDecl->getAttrs().removeAttribute(unsafeAttr);
+        swiftDecl->addAttribute(new (Impl.SwiftContext) UnsafeAttr(
+            SourceLoc(), SourceRange(), /*always=*/true, implicit));
       }
 
       // Keeping the original name collides with the same-named safe wrapper
@@ -4733,23 +4746,13 @@ namespace {
                                /*correctSwiftName=*/std::nullopt,
                                /*accessorInfo=*/std::nullopt, funcTemplate));
       }
-      if (!stub || stub == swiftDecl)
-        return;
-
       // The stub's own name says 'Unsafe', so its uses don't have to be
       // acknowledged with 'unsafe' unless strict memory safety is on; that
       // also keeps existing code that already calls the renamed spelling
-      // compiling. Only the original name is '@unsafe(always)'.
-      //
-      // An implicit '@unsafe(always)' here is necessarily the one the rename
-      // heuristic asked importSwiftAttrAttributes() for; an 'unsafe(always)'
-      // spelled in C++ is explicit, and still wins.
-      if (auto *unsafeAttr = stub->getAttrs().getAttribute<UnsafeAttr>();
-          unsafeAttr && unsafeAttr->isAlways() && unsafeAttr->isImplicit()) {
-        stub->getAttrs().removeAttribute(unsafeAttr);
-        stub->addAttribute(new (Impl.SwiftContext)
-                               UnsafeAttr(/*implicit=*/true));
-      }
+      // compiling. It is imported from the same declaration, so it gets the
+      // heuristic's plain '@unsafe', and only the original name is promoted.
+      if (!stub || stub == swiftDecl)
+        return;
 
       // A method that C++ already deprecates keeps that deprecation; Clang's
       // message wins at the use site either way.
@@ -9589,22 +9592,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
-    bool importUnsafeHeuristic = false;
-    bool heuristicIsAlways = false;
-    if (const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
-        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext)) {
-      importUnsafeHeuristic = true;
-      // Only require every use to be acknowledged for methods that actually
-      // kept their original name; a method that is still renamed has no
-      // un-renamed spelling to migrate to.
-      heuristicIsAlways =
-          keepsNameWhenImportedAsUnsafe(CXXMethod, SwiftContext);
-    }
+    // A method that keeps a name it would otherwise have been renamed away
+    // from is promoted to '@unsafe(always)' by renameToUnsafeIfNeeded(), which
+    // is the only place that knows whether the rename applies.
+    const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
+    bool importUnsafeHeuristic =
+        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext);
 
     if (seenUnsafe || importUnsafeHeuristic) {
       auto attr = new (SwiftContext)
-          UnsafeAttr(SourceLoc(), SourceRange(),
-                     seenUnsafe.value_or(false) || heuristicIsAlways,
+          UnsafeAttr(SourceLoc(), SourceRange(), seenUnsafe.value_or(false),
                      /*implicit=*/!seenUnsafe.has_value());
       MappedDecl->addAttribute(attr);
     }

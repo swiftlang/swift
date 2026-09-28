@@ -94,4 +94,14 @@ struct IntPair {
   SelfContained selfContained() const;
 };
 
+// An unsafe projection that is never renamed to '__getUnsafe', because it has
+// a custom Swift name. It stays '@unsafe' rather than becoming '@unsafe(always)'.
+struct CustomNamed {
+  int x;
+  CustomNamed(const CustomNamed &);
+
+  // expected-strict-note@+1 {{this returns a pointer or reference into a type that owns its storage}}
+  int *_get() __attribute__((swift_name("get()")));
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_METHOD_UNSAFE_PROJECTIONS_H

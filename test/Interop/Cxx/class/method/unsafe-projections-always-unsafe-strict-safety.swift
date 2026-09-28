@@ -22,3 +22,9 @@ func useMigrationStub(_ sc: SelfContained) {
   // expected-note@-4 {{reference to unsafe instance method '__viewUnsafe()'}}
   // expected-note@-5 {{reference to parameter 'sc' involves unsafe type 'SelfContained'}}
 }
+
+func useCustomNamed(_ c: inout CustomNamed) {
+  // Only '@unsafe', but still unsafe.
+  _ = c.get() // expected-strict-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-strict-note@-1 {{reference to unsafe instance method 'get()'}}
+}
