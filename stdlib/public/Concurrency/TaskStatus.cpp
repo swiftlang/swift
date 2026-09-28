@@ -1372,12 +1372,43 @@ void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 
+/// Calls `fn` for every record in `status` that comes before `end` and that is
+/// not inside a cancellation shield. Pass `nullptr` for `end` to visit the
+/// whole chain.
+///
+/// A cancellation shield prevents the cancellation of everything outside of it
+/// from reaching everything inside of it. Since the chain is innermost first,
+/// the records inside a shield are the records before the outermost shield.
+/// The caller must hold the status record lock.
+template <typename Fn>
+static void forEachRecordOutsideShieldsLocked(ActiveTaskStatus status,
+                                              TaskStatusRecord *end, Fn &&fn) {
+  assert(status.isStatusRecordLocked());
+  TaskStatusRecord *outermostShield = nullptr;
+  for (auto cur : status.records()) {
+    if (cur == end)
+      break;
+    if (cur->getKind() == TaskStatusRecordKind::CancellationShield)
+      outermostShield = cur;
+  }
+
+  bool shielded = outermostShield != nullptr;
+  for (auto cur : status.records()) {
+    if (cur == end)
+      break;
+    if (cur == outermostShield) {
+      shielded = false;
+      continue;
+    }
+    if (!shielded)
+      fn(cur);
+  }
+}
+
 /// Perform any cancellation actions required by the given record. The
 /// `reason` is threaded through so child tasks inherit the parent's
 /// cancellation reason.
-static void performCancellationAction(ActiveTaskStatus status,
-                                      TaskStatusRecord *record,
-                                      size_t reason) {
+static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
   switch (record->getKind()) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
@@ -1398,12 +1429,7 @@ static void performCancellationAction(ActiveTaskStatus status,
 
   // Cancellation notifications need to be called.
   case TaskStatusRecordKind::CancellationNotification: {
-    auto notification =
-      cast<CancellationNotificationStatusRecord>(record);
-    if (status.hasCancellationShield()) {
-      SWIFT_TASK_DEBUG_LOG("cancellation shielded: skip cancellation handler invocation in task = %p", swift_task_getCurrent());
-      return; 
-    }
+    auto notification = cast<CancellationNotificationStatusRecord>(record);
     notification->run(reason);
     return;
   }
@@ -1430,10 +1456,8 @@ static void performCancellationAction(ActiveTaskStatus status,
   case TaskStatusRecordKind::TaskCancellationScope:
     break;
 
-  // Shield records are pure positional markers; they take no cancellation
-  // action. The shield's masking effect on `Task.isCancelled` is handled
-  // elsewhere via the `HasActiveTaskCancellationShield` bit and the
-  // scope search's shield-first short-circuit.
+  // Shield records take no cancellation action. The walk skips the records
+  // inside of a shield.
   case TaskStatusRecordKind::CancellationShield:
     break;
 
@@ -1490,15 +1514,11 @@ static void swift_task_cancelWithFlagsImpl(AsyncTask *task, size_t flags) {
   }
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
-    for (auto cur : status.records()) {
-      // Some of the cancellation actions can cause us to recursively
-      // modify this list that is being iterated. However, cancellation is
-      // happening from outside of the task so we know that no new records will
-      // be added since that's only possible while on task.
-      //
-      // Each action must independently take care of how to deal with cancellation shields.
-      performCancellationAction(newStatus, cur, reason);
-    }
+    // A cancellation shield prevents the cancellation of the task from
+    // reaching everything inside of the shield, so we skip those records.
+    forEachRecordOutsideShieldsLocked(
+        status, /*end=*/nullptr,
+        [&](TaskStatusRecord *cur) { performCancellationAction(cur, reason); });
   });
 }
 
