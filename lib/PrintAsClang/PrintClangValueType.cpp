@@ -617,15 +617,18 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   auto *NTD = dyn_cast<NominalTypeDecl>(typeDecl);
   ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
   if (typeDecl->hasClangNode()) {
-    /// Print a reference to the type metadata function for a C++ type.
-    printer.printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &os) {
-      printer.printNamespace(
-          cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
-            ClangSyntaxPrinter(typeDecl->getASTContext(), os)
-                .printCTypeMetadataTypeFunction(typeDecl, typeMetadataFuncName,
-                                                typeMetadataFuncRequirements);
-          });
-    });
+    /// Print a reference to the type metadata function for a C++ type. The
+    /// function has a unique mangled name, so it goes directly into the
+    /// module's _impl namespace even if the type is nested. The
+    /// `__<Parent>Nested` namespaces of nested Swift types would need the
+    /// Swift name of the parent, which is not always a valid C++ identifier,
+    /// e.g. `Outer<CInt>`.
+    printer.printNamespace(
+        cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
+          ClangSyntaxPrinter(typeDecl->getASTContext(), os)
+              .printCTypeMetadataTypeFunction(typeDecl, typeMetadataFuncName,
+                                              typeMetadataFuncRequirements);
+        });
   }
 
   bool objCxxOnly = false;
@@ -679,13 +682,15 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
-  if (typeDecl->hasClangNode())
+  if (typeDecl->hasClangNode()) {
     printer.printBaseName(moduleContext);
-  else
-    printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  if (!printer.printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
+  } else {
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+    if (!printer.printNestedTypeNamespaceQualifiers(typeDecl))
+      os << "::";
+  }
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printSwiftTypeMetadataAccessFunctionCall(
       typeMetadataFuncName, typeMetadataFuncRequirements);
