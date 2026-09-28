@@ -172,22 +172,9 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
   while (true) {
     if (oldStatus.isStatusRecordLocked()) {
       // If the record is locked, then acquire the lock and emplace the new
-      // record with the lock held. We don't have any other work to do, so we
-      // pass an empty function for `fn`, and give a `statusUpdate` that puts
-      // the new record in place.
-      bool addRecord = false;
-      withStatusRecordLock(
-          task, oldStatus, [](ActiveTaskStatus) {},
-          [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-            // Reset the parent of the new record.
-            newRecord->resetParent(newStatus.getInnermostRecord());
-            ActiveTaskStatus modifiedStatus =
-                newStatus.withInnermostRecord(newRecord);
-            addRecord = shouldAddRecord(newStatus, modifiedStatus);
-            if (addRecord)
-              newStatus = modifiedStatus;
-          });
-      return addRecord;
+      // record with the lock held.
+      return addStatusRecordWithLock(task, newRecord, oldStatus,
+                                     shouldAddRecord);
     }
 
     // If the status record is not locked, try emplacing the new record without
@@ -233,6 +220,29 @@ SWIFT_CC(swift)
 bool swift::addStatusRecordToSelf(TaskStatusRecord *record, ActiveTaskStatus &status,
      llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord) {
   return addStatusRecord(swift_task_getCurrent(), record, status, testAddRecord);
+}
+
+SWIFT_CC(swift)
+bool swift::addStatusRecordWithLock(AsyncTask *task, TaskStatusRecord *newRecord,
+    ActiveTaskStatus& oldStatus,
+    llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> shouldAddRecord) {
+  SWIFT_TASK_DEBUG_LOG("Adding %p record to task %p with lock", newRecord, task);
+  // We don't have any other work to do while holding the lock, so we pass an
+  // empty function for `fn`, and give a `statusUpdate` that puts the new record
+  // in place.
+  bool addRecord = false;
+  withStatusRecordLock(
+      task, oldStatus, [](ActiveTaskStatus) {},
+      [&](ActiveTaskStatus lockedStatus, ActiveTaskStatus &newStatus) {
+        // Reset the parent of the new record.
+        newRecord->resetParent(newStatus.getInnermostRecord());
+        ActiveTaskStatus modifiedStatus =
+            newStatus.withInnermostRecord(newRecord);
+        addRecord = shouldAddRecord(lockedStatus, modifiedStatus);
+        if (addRecord)
+          newStatus = modifiedStatus;
+      });
+  return addRecord;
 }
 
 // Remove a status record that is not the innermost record. The status record
@@ -1064,39 +1074,63 @@ swift_task_cancellationScopeIsCancelledImpl(TaskCancellationScopeRecord *record)
   return record->isCancelled();
 }
 
-TaskCancellationScopeRecord *
-swift::_swift_task_getCancellationScope(AsyncTask *task,
-                                        GetCancellationScopeFlags flags) {
-  // The `HasTaskCancellationScope` flag must have been checked by the caller;
-  // this function takes the record lock unconditionally.
-  //
-  // A `TaskCancellationShieldRecord` seen before any scope means the call
-  // site is inside a shield deeper than the innermost scope - return
-  // nullptr so callers observe the task "as-if" no scope were installed,
-  // matching "as-if child task" semantics. Pass
-  // `IgnoringTaskCancellationShield` to bypass that masking.
-  const bool ignoreShield =
-      (static_cast<uintptr_t>(flags) &
-       static_cast<uintptr_t>(
-           GetCancellationScopeFlags::IgnoringTaskCancellationShield)) != 0;
-  TaskCancellationScopeRecord *found = nullptr;
-  ::withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+std::optional<size_t> swift::getObservedCancellation(ActiveTaskStatus status) {
+  if (status.hasTaskCancellationScope()) {
+    assert(status.isStatusRecordLocked());
     for (auto record : status.records()) {
       switch (record->getKind()) {
       case TaskStatusRecordKind::CancellationShield:
-        if (ignoreShield)
-          break;
-        // Shield above the innermost scope masks it; short-circuit.
-        return;
-      case TaskStatusRecordKind::TaskCancellationScope:
-        found = cast<TaskCancellationScopeRecord>(record);
-        return;
+        return std::nullopt;
+      case TaskStatusRecordKind::TaskCancellationScope: {
+        // The nearest scope decides, even if it isn't cancelled yet. A
+        // cancellation of the task reaches the code inside the scope only once
+        // it reached the scope.
+        auto scope = cast<TaskCancellationScopeRecord>(record);
+        if (!scope->isCancelled())
+          return std::nullopt;
+        return scope->getReason();
+      }
       default:
         break;
       }
     }
+  }
+  if (status.isCancelled())
+    return status.getCancellationReason();
+  return std::nullopt;
+}
+
+std::optional<size_t> swift::getObservedCancellation(AsyncTask *task) {
+  assert(task == swift_task_getCurrent());
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  if (!status.hasTaskCancellationScope())
+    return getObservedCancellation(status);
+
+  std::optional<size_t> reason;
+  ::withStatusRecordLock(task, [&](ActiveTaskStatus lockedStatus) {
+    reason = getObservedCancellation(lockedStatus);
   });
-  return found;
+  return reason;
+}
+
+bool swift::addStatusRecordObservingCancellation(
+    AsyncTask *task, TaskStatusRecord *record,
+    llvm::function_ref<bool(std::optional<size_t>, ActiveTaskStatus &)>
+        testAddRecord) {
+  auto shouldAddRecord = [&](ActiveTaskStatus oldStatus,
+                             ActiveTaskStatus &newStatus) {
+    return testAddRecord(getObservedCancellation(oldStatus), newStatus);
+  };
+
+  // The cancellation of a scope doesn't change the status of the task. So if
+  // the task has a scope, we have to take the lock to avoid a concurrent
+  // cancellation of the scope racing with adding the record. Only the task
+  // itself pushes scopes, so the "has cancellation scope" flag can't change
+  // concurrently.
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  if (status.hasTaskCancellationScope())
+    return addStatusRecordWithLock(task, record, status, shouldAddRecord);
+  return addStatusRecord(task, record, status, shouldAddRecord);
 }
 
 // Since the header would have incomplete declarations, we instead instantiate a concrete version of the function here

@@ -803,26 +803,20 @@ bool AsyncTask::isTaskCancelled() const {
 }
 
 bool AsyncTask::isCancelledInCurrentContext() const {
-  auto status = _private()._status().load(std::memory_order_relaxed);
-  // Is the whole task cancelled?
-  if (status.isCancelled())
-    return true;
-  // Slow path: only entered when a `TaskCancellationScopeRecord` is present.
-  // `_swift_task_getCancellationScope` is records-aware: if a
-  // `TaskCancellationShieldRecord` sits above the innermost scope, it
-  // returns nullptr - the shield masks the scope at this call site,
-  // matching the "as-if child task" semantics of `withDeadline`. We then
-  // query the returned scope's own cancelled flag.
-  //
+  return getCancellationReasonInCurrentContext().has_value();
+}
+
+std::optional<size_t> AsyncTask::getCancellationReasonInCurrentContext() const {
   // Only the task itself can observe its scopes. For any other caller the
   // scopes describe an unrelated point of execution and might be popped
   // concurrently.
-  if (SWIFT_UNLIKELY(status.hasTaskCancellationScope()) &&
-      this == swift_task_getCurrent()) {
-    if (auto scope = _swift_task_getCancellationScope(const_cast<AsyncTask *>(this)))
-      return scope->isCancelled();
+  if (this != swift_task_getCurrent()) {
+    auto status = _private()._status().load(std::memory_order_relaxed);
+    if (status.isCancelled())
+      return status.getCancellationReason();
+    return std::nullopt;
   }
-  return false;
+  return getObservedCancellation(const_cast<AsyncTask *>(this));
 }
 
 void FutureFragment::destroy() {
@@ -1894,44 +1888,12 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   // Perform additional linking between parent and child task.
   if (parent) {
-    // If the parent was already cancelled, we carry this flag forward to the child.
-    //
-    // In a task group we would not have allowed the `add` to create a child anymore,
-    // however better safe than sorry and `async let` are not expressed as task groups,
-    // so they may have been spawned in any case still.
-    //
-    // Both whole-task cancellation AND an active `TaskCancellationScope`
-    // in the parent propagate to structured children. A child created
-    // inside a cancelled scope must be immediately cancelled with
-    // the scope's reason..
-    //
-    // Propagate the parent's cancellation reason so structured children
-    // see the same `Task.cancellationReason` the parent set (typically
-    // `.deadlineExpired` from a `withDeadline` scope).
-    auto parentStatus =
-        parent->_private()._status().load(std::memory_order_relaxed);
-    // Also consider a cancelled cancellation scope in the parent's records:
-    // structured children spawned inside a cancelled `__withTaskCancellationScope`
-    // (including `withDeadline` after its deadline elapsed) must be cancelled
-    // immediately at creation, with the scope's reason.
-    TaskCancellationScopeRecord *cancelledScope = nullptr;
-    if (parentStatus.hasTaskCancellationScope()) {
-      if (auto *scope = _swift_task_getCancellationScope(parent))
-        if (scope->isCancelled())
-          cancelledScope = scope;
-    }
-    if (parentStatus.isCancelled()) {
-      // Whole-task cancellation on the parent: propagate the parent's reason
-      // verbatim. A child created inside a cancellation shield is not
-      // cancelled, since `isCancelled` respects the shield.
-      swift_task_cancelWithFlags(task, parentStatus.getCancellationReason());
-    } else if ((group && group->isCancelled()) || cancelledScope) {
-      // Either the enclosing group is cancelled, or an active
-      // TaskCancellationScope in the parent is cancelled.
-      size_t reason = cancelledScope ? cancelledScope->getReason()
-                                     : group->getCancellationReason();
-      swift_task_cancelWithFlags(task, reason);
-    }
+    // A child task starts out cancelled if the code that creates it observes a
+    // cancellation, or if its task group is cancelled.
+    if (auto reason = getObservedCancellation(parent))
+      swift_task_cancelWithFlags(task, *reason);
+    else if (group && group->isCancelled())
+      swift_task_cancelWithFlags(task, group->getCancellationReason());
 
     task->inheritDeadlineFrom(parent);
 
@@ -2578,27 +2540,21 @@ size_t swift::swift_task_getIsCancelledWithReason(AsyncTask *task) {
 
 size_t swift::swift_task_getIsCancelledWithReasonWithFlags(
     AsyncTask *task, swift_task_is_cancelled_flag flags) {
+  std::optional<size_t> reason;
+  if (flags & swift_task_is_cancelled_flag_TaskOnly) {
+    auto status = task->_private()._status().load(std::memory_order_relaxed);
+    if (status.isCancelledIgnoringShield())
+      reason = status.getCancellationReason();
+  } else {
+    reason = task->getCancellationReasonInCurrentContext();
+  }
+
   // The return value must encode the isCancelled and reason into one word.
   // See Concurrency.h for more details.
   constexpr size_t isCancelledBit = 1u;
-  auto status = task->_private()._status().load(std::memory_order_relaxed);
-  if (!status.isCancelledIgnoringShield()) {
-    // Even when the whole task isn't cancelled, an enclosing cancellation
-    // scope might be. Look up the innermost visible scope; if
-    // it's actually cancelled, report that scope's reason.
-    //
-    // Only the task itself can observe its scopes.
-    if (!(flags & swift_task_is_cancelled_flag_TaskOnly) &&
-        status.hasTaskCancellationScope() && task == swift_task_getCurrent()) {
-      if (auto *scope = _swift_task_getCancellationScope(task)) {
-        if (scope->isCancelled())
-          return isCancelledBit | (scope->getReason() << 1);
-      }
-    }
+  if (!reason)
     return 0;
-  }
-  // Whole-task was cancelled
-  return isCancelledBit | (status.getCancellationReason() << 1);
+  return isCancelledBit | (*reason << 1);
 }
 
 template <typename FunctionPtrType>
@@ -2612,39 +2568,22 @@ addCancellationHandlerCommon(FunctionPtrType handler, void *context,
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
   auto *task = swift_task_getCurrent();
-  bool fireHandlerNow = false;
-  size_t immediateReason = 0;
-  addStatusRecord(task, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
-    if (oldStatus.isCancelled()) {
-      // We don't fire the cancellation handler here since this function needs
-      // to be idempotent
-      fireHandlerNow = true;
-      immediateReason = oldStatus.getCancellationReason();
+  std::optional<size_t> immediateReason;
+  addStatusRecordObservingCancellation(
+      task, record,
+      [&](std::optional<size_t> reason, ActiveTaskStatus &newStatus) {
+        // We don't fire the cancellation handler here since this function
+        // needs to be idempotent
+        immediateReason = reason;
 
-      // don't add the record, because that would risk triggering it from
-      // task_cancel, concurrently with the record->run() we're about to do below.
-      return false;
-    }
-    return true; // add the record
-  });
+        // don't add the record, because that would risk triggering it from
+        // task_cancel, concurrently with the record->run() we're about to do
+        // below.
+        return !reason;
+      });
 
-  // Check the for cancelled scopes so we fire the handler immediately if we're
-  // installing inside an already-cancelled scope (e.g. `withDeadline` past deadline).
-  if (!fireHandlerNow && task) {
-    auto status = task->_private()._status().load(std::memory_order_relaxed);
-    if (status.hasTaskCancellationScope()) {
-      if (auto *scope = _swift_task_getCancellationScope(task)) {
-        if (scope->isCancelled()) {
-          fireHandlerNow = true;
-          immediateReason = scope->getReason();
-          removeStatusRecord(task, record, [](ActiveTaskStatus, ActiveTaskStatus&){});
-        }
-      }
-    }
-  }
-
-  if (fireHandlerNow) {
-    record->run(immediateReason);
+  if (immediateReason) {
+    record->run(*immediateReason);
 
     // we have not added the record to the task because it has fired immediately,
     // and therefore we can clean it up immediately rather than wait until removeCancellationHandler
