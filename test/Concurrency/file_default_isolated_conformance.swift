@@ -17,6 +17,8 @@ protocol Q: SendableMetatype {
   func g()
 }
 
+actor SomeActor {}
+
 func acceptSendableP<T: P & Sendable>(_: T) {} // expected-note {{'acceptSendableP' declared here}}
 
 //--- ext.swift
@@ -50,4 +52,22 @@ struct S: Q {
   func g() {}
   // expected-note@-1:8 {{main actor-isolated instance method 'g()' cannot satisfy nonisolated requirement}}
   // expected-note@-2:8 {{mark instance method 'g()' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
+// The file default isolates `shared`, which then can't witness `GlobalActor`.
+@globalActor
+struct IsolatedSharedGlobalActor {
+  // expected-error@-1:8 {{conformance of 'IsolatedSharedGlobalActor' to protocol 'GlobalActor' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2:8 {{turn data races into runtime errors with '@preconcurrency'}}{{none}}
+  static let shared = SomeActor()
+  // expected-note@-1:14 {{main actor-isolated static property 'shared' cannot satisfy nonisolated requirement}}
+  // expected-note@-2:14 {{mark static property 'shared' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
+struct GlobalActorConformer: GlobalActor {
+  // expected-error@-1:30 {{conformance of 'GlobalActorConformer' to protocol 'GlobalActor' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2:30 {{turn data races into runtime errors with '@preconcurrency'}}{{30-30=@preconcurrency }}
+  static let shared = SomeActor()
+  // expected-note@-1:14 {{main actor-isolated static property 'shared' cannot satisfy nonisolated requirement}}
+  // expected-note@-2:14 {{mark static property 'shared' 'nonisolated'}}{{3-3=nonisolated }}
 }
