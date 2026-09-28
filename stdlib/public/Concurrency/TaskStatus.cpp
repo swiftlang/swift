@@ -1462,9 +1462,10 @@ static void swift_task_cancelWithFlagsImpl(AsyncTask *task, size_t flags) {
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
-    // Are we already cancelled?
-    // Even if we have a cancellation shield active, we do want to set the isCancelled flag.
-    if (oldStatus.isCancelled(/*ignoreShield=*/false)) {
+    // Are we already cancelled? A task is only cancelled once, even if a
+    // cancellation shield is active. Otherwise a second cancellation would
+    // change the reason of the first one.
+    if (oldStatus.isCancelledIgnoringShield()) {
       return;
     }
 
