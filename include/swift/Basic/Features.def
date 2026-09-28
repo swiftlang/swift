@@ -688,7 +688,7 @@ LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builti
 EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
-EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
+LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote distributed actor references")
 
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
