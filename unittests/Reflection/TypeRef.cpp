@@ -12,6 +12,7 @@
 
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Demangling/Demangler.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -531,6 +532,62 @@ TEST(TypeRefTest, NestedTypes) {
 
   EXPECT_TRUE(Child->isConcreteAfterSubstitutions(Subs));
   EXPECT_EQ(SubstChild, Child->subst(Builder, Subs));
+}
+
+// A BoundGenericTypeRef whose mangled name fails to demangle must not crash
+// when demangled back into a node tree; getDemangling() should fail gracefully
+// by returning null. Remote Mirror can encounter such names when inspecting
+// corrupt or foreign process memory (rdar://181289066).
+TEST(TypeRefTest, DemangleBoundGenericInvalidMangledName) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  Demangle::Demangler Dem;
+
+  auto Int = Builder.createNominalType(TypeRefDecl("Si"), /*parent*/ nullptr);
+  std::vector<const TypeRef *> Args{Int};
+
+  // An empty mangled name does not demangle to a type.
+  auto BG = Builder.createBoundGenericType(TypeRefDecl(""), Args,
+                                           /*parent*/ nullptr);
+
+  EXPECT_EQ(nullptr, BG->getDemangling(Dem));
+}
+
+// A BoundGenericTypeRef with a generic argument that fails to demangle must
+// likewise fail gracefully rather than crash (rdar://181289066).
+TEST(TypeRefTest, DemangleBoundGenericInvalidArgument) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  Demangle::Demangler Dem;
+
+  // A nominal argument with an empty mangled name does not demangle.
+  auto BadArg = Builder.createNominalType(TypeRefDecl(""), /*parent*/ nullptr);
+  std::vector<const TypeRef *> Args{BadArg};
+
+  auto BG = Builder.createBoundGenericType(TypeRefDecl("Si"), Args,
+                                           /*parent*/ nullptr);
+
+  EXPECT_EQ(nullptr, BG->getDemangling(Dem));
+}
+
+// The remaining container visitors in DemanglingForTypeRef must also propagate
+// a failed sub-demangling as null rather than tripping Node::addChild's
+// assertion (rdar://181289066).
+TEST(TypeRefTest, DemangleContainersWithInvalidElement) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  Demangle::Demangler Dem;
+
+  // A nominal with an empty mangled name does not demangle.
+  auto BadArg = Builder.createNominalType(TypeRefDecl(""), /*parent*/ nullptr);
+
+  // Labels must match the element count so the element is actually visited.
+  StringRef Labels[] = {StringRef()};
+  auto Tuple = Builder.createTupleType({BadArg}, Labels);
+  EXPECT_EQ(nullptr, Tuple->getDemangling(Dem));
+
+  auto Meta = Builder.createMetatypeType(BadArg, std::nullopt);
+  EXPECT_EQ(nullptr, Meta->getDemangling(Dem));
+
+  auto ExistentialMeta = Builder.createExistentialMetatypeType(BadArg);
+  EXPECT_EQ(nullptr, ExistentialMeta->getDemangling(Dem));
 }
 
 TEST(TypeRefTest, DeriveSubstitutions) {
