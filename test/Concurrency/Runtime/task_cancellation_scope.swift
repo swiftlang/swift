@@ -38,6 +38,7 @@ import Synchronization
     await test_scope_cancel_does_not_fire_handler_inside_shield()
     await test_scope_cancel_does_not_cancel_children_inside_shield()
     await test_scope_cancel_does_not_cancel_scope_inside_shield()
+    await test_scope_cancelled_from_two_threads()
     print("done")
   }
 }
@@ -668,6 +669,77 @@ func test_scope_cancel_does_not_cancel_scope_inside_shield() async {
       }
     }
   }
+}
+
+// TODO: The below method and silgen methods are needed right now since
+// TaskCancellationScope is ~Copyable and ~Sendable. Once we do that
+// we can remove those.
+@available(StdlibDeploymentTarget 6.5, *)
+func withScopeRecord(_ body: (ScopeRecord) async -> Void) async {
+  let scope = ScopeRecord(pointer: _pushCancellationScope())
+  await body(scope)
+  _popCancellationScope(scope.pointer)
+}
+
+struct ScopeRecord: @unchecked Sendable {
+  let pointer: UnsafeRawPointer
+}
+
+@_silgen_name("swift_task_pushCancellationScope")
+func _pushCancellationScope() -> UnsafeRawPointer
+
+@_silgen_name("swift_task_popCancellationScope")
+func _popCancellationScope(_ record: UnsafeRawPointer)
+
+@_silgen_name("swift_task_cancelCancellationScope")
+func _cancelCancellationScope(_ record: UnsafeRawPointer, _ flags: UInt)
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_cancelled_from_two_threads() async {
+  print("--- test_scope_cancelled_from_two_threads")
+  // CHECK: --- test_scope_cancelled_from_two_threads
+
+  // A scope is only cancelled once. If two threads cancel it at the same time,
+  // the handlers inside of the scope get the reason of the scope. This is quite
+  // hard to setup so the test isn't simple.
+  let continuation = Mutex<CheckedContinuation<Void, Never>?>(nil)
+  let task = Task(priority: .low) {
+    await withScopeRecord { scope in
+      let otherThread = DispatchGroup()
+      let handlerReason = Mutex<CancellationError.Reason?>(nil)
+      await withTaskCancellationHandler {
+        await withTaskPriorityEscalationHandler {
+          await withCheckedContinuation { c in
+            continuation.withLock { $0 = c }
+          }
+        } onPriorityEscalated: { _, _ in
+          // This runs while the escalating thread holds the status record
+          // lock of the task. Another thread cancels the scope while we wait,
+          // and then we cancel it with a different reason.
+          otherThread.enter()
+          DispatchQueue.global().async {
+            _cancelCancellationScope(scope.pointer, 0) // .unspecified
+            otherThread.leave()
+          }
+          _ = DispatchSemaphore(value: 0).wait(timeout: .now() + .milliseconds(100))
+          _cancelCancellationScope(scope.pointer, 1) // .deadlineExpired
+        }
+      } onCancel: { reason in
+        handlerReason.withLock { $0 = reason }
+      }
+      otherThread.wait()
+      let reason = handlerReason.withLock { $0 }
+      print("handler reason is scope reason: \(reason == Task.cancellationReason)")
+      // CHECK: handler reason is scope reason: true
+    }
+  }
+
+  while continuation.withLock({ $0 == nil }) {
+    await Task.yield()
+  }
+  task.escalatePriority(to: .high)
+  continuation.withLock { $0!.resume() }
+  await task.value
 }
 
 // CHECK: done
