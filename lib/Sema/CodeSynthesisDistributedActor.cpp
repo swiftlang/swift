@@ -1438,10 +1438,21 @@ FuncDecl *swift::createEmbeddedDistributedReceiveDispatch(ClassDecl *actor) {
 
   // Collect the distributed funcs from the actor.
   llvm::SmallVector<AbstractFunctionDecl *, 4> distributedFuncs;
-  for (auto member : actor->getMembers()) {
-    if (auto *func = dyn_cast<FuncDecl>(member)) {
-      if (func->isDistributed())
-        distributedFuncs.push_back(func);
+
+  // A '@Resolvable' stub '$P' is only ever resolved as a remote reference, so
+  // no call is ever executed on it and its dispatcher never has a target to
+  // match. Leave it with no branches, so it only throws 'target not found' and
+  // does not keep argument decoding, result handling and the stub thunks alive
+  auto *stubProto = C.get_DistributedActorStubDecl();
+  bool isStub = stubProto && llvm::is_contained(actor->getAllProtocols(),
+                                                stubProto);
+
+  if (!isStub) {
+    for (auto member : actor->getMembers()) {
+      if (auto *func = dyn_cast<FuncDecl>(member)) {
+        if (func->isDistributed())
+          distributedFuncs.push_back(func);
+      }
     }
   }
 
@@ -1452,7 +1463,7 @@ FuncDecl *swift::createEmbeddedDistributedReceiveDispatch(ClassDecl *actor) {
   // dispatch needs to recognize that target string and call `self.<method>`
   // which dynamically resolves to the concrete impl
   auto *distActorProto = C.getDistributedActorDecl();
-  if (distActorProto) {
+  if (distActorProto && !isStub) {
     for (auto *inherited : actor->getAllProtocols()) {
       if (inherited == distActorProto)
         continue;

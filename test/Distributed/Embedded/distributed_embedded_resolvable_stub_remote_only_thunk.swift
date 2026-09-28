@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.sil
 // RUN: %FileCheck %s --check-prefix=SIL < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=NO-STUB-FATAL-ERROR < %t/main.sil
+// RUN: %FileCheck %s --check-prefix=DISPATCH < %t/main.sil
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.ll
 // RUN: %FileCheck %s --check-prefix=IR < %t/main.ll
 
@@ -142,3 +143,23 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // SIL: function_ref @swift_distributed_actor_is_remote
 // SIL: function_ref @$e4main11GreeterImplC5greet4nameS2S_tF
 // SIL: } // end sil function '$e4main11GreeterImplC5greet4nameS2S_tYaKFTE'
+
+// ==== ------------------------------------------------------------------------
+// MARK: Stub dispatcher has no targets
+
+// A stub is never local, so its '_executeDistributedTarget' never matches a
+// target and does not decode arguments or reach the stub thunks
+// DISPATCH-LABEL: sil @$e4main8$GreeterC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}} :
+// DISPATCH-NOT: function_ref @$e4main9MyDecoderV18decodeNextArgument
+// DISPATCH-NOT: function_ref @$e4main15MyResultHandlerV
+// DISPATCH-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStub
+// DISPATCH: function_ref @$e11Distributed08EmbeddedA14TargetNotFoundV15targetByteCount
+// DISPATCH-NOT: function_ref @$e4main9MyDecoderV18decodeNextArgument
+// DISPATCH-NOT: function_ref @$e4main15MyResultHandlerV
+// DISPATCH-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStub
+// DISPATCH: } // end sil function '$e4main8$GreeterC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}}'
+
+// The dispatcher of the real actor still decodes and calls its targets
+// DISPATCH-LABEL: sil @$e4main11GreeterImplC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}} :
+// DISPATCH: function_ref @$e4main9MyDecoderV18decodeNextArgument
+// DISPATCH: } // end sil function '$e4main11GreeterImplC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}}'
