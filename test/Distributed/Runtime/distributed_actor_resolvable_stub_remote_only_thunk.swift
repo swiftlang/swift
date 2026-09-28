@@ -10,13 +10,17 @@
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
 
 // The distributed thunks of the '$Greeter' stub only contain the remote branch,
-// make sure calls through 'any Greeter' and 'some Greeter' still reach the system
+// make sure calls through 'any Greeter' and 'some Greeter' still reach the system,
+// and that calling into a locally initialized stub traps with the same message
+// the stub bodies use
 
+import StdlibUnittest
 import Distributed
 import FakeDistributedActorSystems
 
@@ -46,32 +50,48 @@ func callSome(_ greeter: some Greeter) async throws -> String {
 }
 
 @main struct Main {
-  static func main() async throws {
-    let system = FakeRoundtripActorSystem()
-    let real = GreeterImpl(actorSystem: system)
+  static func main() async {
+    let tests = TestSuite("ResolvableStubRemoteOnlyThunk")
 
-    let greeter: any Greeter = try $Greeter.resolve(id: real.id, using: system)
+    tests.test("calls on a resolved stub reach the actor system") {
+      let system = FakeRoundtripActorSystem()
+      let real = GreeterImpl(actorSystem: system)
 
-    let reply = try await greeter.greet(name: "any")
-    // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.greet(name:)
-    // CHECK: < REPLY: Hello, any!
-    print("< REPLY: \(reply)")
+      let greeter: any Greeter = try! $Greeter.resolve(id: real.id, using: system)
 
-    let someReply = try await callSome(greeter)
-    // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.greet(name:)
-    // CHECK: < REPLY: Hello, some!
-    print("< REPLY: \(someReply)")
+      let reply = try! await greeter.greet(name: "any")
+      // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.greet(name:)
+      expectEqual(reply, "Hello, any!")
 
-    try await greeter.ping()
-    // CHECK: >> remoteCallVoid: on:main.$Greeter, target:main.$Greeter.ping()
-    // CHECK: ping on GreeterImpl
+      let someReply = try! await callSome(greeter)
+      // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.greet(name:)
+      expectEqual(someReply, "Hello, some!")
 
-    let count = try await greeter.count
-    // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.count
-    // CHECK: < COUNT: 42
-    print("< COUNT: \(count)")
+      try! await greeter.ping()
+      // CHECK: >> remoteCallVoid: on:main.$Greeter, target:main.$Greeter.ping()
+      // CHECK: ping on GreeterImpl
 
-    // CHECK: DONE
-    print("DONE")
+      let count = try! await greeter.count
+      // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.count
+      expectEqual(count, 42)
+    }
+
+    tests.test("calling a distributed func on a local stub traps") {
+      let system = FakeRoundtripActorSystem()
+      let stub = $Greeter(actorSystem: system)
+      expectCrashLater(withMessage: "Unexpected invocation of distributed method 'greet(name:)' stub!")
+      _ = try? await stub.greet(name: "local")
+    }
+
+    tests.test("reading a distributed var on a local stub traps") {
+      let system = FakeRoundtripActorSystem()
+      let stub = $Greeter(actorSystem: system)
+      expectCrashLater(withMessage: "Unexpected invocation of distributed method 'count' stub!")
+      _ = try? await stub.count
+    }
+
+    await runAllTestsAsync()
   }
 }
+
+// CHECK: ResolvableStubRemoteOnlyThunk: All tests passed

@@ -74,9 +74,6 @@ NominalTypeDecl *getDistributedResolvableProtocolStubDecl(ProtocolDecl *proto);
 
 /// Determine if \p member is declared in a "distributed actor stub"
 /// generated for a `@Resolvable` protocol.
-///
-/// Such methods can never be executed on a 'local' instance,
-/// and therefore can skip generating the local branch of distributed thunks
 bool isDistributedActorStubMember(const ValueDecl *member);
 
 /// Synthesize the identifier `$<name>` of the `@Resolvable`-generated stub

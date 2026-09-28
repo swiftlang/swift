@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.sil
 // RUN: %FileCheck %s --check-prefix=SIL < %t/main.sil
-// RUN: %FileCheck %s --check-prefix=NO-STUB-FATAL-ERROR < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=DISPATCH < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=SHARED-ON-THROW < %t/main.sil
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.ll
@@ -124,14 +123,10 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // ==== ------------------------------------------------------------------------
 // MARK: Stub thunks only keep the remote branch
 
-// The Embedded stub thunks trap without the message formatting of
-// _distributedStubFatalError
-// NO-STUB-FATAL-ERROR-NOT: _distributedStubFatalError
-
 // SIL-LABEL: sil [thunk] @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tYaKFTE{{.*}} :
 // SIL: function_ref @swift_distributed_actor_is_remote
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tF
-// SIL: function_ref @$es31_embeddedReportFatalErrorInFile
+// SIL: function_ref @$e11Distributed26_distributedStubFatalError8functions5NeverOSS_tF
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tF
 // SIL: function_ref @$e4main16systemRemoteCallyy11Distributed0cD6TargetVF
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE5greet4nameS2S_tF
@@ -140,7 +135,7 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // SIL-LABEL: sil [thunk] @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyYaKFTE{{.*}} :
 // SIL: function_ref @swift_distributed_actor_is_remote
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyF
-// SIL: function_ref @$es31_embeddedReportFatalErrorInFile
+// SIL: function_ref @$e11Distributed26_distributedStubFatalError8functions5NeverOSS_tF
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyF
 // SIL: function_ref @$e4main20systemRemoteCallVoidyy11Distributed0cD6TargetVF
 // SIL-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStubRzrlE4pingyyF
@@ -159,15 +154,19 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // SIL: } // end sil function '$e4main11GreeterImplC5greet4nameS2S_tYaKFTE'
 
 // ==== ------------------------------------------------------------------------
-// MARK: Stub dispatcher has no targets
+// MARK: Stub dispatcher only traps
 
-// A stub is never local, so its '_executeDistributedTarget' never matches a
-// target and does not decode arguments or reach the stub thunks
+// A stub is never local, so its '_executeDistributedTarget' only traps and
+// does not match targets, decode arguments or reach the stub thunks
 // DISPATCH-LABEL: sil @$e4main8$GreeterC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}} :
 // DISPATCH-NOT: function_ref @$e4main9MyDecoderV18decodeNextArgument
 // DISPATCH-NOT: function_ref @$e4main15MyResultHandlerV
 // DISPATCH-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStub
-// DISPATCH: function_ref @$e11Distributed08EmbeddedA14TargetNotFoundV15targetByteCount
+// DISPATCH-NOT: function_ref @$e11Distributed08EmbeddedA14TargetNotFound
+// DISPATCH-NOT: function_ref @$e11Distributed16RemoteCallTargetV
+// DISPATCH: function_ref @$e11Distributed26_distributedStubFatalError8functions5NeverOSS_tF
+// DISPATCH-NOT: function_ref @$e11Distributed08EmbeddedA14TargetNotFound
+// DISPATCH-NOT: function_ref @$e11Distributed16RemoteCallTargetV
 // DISPATCH-NOT: function_ref @$e4main9MyDecoderV18decodeNextArgument
 // DISPATCH-NOT: function_ref @$e4main15MyResultHandlerV
 // DISPATCH-NOT: function_ref @$e4main7GreeterPAA11Distributed01_C9ActorStub
