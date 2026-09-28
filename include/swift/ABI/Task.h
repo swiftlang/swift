@@ -42,6 +42,7 @@
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include <optional>
 
 // Does the runtime integrate with libdispatch?
 #if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
@@ -595,6 +596,11 @@ public:
   /// Only the task itself observes its cancellation scopes. For any other
   /// caller this only takes cancellation shields into account.
   bool isCancelledInCurrentContext() const;
+
+  /// The reason of the cancellation that `isCancelledInCurrentContext`
+  /// observes, or `std::nullopt` if it doesn't observe one. The nearest
+  /// cancellation scope decides the reason.
+  std::optional<size_t> getCancellationReasonInCurrentContext() const;
 
   // ==== Task Naming ----------------------------------------------------------
 

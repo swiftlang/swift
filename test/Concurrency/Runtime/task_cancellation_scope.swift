@@ -40,6 +40,9 @@ import Synchronization
     await test_scope_cancel_does_not_cancel_scope_inside_shield()
     await test_scope_cancelled_from_two_threads()
     await test_cancellation_reaches_scope_before_handler()
+    await test_reason_of_scope_cancelled_before_task()
+    await test_reason_of_task_cancelled_before_scope()
+    await test_reason_inside_shield_of_cancelled_task()
     print("done")
   }
 }
@@ -796,6 +799,99 @@ func test_cancellation_reaches_scope_before_handler() async {
       }
     }
   }
+}
+
+func describe(_ reason: CancellationError.Reason?) -> String {
+  reason.map { "\($0)" } ?? "nil"
+}
+
+/// Prints the cancellation reason that is observed through
+/// `Task.cancellationReason`, `Task.checkCancellation()`, a cancellation handler
+/// and a child task.
+@available(StdlibDeploymentTarget 6.5, *)
+func printCancellation(_ label: String) async {
+  print("\(label): cancellationReason=\(describe(Task.cancellationReason))")
+
+  do {
+    try Task.checkCancellation()
+    print("\(label): checkCancellation didn't throw")
+  } catch let error as CancellationError {
+    print("\(label): checkCancellation reason=\(error.reason)")
+  } catch {
+    print("\(label): unexpected error \(error)")
+  }
+
+  let handlerReason = Mutex("nil")
+  await withTaskCancellationHandler {
+  } onCancel: { reason in
+    handlerReason.withLock { $0 = "\(reason)" }
+  }
+  print("\(label): handler reason=\(handlerReason.withLock { $0 })")
+
+  async let childReason = Task.cancellationReason
+  print("\(label): child reason=\(describe(await childReason))")
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_reason_of_scope_cancelled_before_task() async {
+  print("--- test_reason_of_scope_cancelled_before_task")
+  // CHECK: --- test_reason_of_scope_cancelled_before_task
+
+  // The first cancellation that reaches a scope decides its reason. Code
+  // observes the reason of the nearest cancelled scope, and outside of any
+  // scope the reason of the task.
+  await Task {
+    await __withTaskCancellationScope { scope in
+      scope.cancel(reason: .deadlineExpired)
+      withUnsafeCurrentTask { $0?.cancel() }
+      await printCancellation("in scope")
+      // CHECK: in scope: cancellationReason=deadlineExpired
+      // CHECK: in scope: checkCancellation reason=deadlineExpired
+      // CHECK: in scope: handler reason=deadlineExpired
+      // CHECK: in scope: child reason=deadlineExpired
+    }
+    await printCancellation("after scope")
+    // CHECK: after scope: cancellationReason=unspecified
+    // CHECK: after scope: checkCancellation reason=unspecified
+    // CHECK: after scope: handler reason=unspecified
+    // CHECK: after scope: child reason=unspecified
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_reason_of_task_cancelled_before_scope() async {
+  print("--- test_reason_of_task_cancelled_before_scope")
+  // CHECK: --- test_reason_of_task_cancelled_before_scope
+
+  await Task {
+    await __withTaskCancellationScope { scope in
+      withUnsafeCurrentTask { $0?.cancel() }
+      scope.cancel(reason: .deadlineExpired)
+      await printCancellation("in scope")
+      // CHECK: in scope: cancellationReason=unspecified
+      // CHECK: in scope: checkCancellation reason=unspecified
+      // CHECK: in scope: handler reason=unspecified
+      // CHECK: in scope: child reason=unspecified
+    }
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_reason_inside_shield_of_cancelled_task() async {
+  print("--- test_reason_inside_shield_of_cancelled_task")
+  // CHECK: --- test_reason_inside_shield_of_cancelled_task
+
+  // A shield prevents the code inside of it from observing the cancellation of
+  // the task, including its reason.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    await withTaskCancellationShield {
+      print("in shield: isCancelled=\(Task.isCancelled)")
+      // CHECK: in shield: isCancelled=false
+      print("in shield: cancellationReason=\(describe(Task.cancellationReason))")
+      // CHECK: in shield: cancellationReason=nil
+    }
+  }.value
 }
 
 // CHECK: done
