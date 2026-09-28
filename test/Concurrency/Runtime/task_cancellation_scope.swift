@@ -9,6 +9,7 @@
 
 @_spi(Concurrency) import _Concurrency
 import Dispatch
+import Synchronization
 
 @available(StdlibDeploymentTarget 6.5, *)
 @main struct Main {
@@ -30,6 +31,7 @@ import Dispatch
     await test_scope_outer_cancel_cascades_to_inner()
     await test_scope_structured_children_are_cascaded()
     await test_scope_async_let_child_is_cancelled()
+    await test_task_handle_does_not_observe_scope_cancellation()
     print("done")
   }
 }
@@ -447,6 +449,64 @@ func test_scope_async_let_child_is_cancelled() async {
     print("async let (after cancel) isCancelled=\(b)")
     // CHECK: async let (after cancel) isCancelled=true
   }
+}
+
+// A signal whose `wait()` ignores cancellation by spinning.
+@available(StdlibDeploymentTarget 6.5, *)
+final class CancellationIgnoringSignal: Sendable {
+  private let signalled = Atomic<Bool>(false)
+
+  func signal() {
+    signalled.store(true, ordering: .releasing)
+  }
+
+  func wait() async {
+    while !signalled.load(ordering: .acquiring) {
+      await Task.yield()
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_handle_does_not_observe_scope_cancellation() async {
+  print("--- test_task_handle_does_not_observe_scope_cancellation")
+  // CHECK: --- test_task_handle_does_not_observe_scope_cancellation
+
+  // `isCancelled` on a task handle reports the cancellation of the task itself.
+  // The cancellation of a scope is only visible to the code inside the scope.
+  let entered = Signal()
+  let checked = CancellationIgnoringSignal()
+
+  let task = Task {
+    await __withTaskCancellationScope { scope in
+      scope.cancel(reason: .deadlineExpired)
+      print("inside scope: Task.isCancelled=\(Task.isCancelled)")
+      // CHECK: inside scope: Task.isCancelled=true
+      print("inside scope: Task.cancellationReason=\(Task.cancellationReason.map { "\($0)" } ?? "nil")")
+      // CHECK: inside scope: Task.cancellationReason=deadlineExpired
+      let unsafeIsCancelled = withUnsafeCurrentTask { $0!.isCancelled }
+      print("inside scope: UnsafeCurrentTask.isCancelled=\(unsafeIsCancelled)")
+      // CHECK: inside scope: UnsafeCurrentTask.isCancelled=false
+      let unsafeReason = withUnsafeCurrentTask { $0!.cancellationReason }
+      print("inside scope: UnsafeCurrentTask.cancellationReason=\(unsafeReason.map { "\($0)" } ?? "nil")")
+      // CHECK: inside scope: UnsafeCurrentTask.cancellationReason=nil
+
+      entered.signal()
+      await checked.wait()
+    }
+  }
+
+  await entered.wait()
+  print("handle while inside scope: isCancelled=\(task.isCancelled)")
+  // CHECK: handle while inside scope: isCancelled=false
+
+  // The cancellation of the task itself is visible through the handle.
+  task.cancel()
+  print("handle after cancel: isCancelled=\(task.isCancelled)")
+  // CHECK: handle after cancel: isCancelled=true
+
+  checked.signal()
+  await task.value
 }
 
 // CHECK: done

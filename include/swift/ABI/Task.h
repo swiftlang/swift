@@ -581,12 +581,20 @@ public:
   /// but can be used to locally insert logging.
   void flagAsDestroyed();
 
-  /// Check whether this task has been cancelled.
+  /// Check whether the task itself has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   ///
-  /// \param ignoreShield if cancellation shield should be ignored. 
-  ///        Cancellation shields prevent the observation of the isCancelled flag while active.
-  bool isCancelled(bool ignoreShield = false) const;
+  /// Cancellation shields and cancellation scopes only affect the code that
+  /// runs inside of them, so they are not taken into account.
+  bool isTaskCancelled() const;
+
+  /// Check whether the code that the task currently runs observes a
+  /// cancellation, taking cancellation shields and cancellation scopes into
+  /// account.
+  ///
+  /// Only the task itself observes its cancellation scopes. For any other
+  /// caller this only takes cancellation shields into account.
+  bool isCancelledInCurrentContext() const;
 
   // ==== Task Naming ----------------------------------------------------------
 

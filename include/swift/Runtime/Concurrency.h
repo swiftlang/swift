@@ -713,10 +713,13 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
-/// Read the cancellation state and reason of the given task.
+/// Read the cancellation state and reason of the given task itself.
 ///
 /// This API exists to answer, in a single runtime call, if the passed in task
 /// is cancelled, and if so, what was its cancellation reason (if any).
+///
+/// This is the same as `swift_task_getIsCancelledWithReasonWithFlags` with
+/// `swift_task_is_cancelled_flag_TaskOnly`.
 ///
 /// ### Return value layout
 ///
@@ -744,9 +747,14 @@ enum swift_task_is_cancelled_flag : uint64_t {
   /// Effectively this is a backwards compatible mode.
   swift_task_is_cancelled_flag_None = 0x0,
 
-  /// Ignore any active cancellation shield and return the actual cancellation
-  /// state of the task.
-  swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1,
+  /// Only check the cancellation of the task itself. Cancellation shields and
+  /// cancellation scopes only affect the code that runs inside of them, so
+  /// they are not taken into account.
+  ///
+  /// Without this flag, the check reports the cancellation that the code the
+  /// task currently runs observes. Only the task itself observes its
+  /// cancellation scopes.
+  swift_task_is_cancelled_flag_TaskOnly = 0x1,
 };
 
 /// Check if the task is cancelled.
@@ -756,6 +764,19 @@ enum swift_task_is_cancelled_flag : uint64_t {
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelledWithFlags(AsyncTask* task,
                                      swift_task_is_cancelled_flag flags);
+
+/// Read the cancellation state and reason of the given task.
+///
+/// The return value has the same layout as the one of
+/// `swift_task_getIsCancelledWithReason`.
+///
+/// \param task The task to check cancellation status for.
+/// \param flags Flags controlling the behavior of the check.
+///
+/// Runtime availability: Swift 6.5.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_getIsCancelledWithReasonWithFlags(
+    AsyncTask *task, swift_task_is_cancelled_flag flags);
 
 /// Returns the current priority of the task which is >= base priority of the
 /// task. This function does not exist in the base ABI of this library and must
