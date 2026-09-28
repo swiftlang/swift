@@ -613,7 +613,9 @@ public:
   /// Only 3 bits of the reason are used, remaining bits are reserved for future evolution.
   ///
   /// First-cancel-wins: if the scope is already cancelled, this is a no-op.
-  void cancel(size_t reason) {
+  ///
+  /// Returns whether this call cancelled the scope.
+  bool cancel(size_t reason) {
     auto oldState = State.load(std::memory_order_relaxed);
     // bail if the scope was already cancelled - first-cancel-wins.
     while (!(oldState & CancelledBit)) {
@@ -621,10 +623,11 @@ public:
       if (State.compare_exchange_weak(oldState, newState,
                                        std::memory_order_relaxed,
                                        std::memory_order_relaxed)) {
-        return;
+        return true;
       }
       // CAS failed, retry
     }
+    return false;
   }
 
   static bool classof(const TaskStatusRecord *record) {

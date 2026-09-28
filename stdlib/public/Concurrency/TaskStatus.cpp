@@ -1037,15 +1037,20 @@ swift_task_cancelCancellationScopeImpl(
   // The low 3 bits of `flags` carry `CancellationError.Reason`'s raw value;
   // the remaining bits are reserved for future evolution and ignored here.
   size_t reason = flags & 0b111;
-  record->cancel(reason);
 
   auto task = record->getOwningTask();
   if (!task)
     return;
 
-  // Walk the chain under the record lock. The chain is push-ordered
-  // (innermost first); stop when we hit the scope itself.
+  // A scope is only cancelled once. We cancel it and everything inside of it
+  // while holding the lock, so that a concurrent cancellation of the same
+  // scope can't cancel the things inside of it with a different reason.
+  //
+  // The chain is push-ordered (innermost first); stop when we hit the scope
+  // itself.
   withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    if (!record->cancel(reason))
+      return;
     cancelRecordsLocked(status, /*end=*/record, reason);
   });
 }
