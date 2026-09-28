@@ -807,8 +807,7 @@ protected:
                       MangledTypeRefRole::Reflection) {
     if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
       IRGenMangler mangler(nominal->getASTContext());
-      SymbolicMangling mangledStr;
-      mangledStr.String = mangler.mangleBareProtocol(proto);
+      SymbolicMangling mangledStr = mangler.mangleBareProtocol(IGM, proto);
       auto mangledName =
         IGM.getAddrOfStringForTypeRef(mangledStr, role);
       B.addRelativeAddress(mangledName);

@@ -304,11 +304,8 @@ public:
     return finalize();
   }
 
-  std::string mangleBareProtocol(const ProtocolDecl *Decl) {
-    beginMangling();
-    appendAnyGenericType(Decl);
-    return finalize();
-  }
+  SymbolicMangling mangleBareProtocol(IRGenModule &IGM,
+                                      const ProtocolDecl *Decl);
 
   std::string mangleProtocolDescriptor(const ProtocolDecl *Decl) {
     beginMangling();
