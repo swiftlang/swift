@@ -17,6 +17,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -139,24 +140,32 @@ void LoopCloner::cloneLoop() {
                        /*insertAfter*/Loop->getLoopLatch());
 }
 
-/// Determine the number of iterations the loop is at most executed. The loop
-/// might contain early exits so this is the maximum if no early exits are
-/// taken.
-static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
-                                                   SILBasicBlock *Preheader,
-                                                   SILBasicBlock *Header,
-                                                   SILBasicBlock *Latch) {
+namespace {
 
-  // Skip a split backedge.
-  SILBasicBlock *OrigLatch = Latch;
-  if (!Loop->isLoopExiting(Latch) &&
-      !(Latch = Latch->getSinglePredecessorBlock()))
-    return std::nullopt;
-  if (!Loop->isLoopExiting(Latch))
-    return std::nullopt;
+/// A loop exit which is taken after a known number of iterations.
+struct CountedLoopExit {
+  /// The block which conditionally branches out of the loop. It dominates the
+  /// latch, so it executes on every iteration of the loop.
+  SILBasicBlock *ExitingBlock;
 
- // Get the loop exit condition.
-  auto *CondBr = dyn_cast<CondBranchInst>(Latch->getTerminator());
+  /// Whether ExitingBlock exits the loop through the true or false successor
+  /// of its `cond_br`.
+  bool ExitsOnTrue;
+
+  /// The number of times ExitingBlock executes if no other exit is taken. The
+  /// last time, it exits the loop. This is the number of copies of the loop
+  /// body needed to fully unroll the loop.
+  uint64_t TripCount;
+};
+
+} // end anonymous namespace
+
+static std::optional<CountedLoopExit> getMaxLoopTripCountBoundedByExitingBlock(
+    SILLoop *Loop, SILBasicBlock *Preheader, SILBasicBlock *Header,
+    SILBasicBlock *Latch, SILBasicBlock *Exiting) {
+
+  // Get the loop exit condition.
+  auto *CondBr = dyn_cast<CondBranchInst>(Exiting->getTerminator());
   if (!CondBr)
     return std::nullopt;
 
@@ -198,6 +207,21 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   SILValue RecNext = Cmp->getArguments()[0];
   SILPhiArgument *RecArg;
 
+  auto *RecNextArg = dyn_cast<SILPhiArgument>(RecNext);
+  if (RecNextArg) {
+    // The exit condition may compare the header argument itself, i.e. the
+    // value before the increment, instead of the incremented value. The "add 1"
+    // pattern may occur later in the loop, and be passed as a Phi value from
+    // the latch to the header.
+    if (RecNextArg->getParent() != Header)
+      return std::nullopt;
+
+    auto IncomingFromLatch = RecNextArg->getIncomingPhiValue(Latch);
+    if (!IncomingFromLatch)
+      return std::nullopt;
+    RecNext = IncomingFromLatch;
+  }
+
   // Match signed add with overflow, unsigned add with overflow and
   // add without overflow.
   if (!match(RecNext, m_TupleExtractOperation(
@@ -221,7 +245,7 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (!Start)
     return std::nullopt;
 
-  if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
+  if (RecNext != RecArg->getIncomingPhiValue(Latch))
     return std::nullopt;
 
   auto StartVal = Start->getValue();
@@ -236,7 +260,39 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (Dist == 0)
     return std::nullopt;
 
-  return Dist.getZExtValue() + Adjust;
+  uint64_t TripCount = Dist.getZExtValue() + Adjust;
+  // Comparing the value before the increment takes one more iteration to reach
+  // the exit value.
+  if (RecNextArg)
+    ++TripCount;
+
+  return CountedLoopExit{Exiting, Exit == CondBr->getTrueBB(), TripCount};
+}
+
+/// Determine the number of iterations the loop is at most executed. The loop
+/// might contain early exits so this is the maximum if no early exits are
+/// taken.
+static std::optional<CountedLoopExit>
+getMaxLoopTripCount(SILLoop *Loop, SILBasicBlock *Preheader,
+                    SILBasicBlock *Header, SILBasicBlock *Latch,
+                    DominanceInfo *DT) {
+  SmallVector<swift::SILBasicBlock *, 2> ExitingBlocks;
+  Loop->getExitingBlocks(ExitingBlocks);
+
+  for (SILBasicBlock *Exiting : ExitingBlocks) {
+    // An exit only bounds the trip count if its condition is checked on every
+    // iteration.
+    if (!DT->dominates(Exiting, Latch))
+      continue;
+
+    auto CountedExit = getMaxLoopTripCountBoundedByExitingBlock(
+        Loop, Preheader, Header, Latch, Exiting);
+    if (CountedExit.has_value()) {
+      return CountedExit;
+    }
+  }
+
+  return std::nullopt;
 }
 
 /// A loop that iterates over the elements of a variadic generic pack uses its
@@ -305,50 +361,27 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
   return true;
 }
 
-/// Redirect the terminator of the current loop iteration's latch to the next
-/// iterations header or if this is the last iteration remove the backedge to
-/// the header.
-static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
-                               unsigned LastLoopIter, SILBasicBlock *CurrentHeader,
-                               SILBasicBlock *NextIterationsHeader) {
+/// Redirect the backedge of the current loop iteration's latch to the next
+/// iteration's header.
+static void redirectLatchToNextHeader(SILBasicBlock *Latch,
+                                      SILBasicBlock *CurrentHeader,
+                                      SILBasicBlock *NextIterationsHeader) {
 
   auto *CurrentTerminator = Latch->getTerminator();
 
   // We can either have a split backedge as our latch terminator.
-  //   HeaderBlock:
-  //     ...
-  //     cond_br %cond, ExitBlock, BackedgeBlock
-  //
   //   BackedgeBlock:
-  //     br HeaderBlock:
+  //     br HeaderBlock
   //
   // Or a conditional branch back to the header.
-  //   HeaderBlock:
+  //   LatchBlock:
   //     ...
   //     cond_br %cond, ExitBlock, HeaderBlock
   //
-  // Redirect the HeaderBlock target to the unrolled successor. In the
-  // unrolled block of the last iteration unconditionally jump to the
-  // ExitBlock instead.
+  // Redirect the HeaderBlock target to the unrolled successor.
 
   // Handle the split backedge case.
   if (auto *Br = dyn_cast<BranchInst>(CurrentTerminator)) {
-    // On the last iteration change the conditional exit to an unconditional
-    // one.
-    if (CurLoopIter == LastLoopIter) {
-      auto *CondBr = cast<CondBranchInst>(
-          Latch->getSinglePredecessorBlock()->getTerminator());
-      if (CondBr->getTrueBB() != Latch)
-        SILBuilderWithScope(CondBr).createBranch(
-            CondBr->getLoc(), CondBr->getTrueBB());
-      else
-        SILBuilderWithScope(CondBr).createBranch(
-            CondBr->getLoc(), CondBr->getFalseBB());
-      CondBr->eraseFromParent();
-      return;
-    }
-
-    // Otherwise, branch to the next iteration's header.
     SILBuilderWithScope(Br).createBranch(Br->getLoc(), NextIterationsHeader,
                                          Br->getArgs());
     Br->eraseFromParent();
@@ -357,22 +390,6 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
 
   // Otherwise, we have a conditional branch to the header.
   auto *CondBr = cast<CondBranchInst>(CurrentTerminator);
-  // On the last iteration change the conditional exit to an unconditional
-  // one.
-  if (CurLoopIter == LastLoopIter) {
-    if (CondBr->getTrueBB() == CurrentHeader) {
-      SILBuilderWithScope(CondBr).createBranch(
-          CondBr->getLoc(), CondBr->getFalseBB());
-    } else {
-      assert(CondBr->getFalseBB() == CurrentHeader);
-      SILBuilderWithScope(CondBr).createBranch(
-          CondBr->getLoc(), CondBr->getTrueBB());
-    }
-    CondBr->eraseFromParent();
-    return;
-  }
-
-  // Otherwise, branch to the next iteration's header.
   if (CondBr->getTrueBB() == CurrentHeader) {
     SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), NextIterationsHeader,
@@ -383,6 +400,20 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
         CondBr->getLoc(), CondBr->getCondition(), CondBr->getTrueBB(),
         NextIterationsHeader);
   }
+  CondBr->eraseFromParent();
+}
+
+/// On the last iteration, the exit which bounds the trip count is always taken.
+/// Replace its conditional branch with an unconditional branch out of the loop.
+/// Because the exiting block dominates the latch, this makes the last
+/// iteration's backedge unreachable.
+static void foldLastIterationExit(SILBasicBlock *Exiting, bool ExitsOnTrue) {
+  auto *CondBr = cast<CondBranchInst>(Exiting->getTerminator());
+  // Cloning splits the edges from exiting blocks to exit blocks, so this is not
+  // necessarily the original exit block.
+  SILBasicBlock *Exit =
+      ExitsOnTrue ? CondBr->getTrueBB() : CondBr->getFalseBB();
+  SILBuilderWithScope(CondBr).createBranch(CondBr->getLoc(), Exit);
   CondBr->eraseFromParent();
 }
 
@@ -447,7 +478,8 @@ updateSSA(SILFunction *Fn, SILLoop *Loop,
 
 /// Try to fully unroll the loop if we can determine the trip count and the trip
 /// count is below a threshold.
-static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEndBlocks *deb) {
+static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
+                            DeadEndBlocks *deb, DominanceInfo *DT) {
   assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
 
   LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
@@ -461,14 +493,15 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEnd
 
   auto *Header = Loop->getHeader();
 
-  std::optional<uint64_t> MaxTripCount =
-      getMaxLoopTripCount(Loop, Preheader, Header, Latch);
-  if (!MaxTripCount) {
+  std::optional<CountedLoopExit> CountedExit =
+      getMaxLoopTripCount(Loop, Preheader, Header, Latch, DT);
+  if (!CountedExit) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
     return false;
   }
+  uint64_t MaxTripCount = CountedExit->TripCount;
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA, deb)) {
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount, SRA, deb)) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }
@@ -493,13 +526,17 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEnd
 
   MapVector<SILValue, SmallVector<SILValue, 8>> LoopLiveOutValues;
 
+  // The counted exiting block of the last iteration.
+  SILBasicBlock *LastExiting = CountedExit->ExitingBlock;
+
   // Copy the body MaxTripCount-1 times.
-  for (uint64_t Cnt = 1; Cnt < *MaxTripCount; ++Cnt) {
+  for (uint64_t Cnt = 1; Cnt < MaxTripCount; ++Cnt) {
     // Clone the blocks in the loop.
     LoopCloner cloner(Loop);
     cloner.cloneLoop();
     Headers.push_back(cloner.getOpBasicBlock(Header));
     Latches.push_back(cloner.getOpBasicBlock(Latch));
+    LastExiting = cloner.getOpBasicBlock(CountedExit->ExitingBlock);
 
     // Collect values defined in the loop but used outside. On the first
     // iteration we populate the map from original loop to cloned loop. On
@@ -519,17 +556,14 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEnd
 
   // Thread the loop clones by redirecting the loop latches to the successor
   // iteration's header.
-  for (unsigned Iteration = 0, End = Latches.size(); Iteration != End;
-       ++Iteration) {
-    auto *CurrentLatch = Latches[Iteration];
-    auto LastIteration = End - 1;
-    auto *CurrentHeader = Headers[Iteration];
-    auto *NextIterationsHeader =
-        Iteration == LastIteration ? nullptr : Headers[Iteration + 1];
-
-    redirectTerminator(CurrentLatch, Iteration, LastIteration, CurrentHeader,
-                       NextIterationsHeader);
+  for (unsigned Iteration = 0, LastIteration = Latches.size() - 1;
+       Iteration != LastIteration; ++Iteration) {
+    redirectLatchToNextHeader(Latches[Iteration], Headers[Iteration],
+                              Headers[Iteration + 1]);
   }
+
+  // The last iteration always takes the counted exit.
+  foldLastIterationExit(LastExiting, CountedExit->ExitsOnTrue);
 
   // Fixup SSA form for loop values used outside the loop.
   updateSSA(Loop->getFunction(), Loop, LoopLiveOutValues);
@@ -550,6 +584,10 @@ class LoopUnrolling : public SILFunctionTransform {
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
     IsSelfRecursiveAnalysis *SRA = PM->getAnalysis<IsSelfRecursiveAnalysis>();
     DeadEndBlocks *deb = PM->getAnalysis<DeadEndBlocksAnalysis>()->get(Fun);
+    // Unrolling one innermost loop does not change the dominance relation
+    // between blocks of the other innermost loops, so this remains valid for
+    // them.
+    DominanceInfo *DT = PM->getAnalysis<DominanceAnalysis>()->get(Fun);
 
     LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
                             << Fun->getName() << "\n");
@@ -577,7 +615,7 @@ class LoopUnrolling : public SILFunctionTransform {
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)
-      Changed |= tryToUnrollLoop(Loop, SRA, deb);
+      Changed |= tryToUnrollLoop(Loop, SRA, deb, DT);
 
     if (Changed) {
       updateAllGuaranteedPhis(PM, Fun);
