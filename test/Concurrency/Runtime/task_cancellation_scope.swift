@@ -39,6 +39,7 @@ import Synchronization
     await test_scope_cancel_does_not_cancel_children_inside_shield()
     await test_scope_cancel_does_not_cancel_scope_inside_shield()
     await test_scope_cancelled_from_two_threads()
+    await test_cancellation_reaches_scope_before_handler()
     print("done")
   }
 }
@@ -740,6 +741,61 @@ func test_scope_cancelled_from_two_threads() async {
   task.escalatePriority(to: .high)
   continuation.withLock { $0!.resume() }
   await task.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_cancellation_reaches_scope_before_handler() async {
+  print("--- test_cancellation_reaches_scope_before_handler")
+  // CHECK: --- test_cancellation_reaches_scope_before_handler
+
+  // Cancelling a task reaches a scope before the handlers inside of it. A
+  // handler that cancels the scope with a different reason doesn't change the
+  // reason of the scope.
+  await Task {
+    await withScopeRecord { scope in
+      await withTaskCancellationHandler {
+        withUnsafeCurrentTask { $0!.cancel(reason: .unspecified) }
+      } onCancel: { reason in
+        _cancelCancellationScope(scope.pointer, 1) // .deadlineExpired
+        print("task cancel: handler reason=\(reason)")
+        // CHECK: task cancel: handler reason=unspecified
+      }
+      print("task cancel: scope reason=\(Task.cancellationReason.map { "\($0)" } ?? "nil")")
+      // CHECK: task cancel: scope reason=unspecified
+    }
+  }.value
+
+  // The same applies to a scope inside of a cancelled scope.
+  await withScopeRecord { outer in
+    await withScopeRecord { inner in
+      await withTaskCancellationHandler {
+        _cancelCancellationScope(outer.pointer, 0) // .unspecified
+      } onCancel: { reason in
+        _cancelCancellationScope(inner.pointer, 1) // .deadlineExpired
+        print("scope cancel: handler reason=\(reason)")
+        // CHECK: scope cancel: handler reason=unspecified
+      }
+      print("scope cancel: inner scope reason=\(Task.cancellationReason.map { "\($0)" } ?? "nil")")
+      // CHECK: scope cancel: inner scope reason=unspecified
+    }
+  }
+
+  // A handler that cancels an outer scope doesn't change the reason of the
+  // other handlers in the scope that it is in.
+  await withScopeRecord { outer in
+    await withScopeRecord { inner in
+      await withTaskCancellationHandler {
+        await withTaskCancellationHandler {
+          _cancelCancellationScope(inner.pointer, 0) // .unspecified
+        } onCancel: {
+          _cancelCancellationScope(outer.pointer, 1) // .deadlineExpired
+        }
+      } onCancel: { reason in
+        print("outer cancel: other handler reason=\(reason)")
+        // CHECK: outer cancel: other handler reason=unspecified
+      }
+    }
+  }
 }
 
 // CHECK: done

@@ -1422,11 +1422,9 @@ static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
   case TaskStatusRecordKind::Deadline:
     break;
 
-  // Scopes are cancelled together with their task. A scope that got cancelled
-  // before keeps its own reason.
+  // Scopes are cancelled before all other records, see `cancelRecordsLocked`.
   case TaskStatusRecordKind::TaskCancellationScope:
-    cast<TaskCancellationScopeRecord>(record)->cancel(reason);
-    return;
+    break;
 
   // Shield records take no cancellation action. The walk skips the records
   // inside of a shield.
@@ -1442,6 +1440,18 @@ static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
   // FIXME: allow dynamic extension/correction?
 }
 
+/// Returns the reason of the nearest scope around `record` that comes before
+/// `end`, or `reason` if there is none. The scopes must already be cancelled.
+static size_t getReasonOfNearestScope(TaskStatusRecord *record,
+                                      TaskStatusRecord *end, size_t reason) {
+  for (auto cur = record->getParent(); cur && cur != end;
+       cur = cur->getParent()) {
+    if (auto scope = dyn_cast<TaskCancellationScopeRecord>(cur))
+      return scope->getReason();
+  }
+  return reason;
+}
+
 /// Cancels everything in `status` that comes before `end`, except for the
 /// records inside a cancellation shield. Pass `nullptr` for `end` to cancel
 /// everything of the task. The caller must hold the status record lock.
@@ -1450,9 +1460,25 @@ static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
 /// scope behaves like an inline child task.
 static void cancelRecordsLocked(ActiveTaskStatus status,
                                 TaskStatusRecord *end, size_t reason) {
-  forEachRecordOutsideShieldsLocked(
-      status, end,
-      [&](TaskStatusRecord *cur) { performCancellationAction(cur, reason); });
+  // The cancellation must reach a scope before the things inside of it.
+  // Otherwise a cancellation handler inside of the scope could cancel the scope
+  // with a different reason before we reach it. So we cancel the scopes first,
+  // before we run any cancellation handler.
+  forEachRecordOutsideShieldsLocked(status, end, [&](TaskStatusRecord *cur) {
+    if (auto scope = dyn_cast<TaskCancellationScopeRecord>(cur))
+      scope->cancel(reason);
+  });
+
+  // The first cancellation that reached a scope decides the reason of
+  // everything inside of it. A cancellation handler might cancel an outer scope
+  // while we walk, which then reaches the things inside of the scopes that we
+  // cancelled above.
+  forEachRecordOutsideShieldsLocked(status, end, [&](TaskStatusRecord *cur) {
+    if (isa<TaskCancellationScopeRecord>(cur))
+      return;
+    performCancellationAction(cur,
+                              getReasonOfNearestScope(cur, end, reason));
+  });
 }
 
 SWIFT_CC(swift)
