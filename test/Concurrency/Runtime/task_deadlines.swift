@@ -762,6 +762,46 @@ struct ClassInstantClock: Clock, Identifiable {
       }
     }
 
+    tests.test("deadline inside a shield is not subsumed by an outer deadline") {
+      // A shield prevents the cancellation of the outer deadline from reaching
+      // the code inside of it, so the code inside doesn't find the outer
+      // deadline and the inner deadline creates its own scope.
+      await withDeadline(in: .milliseconds(10)) {
+        await withTaskCancellationShield {
+          expectFalse(Task.hasActiveDeadline)
+          expectNil(Task.activeDeadline(for: ContinuousClock()))
+
+          await withDeadline(in: .milliseconds(100)) {
+            let start = ContinuousClock.now
+            try? await Task.sleep(for: .seconds(10))
+            expectLT(ContinuousClock.now - start, .seconds(5))
+            expectEqual(.deadlineExpired, Task.cancellationReason)
+          }
+        }
+      }
+    }
+
+    tests.test("child task inside a shield doesn't inherit the deadline") {
+      await withDeadline(in: .seconds(60)) {
+        await withTaskCancellationShield {
+          async let hasDeadline = Task.hasActiveDeadline
+          async let deadline = Task.activeDeadline(for: ContinuousClock())
+          expectFalse(await hasDeadline)
+          expectNil(await deadline)
+        }
+      }
+    }
+
+    tests.test("task group child doesn't inherit a deadline outside of its group") {
+      // The child belongs to its task group, which is outside of the deadline.
+      await withTaskGroup(of: Bool.self) { group in
+        await withDeadline(in: .seconds(60)) {
+          group.addTask { Task.hasActiveDeadline }
+          expectFalse(await group.next()!)
+        }
+      }
+    }
+
     await runAllTestsAsync()
   }
 }

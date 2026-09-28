@@ -785,40 +785,87 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
   // nothing to destroy either.
 }
 
-/// Search a single task's status record chain for a deadline record
-/// whose clock matches the given query. Returns a borrowed pointer to
-/// the matching record's instant (which itself points into the async
-/// frame of whichever ancestor task installed the deadline), or nullptr
-/// if none.
-///
-/// Takes the task's status-record lock.
-static OpaqueValue *
-findDeadlineOnSingleTask(AsyncTask *task,
-                         OpaqueValue *queryClock,
-                         const Metadata *clockType,
-                         const WitnessTable *identifiableWT) {
-  OpaqueValue *foundInstant = nullptr;
-  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
-    for (auto _record : status.records()) {
-      if (_record->getKind() != TaskStatusRecordKind::Deadline)
-        continue;
-      auto record = cast<TaskDeadlineStatusRecord>(_record);
-      // Fast-check: clock types must be pointer-equal.
-      if (record->getClockType() != clockType)
-        continue;
+/// Whether `record` is the record of `parent` that the child task `child`
+/// belongs to: the record of its task group, or its `async let` record.
+static bool isRecordOfChildTask(TaskStatusRecord *record, AsyncTask *child) {
+  switch (record->getKind()) {
+  case TaskStatusRecordKind::TaskGroup:
+    return child->hasGroupChildFragment() &&
+           cast<TaskGroupTaskStatusRecord>(record)->getGroup() ==
+               child->groupChildFragment()->getGroup();
+  case TaskStatusRecordKind::ChildTask:
+    for (auto cur : cast<ChildTaskStatusRecord>(record)->children())
+      if (cur == child)
+        return true;
+    return false;
+  default:
+    return false;
+  }
+}
 
-      // Same-clock identity check via Swift callout.
-      if (_task_isEqualIdentifiableID(
-        /*recordClockStorage=*/record->getClockPtr(),
-        /*queryClock=*/queryClock,
-        /*clockType=*/clockType,
-        /*identifiableWT=*/identifiableWT)) {
-        foundInstant = record->getInstantPtr();
-        return;
+/// Finds the nearest deadline record of `task` or of its parent tasks for
+/// which `matches` returns true. Returns a borrowed pointer to the matching
+/// record's instant (which itself points into the async frame of whichever
+/// ancestor task installed the deadline), or nullptr if none.
+///
+/// A deadline is a cancellation scope, so a cancellation shield prevents the
+/// code inside of it from finding the deadlines outside of it. For a parent
+/// task, only the records outside of the record that the child task belongs to
+/// apply to the child.
+///
+/// Takes the status-record lock of each task.
+static OpaqueValue *findNearestDeadline(
+    AsyncTask *task,
+    llvm::function_ref<bool(TaskDeadlineStatusRecord *)> matches) {
+  AsyncTask *child = nullptr;
+  for (auto cur = task; cur;) {
+    auto status = cur->_private()._status().load(std::memory_order_relaxed);
+    // We can stop our search early if the cur task definitely has no deadline,
+    // since this means its parent tasks also don't have any deadline set.
+    // See: AsyncTask::inheritDeadlineFrom.
+    if (!status.hasDeadline())
+      return nullptr;
+
+    OpaqueValue *foundInstant = nullptr;
+    bool stop = false;
+    withStatusRecordLock(cur, [&](ActiveTaskStatus status) {
+      bool reachedChild = child == nullptr;
+      for (auto record : status.records()) {
+        if (!reachedChild) {
+          reachedChild = isRecordOfChildTask(record, child);
+          continue;
+        }
+        switch (record->getKind()) {
+        case TaskStatusRecordKind::CancellationShield:
+          stop = true;
+          return;
+        case TaskStatusRecordKind::Deadline: {
+          auto deadline = cast<TaskDeadlineStatusRecord>(record);
+          if (matches(deadline)) {
+            foundInstant = deadline->getInstantPtr();
+            return;
+          }
+          break;
+        }
+        default:
+          break;
+        }
       }
-    }
-  });
-  return foundInstant; // Return opaque, caller will know to treat this as C.Instant
+      // The child isn't linked to the parent anymore, so none of the deadlines
+      // of the parent apply to it.
+      if (!reachedChild)
+        stop = true;
+    });
+    if (foundInstant || stop)
+      return foundInstant;
+
+    // Check the parent task next
+    if (!cur->hasChildFragment())
+      return nullptr;
+    child = cur;
+    cur = cur->childFragment()->getParent();
+  }
+  return nullptr;
 }
 
 SWIFT_CC(swift)
@@ -837,36 +884,27 @@ swift_task_findNearestDeadlineForClockImpl(
   if (!task)
     return nullptr;
 
-  auto cur = task;
-  while (cur) {
-    auto status = cur->_private()._status().load(std::memory_order_relaxed);
-    // We can stop our search early if the cur task definitely has no deadline,
-    // since this means its parent tasks also don't have any deadline set.
-    // See: AsyncTask::inheritDeadlineFrom.
-    if (!status.hasDeadline())
-      break;
+  // Return borrowed (+0). The Swift caller in `_findNearestDeadline` copies the
+  // instant out immediately; the record continues to own the storage until
+  // pop.
+  return findNearestDeadline(task, [&](TaskDeadlineStatusRecord *record) {
+    // Fast-check: clock types must be pointer-equal.
+    if (record->getClockType() != clockType)
+      return false;
 
-    if (auto found = findDeadlineOnSingleTask(cur,
-      queryClock, clockType, identifiableWT)) {
-      // Return borrowed (+0). The Swift caller in `_findNearestDeadline`
-      // copies the instant out immediately; the record continues to own the
-      // storage until pop.
-      return found;
-    }
-
-    // Check the parent task next
-    if (!cur->hasChildFragment())
-      return nullptr;
-    cur = cur->childFragment()->getParent();
-  }
-
-  return nullptr;
+    // Same-clock identity check via Swift callout.
+    return _task_isEqualIdentifiableID(
+        /*recordClockStorage=*/record->getClockPtr(),
+        /*queryClock=*/queryClock,
+        /*clockType=*/clockType,
+        /*identifiableWT=*/identifiableWT);
+  });
 }
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
-/// Fast-path check for `Task.hasActiveDeadline`.
-/// We know just based off task status flags if it has "any" deadline installed.
+/// Check for `Task.hasActiveDeadline`. The task status flags tell us if the
+/// task definitely has no deadline installed.
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swift_Concurrency)
 bool _swift_task_hasActiveDeadline() {
@@ -874,7 +912,19 @@ bool _swift_task_hasActiveDeadline() {
   if (!task)
     return false;
   auto status = task->_private()._status().load(std::memory_order_relaxed);
-  return status.hasDeadline();
+  if (!status.hasDeadline())
+    return false;
+#if SWIFT_CONCURRENCY_EMBEDDED
+  return true;
+#else
+  // A cancellation shield prevents finding the deadlines outside of it. A
+  // child task might have inherited the flag from a deadline of its parent that
+  // doesn't apply to it. Otherwise the flag is enough.
+  if (!status.hasCancellationShield() && !task->hasChildFragment())
+    return true;
+  return findNearestDeadline(
+             task, [](TaskDeadlineStatusRecord *) { return true; }) != nullptr;
+#endif
 }
 
 void AsyncTask::inheritDeadlineFrom(AsyncTask *parent) {
