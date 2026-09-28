@@ -643,7 +643,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan {
 
-  /// Update every element of this span to the given value.
+  /// Overwrites every element of this span with the given value.
   ///
   /// - Parameter repeatedValue: The value to set for every element.
   @export(implementation)
@@ -652,7 +652,7 @@ extension MutableSpan {
     updateAll(repeating: repeatedValue)
   }
 
-  /// Update every element of this span to the given value.
+  /// Overwrites every element of this span with the given value.
   ///
   /// - Parameter repeatedValue: The value to set for every element.
   @export(implementation)
@@ -664,8 +664,7 @@ extension MutableSpan {
     }
   }
 
-  /// Updates every element within the supplied range of indices
-  /// to the given value.
+  /// Overwrites every element within a range of indices with the given value.
   ///
   /// - Parameters:
   ///   - subrange: A valid range of indices. Every index in this range
@@ -681,8 +680,7 @@ extension MutableSpan {
     span.updateAll(repeating: repeatedValue)
   }
 
-  /// Updates every element within the supplied range of indices
-  /// to the given value.
+  /// Overwrites every element within a range of indices with the given value.
   ///
   /// - Parameters:
   ///   - subrange: A valid range of indices. Every index in this range
@@ -697,7 +695,7 @@ extension MutableSpan {
     updateSubrange(subrange.relative(to: indices), repeating: repeatedValue)
   }
 
-  /// Updates every element of this span to the given value.
+  /// Overwrites every element of this span with the given value.
   ///
   /// - Parameters:
   ///   - subrange: An unbounded range, selecting every index of this span.
@@ -711,7 +709,8 @@ extension MutableSpan {
     updateAll(repeating: repeatedValue)
   }
 
-  /// Copies elements from source into this span.
+  /// Overwrites every element of this span by copying the elements
+  /// of the source.
   ///
   /// `source` must have exactly as many elements as this span.
   ///
@@ -729,8 +728,8 @@ extension MutableSpan {
     }
   }
 
-  /// Copies elements from source into the supplied range of indices
-  /// within this span.
+  /// Overwrites the elements within a range of indices by copying
+  /// the elements of the source.
   ///
   /// `source` must have exactly as many elements as `subrange`.
   ///
@@ -747,8 +746,8 @@ extension MutableSpan {
     span.updateAll(copying: source)
   }
 
-  /// Copies elements from source into the supplied range of indices
-  /// within this span.
+  /// Overwrites the elements within a range of indices by copying
+  /// the elements of the source.
   ///
   /// `source` must have exactly as many elements as `subrange`.
   ///
@@ -764,7 +763,8 @@ extension MutableSpan {
     updateSubrange(subrange.relative(to: indices), copying: source)
   }
 
-  /// Copies elements from source into this span.
+  /// Overwrites every element of this span by copying the elements
+  /// of the source.
   ///
   /// `source` must have exactly as many elements as this span.
   ///
@@ -780,22 +780,20 @@ extension MutableSpan {
   }
 
 #if !SPAN_COMPATIBILITY_STUB
-  /// Copies every element of the source into this span, starting at index.
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// every element of the source.
   ///
-  /// This span must have enough space between `index` and its end for every
-  /// element `source` provides.
-  ///
-  /// When the function returns, the value of `index` is the index after
-  /// the last written element in the span.
+  /// This span must have enough space from `index` to its end
+  /// (`index..<count`) for every element provided by `source`.
   ///
   /// If reading from `source` throws an error, the elements copied before
   /// the error occurred remain in this span, and `index` is updated to
-  /// the index after the last written element.
+  /// the index after the last element updated before the error.
   ///
   /// - Parameters:
   ///   - index: The index at which to start copying. It must be a valid
-  ///      index of this span, or its count. On return, it is the index
-  ///      after the last element written.
+  ///      index of this span, or equal to its `count`. On return, it is
+  ///      updated to the index after the last element updated.
   ///   - source: The elements to copy into this span.
   /// - Throws: Any error thrown while reading from `source`.
   @export(implementation)
@@ -812,16 +810,17 @@ extension MutableSpan {
     _precondition(next.isEmpty)
   }
 
-  /// Copies every element of the source into this span, starting at index.
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// every element of the source.
   ///
-  /// This span must have space between `index` and its end for every element
-  /// `source` provides.
+  /// This span must have enough space from `index` to its end
+  /// (`index..<count`) for every element provided by `source`.
   ///
   /// - Parameters:
   ///   - index: The index at which to start copying. It must be a valid
-  ///      index of this span, or its count.
+  ///      index of this span, or equal to its `count`.
   ///   - source: The elements to copy into this span.
-  /// - Returns: The index after the last element written.
+  /// - Returns: The index after the last element updated.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
@@ -835,22 +834,20 @@ extension MutableSpan {
     return index
   }
 
-  /// Copies elements from an iterator into this span, starting at index.
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// elements from an iterator.
   ///
-  /// Copying stops as soon as `source` is exhausted, or the end of this span
-  /// is reached, whichever comes first.
-  ///
-  /// When the function returns, the value of `index` is the index after
-  /// the last written element in the span.
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
   ///
   /// If reading from `source` throws an error, the elements copied before
   /// the error occurred remain in this span, and `index` is updated to
-  /// the index after the last written element.
+  /// the index after the last element updated before the error.
   ///
   /// - Parameters:
   ///   - index: The index at which to start copying. It must be a valid
-  ///      index of this span, or its count. On return, it is the index
-  ///      after the last element written.
+  ///      index of this span, or equal to its `count`. On return, it is
+  ///      updated to the index after the last element updated.
   ///   - source: An iterator over the elements to copy into this span. On
   ///      return, it is positioned after the last element copied.
   /// - Throws: Any error thrown while reading from `source`.
@@ -882,7 +879,8 @@ extension MutableSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
 
-  /// Moves elements from source into this span, leaving the source empty.
+  /// Overwrites every element of this span by moving the elements
+  /// from the source.
   ///
   /// `source` must have exactly as many initialized elements as this span.
   /// When this function returns, `source` is empty, and its memory has been
@@ -903,8 +901,8 @@ extension MutableSpan where Element: ~Copyable {
     }
   }
 
-  /// Moves elements from source into the supplied range of indices
-  /// within this span, leaving the source empty.
+  /// Overwrites the elements within a range of indices by moving
+  /// the elements from the source.
   ///
   /// `source` must have exactly as many initialized elements as `subrange`.
   /// When this function returns, `source` is empty, and its memory has been
@@ -923,8 +921,8 @@ extension MutableSpan where Element: ~Copyable {
     span.updateAll(moving: &source)
   }
 
-  /// Moves elements from source into the supplied range of indices
-  /// within this span, leaving the source empty.
+  /// Overwrites the elements within a range of indices by moving
+  /// the elements from the source.
   ///
   /// `source` must have exactly as many initialized elements as `subrange`.
   /// When this function returns, `source` is empty, and its memory has been
@@ -943,7 +941,8 @@ extension MutableSpan where Element: ~Copyable {
     updateSubrange(subrange.relative(to: indices), moving: &source)
   }
 
-  /// Moves elements from source into this span, leaving the source empty.
+  /// Overwrites every element of this span by moving the elements
+  /// from the source.
   ///
   /// `source` must have exactly as many initialized elements as this span.
   /// When this function returns, `source` is empty, and its memory has been

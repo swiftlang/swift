@@ -716,7 +716,7 @@ extension MutableRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
-  /// Updates every byte of this span to the given value.
+  /// Overwrites every byte of this span with the given value.
   ///
   /// - Parameter repeatedByte: The value to set for every byte.
   @export(implementation)
@@ -728,11 +728,10 @@ extension MutableRawSpan {
     }
   }
 
-  /// Updates every byte within the supplied range of positions
-  /// to the given value.
+  /// Overwrites every byte within a range of offsets with the given value.
   ///
   /// - Parameters:
-  ///   - subrange: A valid range of positions. Every position in this range
+  ///   - subrange: A valid range of offsets. Every offset in this range
   ///      must be within the bounds of this `MutableRawSpan`.
   ///   - repeatedByte: The value to set for every byte in `subrange`.
   @export(implementation)
@@ -745,11 +744,10 @@ extension MutableRawSpan {
     span.updateAll(repeating: repeatedByte)
   }
 
-  /// Updates every byte within the supplied range of positions
-  /// to the given value.
+  /// Overwrites every byte within a range of offsets with the given value.
   ///
   /// - Parameters:
-  ///   - subrange: A valid range of positions. Every position in this range
+  ///   - subrange: A valid range of offsets. Every offset in this range
   ///      must be within the bounds of this `MutableRawSpan`.
   ///   - repeatedByte: The value to set for every byte in `subrange`.
   @export(implementation)
@@ -761,10 +759,10 @@ extension MutableRawSpan {
     updateSubrange(subrange.relative(to: byteOffsets), repeating: repeatedByte)
   }
 
-  /// Updates every byte of this span to the given value.
+  /// Overwrites every byte of this span with the given value.
   ///
   /// - Parameters:
-  ///   - subrange: An unbounded range, selecting every position of this span.
+  ///   - subrange: An unbounded range, selecting every offset of this span.
   ///   - repeatedByte: The value to set for every byte.
   @export(implementation)
   @_lifetime(self: copy self)
@@ -775,7 +773,7 @@ extension MutableRawSpan {
     updateAll(repeating: repeatedByte)
   }
 
-  /// Copies bytes from source into this span.
+  /// Overwrites every byte of this span by copying the bytes of the source.
   ///
   /// `source` must have exactly as many bytes as this span.
   ///
@@ -788,13 +786,13 @@ extension MutableRawSpan {
     unsafe _start().copyMemory(from: source._start(), byteCount: byteCount)
   }
 
-  /// Copies bytes from source into the supplied range of positions
-  /// within this span.
+  /// Overwrites the bytes within a range of offsets by copying
+  /// the bytes of the source.
   ///
   /// `source` must have exactly as many bytes as `subrange`.
   ///
   /// - Parameters:
-  ///   - subrange: A valid range of positions. Every position in this range
+  ///   - subrange: A valid range of offsets. Every offset in this range
   ///      must be within the bounds of this `MutableRawSpan`.
   ///   - source: The bytes to copy into `subrange`.
   @export(implementation)
@@ -806,13 +804,13 @@ extension MutableRawSpan {
     span.updateAll(copying: source)
   }
 
-  /// Copies bytes from source into the supplied range of positions
-  /// within this span.
+  /// Overwrites the bytes within a range of offsets by copying
+  /// the bytes of the source.
   ///
   /// `source` must have exactly as many bytes as `subrange`.
   ///
   /// - Parameters:
-  ///   - subrange: A valid range of positions. Every position in this range
+  ///   - subrange: A valid range of offsets. Every offset in this range
   ///      must be within the bounds of this `MutableRawSpan`.
   ///   - source: The bytes to copy into `subrange`.
   @export(implementation)
@@ -823,12 +821,12 @@ extension MutableRawSpan {
     updateSubrange(subrange.relative(to: byteOffsets), copying: source)
   }
 
-  /// Copies bytes from source into this span.
+  /// Overwrites every byte of this span by copying the bytes of the source.
   ///
   /// `source` must have exactly as many bytes as this span.
   ///
   /// - Parameters:
-  ///   - subrange: An unbounded range, selecting every position of this span.
+  ///   - subrange: An unbounded range, selecting every offset of this span.
   ///   - source: The bytes to copy into this span.
   @export(implementation)
   @_lifetime(self: copy self)
@@ -838,7 +836,7 @@ extension MutableRawSpan {
     updateAll(copying: source)
   }
 
-  /// Moves bytes from source into this span, leaving the source empty.
+  /// Overwrites every byte of this span by moving the bytes from the source.
   ///
   /// `source` must have exactly as many initialized bytes as this span.
   /// When this function returns, `source` is empty, and its memory has been
@@ -854,15 +852,15 @@ extension MutableRawSpan {
     source.removeAll()
   }
 
-  /// Moves bytes from source into the supplied range of positions
-  /// within this span, leaving the source empty.
+  /// Overwrites the bytes within a range of offsets by moving
+  /// the bytes from the source.
   ///
   /// `source` must have exactly as many initialized bytes as `subrange`.
   /// When this function returns, `source` is empty, and its memory has been
   /// returned to the uninitialized state.
   ///
   /// - Parameters:
-  ///   - subrange: A valid range of positions. Every position in this range
+  ///   - subrange: A valid range of offsets. Every offset in this range
   ///      must be within the bounds of this `MutableRawSpan`.
   ///   - source: The bytes to move into `subrange`.
   @export(implementation)
@@ -874,15 +872,15 @@ extension MutableRawSpan {
     span.updateAll(moving: &source)
   }
 
-  /// Moves bytes from source into the supplied range of positions
-  /// within this span, leaving the source empty.
+  /// Overwrites the bytes within a range of offsets by moving
+  /// the bytes from the source.
   ///
   /// `source` must have exactly as many initialized bytes as `subrange`.
   /// When this function returns, `source` is empty, and its memory has been
   /// returned to the uninitialized state.
   ///
   /// - Parameters:
-  ///   - subrange: A valid range of positions. Every position in this range
+  ///   - subrange: A valid range of offsets. Every offset in this range
   ///      must be within the bounds of this `MutableRawSpan`.
   ///   - source: The bytes to move into `subrange`.
   @export(implementation)
@@ -893,14 +891,14 @@ extension MutableRawSpan {
     updateSubrange(subrange.relative(to: byteOffsets), moving: &source)
   }
 
-  /// Moves bytes from source into this span, leaving the source empty.
+  /// Overwrites every byte of this span by moving the bytes from the source.
   ///
   /// `source` must have exactly as many initialized bytes as this span.
   /// When this function returns, `source` is empty, and its memory has been
   /// returned to the uninitialized state.
   ///
   /// - Parameters:
-  ///   - subrange: An unbounded range, selecting every position of this span.
+  ///   - subrange: An unbounded range, selecting every offset of this span.
   ///   - source: The bytes to move into this span.
   @export(implementation)
   @_lifetime(self: copy self)
@@ -911,22 +909,20 @@ extension MutableRawSpan {
   }
 
 #if !SPAN_COMPATIBILITY_STUB
-  /// Copies every byte of the source into this span, starting at byteOffset.
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// every byte of the source.
   ///
-  /// This span must have enough space between `byteOffset` and its end for
-  /// every byte `source` provides.
-  ///
-  /// When the function returns, the value of `byteOffset` is the offset after
-  /// the last written byte in the span.
+  /// This span must have enough space from `byteOffset` to its end
+  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
   ///
   /// If reading from `source` throws an error, the bytes copied before
   /// the error occurred remain in this span, and `byteOffset` is updated to
-  /// the offset after the last written byte.
+  /// the offset after the last byte updated before the error.
   ///
   /// - Parameters:
   ///   - byteOffset: The offset at which to start copying. It must be a valid
-  ///      offset into this span, or its `byteCount`. On return, it is the
-  ///      offset after the last byte written.
+  ///      offset into this span, or equal to its `byteCount`. On return, it
+  ///      is updated to the offset after the last byte updated.
   ///   - source: The bytes to copy into this span.
   /// - Throws: Any error thrown while reading from `source`.
   @export(implementation)
@@ -943,16 +939,17 @@ extension MutableRawSpan {
     _precondition(next.isEmpty)
   }
 
-  /// Copies every byte of the source into this span, starting at byteOffset.
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// every byte of the source.
   ///
-  /// This span must have space between `byteOffset` and its end for every byte
-  /// `source` provides.
+  /// This span must have enough space from `byteOffset` to its end
+  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
   ///
   /// - Parameters:
   ///   - byteOffset: The offset at which to start copying. It must be a valid
-  ///      offset into this span, or its `byteCount`.
+  ///      offset into this span, or equal to its `byteCount`.
   ///   - source: The bytes to copy into this span.
-  /// - Returns: The offset after the last byte written.
+  /// - Returns: The offset after the last byte updated.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
@@ -966,22 +963,20 @@ extension MutableRawSpan {
     return byteOffset
   }
 
-  /// Copies bytes from an iterator into this span, starting at byteOffset.
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// bytes from an iterator.
   ///
-  /// Copying stops as soon as `source` is exhausted, or the end of this span
-  /// is reached, whichever comes first.
-  ///
-  /// When the function returns, the value of `byteOffset` is the offset after
-  /// the last written byte in the span.
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
   ///
   /// If reading from `source` throws an error, the bytes copied before
   /// the error occurred remain in this span, and `byteOffset` is updated to
-  /// the offset after the last written byte.
+  /// the offset after the last byte updated before the error.
   ///
   /// - Parameters:
   ///   - byteOffset: The offset at which to start copying. It must be a valid
-  ///      offset into this span, or its `byteCount`. On return, it is the
-  ///      offset after the last byte written.
+  ///      offset into this span, or equal to its `byteCount`. On return, it
+  ///      is updated to the offset after the last byte updated.
   ///   - source: An iterator over the bytes to copy into this span. On
   ///      return, it is positioned after the last byte copied.
   /// - Throws: Any error thrown while reading from `source`.
