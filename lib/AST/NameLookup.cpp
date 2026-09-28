@@ -2794,6 +2794,14 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   bool wantProtocolMembers = options.contains(NLFlags::ProtocolMembers);
+
+  // Don't build conformance lookup tables while extensions are being bound:
+  // a protocol declared in a not-yet-bound extension would be missing from
+  // the table, and the table never revisits it.
+  bool bindingExtensions =
+      wantProtocolMembers &&
+      eval.hasActiveRequest(BindExtensionsRequest{DC->getParentModule()});
+
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
@@ -2887,6 +2895,21 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       for (auto inheritedProto : protoDecl->getInheritedProtocols()) {
         addNominalType(inheritedProto);
       }
+    } else if (bindingExtensions) {
+      // Visit the protocols stated on the type and its bound extensions.
+      // Unlike getAllProtocols(), this excludes the superclass's
+      // conformances, so superclasses are visited on their own.
+      auto addStatedProtocols = [&](auto *decl) {
+        InvertibleProtocolSet inverses;
+        bool anyObject = false;
+        for (const auto &found :
+             getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject))
+          if (auto *proto = dyn_cast<ProtocolDecl>(found.Item))
+            addNominalType(proto);
+      };
+      addStatedProtocols(current);
+      for (auto *ext : current->getExtensions())
+        addStatedProtocols(ext);
     } else {
       // Collect the protocols to which the nominal type conforms.
       for (auto proto : current->getAllProtocols()) {
