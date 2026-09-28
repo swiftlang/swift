@@ -35,6 +35,9 @@ import Synchronization
     await test_task_cancel_cancels_scopes()
     await test_scope_created_inside_cancelled_task()
     await test_task_cancel_does_not_cancel_scope_inside_shield()
+    await test_scope_cancel_does_not_fire_handler_inside_shield()
+    await test_scope_cancel_does_not_cancel_children_inside_shield()
+    await test_scope_cancel_does_not_cancel_scope_inside_shield()
     print("done")
   }
 }
@@ -571,6 +574,100 @@ func test_task_cancel_does_not_cancel_scope_inside_shield() async {
       }
     }
   }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_cancel_does_not_fire_handler_inside_shield() async {
+  print("--- test_scope_cancel_does_not_fire_handler_inside_shield")
+  // CHECK: --- test_scope_cancel_does_not_fire_handler_inside_shield
+
+  // A shield inside a scope prevents the cancellation of the shield's scope, so a
+  // handler installed inside the shield must not fire. A handler installed
+  // inside the scope but outside the shield still fires.
+  await __withTaskCancellationScope { scope in
+    var outsideFired = false
+    var insideFired = false
+    await withTaskCancellationHandler {
+      await withTaskCancellationShield {
+        await withTaskCancellationHandler {
+          scope.cancel()
+          print("in shield: isCancelled=\(Task.isCancelled)")
+          // CHECK: in shield: isCancelled=false
+        } onCancel: {
+          insideFired = true
+        }
+      }
+    } onCancel: {
+      outsideFired = true
+    }
+    print("handler outside shield fired=\(outsideFired)")
+    // CHECK: handler outside shield fired=true
+    print("handler inside shield fired=\(insideFired)")
+    // CHECK: handler inside shield fired=false
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_cancel_does_not_cancel_children_inside_shield() async {
+  print("--- test_scope_cancel_does_not_cancel_children_inside_shield")
+  // CHECK: --- test_scope_cancel_does_not_cancel_children_inside_shield
+
+  // Child tasks created inside a shield are not cancelled by the cancellation
+  // of the scope, no matter if they are created before or after the scope got
+  // cancelled.
+  await __withTaskCancellationScope { scope in
+    await withTaskCancellationShield {
+      let childStarted = Signal()
+      let scopeCancelled = Signal()
+
+      async let asyncLetChild: Bool = {
+        childStarted.signal()
+        await scopeCancelled.wait()
+        return Task.isCancelled
+      }()
+
+      await withTaskGroup(of: Bool.self) { group in
+        let groupChildStarted = Signal()
+        group.addTask {
+          groupChildStarted.signal()
+          await scopeCancelled.wait()
+          return Task.isCancelled
+        }
+
+        await childStarted.wait()
+        await groupChildStarted.wait()
+        scope.cancel()
+        scopeCancelled.signal()
+        scopeCancelled.signal()
+
+        print("group child in shield isCancelled=\(await group.next()!)")
+        // CHECK: group child in shield isCancelled=false
+      }
+      print("async let in shield isCancelled=\(await asyncLetChild)")
+      // CHECK: async let in shield isCancelled=false
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_cancel_does_not_cancel_scope_inside_shield() async {
+  print("--- test_scope_cancel_does_not_cancel_scope_inside_shield")
+  // CHECK: --- test_scope_cancel_does_not_cancel_scope_inside_shield
+
+  // A scope inside a shield is not cancelled by the cancellation of an outer
+  // scope, the same as a scope that is created inside a shield after the outer
+  // scope got cancelled.
+  await __withTaskCancellationScope { outer in
+    await withTaskCancellationShield {
+      await __withTaskCancellationScope { inner in
+        outer.cancel()
+        print("inner scope isCancelled=\(inner.isCancelled)")
+        // CHECK: inner scope isCancelled=false
+        print("Task.isCancelled=\(Task.isCancelled)")
+        // CHECK: Task.isCancelled=false
+      }
+    }
+  }
 }
 
 // CHECK: done

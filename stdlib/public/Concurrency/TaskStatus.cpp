@@ -1018,15 +1018,16 @@ void AsyncTask::cancellationShieldPop() {
 }
 
 
+static void cancelRecordsLocked(ActiveTaskStatus status,
+                                TaskStatusRecord *end, size_t reason);
+
 SWIFT_CC(swift)
 static void
 swift_task_cancelCancellationScopeImpl(
     TaskCancellationScopeRecord *record, size_t flags) {
-  // Cancelling a scope is a local operation on the scope's own atomic flag.
-  // Unlike `swift_task_cancel`, it does not set the task's own IsCancelled
-  // flag. We fire any `CancellationNotificationStatusRecord`s installed
-  // inside the scope's dynamic extent so `withTaskCancellationHandler`-based
-  // operations (`Task.sleep`, URLSession handlers, etc.) wake up.
+  // Cancelling a scope doesn't cancel the task itself. It cancels everything
+  // inside of the scope, the same as cancelling a task cancels everything
+  // inside of the task.
   //
   // Callable from any thread/task context, so we use the record's stored
   // `OwningTask` pointer rather than `swift_task_getCurrent()`.
@@ -1045,46 +1046,7 @@ swift_task_cancelCancellationScopeImpl(
   // Walk the chain under the record lock. The chain is push-ordered
   // (innermost first); stop when we hit the scope itself.
   withStatusRecordLock(task, [&](ActiveTaskStatus status) {
-    for (auto cur : status.records()) {
-      if (cur == record)
-        break; // reached the scope; anything past this pre-dates the scope
-
-      switch (cur->getKind()) {
-      case TaskStatusRecordKind::CancellationNotification: {
-        // A cancellation shield is a within-task feature and only makes sense
-        // for whole-task cancellation. Scope cancellation always fires
-        // handlers registered inside the scope.
-        auto notification =
-            cast<CancellationNotificationStatusRecord>(cur);
-        notification->run(reason);
-        break;
-      }
-      case TaskStatusRecordKind::TaskCancellationScope: {
-        // An inner scope, nested inside the scope being cancelled. Mark
-        // it cancelled too (idempotent), carrying the same reason as the
-        // outer cancel. Its own inner notification handlers were already
-        // fired above as we walked past them.
-        cast<TaskCancellationScopeRecord>(cur)->cancel(reason);
-        break;
-      }
-      case TaskStatusRecordKind::ChildTask: {
-        // Structured child tasks (async let) spawned inside the scope
-        // cascade with the scope's reason.
-        auto childRecord = cast<ChildTaskStatusRecord>(cur);
-        for (AsyncTask *child : childRecord->children())
-          swift_task_cancelWithFlags(child, reason);
-        break;
-      }
-      case TaskStatusRecordKind::TaskGroup: {
-        // TaskGroup children spawned inside the scope also cascade.
-        auto groupRecord = cast<TaskGroupTaskStatusRecord>(cur);
-        _swift_taskGroup_cancel(groupRecord->getGroup(), reason);
-        break;
-      }
-      default:
-        break;
-      }
-    }
+    cancelRecordsLocked(status, /*end=*/record, reason);
   });
 }
 
@@ -1475,6 +1437,19 @@ static void performCancellationAction(TaskStatusRecord *record, size_t reason) {
   // FIXME: allow dynamic extension/correction?
 }
 
+/// Cancels everything in `status` that comes before `end`, except for the
+/// records inside a cancellation shield. Pass `nullptr` for `end` to cancel
+/// everything of the task. The caller must hold the status record lock.
+///
+/// This is the same for cancelling a task and cancelling a scope, since a
+/// scope behaves like an inline child task.
+static void cancelRecordsLocked(ActiveTaskStatus status,
+                                TaskStatusRecord *end, size_t reason) {
+  forEachRecordOutsideShieldsLocked(
+      status, end,
+      [&](TaskStatusRecord *cur) { performCancellationAction(cur, reason); });
+}
+
 SWIFT_CC(swift)
 static void swift_task_cancelImpl(AsyncTask *task) {
   swift_task_cancelWithFlags(task, /*unspecified=*/0);
@@ -1519,11 +1494,7 @@ static void swift_task_cancelWithFlagsImpl(AsyncTask *task, size_t flags) {
   }
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
-    // A cancellation shield prevents the cancellation of the task from
-    // reaching everything inside of the shield, so we skip those records.
-    forEachRecordOutsideShieldsLocked(
-        status, /*end=*/nullptr,
-        [&](TaskStatusRecord *cur) { performCancellationAction(cur, reason); });
+    cancelRecordsLocked(status, /*end=*/nullptr, reason);
   });
 }
 
