@@ -1085,14 +1085,14 @@ struct EmbeddedDispatchContext {
 ///   if target.identifier.utf8.elementsEqual("$e_..._TE".utf8) {
 ///     let p1: T1 = try invocationDecoder.decodeNextArgument()
 ///     let p2: T2 = try invocationDecoder.decodeNextArgument()
-///     do {
-///       let __result = try await self.distFunc(p1, p2)
-///       try await resultHandler.onReturn(value: __result)
-///     } catch {
-///       try await resultHandler.onThrow(error: error)
-///     }
+///     let __result = try await self.distFunc(p1, p2)
+///     try await resultHandler.onReturn(value: __result)
 ///     return
 ///   }
+///
+/// The errors of every branch are handled by one shared
+/// `catch { try await resultHandler.onThrow(error: error) }` around the whole
+/// dispatch, see 'buildEmbeddedDispatchOnThrowCatch'
 static IfStmt *buildEmbeddedDispatchBranch(
     ASTContext &C, AbstractFunctionDecl *thunk,
     VarDecl *targetVar, VarDecl *invocationDecoderVar,
@@ -1196,11 +1196,11 @@ static IfStmt *buildEmbeddedDispatchBranch(
   funcCall = AwaitExpr::createImplicit(C, sloc, funcCall);
   funcCall = TryExpr::createImplicit(C, sloc, funcCall);
 
-  // The do-try-catch wrapper, with onReturn / onReturnVoid
-  SmallVector<ASTNode, 4> doStmts;
+  // The call, with onReturn / onReturnVoid
+  SmallVector<ASTNode, 4> callStmts;
   if (isVoidReturn) {
     // self.<func>(...)
-    doStmts.push_back(funcCall);
+    callStmts.push_back(funcCall);
 
     // try await resultHandler.onReturnVoid()
     auto *onReturnVoid =
@@ -1212,7 +1212,7 @@ static IfStmt *buildEmbeddedDispatchBranch(
         C, onReturnVoid, ArgumentList::createImplicit(C, {}));
     onReturnVoidCall = AwaitExpr::createImplicit(C, sloc, onReturnVoidCall);
     onReturnVoidCall = TryExpr::createImplicit(C, sloc, onReturnVoidCall);
-    doStmts.push_back(onReturnVoidCall);
+    callStmts.push_back(onReturnVoidCall);
   } else {
     // let __result = try await self.<func>(...)
     auto *resultVar = new (C) VarDecl(
@@ -1225,8 +1225,8 @@ static IfStmt *buildEmbeddedDispatchBranch(
     Pattern *resultPattern = NamedPattern::createImplicit(C, resultVar, returnTy);
     auto *resultPB = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, resultPattern, funcCall, thunk);
-    doStmts.push_back(resultPB);
-    doStmts.push_back(resultVar);
+    callStmts.push_back(resultPB);
+    callStmts.push_back(resultVar);
 
     // --- Emit a resolve if the result was a @Resolvable protocol:
     //     $P.resolve(id: __result.id, using: self.actorSystem)
@@ -1255,9 +1255,39 @@ static IfStmt *buildEmbeddedDispatchBranch(
             C, { Argument(sloc, C.getIdentifier("value"), resultArgExpr) }));
     onReturnCall = AwaitExpr::createImplicit(C, sloc, onReturnCall);
     onReturnCall = TryExpr::createImplicit(C, sloc, onReturnCall);
-    doStmts.push_back(onReturnCall);
+    callStmts.push_back(onReturnCall);
   }
-  auto *doBody = BraceStmt::create(C, sloc, doStmts, sloc, implicit);
+  thenStmts.append(callStmts.begin(), callStmts.end());
+
+  // return
+  thenStmts.push_back(ReturnStmt::createImplicit(C, sloc, /*Result=*/nullptr));
+
+  auto *thenBody = BraceStmt::create(C, sloc, thenStmts, sloc, implicit);
+
+  return new (C) IfStmt(sloc, /*Cond=*/eqCheck, /*Then=*/thenBody,
+                        /*ElseLoc=*/SourceLoc(), /*Else=*/nullptr,
+                        implicit, C);
+}
+
+/// Wrap the whole dispatch in
+///
+///   do { <dispatch> }
+///   catch { try await resultHandler.onThrow(error: error); return }
+///
+/// The catch is identical for every target, and the `await` in it is a
+/// suspension point with its own funclets, so it is emitted once for the actor
+/// rather than once per target. Like in the non-Embedded
+/// 'executeDistributedTarget', argument decoding errors are delivered to
+/// 'onThrow' as well. The "target not found" throw is emitted after this
+/// statement, so it still propagates to the caller
+static DoCatchStmt *buildEmbeddedDispatchOnThrowCatch(
+    ASTContext &C, AbstractFunctionDecl *thunk, VarDecl *resultHandlerVar,
+    ArrayRef<ASTNode> dispatchStmts) {
+  const auto implicit = true;
+  const SourceLoc sloc = SourceLoc();
+  const DeclNameLoc dloc = DeclNameLoc();
+
+  auto *doBody = BraceStmt::create(C, sloc, dispatchStmts, sloc, implicit);
 
   // catch { try await resultHandler.onThrow(error: error) }
   auto *catchErrorVar = new (C) VarDecl(
@@ -1283,28 +1313,22 @@ static IfStmt *buildEmbeddedDispatchBranch(
                                             implicit)) }));
   onThrowCall = AwaitExpr::createImplicit(C, sloc, onThrowCall);
   onThrowCall = TryExpr::createImplicit(C, sloc, onThrowCall);
-  auto *catchBody = BraceStmt::create(C, sloc, { onThrowCall }, sloc, implicit);
+  // Return after 'onThrow', so control does not fall out of the do/catch into
+  // the "target not found" throw
+  auto *catchBody = BraceStmt::create(
+      C, sloc,
+      { onThrowCall, ReturnStmt::createImplicit(C, sloc, /*Result=*/nullptr) },
+      sloc, implicit);
 
   auto *catchStmt = CaseStmt::createImplicit(
       C, CaseParentKind::DoCatch,
       { CaseLabelItem(catchPattern) },
       catchBody);
 
-  auto *doCatch = DoCatchStmt::create(
+  return DoCatchStmt::create(
       thunk, LabeledStmtInfo(), sloc,
       /*throwsLoc=*/sloc, TypeLoc(),
       doBody, { catchStmt }, implicit);
-
-  thenStmts.push_back(doCatch);
-
-  // return
-  thenStmts.push_back(ReturnStmt::createImplicit(C, sloc, /*Result=*/nullptr));
-
-  auto *thenBody = BraceStmt::create(C, sloc, thenStmts, sloc, implicit);
-
-  return new (C) IfStmt(sloc, /*Cond=*/eqCheck, /*Then=*/thenBody,
-                        /*ElseLoc=*/SourceLoc(), /*Else=*/nullptr,
-                        implicit, C);
 }
 
 /// Body synthesizer for '_executeDistributedTarget'
@@ -1390,7 +1414,13 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
 
   auto *switchStmt = SwitchStmt::createImplicit(
       LabeledStmtInfo(), targetIdentifierCount, cases, C);
-  bodyStmts.push_back(switchStmt);
+  // A dispatcher without targets (e.g. of a '@Resolvable' stub) has nothing
+  // that could throw into the catch
+  if (byLength.empty())
+    bodyStmts.push_back(switchStmt);
+  else
+    bodyStmts.push_back(buildEmbeddedDispatchOnThrowCatch(
+        C, thunk, resultHandlerParam, { ASTNode(switchStmt) }));
 
   // Fallthrough (no match in any case, or a case's if-chain fell
   // through with no match): throw EmbeddedDistributedTargetNotFound

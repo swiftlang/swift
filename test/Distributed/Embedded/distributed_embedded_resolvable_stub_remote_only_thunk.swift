@@ -3,6 +3,7 @@
 // RUN: %FileCheck %s --check-prefix=SIL < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=NO-STUB-FATAL-ERROR < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=DISPATCH < %t/main.sil
+// RUN: %FileCheck %s --check-prefix=SHARED-ON-THROW < %t/main.sil
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.ll
 // RUN: %FileCheck %s --check-prefix=IR < %t/main.ll
 
@@ -163,3 +164,13 @@ public func callGreet(_ greeter: any Greeter) async throws -> String {
 // DISPATCH-LABEL: sil @$e4main11GreeterImplC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}} :
 // DISPATCH: function_ref @$e4main9MyDecoderV18decodeNextArgument
 // DISPATCH: } // end sil function '$e4main11GreeterImplC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}}'
+
+// ==== ------------------------------------------------------------------------
+// MARK: Dispatcher error handling is shared by all targets
+
+// The 'onThrow' catch is emitted once around the whole dispatch, not once per
+// target
+// SHARED-ON-THROW-LABEL: sil @$e4main11GreeterImplC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}} :
+// SHARED-ON-THROW-COUNT-1: function_ref @$e4main15MyResultHandlerV7onThrow
+// SHARED-ON-THROW-NOT: function_ref @$e4main15MyResultHandlerV7onThrow
+// SHARED-ON-THROW: } // end sil function '$e4main11GreeterImplC25_executeDistributedTarget6target17invocationDecoder13resultHandler{{.*}}'
