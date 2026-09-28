@@ -1817,7 +1817,8 @@ getPartialApplicationForwarderEmission(
 void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            HeapLayout const *layout, llvm::Value *rawContextPtr,
                            Address contextPtr,
-                           const llvm::BitVector &consumedFields) {
+                           const llvm::BitVector &consumedFields,
+                           bool contextIsOnStack) {
   if (!layout) {
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
@@ -1849,6 +1850,12 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
         forwarder, field.project(forwarder, contextPtr, offsets), fieldTy,
         /*isOutlined=*/true);
   }
+
+  // A stack-allocated context's storage is going to be deallocated by the
+  // caller via `dealloc_stack` in their frame. All fields have already been
+  // handled above so there's nothing left to release here.
+  if (contextIsOnStack)
+    return;
 
   emitDeallocateUninitializedHeapObject(
       forwarder, rawContextPtr, offsets.getSize(), offsets.getAlignMask(),
@@ -2285,7 +2292,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     if (consumesContext && !dependsOnContextLifetime && rawData) {
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
-      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
+      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
+                            outType->isNoEscape());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2407,7 +2415,8 @@ static llvm::Value *emitPartialApplicationForwarder(
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
-    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
+    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
+                          outType->isNoEscape());
   }
 
   emission->createReturn(call);
