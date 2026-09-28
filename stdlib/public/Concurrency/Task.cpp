@@ -797,10 +797,15 @@ void AsyncTask::PrivateStorage::complete(AsyncTask *task) {
   // It is destroyed when task is destroyed.
 }
 
-bool AsyncTask::isCancelled(bool ignoreShield) const {
+bool AsyncTask::isTaskCancelled() const {
+  auto status = _private()._status().load(std::memory_order_relaxed);
+  return status.isCancelledIgnoringShield();
+}
+
+bool AsyncTask::isCancelledInCurrentContext() const {
   auto status = _private()._status().load(std::memory_order_relaxed);
   // Is the whole task cancelled?
-  if (status.isCancelled(ignoreShield))
+  if (status.isCancelled())
     return true;
   // Slow path: only entered when a `TaskCancellationScopeRecord` is present.
   // `_swift_task_getCancellationScope` is records-aware: if a
@@ -808,7 +813,12 @@ bool AsyncTask::isCancelled(bool ignoreShield) const {
   // returns nullptr - the shield masks the scope at this call site,
   // matching the "as-if child task" semantics of `withDeadline`. We then
   // query the returned scope's own cancelled flag.
-  if (SWIFT_UNLIKELY(status.hasTaskCancellationScope())) {
+  //
+  // Only the task itself can observe its scopes. For any other caller the
+  // scopes describe an unrelated point of execution and might be popped
+  // concurrently.
+  if (SWIFT_UNLIKELY(status.hasTaskCancellationScope()) &&
+      this == swift_task_getCurrent()) {
     if (auto scope = _swift_task_getCancellationScope(const_cast<AsyncTask *>(this)))
       return scope->isCancelled();
   }
@@ -2551,17 +2561,23 @@ static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
 }
 
 bool swift::swift_task_isCancelled(AsyncTask *task) {
-  return task->isCancelled();
+  return task->isCancelledInCurrentContext();
 }
 
 bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
                                             swift_task_is_cancelled_flag flags) {
-  bool ignoreCancellationShield =
-      flags & swift_task_is_cancelled_flag_IgnoreCancellationShield;
-  return task->isCancelled(ignoreCancellationShield);
+  if (flags & swift_task_is_cancelled_flag_TaskOnly)
+    return task->isTaskCancelled();
+  return task->isCancelledInCurrentContext();
 }
 
 size_t swift::swift_task_getIsCancelledWithReason(AsyncTask *task) {
+  return swift_task_getIsCancelledWithReasonWithFlags(
+      task, swift_task_is_cancelled_flag_TaskOnly);
+}
+
+size_t swift::swift_task_getIsCancelledWithReasonWithFlags(
+    AsyncTask *task, swift_task_is_cancelled_flag flags) {
   // The return value must encode the isCancelled and reason into one word.
   // See Concurrency.h for more details.
   constexpr size_t isCancelledBit = 1u;
@@ -2570,7 +2586,10 @@ size_t swift::swift_task_getIsCancelledWithReason(AsyncTask *task) {
     // Even when the whole task isn't cancelled, an enclosing cancellation
     // scope might be. Look up the innermost visible scope; if
     // it's actually cancelled, report that scope's reason.
-    if (status.hasTaskCancellationScope()) {
+    //
+    // Only the task itself can observe its scopes.
+    if (!(flags & swift_task_is_cancelled_flag_TaskOnly) &&
+        status.hasTaskCancellationScope() && task == swift_task_getCurrent()) {
       if (auto *scope = _swift_task_getCancellationScope(task)) {
         if (scope->isCancelled())
           return isCancelledBit | (scope->getReason() << 1);
