@@ -7,6 +7,9 @@
 // UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=windows-msvc
 
+// rdar://188689326
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
+
 import Distributed
 import FakeDistributedActorSystems
 
