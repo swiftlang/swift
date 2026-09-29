@@ -343,8 +343,6 @@ updated without updating swift.py?")
     def _caching_flags(self):
         if not self.args.enable_caching:
             return []
-        if self.args.bootstrapping_mode != 'hosttools':
-            return []
         cas_path = self.args.caching_cas_path
         if cas_path is None:
             return []
