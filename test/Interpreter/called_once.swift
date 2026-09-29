@@ -358,3 +358,20 @@ func testNeverCalledThroughThunkReleasesCapture() {
 
 // CHECK-NEXT: Tracker(unused) deinit
 testNeverCalledThroughThunkReleasesCapture()
+
+@inline(never)
+func specializedCalledOnce(_ fn: @called(once) () -> Void) {
+  fn()
+}
+
+@inline(never)
+func testClosureSpecializationConsumingCapture() {
+  let r = Resource("specialized")
+  specializedCalledOnce {
+    r.use()
+  }
+}
+
+// CHECK-NEXT: Resource(specialized) used
+// CHECK-NEXT: Resource(specialized) deinit
+testClosureSpecializationConsumingCapture()

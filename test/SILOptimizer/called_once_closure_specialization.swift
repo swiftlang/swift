@@ -12,6 +12,16 @@ struct BorrowableValue: ~Copyable {
   borrowing func peek() -> Int { y }
 }
 
+@_silgen_name("consumeResourceTag")
+func consumeResourceTag(_ x: Int)
+
+struct Resource: ~Copyable {
+  var tag: Int
+  deinit { consumeResourceTag(-1) }
+  consuming func use() { consumeResourceTag(tag) }
+}
+
+
 @inline(never)
 func applyInt(_ f: (Int) -> Int, _ x: Int) -> Int { f(x) }
 
@@ -50,6 +60,23 @@ func testMixedCaptures(_ t: Tracker, _ v: borrowing BorrowableValue, _ delta: In
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[V]], [[DELTA]])
 // CHECK: destroy_value [[TRACKER]]
 // CHECK: }
+
+@inline(never)
+func testConsumingNoncopyableCapture(_ r: consuming Resource) {
+  callOnce {
+    r.use()
+  }
+}
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> () {
+// CHECK: bb0([[R:%.*]] : @owned $Resource):
+// CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> ()
+// CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_once] [[CLOSURE_IMPL]]([[R]]) : $@convention(thin) (@owned Resource) -> ()
+// CHECK-NOT: retain_value
+// CHECK-NOT: copy_value
+// CHECK: apply [[PA]]()
+// CHECK: }
+
 
 @inline(never)
 func testEscapingCapture(_ t: Tracker, _ y: Int) {
@@ -106,6 +133,8 @@ public func run() {
   let t2 = Tracker()
   let v = BorrowableValue(y: 10)
   testMixedCaptures(t2, v, 5)
+
+  testConsumingNoncopyableCapture(Resource(tag: 1))
 
   let t3 = Tracker()
   testEscapingCapture(t3, 42)
