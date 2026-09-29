@@ -28,6 +28,11 @@ module DestructorsWithTemporaryValues {
   requires cplusplus
 }
 
+module EmptyFieldLayout {
+  header "empty-field-layout.h"
+  requires cplusplus
+}
+
 module Extensions {
   header "extensions.h"
   requires cplusplus
