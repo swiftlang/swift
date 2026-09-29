@@ -835,6 +835,7 @@ bb3:
 
 sil @pred : $@convention(thin) () -> Builtin.Int1
 sil @work : $@convention(thin) (Builtin.Word) -> ()
+sil @use_element : $@convention(thin) <T> (@in_guaranteed T) -> ()
 
 // The exit condition in the header compares the induction variable before it
 // is incremented, and the body has an early exit. The header executes four
@@ -1006,4 +1007,72 @@ bb8:
 
 bb9(%22 : $Builtin.Int1):
   return %22 : $Builtin.Int1
+}
+
+// Loops over the elements of a pack are unrolled even if they exceed the cost
+// threshold, like dont_unroll_loop_exceeding_cost_threshold does.
+//
+// CHECK-LABEL: sil [ossa] @unroll_pack_loop_exceeding_cost_threshold :
+// CHECK-COUNT-3: dynamic_pack_index
+// CHECK-NOT:     dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_exceeding_cost_threshold'
+sil [ossa] @unroll_pack_loop_exceeding_cost_threshold : $@convention(thin) (@pack_guaranteed Pack{Int, Int64, Bool}) -> () {
+bb0(%0 : $*Pack{Int, Int64, Bool}):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @use_element : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %5 = function_ref @big_func : $@convention(thin) () -> Builtin.Int64
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = dynamic_pack_index %7 of $Pack{Int, Int64, Bool}
+  %9 = open_pack_element %8 of <each T> at <Pack{Int, Int64, Bool}>, shape $each T, id 1
+  %10 = pack_element_get %8 of %0 : $*Pack{Int, Int64, Bool} as $*@pack_element(1) each T
+  %11 = apply %4<@pack_element(1) each T>(%10) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %12 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %13 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %14 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %15 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %16 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %17 = builtin "cmp_eq_Word"(%16 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %17, bb3, bb2
+
+bb2:
+  br bb1(%16 : $Builtin.Word)
+
+bb3:
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_unroll_loop_exceeding_cost_threshold :
+// CHECK:         builtin "add_Word"
+// CHECK-NOT:     builtin "add_Word"
+// CHECK-LABEL: } // end sil function 'dont_unroll_loop_exceeding_cost_threshold'
+sil [ossa] @dont_unroll_loop_exceeding_cost_threshold : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @work : $@convention(thin) (Builtin.Word) -> ()
+  %4 = function_ref @big_func : $@convention(thin) () -> Builtin.Int64
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = apply %3(%6) : $@convention(thin) (Builtin.Word) -> ()
+  %8 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %9 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %10 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %11 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %12 = builtin "add_Word"(%6 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %13 = builtin "cmp_eq_Word"(%12 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %13, bb3, bb2
+
+bb2:
+  br bb1(%12 : $Builtin.Word)
+
+bb3:
+  %16 = tuple ()
+  return %16 : $()
 }
