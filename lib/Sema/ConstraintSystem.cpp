@@ -2827,6 +2827,60 @@ static bool diagnoseAmbiguity(
 
 using FixInContext = std::pair<const Solution *, const ConstraintFix *>;
 
+/// Diagnose an operator application where every solution selected a different
+/// specialization of the same generic operator with an argument mismatch as
+/// its only fix. This can leave a nested operator without a diagnostic because
+/// SolutionDiff does not consider the shared declaration ambiguous.
+static bool diagnoseGenericOperatorArgumentMismatch(
+    ConstraintSystem &cs, ConstraintLocator *calleeLocator,
+    ArrayRef<FixInContext> fixes, ArrayRef<Solution> solutions) {
+  if (fixes.size() != solutions.size())
+    return false;
+
+  llvm::SmallPtrSet<const Solution *, 4> fixedSolutions;
+  for (const auto &entry : fixes) {
+    if (entry.second->getKind() != FixKind::AllowArgumentTypeMismatch ||
+        entry.first->Fixes.size() != 1 ||
+        !fixedSolutions.insert(entry.first).second)
+      return false;
+  }
+
+  FuncDecl *operatorDecl = nullptr;
+  for (const auto &solution : solutions) {
+    auto overload = solution.getOverloadChoiceIfAvailable(calleeLocator);
+    if (!overload)
+      return false;
+
+    auto *decl = overload->choice.getDeclOrNull();
+    auto *operatorFn = dyn_cast_or_null<FuncDecl>(decl);
+    if (!operatorFn || !operatorFn->isOperator() ||
+        !operatorFn->getGenericSignature())
+      return false;
+
+    if (operatorDecl && operatorDecl != operatorFn)
+      return false;
+    operatorDecl = operatorFn;
+  }
+
+  auto *anchor = getAsExpr<Expr>(calleeLocator->getAnchor());
+  auto *apply =
+      anchor ? dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(anchor)) : nullptr;
+  if (!apply || apply->getFn() != anchor)
+    return false;
+
+  // The outer operator can obscure the mismatch of a nested application.
+  // A standalone operator can instead produce a more specific fix diagnostic.
+  auto *parent = cs.getParentExpr(apply);
+  while (parent && parent->getSemanticsProvidingExpr() == apply)
+    parent = cs.getParentExpr(parent);
+  if (!parent || !isa<BinaryExpr>(parent))
+    return false;
+
+  diagnoseOperatorAmbiguity(cs, operatorDecl->getBaseName().getIdentifier(),
+                            solutions, calleeLocator);
+  return true;
+}
+
 // Attempts to diagnose function call ambiguities of types inferred for a result
 // generic parameter from contextual type and a closure argument that
 // conflicting infer a different type for the same argument. Example:
@@ -3084,6 +3138,12 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
     auto *calleeLocator = solution.getCalleeLocator(locator);
     fixesByCallee[calleeLocator].push_back({&solution, fix});
+  }
+
+  for (const auto &entry : fixesByCallee) {
+    if (diagnoseGenericOperatorArgumentMismatch(
+            *this, entry.first, entry.second, solutions))
+      return true;
   }
 
   bool diagnosed = false;
