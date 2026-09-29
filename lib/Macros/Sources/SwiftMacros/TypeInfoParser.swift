@@ -88,6 +88,45 @@ public struct AvailabilityQuery {
   var constantResult: Bool?
 }
 
+extension AvailabilityQuery {
+  /// The `#available` or `#unavailable` condition that this query represents in
+  /// source.
+  var condition: String {
+    var spec = domain
+    if let primaryRange {
+      spec += " \(primaryRange)"
+    }
+    var specs = [spec]
+    if !isUnavailability && primaryRange != nil {
+      specs.append("*")
+    }
+
+    let keyword = isUnavailability ? "#unavailable" : "#available"
+    return "\(keyword)(\(specs.joined(separator: ", ")))"
+  }
+}
+
+extension EnumCaseInfo {
+  /// The `guard` statements that must precede a reference constructing this
+  /// case, each returning `nil` when its condition fails, or `nil` if the case
+  /// can never be constructed and must be left out of the initializer.
+  var constructionGuards: [String]? {
+    guard isConstructible else { return nil }
+
+    var guards: [String] = []
+    for query in runtimeAvailabilityQueries {
+      if let constantResult = query.constantResult {
+        if !constantResult {
+          return nil
+        }
+        continue
+      }
+      guards.append("guard \(query.condition) else { return nil }")
+    }
+    return guards
+  }
+}
+
 public struct StructTypeInfo {
   /// Information on all the struct's properties
   var properties: [StoredProperty]
