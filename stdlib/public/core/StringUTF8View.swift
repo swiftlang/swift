@@ -220,11 +220,11 @@ extension String.UTF8View: BidirectionalCollection {
   ///     print("First character's UTF-8 code unit: \(greeting.utf8[i])")
   ///     // Prints "First character's UTF-8 code unit: 72"
   ///
-  /// - Parameter i: A valid index of the view. `i`
+  /// - Parameter position: A valid index of the view. `position`
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
-  public subscript(i: Index) -> UTF8.CodeUnit {
-    let i = _guts.ensureMatchingEncoding(i)
+  public subscript(position: Index) -> UTF8.CodeUnit {
+    let i = _guts.ensureMatchingEncoding(position)
     _precondition(i._encodedOffset < _guts.count,
       "String index is out of bounds")
     return self[_unchecked: i]

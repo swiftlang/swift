@@ -33,8 +33,8 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   /// 'unsafeAddress' as the mutable reference based on the mutating lifetime of
   /// the given 'owner' argument.
   ///
-  /// - Parameter pointer: The address to use to mutably reference an
-  ///                      instance of type `Value`.
+  /// - Parameter unsafeAddress: The address to use to mutably reference an
+  ///                            instance of type `Value`.
   /// - Parameter owner: The owning instance that this `MutableRef` instance's
   ///                    lifetime is based on.
   @available(StdlibDeploymentTarget 6.4, *)
@@ -43,10 +43,10 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   @_lifetime(&owner)
   @_transparent
   public init<Owner: ~Copyable & ~Escapable>(
-    unsafeAddress pointer: UnsafeMutablePointer<Value>,
+    unsafeAddress: UnsafeMutablePointer<Value>,
     mutating owner: inout Owner
   ) {
-    unsafe self.pointer = pointer
+    unsafe self.pointer = unsafeAddress
   }
 }
 
