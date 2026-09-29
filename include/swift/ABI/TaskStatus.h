@@ -586,19 +586,18 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
   /// to remain alive while the scope is active.
   AsyncTask *OwningTask;
 
-  /// Packed cancellation state
+  /// Packed state
   ///
   /// bit 0:          the cancelled flag;
   /// bits 1-3:       hold the cancellation reason (same shape as swift_task_cancelWithFlags).
+  /// bit 4:          whether this is the outermost scope of the task. When it
+  ///                 is popped, the task has no scope anymore.
   /// remaining bits: reserved for future use.
   std::atomic<uintptr_t> State{0};
 
   static constexpr uintptr_t CancelledBit = 1;
   static constexpr uintptr_t ReasonMask = 0b111;
-
-  /// Whether this is the outermost scope of the task. When it is popped, the
-  /// task has no scope anymore.
-  bool IsOutermostScope = false;
+  static constexpr uintptr_t OutermostScopeBit = 1 << 4;
 
 public:
   explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
@@ -607,8 +606,16 @@ public:
 
   AsyncTask *getOwningTask() const { return OwningTask; }
 
-  bool isOutermostScope() const { return IsOutermostScope; }
-  void setIsOutermostScope(bool isOutermost) { IsOutermostScope = isOutermost; }
+  bool isOutermostScope() const {
+    return (State.load(std::memory_order_relaxed) & OutermostScopeBit) != 0;
+  }
+  /// Only called before the record is added to the task.
+  void setIsOutermostScope(bool isOutermost) {
+    auto state = State.load(std::memory_order_relaxed);
+    state = isOutermost ? (state | OutermostScopeBit)
+                        : (state & ~OutermostScopeBit);
+    State.store(state, std::memory_order_relaxed);
+  }
 
   bool isCancelled() const {
     return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
@@ -626,7 +633,7 @@ public:
     auto oldState = State.load(std::memory_order_relaxed);
     // bail if the scope was already cancelled - first-cancel-wins.
     while (!(oldState & CancelledBit)) {
-      auto newState = ((reason & ReasonMask) << 1) | CancelledBit;
+      auto newState = oldState | ((reason & ReasonMask) << 1) | CancelledBit;
       if (State.compare_exchange_weak(oldState, newState,
                                        std::memory_order_relaxed,
                                        std::memory_order_relaxed)) {
