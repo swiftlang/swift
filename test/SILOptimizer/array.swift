@@ -17,3 +17,23 @@ public func testContiguousArray<Element>(_ a: ContiguousArray<Element>, _ c: (El
   return s
 }
 
+// CHECK-LABEL: sil @$s4test0A4SwapyySaySSGz_S2itF :
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
+// CHECK:       } // end sil function '$s4test0A4SwapyySaySSGz_S2itF'
+public func testSwap(_ a: inout [String], _ i: Int, _ j: Int) {
+  a.swapAt(i, j)
+}
+
+// CHECK-LABEL: sil @$s4test0A14SwapViaWitnessyySaySSGz_S2itF :
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
+// CHECK:       } // end sil function '$s4test0A14SwapViaWitnessyySaySSGz_S2itF'
+func swapit<C: RangeReplaceableCollection & MutableCollection>(_ c: inout C, _ i: C.Index, _ j: C.Index) {
+  c.swapAt(i, j)
+}
+
+public func testSwapViaWitness(_ a: inout [String], _ i: Int, _ j: Int) {
+  swapit(&a, i, j)
+}
+
