@@ -34,7 +34,7 @@ TEST_F(SemaTest, DumpConstraintSystemBasic) {
       TupleType::get({Type(t0), Type(t1)}, Context), emptyLoc));
 
   std::string expectedOutput =
-      R"(Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
+      R"(Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type Variables:
   $T0 [can bind to: lvalue] [supertype delayed by: $T2] [potential bindings: <none>] @ locator@ []
   $T1 [supertype delayed by: $T2] [potential bindings: <none>] @ locator@ []
