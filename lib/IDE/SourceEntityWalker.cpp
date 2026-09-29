@@ -132,12 +132,16 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPre(Decl *D) {
   SEWalker.beginBalancedASTOrderDeclVisit(D);
   auto Result = walkToDeclPreProper(D);
 
-  if (Result.Action != PreWalkAction::Continue) {
-    // To satisfy the contract of balanced calls to
-    // begin/endBalancedASTOrderDeclVisit, we must call
-    // endBalancedASTOrderDeclVisit here if walkToDeclPost isn't going to be
-    // called.
+  switch (Result.Action) {
+  case PreWalkAction::Stop:
+  case PreWalkAction::SkipNode:
+    // walkToDeclPost won't be called, so manually balance the begin call
     SEWalker.endBalancedASTOrderDeclVisit(D);
+    break;
+  case PreWalkAction::SkipChildren:
+  case PreWalkAction::Continue:
+    // walkToDeclPost will be called which will balance the begin call
+    break;
   }
 
   return Result;
@@ -168,8 +172,9 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
         auto Loc = PD->getArgumentNameLoc();
         if (Loc.isInvalid())
           continue;
-        if (!SEWalker.visitDeclarationArgumentName(PD->getArgumentName(), Loc,
-                                                   VD)) {
+        if (SEWalker
+                .visitDeclarationArgumentName(PD->getArgumentName(), Loc, VD)
+                .Action == PostWalkAction::Stop) {
           return false;
         }
       }
@@ -232,13 +237,23 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
 
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();
-  bool ShouldVisitChildren = SEWalker.walkToDeclPre(D, Range);
-  // walkToDeclPost is only called when visiting children, so make sure to only
-  // push the extension decl in that case (otherwise it won't be popped)
-  if (IsExtension && ShouldVisitChildren) {
-    ExtDecls.push_back(static_cast<ExtensionDecl*>(D));
+  auto SubAction = SEWalker.walkToDeclPre(D, Range);
+
+  if (IsExtension) {
+    switch (SubAction.Action) {
+    case PreWalkAction::Stop:
+    case PreWalkAction::SkipNode:
+      // walkToDeclPost won't be called, so no need to record the extension.
+      break;
+    case PreWalkAction::SkipChildren:
+    case PreWalkAction::Continue:
+      // walkToDeclPost will be called, so push the decl so we see it then.
+      ExtDecls.push_back(static_cast<ExtensionDecl *>(D));
+      break;
+    }
   }
-  return Action::VisitNodeIf(ShouldVisitChildren);
+
+  return SubAction;
 }
 
 ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPost(Decl *D) {
@@ -274,14 +289,21 @@ ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPostProper(Decl *D) {
     ExtDecls.pop_back();
   }
 
-  bool Continue = SEWalker.walkToDeclPost(D);
-  return Action::StopIf(!Continue);
+  return SEWalker.walkToDeclPost(D);
 }
 
 ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
-  bool TraverseChildren = SEWalker.walkToStmtPre(S);
-  if (!TraverseChildren)
+  auto SubAction = SEWalker.walkToStmtPre(S);
+  switch (SubAction.Action) {
+  case PreWalkAction::Stop:
+    return Action::Stop();
+  case PreWalkAction::SkipNode:
     return Action::SkipNode(S);
+  case PreWalkAction::SkipChildren:
+    return Action::SkipChildren(S);
+  case PreWalkAction::Continue:
+    break;
+  }
 
   if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
     // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
@@ -296,8 +318,7 @@ ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
         return Action::Stop();
       assert(RetS == Body);
     }
-    bool Continue = SEWalker.walkToStmtPost(DeferS);
-    if (!Continue)
+    if (SEWalker.walkToStmtPost(DeferS).Action == PostWalkAction::Stop)
       return Action::Stop();
 
     // Already walked children.
@@ -308,8 +329,9 @@ ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
 }
 
 ASTWalker::PostWalkResult<Stmt *> SemaAnnotator::walkToStmtPost(Stmt *S) {
-  bool Continue = SEWalker.walkToStmtPost(S);
-  return Action::StopIf(!Continue, S);
+  if (SEWalker.walkToStmtPost(S).Action == PostWalkAction::Stop)
+    return Action::Stop();
+  return Action::Continue(S);
 }
 
 static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
@@ -354,8 +376,18 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
   }
 
-  if (!SEWalker.walkToExprPre(E)) {
-    return Action::SkipNode(E);
+  {
+    auto SubAction = SEWalker.walkToExprPre(E);
+    switch (SubAction.Action) {
+    case PreWalkAction::Stop:
+      return Action::Stop();
+    case PreWalkAction::SkipNode:
+      return Action::SkipNode(E);
+    case PreWalkAction::SkipChildren:
+      return Action::SkipChildren(E);
+    case PreWalkAction::Continue:
+      break;
+    }
   }
 
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
@@ -668,14 +700,23 @@ ASTWalker::PostWalkResult<Expr *> SemaAnnotator::walkToExprPost(Expr *E) {
     CtorRefs.pop_back();
   }
 
-  bool Continue = SEWalker.walkToExprPost(E);
-  return Action::StopIf(!Continue, E);
+  if (SEWalker.walkToExprPost(E).Action == PostWalkAction::Stop)
+    return Action::Stop();
+  return Action::Continue(E);
 }
 
 ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
-  bool Continue = SEWalker.walkToTypeReprPre(T);
-  if (!Continue)
+  auto SubAction = SEWalker.walkToTypeReprPre(T);
+  switch (SubAction.Action) {
+  case PreWalkAction::Stop:
     return Action::Stop();
+  case PreWalkAction::SkipNode:
+    return Action::SkipNode();
+  case PreWalkAction::SkipChildren:
+    return Action::SkipChildren();
+  case PreWalkAction::Continue:
+    break;
+  }
 
   if (auto *DeclRefT = dyn_cast<DeclRefTypeRepr>(T)) {
     if (ValueDecl *VD = DeclRefT->getBoundDecl()) {
@@ -718,14 +759,22 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 }
 
 ASTWalker::PostWalkAction SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
-  bool Continue = SEWalker.walkToTypeReprPost(T);
-  return Action::StopIf(!Continue);
+  return SEWalker.walkToTypeReprPost(T);
 }
 
 ASTWalker::PreWalkResult<Pattern *>
 SemaAnnotator::walkToPatternPre(Pattern *P) {
-  if (!SEWalker.walkToPatternPre(P))
+  auto SubAction = SEWalker.walkToPatternPre(P);
+  switch (SubAction.Action) {
+  case PreWalkAction::Stop:
+    return Action::Stop();
+  case PreWalkAction::SkipNode:
     return Action::SkipNode(P);
+  case PreWalkAction::SkipChildren:
+    return Action::SkipChildren(P);
+  case PreWalkAction::Continue:
+    break;
+  }
 
   if (P->isImplicit())
     return Action::Continue(P);
@@ -753,8 +802,9 @@ SemaAnnotator::walkToPatternPre(Pattern *P) {
 
 ASTWalker::PostWalkResult<Pattern *>
 SemaAnnotator::walkToPatternPost(Pattern *P) {
-  bool Continue = SEWalker.walkToPatternPost(P);
-  return Action::StopIf(!Continue, P);
+  if (SEWalker.walkToPatternPost(P).Action == PostWalkAction::Stop)
+    return Action::Stop();
+  return Action::Continue(P);
 }
 
 bool SemaAnnotator::handleCustomAttributes(Decl *D) {
@@ -895,12 +945,14 @@ bool SemaAnnotator::passModulePathElements(
 bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                                            ReferenceMetaData Data,
                                            bool IsOpenBracket) {
-  return SEWalker.visitSubscriptReference(D, Loc, Data, IsOpenBracket);
+  return SEWalker.visitSubscriptReference(D, Loc, Data, IsOpenBracket).Action !=
+         PostWalkAction::Stop;
 }
 
 bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
                                                 ReferenceMetaData Data) {
-  return SEWalker.visitCallAsFunctionReference(D, Loc, Data);
+  return SEWalker.visitCallAsFunctionReference(D, Loc, Data).Action !=
+         PostWalkAction::Stop;
 }
 
 bool SemaAnnotator::
@@ -950,7 +1002,8 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
   }
 
-  return SEWalker.visitDeclReference(D, Range, CtorTyRef, ExtDecl, Ty, Data);
+  return SEWalker.visitDeclReference(D, Range, CtorTyRef, ExtDecl, Ty, Data)
+             .Action != PostWalkAction::Stop;
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
@@ -959,7 +1012,8 @@ bool SemaAnnotator::passReference(ModuleEntity Mod,
     return true;
   unsigned NameLen = IdLoc.Item.getLength();
   CharSourceRange Range{ IdLoc.Loc, NameLen };
-  return SEWalker.visitModuleReference(Mod, Range);
+  return SEWalker.visitModuleReference(Mod, Range).Action !=
+         PostWalkAction::Stop;
 }
 
 bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
@@ -977,8 +1031,8 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
       continue;
 
     CharSourceRange Range{ Loc, Name.getLength() };
-    bool Continue = SEWalker.visitCallArgName(Name, Range, D);
-    if (!Continue)
+    if (SEWalker.visitCallArgName(Name, Range, D).Action ==
+        PostWalkAction::Stop)
       return false;
   }
 
@@ -1051,45 +1105,44 @@ bool SourceEntityWalker::walk(ASTNode N) {
   llvm_unreachable("unsupported AST node");
 }
 
-bool SourceEntityWalker::visitDeclReference(ValueDecl *D, SourceRange Range,
-                                            TypeDecl *CtorTyRef,
-                                            ExtensionDecl *ExtTyRef, Type T,
-                                            ReferenceMetaData Data) {
-  return true;
+ASTWalker::PostWalkAction SourceEntityWalker::visitDeclReference(
+    ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+    ExtensionDecl *ExtTyRef, Type T, ReferenceMetaData Data) {
+  return ASTWalker::Action::Continue();
 }
 
-bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
-                                                 SourceRange Range,
-                                                 ReferenceMetaData Data,
-                                                 bool IsOpenBracket) {
+ASTWalker::PostWalkAction
+SourceEntityWalker::visitSubscriptReference(ValueDecl *D, SourceRange Range,
+                                            ReferenceMetaData Data,
+                                            bool IsOpenBracket) {
   // Most of the clients treat subscript reference the same way as a
   // regular reference when called on the open bracket and
   // ignore the closing one.
-  return IsOpenBracket
-             ? visitDeclReference(D, Range, nullptr, nullptr, Type(), Data)
-             : true;
+  if (IsOpenBracket)
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
+  return ASTWalker::Action::Continue();
 }
 
-bool SourceEntityWalker::visitCallAsFunctionReference(ValueDecl *D,
-                                                      SourceRange Range,
-                                                      ReferenceMetaData Data) {
-  return true;
+ASTWalker::PostWalkAction SourceEntityWalker::visitCallAsFunctionReference(
+    ValueDecl *D, SourceRange Range, ReferenceMetaData Data) {
+  return ASTWalker::Action::Continue();
 }
 
-bool SourceEntityWalker::visitCallArgName(Identifier Name,
-                                          CharSourceRange Range,
-                                          ValueDecl *D) {
-  return true;
+ASTWalker::PostWalkAction
+SourceEntityWalker::visitCallArgName(Identifier Name, CharSourceRange Range,
+                                     ValueDecl *D) {
+  return ASTWalker::Action::Continue();
 }
 
-bool SourceEntityWalker::
-visitDeclarationArgumentName(Identifier Name, SourceLoc Start, ValueDecl *D) {
-  return true;
+ASTWalker::PostWalkAction SourceEntityWalker::visitDeclarationArgumentName(
+    Identifier Name, SourceLoc Start, ValueDecl *D) {
+  return ASTWalker::Action::Continue();
 }
 
-bool SourceEntityWalker::visitModuleReference(ModuleEntity Mod,
-                                              CharSourceRange Range) {
-  return true;
+ASTWalker::PostWalkAction
+SourceEntityWalker::visitModuleReference(ModuleEntity Mod,
+                                         CharSourceRange Range) {
+  return ASTWalker::Action::Continue();
 }
 
 void SourceEntityWalker::anchor() {}
