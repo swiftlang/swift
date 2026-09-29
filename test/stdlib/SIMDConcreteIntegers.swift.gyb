@@ -83,6 +83,16 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   expectEqual(ge, a .>= b)
 }
 
+%  if n >= 4:
+${Scalar}x${n}_TestSuite.test("low/high/even/odd") {
+  let a = ${Vector}(0 ..< ${n})
+  expectEqual(a.lowHalf, SIMD${n//2}<${Scalar}>(0 ..< ${n//2}))
+  expectEqual(a.highHalf, SIMD${n//2}<${Scalar}>(${n//2} ..< ${n}))
+  expectEqual(a.evenHalf, SIMD${n//2}<${Scalar}>(stride(from:0, to:${n}, by: 2)))
+  expectEqual(a.oddHalf, SIMD${n//2}<${Scalar}>(stride(from:1, to:${n}, by: 2)))
+}
+
+%  end
 ${Scalar}x${n}_TestSuite.test("arithmetic") {
   let a = ${Vector}.random(in: ${Scalar}.min ... .max)
   let b = ${Vector}.random(in: ${Scalar}.min ... .max)
