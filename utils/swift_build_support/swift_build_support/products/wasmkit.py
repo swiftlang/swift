@@ -101,7 +101,7 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
         '--package-path', os.path.join(product.source_dir),
         '--build-path', product.build_dir,
         '--configuration', 'release',
-        '--traits', 'WasmDebuggingSupport',
+        '--traits', 'default,WasmDebuggingSupport',
     ] + platform_args
 
     if product.args.verbose_build:
