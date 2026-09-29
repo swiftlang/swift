@@ -22,10 +22,11 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/UUID.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/Basic/UUID.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -2553,6 +2554,14 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
   if (GenModules.size() == 1 || !ctxt) {
     return getPrimaryIGM();
   }
+
+  // Emit synthesized declarations into their parent source file's IGM so that,
+  // under multi-threaded WMO, their metadata is co-located with the records
+  // that reference it via a direct relative reference.
+  if (auto *synthFU =
+          dyn_cast<SynthesizedFileUnit>(ctxt->getModuleScopeContext()))
+    return getGenModule(&synthFU->getFileUnit());
+
   SourceFile *SF = ctxt->getOutermostParentSourceFile();
   if (!SF) {
     return getPrimaryIGM();
