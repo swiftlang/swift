@@ -401,7 +401,11 @@ extension Task where Success == Never, Failure == Never {
   /// - SeeAlso: `isCancelled()`
   /// - SeeAlso: ``CancellationError/Reason``
   @_unavailableInEmbedded
-  public static func checkCancellation() throws {
+  @_alwaysEmitIntoClient
+  @abi(
+    static func __typed_throws_checkCancellation() throws(_Concurrency.CancellationError)
+  )
+  public static func checkCancellation() throws(_Concurrency.CancellationError) {
     if Task<Never, Never>.isCancelled {
       if #available(StdlibDeploymentTarget 6.5, *) {
         throw _Concurrency.CancellationError(
@@ -411,6 +415,18 @@ extension Task where Success == Never, Failure == Never {
       }
     }
   }
+
+#if !hasFeature(Embedded)
+  @_unavailableInEmbedded
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    static func checkCancellation() throws
+  )
+  @usableFromInline
+  internal static func __untyped_throws_checkCancellation() throws {
+    try Self.checkCancellation()
+  }
+#endif // !hasFeature(Embedded)
 }
 
 /// An error that indicates a task was canceled.
