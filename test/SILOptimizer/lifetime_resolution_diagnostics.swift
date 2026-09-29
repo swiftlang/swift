@@ -299,7 +299,7 @@ func tupleElementUseAfterConsume() {
   use(t.1)          // valid: distinct element
 }
 
-// FIXME: this case is still missing diagnostics!
+// FIXME: this case is still missing diagnostics! (rdar://188752216)
 func consumeCopyableFields() {
   let p = Pair(a: C(), b: C())
   _ = consume p.a
