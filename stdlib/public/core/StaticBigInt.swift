@@ -103,6 +103,7 @@ extension StaticBigInt {
   /// an infinite sign extension. Negative values are in two's complement.
   ///
   ///     let negative: StaticBigInt = -0x0011223344556677_8899AABBCCDDEEFF
+  ///                        //-> 0x...FF_FFEEDDCCBBAA9988_7766554433221101
   ///     negative.signum()  //-> -1
   ///     negative.bitWidth  //-> 118
   ///     negative[0]        //-> 0x7766554433221101
