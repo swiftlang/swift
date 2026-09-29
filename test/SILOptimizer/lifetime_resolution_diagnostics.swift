@@ -133,6 +133,19 @@ func consumeOfCopyableLetIntoBinding() {
   use(q)
 }
 
+func inoutConsume_error(_ s: inout String) {
+  if .random() {
+    _ = consume s  // expected-error {{'' used after consume}}  // expected-note {{consumed here}}
+  }
+}
+func inoutConsume_fixed(_ s: inout String) {
+  if .random() {
+    _ = consume s
+    s = ""
+  }
+  return
+}
+
 // --- simple ~Copyable (loadable), backed by alloc_box ---
 
 func ncUseAfterConsume() {

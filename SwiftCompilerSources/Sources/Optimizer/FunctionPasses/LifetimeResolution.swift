@@ -28,18 +28,16 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   var indexCache = FieldIndexTrieCache(for: function)
 
   // Process results in reverse post-order to ensure dependent uses are already resolved.
-  // TODO: resolve `.guaranteed` values too. It should amount to having all consuming uses
-  //   require a copy, including those on the boundary, and inserting end_access/end_borrow.
   for block in function.blocks.reversed() {
     for inst in block.instructions.reversed() {
       // Ignore `mark_uninitialized` this pass is driven by the storage itself.
       if inst is MarkUninitializedInst { continue }
 
-      for result in inst.results where result.ownership == .owned || inst is AllocStackInst {
+      for result in inst.results {
         resolver.resolve(result, &indexCache)
       }
     }
-    for argument in block.arguments where argument.ownership == .owned {
+    for argument in block.arguments {
       resolver.resolve(argument, &indexCache)
     }
   }
@@ -47,8 +45,7 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
 
 extension Resolver {
   mutating func resolve(_ root: Value, _ indexCache: inout FieldIndexTrieCache) {
-    if root is AllocBoxInst || root is AllocStackInst {
-      _ = run(on: root, &indexCache)
+    if run(on: root, &indexCache) {
       return
     }
 
@@ -58,7 +55,11 @@ extension Resolver {
       return
     }
 
-    resolveSingleDef(root, context)
+    // TODO: resolve `.guaranteed` values too. It should amount to having all consuming uses
+    //   require a copy, including those on the boundary, and inserting end_access/end_borrow.
+    if root.ownership == .owned {
+      resolveSingleDef(root, context)
+    }
   }
 }
 
@@ -79,51 +80,91 @@ struct ResolvableRoot {
 
   let isLexical: Bool
 
+  // Does this address start fully initialized?
+  let startsInitialized: Bool
+
+  // Extra instructions to consider as full liveness uses of this root, that are not captured by walking uses of
+  // the address.
+  let extraLivenessUses: [Instruction]
+
+  // Either the instruction defining this root, or the very first instruction
+  // after which it is defined.
+  var startInstruction: Instruction {
+      if let inst = address.definingInstruction {
+          return inst
+      }
+      return address.nextInstruction
+  }
+
   /// Build from a storage allocation (`alloc_box` / `alloc_stack`). Callers holding only
   /// an address must first walk up to the allocation.
-  init?(_ allocation: Value, _ context: FunctionPassContext) {
-    self.storage = allocation
+  init?(_ val: Value, _ context: FunctionPassContext) {
+    let function = val.parentFunction
+    var extraUses: [Instruction] = []
 
-    let function = allocation.parentFunction
-    var address: Value
-    let varDecl: VarDecl?
-    let isLet: Bool
-    let isLexical: Bool
-
-    switch allocation {
+    switch val {
     case let allocStack as AllocStackInst:
-      address = allocStack
-
-      // A stack-backed local `let` or `var`; its `mark_uninitialized [var]` is the address.
-      if let mu = allocStack.uses.singleUser(ofType: MarkUninitializedInst.self) {
-        address = mu
-      }
+      storage = val
+      startsInitialized = false
+      address = Self.lookThroughMarkUninitialized(storage)
 
       varDecl = allocStack.varDecl
       isLet = allocStack.debugVariable?.isLet() ?? true   // TODO: find a more reliable way to discover this.
       isLexical = allocStack.isLexical
+
     case let allocBox as AllocBoxInst:
-      guard let (projectBox, boxIsLexical) = Self.findProjectBox(of: allocBox) else { return nil }
+      storage = allocBox
+      guard let (projectBox, boxIsLexical) = Self.findProjectBox(of: allocBox) else {
+        return nil
+      }
       address = projectBox
       varDecl = allocBox.varDecl
       isLet = !allocBox.type.getBoxFields(in: function).isMutable(fieldIndex: 0)
       isLexical = boxIsLexical
+      startsInitialized = false
+
+      // Treat any lifetime ends or copies of the box itself as extra uses.
+      let box = Self.lookThroughMarkUninitialized(storage)
+      box.uses.endingLifetime.forEach { extraUses.append($0.instruction) }
+      // TODO: add copies of the box too
+
+
+    case let arg as FunctionArgument where arg.type.isAddress:
+      storage = arg
+      address = arg
+      varDecl = arg.findVarDecl()
+      isLexical = arg.isLexical
+      isLet = false
+
+      switch arg.convention {
+      case .indirectIn:
+        startsInitialized = true
+      case .indirectOut:
+        startsInitialized = false
+      case .indirectInout:
+        startsInitialized = true
+
+        // For an inout parameter, all function exit terminators are considered uses.
+        function.exitingBlocks.forEach { extraUses.append($0.terminator) }
+
+
+      default:
+        return nil   // unimplemented convention
+      }
+
+      break
     default:
       return nil
     }
 
+    extraLivenessUses = extraUses
+
     // Only handle a loadable, nontrivial value (a class, or a noncopyable
     // struct that just wraps one).
     let objectType = address.type.objectType
-    guard objectType.isLoadable(in: function), !objectType.isTrivial(in: function)
-    else {
+    guard objectType.isLoadable(in: function), !objectType.isTrivial(in: function) else {
       return nil
     }
-
-    self.address = address
-    self.varDecl = varDecl
-    self.isLet = isLet
-    self.isLexical = isLexical
   }
 
   /// Find the sole project_box reachable from an alloc_box from SILGen.
@@ -145,6 +186,14 @@ struct ResolvableRoot {
       }
     }
     return nil
+  }
+
+  // A stack-backed local `let` or `var`; its `mark_uninitialized [var]` is the address.
+  private static func lookThroughMarkUninitialized(_ value: Value) -> Value {
+    if let mu = value.uses.singleUser(ofType: MarkUninitializedInst.self) {
+      return mu
+    }
+    return value
   }
 }
 
@@ -170,12 +219,12 @@ private struct Resolver {
   mutating func run(on value: Value, _ indexCache: inout FieldIndexTrieCache) -> Bool {
     log("\nResolver.run(on: \(value))")
 
-    reset()
-
     guard let root = ResolvableRoot(value, context) else {
       log("\n ** skipping due to unrecognized ResolvableRoot \(value)")
       return false
     }
+
+    reset()
 
     ////////////////
     // Step 1: Canonicalize copies/takes.
@@ -345,9 +394,9 @@ private struct Resolver {
       //          emit a load_borrow for a copyable type, given access scopes may end.
       newKind = transform(kind, to: .load(.take), root.isLexical)
 
-    case .root where someDemand:
+    case let .root(r) where someDemand && !r.startsInitialized:
       // Unsatisfied demand reaching the root means there exists a use-before-init.
-      initializeWithUndef(address: root.address, after: root.address.definingInstruction!)
+      initializeWithUndef(address: root.address, after: root.startInstruction)
 
     case .def where noDemand:
       // Arrived at a def with no demand below it: a dead assignment.
@@ -632,19 +681,8 @@ private struct Resolver {
         return false
       }
 
-      // Until we have a better handle on escaping uses, rely on AllocBoxToStack to leave behind only
-      // alloc_box's that are escaping. To catch illegal consumes of the box, add its lifetime ends as
-      // some unknown use of the whole box.
-      if root.storage is AllocBoxInst {
-        var storage = root.storage
-        if let mu = storage.uses.singleUser(ofType: MarkUninitializedInst.self) {
-          storage = mu
-        }
-        for end in storage.uses.endingLifetime {
-          addUse(.unknown(end), indices.wholeRange)
-        }
-      }
-
+      // Add any extra uses specific to this root.
+      root.extraLivenessUses.forEach { addUse(.unknown($0), indices.wholeRange) }
 
       // Ensure correct order within each block
       for blk in uses.keys {
@@ -686,7 +724,7 @@ private struct Resolver {
         case .indirectIn:
           addUse(.take(address, .own), range)
         default:
-          addUse(.unknown(address), range)
+          addUse(.unknown(address.instruction), range)
         }
 
       case let tac as TupleAddrConstructorInst where tac.destinationOperand == address:
@@ -706,7 +744,7 @@ private struct Resolver {
         // skip
         break
       default:
-        addUse(.unknown(address), range)
+        addUse(.unknown(address.instruction), range)
       }
       return .continueWalk
     }
@@ -837,16 +875,16 @@ private struct Resolver {
       case take(Operand, Demand)        // The demand summarizes the kinds of users of this operand's instruction.
       case def(Operand)
       case end(Operand)       // An instruction representing the point at which the operand's lifetime has ended.
-      case unknown(Operand)
+      case unknown(Instruction)
 
       var inst: Instruction {
         switch self {
-        case let .root(r): r.address.definingInstruction!
+        case let .root(r): r.startInstruction
         case let .use(op, _): op.instruction
         case let .take(op, _): op.instruction
         case let .def(op): op.instruction
         case let .end(op): op.instruction
-        case let .unknown(op): op.instruction
+        case let .unknown(inst): inst
         }
       }
 
@@ -865,6 +903,7 @@ private struct Resolver {
       var kills: Demand {
         switch self {
         case .def: .all
+        case let .root(r) where r.startsInitialized: .all // A root that starts initialized is a def.
         default: .nothing
         }
       }
@@ -873,6 +912,7 @@ private struct Resolver {
       var availGen: Availability {
         switch self {
         case .def: .yes
+        case let .root(r) where r.startsInitialized: .yes  // A root that starts initialized is a def.
         case .root, .take, .end: .no    // these leave the operand uninitialized.
         case .use: .unknown       // doesn't change the state
         case .unknown: .unknown   // TODO: conservatively handle once .unknown is removed
@@ -1418,6 +1458,13 @@ private extension MutableCollection {
       body(&self[i])
       i = index(after: i)
     }
+  }
+}
+
+private extension Function {
+  // NOTE: This scans the entire function!
+  var exitingBlocks: LazyFilterSequence<BasicBlockList> {
+    return blocks.lazy.filter { $0.terminator.isFunctionExiting }
   }
 }
 
