@@ -693,6 +693,7 @@ module sys_ioctl [system] {
   export *
 }
 module sys_io [system] {
+  requires x86
   header "sys/io.h"
   export *
 }
