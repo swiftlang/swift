@@ -1151,6 +1151,19 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
         }
         if (isParentDoCatch || isDefault || caseHasExprPattern) {
           SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+
+          // When a default is unreachable because a catch-all case already
+          // covers the space, also diagnose the catch-all case.
+          if (isDefault) {
+            if (auto *switchStmt = dyn_cast<SwitchStmt>(PatternMatchStmt)) {
+              for (auto *caseBlock : switchStmt->getCases()) {
+                if (caseBlock->isCatchAll()) {
+                  SGF.SGM.diagnose(caseBlock->getLoc(),
+                                   diag::default_after_catchall);
+                }
+              }
+            }
+          }
         }
       }
     }
