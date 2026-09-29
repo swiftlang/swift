@@ -1213,6 +1213,21 @@ void IRGenerator::emitGlobalTopLevel(
   for (auto &ot : PrimaryIGM->getSILModule().getDefaultOverrideTableList()) {
     ensureRelativeSymbolCollocation(ot);
   }
+
+  // Under multi-threaded WMO the dynamic-replacements table is emitted into the
+  // primary IGM and references each replacement function with a *direct*
+  // relative reference (newFunction = replacement - tableAnchor). Force those
+  // replacement functions to be emitted into the primary IGM as well, so the
+  // reference does not cross an object-file boundary. A cross-object direct
+  // relative reference is unrepresentable on x86_64 Mach-O (an undefined
+  // minuend in an X86_64_RELOC_SUBTRACTOR). See rdar://187511655.
+  if (GenModules.size() > 1) {
+    for (SILFunction &f : PrimaryIGM->getSILModule()) {
+      if (f.isDefinition() && f.getDynamicallyReplacedFunction())
+        DefaultIGMForFunction[&f] = getPrimaryIGM();
+    }
+  }
+
   for (auto &directive: linkerDirectives) {
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
@@ -2945,7 +2960,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (castStorageToType)
     storageType = cast<ClassTypeInfo>(ti).getClassLayoutType();
 
-  return Address(addr, storageType, Alignment(gvar->getAlignment()));
+  return Address(addr, storageType, Alignment(gvar->getAlign().valueOrOne().value()));
 }
 
 llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
@@ -3599,7 +3614,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     // for the C++ struct that does not zero out trivial fields of a struct.
     auto cxxRecord = ctor->getParent();
     clang::ASTContext &ctx = cxxRecord->getASTContext();
-    auto typeSize = ctx.getTypeSizeInChars(ctx.getRecordType(cxxRecord));
+    auto typeSize = ctx.getTypeSizeInChars(ctx.getCanonicalTagType(cxxRecord));
     subIGF.Builder.CreateMemSet(Args[0],
                                 llvm::ConstantInt::get(subIGF.IGM.Int8Ty, 0),
                                 typeSize.getQuantity(), llvm::MaybeAlign());
@@ -5958,7 +5973,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   llvm::Constant *&entry = cache[entity];
   if (entry) {
     auto existing = cast<llvm::GlobalVariable>(entry);
-    assert(alignment == Alignment(existing->getAlignment()));
+    assert(alignment == Alignment(existing->getAlign().valueOrOne().value()));
     if (forDefinition) updateLinkageForDefinition(IGM, existing, entity);
     return Address(entry, type, alignment);
   }

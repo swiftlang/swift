@@ -122,12 +122,12 @@ bb6:
 // CHECK-NEXT:  Loop bb2:
 // CHECK-NEXT:    bb2: length=1+0, d-entry=0, d-exit=4
 // CHECK-NEXT:    bb7: length=2+0, d-entry=1, d-exit=3
-// CHECK-NEXT:    bb3: length=0+0, d-entry=1, d-exit=3
+// CHECK-NEXT:    bb3: length=0+0, d-entry=1, d-exit=34
 // CHECK-NEXT:    bb4: length=3+30, d-entry=1, d-exit=34
+// CHECK-NEXT:    bb5: length=0+0, d-entry=34, d-exit=34
 // CHECK-NEXT:    bb6: length=0+0, d-entry=34, d-exit=1
 // CHECK-NEXT:    bb8: length=1+0, d-entry=3, d-exit=1
 // CHECK-NEXT:    bb9: length=0+0, d-entry=4, d-exit=0
-// CHECK-NEXT:    bb5: length=0+0, d-entry=34, d-exit=34
 // CHECK-NEXT:  Loop bb4:
 // CHECK-NEXT:    bb4: length=3+0, d-entry=0, d-exit=3
 // CHECK-NEXT:    bb5: length=0+0, d-entry=3, d-exit=0

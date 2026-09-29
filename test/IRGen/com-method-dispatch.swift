@@ -38,7 +38,7 @@ public protocol IProperties: AnyObject {
 
 // CHECK-LABEL: define{{.*}} swiftcc i32 @"$s1M4base
 // CHECK-SAME: (ptr [[ARG:%.*]], i32 [[VALUE:%.*]])
-// CHECK: call void @llvm.lifetime.start{{.*}}(i64 {{4|8}}, ptr [[STORAGE:%.*]])
+// CHECK: call void @llvm.lifetime.start{{.*}}(ptr [[STORAGE:%.*]])
 // CHECK-NEXT: store ptr [[ARG]], ptr [[STORAGE]]
 // CHECK: [[INTERFACE:%.*]] = load ptr, ptr [[STORAGE]]
 // CHECK: [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]
@@ -61,7 +61,7 @@ public func base(_ interface: borrowing any IBase, _ value: CInt) -> CInt {
 
 // CHECK-LABEL: define{{.*}} swiftcc i32 @"$s1M7refined
 // CHECK-SAME: (ptr [[ARG:%.*]], i32 [[VALUE:%.*]])
-// CHECK: call void @llvm.lifetime.start{{.*}}(i64 {{4|8}}, ptr [[STORAGE:%.*]])
+// CHECK: call void @llvm.lifetime.start{{.*}}(ptr [[STORAGE:%.*]])
 // CHECK-NEXT: store ptr [[ARG]], ptr [[STORAGE]]
 // CHECK: [[INTERFACE:%.*]] = load ptr, ptr [[STORAGE]]
 // CHECK: [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]
@@ -76,7 +76,7 @@ public func refined(_ interface: borrowing any IDerived, _ value: CInt) -> CInt 
 
 // CHECK-LABEL: define{{.*}} swiftcc i32 @"$s1M7derived
 // CHECK-SAME: (ptr [[ARG:%.*]], i32 [[VALUE:%.*]])
-// CHECK: call void @llvm.lifetime.start{{.*}}(i64 {{4|8}}, ptr [[STORAGE:%.*]])
+// CHECK: call void @llvm.lifetime.start{{.*}}(ptr [[STORAGE:%.*]])
 // CHECK-NEXT: store ptr [[ARG]], ptr [[STORAGE]]
 // CHECK: [[INTERFACE:%.*]] = load ptr, ptr [[STORAGE]]
 // CHECK: [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]

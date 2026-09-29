@@ -774,12 +774,14 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
 SILBasicBlock *SILFunction::createBasicBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.push_back(newBlock);
   return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   newBlock->setDebugName(debugName);
   BlockList.push_back(newBlock);
   return newBlock;
@@ -787,12 +789,14 @@ SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
 
 SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.insertAfter(afterBB->getIterator(), newBlock);
   return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.insert(beforeBB->getIterator(), newBlock);
   return newBlock;
 }
@@ -800,6 +804,11 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
 SILBasicBlock *SILFunction::createEmptyDebugReconstructionBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
   newBlock->index = -2;
+  // Even though this block is not part of the block list, generic graph
+  // algorithms (e.g. a dominator tree during SIL verification) may still be
+  // queried with it, so give it a valid, unique block number. The block will
+  // simply not be present in those structures.
+  assignFreshBlockNumber(*newBlock);
   // Do NOT insert into BlockList - this is a standalone debug block.
   return newBlock;
 }

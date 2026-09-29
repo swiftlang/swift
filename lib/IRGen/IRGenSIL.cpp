@@ -835,7 +835,7 @@ public:
         llvm::findDbgValues(Var, DbgValues);
         for (auto *DVR : DbgValues)
           if (DVR->getParent() == BB)
-            IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
+            IGM.DebugInfo->getBuilder().insertDbgValue(
                 DVR->getValue(), DVR->getVariable(), DVR->getExpression(),
                 DVR->getDebugLoc(), CurBB->getFirstInsertionPt());
       }
@@ -7394,9 +7394,12 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
     if (IGM.Triple.isWasm() || hasBeenInlined(access)) {
       pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     } else {
-      pc =
-          Builder.CreateIntrinsicCall(llvm::Intrinsic::returnaddress,
-                                      {llvm::ConstantInt::get(IGM.Int32Ty, 0)});
+      pc = Builder.CreateIntrinsicCall(
+          llvm::Intrinsic::returnaddress,
+          // returnaddress is overloaded on the returned pointer type;
+          // `swift_beginAccess` parameter `pc` is a `ptr` in the default
+          // address space.
+          /*typeArgs=*/{IGM.PtrTy}, {llvm::ConstantInt::get(IGM.Int32Ty, 0)});
     }
 
     auto call = Builder.CreateCall(IGM.getBeginAccessFunctionPointer(),
