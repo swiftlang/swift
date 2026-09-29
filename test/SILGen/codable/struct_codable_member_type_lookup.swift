@@ -1,4 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) | %FileCheck %s
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Make sure we have an int, not a float.
 //
