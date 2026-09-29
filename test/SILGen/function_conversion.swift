@@ -1,7 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name function_conversion -primary-file %s
-
-
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name function_conversion -primary-file %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name function_conversion -primary-file %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name function_conversion -primary-file %s
 
@@ -480,6 +477,10 @@ func convTupleToOptionalIndirect<T>(_ f: @escaping (T) -> (T, T)) -> (T) -> (T, 
 // CHECK:         return
 
 func convAnyHashable<T : Hashable>(fn: @escaping () -> T) {
+  let fn: () -> AnyHashable = fn
+}
+
+func convAnyHashableLoadable(fn: @escaping () -> Int) {
   let fn: () -> AnyHashable = fn
 }
 

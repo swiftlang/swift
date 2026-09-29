@@ -718,7 +718,9 @@ ManagedValue Transform::transform(ManagedValue v,
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
     auto conformance = lookupConformance(inputSubstType, protocol);
-    auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
+    auto addr = v;
+    if (SGF.silConv.useLoweredAddresses() && !v.getType().isAddress())
+      addr = v.materialize(SGF, Loc);
     auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,
                                              conformance, ctxt);
     if (result.isInContext())
