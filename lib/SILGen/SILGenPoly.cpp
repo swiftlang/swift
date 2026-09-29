@@ -543,11 +543,9 @@ ManagedValue Transform::transform(ManagedValue v,
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
 
-    // Check if we have any more conversions remaining.
-    if (v.getType() == loweredResultTy)
-      return v;
-
-    inputIsOptional = false;
+    return transform(v, inputOrigType.getOptionalObjectType(), inputObjectType,
+                     outputOrigType, outputObjectType, loweredResultTy,
+                     SGFContext());
   }
 
   // Optional-to-optional conversion.
