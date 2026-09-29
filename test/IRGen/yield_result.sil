@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-irgen -disable-emit-type-malloc-for-coro-frame %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// UNSUPPORTED: CPU=wasm32
 
 import Builtin
 

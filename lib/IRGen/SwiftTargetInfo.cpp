@@ -17,12 +17,13 @@
 
 #include "SwiftTargetInfo.h"
 #include "IRGenModule.h"
-#include "llvm/TargetParser/Triple.h"
-#include "llvm/IR/DataLayout.h"
 #include "swift/ABI/System.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Platform.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace irgen;
@@ -197,6 +198,13 @@ static void configureWasm32(IRGenModule &IGM, const llvm::Triple &triple,
                             SwiftTargetInfo &target) {
   target.LeastValidPointerValue =
     SWIFT_ABI_WASM32_LEAST_VALID_POINTER;
+
+  // Determine whether the target ABI supports returning two pointers directly.
+  llvm::Type *ptrTy = llvm::PointerType::getUnqual(IGM.getLLVMContext());
+  target.SupportsDirectReturningAtLeastTwoPointers =
+      !clang::CodeGen::swiftcall::shouldPassIndirectly(IGM.getClangCGM(),
+                                                       {ptrTy, ptrTy},
+                                                       /*asReturnValue*/ true);
 }
 
 /// Configure a default target.
