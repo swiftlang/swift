@@ -97,6 +97,16 @@ int main() {
     valueError.getMessage();
   }
 
+  auto accessors = Functions::ThrowingAccessors::init(false);
+  assert(accessors.getValue().value() == 42);
+  assert(accessors.isReady().value());
+  assert(accessors[4].value() == 8);
+  auto failingAccessors = Functions::ThrowingAccessors::init(true);
+  assert(!failingAccessors.getValue().has_value());
+  assert(!failingAccessors.isReady().has_value());
+  assert(!failingAccessors[4].has_value());
+  assert(!Functions::ThrowingAccessors::getStaticValue().has_value());
+
   // Test get T's Value (const)
   const auto valueExp = testIntValue;
   if (valueExp.value() == 42)
