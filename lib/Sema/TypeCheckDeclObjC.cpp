@@ -4129,6 +4129,34 @@ private:
     return MatchOutcome::WrongType;
   }
 
+  /// The result of an '@c @implementation' function can be written as
+  /// 'Unmanaged<T>' (or 'Unmanaged<T>?') when the header's result type imports
+  /// as 'T' (or 'T?'). This lets the implementer take over the ownership
+  /// transfer for the result, and is the only way to implement an unretained
+  /// return for CF types.
+  static bool matchesUnmanagedCResult(Type reqTy, Type implTy,
+                                      ValueDecl *implDecl) {
+    if (!implDecl || !implDecl->getAttrs().hasAttribute<CDeclAttr>())
+      return false;
+
+    if (auto reqObjectTy = reqTy->getOptionalObjectType()) {
+      auto implObjectTy = implTy->getOptionalObjectType();
+      if (!implObjectTy)
+        return false;
+      reqTy = reqObjectTy;
+      implTy = implObjectTy;
+    }
+
+    if (!implTy->isUnmanaged() || !reqTy->isAnyClassReferenceType())
+      return false;
+
+    auto boundGenericType = implTy->getAs<BoundGenericType>();
+    if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
+      return false;
+
+    return reqTy->matches(boundGenericType->getGenericArgs()[0], {});
+  }
+
   static MatchOutcome matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
     TypeMatchOptions matchOpts = {};
 
@@ -4173,6 +4201,10 @@ private:
                 if (outcome < MatchOutcome::WrongSendability)
                   return false;
               }
+
+              if (matchesUnmanagedCResult(funcReqTy->getResult(),
+                                          funcImplTy->getResult(), implDecl))
+                return true;
 
               return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
                                 implDecl) == MatchOutcome::Match;

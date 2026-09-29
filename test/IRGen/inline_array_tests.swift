@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -O -emit-ir %s | %FileCheck %s
-// UNSUPPORTED: CPU=wasm32 
+// rdar://188412343 - test is failing on 32bit target
+// REQUIRES: PTRSIZE=64 
 // predictIntra continues to have a memcopy for wasm32 target
 
 // CHECK-LABEL: define {{.*}}swiftcc {{i64|i32}} @"$s{{.*}}13subscriptReadyS{{.*}}InlineArray{{.*}}"(ptr noalias {{(nofree )?}}readonly align {{8|4}} captures(none) dereferenceable({{[0-9]+}}) %0, {{i64|i32}} %1)
