@@ -293,7 +293,7 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
 }
 
 bool TypeInfo::withWitnessableMetadataCollector(
-    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t mayNeedLayout,
+    IRGenFunction &IGF, SILType T,
     DeinitIsNeeded_t needsDeinit,
     llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
   bool needsCollector = false;
@@ -328,7 +328,7 @@ void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
   if (withWitnessableMetadataCollector(
-          IGF, T, LayoutIsNeeded, DeinitIsNotNeeded, [&](auto collector) {
+          IGF, T, DeinitIsNotNeeded, [&](auto collector) {
             collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit,
                                              isTake);
           })) {
@@ -551,7 +551,7 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
     return;
 
   if (withWitnessableMetadataCollector(
-          IGF, T, LayoutIsNeeded, DeinitIsNeeded, [&](auto collector) {
+          IGF, T, DeinitIsNeeded, [&](auto collector) {
             collector.emitCallToOutlinedDestroy(addr, T, *this);
           })) {
     return;
