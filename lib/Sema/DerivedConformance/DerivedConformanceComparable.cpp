@@ -27,6 +27,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/QuotedString.h"
 
 using namespace swift;
 
@@ -276,6 +277,22 @@ DerivedConformance::canDeriveComparable(DeclContext *context, EnumDecl *enumerat
   return allAssociatedValuesConformToProtocol(context, enumeration, comparable) && !enumeration->hasRawType();
 }
 
+static ValueDecl *deriveComparableViaMacros(DerivedConformance &derived,
+                                            ValueDecl *requirement) {
+  // Build the necessary decl.
+  auto enumeration = cast<EnumDecl>(derived.Nominal);
+  auto *parentDC = derived.getConformanceContext();
+
+  std::string macro;
+  auto out = llvm::raw_string_ostream(macro);
+  out << "#_deriveComparable("
+      << QuotedString(getEnumTypeInfoString(enumeration)) << ", isResilient: "
+      << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveComparable);
+}
+
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement)) {
     return nullptr;
@@ -284,11 +301,13 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
     requirement->diagnose(diag::broken_comparable_requirement);
     return nullptr;
   }
-  
+
+  if (Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros))
+    return deriveComparableViaMacros(*this, requirement);
+
   // Build the necessary decl.
-  auto enumeration = dyn_cast<EnumDecl>(this->Nominal);
-  assert(enumeration);
-  
+  auto enumeration = cast<EnumDecl>(this->Nominal);
+
   std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void *);
   if (enumeration->hasCases()) {
     if (enumeration->hasOnlyCasesWithoutAssociatedValues()) {
