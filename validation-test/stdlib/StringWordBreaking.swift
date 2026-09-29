@@ -231,7 +231,7 @@ func testCases() -> [(String, [String])] {
   }
   if #available(SwiftStdlib 6.3, *) {
     tests += [
-      // https://github.com/swiftlang/swift-experimental-string-processing/issues/818
+      // https://github.com/swiftlang/swift-string-processing/issues/818
       // rdar://154902007
       ("\u{2060}\u{2018}\u{2060}\u{2060}example.com\u{2060}\u{2060}\u{2019}",
        ["\u{2060}", "\u{2018}\u{2060}\u{2060}", "example.com\u{2060}\u{2060}", "\u{2019}"]),
