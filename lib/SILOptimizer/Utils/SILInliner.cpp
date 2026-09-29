@@ -1276,8 +1276,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     return InlineCost::Free;
 
   // Unconditional branch is free in empty blocks.
+  // `end_borrow`s don't generate any code. Therefore a block which only
+  // contains `end_borrow`s is considered as empty.
   case SILInstructionKind::BranchInst:
-    return (I.getIterator() == I.getParent()->begin())
+    return std::all_of(I.getParent()->begin(), I.getIterator(),
+                       [](SILInstruction &inst) {
+                         return isa<EndBorrowInst>(&inst);
+                       })
       ? InlineCost::Free : InlineCost::Expensive;
 
   case SILInstructionKind::AbortApplyInst:
