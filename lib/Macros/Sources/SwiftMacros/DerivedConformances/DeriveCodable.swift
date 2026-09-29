@@ -411,7 +411,7 @@ public struct DeriveEncodableMacro: DeclarationMacro {
 
     return """
       case \(codedCase.encodePattern):
-        \(items.joined(separator: "\n"))
+        \(items.joined(separator: "\n  "))
       """
   }
 }
@@ -433,12 +433,12 @@ public struct DeriveDecodableMacro: DeclarationMacro {
   var initDecl: DeclSyntax {
     """
     init(from decoder: any Swift::Decoder) throws {
-      \(body)
+      \(raw: body)
     }
     """
   }
 
-  var body: CodeBlockItemListSyntax {
+  var body: String {
     guard info.hasCodingKeys else {
       return ""
     }
@@ -451,16 +451,16 @@ public struct DeriveDecodableMacro: DeclarationMacro {
     }
   }
 
-  func structBody(_ properties: [CodedProperty]) -> CodeBlockItemListSyntax {
+  func structBody(_ properties: [CodedProperty]) -> String {
     if properties.isEmpty {
       return """
-        _ = try decoder.container(keyedBy: \(raw: codingKeysRef).self)
+        _ = try decoder.container(keyedBy: \(codingKeysRef).self)
         """
     }
 
-    var items: [CodeBlockItemSyntax] = [
+    var items: [String] = [
       """
-      let container = try decoder.container(keyedBy: \(raw: codingKeysRef).self)
+      let container = try decoder.container(keyedBy: \(codingKeysRef).self)
       """
     ]
 
@@ -468,53 +468,35 @@ public struct DeriveDecodableMacro: DeclarationMacro {
       let method = property.useIfPresent ? "decodeIfPresent" : "decode"
       items.append(
         """
-        \(raw: info.unsafeMark)self.\(raw: property.memberName) = try container.\(raw: method)(\(raw: property.typeName).self, forKey: .\(raw: property.keyName))
+        \(info.unsafeMark)self.\(property.memberName) = try container.\(method)(\(property.typeName).self, forKey: .\(property.keyName))
         """
       )
     }
 
-    return .init(items)
+    return items.joined(separator: "\n")
   }
 
-  func enumBody(_ cases: [CodedCase]) -> CodeBlockItemListSyntax {
-    var items: [CodeBlockItemSyntax] = []
+  func enumBody(_ cases: [CodedCase]) -> String {
+    let caseSyntax = cases.compactMap(decodeCase)
 
-    items.append(
-      """
-      let container = try decoder.container(keyedBy: \(raw: codingKeysRef).self)
-      """
-    )
-    items.append(
-      """
+    return """
+      let container = try decoder.container(keyedBy: \(codingKeysRef).self)
       var allKeys = Swift::ArraySlice(container.allKeys)
-      """
-    )
-    items.append(
-      """
       guard let onlyKey = allKeys.popFirst(), allKeys.isEmpty else {
         throw Swift::DecodingError.typeMismatch(Self.self, Swift::DecodingError.Context(codingPath: container.codingPath, debugDescription: "Invalid number of keys found, expected one.", underlyingError: nil))
       }
-      """
-    )
-
-    let caseSyntax = cases.compactMap(decodeCase)
-    items.append(
-      """
       switch onlyKey {
-      \(raw: caseSyntax.map { $0.trimmedDescription }.joined(separator: "\n"))
+      \(caseSyntax.joined(separator: "\n"))
       }
       """
-    )
-
-    return .init(items)
   }
 
-  func decodeCase(_ codedCase: CodedCase) -> SwitchCaseSyntax? {
+  func decodeCase(_ codedCase: CodedCase) -> String? {
     guard let (keyName, decoding) = codedCase.decoding else {
       return nil
     }
 
-    var items: [CodeBlockItemSyntax] = []
+    var items: [String] = []
 
     switch decoding {
     case .unavailable:
@@ -529,13 +511,13 @@ public struct DeriveDecodableMacro: DeclarationMacro {
       if decoded.isEmpty {
         items.append(
           """
-          _ = try container.nestedContainer(keyedBy: \(raw: keysRef).self, forKey: .\(raw: keyName))
+          _ = try container.nestedContainer(keyedBy: \(keysRef).self, forKey: .\(keyName))
           """
         )
       } else {
         items.append(
           """
-          let nestedContainer = try container.nestedContainer(keyedBy: \(raw: keysRef).self, forKey: .\(raw: keyName))
+          let nestedContainer = try container.nestedContainer(keyedBy: \(keysRef).self, forKey: .\(keyName))
           """
         )
       }
@@ -552,21 +534,21 @@ public struct DeriveDecodableMacro: DeclarationMacro {
         let parens = codedCase.payload.isEmpty ? "" : "()"
         items.append(
           """
-          \(raw: info.unsafeMark)self = .\(raw: codedCase.name)\(raw: parens)
+          \(info.unsafeMark)self = .\(codedCase.name)\(parens)
           """
         )
       } else {
         items.append(
           """
-          \(raw: info.unsafeMark)self = .\(raw: codedCase.name)(\(raw: args.joined(separator: ", ")))
+          \(info.unsafeMark)self = .\(codedCase.name)(\(args.joined(separator: ", ")))
           """
         )
       }
     }
 
     return """
-      case .\(raw: keyName):
-        \(CodeBlockItemListSyntax(items))
+      case .\(keyName):
+        \(items.joined(separator: "\n  "))
       """
   }
 }
