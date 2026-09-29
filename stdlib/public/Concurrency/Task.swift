@@ -865,8 +865,9 @@ public struct UnsafeCurrentTask {
   /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
-  /// This property also doesn't reflect a cancellation that only applies to a part of the
-  /// task, such as an expired deadline of ``withDeadline(in:tolerance:clock:operation:)``.
+  /// Unlike the static ``Task/isCancelled-type.property`` property, this property doesn't reflect
+  /// a cancellation that only applies to a part of the task, such as an expired deadline of
+  /// ``withDeadline(in:tolerance:clock:operation:)``.
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
@@ -974,9 +975,9 @@ public struct UnsafeCurrentTask {
   /// will consistently return the same value for the remaining life of the
   /// task. Not affected by cancellation shields.
   ///
-  /// This property also doesn't reflect a cancellation that only applies to a part of the
-  /// task, such as an expired deadline of ``withDeadline(in:tolerance:clock:operation:)``.
-  /// Use ``Task/cancellationReason`` (the static property) for that.
+  /// Unlike the static ``Task/cancellationReason`` property, this property doesn't reflect a
+  /// cancellation that only applies to a part of the task, such as an expired deadline of
+  /// ``withDeadline(in:tolerance:clock:operation:)``.
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public var cancellationReason: CancellationError.Reason? {

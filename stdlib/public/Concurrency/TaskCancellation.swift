@@ -308,8 +308,8 @@ extension Task {
   /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
-  /// This property also doesn't reflect a cancellation that only applies to a part of the
-  /// task, such as an expired deadline of ``withDeadline(in:tolerance:clock:operation:)``.
+  /// This property doesn't reflect a cancellation that only applies to a part of the task,
+  /// such as an expired deadline of ``withDeadline(in:tolerance:clock:operation:)``.
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///

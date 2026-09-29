@@ -808,8 +808,10 @@ static bool isRecordOfChildTask(TaskStatusRecord *record, AsyncTask *child) {
 /// record's instant (which itself points into the async frame of whichever
 /// ancestor task installed the deadline), or nullptr if none.
 ///
-/// A deadline is a cancellation scope, so a cancellation shield prevents the
-/// code inside of it from finding the deadlines outside of it. For a parent
+/// `withDeadline` runs its operation inside a cancellation scope. A
+/// cancellation shield prevents the scopes outside of it from cancelling the
+/// code inside of it, so that code doesn't find the deadlines outside of the
+/// shield either. For a parent
 /// task, only the records outside of the record that the child task belongs to
 /// apply to the child.
 ///
@@ -971,9 +973,9 @@ swift_task_pushCancellationScopeImpl() {
       [&](std::optional<size_t> reason, ActiveTaskStatus &newStatus) {
         if (reason)
           record->cancel(*reason);
-        // Set the "has cancellation scope" flag so `getObservedCancellation`
-        // can bail out without walking the record chain when there are no
-        // scopes installed.
+        // Set the "has cancellation scope" flag so
+        // `getObservedCancellationReason` can bail out without walking the
+        // record chain when there are no scopes installed.
         // Remember if this is the outermost scope, so that the matching pop can
         // clear the flag again without walking the chain.
         record->setIsOutermostScope(!newStatus.hasTaskCancellationScope());
@@ -1107,7 +1109,8 @@ swift_task_cancellationScopeIsCancelledImpl(TaskCancellationScopeRecord *record)
   return record->isCancelled();
 }
 
-std::optional<size_t> swift::getObservedCancellation(ActiveTaskStatus status) {
+std::optional<size_t>
+swift::getObservedCancellationReason(ActiveTaskStatus status) {
   if (status.hasTaskCancellationScope()) {
     assert(status.isStatusRecordLocked());
     for (auto record : status.records()) {
@@ -1119,9 +1122,9 @@ std::optional<size_t> swift::getObservedCancellation(ActiveTaskStatus status) {
         // cancellation of the task reaches the code inside the scope only once
         // it reached the scope.
         auto scope = cast<TaskCancellationScopeRecord>(record);
-        if (!scope->isCancelled())
-          return std::nullopt;
-        return scope->getReason();
+        if (scope->isCancelled())
+          return scope->getReason();
+        return std::nullopt;
       }
       default:
         break;
@@ -1133,15 +1136,15 @@ std::optional<size_t> swift::getObservedCancellation(ActiveTaskStatus status) {
   return std::nullopt;
 }
 
-std::optional<size_t> swift::getObservedCancellation(AsyncTask *task) {
+std::optional<size_t> swift::getObservedCancellationReason(AsyncTask *task) {
   assert(task == swift_task_getCurrent());
   auto status = task->_private()._status().load(std::memory_order_relaxed);
   if (!status.hasTaskCancellationScope())
-    return getObservedCancellation(status);
+    return getObservedCancellationReason(status);
 
   std::optional<size_t> reason;
   ::withStatusRecordLock(task, [&](ActiveTaskStatus lockedStatus) {
-    reason = getObservedCancellation(lockedStatus);
+    reason = getObservedCancellationReason(lockedStatus);
   });
   return reason;
 }
@@ -1152,7 +1155,7 @@ bool swift::addStatusRecordObservingCancellation(
         testAddRecord) {
   auto shouldAddRecord = [&](ActiveTaskStatus oldStatus,
                              ActiveTaskStatus &newStatus) {
-    return testAddRecord(getObservedCancellation(oldStatus), newStatus);
+    return testAddRecord(getObservedCancellationReason(oldStatus), newStatus);
   };
 
   // The cancellation of a scope doesn't change the status of the task. So if
@@ -1516,7 +1519,7 @@ static size_t getReasonOfNearestScope(TaskStatusRecord *record,
 
 /// Cancels everything in `status` that comes before `end`, except for the
 /// records inside a cancellation shield. Pass `nullptr` for `end` to cancel
-/// everything of the task. The caller must hold the status record lock.
+/// all records. The caller must hold the status record lock.
 ///
 /// This is the same for cancelling a task and cancelling a scope, since a
 /// scope behaves like an inline child task.
