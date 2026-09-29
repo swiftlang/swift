@@ -1087,7 +1087,18 @@ struct AsyncTask::PrivateStorage {
 
   /// Storage for the ActiveTaskStatus. See doc for ActiveTaskStatus for size
   /// and alignment requirements.
-  alignas(ActiveTaskStatus) char StatusStorage[sizeof(ActiveTaskStatus)];
+  ///
+  /// Sized and aligned by the *atomic wrapper*, not the payload: `_status()`
+  /// reinterprets this buffer as `swift::atomic<ActiveTaskStatus>`, and on
+  /// targets where that atomic is not lock-free the wrapper can be bigger
+  /// than the value it holds (e.g. a libc++ whose non-lock-free atomics
+  /// carry an embedded spinlock byte). Sizing by the payload let that lock
+  /// byte alias the first byte of `Allocator` -- the task allocator's
+  /// `lastAllocation` -- and every enqueued task died in
+  /// `_swift_task_dealloc_specific` with "freed pointer was not the last
+  /// allocation" on 32-bit embedded targets.
+  using AtomicActiveTaskStatus = swift::atomic<ActiveTaskStatus>;
+  alignas(AtomicActiveTaskStatus) char StatusStorage[sizeof(AtomicActiveTaskStatus)];
 
   /// The allocator for the task stack.
   /// Currently 2 words + 4 bytes.
