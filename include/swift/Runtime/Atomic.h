@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <atomic>
 #include <cstdlib>
+#include <type_traits>
 #if defined(_WIN64)
 #include <intrin.h>
 #endif
@@ -51,7 +52,8 @@ namespace impl {
 ///
 /// TODO: should we make this use non-atomic operations when the runtime
 /// is single-threaded?
-template <class Value, std::size_t Size = sizeof(Value)>
+template <class Value, std::size_t Size = sizeof(Value),
+          bool IsAlwaysLockFree = std::atomic<Value>::is_always_lock_free>
 class alignas(Size) atomic_impl {
   std::atomic<Value> value;
 public:
@@ -89,8 +91,9 @@ public:
 /// which is not only unnecessarily inefficient but also doubles the size
 /// of the atomic object.  We don't care about supporting ancient
 /// AMD processors that lack cmpxchg16b, so we just use the intrinsic.
-template <class Value>
-class alignas(2 * sizeof(void*)) atomic_impl<Value, 2 * sizeof(void*)> {
+template <class Value, bool IsAlwaysLockFree>
+class alignas(2 * sizeof(void*))
+    atomic_impl<Value, 2 * sizeof(void*), IsAlwaysLockFree> {
   mutable volatile Value atomicValue;
 public:
   constexpr atomic_impl(Value initialValue) : atomicValue(initialValue) {}
@@ -177,6 +180,57 @@ public:
 #endif
   }
 };
+
+#else
+
+/// For values std::atomic cannot make lock-free. libc++'s freestanding mode
+/// then adds a lock byte to the object; the runtime needs sizeof(atomic<T>) ==
+/// sizeof(T), so do the operations with the __atomic builtins on the value.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Watomic-alignment"
+template <class Value, std::size_t Size>
+class alignas(Size) atomic_impl<Value, Size, /*IsAlwaysLockFree=*/false> {
+  static_assert(std::is_trivially_copyable<Value>::value,
+                "atomic value must be trivially copyable");
+  Value value;
+
+  static int order(std::memory_order o) { return static_cast<int>(o); }
+
+public:
+  constexpr atomic_impl(Value value) : value(value) {}
+
+  atomic_impl(const atomic_impl &) = delete;
+  atomic_impl &operator=(const atomic_impl &) = delete;
+
+  Value load(std::memory_order o) const {
+    // Value need not be default-constructible.
+    alignas(Value) unsigned char result[sizeof(Value)];
+    __atomic_load(const_cast<Value *>(&value),
+                  reinterpret_cast<Value *>(result), order(o));
+    return *reinterpret_cast<Value *>(result);
+  }
+
+  void store(Value newValue, std::memory_order o) {
+    __atomic_store(&value, &newValue, order(o));
+  }
+
+  bool compare_exchange_weak(Value &oldValue, Value newValue,
+                             std::memory_order successOrder,
+                             std::memory_order failureOrder) {
+    return __atomic_compare_exchange(&value, &oldValue, &newValue,
+                                     /*weak=*/true, order(successOrder),
+                                     order(failureOrder));
+  }
+
+  bool compare_exchange_strong(Value &oldValue, Value newValue,
+                               std::memory_order successOrder,
+                               std::memory_order failureOrder) {
+    return __atomic_compare_exchange(&value, &oldValue, &newValue,
+                                     /*weak=*/false, order(successOrder),
+                                     order(failureOrder));
+  }
+};
+#pragma clang diagnostic pop
 
 #endif
 
