@@ -56,6 +56,10 @@ public struct EnumCaseInfo {
   /// appear in Swift source) and `nil` if there isn't one
   var associatedValueLabels: [String?]
 
+  /// The textual representation of the case's raw value literal, `nil` if it
+  /// does not have one.
+  var rawValue: String?
+
   /// Whether a value of this case can exist at runtime. False only when the
   /// case is unavailable in every execution context the code may run in, so a
   /// switch over `self` may treat it as unreachable.
@@ -337,6 +341,25 @@ extension LabeledExprListSyntax {
       try e.expect(arg: lst[4])
     )
   }
+
+  /// Parses six labelled arguments from the argument list.
+  func expect<A, B, C, D, E, F>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>,
+    _ e: ArgParser<E>, _ f: ArgParser<F>
+  ) throws -> (A, B, C, D, E, F) {
+    guard count == 6 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 6, args: self)
+    }
+    let lst = Array(self)
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2]),
+      try d.expect(arg: lst[3]),
+      try e.expect(arg: lst[4]),
+      try f.expect(arg: lst[5])
+    )
+  }
 }
 
 /// Protocol for `NominalTypeInfo` and associated types to conform to.
@@ -535,18 +558,22 @@ extension EnumCaseInfo: TypeInfoProtocol {
     // Expecting:
     //   EnumCaseInfo(name: <String>,
     //                associatedValueLabels: <[String?]>,
+    //                rawValue: <String?>,
     //                isReachable: <Bool>,
     //                isConstructible: <Bool>,
     //                runtimeAvailabilityQueries: <[AvailabilityQuery]>)
 
-    let (name, associatedValueLabels, isReachable, isConstructible,
-         runtimeAvailabilityQueries) =
+    let (
+      name, associatedValueLabels, rawValue, isReachable, isConstructible,
+      runtimeAvailabilityQueries
+    ) =
       try getNamedFuncallArgs(
         node: node,
         name: "EnumCaseInfo"
       ).expect(
         .stringArg("name"),
         .stringArg("associatedValueLabels").toOptional().toArray(),
+        .stringArg("rawValue").toOptional(),
         .boolArg("isReachable"),
         .boolArg("isConstructible"),
         .arrayArg("runtimeAvailabilityQueries", parser: AvailabilityQuery.fromSyntax)
@@ -555,6 +582,7 @@ extension EnumCaseInfo: TypeInfoProtocol {
     return Self(
       name: name,
       associatedValueLabels: associatedValueLabels,
+      rawValue: rawValue,
       isReachable: isReachable,
       isConstructible: isConstructible,
       runtimeAvailabilityQueries: runtimeAvailabilityQueries)
@@ -562,7 +590,7 @@ extension EnumCaseInfo: TypeInfoProtocol {
 
   public var syntax: ExprSyntax {
     """
-    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), isConstructible: \(boollit(isConstructible)), runtimeAvailabilityQueries: \(arraySyntax(runtimeAvailabilityQueries, \.syntax)))
+    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), rawValue: \(optionalSyntax(rawValue, stringlit)), isReachable: \(boollit(isReachable)), isConstructible: \(boollit(isConstructible)), runtimeAvailabilityQueries: \(arraySyntax(runtimeAvailabilityQueries, \.syntax)))
     """
   }
 }
