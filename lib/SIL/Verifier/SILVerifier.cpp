@@ -315,16 +315,6 @@ template <class S>
 struct AddressTypeSynthesizer {
   S sub;
 };
-template <class S>
-constexpr AddressTypeSynthesizer<S> _address(const S &s) {
-  return AddressTypeSynthesizer<S>{s};
-}
-template <class S>
-SILType synthesizeSILType(SynthesisContext &SC,
-                          const AddressTypeSynthesizer<S> &s) {
-  return SILType::getPrimitiveAddressType(
-           synthesizeType(SC, s.sub)->getCanonicalType());
-}
 
 } // end anonymous namespace
 

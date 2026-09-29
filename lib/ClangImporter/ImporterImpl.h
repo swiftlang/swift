@@ -2238,7 +2238,7 @@ void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+T *dynCastIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2251,7 +2251,7 @@ static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *castIgnoringCompatibilityAlias(Decl *D) {
+T *castIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {

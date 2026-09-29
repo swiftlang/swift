@@ -890,20 +890,6 @@ makeTuple(const Gs & ...elementGenerators) {
   };
 }
 
-template <class... Gs>
-static BuiltinFunctionBuilder::LambdaGenerator
-makeBoundGenericType(NominalTypeDecl *decl,
-                     const Gs & ...argumentGenerators) {
-  return {
-    [=](BuiltinFunctionBuilder &builder) -> Type {
-      Type args[] = {
-        argumentGenerators.build(builder)...
-      };
-      return BoundGenericType::get(decl, Type(), args);
-    }
-  };
-}
-
 template <class T>
 static BuiltinFunctionBuilder::MetatypeGenerator<T>
 makeMetatype(const T &object,

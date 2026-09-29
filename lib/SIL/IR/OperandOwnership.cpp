@@ -746,11 +746,6 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
   return OperandOwnership::UnownedInstantaneousUse;
 }
 
-template<SILInstructionKind Opc, typename Derived>
-static OperandOwnership
-visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, Derived> *mdi) {
-}
-
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.

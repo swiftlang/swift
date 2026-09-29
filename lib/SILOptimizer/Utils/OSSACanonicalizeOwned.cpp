@@ -98,12 +98,6 @@ STATISTIC(NumDestroysGenerated, "number of destroy_value instructions created");
 //                           MARK: General utilities
 //===----------------------------------------------------------------------===//
 
-template <typename... T, typename... U>
-static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-                     U &&...args) {
-  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
 /// Is \p instruction a destroy_value whose operand is \p def, or its
 /// transitive copy.
 static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
