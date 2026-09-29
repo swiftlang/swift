@@ -39,6 +39,39 @@ class Workspace(object):
                             deployment_target)
 
 
+def is_swift_build_dir(path, host_target, unified_build_dir=False):
+    if unified_build_dir:
+        tests_path = os.path.join(
+            path, 'tools', 'swift', 'test-%s' % host_target)
+    else:
+        tests_path = os.path.join(path, 'test-%s' % host_target)
+
+    return (os.path.isfile(os.path.join(path, 'CMakeCache.txt')) and
+            os.path.isdir(tests_path))
+
+
+def find_swift_build_dirs(build_root, host_target,
+                          unified_build_dir=False):
+    """Find configured Swift build directories below ``build_root``."""
+    if not os.path.isdir(build_root):
+        return []
+
+    build_root = os.path.realpath(build_root)
+    root_depth = build_root.rstrip(os.sep).count(os.sep)
+    result = []
+    for path, directories, _ in os.walk(build_root):
+        if is_swift_build_dir(path, host_target, unified_build_dir):
+            result.append(path)
+            directories[:] = []
+            continue
+
+        depth = path.rstrip(os.sep).count(os.sep) - root_depth
+        if depth >= 2:
+            directories[:] = []
+
+    return sorted(result)
+
+
 def compute_build_subdir(args):
     # Create a name for the build directory.
     build_subdir = args.cmake_generator.replace(" ", "_")
