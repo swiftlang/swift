@@ -3509,6 +3509,8 @@ NOTE(no_witnesses,none,
      (RequirementKind, const ValueDecl *, WitnessType))
 NOTE(missing_witnesses_general,none, "add stubs for conformance",
      ())
+NOTE(missing_witnesses_opaque_results,none,
+     "add stubs using opaque result types", ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
