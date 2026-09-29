@@ -46,6 +46,10 @@ void swift_ASTGen_renderSingleDiagnostic(
 void swift_ASTGen_renderQueuedDiagnostics(
     void *_Nonnull queued, ssize_t contextSize, ssize_t colorize,
     BridgedStringRef *_Nonnull renderedString);
+void swift_ASTGen_renderQueuedDiagnosticsAsSARIF(
+    void *_Nonnull queuedDiagnosticsPtr, BridgedStringRef compilerVersion,
+    BridgedStringRef outputPath, BridgedArrayRef invocationProperties,
+    BridgedStringRef *_Nullable errorMessage);
 
 void *_Nonnull swift_ASTGen_createPerFrontendDiagnosticState();
 void swift_ASTGen_destroyPerFrontendDiagnosticState(void * _Nonnull state);
