@@ -346,15 +346,15 @@ public struct DeriveEncodableMacro: DeclarationMacro {
         """
     }
 
-    let mutatesContainer = cases.contains { $0.isEncodable }
-    let readsContainer = cases.contains { !$0.isUnavailable && !$0.isEncodable }
-
     let containerDecl: String =
-      if mutatesContainer {
+      // If we mutate the container
+      if (cases.contains { $0.isEncodable }) {
         "var container = \(containerCall)"
-      } else if readsContainer {
+        // If we read the container
+      } else if (cases.contains { !$0.isUnavailable }) {
         "let container = \(containerCall)"
       } else {
+        // Don't need to declare the container
         "_ = \(containerCall)"
       }
 
