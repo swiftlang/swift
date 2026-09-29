@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/Builtins.h"
 #include "swift/Basic/LLVM.h"
+#include <optional>
 #include <utility>
 
 namespace swift {
@@ -45,12 +46,46 @@ class NominalTypeDecl;
 class ParamDecl;
 class Pattern;
 class PatternBindingDecl;
+class ProtocolConformanceRef;
 class ProtocolDecl;
 class StructDecl;
 class Type;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
+
+/// A stored property or an enum case parameter whose type prevents the
+/// synthesis of a derived protocol conformance.
+struct NonconformingMember {
+  /// The stored property or the enum case parameter.
+  VarDecl *member;
+
+  /// The location to diagnose. This is the type of an enum case parameter
+  /// when the parameter has a type representation, and the member or the
+  /// declaration that contains it otherwise.
+  SourceLoc loc;
+
+  /// The availability restriction that prevents the synthesized code from
+  /// using the conformance of the member's type to the protocol. This is
+  /// \c std::nullopt when the member's type does not conform to the protocol
+  /// at all.
+  std::optional<AvailabilityRestriction> restriction;
+};
+
+/// Returns the availability restriction that prevents the code synthesized in
+/// \p availability from using \p conformance, or \c std::nullopt when the
+/// synthesized code can use the conformance. Also returns \c std::nullopt when
+/// availability checking is disabled, since no availability restriction should
+/// affect which conformances the compiler derives in that mode.
+std::optional<AvailabilityRestriction>
+availabilityRestrictionPreventingSynthesis(ProtocolConformanceRef conformance,
+                                           AvailabilityContext availability);
+
+/// Returns true if the code synthesized in \p availability can use the
+/// conformance of \p type to \p protocol. The type must conform to the
+/// protocol, and availability must not restrict the conformance.
+bool conformanceIsUsableForSynthesis(Type type, ProtocolDecl *protocol,
+                                     AvailabilityContext availability);
 
 class DerivedConformance {
 public:
@@ -83,13 +118,16 @@ public:
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
 
-  /// Returns the VarDecl of each stored property in the given struct whose type
-  /// does not conform to a protocol.
+  /// Returns each stored property of the given struct whose type prevents the
+  /// synthesis of a conformance to a protocol, either because the type does
+  /// not conform to the protocol or because availability restricts the
+  /// conformance.
+  /// \p DC The context that declares the conformance being synthesized.
   /// \p theStruct The struct whose stored properties should be checked.
   /// \p protocol The protocol being requested.
-  /// \return The VarDecl of each stored property whose type does not conform.
-  static SmallVector<VarDecl *, 3> storedPropertiesNotConformingToProtocol(
-      DeclContext *DC, StructDecl *theStruct, ProtocolDecl *protocol);
+  static SmallVector<NonconformingMember, 3>
+  storedPropertiesPreventingSynthesis(DeclContext *DC, StructDecl *theStruct,
+                                      ProtocolDecl *protocol);
 
   /// True if the type can implicitly derive a conformance for the given
   /// protocol.
@@ -208,6 +246,15 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveRawRepresentable(ValueDecl *requirement);
+
+  /// Diagnose problems, if any, preventing automatic derivation of
+  /// RawRepresentable requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void
+  tryDiagnoseFailedRawRepresentableDerivation(DeclContext *DC,
+                                              NominalTypeDecl *nominal);
 
   /// Derive a RawRepresentable type witness for an enum, if it has a valid
   /// raw type and raw values for all of its cases.
@@ -415,23 +462,27 @@ public:
   static GuardStmt *
   returnComparisonIfNotEqualGuard(ASTContext &C, Expr *lhsExpr, Expr *rhsExpr);
 
-  /// Returns the ParamDecl for each associated value of the given enum whose
-  /// type does not conform to a protocol \p theEnum The enum whose elements and
-  /// associated values should be checked. \p protocol The protocol being
-  /// requested. \return The ParamDecl of each associated value whose type does
-  /// not conform.
-  static SmallVector<ParamDecl *, 4>
-  associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
-                                          ProtocolDecl *protocol);
-
-  /// Returns true if, for every element of the given enum, it either has no
-  /// associated values or all of them conform to a protocol.
+  /// Returns each associated value of the given enum whose type prevents the
+  /// synthesis of a conformance to a protocol, either because the type does
+  /// not conform to the protocol or because availability restricts the
+  /// conformance.
+  /// \p DC The context that declares the conformance being synthesized.
   /// \p theEnum The enum whose elements and associated values should be
-  /// checked. \p protocol The protocol being requested. \return True if all
-  /// associated values of all elements of the enum conform.
-  static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
-                                                   EnumDecl *theEnum,
-                                                   ProtocolDecl *protocol);
+  /// checked.
+  /// \p protocol The protocol being requested.
+  static SmallVector<NonconformingMember, 4>
+  associatedValuesPreventingSynthesis(DeclContext *DC, EnumDecl *theEnum,
+                                      ProtocolDecl *protocol);
+
+  /// Returns true if any associated value of any element of the given enum
+  /// prevents the synthesis of a conformance to a protocol.
+  /// \p DC The context that declares the conformance being synthesized.
+  /// \p theEnum The enum whose elements and associated values should be
+  /// checked.
+  /// \p protocol The protocol being requested.
+  static bool anyAssociatedValuePreventsSynthesis(DeclContext *DC,
+                                                  EnumDecl *theEnum,
+                                                  ProtocolDecl *protocol);
   /// Create AST statements which convert from an enum to an Int with a switch.
   /// \p stmts The generated statements are appended to this vector.
   /// \p parentDC Either an extension or the enum itself.
@@ -448,6 +499,12 @@ public:
   static Pattern *enumElementPayloadSubpattern(
       EnumElementDecl *enumElementDecl, char varPrefix, DeclContext *varContext,
       SmallVectorImpl<VarDecl *> &boundVars, bool useLabels = false);
+
+  /// Returns true if the synthesized case for \p elt is replaced with a
+  /// diagnostic because the element cannot be reached at runtime. When this
+  /// returns false, the case is synthesized normally and does use the
+  /// conformances that the element's associated values need.
+  static bool synthesizesUnavailableEnumElementCase(EnumElementDecl *elt);
 
   /// Creates a synthesized case statement that has the following structure:
   ///

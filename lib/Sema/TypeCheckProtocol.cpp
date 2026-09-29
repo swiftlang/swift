@@ -6273,6 +6273,10 @@ void swift::diagnoseConformanceFailure(Type T,
         return;
       }
 
+      // The raw type does conform to Equatable, but availability may restrict
+      // the synthesized code from using that conformance.
+      DerivedConformance::tryDiagnoseFailedRawRepresentableDerivation(DC,
+                                                                      enumDecl);
       return;
     }
   }

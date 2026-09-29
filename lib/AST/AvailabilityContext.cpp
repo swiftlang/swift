@@ -582,13 +582,19 @@ bool AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance(
   return false;
 }
 
-bool AvailabilityContext::hasUnsatisfiedRestrictionsForConformance(
+std::optional<AvailabilityRestriction>
+AvailabilityContext::unsatisfiedRestrictionForConformance(
     ProtocolConformanceRef conformance, AvailabilityRestrictionFlags flags) {
-  return enumerateUnsatisfiedRestrictionsForConformance(
+  std::optional<AvailabilityRestriction> result;
+  enumerateUnsatisfiedRestrictionsForConformance(
       conformance,
-      [](const Decl *decl, const ProtocolDecl *proto,
-         AvailabilityRestriction restriction) { return true; },
+      [&result](const Decl *decl, const ProtocolDecl *proto,
+                AvailabilityRestriction restriction) {
+        result.emplace(restriction);
+        return true;
+      },
       flags);
+  return result;
 }
 
 static bool restrictionIsStronger(const AvailabilityRestriction &lhs,

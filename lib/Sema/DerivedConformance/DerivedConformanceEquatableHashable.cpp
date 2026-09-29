@@ -44,14 +44,16 @@ static bool canDeriveConformance(DeclContext *DC,
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
-    return DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
+    return !DerivedConformance::anyAssociatedValuePreventsSynthesis(
+        DC, enumDecl, protocol);
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
     // All stored properties of the struct must conform to the protocol. If
     // there are no stored properties, we will vaccously return true.
-    if (!DerivedConformance::storedPropertiesNotConformingToProtocol(
-               DC, structDecl, protocol).empty())
+    if (!DerivedConformance::storedPropertiesPreventingSynthesis(DC, structDecl,
+                                                                 protocol)
+             .empty())
       return false;
 
     return true;

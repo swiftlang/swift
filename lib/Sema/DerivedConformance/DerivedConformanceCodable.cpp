@@ -18,6 +18,8 @@
 #include "CodeSynthesis.h"
 #include "DerivedConformance.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -30,6 +32,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
@@ -307,10 +310,13 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 ///
 /// \param varDecls The \c var decls to validate against.
 /// \param codingKeysTypeDecl The \c CodingKeys enum decl to validate.
-static bool validateCodingKeysEnum(const DerivedConformance &derived,
-                               llvm::SmallMapVector<Identifier, VarDecl *, 8> varDecls,
-                               TypeDecl *codingKeysTypeDecl,
-                               DelayedNotes &delayedNotes) {
+/// \param baseAvailability The availability context that the synthesized
+/// implementations for these var decls are checked against.
+static bool
+validateCodingKeysEnum(const DerivedConformance &derived,
+                       llvm::SmallMapVector<Identifier, VarDecl *, 8> varDecls,
+                       TypeDecl *codingKeysTypeDecl, DelayedNotes &delayedNotes,
+                       AvailabilityContext baseAvailability) {
   auto *codingKeysDecl = validateCodingKeysType(
       derived, codingKeysTypeDecl, delayedNotes);
   if (!codingKeysDecl)
@@ -323,6 +329,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
   // If there are any vars left in the type which don't have a default value
   // (for Decodable), then this decl doesn't match.
   bool varDeclsAreValid = true;
+  auto *conformanceDC = derived.getConformanceContext();
   for (auto elt : codingKeysDecl->getAllElements()) {
     auto it = varDecls.find(elt->getBaseIdentifier());
     if (it == varDecls.end()) {
@@ -337,9 +344,17 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     }
 
     // We have a property to map to. Ensure it's {En,De}codable.
-    auto target = derived.getConformanceContext()->mapTypeIntoEnvironment(
-         it->second->getValueInterfaceType());
-    if (checkConformance(target, derived.Protocol).isInvalid()) {
+    auto target = conformanceDC->mapTypeIntoEnvironment(
+        it->second->getValueInterfaceType());
+    auto conformance = checkConformance(target, derived.Protocol);
+
+    // The synthesized implementations can only use the conformance if
+    // availability does not restrict it.
+    std::optional<AvailabilityRestriction> restriction;
+    if (!conformance.isInvalid())
+      restriction = availabilityRestrictionPreventingSynthesis(
+          conformance, baseAvailability);
+    if (conformance.isInvalid() || restriction) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
           it->second->getTypeInContext(),
@@ -347,10 +362,20 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
 
       auto var = it->second;
       auto proto = derived.getProtocolType();
-      delayedNotes.push_back([=] {
-        var->diagnose(diag::codable_non_conforming_property_here,
-                      proto, typeLoc);
-      });
+      if (restriction) {
+        delayedNotes.push_back([=] {
+          llvm::SmallString<64> scratch;
+          var->diagnose(diag::codable_unavailable_property_conformance_here,
+                        proto, typeLoc,
+                        restriction->getDiagnosticDescription(
+                            scratch, var->getASTContext()));
+        });
+      } else {
+        delayedNotes.push_back([=] {
+          var->diagnose(diag::codable_non_conforming_property_here, proto,
+                        typeLoc);
+        });
+      }
       varDeclsAreValid = false;
     } else {
       // The property was valid. Remove it from the list.
@@ -470,7 +495,8 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     }
 
     return validateCodingKeysEnum(
-        derived, properties, codingKeysTypeDecl, delayedNotes);
+        derived, properties, codingKeysTypeDecl, delayedNotes,
+        AvailabilityContext::forDeclContext(derived.getConformanceContext()));
   }
 }
 
@@ -537,8 +563,16 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
     }
   }
 
-  return validateCodingKeysEnum(
-      derived, properties, codingKeysTypeDecl, delayedNotes);
+  // A synthesized case that matches this element only ever executes for a
+  // value of this element, and such a value can only exist at runtime where
+  // the element is available. The conformances that the element's associated
+  // values need are therefore only required where the element is available.
+  auto elementAvailability =
+      AvailabilityContext::forDeclContext(derived.getConformanceContext());
+  elementAvailability.constrainWithDecl(elementDecl);
+
+  return validateCodingKeysEnum(derived, properties, codingKeysTypeDecl,
+                                delayedNotes, elementAvailability);
 }
 
 /// Creates a new var decl representing

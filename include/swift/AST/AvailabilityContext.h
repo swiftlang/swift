@@ -78,6 +78,13 @@ public:
   /// of the given declaration.
   static AvailabilityContext forDeclSignature(const Decl *decl);
 
+  /// Returns the most refined `AvailabilityContext` for the given declaration
+  /// context. This is a convenience wrapper for `forLocation()` with an
+  /// invalid source location.
+  static AvailabilityContext forDeclContext(const DeclContext *declContext) {
+    return forLocation(SourceLoc(), declContext);
+  }
+
   /// Returns the unconstrained availability context.
   static AvailabilityContext forAlwaysAvailable(const ASTContext &ctx);
 
@@ -173,9 +180,9 @@ public:
                               AvailabilityRestriction)> callback,
       AvailabilityRestrictionFlags flags = std::nullopt);
 
-  /// Returns true if any availability restriction must be satisfied to use
+  /// Returns the first availability restriction that must be satisfied to use
   /// \p conformance from this context.
-  bool hasUnsatisfiedRestrictionsForConformance(
+  std::optional<AvailabilityRestriction> unsatisfiedRestrictionForConformance(
       ProtocolConformanceRef conformance,
       AvailabilityRestrictionFlags flags = std::nullopt);
 
