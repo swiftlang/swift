@@ -5223,6 +5223,30 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   return base;
 }
 
+/// Rebuilds \p derived with the parameter flags of \p base in each of its
+/// first \p numParameterLists curried parameter lists. Lowering takes
+/// parameter conventions from these flags, and a vtable entry must keep the
+/// conventions of the method that introduced it.
+static CanAnyFunctionType
+copyParameterFlagsFromBaseToDerived(CanAnyFunctionType derived,
+                                    CanAnyFunctionType base,
+                                    unsigned numParameterLists) {
+  SmallVector<AnyFunctionType::Param, 8> params;
+  for (auto [baseParam, derivedParam] :
+       llvm::zip_equal(base.getParams(), derived.getParams()))
+    params.push_back(derivedParam.withFlags(baseParam.getParameterFlags()));
+
+  auto result = derived.getResult();
+  if (numParameterLists > 1)
+    result = copyParameterFlagsFromBaseToDerived(
+        cast<AnyFunctionType>(result), cast<AnyFunctionType>(base.getResult()),
+        numParameterLists - 1);
+
+  return CanAnyFunctionType::get(derived.getOptGenericSignature(),
+                                 llvm::ArrayRef(params), derived.getYields(),
+                                 result, derived->getExtInfo());
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 const SILConstantInfo &
@@ -5272,13 +5296,18 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
                                      overrideInterfaceTy)) {
 
     // The derived method is ABI-compatible with the base method. Let's
-    // just use the derived method's formal type.
+    // just use the derived method's formal type, with the base method's
+    // parameter conventions.
     basePattern = AbstractionPattern(
       copyOptionalityFromDerivedToBase(
         *this,
-        derivedInfo.LoweredType,
+        copyParameterFlagsFromBaseToDerived(derivedInfo.LoweredType,
+                                            baseInfo.LoweredType,
+                                            /*numParameterLists=*/1),
         baseInfo.LoweredType));
-    overrideInterfaceTy = derivedInfo.FormalType;
+    overrideInterfaceTy = copyParameterFlagsFromBaseToDerived(
+        derivedInfo.FormalType, overrideInterfaceTy,
+        derived.getParameterListCount());
   }
 
   if (genericSig && !genericSig->areAllParamsConcrete()) {
