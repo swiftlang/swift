@@ -217,13 +217,11 @@ private struct Resolver {
 
   // - Returns: true iff legalization was successful
   mutating func run(on value: Value, _ indexCache: inout FieldIndexTrieCache) -> Bool {
-    log("\nResolver.run(on: \(value))")
-
     guard let root = ResolvableRoot(value, context) else {
-      log("\n ** skipping due to unrecognized ResolvableRoot \(value)")
       return false
     }
 
+    log("\nResolver.run(on: \(value))")
     reset()
 
     ////////////////
@@ -397,10 +395,6 @@ private struct Resolver {
     case let .root(r) where someDemand && !r.startsInitialized:
       // Unsatisfied demand reaching the root means there exists a use-before-init.
       initializeWithUndef(address: root.address, after: root.startInstruction)
-
-    case .def where noDemand:
-      // Arrived at a def with no demand below it: a dead assignment.
-      log("!!!! could delete assignment: \(kind.inst)")
 
     default:
       break
