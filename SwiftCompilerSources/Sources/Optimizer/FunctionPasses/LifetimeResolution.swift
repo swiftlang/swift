@@ -699,17 +699,21 @@ private struct Resolver {
       let range = indices.range(of: path)
       log("leafUse(\(path)) of \(range) in \t\(inst)")
 
+      // If the loaded SSA value is consumed by some non-destroying instruction, its demand is "own".
+      func hasConsumingUser(_ op: Operand) -> Bool {
+        return op.ownership == .forwardingConsume || op.instruction is MoveValueInst
+      }
+
       switch inst {
       case let load as LoadInst:
         switch load.loadOwnership {
         case .take:
             addUse(.take(address, .own), range)   // TODO: what about a take where all non-destroy users borrow?
         case .unqualified, .copy:
-          if !load.uses.filter({ $0.ownership == .forwardingConsume }).isEmpty {
-            // If the loaded SSA value is consumed by some instruction, its demand is "own"
-            addUse(.use(address, .own), range)
-          } else {
+          if load.uses.filter(hasConsumingUser).isEmpty {
             addUse(.use(address, .borrow), range)
+          } else {
+            addUse(.use(address, .own), range)
           }
         default:
           fatalError("unexpected load: \(load)")

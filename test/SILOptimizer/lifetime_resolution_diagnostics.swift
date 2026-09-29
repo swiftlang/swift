@@ -331,3 +331,16 @@ func testStringSwitch(_ s: String) -> Int {
 func testArray(_ s: Array<String>) -> String {
   return s[0]
 }
+
+
+struct Initializers: ~Copyable {
+  let x: C
+  init(test: Void) throws {
+    self.x = try Self.f()
+    _ = self    // expected-note {{consumed here}}
+    try self.doStuff()  // expected-error {{'self' used after consume}}
+  }
+  private func doStuff() throws {}
+
+  private static func f() throws -> C { C() }
+}
