@@ -18,9 +18,8 @@ import Swift
 @_spi(ExperimentalCustomExecutors)
 @available(SwiftStdlib 6.2, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
-  public static let mainExecutor: any MainExecutor = DispatchMainExecutor()
-  public static let defaultExecutor: any TaskExecutor
-    = DispatchGlobalTaskExecutor()
+  public static let mainExecutor = DispatchMainExecutor()
+  public static let defaultExecutor = DispatchGlobalTaskExecutor()
 }
 
 #endif
