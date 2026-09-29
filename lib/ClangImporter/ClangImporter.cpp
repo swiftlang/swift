@@ -8429,7 +8429,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
     return failurePlaceholder();
 
   auto [fnIt, inserted] =
-      Impl.specializedFunctionTemplates.try_emplace(newFn, nullptr);
+      Impl.specializedFunctionTemplates.try_emplace({newFn, decl}, nullptr);
   if (!inserted)
     return ConcreteDeclRef(fnIt->second);
 
@@ -8456,7 +8456,20 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (!newDecl)
     return failurePlaceholder();
 
+  // Like a method, the specialization is imported once for each of the
+  // template's spellings, e.g. its original name and its '__<name>Unsafe'
+  // migration stub, which differ in safety and deprecation. Call the one named
+  // like the template that was called.
+  if (newDecl->getBaseName() != decl->getBaseName()) {
+    auto alternates = Impl.getAlternateDecls(newDecl);
+    auto match = llvm::find_if(alternates, [&](ValueDecl *alternate) {
+      return alternate->getBaseName() == decl->getBaseName();
+    });
+    if (match != alternates.end())
+      newDecl = *match;
+  }
   auto *specialization = newDecl;
+
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
     if (!subst.empty()) {
       newDecl = rewriteIntegerTypes(subst, decl, fn);
@@ -8474,8 +8487,22 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
 
   // The call resolves to a declaration built above in place of the imported
   // specialization, so give it the specialization's attributes.
-  if (newDecl != specialization)
+  if (newDecl != specialization) {
     cloneImportedAttributes(specialization, newDecl);
+    // A specialization named for the metatype thunk is not renamed along with
+    // the template, so take the safety and deprecation of the one called.
+    if (needsThunkForMetatypes) {
+      ASTContext &ctx = decl->getASTContext();
+      if (auto *attr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
+        if (auto *cloned = newDecl->getAttrs().getAttribute<UnsafeAttr>())
+          newDecl->getAttrs().removeAttribute(cloned);
+        newDecl->addAttribute(attr->clone(ctx));
+      }
+      for (auto *avail : decl->getAttrs().getAttributes<AvailableAttr>())
+        if (avail->isUnconditionallyDeprecated())
+          newDecl->addAttribute(avail->clone(ctx, /*implicit=*/true));
+    }
+  }
 
   fnIt->getSecond() = newDecl;
   return ConcreteDeclRef(newDecl);
