@@ -585,7 +585,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
   if(SWIFT_WASI_SYSROOT_PATH)
     set(arch "wasm32")
-    set(triple "wasm32-unknown-wasip1")
+    set(triple "${SWIFT_EMBEDDED_WASI_TRIPLE}")
 
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")

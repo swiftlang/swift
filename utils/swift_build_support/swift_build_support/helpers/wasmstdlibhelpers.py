@@ -34,12 +34,8 @@ def build_stdlib(args, toolchain, source_dir, build_dir, host_target,
 
     `append_platform_cmake_options(cmake_options)` sets every option that
     differs between the WASI and Emscripten stdlib builds; see each product's
-    `_append_platform_cmake_options`. It is invoked before the options
-    shared verbatim by both builds (which this helper owns), so the shared
-    block is emitted last and would win under CMake last-wins on any
-    collision. In practice the two sets are disjoint (guarded by
-    `test_stdlib_configure_has_no_duplicate_options`), so the call order
-    does not affect the resulting configuration.
+    `_append_platform_cmake_options`. An option it sets that the shared block
+    below also sets is silently overridden, so the two sets must stay disjoint.
     """
     prefer_native = not args.build_runtime_with_host_compiler
 

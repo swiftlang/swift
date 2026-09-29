@@ -21,6 +21,24 @@ from ..helpers import wasmstdlibhelpers
 
 
 class WASIStdlib(cmake_product.CMakeProduct):
+    _os_environment = 'wasip1'
+    _max_memory_bytes = None
+
+    # Clang's multiarch triple names the sysroot and resource-dir layout,
+    # Swift's `-target` triple names module directories, and the short triple
+    # names the target-only LLVM build directory.
+    @classmethod
+    def multiarch_triple(cls):
+        return 'wasm32-%s' % cls._os_environment
+
+    @classmethod
+    def swift_triple(cls):
+        return 'wasm32-unknown-%s' % cls._os_environment
+
+    @classmethod
+    def short_triple(cls):
+        return '%s-wasm32' % cls._os_environment
+
     @classmethod
     def product_source_name(cls):
         return "swift"
@@ -40,28 +58,25 @@ class WASIStdlib(cmake_product.CMakeProduct):
         return self.args.test_wasistdlib
 
     def build(self, host_target):
-        target_triple = 'wasm32-wasip1'
         wasmstdlibhelpers.build_stdlib(
             args=self.args, toolchain=self.toolchain,
             source_dir=self.source_dir, build_dir=self.build_dir,
-            host_target=host_target, short_triple='wasip1-wasm32',
-            append_platform_cmake_options=lambda opts:
-                self._append_platform_cmake_options(opts, target_triple))
+            host_target=host_target, short_triple=self.short_triple(),
+            append_platform_cmake_options=self._append_platform_cmake_options)
 
-    def _append_platform_cmake_options(self, cmake_options, target_triple):
+    def _append_platform_cmake_options(self, cmake_options):
+        sysroot = self._wasi_sysroot_path(self.multiarch_triple())
         # Teach CMake about the WASI target. (UNIX:BOOL=TRUE, shared by both
         # WASI and Emscripten, is set in wasmstdlibhelpers.build_stdlib.)
         cmake_options.define('CMAKE_SYSTEM_NAME:STRING', 'WASI')
-        cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
-                             self._wasi_sysroot_path(target_triple))
+        cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING', sysroot)
         cmake_options.define('SWIFT_PRIMARY_VARIANT_SDK:STRING', 'WASI')
         cmake_options.define('SWIFT_SDKS:STRING', 'WASI')
         cmake_options.define(
-            'SWIFT_SDK_embedded_ARCH_wasm32_PATH:PATH',
-            self._wasi_sysroot_path('wasm32-wasip1'))
+            'SWIFT_SDK_embedded_ARCH_wasm32_PATH:PATH', sysroot)
         cmake_options.define(
-            'SWIFT_SDK_embedded_ARCH_wasm32-unknown-wasip1_PATH:PATH',
-            self._wasi_sysroot_path('wasm32-wasip1'))
+            'SWIFT_SDK_embedded_ARCH_%s_PATH:PATH' % self.swift_triple(),
+            sysroot)
 
         lit_test_paths = [
             'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded', 'AutoDiff', 'DebugInfo',
@@ -79,29 +94,51 @@ class WASIStdlib(cmake_product.CMakeProduct):
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
             '-Xclang-linker',
-            '-resource-dir=' + self._wasi_resource_dir_path(target_triple),
+            '-resource-dir=' + self._wasi_resource_dir_path(
+                self.multiarch_triple()),
         ]
+        if self._max_memory_bytes is not None:
+            test_driver_options += [
+                '-Xclang-linker',
+                '-Wl,--max-memory=%d' % self._max_memory_bytes]
+        # Read by test/embedded/lit.local.cfg for the embedded suite's link line.
+        cmake_options.define(
+            'SWIFT_WASI_MAX_MEMORY:STRING',
+            '' if self._max_memory_bytes is None
+            else str(self._max_memory_bytes))
         # Leading space is needed to separate from other options
         cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
                              ' ' + ' '.join(test_driver_options))
 
-        # The threads subclass overrides these below, so its (unserved) stdlib is left unmapped.
+        extra_swift_flags, extra_c_flags = self.threading_compile_flags()
         prefix_map = wasisysroot.file_prefix_map()
         if prefix_map:
-            cmake_options.define('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
-                                 '-file-prefix-map;' + prefix_map)
+            extra_swift_flags = ['-file-prefix-map',
+                                 prefix_map] + extra_swift_flags
+            extra_c_flags = ['-ffile-prefix-map=' + prefix_map] + extra_c_flags
+        # Each of these keys is defined once: a later -D wins, so defining one
+        # again in a subclass would drop everything the base put there.
+        if extra_swift_flags:
+            cmake_options.define(
+                'SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
+                ';'.join(extra_swift_flags))
+        if extra_c_flags:
             cmake_options.define('SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS:STRING',
-                                 '-ffile-prefix-map=' + prefix_map)
+                                 ';'.join(extra_c_flags))
 
         self._append_threading_options(cmake_options)
+
+    @classmethod
+    def threading_compile_flags(cls):
+        """Return `(swift_flags, clang_flags)` making this product's target
+        thread-capable. Read by wasiswiftsdk.py for the Swift SDK's own
+        libraries, which are built outside the stdlib's CMake."""
+        return ([], [])
 
     def _append_threading_options(self, cmake_options):
         cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
 
     def test(self, host_target):
-        self._test(host_target, 'wasm32-wasip1')
-
-    def _test(self, host_target, target_triple):
         build_root = os.path.dirname(self.build_dir)
         bin_paths = [
             os.path.join(self._host_swift_build_dir(host_target), 'bin'),
@@ -111,11 +148,13 @@ class WASIStdlib(cmake_product.CMakeProduct):
         wasmkit_build_path = os.path.join(
             build_root, '%s-%s' % ('wasmkit', host_target))
         wasmkit_bin_path = wasmkit.WasmKit.cli_file_path(wasmkit_build_path)
-        if not os.path.exists(wasmkit_bin_path) or not self.should_test_executable():
-            test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
-        else:
+        can_run_wasm = (os.path.exists(wasmkit_bin_path)
+                        and self.should_test_executable())
+        if can_run_wasm:
             test_target = "check-swift-wasi-wasm32-custom"
             bin_paths = [os.path.dirname(wasmkit_bin_path)] + bin_paths
+        else:
+            test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
 
         env = {
             'PATH': os.path.pathsep.join(bin_paths),
@@ -124,11 +163,11 @@ class WASIStdlib(cmake_product.CMakeProduct):
                 '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
         }
 
-        # Embedded stdlib is not built for the threads triple, don't include embedded tests for it.
-        if target_triple == 'wasm32-wasip1-threads':
-            test_targets = [test_target]
-        else:
-            test_targets = [test_target, 'check-swift-embedded-wasi']
+        test_targets = [test_target]
+        # No non-executable variant of this target exists to fall back to:
+        # test/CMakeLists.txt builds it with one hardcoded test mode.
+        if can_run_wasm:
+            test_targets.append('check-swift-embedded-wasi')
 
         self.test_with_cmake(None, test_targets, self._build_variant, [], test_env=env)
 
@@ -167,29 +206,20 @@ class WASIStdlib(cmake_product.CMakeProduct):
 
 
 class WASIThreadsStdlib(WASIStdlib):
-    def build(self, host_target):
-        target_triple = 'wasm32-wasip1-threads'
-        wasmstdlibhelpers.build_stdlib(
-            args=self.args, toolchain=self.toolchain,
-            source_dir=self.source_dir, build_dir=self.build_dir,
-            host_target=host_target, short_triple='wasip1-threads-wasm32',
-            append_platform_cmake_options=lambda opts:
-                self._append_platform_cmake_options(opts, target_triple))
+    _os_environment = 'wasip1-threads'
+    # wasm-ld pins a shared memory's maximum to its initial size unless a
+    # maximum is given, which leaves the guest heap unable to grow. Matches the
+    # maximum the shipped Swift SDK's threads toolset sets.
+    _max_memory_bytes = 1073741824
 
-    def test(self, host_target):
-        self._test(host_target, 'wasm32-wasip1-threads')
-
-    def should_test_executable(self):
-        # TODO(katei): Enable tests once WasmKit supports WASI threads
-        return False
+    @classmethod
+    def threading_compile_flags(cls):
+        return (['-Xcc', '-matomics', '-Xcc', '-mbulk-memory',
+                 '-Xcc', '-mthread-model', '-Xcc', 'posix',
+                 '-Xcc', '-pthread', '-Xcc', '-ftls-model=local-exec'],
+                ['-mthread-model', 'posix', '-pthread',
+                 '-ftls-model=local-exec'])
 
     def _append_threading_options(self, cmake_options):
         cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'pthreads')
-        cmake_options.define('SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS:STRING',
-                             '-mthread-model;posix;-pthread;'
-                             '-ftls-model=local-exec')
-        cmake_options.define('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
-                             '-Xcc;-matomics;-Xcc;-mbulk-memory;'
-                             '-Xcc;-mthread-model;-Xcc;posix;'
-                             '-Xcc;-pthread;-Xcc;-ftls-model=local-exec')
         cmake_options.define('SWIFT_ENABLE_WASI_THREADS:BOOL', 'TRUE')

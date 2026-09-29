@@ -25,6 +25,8 @@ class WASIRunner(object):
 
     def invocation(self, args):
         command = ["wasmkit", "run"]
+        if args.threads:
+            command += ["--feature", "threads"]
         envs = collect_wasm_env()
         for key in envs:
             command.append("--env")
@@ -42,6 +44,9 @@ def main():
     parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
                         help="print the commands that would have been run, but"
                              " don't actually run them")
+    parser.add_argument('--threads', action='store_true', dest='threads',
+                        help='enable the WebAssembly threads proposal in the'
+                             ' runtime')
     parser.add_argument('command', nargs=argparse.REMAINDER,
                         help='the command to run', metavar='command...')
 
