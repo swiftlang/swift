@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/Bridging/BasicSwift.h"
 
 using namespace swift;
@@ -125,6 +126,12 @@ bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
                                       SourceLoc());
   return cContext.unbridged().testImportModule(
       builder.get(), version, versionKind == CanImportUnderlyingVersion);
+}
+
+bool BridgedASTContext_hasTargetFeature(BridgedASTContext cContext,
+                                        BridgedStringRef cName) {
+  return cContext.unbridged().getClangModuleLoader()->hasTargetFeature(
+      cName.unbridged());
 }
 
 BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
