@@ -1485,7 +1485,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)BI->getType().getCategory(),
         S.addDeclBaseNameRef(BI->getName()),
         unsigned(swift::ActorIsolation::Unspecified),
-        unsigned(swift::ActorIsolation::Unspecified), Args);
+        unsigned(swift::ActorIsolation::Unspecified),
+        /*unresolved*/ unsigned(false), Args);
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -1514,7 +1515,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
-        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+        unsigned(callerIsolation), unsigned(calleeIsolation),
+        /*unresolved*/ unsigned(false), Args);
     writeApplyArgLocs(ApplySite(const_cast<ApplyInst *>(AI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1545,7 +1547,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
-        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+        unsigned(callerIsolation), unsigned(calleeIsolation),
+        unsigned(AI->isUnresolved()), Args);
     writeApplyArgLocs(ApplySite(const_cast<BeginApplyInst *>(AI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1579,7 +1582,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
-        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+        unsigned(callerIsolation), unsigned(calleeIsolation),
+        /*unresolved*/ unsigned(false), Args);
     writeApplyArgLocs(ApplySite(const_cast<TryApplyInst *>(AI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1601,7 +1605,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()), flags,
-        unsigned(swift::ActorIsolation::Unspecified), Args);
+        unsigned(swift::ActorIsolation::Unspecified),
+        /*unresolved*/unsigned(false), Args);
     writeApplyArgLocs(ApplySite(const_cast<PartialApplyInst *>(PAI)),
                       SI.getModule().getSourceManager());
     break;
@@ -2469,7 +2474,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr = unsigned(BAI->getAccessKind())
                     + (unsigned(BAI->getEnforcement()) << 2)
                     + (BAI->hasNoNestedConflict() << 5)
-                    + (BAI->isFromBuiltin() << 6);
+                    + (BAI->isFromBuiltin() << 6)
+                    + (BAI->isUnresolved() << 7);
     SILValue operand = BAI->getOperand();
 
     SILOneOperandExtraAttributeLayout::emitRecord(

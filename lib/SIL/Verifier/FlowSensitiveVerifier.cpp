@@ -339,7 +339,8 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
 
         // Also track begin_apply's token as an ActiveOp so we can also verify
         // its joint dominance.
-        if (auto *bai = dyn_cast<BeginApplyInst>(&i)) {
+        if (auto *bai = dyn_cast<BeginApplyInst>(&i);
+            bai && !bai->isUnresolved()) {
           state.handleScopeInst(bai->getTokenResult());
         }
         continue;

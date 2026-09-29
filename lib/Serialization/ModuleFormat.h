@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1035; // serialize 'hasOwnershipForTrivialValues' flag
+    1035; // IsUnresolved flag for BeginApply and BeginAccessInst
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///

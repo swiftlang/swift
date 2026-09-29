@@ -975,11 +975,13 @@ BeginApplyInst::BeginApplyInst(
     ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
     std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing)
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    bool isUnresolved)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
                       typeDependentOperands, argLocs, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
-                                              allResultOwnerships) {
+                                              allResultOwnerships),
+      IsUnresolved(isUnresolved) {
   setApplyOptions(options);
   assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
@@ -991,7 +993,8 @@ BeginApplyInst *BeginApplyInst::create(
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
-    std::optional<ArrayRef<SILLocation>> argLocs) {
+    std::optional<ArrayRef<SILLocation>> argLocs,
+    bool isUnresolved) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -1044,7 +1047,8 @@ BeginApplyInst *BeginApplyInst::create(
   return ::new (buffer)
       BeginApplyInst(loc, callee, substCalleeSILType, resultTypes,
                      resultOwnerships, subs, args, typeDependentOperands,
-                     argLocs, options, specializationInfo, isolationCrossing);
+                     argLocs, options, specializationInfo, isolationCrossing,
+                     isUnresolved);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
