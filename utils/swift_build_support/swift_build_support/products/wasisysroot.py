@@ -16,6 +16,7 @@ import sys
 from . import cmake_product
 from . import llvm
 from . import product
+from . import wasmkit
 from ..helpers import wasmsysroothelpers
 
 
@@ -40,8 +41,6 @@ class WASISysroot(product.Product):
         return False
 
     def should_build(self, host_target):
-        # WASI sysroot should always be built if standard library is being
-        # built for WebAssembly.
         return self.args.build_wasistdlib
 
     def should_test(self, host_target):
@@ -61,6 +60,50 @@ class WASISysroot(product.Product):
             enable_wasi_threads=True,
             compiler_rt_os_dir='wasip1',
             target_triple='wasm32-wasip1-threads')
+        if self.args.wasi_libc_component_tools_path:
+            self._build_target(
+                host_target,
+                enable_wasi_threads=False,
+                compiler_rt_os_dir='wasip2',
+                target_triple='wasm32-wasip2')
+
+    @staticmethod
+    def _find_component_tool(tools_dir, *names):
+        # Not shutil.which: its path= argument is split on os.pathsep.
+        for name in names:
+            candidate = os.path.join(tools_dir, name)
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def _wasm_component_tool_paths(self, host_target):
+        # The component-embedding tool and link driver the wasip2 wasi-libc
+        # build needs; (None, None) leaves wasi-libc's own discovery intact.
+        tools_dir = self.args.wasi_libc_component_tools_path
+        if tools_dir:
+            wasm_tools = self._find_component_tool(
+                tools_dir, 'wasmkit', 'wasm-tools')
+            component_ld = self._find_component_tool(
+                tools_dir, 'wasmkit-component-ld', 'wasm-component-ld')
+            if wasm_tools and component_ld:
+                return wasm_tools, component_ld
+            if self.args.dry_run:
+                # A dry-run can precede the tools being built; do not fail.
+                return (wasm_tools or os.path.join(tools_dir, 'wasmkit'),
+                        component_ld
+                        or os.path.join(tools_dir, 'wasmkit-component-ld'))
+            print(f'error: --wasi-libc-component-tools-path={tools_dir} must '
+                  'contain executable component tools (wasmkit or wasm-tools, '
+                  'and wasmkit-component-ld or wasm-component-ld); check they '
+                  'exist and are executable', file=sys.stderr)
+            sys.exit(1)
+        if self.args.build_wasmkit:
+            build_root = os.path.dirname(self.build_dir)
+            wasmkit_build_dir = os.path.join(build_root,
+                                             'wasmkit-%s' % host_target)
+            return (wasmkit.WasmKit.cli_file_path(wasmkit_build_dir),
+                    wasmkit.WasmKit.component_ld_file_path(wasmkit_build_dir))
+        return None, None
 
     def _toolchain_paths(self, host_target):
         if self.args.build_runtime_with_host_compiler:
@@ -99,6 +142,8 @@ class WASISysroot(product.Product):
         compiler_rt_build_dir = os.path.join(target_build_dir, 'compiler-rt')
 
         cc_path, cxx_path, ar_path, nm_path, ranlib_path = self._toolchain_paths(host_target)
+        wasm_tools_path, component_ld_path = \
+            self._wasm_component_tool_paths(host_target)
 
         cmake_has_threads = 'TRUE' if enable_wasi_threads else 'FALSE'
         sysroot_install_path = WASISysroot.sysroot_install_path(build_root, target_triple)
@@ -149,7 +194,9 @@ class WASISysroot(product.Product):
             ar_path=ar_path,
             nm_path=nm_path,
             ranlib_path=ranlib_path,
-            builtins_lib_path=builtins_lib_path)
+            builtins_lib_path=builtins_lib_path,
+            wasm_tools_path=wasm_tools_path,
+            component_ld_path=component_ld_path)
 
         self._build_compiler_rt(
             compiler_rt_build_dir=compiler_rt_build_dir,
@@ -178,7 +225,8 @@ class WASISysroot(product.Product):
             cxx_flags=cxx_flags_str)
 
     def _build_wasi_libc(self, wasi_libc_build_dir, target_triple, build_root,
-                         cc_path, ar_path, nm_path, ranlib_path, builtins_lib_path):
+                         cc_path, ar_path, nm_path, ranlib_path, builtins_lib_path,
+                         wasm_tools_path=None, component_ld_path=None):
         cmake = cmake_product.CMakeProduct(
             args=self.args,
             toolchain=self.toolchain,
@@ -203,11 +251,28 @@ class WASISysroot(product.Product):
         cmake.cmake_options.define('TARGET_TRIPLE:STRING', target_triple)
         cmake.cmake_options.define('BUILTINS_LIB:FILEPATH', builtins_lib_path)
 
-        cmake.build_with_cmake([], cmake.args.build_variant, [],
-                               prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
-                               ignore_extra_cmake_options=True)
-        sysroot_install_path = WASISysroot.sysroot_install_path(build_root, target_triple)
-        cmake.install_with_cmake(['install'], sysroot_install_path)
+        # Setting these cache vars makes wasi-libc's find_program a no-op and
+        # skips its ba_download fallback; consumed only by the component build.
+        if wasm_tools_path:
+            cmake.cmake_options.define('WASM_TOOLS_EXECUTABLE:FILEPATH', wasm_tools_path)
+        if component_ld_path:
+            cmake.cmake_options.define(
+                'WASM_COMPONENT_LD_EXECUTABLE:FILEPATH', component_ld_path)
+
+        # The component link driver finds wasm-ld via PATH (clang can't forward
+        # its path under -fuse-ld), but the sub-build doesn't add it; prepend
+        # the LLVM bin dir, where wasm-ld sits beside llvm-ar.
+        llvm_bin_dir = os.path.dirname(ar_path)
+        saved_path = os.environ.get('PATH', '')
+        os.environ['PATH'] = llvm_bin_dir + os.pathsep + saved_path
+        try:
+            cmake.build_with_cmake([], cmake.args.build_variant, [],
+                                   prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
+                                   ignore_extra_cmake_options=True)
+            sysroot_install_path = WASISysroot.sysroot_install_path(build_root, target_triple)
+            cmake.install_with_cmake(['install'], sysroot_install_path)
+        finally:
+            os.environ['PATH'] = saved_path
 
     @classmethod
     def sysroot_build_path(cls, build_root, host_target, target_triple):
