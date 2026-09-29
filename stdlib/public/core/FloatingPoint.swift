@@ -1098,7 +1098,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if this value is not greater than `other`; otherwise,
+  /// - Returns: `true` if this value is less than or equal to `other`; otherwise,
   ///   `false`. If either this value or `other` is NaN, the result of this
   ///   method is `false`.
   func isLessThanOrEqualTo(_ other: Self) -> Bool
