@@ -4,11 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
-// UNSUPPORTED: OS=linux-gnu
-// UNSUPPORTED: OS=windows-msvc
-
-// rdar://188689326
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
+// REQUIRES: OS_FAMILY=darwin
 
 import Distributed
 import FakeDistributedActorSystems
