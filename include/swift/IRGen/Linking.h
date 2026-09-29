@@ -1938,6 +1938,14 @@ public:
   llvm::GlobalValue::VisibilityTypes getVisibility() const {
     return IRL.Visibility;
   }
+  /// Override the computed linkage/visibility. @objcDirect uses these to fix up
+  /// the LinkInfo *before* createFunction() makes its
+  /// markGlobalAsUsedBasedOnLinkage() decision, so a non-public direct method is
+  /// not pinned into llvm.used and stays eligible for dead-code elimination.
+  void setLinkage(llvm::GlobalValue::LinkageTypes L) { IRL.Linkage = L; }
+  void setVisibility(llvm::GlobalValue::VisibilityTypes V) {
+    IRL.Visibility = V;
+  }
   llvm::GlobalValue::DLLStorageClassTypes getDLLStorage() const {
     return IRL.DLLStorage;
   }

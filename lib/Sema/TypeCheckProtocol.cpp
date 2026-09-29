@@ -6082,6 +6082,22 @@ void ConformanceChecker::resolveValueWitnesses() {
           return;
         }
 
+        // A direct method is absent from the class's Objective-C method list,
+        // but a witness for an @objc requirement is dispatched by selector --
+        // so every call made through the protocol would fail to resolve, at a
+        // distance from the declaration that carries the attribute. Reject the
+        // conformance instead.
+        if (witness->isObjCDirectDispatched()) {
+          SourceLoc diagLoc = getLocForDiagnosingWitness(Conformance, witness);
+          C.Diags.diagnose(diagLoc, diag::witness_objc_direct, witness,
+                           Proto->getName());
+          if (diagLoc != witness->getLoc())
+            witness->diagnose(diag::decl_declared_here, witness);
+          requirement->diagnose(diag::requirement_declared_here, requirement);
+          Conformance->setInvalid();
+          return;
+        }
+
         // The selectors must coincide.
         if (checkObjCWitnessSelector(requirement, witness)) {
           Conformance->setInvalid();

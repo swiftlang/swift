@@ -1524,6 +1524,22 @@ public:
   /// Whether this declaration is never emitted into the client.
   bool isNeverEmitIntoClient() const;
 
+  /// If this function is the exported entry point of an @objcDirect method,
+  /// returns the declaration carrying the attribute; otherwise null. The AST
+  /// attribute stays the single source of truth, and every client resolves the
+  /// declaration the same way: prefer the SILDeclRef SILGen assigned, and fall
+  /// back to the location for functions that have no decl ref.
+  AbstractFunctionDecl *getObjCDirectDecl() const {
+    auto *AFD = getDeclRef().getAbstractFunctionDecl();
+    if (!AFD && hasLocation())
+      AFD = getLocation().getAsASTNode<AbstractFunctionDecl>();
+    return (AFD && AFD->isObjCDirect()) ? AFD : nullptr;
+  }
+
+  /// True if this function is the exported entry point of an @objcDirect
+  /// method.
+  bool isObjCDirect() const { return getObjCDirectDecl() != nullptr; }
+
   /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
