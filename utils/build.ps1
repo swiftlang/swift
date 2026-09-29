@@ -3426,7 +3426,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
-    if ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
+    elseif ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
