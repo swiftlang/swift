@@ -20,6 +20,7 @@ add_swift_host_library(swiftFrontend STATIC
   ModuleInterfaceLoader.cpp
   ModuleInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
+  SARIFDiagnosticConsumer.cpp
   Serialization.cpp
   SerializedDiagnosticConsumer.cpp)
 add_dependencies(swiftFrontend

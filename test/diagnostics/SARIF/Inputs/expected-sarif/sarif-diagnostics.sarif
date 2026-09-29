@@ -1,0 +1,109 @@
+{
+  "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+        {
+          "location" : {
+            "uri" : "file:///TEST_DIR/sarif-diagnostics.swift"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        }
+      ],
+      "columnKind" : "utf16CodeUnits",
+      "results" : [
+        {
+          "level" : "error",
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 15,
+                  "endLine" : 13,
+                  "startColumn" : 14,
+                  "startLine" : 13
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "missing arguments for parameters 'x', 'y' in call"
+          },
+          "ruleId" : "missing_arguments_in_call",
+          "ruleIndex" : 0
+        },
+        {
+          "level" : "note",
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 9,
+                  "endLine" : 12,
+                  "startColumn" : 8,
+                  "startLine" : 12
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "'init(x:y:)' declared here"
+          },
+          "ruleId" : "decl_declared_here",
+          "ruleIndex" : 1
+        },
+        {
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 17,
+                  "endLine" : 14,
+                  "startColumn" : 16,
+                  "startLine" : 14
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it"
+          },
+          "ruleId" : "pbd_never_used",
+          "ruleIndex" : 2
+        }
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "rules" : [
+            {
+              "id" : "missing_arguments_in_call"
+            },
+            {
+              "id" : "decl_declared_here"
+            },
+            {
+              "id" : "pbd_never_used"
+            }
+          ],
+          "version" : "Swift version SWIFT_VERSION"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}

@@ -899,6 +899,8 @@ else()
   set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
 endif()
 
+# Turned off while swift-toolchain-sarif is not yet built in CI on every
+# host and the output is unexercised on Windows.
 option(SWIFT_BUILD_SARIF
   "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
   FALSE)
