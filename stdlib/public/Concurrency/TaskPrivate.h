@@ -254,12 +254,12 @@ bool addStatusRecordWithLock(AsyncTask *task, TaskStatusRecord *record,
 ///
 /// If the task has a cancellation scope, the caller must hold the status record
 /// lock.
-std::optional<size_t> getObservedCancellation(ActiveTaskStatus status);
+std::optional<size_t> getObservedCancellationReason(ActiveTaskStatus status);
 
 /// Returns the reason of the cancellation that the code the current task runs
 /// observes, or `std::nullopt` if it doesn't observe one. Takes the status
 /// record lock if the task has a cancellation scope.
-std::optional<size_t> getObservedCancellation(AsyncTask *task);
+std::optional<size_t> getObservedCancellationReason(AsyncTask *task);
 
 /// Add a status record to the current task, and pass the cancellation that
 /// the code of the task observes to `testAddRecord`.
@@ -725,8 +725,8 @@ public:
   ///
   /// Cancellation shields and cancellation scopes only affect the code that
   /// runs inside of them, so they are not taken into account. See
-  /// `getObservedCancellation` for the cancellation that the code of the task
-  /// observes.
+  /// `getObservedCancellationReason` for the cancellation that the code of the
+  /// task observes.
   bool isTaskCancelled() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled(size_t reason) const {
     // Reasons are set only once, when transitioning from not-cancelled to
@@ -1417,7 +1417,7 @@ inline bool AsyncTask::localValuePop() {
 // `cancellationShieldPush` / `cancellationShieldPop` are implemented in
 // TaskStatus.cpp because they push/pop a `TaskCancellationShieldRecord`
 // alongside the fast-path shield bit; the record makes shield-vs-scope
-// ordering visible to `getObservedCancellation`.
+// ordering visible to `getObservedCancellationReason`.
 
 } // end namespace swift
 

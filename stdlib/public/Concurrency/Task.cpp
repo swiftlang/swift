@@ -816,7 +816,7 @@ std::optional<size_t> AsyncTask::getCancellationReasonInCurrentContext() const {
       return status.getCancellationReason();
     return std::nullopt;
   }
-  return getObservedCancellation(const_cast<AsyncTask *>(this));
+  return getObservedCancellationReason(const_cast<AsyncTask *>(this));
 }
 
 void FutureFragment::destroy() {
