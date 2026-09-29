@@ -1459,7 +1459,7 @@ bool SILDeserializer::readBlockArgs(SILBasicBlock *CurrentBB, SILFunction *Fn,
       fArg->setInferredImmutable(isInferredImmutable);
       fArg->setOwnershipKind(OwnershipKind);
       Arg = fArg;
-    } else { f
+    } else {
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
                                          /*decl*/ nullptr, reborrow,
                                          pointerEscape);
@@ -1660,6 +1660,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   unsigned ApplyCallerIsolation = unsigned(ActorIsolation::Unspecified);
   unsigned ApplyCalleeIsolation = unsigned(ActorIsolation::Unspecified);
+  unsigned IsUnresolved = 0;
   unsigned ApplyHasArgumentLocs = 0;
 
   switch (RecordKind) {
@@ -1746,7 +1747,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     unsigned Kind, RawApplyOpts;
     SILInstApplyLayout::readRecord(
         scratch, Kind, RawApplyOpts, ApplyHasArgumentLocs, SubID, TyID, TyID2,
-        ValID, ApplyCallerIsolation, ApplyCalleeIsolation, ListOfValues);
+        ValID, ApplyCallerIsolation, ApplyCalleeIsolation, IsUnresolved,
+        ListOfValues);
     switch (Kind) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -2464,7 +2466,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       ResultInst = Builder.createBeginApply(
           Loc, getLocalValue(Builder.maybeGetFunction(), ValID, FnTy),
           Substitutions, Args, ApplyOpts, nullptr, IsolationCrossing,
-          argLocsRef);
+          argLocsRef, IsUnresolved);
     }
     break;
   }
@@ -3262,8 +3264,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x07);
     bool noNestedConflict = (Attr >> 5) & 0x01;
     bool fromBuiltin = (Attr >> 6) & 0x01;
+    bool isUnresolved = (Attr >> 7) & 0x01;
     ResultInst = Builder.createBeginAccess(Loc, op, accessKind, enforcement,
-                                           noNestedConflict, fromBuiltin);
+                                           noNestedConflict, fromBuiltin,
+                                           isUnresolved);
     break;
   }
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst: {

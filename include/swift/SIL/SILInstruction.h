@@ -3484,6 +3484,8 @@ class BeginApplyInst final
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
           InitialTrailingObjects<Operand, SILLocation>> {
+  bool IsUnresolved;
+
   friend SILBuilder;
 
   template <class, class...>
@@ -3502,7 +3504,8 @@ class BeginApplyInst final
                  std::optional<ArrayRef<SILLocation>> argLocs,
                  ApplyOptions options,
                  const GenericSpecializationInformation *specializationInfo,
-                 std::optional<ApplyIsolationCrossing> isolationCrossing);
+                 std::optional<ApplyIsolationCrossing> isolationCrossing,
+                 bool isUnresolved);
 
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue callee,
@@ -3512,7 +3515,8 @@ class BeginApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
-         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt,
+         bool isUnresolved = false);
 
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
@@ -3549,6 +3553,13 @@ public:
       SmallVectorImpl<Operand *> &endApplyInsts,
       SmallVectorImpl<Operand *> &abortApplyInsts,
       SmallVectorImpl<Operand *> *endBorrowInsts = nullptr) const;
+      
+  /// True if the `end_apply` and/or `abort_apply` resumptions for this
+  /// instruction are not yet in their final place. This should only be possible
+  /// in raw SILGen output that has not had lifetime resolution run on it yet.
+  bool isUnresolved() const { return IsUnresolved; }
+  
+  void setUnresolved(bool unresolved) { IsUnresolved = unresolved; }
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
@@ -5304,14 +5315,15 @@ public:
 class BeginAccessInst
     : public BeginAccessBase<UnaryInstructionBase<SILInstructionKind::BeginAccessInst,
                                   SingleValueInstruction>> {
+  bool IsUnresolved;
   friend class SILBuilder;
 
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
                   SILAccessKind accessKind, SILAccessEnforcement enforcement,
-                  bool noNestedConflict, bool fromBuiltin)
+                  bool noNestedConflict, bool fromBuiltin,
+                  bool unresolved)
       : BeginAccessBase(loc, accessKind, enforcement, noNestedConflict,
-        fromBuiltin, lvalue, lvalue->getType()) {
-
+        fromBuiltin, lvalue, lvalue->getType()), IsUnresolved(unresolved) {
     static_assert(unsigned(SILAccessKind::Last) < (1 << 3),
                   "reserve sufficient bits for serialized SIL");
     static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 3),
@@ -5335,6 +5347,13 @@ public:
 
   /// Find all the associated end_access instructions for this begin_access.
   EndAccessRange getEndAccesses() const;
+  
+  /// True if the `end_access` markers for this instruction are not yet in
+  /// their final place. This should only be possible in raw SILGen output
+  /// that has not had lifetime resolution run on it yet.
+  bool isUnresolved() const { return IsUnresolved; }
+  
+  void setUnresolved(bool unresolved) { IsUnresolved = unresolved; }
 };
 
 /// Represents the end of an access scope.
