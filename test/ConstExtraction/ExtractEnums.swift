@@ -232,12 +232,16 @@ public struct Enums: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "title",
 // CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractEnums.swift",
+// CHECK-NEXT:              "line": 27,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "the_title"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "subtitle",
 // CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractEnums.swift",
+// CHECK-NEXT:              "line": 27,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "the_subtitle"
 // CHECK-NEXT:            }
@@ -272,6 +276,8 @@ public struct Enums: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractEnums.swift",
+// CHECK-NEXT:              "line": 28,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "42"
 // CHECK-NEXT:            }
