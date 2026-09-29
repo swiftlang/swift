@@ -5,7 +5,6 @@
 - [Introduction](#introduction)
 - [Pull Request Testing](#pull-request-testing)
     - [@swift-ci](#swift-ci)
-    - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
     - [Linting](#linting)
     - [Source Compatibility Testing](#source-compatibility-testing)
@@ -28,54 +27,20 @@ This page is designed to assist in the understanding of proper practices for tes
 
 ## Pull Request Testing
 
-In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [^1]. In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
+In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [^1]. In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a full [validation test](#validation-testing). If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
 
 ### @swift-ci
 
 Users with [commit access](/CONTRIBUTING.md#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
 
-1. Smoke Testing
-2. Validation Testing
-3. Benchmarking.
-4. Linting
-5. Source Compatibility Testing
-6. Specific Preset Testing
-7. Testing Compiler Performance
+1. Validation Testing
+2. Benchmarking.
+3. Linting
+4. Source Compatibility Testing
+5. Specific Preset Testing
+6. Testing Compiler Performance
 
 We describe each in detail below:
-
-### Smoke Testing
-
-Platform     | Comment | Check Status
------------- | ------- | ------------
-All supported platforms     | @swift-ci Please smoke test                      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
-All supported platforms     | @swift-ci Please clean smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
-macOS platform              | @swift-ci Please smoke test macOS platform        | Swift Test macOS Platform (smoke test)
-macOS platform              | @swift-ci Please clean smoke test macOS platform  | Swift Test macOS Platform (smoke test)
-Linux platform              | @swift-ci Please smoke test Linux platform       | Swift Test Linux Platform (smoke test)
-Linux platform              | @swift-ci Please clean smoke test Linux platform | Swift Test Linux Platform (smoke test)
-
-A smoke test on macOS does the following:
-
-1. Builds LLVM/Clang incrementally.
-2. Builds Swift clean.
-3. Builds the standard library clean only for macOS. Simulator standard libraries and
-   device standard libraries are not built.
-4. lldb is not built.
-5. The test and validation-test targets are run only for macOS. The optimized
-   version of these tests are not run.
-
-A smoke test on Linux does the following:
-
-1. Builds LLVM/Clang incrementally.
-2. Builds Swift clean.
-3. Builds the standard library clean.
-4. lldb is built incrementally.
-5. Foundation, SwiftPM, LLBuild, XCTest are built.
-6. The swift test and validation-test targets are run. The optimized version of these
-   tests are not run.
-7. lldb is tested.
-8. Foundation, SwiftPM, LLBuild, XCTest are tested.
 
 ### Validation Testing
 
@@ -276,7 +241,7 @@ apple/swift-lldb#48
 
 1. Create a separate PR for each repository that needs to be changed. Each should reference the main Swift PR and create a reference to all of the others from the main PR.
 
-2. Gate all commits on @swift-ci smoke test. As stated above, it is important that *all* checkins perform PR testing since if breakage enters the tree PR testing becomes less effective. If you have done local testing (using build-toolchain) and have made appropriate changes to the other repositories then perform a smoke test should be sufficient for correctness. This is not meant to check for correctness in your commits, but rather to be sure that no one landed changes in other repositories or in swift that cause your PR to no longer be correct. If you were unable to make workarounds to the other repositories, this smoke test will break *after* Swift has built. Check the log to make sure that it is the expected failure for that platform/repository that coincides with the failure your PR is supposed to fix.
+2. Gate all commits on @swift-ci Please test. As stated above, it is important that *all* checkins perform PR testing since if breakage enters the tree PR testing becomes less effective. If you have done local testing (using build-toolchain) and have made appropriate changes to the other repositories then this should be sufficient for correctness. This is not meant to check for correctness in your commits, but rather to be sure that no one landed changes in other repositories or in swift that cause your PR to no longer be correct. If you were unable to make workarounds to the other repositories, this test will break *after* Swift has built. Check the log to make sure that it is the expected failure for that platform/repository that coincides with the failure your PR is supposed to fix.
 
 3. Merge all of the pull requests simultaneously.
 
