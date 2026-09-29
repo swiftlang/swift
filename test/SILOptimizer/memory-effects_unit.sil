@@ -2227,3 +2227,33 @@ bb0(%0 : @owned $X):
   end_access %10 : $*X
   return %11 : $X
 }
+
+// An `end_borrow` of a reborrowed `load_borrow` has the same effects as an `end_borrow` of
+// the `load_borrow` itself.
+// CHECK-LABEL: @test_end_borrow_of_reborrowed_load_borrow
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %8 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %8 : $X
+// CHECK-NEXT:     %1 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow_of_reborrowed_load_borrow : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  specify_test "memory_effects"
+  %1 = alloc_stack $X
+  %2 = load_borrow %0 : $*X
+  br bb1(%2 : $X)
+
+bb1(%4 : @reborrow $X):
+  %5 = borrowed %4 : $X from ()
+  br bb2(%5 : $X)
+
+bb2(%7 : @reborrow $X):
+  %8 = borrowed %7 : $X from ()
+  end_borrow %8 : $X
+  dealloc_stack %1 : $*X
+  %11 = tuple ()
+  return %11 : $()
+}

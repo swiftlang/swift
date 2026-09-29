@@ -343,6 +343,13 @@ struct AliasAnalysis {
           return .worstEffects
         }
         return borrowEffects
+      case let borrowedFrom as BorrowedFromInst where borrowedFrom.borrowedPhi.isReborrow:
+        // A reborrow continues the borrow scope of the incoming borrow(s). If one of those is a
+        // `load_borrow`, the `end_borrow` has the same effects on the loaded memory location as an
+        // `end_borrow` of the `load_borrow` itself.
+        if isEndOfReborrowedLoadBorrow(borrowedFrom, aliasingWith: memLoc) {
+          return .worstEffects
+        }
       default:
         break
       }
@@ -400,6 +407,31 @@ struct AliasAnalysis {
       var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
+  }
+
+  /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow` whose
+  /// address may alias with `memLoc`.
+  private func isEndOfReborrowedLoadBorrow(_ borrowedFrom: BorrowedFromInst,
+                                           aliasingWith memLoc: MemoryLocation) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+    worklist.pushIfNotVisited(borrowedFrom.borrowedValue)
+
+    while let value = worklist.pop() {
+      switch value {
+      case let loadBorrow as LoadBorrowInst:
+        if memLoc.mayAlias(with: loadBorrow.address, self) {
+          return true
+        }
+      case let bf as BorrowedFromInst:
+        worklist.pushIfNotVisited(bf.borrowedValue)
+      default:
+        if let phi = Phi(value), phi.isReborrow {
+          worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+        }
+      }
+    }
+    return false
   }
 
   private func getAccessScopeEffect(of beginAccess: BeginAccessInst, on memLoc: MemoryLocation) -> SideEffects.Memory {
