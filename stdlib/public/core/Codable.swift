@@ -3776,13 +3776,13 @@ public enum DecodingError: Error {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension EncodingError: CustomDebugStringConvertible {
   /// A textual representation of this encoding error, intended for debugging.
   ///
   /// - Important: The contents of the returned string are not guaranteed to
   ///    remain stable: they may arbitrarily change in any Swift release.
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   public var debugDescription: String {
     let (message, context) = switch self {
       case .invalidValue(let value, let context):
@@ -3812,13 +3812,13 @@ extension EncodingError: CustomDebugStringConvertible {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension DecodingError: CustomDebugStringConvertible {
   /// A textual representation of this decoding error, intended for debugging.
   ///
   /// - Important: The contents of the returned string are not guaranteed to
   ///    remain stable: they may arbitrarily change in any Swift release.
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   public var debugDescription: String {
     let (message, context) = switch self {
       case .typeMismatch(let expectedType, let context):
