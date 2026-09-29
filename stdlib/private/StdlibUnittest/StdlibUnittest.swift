@@ -797,6 +797,23 @@ public func expectCrashLater(withMessage message: String = "") {
   _seenExpectCrash.store(true)
 }
 
+/// Registers an expected crash, along with a message whose presense should
+/// only be expected in debug mode (debug-asserts configuration).
+///
+/// The configuration of interest is the configuration of the module calling
+/// this function, not the configuration of StdlibUnittest.
+///
+/// - Parameter message: A message expected from the crashing code, when
+///     built in debug mode.
+@export(implementation)
+public func expectCrashLater(withDebugMessage message: String) {
+  if _isDebugAssertConfiguration() {
+    expectCrashLater(withMessage: message)
+  } else {
+    expectCrashLater()
+  }
+}
+
 public func expectCrash(withMessage message: String = "", executing: () -> Void) -> Never {
   expectCrashLater(withMessage: message)
   executing()
