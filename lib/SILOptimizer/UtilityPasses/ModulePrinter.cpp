@@ -27,8 +27,10 @@ class SILModulePrinter : public SILModuleTransform {
   /// The entry point.
   void run() override {
     auto *module = getModule();
-    SILPrintContext context(llvm::outs(), /*Verbose*/ true, /*SortedSIL*/ true,
-                            /*PrintFullConvention*/ true);
+    SILPrintContext context(llvm::outs(),
+                            {SILPrintContext::Flag::Verbose,
+                             SILPrintContext::Flag::SortedSIL,
+                             SILPrintContext::Flag::PrintFullConvention});
     module->print(context);
   }
 };
