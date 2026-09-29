@@ -7,6 +7,8 @@
 // Each variant is compiled in isolation so that an earlier error does not stop
 // IR generation before the later type is laid out.
 
+// UNSUPPORTED: CPU=wasm32
+
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DARRAY  -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=ARRAY
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DSTRUCT -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=STRUCT
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DCLASS  -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CLASS
