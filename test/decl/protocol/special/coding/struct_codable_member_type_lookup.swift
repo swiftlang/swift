@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -package-name myPkg
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -package-name myPkg -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // A top-level CodingKeys type to fall back to in lookups below.
 public enum CodingKeys : String, CodingKey {
