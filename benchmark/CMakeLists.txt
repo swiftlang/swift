@@ -204,6 +204,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringRemoveDupes
     single-source/StringRepeating
     single-source/StringReplaceSubrange
+    single-source/SmallString
     single-source/StringSplitting
     single-source/StringSwitch
     single-source/StringTests
