@@ -1494,7 +1494,7 @@ bool DisjunctionChoice::isUnaryOperator() const {
 bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
   // First, let's bring all referenced variables into scope.
   {
-    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
 
     if (cs.isDebugMode()) {

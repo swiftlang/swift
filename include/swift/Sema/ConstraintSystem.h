@@ -4414,7 +4414,7 @@ class TypeVarRefCollector : public ASTWalker {
   DeclContext *DC;
   ConstraintLocator *Locator;
 
-  llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> TypeVars;
   unsigned DCDepth = 0;
 
 public:

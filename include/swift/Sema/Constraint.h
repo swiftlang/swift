@@ -468,48 +468,42 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
              bool isIsolated, ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second, Type third,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
              DeclContext *useDC, FunctionRefInfo functionRefInfo,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
   Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
              DeclContext *useDC, ConstraintFix *fix, ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
              Type first, Type second, ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a closure body element constraint.
   Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   Constraint(FunctionType *appliedFn, Type calleeType,
              unsigned trailingClosureMatching, DeclContext *useDC,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {

@@ -751,16 +751,16 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 }
 
 void TypeBase::getTypeVariables(
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (!hasTypeVariable())
     return;
 
   class Walker : public TypeWalker {
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables;
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVariables;
 
   public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables)
+    explicit Walker(SmallPtrSetVector<TypeVariableType *, 4> &typeVariables)
         : typeVariables(typeVariables) {}
 
     Action walkToTypePre(Type ty) override {
@@ -768,9 +768,8 @@ void TypeBase::getTypeVariables(
       if (!ty->hasTypeVariable())
         return Action::SkipNode;
 
-      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
+      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer()))
         typeVariables.insert(tv);
-      }
 
       return Action::Continue;
     }
