@@ -31,6 +31,11 @@ struct WeaksInAStructArc {
   __weak MYObject *_Nullable myobj;
 };
 
+@interface WeakArcStructBase : NSObject
+- (struct WeaksInAStructArc)transformWeakArcStruct:
+    (struct WeaksInAStructArc)value;
+@end
+
 struct WeakAndNonnull {
   __weak MYObject *_Nonnull myobj;
 };
