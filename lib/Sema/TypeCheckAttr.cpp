@@ -9586,17 +9586,6 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   return renamedDecl;
 }
 
-template <typename ATTR>
-static void forEachCustomAttribute(
-    Decl *decl,
-    llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
-  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    auto *nominal = attr->getNominalDecl();
-    if (nominal && nominal->getAttrs().hasAttribute<ATTR>())
-      fn(attr, nominal);
-  }
-}
-
 ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
     Evaluator &evaluator, DeclAttribute *attr, AccessorDecl *attachedTo,
     ArrayRef<Identifier> referencedVars) const {

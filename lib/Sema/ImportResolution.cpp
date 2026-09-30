@@ -219,11 +219,6 @@ private:
   // Ignore other decls.
   void visitDecl(Decl *D) {}
 
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
-  }
-
   /// Calls \c bindImport() on unbound imports until \c boundImports is drained.
   void bindPendingImports();
 

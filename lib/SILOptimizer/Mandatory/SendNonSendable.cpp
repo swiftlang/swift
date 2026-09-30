@@ -429,26 +429,6 @@ findClosureUse(Operand *initialOperand) {
 }
 
 //===----------------------------------------------------------------------===//
-//                             MARK: Diagnostics
-//===----------------------------------------------------------------------===//
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(const PartitionOp &op, Diag<T...> diag,
-                                        U &&...args) {
-  return siloptimizer::diagnoseError(
-      op.getSourceInst()->getFunction()->getASTContext(),
-      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
-                                       U &&...args) {
-  return siloptimizer::diagnoseNote(
-      op.getSourceInst()->getFunction()->getASTContext(),
-      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
-}
-
-//===----------------------------------------------------------------------===//
 //                           MARK: IsolationHistory
 //===----------------------------------------------------------------------===//
 
@@ -2386,12 +2366,6 @@ private:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
@@ -3293,12 +3267,6 @@ private:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
     return diagnoseError(op->getUser()->getLoc(), diag,
                          std::forward<U>(args)...);
@@ -3313,12 +3281,6 @@ private:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
   template <typename... T, typename... U>
@@ -4052,12 +4014,6 @@ public:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
@@ -4066,12 +4022,6 @@ public:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 };
 
@@ -4795,12 +4745,6 @@ public:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
     return diagnoseError(op->getUser()->getLoc(), diag,
                          std::forward<U>(args)...);
@@ -4815,12 +4759,6 @@ public:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
   template <typename... T, typename... U>
