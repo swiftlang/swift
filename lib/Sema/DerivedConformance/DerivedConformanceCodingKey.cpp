@@ -338,57 +338,23 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
 
 static ValueDecl *deriveCodingKeyViaMacros(DerivedConformance &derived,
                                            ValueDecl *requirement) {
-
-  // We can only synthesize CodingKey for enums.
-  auto *enumDecl = dyn_cast<EnumDecl>(derived.Nominal);
-  if (!enumDecl)
-    return nullptr;
-
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeCodingKey(derived))
-    return nullptr;
+  auto *enumDecl = cast<EnumDecl>(derived.Nominal);
 
   auto rawType = enumDecl->getRawType();
   auto name = requirement->getBaseName();
 
-  bool isInit, isString, usingRaw;
+  bool isInit = name.isConstructor();
+  auto argumentNames = requirement->getName().getArgumentNames();
 
-  auto computeRequirement = [&]() {
-    if (name == derived.Context.Id_stringValue) {
-      isInit = false;
-      isString = true;
-      usingRaw = rawType && rawType->isString();
-      return true;
-    }
-    if (name == derived.Context.Id_intValue) {
-      isInit = false;
-      isString = false;
-      usingRaw = rawType && rawType->isInt();
-      return true;
-    }
-    if (!name.isConstructor())
-      return false;
+  DeclBaseName valueName = name;
+  if (isInit)
+    valueName = argumentNames.size() == 1 ? argumentNames[0] : Identifier();
 
-    auto argumentNames = requirement->getName().getArgumentNames();
+  bool isString = valueName == derived.Context.Id_stringValue;
+  bool usingRaw =
+      rawType && (isString ? rawType->isString() : rawType->isInt());
 
-    if (argumentNames.size() != 1)
-      return false;
-    if (argumentNames[0] == derived.Context.Id_stringValue) {
-      isInit = true;
-      isString = true;
-      usingRaw = rawType && rawType->isString();
-      return true;
-    }
-    if (argumentNames[0] == derived.Context.Id_intValue) {
-      isInit = true;
-      isString = false;
-      usingRaw = rawType && rawType->isInt();
-      return true;
-    }
-    return false;
-  };
-
-  if (!computeRequirement()) {
+  if (!isString && valueName != derived.Context.Id_intValue) {
     derived.Context.Diags.diagnose(requirement->getLoc(),
                                    diag::broken_coding_key_requirement);
     return nullptr;
