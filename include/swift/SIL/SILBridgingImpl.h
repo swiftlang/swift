@@ -1754,6 +1754,10 @@ bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
 }
 
+void BridgedInstruction::AllocStackInst_setDynamicLifetime() const {
+  getAs<swift::AllocStackInst>()->setDynamicLifetime();
+}
+
 bool BridgedInstruction::AllocStackInst_isFromVarDecl() const {
   return getAs<swift::AllocStackInst>()->isFromVarDecl();
 }
@@ -1768,6 +1772,10 @@ bool BridgedInstruction::AllocStackInst_isLexical() const {
 
 bool BridgedInstruction::AllocBoxInst_hasDynamicLifetime() const {
   return getAs<swift::AllocBoxInst>()->hasDynamicLifetime();
+}
+
+void BridgedInstruction::AllocBoxInst_setDynamicLifetime() const {
+  getAs<swift::AllocBoxInst>()->setDynamicLifetime();
 }
 
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {

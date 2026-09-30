@@ -1847,6 +1847,12 @@ public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction, MetaInstruction {
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
+
+  public func setDynamicLifetime(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocStackInst_setDynamicLifetime()
+    context.notifyInstructionChanged(self)
+  }
   public var isFromVarDecl: Bool { bridged.AllocStackInst_isFromVarDecl() }
   public var usesMoveableValueDebugInfo: Bool { bridged.AllocStackInst_usesMoveableValueDebugInfo() }
   public override var isLexical: Bool { bridged.AllocStackInst_isLexical() }
@@ -1930,6 +1936,12 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
   }
 
   public var hasDynamicLifetime: Bool { bridged.AllocBoxInst_hasDynamicLifetime() }
+
+  public func setDynamicLifetime(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocBoxInst_setDynamicLifetime()
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {

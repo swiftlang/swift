@@ -929,10 +929,12 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool PartialApplyInst_isStackAllocationNested() const;
   BRIDGED_INLINE void PartialApplyInst_setStackAllocationIsNested(bool) const;
   BRIDGED_INLINE bool AllocStackInst_hasDynamicLifetime() const;
+  BRIDGED_INLINE void AllocStackInst_setDynamicLifetime() const;
   BRIDGED_INLINE bool AllocStackInst_isFromVarDecl() const;
   BRIDGED_INLINE bool AllocStackInst_usesMoveableValueDebugInfo() const;
   BRIDGED_INLINE bool AllocStackInst_isLexical() const;
   BRIDGED_INLINE bool AllocBoxInst_hasDynamicLifetime() const;
+  BRIDGED_INLINE void AllocBoxInst_setDynamicLifetime() const;
   BRIDGED_INLINE bool AllocRefInstBase_isObjc() const;
   BRIDGED_INLINE bool AllocRefInstBase_canAllocOnStack() const;
   BRIDGED_INLINE bool AllocRefInstBase_isStackAllocationNested() const;
