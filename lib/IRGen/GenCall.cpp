@@ -1725,10 +1725,10 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   auto &FI = isCXXMethod ?
       clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All) :
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr) :
       clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All);
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
