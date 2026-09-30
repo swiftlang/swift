@@ -66,6 +66,7 @@ add_library(swift_StringProcessing
   ByteCodeGen+DSLList.swift
   Optimizations/AutoPossessification.swift
   Utility/AsciiBitset.swift
+  Utility/AtomicCounter.swift
   Utility/Traced.swift
   Utility/TypedIndex.swift
   Utility/Misc.swift
