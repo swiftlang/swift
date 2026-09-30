@@ -265,8 +265,17 @@ private:
 
   /// Lookup table for specialized witness tables from conformances.
   /// Currently only used in embedded mode.
+  ///
+  /// Keyed by the canonical conformance (see getSpecializedWitnessTableKey),
+  /// because conformances which only differ in type sugar share a witness
+  /// table symbol.
   llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
   specializedWitnessTableMap;
+
+  static const ProtocolConformance *
+  getSpecializedWitnessTableKey(const ProtocolConformance *C) {
+    return const_cast<ProtocolConformance *>(C)->getCanonicalConformance();
+  }
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;

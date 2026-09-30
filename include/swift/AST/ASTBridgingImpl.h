@@ -965,6 +965,10 @@ BridgedConformance BridgedConformance::getGenericConformance() const {
   return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
 }
 
+BridgedConformance BridgedConformance::getCanonicalConformance() const {
+  return {unbridged().getCanonicalConformanceRef()};
+}
+
 BridgedConformance BridgedConformance::getInheritedConformance() const {
   auto *inheritedConf = swift::cast<swift::InheritedProtocolConformance>(unbridged().getConcrete());
   return {swift::ProtocolConformanceRef(inheritedConf->getInheritedConformance())};
