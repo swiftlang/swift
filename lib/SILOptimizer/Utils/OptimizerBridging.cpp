@@ -239,6 +239,7 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
     void *context,
     void (*callback)(void *context, BridgedConformance conformance)) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
+  SmallVector<NormalProtocolConformance *, 8> conformances;
   for (SILWitnessTable &wt : mod->getWitnessTables()) {
     if (wt.isDeclaration() || wt.isSpecialized())
       continue;
@@ -249,6 +250,15 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
         normal->getDeclContext()->getParentModule() != mod->getSwiftModule() ||
         normal->getDeclContext()->isGenericContext())
       continue;
+    conformances.push_back(normal);
+  }
+
+  for (auto *normal : conformances) {
+    // The entries of an eagerly emitted witness table point directly to the
+    // witness tables of the conformances it references, so deserialize those
+    // just like for a conformance that forms an existential.
+    mod->linkWitnessTable(normal, SILModule::LinkingMode::LinkNormal,
+                          /*referencedFromInitExistential=*/true);
     callback(context, {ProtocolConformanceRef(normal)});
   }
 }

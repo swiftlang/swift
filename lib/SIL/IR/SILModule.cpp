@@ -436,8 +436,11 @@ bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, Mode).processFunction(F);
 }
 
-bool SILModule::linkWitnessTable(ProtocolConformance *PC, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, Mode).processConformance(ProtocolConformanceRef(PC));
+bool SILModule::linkWitnessTable(ProtocolConformance *PC,
+                                 SILModule::LinkingMode Mode,
+                                 bool referencedFromInitExistential) {
+  return SILLinkerVisitor(*this, Mode).processConformance(
+      ProtocolConformanceRef(PC), referencedFromInitExistential);
 }
 
 bool SILModule::hasFunction(StringRef Name) {

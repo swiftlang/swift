@@ -904,8 +904,13 @@ public:
 
   /// Attempt to deserialize witness table for protocol conformance \p PC.
   ///
+  /// If \p referencedFromInitExistential is true, then in Embedded Swift the
+  /// witness tables of the conformances it references are deserialized as
+  /// well, as for a conformance used to form an existential.
+  ///
   /// Returns true if linking succeeded, false otherwise.
-  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode,
+                        bool referencedFromInitExistential = false);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.

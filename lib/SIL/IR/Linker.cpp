@@ -211,8 +211,9 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return Changed;
 }
 
-bool SILLinkerVisitor::processConformance(ProtocolConformanceRef conformanceRef) {
-  visitProtocolConformance(conformanceRef, false);
+bool SILLinkerVisitor::processConformance(ProtocolConformanceRef conformanceRef,
+                                          bool referencedFromInitExistential) {
+  visitProtocolConformance(conformanceRef, referencedFromInitExistential);
   process();
   return Changed;
 }
