@@ -71,3 +71,18 @@ func useNotStd(_ n: inout NotStd) {
   // expected-warning@-1 {{'__insertUnsafe' is deprecated: renamed to 'insert(_:)'}}
   // expected-note@-2 {{use 'insert(_:)' instead}}
 }
+
+func useTemplateAndSafe(_ o: TemplateAndSafeOwner,
+                        _ p: UnsafeMutablePointer<CInt>) {
+  // Instantiating with a pointer doesn't make this a projection.
+  _ = o.identity(p)
+
+  _ = o.vouchedProjection()
+
+  // 'safe' doesn't exempt begin and end, which keep their stubs.
+  _ = o.begin() // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+  _ = unsafe o.begin()
+  _ = unsafe o.__beginUnsafe()
+  _ = unsafe o.__endUnsafe()
+}
