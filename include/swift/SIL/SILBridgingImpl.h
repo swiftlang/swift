@@ -1895,6 +1895,10 @@ SwiftInt BridgedInstruction::AssignInst_getAssignOwnership() const {
   return (SwiftInt)getAs<swift::AssignInst>()->getOwnershipQualifier();
 }
 
+void BridgedInstruction::AssignInst_setAssignOwnership(SwiftInt assignOwnership) const {
+  getAs<swift::AssignInst>()->setOwnershipQualifier((swift::AssignOwnershipQualifier)assignOwnership);
+}
+
 BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_dependenceKind() const {
   return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
 }

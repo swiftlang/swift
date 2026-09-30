@@ -960,6 +960,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
   BRIDGED_INLINE void StoreInst_setStoreOwnership(SwiftInt rawOwnership) const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
+  BRIDGED_INLINE void AssignInst_setAssignOwnership(SwiftInt assignOwnership) const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
   BRIDGED_INLINE void MarkDependenceInstruction_resolveToNonEscaping() const;
   BRIDGED_INLINE void MarkDependenceInstruction_settleToEscaping() const;

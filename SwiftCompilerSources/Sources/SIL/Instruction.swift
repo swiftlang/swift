@@ -479,6 +479,11 @@ final public class AssignInst : Instruction, StoringInstruction {
   public var assignOwnership: AssignOwnership {
     AssignOwnership(rawValue: bridged.AssignInst_getAssignOwnership())!
   }
+  public func set(ownership: AssignOwnership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AssignInst_setAssignOwnership(ownership.rawValue)
+    context.notifyInstructionChanged(self)
+  }
 
   public override var mayCallFunction: Bool {
     switch assignOwnership {
