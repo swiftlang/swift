@@ -301,8 +301,15 @@ updated without updating swift.py?")
 
     @property
     def _enable_stdlib_symbol_graphs(self):
-        return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
-                 self.args.build_stdlib_docs)]
+        options = [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
+                    self.args.build_stdlib_docs)]
+        if self.args.build_stdlib_docs:
+            # if we're building the standard library docs, disable the module
+            # verification through Swift driver, which fails for some of these
+            # modules.
+            options.append(('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
+                            '-no-verify-emitted-module-interface'))
+        return options
 
     @property
     def _enable_new_runtime_build(self):
