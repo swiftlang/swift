@@ -930,14 +930,7 @@ bool ConstraintGraph::contractEdges() {
 
         for (auto &binding : bindings.Bindings) {
           auto type = binding.BindingType;
-          isNotContractable = type.findIf([&](Type nestedType) -> bool {
-            if (auto tv = nestedType->getAs<TypeVariableType>()) {
-              if (tv->getImpl().canBindToInOut())
-                return true;
-            }
-
-            return nestedType->is<InOutType>();
-          });
+          isNotContractable = type->is<InOutType>();
 
           // If there is at least one non-contractable binding, let's
           // not risk contracting this edge.
