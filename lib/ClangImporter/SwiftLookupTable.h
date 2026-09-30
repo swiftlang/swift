@@ -117,12 +117,6 @@ using swift::SerializedSwiftName;
 // Inherit the DenseMapInfo from StringRef but add a few special cases for
 // special names
 template<> struct DenseMapInfo<SerializedSwiftName> {
-  static SerializedSwiftName getEmptyKey() {
-    return SerializedSwiftName(DenseMapInfo<StringRef>::getEmptyKey());
-  }
-  static SerializedSwiftName getTombstoneKey() {
-    return SerializedSwiftName(DenseMapInfo<StringRef>::getTombstoneKey());
-  }
   static unsigned getHashValue(SerializedSwiftName Val) {
     if (Val.Kind == swift::DeclBaseName::Kind::Normal) {
       return DenseMapInfo<StringRef>::getHashValue(Val.Name);

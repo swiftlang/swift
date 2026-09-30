@@ -326,12 +326,6 @@ struct DenseMapInfo<swift::AnyFunctionRef> {
   using PointerUnionTraits = DenseMapInfo<PointerUnion>;
   using AnyFunctionRef = swift::AnyFunctionRef;
 
-  static inline AnyFunctionRef getEmptyKey() {
-    return AnyFunctionRef(PointerUnionTraits::getEmptyKey());
-  }
-  static inline AnyFunctionRef getTombstoneKey() {
-    return AnyFunctionRef(PointerUnionTraits::getTombstoneKey());
-  }
   static inline unsigned getHashValue(AnyFunctionRef ref) {
     return PointerUnionTraits::getHashValue(ref.TheFunction);
   }

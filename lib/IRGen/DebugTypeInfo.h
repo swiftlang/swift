@@ -145,13 +145,6 @@ namespace llvm {
 
 // Dense map specialization.
 template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
-  static swift::irgen::DebugTypeInfo getEmptyKey() {
-    return {};
-  }
-  static swift::irgen::DebugTypeInfo getTombstoneKey() {
-    return swift::irgen::DebugTypeInfo(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
-  }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());
   }

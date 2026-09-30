@@ -233,16 +233,6 @@ public:
     return SubstitutionMap(const_cast<Storage *>((const Storage *)ptr));
   }
 
-  static SubstitutionMap getEmptyKey() {
-    return SubstitutionMap(
-             (Storage *)llvm::DenseMapInfo<void*>::getEmptyKey());
-  }
-
-  static SubstitutionMap getTombstoneKey() {
-    return SubstitutionMap(
-               (Storage *)llvm::DenseMapInfo<void*>::getTombstoneKey());
-  }
-
   friend bool operator ==(SubstitutionMap lhs, SubstitutionMap rhs) {
     return lhs.storage == rhs.storage;
   }
@@ -361,12 +351,6 @@ namespace llvm {
 
   // Substitution maps hash just like pointers.
   template<> struct DenseMapInfo<swift::SubstitutionMap> {
-    static swift::SubstitutionMap getEmptyKey() {
-      return swift::SubstitutionMap::getEmptyKey();
-    }
-    static swift::SubstitutionMap getTombstoneKey() {
-      return swift::SubstitutionMap::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::SubstitutionMap map) {
       return DenseMapInfo<void*>::getHashValue(map.getOpaqueValue());
     }

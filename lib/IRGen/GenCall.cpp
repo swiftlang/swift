@@ -1386,6 +1386,11 @@ namespace {
 #include "clang/Basic/HLSLIntangibleTypes.def"
         llvm_unreachable("HLSL intangible type in ABI lowering");
 
+      // We should never see SPIRV opaque types at all.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
+        llvm_unreachable("SPIRV type in ABI lowering");
+
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
 #define SIGNED_TYPE(Id, SingletonId) \

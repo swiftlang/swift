@@ -588,12 +588,6 @@ public:
 
 template <>
 struct DenseMapInfo<AvailabilityDomain> {
-  static inline AvailabilityDomain getEmptyKey() {
-    return DenseMapInfo<AvailabilityDomain::Storage>::getEmptyKey();
-  }
-  static inline AvailabilityDomain getTombstoneKey() {
-    return DenseMapInfo<AvailabilityDomain::Storage>::getTombstoneKey();
-  }
   static inline unsigned getHashValue(AvailabilityDomain domain) {
     return DenseMapInfo<AvailabilityDomain::Storage>::getHashValue(
         domain.storage);
