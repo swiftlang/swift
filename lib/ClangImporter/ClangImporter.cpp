@@ -1506,6 +1506,12 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   // Clear clang debug flags.
   CI->getCodeGenOpts().DwarfDebugFlags.clear();
 
+  // clang -cc1 defaults to -mincremental-linker-compatible, which writes the
+  // current timestamp into the COFF header of PCM/PCH containers. Disable it
+  // so identical inputs produce identical bytes, as setOnlyIfDifferent
+  // requires.
+  CI->getCodeGenOpts().IncrementalLinkerCompatible = false;
+
   // Disable validation for PCH in LLDB. This option is not controllable via a
   // command line option; setting it depending on the DebuggerSupport flag.
   // LLDB makes a best effort to create a 100% compatible environment by
