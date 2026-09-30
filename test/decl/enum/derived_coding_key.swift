@@ -273,6 +273,9 @@ enum RawIdentifiers: CodingKey {
   // CHECK-NORMAL-NEXT:     }
   // CHECK-NORMAL-NEXT:   }
 
+  // FIXME: Because of an ASTPrinter bug, raw identifiers aren't escaped 
+  // e.g. "case .`hello world`" is just "case .hello world" here, ditto for `if`.
+
   // CHECK-MACRO:        internal init?(stringValue: String) {
   // CHECK-MACRO-NEXT:     switch stringValue {
   // CHECK-MACRO-NEXT:     case "hello world":
@@ -284,6 +287,9 @@ enum RawIdentifiers: CodingKey {
   // CHECK-MACRO-NEXT:     }
   // CHECK-MACRO-NEXT:   }
 
+  // FIXME: Because of an ASTPrinter bug, raw identifiers aren't escaped 
+  // e.g. "case .`hello world`" is just "case .hello world" here, ditto for `if`.
+  
   // CHECK:        internal var stringValue: String {
   // CHECK-NEXT:     get {
   // CHECK-NEXT:       switch self {
