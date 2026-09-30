@@ -303,10 +303,7 @@ private func specializeWitnessTable(for conformance: Conformance,
       // The associated conformance is abstract if the associated type is an opaque result
       // type. Keep the abstract conformance in the entry - IRGen looks through the opaque
       // type - but make sure the underlying type's witness table exists.
-      let underlyingConf = concreteAssociateConf.lookingThroughOpaqueTypes(context)
-      if underlyingConf.isConcrete, underlyingConf.isSpecialized {
-        specializeWitnessTable(for: underlyingConf, visited: &visited, context)
-      }
+      specializeNestedConformance(concreteAssociateConf, visited: &visited, context)
       return .associatedConformance(requirement: requirement,
                                     witness: concreteAssociateConf)
     }
