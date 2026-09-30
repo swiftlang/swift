@@ -181,7 +181,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public final var isDeinitBarrier: Bool {
     switch self {
-    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst, is YieldInst:
       return true
     default:
       return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
