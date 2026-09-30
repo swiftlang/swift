@@ -1446,3 +1446,366 @@ bb7:
   %31 = tuple ()
   return %31 : $()
 }
+
+class SubKlass : Klass {}
+
+sil @get_opt_word : $@convention(thin) () -> Optional<Builtin.Word>
+sil @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+sil @get_klass : $@convention(thin) () -> @owned Klass
+sil @may_throw : $@convention(thin) () -> @error any Error
+
+// An early exit which isn't a cond_br can pass a terminator result to its exit
+// block. Cloning splits the exit edges, and the split block of each iteration
+// must forward that iteration's terminator result.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_with_trivial_payload :
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : $Builtin.Word):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : $Builtin.Word):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : $Builtin.Word):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_with_trivial_payload'
+sil [ossa] @unroll_switch_enum_exit_with_trivial_payload : $@convention(thin) () -> Optional<Builtin.Word> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_opt_word : $@convention(thin) () -> Optional<Builtin.Word>
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Builtin.Word>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Builtin.Word>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> Optional<Builtin.Word>
+  switch_enum %10 : $Optional<Builtin.Word>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%12 : $Optional<Builtin.Word>):
+  return %12 : $Optional<Builtin.Word>
+
+bb5(%14 : $Builtin.Word):
+  %15 = enum $Optional<Builtin.Word>, #Optional.some!enumelt, %14 : $Builtin.Word
+  br bb4(%15 : $Optional<Builtin.Word>)
+
+bb6:
+  %17 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%17 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_with_owned_payload :
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_with_owned_payload'
+sil [ossa] @unroll_switch_enum_exit_with_owned_payload : $@convention(thin) () -> @owned Optional<Klass> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Klass>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> @owned Optional<Klass>
+  switch_enum %10 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%12 : @owned $Optional<Klass>):
+  return %12 : $Optional<Klass>
+
+bb5(%14 : @owned $Klass):
+  %15 = enum $Optional<Klass>, #Optional.some!enumelt, %14 : $Klass
+  br bb4(%15 : $Optional<Klass>)
+
+bb6:
+  %17 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%17 : $Builtin.Word)
+}
+
+// Every iteration switches on the function argument. The payloads become
+// guaranteed phis, which need a borrowed_from with the argument as the
+// enclosing value.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_with_guaranteed_payload :
+// CHECK:         switch_enum %0, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br [[PHIBB:bb[0-9]+]]([[P0]])
+// CHECK:       [[PHIBB]]([[PHI:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    borrowed [[PHI]] from (%0)
+// CHECK:         switch_enum %0, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         switch_enum %0, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_with_guaranteed_payload'
+sil [ossa] @unroll_switch_enum_exit_with_guaranteed_payload : $@convention(thin) (@guaranteed Optional<Klass>) -> @owned Optional<Klass> {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Klass>)
+
+bb3:
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%11 : @owned $Optional<Klass>):
+  return %11 : $Optional<Klass>
+
+bb5(%13 : @guaranteed $Klass):
+  %14 = copy_value %13 : $Klass
+  %15 = enum $Optional<Klass>, #Optional.some!enumelt, %14 : $Klass
+  br bb4(%15 : $Optional<Klass>)
+
+bb6:
+  %17 = builtin "add_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%17 : $Builtin.Word)
+}
+
+// The switched value is borrowed inside the loop, and its borrow scope ends in
+// the exit block. The exit block needs phis for the owned value and its
+// reborrow, as well as the payload, and each iteration passes its own values
+// to them. The exit block follows the return block, after the blocks created
+// by splitting the exit edges.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_borrowed_in_loop :
+// CHECK:         [[V0:%[0-9]+]] = apply
+// CHECK-NEXT:    [[B0:%[0-9]+]] = begin_borrow [[V0]]
+// CHECK-NEXT:    switch_enum [[B0]], case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]], [[V0]], [[B0]])
+// CHECK:         return
+// CHECK:       bb{{[0-9]+}}([[P:%[0-9]+]] : @guaranteed $Klass, [[V:%[0-9]+]] : @owned $Optional<Klass>, [[R:%[0-9]+]] : @reborrow $Optional<Klass>):
+// CHECK-NEXT:    [[RB:%[0-9]+]] = borrowed [[R]] from ([[V]])
+// CHECK-NEXT:    [[PB:%[0-9]+]] = borrowed [[P]] from ([[R]])
+// CHECK-NEXT:    copy_value [[PB]]
+// CHECK-NEXT:    end_borrow [[RB]]
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK:         [[V1:%[0-9]+]] = apply
+// CHECK-NEXT:    [[B1:%[0-9]+]] = begin_borrow [[V1]]
+// CHECK-NEXT:    switch_enum [[B1]], case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]], [[V1]], [[B1]])
+// CHECK:         [[V2:%[0-9]+]] = apply
+// CHECK-NEXT:    [[B2:%[0-9]+]] = begin_borrow [[V2]]
+// CHECK-NEXT:    switch_enum [[B2]], case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]], [[V2]], [[B2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_borrowed_in_loop'
+sil [ossa] @unroll_switch_enum_exit_borrowed_in_loop : $@convention(thin) () -> @owned Optional<Klass> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Klass>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> @owned Optional<Klass>
+  %11 = begin_borrow %10 : $Optional<Klass>
+  switch_enum %11 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%13 : @owned $Optional<Klass>):
+  return %13 : $Optional<Klass>
+
+bb5(%15 : @guaranteed $Klass):
+  %16 = copy_value %15 : $Klass
+  end_borrow %11 : $Optional<Klass>
+  destroy_value %10 : $Optional<Klass>
+  %19 = enum $Optional<Klass>, #Optional.some!enumelt, %16 : $Klass
+  br bb4(%19 : $Optional<Klass>)
+
+bb6:
+  end_borrow %11 : $Optional<Klass>
+  destroy_value %10 : $Optional<Klass>
+  %23 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%23 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_checked_cast_br_exit :
+// CHECK:         checked_cast_br Klass in {{%.*}} to SubKlass, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @owned $SubKlass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]])
+// CHECK:         checked_cast_br Klass in {{%.*}} to SubKlass, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @owned $SubKlass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         checked_cast_br Klass in {{%.*}} to SubKlass, [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @owned $SubKlass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     checked_cast_br
+// CHECK-LABEL: } // end sil function 'unroll_checked_cast_br_exit'
+sil [ossa] @unroll_checked_cast_br_exit : $@convention(thin) () -> @owned Optional<SubKlass> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<SubKlass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<SubKlass>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> @owned Klass
+  checked_cast_br Klass in %10 : $Klass to SubKlass, bb5, bb6
+
+bb4(%12 : @owned $Optional<SubKlass>):
+  return %12 : $Optional<SubKlass>
+
+bb5(%14 : @owned $SubKlass):
+  %15 = enum $Optional<SubKlass>, #Optional.some!enumelt, %14 : $SubKlass
+  br bb4(%15 : $Optional<SubKlass>)
+
+bb6(%17 : @owned $Klass):
+  destroy_value %17 : $Klass
+  %19 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%19 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_try_apply_exit :
+// CHECK:         try_apply {{%.*}}() : {{.*}}, error [[EXIT0:bb[0-9]+]]
+// CHECK:       [[EXIT0]]([[E0:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[E0]])
+// CHECK:         try_apply {{%.*}}() : {{.*}}, error [[EXIT1:bb[0-9]+]]
+// CHECK:       [[EXIT1]]([[E1:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[E1]])
+// CHECK:         try_apply {{%.*}}() : {{.*}}, error [[EXIT2:bb[0-9]+]]
+// CHECK:       [[EXIT2]]([[E2:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[E2]])
+// CHECK-NOT:     try_apply
+// CHECK-LABEL: } // end sil function 'unroll_try_apply_exit'
+sil [ossa] @unroll_try_apply_exit : $@convention(thin) () -> @error any Error {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @may_throw : $@convention(thin) () -> @error any Error
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = tuple ()
+  return %8 : $()
+
+bb3:
+  try_apply %3() : $@convention(thin) () -> @error any Error, normal bb5, error bb4
+
+bb4(%11 : @owned $any Error):
+  throw %11 : $any Error
+
+bb5(%13 : $()):
+  %14 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%14 : $Builtin.Word)
+}
+
+// The exit block takes the payload and deallocates the loop's stack
+// allocation, so it is an exit prefix. Each iteration has its own copy of the
+// prefix, including its argument.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_prefix_with_payload :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]([[P0]])
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]([[P1]])
+// CHECK:         [[A2:%.*]] = alloc_stack $Klass
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    dealloc_stack [[A2]]
+// CHECK-NEXT:    br [[TAIL]]([[P2]])
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_prefix_with_payload'
+sil [ossa] @unroll_switch_enum_exit_prefix_with_payload : $@convention(thin) (@guaranteed Klass) -> @owned Optional<Klass> {
+bb0(%0 : @guaranteed $Klass):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+  %5 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = builtin "cmp_eq_Word"(%7 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb2, bb3
+
+bb2:
+  %10 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%10 : $Optional<Klass>)
+
+bb3:
+  %12 = alloc_stack $Klass
+  %13 = copy_value %0 : $Klass
+  store %13 to [init] %12 : $*Klass
+  %15 = apply %5(%12) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %12 : $*Klass
+  %17 = apply %4() : $@convention(thin) () -> @owned Optional<Klass>
+  switch_enum %17 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%19 : @owned $Optional<Klass>):
+  return %19 : $Optional<Klass>
+
+bb5(%21 : @owned $Klass):
+  dealloc_stack %12 : $*Klass
+  %23 = enum $Optional<Klass>, #Optional.some!enumelt, %21 : $Klass
+  br bb4(%23 : $Optional<Klass>)
+
+bb6:
+  dealloc_stack %12 : $*Klass
+  %26 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%26 : $Builtin.Word)
+}

@@ -95,8 +95,11 @@ public:
 protected:
   // SILCloner CRTP override.
   SILValue getMappedValue(SILValue V) {
+    // Values defined outside the cloned region are used directly. The
+    // exception is the arguments of the blocks the cloner creates when it
+    // splits exit edges, which are mapped to the cloned block's arguments.
     if (auto *BB = V->getParentBlock()) {
-      if (!isInRegion(BB))
+      if (!isInRegion(BB) && !ValueMap.count(V))
         return V;
     }
     return SILCloner<LoopCloner>::getMappedValue(V);
@@ -585,14 +588,6 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }
-
-  // TODO: We need to split edges from non-condbr exits for the SSA updater. For
-  // now just don't handle loops containing such exits.
-  SmallVector<SILBasicBlock *, 16> ExitingBlocks;
-  Loop->getExitingBlocks(ExitingBlocks);
-  for (auto &Exit : ExitingBlocks)
-    if (!isa<CondBranchInst>(Exit->getTerminator()))
-      return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Unrolling loop in "
                           << Header->getParent()->getName()
