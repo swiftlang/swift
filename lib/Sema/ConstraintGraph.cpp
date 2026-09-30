@@ -911,29 +911,29 @@ bool ConstraintGraph::contractEdges() {
     auto rep1 = CS.getRepresentative(tyvar1);
     auto rep2 = CS.getRepresentative(tyvar2);
 
-    // If the argument is allowed to bind to `inout`, in general,
-    // it's invalid to contract the edge between argument and parameter,
-    // but if we can prove that there are no possible bindings
-    // which result in attempt to bind `inout` type to argument
-    // type variable, we should go ahead and allow (temporary)
-    // contraction, because that greatly helps with performance.
-    // Such action is valid because argument type variable can
-    // only get its bindings from related overload, which gives
-    // us enough information to decided on l-valueness.
+    // If the argument type variable is allowed to bind to 'inout',
+    // then in general, we cannot contract the edge between the
+    // argument and parameter.
+    //
+    // However, it is safe to do when there are no potential bindings
+    // to 'inout' types, because the fixed type of the argument type
+    // variable cannot end up as an 'inout' in that case.
     if (rep1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
       auto bindings = CS.getBindingsFor(rep1);
-      if (bindings.isViable()) {
-        // Holes can't be contracted.
-        if (bindings.isHole())
-          continue;
 
-        for (auto &binding : bindings.Bindings) {
+      // Check if there are any bindings. If there are no bindings, we
+      // do not contract the edge. If there is at least one binding, and
+      // all potential bindings are to non-'inout' types, we can contract.
+      if (!bindings.Bindings.empty()) {
+        isNotContractable = false;
+
+        for (const auto &binding : bindings.Bindings) {
           auto type = binding.BindingType;
-          isNotContractable = type->is<InOutType>();
+          isNotContractable |= type->is<InOutType>();
 
-          // If there is at least one non-contractable binding, let's
-          // not risk contracting this edge.
+          // If there is at least one binding to an 'inout' type, we cannot
+          // contract this edge.
           if (isNotContractable)
             break;
         }
