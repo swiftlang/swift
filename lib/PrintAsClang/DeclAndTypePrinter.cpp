@@ -3061,7 +3061,8 @@ bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeNotCxxAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+    if (const auto *NTD = ED->getExtendedNominal())
+      return hasExposeNotCxxAttr(NTD);
   return false;
 }
 
