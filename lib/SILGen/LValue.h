@@ -24,7 +24,6 @@
 #include "FormalEvaluation.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/Basic/Assertions.h"
 
 namespace swift {
 namespace Lowering {
@@ -376,6 +375,11 @@ public:
                            std::optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
+
+  /// If this l-value is nothing but a reference to a value or an address, as
+  /// `forValue` and `forAddress` build, return an equivalent l-value referring
+  /// to the same one. Returns an invalid l-value for any other l-value.
+  LValue copyOfValueReference() const;
 
   bool isValid() const { return !Path.empty(); }
 

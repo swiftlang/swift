@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -target %target-swift-6.0-abi-triple %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 

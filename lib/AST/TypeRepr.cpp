@@ -17,7 +17,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
@@ -27,7 +26,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -479,6 +477,13 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
       Printer << ")";
     }
   }
+  if (isCoroutine()) {
+    Printer << " ";
+    Printer.printKeyword("yields", Opts);
+    // FIXME: Do we need a PrintStructureKind for this?
+    printTypeRepr(YieldsTy, Printer, Opts);
+  }
+
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
@@ -716,6 +721,10 @@ SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
   auto mem = C.Allocate(size, alignof(SILBoxTypeRepr));
   return new (mem) SILBoxTypeRepr(GenericParams, LBraceLoc, Fields, RBraceLoc,
                                   ArgLAngleLoc, GenericArgs, ArgRAngleLoc);
+}
+
+bool FunctionTypeRepr::isCoroutine() const {
+  return YieldsTy && YieldsTy->getParens().isValid();
 }
 
 SourceLoc FunctionTypeRepr::getStartLocImpl() const {

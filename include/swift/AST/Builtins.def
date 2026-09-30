@@ -325,6 +325,11 @@ BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
+/// TakeFromRawPointer has type (Builtin.RawPointer) -> T.
+/// T must be a single reference supported by SILGen. The pointer carries an
+/// existing +1 reference, which the result takes without retaining it.
+BUILTIN_SIL_OPERATION(TakeFromRawPointer, "takeFromRawPointer", Special)
+
 /// castReference has type T -> U.
 /// T and U must be convertible to AnyObject.
 BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
@@ -372,6 +377,14 @@ BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 /// result can only reach the single element at the given index and cannot be
 /// used for general pointer arithmetic by chaining index_addr instructions.
 BUILTIN_SIL_OPERATION(GepProjection, "gepProjection", Integer)
+
+/// UnprotectedGepProjection (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
+///
+/// Like GepProjection, but doesn't trigger an insertion of stack protectors.
+/// Use this only when the index has already been proven to be in bounds
+/// (e.g. by a preceding, unconditional bounds check on the same value), so
+/// there is no buffer overflow for a stack protector to guard against.
+BUILTIN_SIL_OPERATION(UnprotectedGepProjection, "unprotectedGepProjection", Integer)
 
 /// getTailAddr(Builtin.RawPointer,
 ///             Builtin.Word, T.Type, E.Type) -> Builtin.RawPointer

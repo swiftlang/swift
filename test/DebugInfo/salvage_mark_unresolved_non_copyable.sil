@@ -1,0 +1,22 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-opaque-values -address-lowering %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// With opaque values, a debug_value on a dead mark_unresolved_non_copyable_value must be salvaged
+// during address lowering, with an address type and deref.
+
+// CHECK-LABEL: sil [ossa] @borrowed_self
+// CHECK: bb0(%0 : $*T):
+// CHECK-NEXT: debug_value %0, let, name "self", argno 1, expr op_deref
+sil [ossa] [opaque] @borrowed_self : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $T
+  debug_value %2 : $T, let, name "self", argno 1
+  destroy_value %2 : $T
+  %r = tuple ()
+  return %r : $()
+}

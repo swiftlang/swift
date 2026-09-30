@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %s -disable-availability-checking
+// RUN: %target-swift-frontend -emit-module %s -target %target-swift-5.1-abi-triple
 
 // We substitute away opaque archetypes after serialization;
 // make sure this correctly handles unlowered types like

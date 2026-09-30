@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Functions -cxx-interoperability-mode=default -clang-header-expose-decls=all-public -I %S/Inputs/ -typecheck -verify -emit-clang-header-path %t/functions.h -disable-availability-checking
+// RUN: %target-swift-frontend %s -module-name Functions -cxx-interoperability-mode=default -clang-header-expose-decls=all-public -I %S/Inputs/ -typecheck -verify -emit-clang-header-path %t/functions.h -target %target-swift-5.8-abi-triple
 // RUN: %FileCheck %s < %t/functions.h
 
 // REQUIRES: objc_interop

@@ -19,14 +19,11 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Markup/Markup.h"
-#include <queue>
 
 using namespace swift;
 

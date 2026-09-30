@@ -12,7 +12,6 @@
 
 #include "swift/AST/ASTBridging.h"
 
-#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 
 using namespace swift;

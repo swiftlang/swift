@@ -286,8 +286,10 @@ public enum NormalSinglePayloadEnum {
   case b
 }
 
+@available(SwiftStdlib 6.2, *)
 public struct AFD { var x: [1 of Int] }
 
+@available(SwiftStdlib 6.2, *)
 public enum AFDSinglePayloadEnum {
   case a(AFD)
   case b
@@ -298,6 +300,7 @@ public enum NormalMultiPayloadEnum {
   case b(Int)
 }
 
+@available(SwiftStdlib 6.2, *)
 public enum AFDMultiPayloadEnum {
   case a(AFD)
   case b(Int)
@@ -308,6 +311,7 @@ public struct NormalStruct {
   var b: Int
 }
 
+@available(SwiftStdlib 6.2, *)
 public struct AFDStruct {
   var a: AFD
   var b: Int

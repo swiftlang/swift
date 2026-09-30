@@ -7,7 +7,7 @@
 // CHECK-ONONE:    [[ACC:%.*]] = begin_access [read] [static] %0
 // CHECK-ONONE:    [[S:%.*]] = struct_element_addr [[ACC]], #InlineArray._storage
 // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-// CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
+// CHECK:          [[EA:%.*]] = index_addr [projection] [[BA]],
 // CHECK-OPT:      [[E:%.*]] = load [[EA]]
 // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
 // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -35,7 +35,7 @@ public final class C {
   // CHECK:          [[CA:%.*]] = ref_element_addr [immutable] %1, #C.a
   // CHECK:          [[S:%.*]] = struct_element_addr [[CA]], #InlineArray._storage
   // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
+  // CHECK:          [[EA:%.*]] = index_addr [projection] [[BA]],
   // CHECK-OPT:      [[E:%.*]] = load [[EA]]
   // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
   // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -66,7 +66,7 @@ public struct S {
   // CHECK:          [[A:%.*]] = struct_element_addr %1, #S.a
   // CHECK:          [[S:%.*]] = struct_element_addr [[A]], #InlineArray._storage
   // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
+  // CHECK:          [[EA:%.*]] = index_addr [projection] [[BA]],
   // CHECK-OPT:      [[E:%.*]] = load [[EA]]
   // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
   // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -173,7 +173,8 @@ public func dontCopyEveryIterationSmallConditional(a: [2 of Int32], indices: [In
 
 // TODO: Eliminate the redundant store in this case, where the loop is unrolled.
 //
-// CHECK-LABEL: sil @$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a1fs5Int32Vs11InlineArrayVy$1_AFG_SbSiXEtF : $@convention(thin) (InlineArray<2, Int32>, @guaranteed @noescape @callee_guaranteed (Int) -> Bool) -> Int32 {
+// CHECK-LABEL: sil @$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a4conds5Int32Vs11InlineArrayVy$1_AFG_SbtF : $@convention(thin) (InlineArray<2, Int32>, Bool) -> Int32 {
+
 // CHECK:         alloc_stack
 // CHECK:         store
 // CHECK:         store
@@ -181,11 +182,11 @@ public func dontCopyEveryIterationSmallConditional(a: [2 of Int32], indices: [In
 // CHECK-NOT:     alloc_stack
 // CHECK-NOT:     store
 // CHECK-NOT:     dealloc_stack
-// CHECK:       } // end sil function '$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a1fs5Int32Vs11InlineArrayVy$1_AFG_SbSiXEtF'
-public func dontCopyEveryIterationSmallConditionalUnrolled(a: [2 of Int32], f: (Int) -> Bool) -> Int32 {
+// CHECK-LABEL: } // end sil function '$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a4conds5Int32Vs11InlineArrayVy$1_AFG_SbtF'
+public func dontCopyEveryIterationSmallConditionalUnrolled(a: [2 of Int32], cond: Bool) -> Int32 {
   var s: Int32 = 0
   for i in a.indices {
-    if f(i) {
+    if (cond) {
       s += a[i]
     }
   }

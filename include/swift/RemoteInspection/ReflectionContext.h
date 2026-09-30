@@ -214,6 +214,7 @@ public:
     std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
+    StoredPointer RegistryNext;
 
     std::string Name;
   };
@@ -1658,6 +1659,60 @@ public:
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
+  std::optional<std::string> iterateTaskRegistry(
+      std::function<void(StoredPointer)> Call) {
+    auto RegistryAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry");
+    if (!RegistryAddr) {
+      return "could not find _swift_concurrency_task_registry symbol";
+    }
+
+    auto EnabledAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry_enabled");
+    if (EnabledAddr) {
+      uint8_t Enabled = 0;
+      if (getReader().readInteger(EnabledAddr, 1, &Enabled) && !Enabled) {
+        return "task registry disabled by environment variable";
+      }
+    }
+
+    auto ShardSizeAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry_shard_size");
+    if (!ShardSizeAddr) {
+      return "could not find _swift_concurrency_task_registry_shard_size symbol";
+    }
+    
+    uint8_t PointerSize = getReader().getPointerSize().value_or(sizeof(void*));
+    uint32_t ShardSize = 0;
+    if (!getReader().readInteger(ShardSizeAddr, PointerSize, &ShardSize)) {
+      return "could not read _swift_concurrency_task_registry_shard_size";
+    }
+
+    for (uint32_t i = 0; i < 64; ++i) {
+      // Each shard head is a pointer to the head of a linked list.
+      auto ShardAddr = RegistryAddr + (i * ShardSize);
+      
+      uint64_t TaskAddr = 0;
+      if (!getReader().readInteger(ShardAddr, PointerSize, &TaskAddr)) {
+         return "could not read TaskRegistryShard head";
+      }
+
+      int32_t nodes = 0;
+      int32_t max_registry_nodes = 10000;
+      while (TaskAddr && nodes++ < max_registry_nodes) {
+        Call(TaskAddr);
+        
+        // Find the next task using ReflectionContext's AsyncTaskObj out of process.
+        auto [Error, TaskInfo] = asyncTaskInfo(RemoteAddress(TaskAddr, RegistryAddr.getAddressSpace()), 0, 0);
+        if (Error) {
+          // If we can't read the task info (e.g. memory is corrupted), stop traversing this shard.
+          break;
+        }
+        
+        TaskAddr = TaskInfo.RegistryNext;
+      }
+    }
+
+    return std::nullopt;
+  }
+
   std::optional<std::string> iterateMetadataAllocations(
       std::function<void(MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
@@ -2047,6 +2102,7 @@ private:
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
+    Info.RegistryNext = AsyncTaskObj->PrivateStorage.RegistryNext;
 
     Info.ParentTask = 0;
     if (Info.IsChildTask && asyncTaskSize != 0) {

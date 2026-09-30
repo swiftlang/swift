@@ -239,7 +239,7 @@ protected:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *inst) {
     SILLocation loc = getOpLocation(inst->getLoc());
     SILValue src = getOpValue(inst->getSrc());
-    SILValue dest = getOpValue(inst->getDest());
+    SILValue dest = inst->hasDest() ? getOpValue(inst->getDest()) : SILValue();
     CanType sourceType = getOpASTType(inst->getSourceFormalType());
     CanType targetType = getOpASTType(inst->getTargetFormalType());
     SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());

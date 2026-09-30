@@ -12,13 +12,7 @@
 
 #include "SwiftLangSupport.h"
 #include "swift/AST/MacroDefinition.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDETool/SyntacticMacroExpansion.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/Comment.h"
-#include "clang/AST/Decl.h"
 
 using namespace SourceKit;
 using namespace swift;

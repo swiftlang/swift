@@ -13,7 +13,6 @@
 // rdar://116686158
 // UNSUPPORTED: asan
 
-// expected-note@+1 3 {{first non-import declaration here}}
 func testRegexLiteral() {
   _ = (#/[*/#, #/+]/#, #/.]/#)
   // expected-error@-1:18 {{cannot parse regular expression: quantifier '+' must appear after expression}}
@@ -78,15 +77,12 @@ func misisngPatternTest(arr: [Int]) {
          // expected-note@-1 {{insert pattern, 'in', and expression}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
 }
 
-// expected-error@+1 {{'using' must appear before any non-import declaration}}
-using @MainActor // expected-note {{file-level default isolation previously declared here}}
-// expected-error@+1 {{'using' must appear before any non-import declaration}}
-using nonisolated // expected-error {{invalid redeclaration of file-level default isolation}}
+default @MainActor // expected-note {{file-level default isolation previously declared here}}
+default nonisolated // expected-error {{invalid redeclaration of file-level default isolation}}
 
-// expected-error@+1 {{'using' must appear before any non-import declaration}}
-using @Test
+default @Test
 // expected-error@-1 {{cannot find type 'Test' in scope}}
-// expected-note@-2 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+// expected-note@-2 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
-using test
-// expected-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'}}
+default test
+// expected-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}

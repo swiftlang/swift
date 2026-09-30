@@ -88,6 +88,11 @@ struct WrapperStruct {
   var cls : Klass
 }
 
+struct TwoFields {
+  var cls : Klass
+  var i : Builtin.Int64
+}
+
 struct NonTrivialStruct {
   var val:Klass
 }
@@ -6007,6 +6012,100 @@ bb0(%0 : @guaranteed $Klass):
   %3 = load [take] %2 : $*Klass
   dealloc_stack %2 : $*Klass
   destroy_value %3 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// rdar://187806150, https://github.com/swiftlang/swift/issues/92448
+//
+// A `mark_dependence_addr` does not just read the memory, it replaces the forwarded value
+// with a `mark_dependence` on its base. Loads which follow it must read that new value.
+//
+// CHECK-LABEL: sil [ossa] @mda_then_field_load :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         [[VAL:%[0-9]+]] = struct $WrapperStruct
+// CHECK:         [[MD:%[0-9]+]] = mark_dependence [nonescaping] [[VAL]] on %0
+// CHECK:         [[BORROW:%[0-9]+]] = begin_borrow [[MD]]
+// CHECK:         struct_extract [[BORROW]], #WrapperStruct.cls
+// CHECK-LABEL: } // end sil function 'mda_then_field_load'
+sil [ossa] @mda_then_field_load : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = struct $WrapperStruct (%1 : $Klass)
+  %3 = alloc_stack $WrapperStruct
+  store %2 to [init] %3 : $*WrapperStruct
+  mark_dependence_addr [nonescaping] %3 on %0
+  %4 = struct_element_addr %3 : $*WrapperStruct, #WrapperStruct.cls
+  %5 = load [copy] %4 : $*Klass
+  destroy_addr %3 : $*WrapperStruct
+  dealloc_stack %3 : $*WrapperStruct
+  destroy_value %5 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// The value produced by the `mark_dependence` has to be threaded through the loop phi
+// created for the field mutation.
+//
+// CHECK-LABEL: sil [ossa] @mda_then_loop :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     mark_dependence_addr
+// CHECK:         [[MD:%[0-9]+]] = mark_dependence [nonescaping] {{%[0-9]+}} on %0
+// CHECK:         br bb1([[MD]])
+// CHECK:       bb1([[PHI:%[0-9]+]] : @owned $TwoFields):
+// CHECK:         begin_borrow [[PHI]]
+// CHECK-LABEL: } // end sil function 'mda_then_loop'
+sil [ossa] @mda_then_loop : $@convention(thin) (@guaranteed Klass, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $Klass, %cond : $Builtin.Int1):
+  %1 = copy_value %0 : $Klass
+  %z = integer_literal $Builtin.Int64, 0
+  %2 = struct $TwoFields (%1 : $Klass, %z : $Builtin.Int64)
+  %3 = alloc_stack $TwoFields
+  store %2 to [init] %3 : $*TwoFields
+  mark_dependence_addr [nonescaping] %3 on %0
+  br bb1
+
+bb1:
+  %ia = struct_element_addr %3 : $*TwoFields, #TwoFields.i
+  %iv = load [trivial] %ia : $*Builtin.Int64
+  %ca = struct_element_addr %3 : $*TwoFields, #TwoFields.cls
+  %cv = load [copy] %ca : $*Klass
+  destroy_value %cv : $Klass
+  %one = integer_literal $Builtin.Int64, 1
+  store %one to [trivial] %ia : $*Builtin.Int64
+  cond_br %cond, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_addr %3 : $*TwoFields
+  dealloc_stack %3 : $*TwoFields
+  %r = tuple ()
+  return %r : $()
+}
+
+// Unlike a `store`, a `mark_dependence_addr` may legally appear inside a `load_borrow`
+// scope of a projected field. Promoting it would end the lifetime of the borrowed value
+// inside its own borrow scope, so bail.
+//
+// CHECK-LABEL: sil [ossa] @mda_in_load_borrow_scope :
+// CHECK:         alloc_stack
+// CHECK:         mark_dependence_addr [nonescaping]
+// CHECK-LABEL: } // end sil function 'mda_in_load_borrow_scope'
+sil [ossa] @mda_in_load_borrow_scope : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = struct $WrapperStruct (%1 : $Klass)
+  %3 = alloc_stack $WrapperStruct
+  store %2 to [init] %3 : $*WrapperStruct
+  %4 = struct_element_addr %3 : $*WrapperStruct, #WrapperStruct.cls
+  %5 = load_borrow %4 : $*Klass
+  mark_dependence_addr [nonescaping] %3 on %0
+  end_borrow %5 : $Klass
+  destroy_addr %3 : $*WrapperStruct
+  dealloc_stack %3 : $*WrapperStruct
   %r = tuple ()
   return %r : $()
 }

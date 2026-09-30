@@ -13,10 +13,13 @@
 //--- allowed-dependencies.txt
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
 _abort
 _clock_gettime
 _exit
+_flockfile
 _free
+_funlockfile
 _malloc
 _memcpy
 _memmove

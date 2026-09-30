@@ -20,7 +20,6 @@
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
-#include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -809,11 +808,9 @@ SILFunction *SILGenModule::emitProtocolWitness(
     genericEnv = nullptr;
   }
 
-  reqtSubstTy =
-    CanAnyFunctionType::get(genericSig,
-                            reqtSubstTy->getParams(),
-                            reqtSubstTy.getResult(),
-                            reqtSubstTy->getExtInfo());
+  reqtSubstTy = CanAnyFunctionType::get(
+      genericSig, reqtSubstTy->getParams(), reqtSubstTy.getYields(),
+      reqtSubstTy.getResult(), reqtSubstTy->getExtInfo());
 
   // Coroutine lowering requires us to provide these substitutions
   // in order to recreate the appropriate yield types for the accessor

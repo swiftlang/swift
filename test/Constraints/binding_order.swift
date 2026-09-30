@@ -91,14 +91,13 @@ do {
   class A: Super, Command {}
   class B: Super, Command {}
 
+  // Some of these might be hard to resolve, but we should produce better diagnostics.
   func rdar38159133(a: A, b: B, aOpt: A?, bOpt: B?) {
     let _ = Array<any Command>([a, b])
     let _: [any Command] = [a, b]
     let _: [any Command] = Array([a, b])
     let _: [any Command] = [a, b].filter { _ in true }
     let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
-
-    // Some of these might be hard to resolve, but we should produce better diagnostics.
 
     let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
     // expected-error@-1 {{cannot convert value of type 'A?' to expected element type 'any Command'}}
@@ -169,6 +168,19 @@ do {
   s3.append(contentsOf: [(x, 3)])
   s3.append(contentsOf: [(x, 3), (x, 4)])
   s3.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
+}
+
+// More tuple label weirdness
+do {
+  func g(_: [(a: Int, b: Int)]) {}
+
+  let x = 0
+  let y = 1
+
+  func f(b: Bool) {
+      g([(aa: x, bb: x), (y, y)])
+      g(b ? [(aa: x, bb: x), (y, y)] : [])
+  }
 }
 
 do {
@@ -446,4 +458,24 @@ do {
       }
     }
   }
+}
+
+// rdar://problem/30271695
+do {
+  let x = "hi"
+  _ = [x].compactMap { $0.isEmpty ? nil : $0 }
+  _ = ["hi"].compactMap { $0.isEmpty ? nil : $0 }
+}
+
+// Generic argument matches involving 'any Sendable' are special-cased to
+// allow matching against 'Any' for backward compatibility with preconcurrency
+// code. Make sure this does the right thing here.
+do {
+  class G<T> {
+    init(_ t: T) {}
+  }
+
+  struct S {}  // note: not Sendable, but that's OK, we're in Swift 5 mode
+
+  let _: G<any Sendable> = G(S())
 }

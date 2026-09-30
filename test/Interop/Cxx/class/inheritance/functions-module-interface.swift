@@ -63,7 +63,7 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: CInt) -> CInt
 // CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   @_effects(readonly) public func pure() -> CInt
+// CHECK-NEXT:   @_effects(readonly) @_addressableSelf public func pure() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func sameMethodDifferentSignature() -> CInt
 // CHECK-NEXT:   @discardableResult
@@ -93,7 +93,7 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: CInt) -> CInt
 // CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   @_effects(readonly) public func pure() -> CInt
+// CHECK-NEXT:   @_effects(readonly) @_addressableSelf public func pure() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func sameMethodDifferentSignature() -> CInt
 // CHECK-NEXT:   @discardableResult

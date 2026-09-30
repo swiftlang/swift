@@ -42,6 +42,7 @@ public:
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   var x: CInt
 // CHECK-NEXT:   var y: CInt
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnsClassInTypesModules() -> Never
 // CHECK-NEXT: }
 

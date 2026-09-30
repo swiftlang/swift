@@ -15,17 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SipHash.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -33,7 +31,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -139,6 +136,11 @@ namespace {
           ValueTypeAndIsOptional.getPointer()->getContext(), \
           getFixedSize().getValueInBits()); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
   class Nativeness##Name##ReferenceTypeInfo \
@@ -217,6 +219,11 @@ namespace {
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 
   // The nativeness of a reference storage type is a policy decision.
@@ -260,6 +267,11 @@ namespace {
                               Address dest, SILType T, bool isOutlined) \
     const override { \
       return storeHeapObjectExtraInhabitant(IGF, index, dest); \
+    } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
     } \
   };
 #include "swift/AST/ReferenceStorage.def"
@@ -492,9 +504,10 @@ void irgen::emitDeallocatePartialClassInstanceTyped(
 
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
-                                    std::optional<uint64_t> mallocTypeId,
-                                    const llvm::Twine &layoutName) {
+static llvm::Function *createDtorFn(
+    IRGenModule &IGM, const HeapLayout &layout,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &layoutName,
+    const llvm::BitVector &unownedFields, bool isStackAllocated) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
       "__swift_" + layoutName + "_destructor", &IGM.Module);
@@ -528,13 +541,20 @@ static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
     if (field.isTriviallyDestroyable())
       continue;
 
+    if (!unownedFields.empty() && unownedFields.test(i))
+      continue;
+
     field.getType().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
 
-  emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
-                           offsets.getAlignMask(), mallocTypeId);
+  // The caller is responsible for deallocating the stack slot, destruction in
+  // such cases is decoupled from deallocation.
+  if (!isStackAllocated)
+    emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
+                             offsets.getAlignMask(), mallocTypeId);
+
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -627,10 +647,14 @@ llvm::Constant *
 HeapLayout::getPrivateMetadata(IRGenModule &IGM,
                                llvm::Constant *captureDescriptor,
                                std::optional<uint64_t> mallocTypeId,
-                               const llvm::Twine &name) const {
+                               const llvm::Twine &name,
+                               const llvm::BitVector &unownedFields,
+                               bool isStackAllocated) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(
-        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name),
+        IGM, *this,
+        createDtorFn(IGM, *this, mallocTypeId, name, unownedFields,
+                     isStackAllocated),
         captureDescriptor, MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
@@ -671,8 +695,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
   }
 
   auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
-  llvm::Value *metadata =
-      layout.getPrivateMetadata(IGM, captureDescriptor, maybeDescriptor, name);
+  llvm::Value *metadata = layout.getPrivateMetadata(
+      IGM, captureDescriptor, maybeDescriptor, name, /*unownedFields=*/{});
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -689,6 +713,12 @@ namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
                                  Size size, SpareBitVector spareBits,
                                  Alignment align)
@@ -1623,6 +1653,12 @@ public:
 /// Common implementation for empty box type info.
 class EmptyBoxTypeInfo final : public BoxTypeInfo {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1651,6 +1687,12 @@ public:
 /// Common implementation for non-fixed box type info.
 class NonFixedBoxTypeInfo final : public BoxTypeInfo {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1759,6 +1801,12 @@ static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                              IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
@@ -1768,6 +1816,12 @@ public:
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                                    IGM.getReferenceObjectTypeInfo(refcounting)))
@@ -1807,6 +1861,12 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
   }
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
     : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
   {}

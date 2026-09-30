@@ -58,7 +58,7 @@ TEST(PrebuiltStringMapTest, PrebuiltStringMap) {
       auto keyCopy = key;
       keyCopy += "xyz";
       const char *keyCStr = keyCopy.c_str();
-      auto *element = map->find(keyCStr, key.size());
+      auto *element = map->find({keyCStr, key.size()});
       EXPECT_NE(element, nullptr);
 
       EXPECT_EQ(element->key, key);
@@ -101,7 +101,7 @@ TEST(PrebuiltStringMapTest, PrebuiltAuxDataImplicitStringMap) {
       auto key = getKey(n);
 
       auto isNull = [](auto pointers) { return *pointers.first == 0; };
-      auto pointers = map->insert(key.c_str(), isNull);
+      auto pointers = map->insert(key, isNull);
       EXPECT_NE(pointers.first, nullptr);
       EXPECT_NE(pointers.second, nullptr);
 
@@ -120,7 +120,7 @@ TEST(PrebuiltStringMapTest, PrebuiltAuxDataImplicitStringMap) {
 
       auto isMatch = [n](auto pointers) { return *pointers.first == n; };
       auto isNull = [](auto pointers) { return *pointers.first == 0; };
-      auto pointers = map->find(key.c_str(), keyLength, isMatch, isNull);
+      auto pointers = map->find({key.data(), keyLength}, isMatch, isNull);
       EXPECT_NE(pointers.first, nullptr);
       EXPECT_NE(pointers.second, nullptr);
       EXPECT_EQ(*pointers.first, n);
@@ -131,10 +131,73 @@ TEST(PrebuiltStringMapTest, PrebuiltAuxDataImplicitStringMap) {
     const char *nonexistentKey = "ceci n'est pas une clef";
     auto isMatch = [](auto pointers) { return false; };
     auto isNull = [](auto pointers) { return *pointers.first == 0; };
-    auto pointers =
-        map->find(nonexistentKey, strlen(nonexistentKey), isMatch, isNull);
+    auto pointers = map->find(nonexistentKey, isMatch, isNull);
     EXPECT_EQ(*pointers.first, 0);
     EXPECT_EQ(*pointers.second, 0);
+  };
+
+  testOnce(10);
+  testOnce(100);
+  testOnce(1000);
+}
+
+// A map with no auxiliary data. The aux array is absent, and the aux pointer
+// handed to the callbacks is always NULL.
+TEST(PrebuiltStringMapTest, PrebuiltAuxDataImplicitStringMapVoidAux) {
+  using Map = swift::PrebuiltAuxDataImplicitStringMap<uint64_t, void>;
+
+  EXPECT_EQ(Map::byteSize(10),
+            sizeof(swift::PrebuiltStringMapBase) + 10 * sizeof(uint64_t));
+
+  auto testOnce = [&](unsigned testEntryCount) {
+    // As above, but 0 stands in for an empty entry, so the values stored are
+    // 1...testEntryCount.
+    auto getKey = [](unsigned n) {
+      std::string key;
+      for (unsigned i = 0; i < n; i++) {
+        key += 'A' + (i % 26);
+      }
+      return key;
+    };
+
+    auto isNull = [](auto pointers) { return *pointers.first == 0; };
+
+    unsigned mapSize = testEntryCount * 4 / 3;
+    void *mapAllocation = calloc(1, Map::byteSize(mapSize));
+    Map *map = new (mapAllocation) Map(mapSize);
+
+    for (unsigned n = 1; n <= testEntryCount; n++) {
+      auto key = getKey(n);
+
+      auto pointers = map->insert(key, isNull);
+      ASSERT_NE(pointers.first, nullptr);
+      EXPECT_EQ(pointers.second, nullptr);
+      *pointers.first = n;
+    }
+
+    for (unsigned n = 1; n <= testEntryCount; n++) {
+      auto key = getKey(n);
+      auto keyLength = key.size();
+
+      // Add some trash to the end to make sure the lookup doesn't look beyond
+      // the specified length.
+      key += "xyz";
+
+      auto isMatch = [n](auto pointers) { return *pointers.first == n; };
+      auto pointers = map->find({key.data(), keyLength}, isMatch, isNull);
+      ASSERT_NE(pointers.first, nullptr);
+      EXPECT_EQ(*pointers.first, n);
+      EXPECT_EQ(pointers.second, nullptr);
+    }
+
+    // Verify a nonexistent value is not found.
+    const char *nonexistentKey = "ceci n'est pas une clef";
+    auto isMatch = [](auto pointers) { return false; };
+    auto pointers = map->find(nonexistentKey, isMatch, isNull);
+    ASSERT_NE(pointers.first, nullptr);
+    EXPECT_EQ(*pointers.first, 0u);
+
+    free(mapAllocation);
   };
 
   testOnce(10);

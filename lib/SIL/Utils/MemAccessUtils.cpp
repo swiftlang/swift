@@ -13,8 +13,6 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/NodeDatastructures.h"
@@ -2333,6 +2331,8 @@ swift::getSingleInitAllocStackUse(AllocStackInst *asi,
       // Break!
       if (use->get() == uccai->getDest())
         break;
+      if (uccai->isCopy())
+        continue;
       // Ok, we are the Src and are performing a take. Treat it as a destroy!
       if (destroyingUses)
         destroyingUses->push_back(use);

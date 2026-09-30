@@ -29,10 +29,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Lexer.h"
-#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace namelookup;

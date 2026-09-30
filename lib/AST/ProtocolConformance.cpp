@@ -37,7 +37,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "AST"
 
@@ -1799,6 +1798,28 @@ BuiltinProtocolConformance::BuiltinProtocolConformance(
     : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
       protocol(protocol) {
   Bits.BuiltinProtocolConformance.Kind = unsigned(kind);
+}
+
+std::optional<COMIdentityRequirementKind>
+swift::classifyCOMIdentityRequirement(ValueDecl *requirement) {
+  AbstractStorageDecl *storage = dyn_cast<AbstractStorageDecl>(requirement);
+  if (auto *accessor = dyn_cast<AccessorDecl>(requirement))
+    storage = accessor->getStorage();
+
+  auto *property = dyn_cast_or_null<VarDecl>(storage);
+  auto *protocol =
+      property ? dyn_cast<ProtocolDecl>(property->getDeclContext()) : nullptr;
+  if (!protocol)
+    return std::nullopt;
+
+  auto &context = property->getASTContext();
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) &&
+      property->getBaseName() == context.Id_IID)
+    return COMIdentityRequirementKind::InterfaceID;
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable) &&
+      property->getBaseName() == context.Id_CLSID)
+    return COMIdentityRequirementKind::ActivationID;
+  return std::nullopt;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

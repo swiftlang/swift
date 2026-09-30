@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -Xfrontend -disable-availability-checking -emit-module %s
+// RUN: %target-swiftc_driver -target %target-swift-5.1-abi-triple -emit-module %s
 
 // rdar://problem/49829836
 

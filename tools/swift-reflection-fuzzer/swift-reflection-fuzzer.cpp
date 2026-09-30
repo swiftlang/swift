@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 
 #if defined(__APPLE__) && defined(__MACH__)
@@ -53,8 +54,12 @@ template <typename T> static T unwrap(llvm::Expected<T> value) {
 }
 
 class ObjectMemoryReader : public MemoryReader {
+  const uint8_t *Start;
+  const uint8_t *End;
+
 public:
-  ObjectMemoryReader() {}
+  ObjectMemoryReader(const uint8_t *Data, size_t Size)
+      : Start(Data), End(Data + Size) {}
 
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
@@ -123,9 +128,15 @@ public:
     return RemoteAddress();
   }
 
-  bool isAddressValid(RemoteAddress addr, uint64_t size) const { return true; }
+  bool isAddressValid(RemoteAddress addr, uint64_t size) const {
+    auto *p = (const uint8_t *)addr.getRawAddress();
+    // Compare as sizes to avoid overflowing the pointer arithmetic.
+    return p >= Start && p <= End && size <= (uint64_t)(End - p);
+  }
 
   ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
+    if (!isAddressValid(address, size))
+      return ReadBytesResult();
     return ReadBytesResult((const void *)address.getRawAddress(),
                            [](const void *) {});
   }
@@ -133,14 +144,18 @@ public:
   bool readString(RemoteAddress address, std::string &dest) override {
     if (!isAddressValid(address, 1))
       return false;
-    auto cString = StringRef((const char *)address.getRawAddress());
-    dest.append(cString.begin(), cString.end());
+    auto *p = (const char *)address.getRawAddress();
+    size_t maxLen = (const char *)End - p;
+    size_t len = strnlen(p, maxLen);
+    if (len == maxLen)
+      return false; // Unterminated: the string runs off the end of the input.
+    dest.append(p, p + len);
     return true;
   }
 };
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  auto reader = std::make_shared<ObjectMemoryReader>();
+  auto reader = std::make_shared<ObjectMemoryReader>(Data, Size);
   NativeReflectionContext context(std::move(reader));
   context.addImage(
       RemoteAddress((uint64_t)Data, RemoteAddress::DefaultAddressSpace));

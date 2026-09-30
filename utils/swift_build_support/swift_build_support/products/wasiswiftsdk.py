@@ -98,15 +98,10 @@ class WASISwiftSDK(product.Product):
         # 2. clang_multiarch_triple: The triple used by Clang to find library
         #    and header paths from the sysroot
         #    https://github.com/llvm/llvm-project/blob/73ef397fcba35b7b4239c00bf3e0b4e689ca0add/clang/lib/Driver/ToolChains/WebAssembly.cpp#L29-L36
-        # TODO: Include wasip1-threads in the Swift SDK once WasmKit supports
-        # the wasip1-threads target. Until then the per-triple install tree
-        # for p1-threads is still built (stdlib + foundation + swift-testing
-        # + xctest) so downstream tools can consume it directly, but no
-        # Swift SDK artifact is added to the shared `.artifactbundle`.
         for swift_host_triple, clang_multiarch_triple, build_basename, build_sdk, has_pthread in [
             ('wasm32-unknown-wasip1', 'wasm32-wasip1', 'wasistdlib', True, False),
             ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
-             'wasithreadsstdlib', False, True),
+             'wasithreadsstdlib', True, True),
         ]:
             stdlib_build_path = os.path.join(
                 build_root, '%s-%s' % (build_basename, host_target))
@@ -151,8 +146,7 @@ class WASISwiftSDK(product.Product):
             # Append this triple's Swift SDK to the shared wasm
             # `.artifactbundle`. The bundle is reused across wasi /
             # emscripten via `--incremental` + `--bundle-name
-            # canonical_bundle_name(swift_version)`. wasip1-threads is skipped
-            # — see the TODO above the loop.
+            # canonical_bundle_name(swift_version)`.
             if build_sdk:
                 helpers.generate_swift_sdk(
                     swift_run=swift_run,

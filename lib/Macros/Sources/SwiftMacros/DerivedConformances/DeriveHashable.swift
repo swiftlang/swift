@@ -124,17 +124,13 @@ public struct DeriveHashableMacro: DeclarationMacro {
     """
   }
 
-  /// Returns the signature of the `hash(into:)` method.
-  static var getHashSignature: DeclSyntax {
-    """
-    func hash(into hasher: inout Swift::Hasher)
-    """
-  }
+  /// The signature of the `hash(into:)` method.
+  static let hashSignature = "func hash(into hasher: inout Swift::Hasher)"
 
   /// Returns the expansion of the `hash(into:)` method using the `hashValue` var.
   var expandCompatHash: DeclSyntax {
     """
-    \(Self.getHashSignature) {
+    \(raw: Self.hashSignature) {
       \(raw: unsafeMark)hasher.combine(self.hashValue)
     }
     """
@@ -143,78 +139,59 @@ public struct DeriveHashableMacro: DeclarationMacro {
   /// Returns the expansion of the `hash(into:)` method using the enum's raw value.
   var expandHashRawValue: DeclSyntax {
     """
-    \(Self.getHashSignature) {
+    \(raw: Self.hashSignature) {
       \(raw: unsafeMark)hasher.combine(self.rawValue)
     }
     """
   }
 
   /// Derives the body of `hash(into:)` for an enum with no associated values
-  static func getHashBodyNoAssociatedValues(_ infos: EnumTypeInfo) -> CodeBlockItemListSyntax {
+  static func getHashBodyNoAssociatedValues(_ infos: EnumTypeInfo) -> String {
     if infos.cases.isEmpty {
-      return [
-        """
-        switch self {}
-        """
-      ]
-    }
-    var items = getDiscriminant(infos, scrutinee: "self", discrName: "discriminator")
-    items += [
       """
+      switch self {}
+      """
+    } else {
+      """
+      \(getDiscriminant(infos, scrutinee: "self", discrName: "discriminator"))
       hasher.combine(discriminator)
       """
-    ]
-    return items
+    }
   }
 
   /// Derives the body of `hash(into:)` for an enum with associated values. When
   /// the conformance is unsafe, each associated value is combined through an
   /// `unsafe` expression, since it relies on the value's Hashable conformance.
-  func getHashBodyHasAssociatedValues(_ infos: EnumTypeInfo) -> CodeBlockItemListSyntax {
+  func getHashBodyHasAssociatedValues(_ infos: EnumTypeInfo) -> String {
     var idx = 0
-    let cases: [SwitchCaseSyntax] =
+    let cases =
       infos.cases.map { caseInfo in
-        let fstStmt: [CodeBlockItemSyntax]
-        /// Combine the element's index
+        var stmtsInCase: [String]
         if caseInfo.isReachable {
-          fstStmt = [
-            """
-            hasher.combine(\(raw: idx))
-            """
-          ]
+          stmtsInCase = ["hasher.combine(\(idx))"]
           idx += 1
-        } else {
-          fstStmt = []
-        }
-
-        /// Combine each associated value in order
-        let stmtsInCase: [CodeBlockItemSyntax] =
-          if caseInfo.isReachable {
-            (0..<caseInfo.associatedValueLabels.count).map { i in
-              """
-              \(raw: unsafeMark)hasher.combine(a\(raw: i))
-              """
-            }
-          } else {
-            [getUnreachableStatement()]
+          stmtsInCase += (0..<caseInfo.associatedValueLabels.count).map { i in
+            "\(unsafeMark)hasher.combine(a\(i))"
           }
-        let pat = getEnumElementPayloadPattern(caseInfo, varPrefix: "a")
+        } else {
+          stmtsInCase = [getUnreachableStatement()]
+        }
         return
           """
-          case \(pat): 
-            \(CodeBlockItemListSyntax(fstStmt + stmtsInCase))
+          case \(getEnumElementPayloadPattern(caseInfo, varPrefix: "a")):
+            \(stmtsInCase.joined(separator: "\n"))
           """
-      }
+      }.joined(separator: "\n")
     return
       """
       switch self {
-      \(raw: cases.map { $0.trimmedDescription }.joined(separator: "\n"))
+      \(cases)
       }
       """
   }
 
   /// Derives the body of `hash(into:)` for an enum
-  func getHashBody(_ infos: EnumTypeInfo) -> CodeBlockItemListSyntax {
+  func getHashBody(_ infos: EnumTypeInfo) -> String {
     if infos.hasNoAssociatedValues() {
       Self.getHashBodyNoAssociatedValues(infos)
     } else {
@@ -225,36 +202,28 @@ public struct DeriveHashableMacro: DeclarationMacro {
   /// Derives the body of `hash(into:)` for a struct. When the conformance is
   /// unsafe, each property is combined through an `unsafe` expression, since it
   /// relies on the property's Hashable conformance.
-  func getHashBody(_ infos: StructTypeInfo) -> CodeBlockItemListSyntax {
-    var items: [CodeBlockItemSyntax] = []
-    for prop in infos.properties {
-      if !prop.isUserAccessible {
-        continue
-      }
-      items.append(
-        """
-        \(raw: unsafeMark)hasher.combine(self.\(raw: prop.name))
-        """
-      )
-    }
-    return .init(items)
+  func getHashBody(_ infos: StructTypeInfo) -> String {
+    infos.properties.compactMap { prop in
+      guard prop.isUserAccessible else { return nil }
+      return "\(unsafeMark)hasher.combine(self.\(prop.name))"
+    }.joined(separator: "\n")
   }
 
   /// Derives the body of `hash(into:)`
-  func getHashBody(_ infos: NominalTypeInfo) -> CodeBlockItemListSyntax {
+  func getHashBody(_ infos: NominalTypeInfo) -> String {
     switch infos.kind {
-    case .enumLike(let enum_infos):
-      return getHashBody(enum_infos)
-    case .structLike(let struct_infos):
-      return getHashBody(struct_infos)
+    case .enumLike(let enumInfo):
+      getHashBody(enumInfo)
+    case .structLike(let structInfo):
+      getHashBody(structInfo)
     }
   }
 
   /// Derives the `hash(into:)` method
   func expandHash(_ infos: NominalTypeInfo) -> DeclSyntax {
     """
-    \(Self.getHashSignature) {
-      \(getHashBody(infos))
+    \(raw: Self.hashSignature) {
+      \(raw: getHashBody(infos))
     }
     """
   }

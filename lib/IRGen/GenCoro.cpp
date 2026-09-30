@@ -12,7 +12,6 @@
 
 #include "swift/ABI/Coro.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"

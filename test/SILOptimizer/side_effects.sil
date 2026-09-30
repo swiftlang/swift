@@ -304,13 +304,13 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil @checkedaddr
-sil @checkedaddr : $@convention(thin) (Builtin.NativeObject, X) -> () {
-// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
-// CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
+sil @checkedaddr : $@convention(thin) (@in Builtin.NativeObject) -> @out X {
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: read v**, write v**, copy v**, destroy v**]
 // CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
-bb0(%0 : $Builtin.NativeObject, %1 : $X):
-  unconditional_checked_cast_addr Builtin.NativeObject in %0 : $Builtin.NativeObject to X in %1 : $X
+bb0(%0 : $*X, %1 : $*Builtin.NativeObject):
+  unconditional_checked_cast_addr Builtin.NativeObject in %1 : $*Builtin.NativeObject to X in %0 : $*X
   %r = tuple ()
   return %r : $()
 }

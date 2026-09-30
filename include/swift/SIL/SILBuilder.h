@@ -1433,9 +1433,9 @@ public:
   }
 
   RawPointerToRefInst *createRawPointerToRef(SILLocation Loc, SILValue Op,
-                                             SILType Ty) {
-    return insert(new (getModule())
-                      RawPointerToRefInst(getSILDebugLocation(Loc), Op, Ty));
+                                             SILType Ty, bool isImmortal) {
+    return insert(new (getModule()) RawPointerToRefInst(
+        getSILDebugLocation(Loc), Op, Ty, isImmortal));
   }
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
@@ -1623,14 +1623,13 @@ public:
         destFormalTy, getFunction(), forwardingOwnershipKind));
   }
 
-  UnconditionalCheckedCastAddrInst *
-  createUnconditionalCheckedCastAddr(SILLocation Loc,
-                                     CheckedCastInstOptions options,
-                                     SILValue src, CanType sourceFormalType,
-                                     SILValue dest, CanType targetFormalType) {
+  UnconditionalCheckedCastAddrInst *createUnconditionalCheckedCastAddr(
+      SILLocation Loc, CheckedCastInstOptions options, SILValue src,
+      CanType sourceFormalType, SILValue dest, CanType targetFormalType,
+      bool isCopy = false) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), options, src, sourceFormalType,
-        dest, targetFormalType, getFunction()));
+        getSILDebugLocation(Loc), options, isCopy, src, sourceFormalType, dest,
+        targetFormalType, getFunction()));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
@@ -2162,6 +2161,12 @@ public:
                                          Member, MethodTy, &getFunction()));
   }
 
+  COMMethodInst *createCOMMethod(SILLocation Loc, SILValue Operand,
+                                 SILDeclRef Member, SILType MethodTy) {
+    return insert(COMMethodInst::create(getSILDebugLocation(Loc), Operand,
+                                        Member, MethodTy, &getFunction()));
+  }
+
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
                                              SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ObjCSuperMethodInst(
@@ -2215,6 +2220,20 @@ public:
                            ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) OpenExistentialRefInst(
         getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind));
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createOpenCOMExistential(Loc, Operand, Ty,
+                                    Operand->getOwnershipKind());
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
+    auto instruction = new (getModule()) OpenCOMExistentialInst(
+        getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind);
+    return insert(instruction);
   }
 
   OpenExistentialBoxInst *
@@ -2453,6 +2472,12 @@ public:
   ExtendLifetimeInst *createExtendLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       ExtendLifetimeInst(getSILDebugLocation(Loc), Operand));
+  }
+
+  DiagnoseInst *createDiagnose(SILLocation Loc, SILValue Operand,
+                               DiagnoseInst::DiagnoseKind Kind) {
+    return insert(new (getModule()) DiagnoseInst(getSILDebugLocation(Loc),
+                                                 Operand, Kind));
   }
 
   UncheckedOwnershipConversionInst *

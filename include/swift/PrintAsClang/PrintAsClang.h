@@ -14,8 +14,6 @@
 #define SWIFT_PRINTASCLANG_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/AttrKind.h"
-#include "swift/AST/Identifier.h"
 
 namespace clang {
 class HeaderSearch;

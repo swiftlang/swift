@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -disable-availability-checking -O -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -target %target-swift-5.7-abi-triple -O -o - | %FileCheck %s
 
 public protocol P<T> {
   associatedtype T

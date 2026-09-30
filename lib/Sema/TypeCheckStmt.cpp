@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
@@ -47,9 +46,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -1431,8 +1427,14 @@ public:
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
-    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
+    // Checking yields requires proper interface type. If decl is invalid, then
+    // we already emitted diagnostics elsewhere.
+    if (auto *AFD = TheFunc->getAbstractFunctionDecl()) {
+      if (AFD->isInvalid())
+        return YS;
+    }
 
+    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
     auto yieldExprs = YS->getMutableYields();
     if (yieldExprs.size() != yieldResults.size()) {
       getASTContext().Diags.diagnose(YS->getYieldLoc(), diag::bad_yield_count,
@@ -2601,6 +2603,14 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
+    // A Swift subclass of a C++ FRT calls the base's imported constructor.
+    // There is no designated initializer to chain to.
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      auto &ctx = fromCtor->getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          classDecl->isForeignReferenceType())
+        return false;
+    }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
       if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
@@ -3774,6 +3784,7 @@ class DesugarForEachStmt {
   bool isAsync;
   bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
+  VarDecl *sequenceVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
   WhileStmt *innerLoop = nullptr;
@@ -3810,16 +3821,28 @@ public:
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     if (!ctx.LangOpts.DisableAvailabilityChecking) {
-      if (auto restriction = seqConformanceRef.getAvailabilityRestriction(
-              dc, stmt->getForLoc())) {
-        emitDiagnosticsForUnavailableConformance(seqType, restriction.value());
+      auto availability =
+          AvailabilityContext::forLocation(stmt->getForLoc(), dc);
+      bool hadError = false;
+      availability.enumerateUnsatisfiedRestrictionsForConformance(
+          seqConformanceRef,
+          [&](const Decl *decl, const ProtocolDecl *proto,
+              AvailabilityRestriction restriction) {
+            hadError =
+                emitDiagnosticForUnavailableConformance(seqType, proto,
+                                                        restriction);
+            return true;
+          });
+      if (hadError)
         return nullptr;
-      }
     }
 
     buildMakeIteratorVar();
+    buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 2> stmts;
+    SmallVector<ASTNode, 3> stmts;
+    if (auto *sequenceBinding = buildSequenceBinding())
+      stmts.push_back(sequenceBinding);
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
 
@@ -3834,25 +3857,36 @@ public:
   }
 
 private:
-  void emitDiagnosticsForUnavailableConformance(
-      Type seqType, AvailabilityRestriction restriction) {
+  bool emitDiagnosticForUnavailableConformance(
+      Type seqType, const ProtocolDecl *unavailableProto,
+      AvailabilityRestriction restriction) {
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = restriction.getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
-    auto range = domainAndRange.getRange();
-    if (domain.isVersioned() && range.hasMinimumVersion()) {
-      ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                         seqType, protoDecl,
-                         domain.getNameForAttributePrinting(),
-                         range.getVersionString());
+    llvm::SmallString<64> scratch;
+    auto diag =
+        ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                           seqType, protoDecl,
+                           restriction.getDiagnosticDescription(scratch, ctx));
+
+    // An unavailable conformance to 'Sendable' must be downgraded to a warning
+    // since previously there may have been code silently working with this violation,
+    // and we don't want to source-break those sites.
+    bool isSendableConformance =
+        unavailableProto &&
+        unavailableProto->isSpecificProtocol(KnownProtocolKind::Sendable);
+
+    if (isSendableConformance)
+      diag.warnUntilLanguageMode(LanguageMode::v6);
+
+    // A restriction that is unavailable cannot be satisfied with a runtime
+    // availability query, so only offer a fix-it for the other restrictions.
+    if (!restriction.isUnavailable())
       fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
-    } else {
-      ctx.Diags.diagnose(
-          loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
-          seqType, protoDecl);
-    }
+
+    // Only return true if we truly emitted an error diagnostic.
+    return !isSendableConformance ||
+           ctx.LangOpts.isLanguageModeAtLeast(LanguageMode::v6);
   }
 
   void buildMakeIteratorVar() {
@@ -3968,12 +4002,65 @@ private:
     return nextCall;
   }
 
-  PatternBindingDecl *buildMakeIterator() {
+  void buildOpaqueSequenceExpr() {
     auto *sequence = stmt->getSequence();
-    auto seqType = sequence->getType();
-    auto *opaqueSeqExpr =
-        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    auto *opaqueSeqExpr = new (ctx)
+        OpaqueValueExpr(sequence->getSourceRange(), sequence->getType());
     stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+  }
+
+  /// Whether the sequence expression reads a parameter directly.
+  bool sequenceReadsNoImplicitCopyBinding() const {
+    auto *expr = stmt->getSequence()->getSemanticsProvidingExpr();
+    // A mutable binding is loaded before it is used as an rvalue.
+    if (auto *load = dyn_cast<LoadExpr>(expr))
+      expr = load->getSubExpr()->getSemanticsProvidingExpr();
+
+    auto *declRef = dyn_cast<DeclRefExpr>(expr);
+    if (!declRef)
+      return false;
+
+    auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl());
+    return paramDecl;
+  }
+
+  /// Bind the sequence to an implicit local whose scope encloses the loop.
+  ///
+  /// Returns `nullptr` if no binding is needed.
+  PatternBindingDecl *buildSequenceBinding() {
+    // Only a borrowing iterator holds onto the sequence for the duration of
+    // the loop.
+    if (!isBorrowing)
+      return nullptr;
+
+    // A sequence read directly from a parameter needs no binding of its own:
+    // the parameter's scope already covers the loop.
+    if (sequenceReadsNoImplicitCopyBinding())
+      return nullptr;
+
+    std::string name;
+    {
+      if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+        name = "$" + np->getBoundName().str().str();
+      name += "$sequence";
+    }
+
+    auto introducer = stmt->getSequence()->getType()->isNoncopyable()
+                          ? VarDecl::Introducer::Borrowing
+                          : VarDecl::Introducer::Let;
+    sequenceVar = new (ctx) VarDecl(/*isStatic=*/false, introducer,
+                                    stmt->getSequence()->getStartLoc(),
+                                    ctx.getIdentifier(name), dc);
+    sequenceVar->setImplicit();
+
+    Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
+    return PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, stmt->getOpaqueSequenceExpr(),
+        dc);
+  }
+
+  PatternBindingDecl *buildMakeIterator() {
+    auto seqType = stmt->getSequence()->getType();
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
@@ -3989,8 +4076,18 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
+    // Call `makeIterator()` on the sequence binding when there is one, so that
+    // the iterator depends on that binding's scope rather than on a temporary.
+    Expr *base;
+    if (sequenceVar) {
+      base = new (ctx) DeclRefExpr(sequenceVar, DeclNameLoc(stmt->getForLoc()),
+                                   /*Implicit=*/true);
+    } else {
+      base = stmt->getOpaqueSequenceExpr();
+    }
+
     auto *makeIteratorRef = new (ctx)
-        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+        MemberRefExpr(base, stmt->getForLoc(), witness,
                       DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
 
     Expr *makeIteratorCall =

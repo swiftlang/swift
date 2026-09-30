@@ -35,7 +35,6 @@
 #include "llvm/Object/IRObjectFile.h"
 #include "llvm/Object/Wasm.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/BinaryFormat/Wasm.h"
 
 using namespace swift;
 using namespace llvm::opt;

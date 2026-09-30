@@ -92,7 +92,7 @@ reversePathSortedFilenames(const Container &elts) {
   return tmp;
 }
 
-static void emitMakeDependenciesFile(std::vector<std::string> &dependencies,
+static void emitMakeDependenciesFile(std::vector<std::string> dependencies,
                                      const FrontendOptions &opts,
                                      const InputFile &input,
                                      const std::vector<std::pair<std::string, std::string>> &prefixMap,

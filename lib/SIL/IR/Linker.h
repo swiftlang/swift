@@ -16,7 +16,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILModule.h"
-#include <functional>
 
 namespace swift {
 

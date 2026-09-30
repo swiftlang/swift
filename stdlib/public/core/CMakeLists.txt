@@ -344,6 +344,9 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "LINUX")
   endif()
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS")
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp;Synchronization)
+  # Low-address heap pointers can overlap the inline UTF-16 count encoding.
+  list(APPEND swift_stdlib_compile_flags
+    "-DWORKAROUND_LOW_ENTROPY_VA_BREADCRUMBS")
 endif()
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
@@ -535,6 +538,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     embedded-stdlib
     swiftCore
     IS_STDLIB IS_STDLIB_CORE
+    DETECT_ARC4RANDOM
     ${SWIFTLIB_EMBEDDED_SOURCES}
     GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
     SWIFT_COMPILE_FLAGS

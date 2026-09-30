@@ -1149,13 +1149,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
-  case DeclAttrKind::OriginallyDefinedIn: {
-    auto Attr = cast<OriginallyDefinedInAttr>(this);
-    auto Name = D->getDeclContext()->getParentModule()->getName().str();
-    if (Options.IsForSwiftInterface && Attr->getManglingModuleName() == Name)
-      return false;
-    break;
-  }
   default:
     break;
   }
@@ -1431,7 +1424,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Attr->IID.empty()) {
       Printer << "(interface: \"" << Attr->IID << "\")";
     } else if (!Attr->CLSID->empty()) {
-      Printer << "(implementation: " << Attr->CLSID.value() << ", threading: .";
+      Printer << "(implementation: \"" << Attr->CLSID.value()
+              << "\", threading: .";
       switch (Attr->getThreadingModel()) {
       case COMThreadingModel::Single:
         Printer << "single";

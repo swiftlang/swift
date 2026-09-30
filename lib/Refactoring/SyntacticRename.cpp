@@ -13,7 +13,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/IDEBridging.h"
 #include "swift/Parse/Lexer.h"

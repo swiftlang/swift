@@ -12,9 +12,7 @@
 #ifndef SWIFT_IRGEN_TBDGEN_H
 #define SWIFT_IRGEN_TBDGEN_H
 
-#include "swift/Basic/Version.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/StringSet.h"
 #include <vector>
 
 namespace llvm {

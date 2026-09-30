@@ -31,7 +31,6 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Strings.h"

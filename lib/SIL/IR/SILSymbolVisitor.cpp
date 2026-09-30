@@ -832,7 +832,7 @@ public:
     case DeclKind::PostfixOperator:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
     case DeclKind::HiddenTypeLayoutInfo:
       return false;
     case DeclKind::Missing:
@@ -860,7 +860,8 @@ public:
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
             : Visitor{V.Visitor}, PD{PD},
-              Resilient{PD->getParentModule()->isResilient()},
+              Resilient{PD->getParentModule()->isResilient() &&
+                        !PD->isCOMInterface()},
               WitnessMethodElimination{
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
@@ -946,7 +947,7 @@ public:
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
-  UNINTERESTING_DECL(Using)
+  UNINTERESTING_DECL(FileDefault)
 
 #undef UNINTERESTING_DECL
 };

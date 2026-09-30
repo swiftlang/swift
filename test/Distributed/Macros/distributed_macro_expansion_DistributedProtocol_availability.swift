@@ -35,22 +35,26 @@ public protocol Greeter: DistributedActor where ActorSystem: DistributedActorSys
 // CHECK:   @available(iOS 6666, macOS 7777, tvOS 8888, visionOS 9999, *)
 // CHECK:   public
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
-// CHECK:       Distributed._distributedStubFatalError()
-// CHECK:     } else {
-// CHECK:       fatalError()
-// CHECK:     }
+// CHECK:     #if !$Embedded
+// CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+// CHECK-NEXT:       Distributed._distributedStubFatalError()
+// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-EMPTY:
+// CHECK-NEXT:     fatalError()
 // CHECK:   }
    
 // CHECK:   @available(iOS 6666, macOS 7777, tvOS 8888, visionOS 9999, *)
 // CHECK:   public
 // CHECK:   distributed var name : String {
 // CHECK:     get  {
-// CHECK:       if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
-// CHECK:         Distributed._distributedStubFatalError()
-// CHECK:       } else {
-// CHECK:         fatalError()
-// CHECK:       }
+// CHECK:     #if !$Embedded
+// CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+// CHECK-NEXT:       Distributed._distributedStubFatalError()
+// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-EMPTY:
+// CHECK-NEXT:     fatalError()
 // CHECK:     }
 // CHECK:   }
    

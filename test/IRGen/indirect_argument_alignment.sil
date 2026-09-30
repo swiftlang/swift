@@ -1,0 +1,57 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+// Indirectly-passed function parameters should carry an `align` attribute
+// derived from the parameter type's alignment. Not emitting it blocks LLVM
+// optimizations that eliminate top-level temporary copies of readonly
+// arguments.
+//
+// rdar://186672118 (Specify alignment attribute for function parameters passed indirectly)
+// rdar://172132230 (Getting a Span from an InlineArray causes a full copy of the array)
+// rdar://184514053 (LLVM does not eliminate top-level temporary copies of readonly arguments)
+// rdar://172281449 (InlineArray Performance)
+
+import Swift
+import Builtin
+
+@_alignment(16)
+struct OverAligned {
+  var x, y, z, w, v: Builtin.Word
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @pass_array(ptr noalias align {{4|8}} captures(none) dereferenceable({{2048|4096}}) %0)
+sil @pass_array : $@convention(thin) (InlineArray<512, Int>) -> () {
+bb0(%0 : $InlineArray<512, Int>):
+  %99 = tuple ()
+  return %99
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @borrow_array(ptr noalias align {{4|8}} captures(none) dereferenceable({{2048|4096}}) %0)
+sil @borrow_array : $@convention(thin) (@in_guaranteed InlineArray<512, Int>) -> () {
+bb0(%0 : $*InlineArray<512, Int>):
+  %99 = tuple ()
+  return %99
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @mutate_array(ptr noalias align {{4|8}} captures(none) dereferenceable({{2048|4096}}) %0)
+sil @mutate_array : $@convention(thin) (@inout InlineArray<512, Int>) -> () {
+bb0(%0 : $*InlineArray<512, Int>):
+  %99 = tuple ()
+  return %99
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @pass_overaligned(ptr noalias align 16 captures(none) dereferenceable({{20|40}}) %0)
+sil @pass_overaligned : $@convention(thin) (OverAligned) -> () {
+bb0(%0 : $OverAligned):
+  %99 = tuple ()
+  return %99
+}
+
+// A parameter of a type with unknown (non-fixed) layout does not get an
+// alignment (or dereferenceable) attribute, since the alignment isn't known
+// statically.
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @pass_opaque(ptr noalias %0, ptr %T)
+sil @pass_opaque : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %99 = tuple ()
+  return %99
+}

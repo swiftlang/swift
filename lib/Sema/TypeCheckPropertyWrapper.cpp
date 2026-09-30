@@ -24,7 +24,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,

@@ -25,7 +25,6 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/TargetParser/Triple.h"
 #include <optional>
@@ -1112,6 +1111,14 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::SIL_LAYOUT_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(SILLayouts, scratch);
+        break;
+      case index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(HiddenTypeLayoutInfoDecls, scratch);
+        break;
+      case index_block::HIDDEN_TYPE_FALLBACK_TABLE:
+        assert(blobData.empty());
+        allocateBuffer(HiddenTypeFallbackTableData, scratch);
         break;
 
       default:

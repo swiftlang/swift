@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %swift-frontend-plain -target arm64-apple-ios18 -clang-target arm64-apple-ios26 -scan-dependencies -o %t/deps.json -I %t \
+// RUN: %swift_frontend_plain -target arm64-apple-ios18 -clang-target arm64-apple-ios26 -scan-dependencies -o %t/deps.json -I %t \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-builtin-module \
 // RUN:   %t/test.swift -module-name Test -swift-version 5 -experimental-clang-importer-direct-cc1-scan
 
@@ -21,7 +21,7 @@
 
 // CLANG-DIAG-NOT: clang importer driver args:
 
-// RUN: %swift-frontend-plain -target arm64-apple-ios18 -clang-target arm64-apple-ios26 \
+// RUN: %swift_frontend_plain -target arm64-apple-ios18 -clang-target arm64-apple-ios26 \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-builtin-module \
 // RUN:   %t/test.swift -module-name Test -swift-version 5 -O @%t/Test.cmd -S -o %t/test.s
 

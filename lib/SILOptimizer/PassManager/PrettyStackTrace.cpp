@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/Support/raw_ostream.h"
 

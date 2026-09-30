@@ -199,7 +199,7 @@ protocol FooP {
 // CHECK: [[COPYIDX:%.*]] = copy_value [[ARG0]] : $Elements.Index
 // CHECK: [[BORROWELT:%.*]] = begin_borrow [[COPYELT]] : $Elements
 // CHECK: [[BORROWIDX:%.*]] = begin_borrow [[COPYIDX]] : $Elements.Index
-// CHECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!read : <Self where Self : Collection> (Self) -> (Self.Index) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!read : <Self where Self : Collection> (Self) -> @yield_once (Self.Index) yields (Self.Element) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK: ([[YIELD:%.*]], [[TOKEN:%.*]]) = begin_apply [[WT]]<Elements>([[BORROWIDX]], [[BORROWELT]]) : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK: [[RESULT:%.*]] = copy_value [[YIELD]] : $Elements.Element
 // CHECK: end_apply [[TOKEN]]

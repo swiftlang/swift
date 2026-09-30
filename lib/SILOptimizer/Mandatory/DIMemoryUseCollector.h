@@ -23,7 +23,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {

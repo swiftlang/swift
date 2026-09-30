@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution \
+// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
@@ -41,14 +41,30 @@ func ConsumeThenBorrow() {
   Use(x)
 }
 
-// A `var` is box-backed, so its uses sit inside a `begin_borrow [lexical]` scope. The box's
-// destroy must stay below the `end_borrow` that closes that scope.
+func takeClosureEscape(_ f: @escaping () -> ()) {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}VarReassign
+// An escaping `var` stays in a box.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}EscapeVarReassign
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var Kl }
 // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:      end_borrow [[BORROW]]
 // CHECK-NEXT: destroy_value [[BOX]]
+// CHECK-LABEL: } // end sil function
+func EscapeVarReassign() {
+  var x = Kl()
+  takeClosureEscape { _ = x }
+  Consume(x)
+  x = Kl()
+  Use(x)
+}
+
+// An non-escaping `var` and uses an alloc_stack.
+// The last use ends up as a take.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}VarReassign
+// CHECK:      [[STK:%.*]] = alloc_stack [lexical] [var_decl] $Kl
+// CHECK:      load [take]
+// CHECK-NOT:  destroy_addr [[STK]]
+// CHECK:      dealloc_stack [[STK]]
 // CHECK-LABEL: } // end sil function
 func VarReassign() {
   var x = Kl()
@@ -139,4 +155,25 @@ func NEDependent() {
   let b = Buf()
   let n = MakeNE(b)
   UseNE(n)
+}
+
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}stress_copy_addrs
+// CHECK:      [[FIRST:%.*]] = alloc_stack [var_decl] $String, var, name "longStr"
+// CHECK:      store {{.*}} to [init] [[FIRST]]
+// CHECK:      [[SECOND:%.*]] = alloc_stack [var_decl] $String, var, name "str"
+
+// CHECK:      [[FIRST_BA:%.*]] = begin_access [read] [unknown] [[FIRST]]
+// CHECK:      copy_addr [take] [[FIRST_BA]] to [init] [[SECOND]]
+
+// CHECK:      [[SECOND_BA:%.*]] = begin_access [read] [unknown] [[SECOND]]
+// CHECK:      [[STR:%.*]] = load [take] [[SECOND_BA]]
+
+// CHECK-NOT:  destroy_addr
+// CHECK:      return [[STR]]
+// CHECK-LABEL: } // end sil function
+func stress_copy_addrs() -> String {
+  var longStr = "ascii"  // expected-warning {{was never mutated}}
+  var str = longStr      // expected-warning {{was never mutated}}
+  return str
 }

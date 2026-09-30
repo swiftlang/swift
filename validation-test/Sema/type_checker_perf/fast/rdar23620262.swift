@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=500 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000 -solver-disable-promote-supertypes
 // REQUIRES: tools-release,no_asan
 
 func test() {

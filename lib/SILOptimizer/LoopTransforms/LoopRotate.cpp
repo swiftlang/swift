@@ -12,10 +12,8 @@
 
 #define DEBUG_TYPE "sil-looprotate"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -449,6 +447,9 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The rotation and the critical-edge splitting above changed the CFG
   // significantly. Recompute dominance rather than updating it incrementally.
+  // The blocks created above were given fresh numbers via
+  // SILFunction::assignFreshBlockNumber() without bumping the numbering epoch,
+  // so both this dominator tree and the live loop info remain consistent.
   domInfo->recalculate(*header->getParent());
 
   // Beautify the IR. Move the old header to after the old latch as it is now

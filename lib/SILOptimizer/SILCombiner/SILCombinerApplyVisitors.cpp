@@ -18,25 +18,18 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeBits.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
-#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include <utility>
@@ -678,8 +671,11 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
 
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
+    // Debug uses are rewritten during salvage and shouldn't extend lifetimes.
+    if (isa<DebugValueInst>(Inst))
+      continue;
     if (isa<RefCountingInst>(Inst) || isa<DestroyValueInst>(Inst) ||
-        isa<DebugValueInst>(Inst) || isa<EndBorrowInst>(Inst)) {
+        isa<EndBorrowInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
     }

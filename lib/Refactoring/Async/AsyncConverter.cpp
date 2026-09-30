@@ -12,7 +12,6 @@
 
 #include "AsyncRefactoring.h"
 #include "Utils.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::refactoring::asyncrefactorings;

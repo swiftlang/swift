@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -Xfrontend -disable-availability-checking -Onone)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -Onone)
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 // Temporarily disable when running with an older runtime (rdar://181060167)
 // UNSUPPORTED: use_os_stdlib

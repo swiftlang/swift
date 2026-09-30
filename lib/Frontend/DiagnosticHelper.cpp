@@ -164,7 +164,8 @@ createSerializedDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
       [emitMacroExpansionFiles](
           const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-        auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
+        auto serializedDiagnosticsPath =
+            input.getLLVMBitcodeDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
         return serialized_diagnostics::createConsumer(serializedDiagnosticsPath,

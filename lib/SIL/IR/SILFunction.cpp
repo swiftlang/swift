@@ -21,11 +21,9 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -35,7 +33,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
-#include "clang/AST/Decl.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -217,6 +214,7 @@ static BridgedFunction::ParseFn parseFunction = nullptr;
 static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
+static BridgedFunction::HasComputedSideEffectsFn hasComputedSideEffectsFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
 static BridgedFunction::ArgumentMayWriteFn argumentMayWriteFunction = nullptr;
 static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
@@ -292,6 +290,7 @@ void SILFunction::init(
   // born after the module advances past Raw are reported lowered by the
   // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
+  this->HasOwnershipForTrivialValues = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -419,6 +418,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
+  newSnapshot->HasLoweredAddresses = HasLoweredAddresses;
 
   SILFunctionCloner cloner(newSnapshot);
   cloner.cloneFunction(this);
@@ -774,12 +774,14 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
 SILBasicBlock *SILFunction::createBasicBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.push_back(newBlock);
   return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   newBlock->setDebugName(debugName);
   BlockList.push_back(newBlock);
   return newBlock;
@@ -787,12 +789,14 @@ SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
 
 SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.insertAfter(afterBB->getIterator(), newBlock);
   return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.insert(beforeBB->getIterator(), newBlock);
   return newBlock;
 }
@@ -800,6 +804,11 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
 SILBasicBlock *SILFunction::createEmptyDebugReconstructionBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
   newBlock->index = -2;
+  // Even though this block is not part of the block list, generic graph
+  // algorithms (e.g. a dominator tree during SIL verification) may still be
+  // queried with it, so give it a valid, unique block number. The block will
+  // simply not be present in those structures.
+  assignFreshBlockNumber(*newBlock);
   // Do NOT insert into BlockList - this is a standalone debug block.
   return newBlock;
 }
@@ -1375,6 +1384,7 @@ void BridgedFunction::registerBridging(
     SwiftMetatype metatype, RegisterFn initFn, RegisterFn destroyFn,
     WriteFn writeFn, ParseFn parseFn, CopyEffectsFn copyEffectsFn,
     GetEffectInfoFn effectInfoFn, GetMemBehaviorFn memBehaviorFn,
+    HasComputedSideEffectsFn hasComputedSideEffectsFn,
     ArgumentMayReadFn argumentMayReadFn, ArgumentMayWriteFn argumentMayWriteFn,
     IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
@@ -1385,6 +1395,7 @@ void BridgedFunction::registerBridging(
   copyEffectsFunction = copyEffectsFn;
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
+  hasComputedSideEffectsFunction = hasComputedSideEffectsFn;
   argumentMayReadFunction = argumentMayReadFn;
   argumentMayWriteFunction = argumentMayWriteFn;
   isDeinitBarrierFunction = isDeinitBarrierFn;
@@ -1479,6 +1490,14 @@ MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
 
   auto b = getMemBehvaiorFunction({this}, observeRetains);
   return (MemoryBehavior)b;
+}
+
+// Used by the MemoryLifetimeVerifier
+bool SILFunction::hasComputedSideEffects() const {
+  if (!hasComputedSideEffectsFunction)
+    return false;
+
+  return hasComputedSideEffectsFunction({const_cast<SILFunction *>(this)});
 }
 
 // Used by the MemoryLifetimeVerifier

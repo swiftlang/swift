@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -resolve-imports -emit-tbd -emit-tbd-path %t/resolve_imports.tbd %s -disable-availability-checking -tbd-install_name resolve_imports
+// RUN: %target-swift-frontend -resolve-imports -emit-tbd -emit-tbd-path %t/resolve_imports.tbd %s -target %target-swift-5.1-abi-triple -tbd-install_name resolve_imports
 // RUN: %llvm-nm %t/resolve_imports.tbd |  %FileCheck %s 
 
 // REQUIRES: OS=macosx 

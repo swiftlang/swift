@@ -19,7 +19,6 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Assertions.h"
-#include <iostream>
 
 llvm::cl::opt<bool> AssertContinue(
     "assert-continue", llvm::cl::init(false),

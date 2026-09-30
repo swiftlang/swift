@@ -141,6 +141,7 @@ add_swift_host_library(swiftAST STATIC
   TypeWalker.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
+  Yield.cpp
 
   LLVM_LINK_COMPONENTS
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
@@ -157,7 +158,7 @@ if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 target_link_libraries(swiftAST INTERFACE
   clangCodeGen
-  clangIndex
+  clangUnifiedSymbolResolution
   clangFormat
   clangToolingCore
   clangFrontendTool

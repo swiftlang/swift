@@ -5,10 +5,11 @@
 // block containing address_to_pointer when the closure is inlined.
 
 // CHECK-SIL-LABEL: sil @$s{{.*}}5hello
-// CHECK-SIL: debug_value %{{[0-9]+}}, let, name "$0", argno 1, type $UnsafePointer<Int>, expr op_fragment:#UnsafePointer._rawValue, transform {
+// CHECK-SIL: debug_value %{{[0-9]+}}, let, name "$0", argno 1, transform {
 // CHECK-SIL:   bb0(%[[ARG:[0-9]+]] : $*Int):
 // CHECK-SIL:     %[[PTR:[0-9]+]] = address_to_pointer [stack_protection] %[[ARG]]
-// CHECK-SIL:     return %[[PTR]]
+// CHECK-SIL:     %[[S:[0-9]+]] = struct $UnsafePointer<Int> (%[[PTR]])
+// CHECK-SIL:     return %[[S]]
 // CHECK-SIL:   }
 
 // CHECK-IR-LABEL: define {{.*}}hello

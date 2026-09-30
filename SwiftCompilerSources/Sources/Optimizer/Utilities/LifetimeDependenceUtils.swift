@@ -1221,7 +1221,12 @@ extension LifetimeDependenceDefUseWalker {
       case let copyAddr as SourceDestAddrInstruction:
         return loadedAddressUse(of: localAccess.operand!, intoAddress: copyAddr.destinationOperand)
       case let castAddr as CheckedCastAddrBranchInst:
-        return loadedAddressUse(of: localAccess.operand!, intoAddress: castAddr.destinationOperand)
+        guard let destinationOperand = castAddr.destinationOperand else {
+          // A test_only cast produces no value and writes nowhere, so nothing
+          // carries a dependence on what it read -- as with switch_enum_addr.
+          return .continueWalk
+        }
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: destinationOperand)
       case is SwitchEnumAddrInst:
         // switch_enum_addr does not produce any values. Subsequent uses of the address (unchecked_enum_data_addr)
         // directly use the original address.

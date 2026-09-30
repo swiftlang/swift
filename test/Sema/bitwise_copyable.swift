@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated                       \
-// RUN:     -disable-availability-checking                   \
+// RUN:     -target %target-swift-5.1-abi-triple             \
 // RUN:     -enable-experimental-feature Sensitive           \
 // RUN:     -enable-experimental-feature LifetimeDependence  \
 // RUN:     -enable-builtin-module                           \

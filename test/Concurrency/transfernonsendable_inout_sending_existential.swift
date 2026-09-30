@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -disable-availability-checking -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-6.0-abi-triple -verify %s -o /dev/null
 
 // Test that the region isolation checker correctly names values that are wrapped
 // in an existential (any Protocol) before being stored into an indirect return

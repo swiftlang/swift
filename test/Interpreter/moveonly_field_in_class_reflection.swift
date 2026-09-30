@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only)
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-experimental-move-only)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-experimental-move-only) | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -34,7 +34,7 @@ do {
     // copying a noncopyable field.
     // CHECK-NEXT: mo:
     // CHECK-NEXT: b: 42
-    // CHECK-NEXT: c: {{.*}}.MOHaver
+    // CHECK-NEXT: c: {{.*}}MOHaver
     for c in mirror.children {
         print("\(c.label!): \(c.value)")
     }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 // https://github.com/apple/swift/issues/54722
 // Differentiation transform crash for `apply` with opened existential arguments

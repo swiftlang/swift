@@ -18,7 +18,6 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEmbedded.h"
-#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTPrinter.h"
@@ -36,6 +35,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -48,13 +48,11 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "Sema"
@@ -1595,9 +1593,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 DeferredDiags swift::findSyntacticErrorForConsume(
     ModuleDecl *module, SourceLoc loc, Expr *subExpr,
     llvm::function_ref<Type(Expr *)> getType) {
+  DeferredDiags result;
+
+  // LifetimeResolution can handle all kinds of consumes, such as those on
+  // copyable types and results of functions, without restrictions.
+  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
+    return result;
+
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 
-  DeferredDiags result;
   const bool noncopyable =
       getType(subExpr)->isNoncopyable();
 

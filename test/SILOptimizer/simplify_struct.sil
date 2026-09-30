@@ -14,11 +14,17 @@ struct Outer {
 
 // CHECK-LABEL: sil [ossa] @simple_delay_struct :
 // CHECK:       bb0
-// CHECK-NEXT:    debug_value %0, var, name "y", type $S, expr op_fragment:#S.a
-// CHECK-NEXT:    debug_value %1, var, name "y", type $S, expr op_fragment:#S.b
-// CHECK-NEXT:    debug_value %0, var, name "x", type $S, expr op_fragment:#S.a
-// CHECK-NEXT:    debug_value %1, var, name "x", type $S, expr op_fragment:#S.b
+// CHECK-NEXT:    debug_value (%0, %1), var, name "x", transform {
+// CHECK:         bb0(%0 : $String, %1 : $Int):
+// CHECK-NEXT:      %2 = struct $S (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
 // CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    debug_value (%0, %1), var, name "y", transform {
+// CHECK:         bb0(%0 : $String, %1 : $Int):
+// CHECK-NEXT:      %2 = struct $S (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
 // CHECK-NEXT:    fix_lifetime [[B]]
 // CHECK-NEXT:    fix_lifetime %1
 // CHECK-NEXT:    end_borrow [[B]]
@@ -43,11 +49,14 @@ bb0(%0 : @owned $String, %1 : $Int):
 
 // CHECK-LABEL: sil [ossa] @destructure_of_copy :
 // CHECK:       bb0(%0 : @owned $String, %1 : $Int):
-// CHECK-NEXT:    debug_value %0, var, name "x", type $S, expr op_fragment:#S.a
-// CHECK-NEXT:    debug_value %1, var, name "x", type $S, expr op_fragment:#S.b
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    debug_value (%0, %1), var, name "x", transform {
+// CHECK:         bb0(%0 : $String, %1 : $Int):
+// CHECK-NEXT:      %2 = struct $S (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
 // CHECK-NEXT:    fix_lifetime %1
 // CHECK-NEXT:    destroy_value [[C]]
 // CHECK:       bb3:

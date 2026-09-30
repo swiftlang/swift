@@ -818,6 +818,19 @@ bb0(%0 : $*Builtin.Word):
   return %8 : $()
 }
 
+// CHECK-LABEL: sil @test_raw_pointer_to_ref_flags
+sil @test_raw_pointer_to_ref_flags : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  // CHECK: raw_pointer_to_ref %0 : $Builtin.RawPointer to $Class1
+  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Class1
+  // CHECK: raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $Class1
+  %2 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $Class1
+  // CHECK: raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $Builtin.NativeObject
+  %3 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $Builtin.NativeObject
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // CHECK-LABEL: sil @test_tail_elems
 sil @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
@@ -1560,6 +1573,8 @@ sil @c_convention : $@convention(c) () -> ()
 sil @method_convention : $@convention(method) (Int) -> ()
 sil @objc_method_convention : $@convention(objc_method) (Int) -> ()
 sil @witness_method_convention : $@convention(witness_method: Bendable) (Fork) -> ()
+// CHECK-LABEL: sil @com_method_convention : $@convention(com_method) (Builtin.RawPointer) -> ()
+sil @com_method_convention : $@convention(com_method) (Builtin.RawPointer) -> ()
 
 // CHECK-LABEL: sil @conventions : $@convention(thin) (() -> (), @convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(method) () -> (), @convention(objc_method) () -> (), @convention(witness_method: Bendable) (Fork) -> ()) -> () {
 sil @conventions : $@convention(thin) (@convention(thick) () -> (),

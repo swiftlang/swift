@@ -41,7 +41,7 @@
 #define LITTLE_ENDIAN 1234
 #define BYTE_ORDER BIG_ENDIAN
 #else
-#if !defined(BYTE_ORDER) && !defined(_WIN32)
+#if !defined(BYTE_ORDER) && !defined(_WIN32) && __has_include(<machine/endian.h>)
 #include <machine/endian.h>
 #endif
 #endif
@@ -93,7 +93,9 @@ inline uint64_t ByteSwap_64(uint64_t value) {
 
 namespace sys {
 
-#if defined(BYTE_ORDER) && defined(BIG_ENDIAN) && BYTE_ORDER == BIG_ENDIAN
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__)
+constexpr bool IsBigEndianHost = __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__;
+#elif defined(BYTE_ORDER) && defined(BIG_ENDIAN) && BYTE_ORDER == BIG_ENDIAN
 constexpr bool IsBigEndianHost = true;
 #else
 constexpr bool IsBigEndianHost = false;

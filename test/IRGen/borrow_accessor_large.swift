@@ -178,7 +178,7 @@ func nctest() {
 // CHECK: }
 
 // IRGen result type is PtrTy because we are returning a class reference 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0A5KlassAA0F0Cvb"(ptr noalias swiftself captures(none) dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0A5KlassAA0F0Cvb"(ptr noalias swiftself align 8 captures(none) dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._k = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 0
 // CHECK-IRGEN:   [[REG1:%.*]] = load ptr, ptr %._k, align 8
@@ -192,7 +192,7 @@ func nctest() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large11LargeStructV0a5SmallE0AA0fE0Vvb"(ptr noalias swiftself captures(none) dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large11LargeStructV0a5SmallE0AA0fE0Vvb"(ptr noalias swiftself align 8 captures(none) dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._smallStruct = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 4
 // CHECK-IRGEN:   %._smallStruct.id = getelementptr inbounds nuw %T21borrow_accessor_large11SmallStructV, ptr %._smallStruct, i32 0, i32 0
@@ -207,7 +207,7 @@ func nctest() {
 // CHECK: return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeProp = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 3
 // CHECK-IRGEN:   ret ptr %._largeProp
@@ -219,7 +219,7 @@ func nctest() {
 // CHECK:   return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeTuple = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 2
 // CHECK-IRGEN:   ret ptr %._largeTuple
@@ -232,9 +232,9 @@ func nctest() {
 // CHECK:   return [[REG2]]
 // CHECK: } // end sil function '$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb'
 
-// CHECK-IRGEN define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN entry:
-// CHECK-IRGEN   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself dereferenceable(272) [[REG0]])
+// CHECK-IRGEN   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0]])
 // CHECK-IRGEN   ret ptr [[REG1]]
 // CHECK-IRGEN }
 
@@ -245,9 +245,9 @@ func nctest() {
 // CHECK:   return [[REG2]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV06nestedD11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV06nestedD11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
-// CHECK-IRGEN:   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself dereferenceable(272) [[REG0]])
+// CHECK-IRGEN:   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0]])
 // CHECK-IRGEN:   ret ptr [[REG1]]
 // CHECK-IRGEN: }
 
@@ -257,7 +257,7 @@ func nctest() {
 // CHECK:   return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C18TrivialTupleBorrowSi_S7itvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C18TrivialTupleBorrowSi_S7itvb"(ptr noalias swiftself align 8 dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._t = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 1
 // CHECK-IRGEN:   ret ptr %._t
@@ -269,7 +269,7 @@ func nctest() {
 // CHECK:   return %2
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C17TrivialPropBorrowAA0dfG0Vvb"(ptr noalias swiftself dereferenceable(272) %0) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C17TrivialPropBorrowAA0dfG0Vvb"(ptr noalias swiftself align 8 dereferenceable(272) %0) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeTrivialProp = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr %0, i32 0, i32 5
 // CHECK-IRGEN:   ret ptr %._largeTrivialProp
@@ -282,7 +282,7 @@ func nctest() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large13NCLargeStructV0A2NCAA0F0Vvb"(ptr noalias swiftself captures(none) dereferenceable(72) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large13NCLargeStructV0A2NCAA0F0Vvb"(ptr noalias swiftself align 8 captures(none) dereferenceable(72) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._k = getelementptr inbounds nuw %T21borrow_accessor_large13NCLargeStructV, ptr [[REG0]], i32 0, i32 0
 // CHECK-IRGEN:   %._k.id = getelementptr inbounds nuw %T21borrow_accessor_large2NCV, ptr %._k, i32 0, i32 0
@@ -298,7 +298,7 @@ func nctest() {
 // CHECK:   return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias swiftself dereferenceable(72) [[REG1:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias swiftself align 8 dereferenceable(72) [[REG1:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeProp = getelementptr inbounds nuw %T21borrow_accessor_large13NCLargeStructV, ptr [[REG1]], i32 0, i32 1
 // CHECK-IRGEN:   ret ptr %._largeProp
@@ -311,9 +311,9 @@ func nctest() {
 // CHECK:   return [[REG2]]
 // CHECK: } // end sil function '$s21borrow_accessor_large13NCLargeStructV21nestedLargePropBorrowAA0G6NCPropVvb'
 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV21nestedLargePropBorrowAA0G6NCPropVvb"(ptr noalias swiftself dereferenceable(72) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV21nestedLargePropBorrowAA0G6NCPropVvb"(ptr noalias swiftself align 8 dereferenceable(72) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
-// CHECK-IRGEN:   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias swiftself dereferenceable(72) [[REG0]])
+// CHECK-IRGEN:   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias swiftself align 8 dereferenceable(72) [[REG0]])
 // CHECK-IRGEN:   ret ptr [[REG1]]
 // CHECK-IRGEN: }
 

@@ -56,6 +56,24 @@ public struct FunctionConvention : CustomStringConvertible {
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
+  /// True if there is an error result which can never hold a value, e.g. `Never`, so that the
+  /// function cannot actually throw.
+  public func hasUninhabitedErrorResult(in function: Function) -> Bool {
+    guard let errorResult else {
+      return false
+    }
+    let errorType = errorResult.getReturnValueType(ofFunctionType: functionType, in: function)
+    guard errorType.isStructurallyUninhabited else {
+      return false
+    }
+    if let enumDecl = errorType.nominal as? EnumDecl {
+      // Being case-less today is not enough: a resilient enum can gain cases in a future version of
+      // its module, and cases which are unavailable during lowering can still exist at runtime.
+      return !enumDecl.hasCasesUnavailableDuringLowering && enumDecl.isEffectivelyExhaustive(in: function)
+    }
+    return true
+  }
+
   /// Number of indirect results including the error.
   /// This avoids quadratic lazy iteration on indirectResults.count.
   public var indirectSILResultCount: Int {
@@ -184,8 +202,15 @@ public struct ResultInfo : CustomStringConvertible {
     convention.description + ": " + type.description
   }
 
-  public func getReturnValueType(function: Function) -> CanonicalType {
-    CanonicalType(bridged: self._bridged.getReturnValueType(function.bridged))
+  /// The type of the value returned for this result. Unlike `type`, which is the unsubstituted
+  /// interface type, this has the pattern substitutions of `functionType` applied. For example, for
+  ///   `@substituted <τ_0_0, τ_0_1> () -> (@out τ_0_0, @error_indirect τ_0_1) for <Int, Never>`
+  /// the error result's `type` is `τ_0_1` whereas its return value type is `Never`.
+  ///
+  /// `functionType` must be the function type this result belongs to.
+  public func getReturnValueType(ofFunctionType functionType: CanonicalType,
+                                 in function: Function) -> CanonicalType {
+    CanonicalType(bridged: self._bridged.getReturnValueType(functionType.bridged, function.bridged))
   }
 }
 

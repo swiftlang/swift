@@ -16,7 +16,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;

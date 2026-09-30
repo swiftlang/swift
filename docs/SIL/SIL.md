@@ -1801,9 +1801,13 @@ by the type system as follows:
     including a Swift class instance, a box allocated by `alloc_box`, or
     a thick function's closure context. It may not alias natively
     Objective-C class instances.
--   An `AnyObject` or `Builtin.BridgeObject` may alias any class
-    instance, whether Swift or Objective-C, but may not alias
-    non-class-instance heap objects.
+-   An `AnyObject` may alias any class instance, whether Swift or Objective-C,
+    but may not alias non-class-instance heap objects.
+-   A `Builtin.BridgeObject` may alias any class instance, whether Swift or
+    Objective-C, but may not alias non-class-instance heap objects. Here,
+    "aliasing" refers to accessing the memory pointed-to by the bridge object
+    value. As explained in [Typed Access TBAA](#typed-access-tbaa), a pointer
+    to a `Builtin.BridgeObject` cannot alias another type.
 -   Two values of the same class type `$C` may alias. Two values of
     related class type `$B` and `$D`, where there is a subclass
     relationship between `$B` and `$D`, may alias. Two values of
@@ -1916,6 +1920,10 @@ Similarly, the LLVM builtins `Builtin.bitcast` and
 pointer values must be converted to an address via `pointer_to_address`
 before typed access can occur. Whether the `pointer_to_address` is
 strict determines whether aliasing may occur.
+
+A pointer to a `Builtin.BridgeObject` cannot alias another type. Although a
+`Builtin.BridgeObject` may be cast to and from a class reference or a
+`Builtin.Word`, such casts are always value casts, not in-place address casts.
 
 Memory may be rebound to an unrelated type. Addresses to unrelated types
 may alias as long as typed access only occurs while memory is bound to

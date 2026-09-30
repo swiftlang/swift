@@ -346,11 +346,13 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
 
 /// Demangle a type name.
 ///
-/// Copies at most `MaxLength` bytes from the demangled name string into
-/// `OutDemangledName`.
+/// Copies at most `MaxLength` bytes, including the terminating NUL, from the
+/// demangled name string into `OutDemangledName`. The result is always
+/// NUL-terminated when `MaxLength` is nonzero, truncating the name if
+/// necessary.
 ///
 /// Returns the length of the demangled string this function tried to copy
-/// into `OutDemangledName`.
+/// into `OutDemangledName`, not including the terminating NUL.
 SWIFT_REMOTE_MIRROR_LINKAGE
 size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
@@ -484,9 +486,24 @@ swift_reflection_ptr_t
 swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
                          swift_reflection_ptr_t JobPtr);
 
+/// Task registry iterator callback passed to
+/// swift_reflection_iterateTaskRegistry
+typedef void (*swift_taskRegistryIterator)(swift_reflection_ptr_t Task,
+                                           void *ContextPtr);
+
+/// Iterate over all live tasks in the target process's task registry.
+///
+/// Calls the passed in Call function for each task in the registry.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateTaskRegistry(
+    SwiftReflectionContextRef ContextRef,
+    swift_taskRegistryIterator Call, void *ContextPtr);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
 
 #endif // SWIFT_REFLECTION_SWIFT_REFLECTION_H
-

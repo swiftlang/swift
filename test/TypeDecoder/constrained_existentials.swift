@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-executable %s -g -o %t/constrained_existentials -emit-module -Xfrontend -disable-availability-checking
+// RUN: %target-build-swift -emit-executable %s -g -o %t/constrained_existentials -emit-module -target %target-swift-6.0-abi-triple
 // RUN: sed -ne '/\/\/ *DEMANGLE: /s/\/\/ *DEMANGLE: *//p' < %s > %t/input
 // RUN: %lldb-moduleimport-test %t/constrained_existentials -type-from-mangled=%t/input | %FileCheck %s --match-full-lines
 
@@ -68,7 +68,7 @@ do {
 // The mangled names below are compiler-generated via...
 //
 //   swiftc -emit-ir -g -module-name constrained_existentials \
-//     -Xfrontend -disable-availability-checking \
+//     -target arm64-apple-macosx15.0 \
 //     test/TypeDecoder/constrained_existentials.swift
 
 protocol Base<T> {

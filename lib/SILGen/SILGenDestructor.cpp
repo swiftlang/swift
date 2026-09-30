@@ -13,20 +13,16 @@
 #include "ArgumentScope.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
-#include "SILGenFunctionBuilder.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallSet.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -482,7 +478,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
 void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
                                         ManagedValue selfValue, VarDecl *D) {
   const TypeLowering &ti = getTypeLowering(D->getTypeInContext());
-  if (!ti.isTrivial()) {
+  if (!ti.isTrivial(&F)) {
     SILValue addr =
         B.createRefElementAddr(cleanupLoc, selfValue.getValue(), D,
                                ti.getLoweredType().getAddressType());
@@ -693,7 +689,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
   if (isa<StructDecl>(nom)) {
     for (VarDecl *vd : nom->getStoredProperties()) {
       const TypeLowering &ti = getTypeLowering(vd->getTypeInContext());
-      if (ti.isTrivial())
+      if (ti.isTrivial(&F))
         continue;
 
       SILValue addr = B.createStructElementAddr(

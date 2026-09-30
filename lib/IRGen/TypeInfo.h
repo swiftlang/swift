@@ -123,6 +123,8 @@ protected:
       IRGenModule &IGM,
       SerializableHiddenTypeInfoRepresentation &representation) const;
 
+  [[noreturn]] void unsupportedSerializableHiddenTypeInfoRepresentation() const;
+
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
 
   void assertNotDeserialized(const char *operation) const;
@@ -160,7 +162,7 @@ public:
   virtual ~TypeInfo();
 
   virtual std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const;
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const = 0;
 
   /// Unsafely cast this to the given subtype.
   template <class T> const T &as() const {

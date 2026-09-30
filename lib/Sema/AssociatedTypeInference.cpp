@@ -50,7 +50,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -2097,9 +2096,8 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
   // common, because most of the recursion involves the requirements
   // of the generic type.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    type = FunctionType::get(genericFn->getParams(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
+    type = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
   }
 
   if (!witness->getDeclContext()->getExtendedProtocolDecl()) {
@@ -2302,7 +2300,8 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
   if (auto funcType = type->getAs<FunctionType>()) {
     performed = needsAdjustment(funcType);
     if (performed)
-      return FunctionType::get(funcType->getParams(), funcType->getResult(),
+      return FunctionType::get(funcType->getParams(), funcType->getYields(),
+                               funcType->getResult(),
                                adjust(funcType->getExtInfo()));
   }
   return type;

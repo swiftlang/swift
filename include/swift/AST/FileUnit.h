@@ -59,6 +59,12 @@ public:
 
   /// Returns the synthesized file for this source file, creating one and
   /// inserting it into the module if it does not exist.
+  ///
+  /// NOTE: Mutating the AST through the synthesized file should *never* be done
+  /// in Sema -- it breaks lazy type-checking and violates the request
+  /// evaluator. If you need to add a new top-level decl, adjust the logic in
+  /// `getTopLevelItemsWithAuxiliaryDecls`. This only exists to allow code
+  /// synthesis during SILOptimizer passes.
   SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -217,13 +223,28 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+  /// Finds all top-level items in this file with their auxiliary decls such as
+  /// macro expansions.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  ///
+  /// \p visitFreestanding When \c true (the default), includes any top-level
+  /// freestanding macro expansions.
+  ArrayRef<ASTNode>
+  getTopLevelItemsWithAuxiliaryDecls(SmallVectorImpl<ASTNode> &scratch,
+                                     bool visitFreestanding = true) const;
+
   /// Finds all top-level decls in this file with their auxiliary decls such as
   /// macro expansions.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
-  void getTopLevelDeclsWithAuxiliaryDecls(
-      SmallVectorImpl<Decl*> &results) const;
+  ///
+  /// \p visitFreestanding When \c true (the default), includes any top-level
+  /// freestanding macro expansions.
+  void getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &results,
+                                          bool visitFreestanding = true) const;
 
   virtual void
   getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}
@@ -275,7 +296,8 @@ public:
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const {
-    getTopLevelDecls(results);
+    // When displaying, we generally want to include auxiliary decls.
+    getTopLevelDeclsWithAuxiliaryDecls(results, /*visitFreestanding*/ false);
   }
 
   /// Looks up which modules are imported by this file.

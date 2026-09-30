@@ -249,6 +249,10 @@ public:
   /// reference type, returns the originally-imported (un-thunked) method.
   virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
 
+  /// If \param decl is an accessor or operator function the importer
+  /// synthesized around an imported function, returns that function.
+  virtual ValueDecl *getForwardingSource(const ValueDecl *decl) = 0;
+
   /// Returns the forwarding method in the derived class that calls the base
   /// method.
   virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;
@@ -353,6 +357,19 @@ public:
   virtual bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) = 0;
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
+
+  /// Emit a note explaining why \p decl or \p type was imported as unsafe,
+  /// located at the responsible C++ declaration.
+  ///
+  /// Emits nothing when the entity did not come from C++, when the unsafety
+  /// was spelled out in the header, or when no reason can be attributed with
+  /// confidence: a missing explanation is preferable to a wrong one.
+  ///
+  /// \param decl The unsafe declaration, or null when only a type is known.
+  /// \param type The unsafe type, or null when only a declaration is known.
+  /// \param useLoc Fallback location, used if the C++ location is invalid.
+  virtual void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                         SourceLoc useLoc) = 0;
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 

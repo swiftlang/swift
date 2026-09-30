@@ -13,10 +13,8 @@
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/MD5Stream.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -149,6 +147,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::MoveValueInst:
     mangleConstantProp(cast<SingleValueInstruction>(constInst->getOperand(0)));
     break;

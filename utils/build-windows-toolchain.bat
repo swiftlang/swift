@@ -65,7 +65,9 @@ set NINJA_STATUS=[%%f/%%t][%%p][%%es]
 :: Build the -Test argument, if any, by subtracting skipped tests
 set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
 set "TestArg="
-set "Skip=,%SKIP_TESTS%,"
+:: Strip stray double quotes from SKIP_TESTS so the substring match below still works.
+set "SkipTests=%SKIP_TESTS:"=%"
+set "Skip=,%SkipTests%,"
 for %%I in (%TestsList%) do (
   if "!Skip:,%%I,=!" == "!Skip!" (
       set "TestArg=!TestArg!%%I,"

@@ -466,7 +466,7 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
           (partialApply.isOnStack || callee.effectAllowsSpecialization),
 
           // TODO: handle other kind of indirect arguments
-          partialApply.hasOnlyInoutIndirectArguments,
+          partialApply.hasOnlySupportedIndirectArguments,
 
           (partialApply.isOnStack || partialApply.allArgumentsCanBeCopied)
     else {
@@ -985,10 +985,13 @@ private extension PartialApplyInst {
     return false
   }
 
-  var hasOnlyInoutIndirectArguments: Bool {
+  var hasOnlySupportedIndirectArguments: Bool {
     self.argumentOperands
       .filter { !$0.value.type.isObject }
-      .allSatisfy { self.convention(of: $0)!.isInout }
+      .allSatisfy {
+        let conv = self.convention(of: $0)!
+        return conv.isInout || (self.isOnStack && conv == .indirectInGuaranteed)
+      }
   }
 
   var allArgumentsCanBeCopied: Bool {
@@ -1284,7 +1287,7 @@ private extension Instruction {
     // TODO: figure out what to do with non-inout indirect arguments
     // https://forums.swift.org/t/non-inout-indirect-types-not-supported-in-closure-specialization-optimization/70826
     case let pai as PartialApplyInst
-    where pai.callee is FunctionRefInst && pai.hasOnlyInoutIndirectArguments:
+    where pai.callee is FunctionRefInst && pai.hasOnlySupportedIndirectArguments:
       return pai
     default:
       return nil

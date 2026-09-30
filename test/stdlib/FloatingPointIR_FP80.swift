@@ -18,5 +18,5 @@ func testConstantFoldFloatLiterals() {
   acceptFloat80(1.0)
 }
 
-// i386: call swiftcc void @"$s20FloatingPointIR_FP8013acceptFloat80yys0F0VF{{.*}}"(x86_fp80 0xK3FFF8000000000000000)
-// x86_64: call swiftcc void @"$s20FloatingPointIR_FP8013acceptFloat80yys0F0VF{{.*}}"(x86_fp80 0xK3FFF8000000000000000)
+// i386: call swiftcc void @"$s20FloatingPointIR_FP8013acceptFloat80yys0F0VF{{.*}}"(x86_fp80 {{(1\.000000e\+00|0xK3FFF8000000000000000)}})
+// x86_64: call swiftcc void @"$s20FloatingPointIR_FP8013acceptFloat80yys0F0VF{{.*}}"(x86_fp80 {{(1\.000000e\+00|0xK3FFF8000000000000000)}})

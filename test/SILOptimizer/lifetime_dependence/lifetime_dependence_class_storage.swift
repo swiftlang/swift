@@ -3,7 +3,7 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature Lifetimes
 
 // Check which value each dependence is rooted at. A chain of immutable strong
@@ -14,7 +14,7 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -module-name test \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -Xllvm -sil-print-after=lifetime-dependence-insertion 2>&1 | %FileCheck %s
 

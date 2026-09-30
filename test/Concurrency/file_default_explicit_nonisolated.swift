@@ -34,7 +34,7 @@ protocol SendableMetatypeProto: SendableMetatype {
 
 //--- conformances.swift
 
-using @MainActor
+default @MainActor
 
 class A {}
 extension A: PlainProto {

@@ -4,11 +4,11 @@
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // Test both with and without '-experimental-lazy-typecheck'
-// RUN: %swift-frontend -emit-module %t/Lib.swift -swift-version 6 -experimental-lazy-typecheck -experimental-skip-all-function-bodies -enable-upcoming-feature NonisolatedNonsendingByDefault -module-name Lib -o %t/Modules/Lib.swiftmodule
-// RUN: %swift-frontend -emit-sil %t/Test.swift -I %t/Modules -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -emit-module %t/Lib.swift -swift-version 6 -experimental-lazy-typecheck -experimental-skip-all-function-bodies -enable-upcoming-feature NonisolatedNonsendingByDefault -module-name Lib -o %t/Modules/Lib.swiftmodule
+// RUN: %target-swift-frontend -emit-sil %t/Test.swift -I %t/Modules -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
 
-// RUN: %swift-frontend -emit-module %t/Lib.swift -swift-version 6 -experimental-skip-all-function-bodies -enable-upcoming-feature NonisolatedNonsendingByDefault -module-name Lib -o %t/Modules/Lib.swiftmodule
-// RUN: %swift-frontend -emit-sil %t/Test.swift -I %t/Modules -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -emit-module %t/Lib.swift -swift-version 6 -experimental-skip-all-function-bodies -enable-upcoming-feature NonisolatedNonsendingByDefault -module-name Lib -o %t/Modules/Lib.swiftmodule
+// RUN: %target-swift-frontend -emit-sil %t/Test.swift -I %t/Modules -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 //--- Lib.swift
 

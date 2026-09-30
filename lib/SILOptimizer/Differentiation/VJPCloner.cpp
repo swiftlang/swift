@@ -19,7 +19,6 @@
 
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
@@ -448,7 +447,8 @@ public:
         ccabi->getCheckedCastOptions(),
         ccabi->getConsumptionKind(),
         getOpValue(ccabi->getSrc()), getOpASTType(ccabi->getSourceFormalType()),
-        getOpValue(ccabi->getDest()),
+        // A test_only cast has no destination operand.
+        ccabi->hasDest() ? getOpValue(ccabi->getDest()) : SILValue(),
         getOpASTType(ccabi->getTargetFormalType()),
         createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getSuccessBB()),
         createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getFailureBB()),
@@ -1150,7 +1150,7 @@ public:
         vjpFnTy->getDirectFormalResultsType(getModule(),
                                             TypeExpansionContext::minimal(),
                                             vjp->hasLoweredAddresses()),
-        tai->getNormalBB()->getArgument(0)->getOwnershipKind());
+        OwnershipKind::Owned);
 
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
@@ -1727,9 +1727,9 @@ bool VJPCloner::Implementation::run() {
 
   // Generate pullback code.
   PullbackCloner PullbackCloner(cloner);
-  if (PullbackCloner.run()) {
+  if (PullbackCloner.run())
     errorOccurred = true;
-  }
+
   if (!errorOccurred) {
     auto *pm = &context.getPassManager();
     pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);

@@ -52,7 +52,6 @@
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -1055,9 +1054,6 @@ private:
 
   /// Returns true if \p clangTy is the typedef for NSUInteger.
   bool isNSUInteger(clang::QualType clangTy) {
-    if (const auto* elaboratedTy = dyn_cast<clang::ElaboratedType>(clangTy)) {
-      clangTy = elaboratedTy->desugar();
-    }
     const auto *typedefTy = dyn_cast<clang::TypedefType>(clangTy);
     if (!typedefTy)
       return false;
@@ -2047,26 +2043,6 @@ private:
     return true;
   }
 
-  /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
-  /// thereof.
-  bool isCFTypeRef(Type ty) {
-    if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
-      ty = existential->getConstraintType();
-
-    const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
-      TAD = aliasTy->getDecl();
-      ty = aliasTy->getSinglyDesugaredType();
-    }
-
-    if (!TAD || !TAD->hasClangNode())
-      return false;
-
-    if (owningPrinter.ID_CFTypeRef.empty())
-      owningPrinter.ID_CFTypeRef = getASTContext().getIdentifier("CFTypeRef");
-    return TAD->getName() == owningPrinter.ID_CFTypeRef;
-  }
-
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
@@ -2083,7 +2059,7 @@ private:
       }
     }
 
-    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !ty->isCFTypeRef())
       return true;
 
     return false;

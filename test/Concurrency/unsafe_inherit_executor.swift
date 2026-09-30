@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=targeted
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -target %target-swift-6.0-abi-triple %s
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -target %target-swift-6.0-abi-triple %s -strict-concurrency=targeted
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -target %target-swift-6.0-abi-triple %s -strict-concurrency=complete
 
 
 

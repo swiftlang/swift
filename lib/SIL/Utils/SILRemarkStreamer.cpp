@@ -12,7 +12,6 @@
 
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/IR/LLVMContext.h"
 
 using namespace swift;
@@ -22,6 +21,18 @@ SILRemarkStreamer::SILRemarkStreamer(
     std::unique_ptr<llvm::raw_fd_ostream> &&stream, const ASTContext &Ctx)
     : owner(Owner::SILModule), streamer(std::move(streamer)), context(nullptr),
       remarkStream(std::move(stream)), ctx(Ctx) { }
+
+SILRemarkStreamer::~SILRemarkStreamer() {
+  // If we still own the underlying LLVM streamer (i.e. it was never handed off
+  // to an LLVMContext via intoLLVMContext), release its serializer so that the
+  // remark string table is flushed to the end of the remarks file. This also
+  // satisfies llvm::remarks::RemarkStreamer's destructor assertion that the
+  // serializer has been released before the streamer is destroyed. When owned
+  // by an LLVMContext, finalization is instead performed via
+  // llvm::finalizeLLVMOptimizationRemarks once backend codegen completes.
+  if (streamer)
+    streamer->releaseSerializer();
+}
 
 llvm::remarks::RemarkStreamer &SILRemarkStreamer::getLLVMStreamer() {
   switch (owner) {
@@ -69,8 +80,8 @@ SILRemarkStreamer::create(SILModule &silModule) {
   }
 
   llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-      remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+      remarkSerializerOrErr =
+          llvm::remarks::createRemarkSerializer(format, *file);
   if (llvm::Error err = remarkSerializerOrErr.takeError()) {
     diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                         toString(std::move(err)));

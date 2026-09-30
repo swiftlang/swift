@@ -20,13 +20,11 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Casting.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -117,11 +115,11 @@ void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
   }
   auto &clangCtx = typeDecl->getASTContext();
   clang::PrintingPolicy pp(clangCtx.getLangOpts());
-  const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
+  const auto NS = clang::NestedNameSpecifier::getRequiredQualification(
       clangCtx, clangCtx.getTranslationUnitDecl(),
       typeDecl->getLexicalDeclContext());
   if (NS)
-    NS->print(os, pp);
+    NS.print(os, pp);
   assert(cast<clang::NamedDecl>(typeDecl)->getDeclName().isIdentifier());
   os << cast<clang::NamedDecl>(typeDecl)->getName();
   if (auto *ctd = dyn_cast<clang::ClassTemplateSpecializationDecl>(typeDecl)) {

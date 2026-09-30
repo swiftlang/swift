@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
 #include "Conversion.h"
@@ -486,17 +485,6 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   // Create an initialization which will initialize it.
   auto &resultTL = SGF.getTypeLowering(addr->getType());
   auto temporary = SGF.useBufferAsTemporary(addr, resultTL);
-
-  // A tuple result stored into an @out buffer must not be initialized
-  // element-by-element across a suspension point. This could result in
-  // a partial write happening before the suspension, and only the part of the write
-  // happening after the suspension point would survive, leaving the earlier part corrupt.
-  // Only a tuple with more than one element can be left partially written
-  if (SGF.F.isAsync()) {
-    if (auto tupleTy = addr->getType().getAs<TupleType>())
-      if (tupleTy->getNumElements() > 1)
-        temporary->setCanSplitIntoTupleElements(false);
-  }
 
   // Remember the cleanup that will be activated.
   auto cleanup = temporary->getInitializedCleanup();
@@ -994,7 +982,7 @@ void StmtEmitter::visitDiscardStmt(DiscardStmt *S) {
     assert(varDecl->hasStorage());
     auto varType = varDecl->getTypeInContext();
     auto &varTypeLowering = SGF.getTypeLowering(varType);
-    if (!varTypeLowering.isTrivial()) {
+    if (!varTypeLowering.isTrivial(&SGF.F)) {
       diagnose(getASTContext(),
                S->getStartLoc(),
                diag::discard_nontrivial_storage,
@@ -1665,6 +1653,10 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
   if (suppressErrorPath) {
+    // A boxed error arrives as an owned phi argument, and OSSA rejects an owned
+    // value that reaches `unreachable` without a lifetime-ending use.
+    if (errorValue->getOwnershipKind() == OwnershipKind::Owned)
+      B.createDestroyValue(loc, errorValue, IsDeadEnd);
     B.createUnreachable(loc);
     return destBB;
   }

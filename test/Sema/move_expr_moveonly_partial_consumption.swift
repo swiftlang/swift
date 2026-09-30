@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift                              \
-// RUN:     -disable-availability-checking                          \
 // RUN:     -enable-experimental-feature NoImplicitCopy             \
 // RUN:     -debug-diagnostic-names
 

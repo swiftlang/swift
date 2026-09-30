@@ -124,6 +124,28 @@ public class PublicSubClass : ExternalOpenClass {
   }
 }
 
+internal struct InternalBox {
+  open class NestedOpenSubClass : ExternalOpenClass {
+    internal override func openMethod() {}
+    internal override var openProperty: Int { get{return 0} set{} }
+    internal override subscript(index: MarkerForOpenSubscripts) -> Int {
+      get { return 0 }
+      set {}
+    }
+  }
+}
+
+public struct PublicBox {
+  open class NestedOpenSubClass : ExternalOpenClass {
+    internal override func openMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{5-13=open}}
+    internal override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{5-13=open}}
+    internal override subscript(index: MarkerForOpenSubscripts) -> Int { // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{5-13=open}}
+      get { return 0 }
+      set {}
+    }
+  }
+}
+
 
 // The proposal originally made these invalid, but we changed our minds.
 open class OpenSuperClass {

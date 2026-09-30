@@ -11,19 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/StaticMirror/BinaryScanningTool.h"
-#include "swift/Basic/Unreachable.h"
-#include "swift/Demangling/Demangler.h"
-#include "swift/RemoteInspection/ReflectionContext.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/RemoteInspection/TypeLowering.h"
-#include "swift/Remote/CMemoryReader.h"
 #include "swift/StaticMirror/ObjectFileContext.h"
 
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Object/Archive.h"
 #include "llvm/Object/MachOUniversal.h"
 
-#include <sstream>
 
 using namespace llvm::object;
 using namespace swift::reflection;

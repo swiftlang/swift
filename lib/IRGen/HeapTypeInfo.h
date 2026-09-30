@@ -19,7 +19,6 @@
 #define SWIFT_IRGEN_HEAPTYPEINFO_H
 
 #include "swift/AST/ASTContext.h"
-#include "clang/AST/Attr.h"
 #include "llvm/IR/DerivedTypes.h"
 
 #include "ExtraInhabitants.h"

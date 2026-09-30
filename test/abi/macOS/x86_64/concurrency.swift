@@ -470,6 +470,8 @@ Added: __swift_concurrency_debug_task_getTaskNext
 Added: __swift_concurrency_debug_task_registryCount
 Added: __swift_concurrency_debug_task_registryWalk
 Added: __swift_concurrency_task_registry
+Added: __swift_concurrency_task_registry_enabled
+Added: __swift_concurrency_task_registry_shard_size
 
 // withDeadline / TaskCancellationScope: structured-concurrency deadlines,
 // scoped cancellation (SPI), and CancellationError.Reason plumbing.

@@ -32,7 +32,7 @@ public struct B {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) A final {
 
-// CHECK: B returnsB() const SWIFT_SYMBOL({{.*}});
+// CHECK: B returnsB() const noexcept SWIFT_SYMBOL({{.*}});
 
 // CHECK: namespace _impl {
 // CHECK-EMPTY:
@@ -44,5 +44,5 @@ public struct B {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) B final {
 
-// CHECK: SWIFT_INLINE_THUNK B A::returnsB() const {
-// CHECK: SWIFT_INLINE_THUNK A B::returnsA() const {
+// CHECK: SWIFT_INLINE_THUNK B A::returnsB() const noexcept {
+// CHECK: SWIFT_INLINE_THUNK A B::returnsA() const noexcept {

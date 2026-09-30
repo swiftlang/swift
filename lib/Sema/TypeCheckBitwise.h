@@ -2,7 +2,6 @@
 #define SWIFT_SEMA_TYPECHECKBITWISE_H
 
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/TypeCheckRequests.h"
 
 namespace swift {
 class ProtocolConformance;

@@ -872,7 +872,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   SILValue indirectResult;
   if (funcTy->getNumResults() != 0) {
     auto result = funcTy->getSingleResult();
-    if (result.getConvention() == ResultConvention::Indirect) {
+    // A formally indirect result only occupies an indirect SIL argument in
+    // lowered-address mode; with opaque values it is returned as a value.
+    if (fnConv.isSILIndirect(result)) {
       SILType resultTy =
           fnConv.getSILType(result, SGF.getTypeExpansionContext());
       indirectResult = entry->createFunctionArgument(resultTy);
@@ -1063,9 +1065,12 @@ static ManagedValue emitCBridgedToNativeValue(
       return ManagedValue();
     auto record = dyn_cast_or_null<clang::CXXRecordDecl>(
         bridgedType->castTo<StructType>()->getDecl()->getClangDecl());
-    if (record && Lowering::getBridgedSmartPtr(AbstractionPattern(
-                      bridgedType, record->getTypeForDecl()))) {
-      return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+    if (record) {
+      auto recordTy = record->getASTContext().getCanonicalTagType(record);
+      if (Lowering::getBridgedSmartPtr(
+              AbstractionPattern(bridgedType, recordTy.getTypePtr()))) {
+        return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+      }
     }
     return ManagedValue();
   };
@@ -1356,7 +1361,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If arg is non-trivial and has an address type, make a +1 copy and operate
   // on that.
-  if (!lowering.isTrivial() && arg->getType().isAddress() &&
+  if (!lowering.isTrivial(&SGF.F) && arg->getType().isAddress() &&
       SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);

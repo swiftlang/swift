@@ -1624,6 +1624,34 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
     let p = unsafe baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     unsafe p.deinitialize(count: 1)
   }
+
+  /// Initializes the element at `index` to the given value, without
+  /// triggering the insertion of a stack-protection guard for the
+  /// containing function.
+  ///
+  /// Only call this when `index` is in bounds, e.g. an index drawn from
+  /// `0 ..< count`).
+  @export(implementation)
+  internal func _unprotectedInitializeElement(
+    at index: Index, to value: consuming Element
+  ) {
+    _debugPrecondition(startIndex <= index && index < endIndex)
+    let p = unsafe baseAddress._unsafelyUnwrappedUnchecked.unprotectedProject(index)
+    unsafe p.initialize(to: value)
+  }
+
+  /// Deinitializes the memory underlying the element at `index`, without
+  /// triggering the insertion of a stack-protection guard for the
+  /// containing function.
+  ///
+  /// Only call this when `index` is in bounds, e.g. an index drawn from
+  /// `0 ..< count`).
+  @export(implementation)
+  internal func _unprotectedDeinitializeElement(at index: Index) {
+    _debugPrecondition(startIndex <= index && index < endIndex)
+    let p = unsafe baseAddress._unsafelyUnwrappedUnchecked.unprotectedProject(index)
+    unsafe p.deinitialize(count: 1)
+  }
 }
 % end
 

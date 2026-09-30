@@ -16,26 +16,18 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Concurrency.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
-#include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/NodeDatastructures.h"
-#include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Test.h"
@@ -44,7 +36,6 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -2756,9 +2747,8 @@ void UseAfterSendDiagnosticInferrer::infer() {
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
-    if (pai->isCalledOnce() && ApplySite(pai)
-                                   .getParamInfoForOperand(*sendingOp)
-                                   .hasOption(SILParameterInfo::Sending)) {
+    // @called(once) closures can have both implicit and explicit `sending` captures.
+    if (pai->isCalledOnce()) {
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
         return diagnosticEmitter.emitNamedUseofStronglySentValue(
             baseLoc, rootValueAndName->first);
@@ -3721,24 +3711,21 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
       }
     }
 
-    // A `sending` capture of an non-isolated `@called(once)` closure is
-    // translated by `translateSILCalledOncePartialApply` as a send of
-    // that specific operand -- so reaching this operand here means the
-    // capture itself crossed isolation, independent of whether the closure
-    // as a whole is isolated. Let's use the captured value's tracked
-    // isolation (when it is actor-isolated) as the caller isolation.
+    // Reaching this operand here means it was individually sent as a capture
+    // of a non-isolated `@called(once)` closure -- either because it was
+    // explicitly `sending`, or because it's an ordinary capture of a
+    // non-escaping closure (every non-Sendable capture of those is sent
+    // individually, independent of whether the closure as a whole is isolated.
+    // Let's use the captured value's tracked isolation (when it is
+    // actor-isolated) as the caller isolation.
     if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
         pai && pai->isCalledOnce()) {
-      ApplySite apply(pai);
-      if (apply.getParamInfoForOperand(*op).hasOption(
-              SILParameterInfo::Sending)) {
-        std::optional<ActorIsolation> callerIsolation;
-        if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
-          callerIsolation =
-              diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
-        if (initForIsolatedPartialApply(op, ace, callerIsolation))
-          return true;
-      }
+      std::optional<ActorIsolation> callerIsolation;
+      if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
+        callerIsolation =
+            diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
+      if (initForIsolatedPartialApply(op, ace, callerIsolation))
+        return true;
     }
   }
 

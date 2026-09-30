@@ -239,6 +239,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, ExtendLifetime)
+OPERAND_OWNERSHIP(InstantaneousUse, Diagnose)
 OPERAND_OWNERSHIP(InstantaneousUse, MergeIsolationRegion)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
@@ -254,6 +255,7 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyBlock)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ExplicitCopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCMethod)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, COMMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
@@ -405,6 +407,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
         /*allowUnowned*/ false);                                               \
   }
 FORWARDING_OWNERSHIP(OpenExistentialRef)
+FORWARDING_OWNERSHIP(OpenCOMExistential)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
 FORWARDING_OWNERSHIP(BridgeObjectToRef)
@@ -656,6 +659,15 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
     // address checker and/or exclusivity checker rather than by value ownership.
     if (operandTy.isAddress()) {
       return OperandOwnership::TrivialUse;
+    }
+
+    if (i->isCalledOnce()) {
+      auto argConv = ApplySite(i).getArgumentConvention(op);
+      // Borrowed non-Copyable captures aren't owned by the closure.
+      if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
+        return OperandOwnership::Borrow;
+      // ... the rest of the operands are consumed.
+      return OperandOwnership::ForwardingConsume;
     }
 
     return OperandOwnership::Borrow;

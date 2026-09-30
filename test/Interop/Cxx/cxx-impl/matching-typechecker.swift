@@ -154,13 +154,3 @@ func templateFunc(_: Int32) -> Int32 {
 func variadicFunc(_: Int32) -> Int32 {
   return 0
 }
-
-
-// Overloads
-// TODO: This should work.
-
-// expected-error@+1{{could not find imported function 'sameArityOverload' matching global function 'sameArityOverload'; make sure you import the module or header that declares it}}
-@cxx @implementation
-func sameArityOverload(_: Int32) -> Int32 {
-  return 0
-}

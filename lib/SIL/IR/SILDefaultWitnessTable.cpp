@@ -19,10 +19,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 

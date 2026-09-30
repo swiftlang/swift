@@ -36,7 +36,6 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 #include <random>
 
 using namespace swift;

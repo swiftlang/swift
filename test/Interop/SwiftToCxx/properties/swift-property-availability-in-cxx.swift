@@ -22,9 +22,9 @@ public struct Struct {
   }
 }
 
-// CHECK:  SWIFT_INLINE_THUNK swift::Int getGetterOnly() const SWIFT_SYMBOL("s:7Methods6StructV10getterOnlySivp") SWIFT_AVAILABILITY(macos,introduced=11);
-// CHECK: static SWIFT_INLINE_THUNK swift::Int getStaticUnavailableProp() SWIFT_SYMBOL("s:7Methods6StructV21staticUnavailablePropSivpZ") SWIFT_UNAVAILABLE_MSG("stuff happened");
+// CHECK:  SWIFT_INLINE_THUNK swift::Int getGetterOnly() const noexcept SWIFT_SYMBOL("s:7Methods6StructV10getterOnlySivp") SWIFT_AVAILABILITY(macos,introduced=11);
+// CHECK: static SWIFT_INLINE_THUNK swift::Int getStaticUnavailableProp() noexcept SWIFT_SYMBOL("s:7Methods6StructV21staticUnavailablePropSivpZ") SWIFT_UNAVAILABLE_MSG("stuff happened");
 
-// CHECK: SWIFT_INLINE_THUNK swift::Int Struct::getGetterOnly() const SWIFT_AVAILABILITY(macos,introduced=11) {
+// CHECK: SWIFT_INLINE_THUNK swift::Int Struct::getGetterOnly() const noexcept SWIFT_AVAILABILITY(macos,introduced=11) {
 
-// CHECK: SWIFT_INLINE_THUNK swift::Int Struct::getStaticUnavailableProp() SWIFT_UNAVAILABLE_MSG("stuff happened") {
+// CHECK: SWIFT_INLINE_THUNK swift::Int Struct::getStaticUnavailableProp() noexcept SWIFT_UNAVAILABLE_MSG("stuff happened") {

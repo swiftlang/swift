@@ -31,14 +31,12 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -60,7 +58,6 @@
 #include "ConstantBuilder.h"
 #include "ComputedWitnessIndex.h"
 #include "EntryPointArgumentEmission.h"
-#include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "Fulfillment.h"
@@ -1210,6 +1207,13 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
+  // A dependent conformance requires its witness table to be instantiated at runtime.
+  // This is not possible in Embedded Swift, which has no such runtime. It's also not
+  // needed: the mandatory pipeline specializes all witness tables, so that every
+  // conformance which is used at runtime is fully concrete.
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(
       *this, conformance,
@@ -1714,7 +1718,7 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
         // It should be never called. We add a pointer to an error function.
         if (isAsyncRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (isCalleeAllocatedCoroutineRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
@@ -1772,8 +1776,12 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
 
       if (IGM.isEmbeddedWithExistentials()) {
         // In Embedded Swift associated type witness point to the metadata.
-        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(
-          typeWitness->getCanonicalType());
+        // The type witness can be an opaque result type, which has no metadata of its
+        // own. Its underlying type is always known in Embedded Swift.
+        CanType canTypeWitness = typeWitness->getCanonicalType();
+        if (canTypeWitness->hasOpaqueArchetype())
+          canTypeWitness = IGM.substOpaqueTypesWithUnderlyingTypes(canTypeWitness);
+        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(canTypeWitness);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, assocType);
@@ -1843,7 +1851,15 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         // In Embedded Swift associated-conformance entries simply point to the witness table
         // of the associated conformance.
-        ProtocolConformance *assocConf = associatedWitness.Witness.getConcrete();
+        ProtocolConformanceRef assocConfRef = associatedWitness.Witness;
+        // An associated type which is an opaque result type has an abstract conformance.
+        // In Embedded Swift the underlying type of an opaque type is always known, so
+        // replace the opaque type to get the concrete conformance.
+        if (assocConfRef.isAbstract() &&
+            assocConfRef.getType()->hasOpaqueArchetype()) {
+          assocConfRef = IGM.substOpaqueTypesWithUnderlyingTypes(assocConfRef);
+        }
+        ProtocolConformance *assocConf = assocConfRef.getConcrete();
         llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;
@@ -2928,6 +2944,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     // May be polymorphic at the SIL level, but no type metadata is actually
     // passed.

@@ -40,7 +40,6 @@
 #include "swift/Strings.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -67,7 +66,6 @@
 #include "GenStruct.h"
 #include "GenValueWitness.h"
 #include "GenericArguments.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -75,7 +73,6 @@
 #include "MetadataRequest.h"
 #include "MetatypeMetadataVisitor.h"
 #include "ProtocolInfo.h"
-#include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
@@ -884,9 +881,10 @@ namespace {
 
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
-                                     SILDefaultWitnessTable *defaultWitnesses)
-      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.getSwiftModule()->isResilient()) {}
+                              SILDefaultWitnessTable *defaultWitnesses)
+        : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
+          Resilient(IGM.getSwiftModule()->isResilient() &&
+                    !Proto->isCOMInterface()) {}
 
     void layout() {
       super::layout();
@@ -4789,7 +4787,7 @@ namespace {
         // It should be never called. We add a pointer to an error function.
         if (afd->hasAsync()) {
           ptr = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (accessor && requiresFeatureCoroutineAccessors(
                                    accessor->getAccessorKind())) {
@@ -7716,6 +7714,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 
@@ -8227,6 +8227,32 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
   builder.addInt32(size.getValue());
   return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
       entity, builder.finishAndCreateFuture()));
+}
+
+// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub(), used
+// to fill dead async-method vtable/witness slots.
+llvm::Constant *IRGenModule::getOrCreateDeadAsyncMethodErrorFunctionPointer() {
+  if (DeadAsyncMethodErrorFunctionPointer)
+    return DeadAsyncMethodErrorFunctionPointer;
+  auto *asyncStub = getOrCreateDeadMethodErrorAsyncStub();
+  // Set up the AsyncFunctionPointer struct, roughly following
+  // emitAsyncFunctionPointer() and getOrCreateDeadMethodErrorStub()
+  ConstantInitBuilder initBuilder(*this);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(AsyncFunctionPointerTy));
+  builder.addCompactFunctionReference(asyncStub);
+  builder.addInt32((NumWords_AsyncLet * getPointerSize()).getValue());
+  bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+  auto *afp = builder.finishAndCreateGlobal(
+      "_swift_dead_async_method_error_afp", getPointerAlignment(),
+      /*constant*/ true,
+      canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                  : llvm::GlobalValue::InternalLinkage);
+  ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                             : IRLinkage::Internal)
+      .to(afp, /* nonAliasedDefinition */ false);
+  DeadAsyncMethodErrorFunctionPointer = afp;
+  return afp;
 }
 
 llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,

@@ -74,6 +74,14 @@ extension MyStruct {
 // CHECK:   "value": "3"
 
 
+// CHECK: "typeName": "ExtractFromMacroExpansion.MacroAddedStruct._Extension_MyProto",
+// CHECK: "properties": [
+// CHECK:   "label": "nested",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "8"
+
+
 // CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct",
 // CHECK: "properties": [
 // CHECK:   "label": "macroAddedVar",
@@ -140,6 +148,22 @@ extension MyStruct {
 // CHECK:   "value": "3"
 
 
+// CHECK: "typeName": "ExtractFromMacroExpansion._Peer_MyStruct._Extension_MyProto",
+// CHECK: "properties": [
+// CHECK:   "label": "nested",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "8"
+
+
+// CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct._Extension_MyProto",
+// CHECK: "properties": [
+// CHECK:   "label": "nested",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "8"
+
+
 // CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct.Inner",
 // CHECK: "properties": [
 // CHECK:   "label": "_member_Inner",
@@ -179,29 +203,6 @@ extension MyStruct {
 // CHECK:   "type": "Swift.Int",
 // CHECK:   "valueKind": "RawLiteral",
 // CHECK:   "value": "3"
-
-
-// CHECK: "typeName": "ExtractFromMacroExpansion.MacroAddedStruct._Extension_MyProto",
-// CHECK: "properties": [
-// CHECK:   "label": "nested",
-// CHECK:   "type": "Swift.Int",
-// CHECK:   "valueKind": "RawLiteral",
-// CHECK:   "value": "8"
-
-
-// CHECK: "typeName": "ExtractFromMacroExpansion._Peer_MyStruct._Extension_MyProto",
-// CHECK: "properties": [
-// CHECK:   "label": "nested",
-// CHECK:   "type": "Swift.Int",
-// CHECK:   "valueKind": "RawLiteral",
-// CHECK:   "value": "8"
-
-// CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct._Extension_MyProto",
-// CHECK: "properties": [
-// CHECK:   "label": "nested",
-// CHECK:   "type": "Swift.Int",
-// CHECK:   "valueKind": "RawLiteral",
-// CHECK:   "value": "8"
 
 
 // CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct._Peer_Inner._Extension_MyProto",

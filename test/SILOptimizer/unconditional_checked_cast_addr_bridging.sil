@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -sil-print-types -sil-combine -enable-sil-verify-all %s | %FileCheck %s
+// REQUIRES: objc_interop
+
+sil_stage canonical
+import Swift
+import Foundation
+
+// Bridge rewrites that take the source must leave copying casts to the runtime.
+// CHECK-LABEL: sil [ossa] @from_objc
+// CHECK: unconditional_checked_cast_addr [copy] NSString in %1 : $*NSString to String in %0 : $*String
+// CHECK-NOT: destroy_addr %1
+// CHECK: fix_lifetime %1 : $*NSString
+sil [ossa] @from_objc : $@convention(thin) (@in_guaranteed NSString) -> @out String {
+bb0(%0 : $*String, %1 : $*NSString):
+  unconditional_checked_cast_addr [copy] NSString in %1 : $*NSString to String in %0 : $*String
+  fix_lifetime %1 : $*NSString
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @to_objc
+// CHECK: unconditional_checked_cast_addr [copy] String in %1 : $*String to NSString in %0 : $*NSString
+// CHECK-NOT: destroy_addr %1
+// CHECK: fix_lifetime %1 : $*String
+sil [ossa] @to_objc : $@convention(thin) (@in_guaranteed String) -> @out NSString {
+bb0(%0 : $*NSString, %1 : $*String):
+  unconditional_checked_cast_addr [copy] String in %1 : $*String to NSString in %0 : $*NSString
+  fix_lifetime %1 : $*String
+  %2 = tuple ()
+  return %2 : $()
+}

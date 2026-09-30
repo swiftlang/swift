@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-using nonisolated
+default nonisolated
 
 // implicitly Sendable
 @MainActor class Base {}

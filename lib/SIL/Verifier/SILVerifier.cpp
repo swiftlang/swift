@@ -939,7 +939,12 @@ struct ImmutableAddressUseVerifier {
         }
         return true;
       }
-      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+        auto *cast = swift::cast<UnconditionalCheckedCastAddrInst>(inst);
+        if (use->get() == cast->getDest() || !cast->isCopy())
+          return true;
+        break;
+      }
       case SILInstructionKind::UncheckedRefCastAddrInst:
         if (isConsumingOrMutatingMoveAddrUse(use)) {
           return true;
@@ -950,6 +955,7 @@ struct ImmutableAddressUseVerifier {
         case CastConsumptionKind::BorrowAlways:
           llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
         case CastConsumptionKind::CopyOnSuccess:
+        case CastConsumptionKind::TestOnly:
           break;
         case CastConsumptionKind::TakeAlways:
         case CastConsumptionKind::TakeOnSuccess:
@@ -1302,24 +1308,19 @@ public:
     forbidObjectType(UnownedStorageType, value, valueDescription);
   }
 
-  // Require that the operand is a reference-counted type, or an Optional
+  // Require that the operand permits reference storage, or is an Optional
   // thereof.
   void requireReferenceOrOptionalReferenceValue(SILValue value,
                                                 const Twine &valueDescription) {
-    require(value->getType().isObject(), valueDescription +" must be an object");
-    
-    auto objectTy = value->getType().unwrapOptionalType();
-    
-    // Immortal C++ foreign reference types are represented as trivially lowered
-    // types since they do not require retain/release calls.
-    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
-                         objectTy.getASTType()->getReferenceCounting() ==
-                             ReferenceCounting::None;
+    require(value->getType().isObject(),
+            valueDescription + " must be an object");
 
-    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
+    auto objectTy = value->getType().unwrapOptionalType();
+    require(objectTy.getASTType()->allowsOwnership(
+                F.getGenericSignature().getPointer()),
             valueDescription + " must have reference semantics");
   }
-  
+
   // Require that the operand is a type that supports reference storage
   // modifiers.
   void requireReferenceStorageCapableValue(SILValue value,
@@ -1738,7 +1739,9 @@ public:
     if (arg->getType().isTrivial(F) && argKind == OwnershipKind::None)
       return;
 
-    require(argKind == term->getForwardingOwnershipKind(),
+    require(argKind == term->getForwardingOwnershipKind() ||
+            (argKind == OwnershipKind::None &&
+             term->getForwardingOwnershipKind() == OwnershipKind::Owned),
             "OwnershipForwardingTermInst nontrivial result "
             "must have the same ownership");
   }
@@ -3210,6 +3213,11 @@ public:
     for (auto *use : uses) {
       auto *user = use->getUser();
       if (deadEndBlocks && deadEndBlocks->isDeadEnd(user->getParent())) {
+        continue;
+      }
+      // A debug use does not require its operand to be alive, so it is allowed
+      // to be outside of the scope.
+      if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
         continue;
       }
       if (scopedAddress.isScopeEndingUse(use)) {
@@ -4796,6 +4804,35 @@ public:
 #endif
   }
 
+  void checkCOMMethodInst(COMMethodInst *CMI) {
+    auto member = CMI->getMember();
+    auto *protocol = dyn_cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+    require(protocol && protocol->isCOMInterface(),
+            "com_method must reference a COM interface requirement");
+
+    auto methodType =
+        requireObjectType(SILFunctionType, CMI, "result of com_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+    require(methodType->getRepresentation() ==
+                SILFunctionTypeRepresentation::COMMethod,
+            "wrong function type representation");
+
+    auto operandType = CMI->getOperand()->getType();
+    // The receiver may be a value or the address of a materialized interface
+    // value.
+    auto archetype = operandType.getASTType()->getAs<ArchetypeType>();
+    require(archetype &&
+                llvm::any_of(archetype->getConformsTo(),
+                             [&](ProtocolDecl *constraint) {
+                               return constraint == protocol ||
+                                      constraint->inheritsFrom(protocol);
+                             }),
+            "com_method operand must be an archetype constrained to the "
+            "declaring COM interface");
+    verifyLocalArchetype(CMI, operandType.getASTType());
+  }
+
   void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
     auto member = OMI->getMember();
     auto overrideTy =
@@ -4876,6 +4913,31 @@ public:
     require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
+            "SILFunction");
+  }
+
+  void checkOpenCOMExistentialInst(OpenCOMExistentialInst *OCE) {
+    SILType operandType = OCE->getOperand()->getType();
+    require(operandType.isObject(),
+            "open_com_existential operand must not be address");
+    require(operandType.canUseExistentialRepresentation(
+                ExistentialRepresentation::COM),
+            "open_com_existential operand must be a COM existential");
+
+    require(OCE->getType().isObject(),
+            "open_com_existential result must not be an address");
+
+    auto archetype =
+        dyn_cast<ExistentialArchetypeType>(OCE->getType().getASTType());
+    require(
+        archetype,
+        "open_com_existential result must be an opened existential archetype");
+    require(
+        archetype->getExistentialType()->isEqual(operandType.getASTType()),
+        "open_com_existential result must open the operand existential type");
+    require(OCE->getModule().getRootLocalArchetypeDefInst(
+                archetype, OCE->getFunction()) == OCE,
+            "Archetype opened by open_com_existential should be registered in "
             "SILFunction");
   }
 
@@ -5348,11 +5410,37 @@ public:
     }
   }
 
+  void checkUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *cast) {
+    require(cast->getSrc()->getType().isAddress(),
+            "unconditional_checked_cast_addr src must be an address");
+    require(cast->getDest()->getType().isAddress(),
+            "unconditional_checked_cast_addr dest must be an address");
+  }
+
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     require(CCABI->getSrc()->getType().isAddress(),
             "checked_cast_addr_br src must be an address");
-    require(CCABI->getDest()->getType().isAddress(),
-            "checked_cast_addr_br dest must be an address");
+
+    // hasDest() is derived from the consumption kind, and the operand list
+    // [src, dest?, typeDependentOperands...] is built to agree with it. If the
+    // two ever disagree, getDest() reads past the end of the operand list and
+    // getNumTypeDependentOperands() underflows, so pin it down here.
+    require(CCABI->getAllOperands().size() >= (CCABI->hasDest() ? 2u : 1u),
+            "checked_cast_addr_br operand list does not match its consumption "
+            "kind");
+
+    // A test_only cast produces no value, so it has no destination operand
+    // at all; see CheckedCastAddrBranchInst::hasDest().
+    if (CCABI->hasDest()) {
+      require(CCABI->getDest()->getType().isAddress(),
+              "checked_cast_addr_br dest must be an address");
+      // The target's lowered type is stored separately, because a test_only
+      // cast has no destination to read it back from. Where there is a
+      // destination the two must not drift apart.
+      require(CCABI->getDest()->getType() == CCABI->getTargetLoweredType(),
+              "checked_cast_addr_br dest must have the cast's target type");
+    }
 
     require(
         CCABI->getSuccessBB()->args_size() == 0,
@@ -6913,6 +7001,13 @@ public:
       if (!F.hasOwnership()) {
         return;
       }
+      
+      // For arguments of trivial type, allow the internal ownership to vary
+      // if the function has ownership for trivial values enabled.
+      if (F.hasOwnershipForTrivialValues()
+          && F.getTypeProperties(bbarg->getType()).isTrivial()) {
+        return;
+      }
 
       // Use the function's own conventions (fnConv carries its per-function
       // lowered-addresses state) so an already-lowered function verifies against
@@ -7024,6 +7119,12 @@ public:
             "diagnostic pass");
     if (i->getType().isAddress())
       checkAddressWalkerCanVisitAllTransitiveUses(i);
+  }
+
+  void checkDiagnoseInst(DiagnoseInst *i) {
+    require(i->getModule().getStage() == SILStage::Raw,
+            "Only valid in Raw SIL! Should have been eliminated by /some/ "
+            "diagnostic pass");
   }
 
   void checkMarkUnresolvedReferenceBindingInst(

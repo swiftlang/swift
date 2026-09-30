@@ -24,8 +24,8 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "llvm/ADT/StringRef.h"
 #include <functional>
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

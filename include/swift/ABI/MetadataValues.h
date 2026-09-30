@@ -1797,6 +1797,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
 
+  /// AsyncTask pointer in the AsyncLetImpl record.
+  const uint16_t AsyncLetTaskPointer = 0x6451; // = 25681
+
   // C type TaskContinuationFunction* descriminator.
   const uint16_t ClangTypeTaskContinuationFunction = 0x2abe; // = 10942
 
@@ -1828,11 +1831,20 @@ namespace SpecialPointerAuthDiscriminators {
   /// discriminator covers all of them.
   const uint16_t ConcurrencyHook = 0xc0a1; // = 49313
 
+  /// ThreadSanitizer interop hook variables (_swift_tsan_acquire,
+  /// _swift_tsan_release). Address-diversified, so one discriminator
+  /// covers both.
+  const uint16_t ThreadSanitizerHook = 0x8f52; // = 36690
+
   /// Function pointers stored in the coro allocator struct.
   const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
   const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
   const uint16_t CoroFrameAllocationFunction = 0xd251;   // = 53841
   const uint16_t CoroFrameDeallocationFunction = 0x5ba8; // = 23464
+
+  /// The compatibility-override cache in each hooked runtime entry point.
+  /// The slot is address-diversified, so one discriminator covers all of them.
+  const uint16_t CompatibilityOverride = 0xf50b; // = 62731
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1995,7 +2007,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
-    /// WARNING: 5 is the last bit!
+    /// Set if a class descriptor is followed by a versioned instance-prefix
+    /// descriptor. The template is copied immediately before the
+    /// native heap-object address point.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasInstancePrefix = 5,
 
     // Type-specific flags:
 
@@ -2109,6 +2126,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
                                 class_hasDefaultOverrideTable,
                                 class_setHasDefaultOverrideTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasInstancePrefix,
+                                class_hasInstancePrefix,
+                                class_setHasInstancePrefix)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -2116,6 +2136,9 @@ public:
                                  class_getResilientSuperclassReferenceKind,
                                  class_setResilientSuperclassReferenceKind)
 };
+
+/// Version of the optional trailing class instance-prefix descriptor.
+static constexpr uint16_t ClassInstancePrefixDescriptorVersion = 0;
 
 /// Extra flags for resilient classes, since we need more than 16 bits of
 /// flags there.

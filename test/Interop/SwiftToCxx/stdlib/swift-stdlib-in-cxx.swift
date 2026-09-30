@@ -40,12 +40,12 @@
 // CHECK: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) noexcept {
 // CHECK: }
-// CHECK: static SWIFT_INLINE_THUNK Array<T_0_0> init() SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK void append(const T_0_0& newElement) SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK T_0_0 removeAt(swift::Int index) SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK T_0_0 operator [](swift::Int index) const SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK swift::Int getCapacity() const SWIFT_SYMBOL({{.*}});
+// CHECK: static SWIFT_INLINE_THUNK Array<T_0_0> init() noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK void append(const T_0_0& newElement) noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK T_0_0 removeAt(swift::Int index) noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK T_0_0 operator [](swift::Int index) const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK swift::Int getCount() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK swift::Int getCapacity() const noexcept SWIFT_SYMBOL({{.*}});
 
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
@@ -73,8 +73,8 @@
 // CHECK-NEXT: };
 // CHECK: SWIFT_INLINE_THUNK bool isSome() const;
 // CHECK: SWIFT_INLINE_THUNK bool isNone() const;
-// CHECK-DAG: SWIFT_INLINE_THUNK T_0_0 getUnsafelyUnwrapped() const SWIFT_SYMBOL({{.*}});
-// CHECK-DAG: SWIFT_INLINE_THUNK String getDebugDescription() const SWIFT_SYMBOL("s:Sq16debugDescriptionSSvp");
+// CHECK-DAG: SWIFT_INLINE_THUNK T_0_0 getUnsafelyUnwrapped() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-DAG: SWIFT_INLINE_THUNK String getDebugDescription() const noexcept SWIFT_SYMBOL("s:Sq16debugDescriptionSSvp");
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) String final {
 // CHECK-NEXT: public:
@@ -84,10 +84,10 @@
 // CHECK:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
 // CHECK:  }
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
-// CHECK:  SWIFT_INLINE_THUNK __StringNested::UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const __StringNested::UTF8View& newValue) SWIFT_SYMBOL({{.*}});
+// CHECK:  SWIFT_INLINE_THUNK __StringNested::UTF8View getUtf8() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const __StringNested::UTF8View& newValue) noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
 // CHECK-NEXT:   }
@@ -120,14 +120,14 @@
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
 // CHECK: SWIFT_INLINE_THUNK UTF8View &operator =(const UTF8View &other) noexcept {
 // CHECK: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:   SWIFT_INLINE_THUNK __StringNested::Index getEndIndex() const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK swift::Optional<__StringNested::Index> indexOffsetByLimitedBy(const __StringNested::Index& i, swift::Int n, const __StringNested::Index& limit) const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK swift::Int distanceFromTo(const __StringNested::Index& i, const __StringNested::Index& j) const SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK uint8_t operator [](const __StringNested::Index& i) const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK String getDescription() const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK bool isTriviallyIdenticalTo(const __StringNested::UTF8View& other) const SWIFT_SYMBOL({{.*}}){{.*}};
+// CHECK-NEXT: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:   SWIFT_INLINE_THUNK __StringNested::Index getEndIndex() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK swift::Optional<__StringNested::Index> indexOffsetByLimitedBy(const __StringNested::Index& i, swift::Int n, const __StringNested::Index& limit) const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK swift::Int distanceFromTo(const __StringNested::Index& i, const __StringNested::Index& j) const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK uint8_t operator [](const __StringNested::Index& i) const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK String getDescription() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK swift::Int getCount() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK bool isTriviallyIdenticalTo(const __StringNested::UTF8View& other) const noexcept SWIFT_SYMBOL({{.*}}){{.*}};
 // CHECK-NEXT: private:
 
 // CHECK: class AnyKeyPath { } SWIFT_UNAVAILABLE_MSG("class 'AnyKeyPath' is not yet exposed to C++");

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs %s -emit-sil -O -cxx-interoperability-mode=default -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -I %S/Inputs %s -emit-sil -O -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import ImmortalFRTHashable
 

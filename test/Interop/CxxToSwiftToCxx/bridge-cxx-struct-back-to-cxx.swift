@@ -21,9 +21,6 @@
 // RUN: %target-interop-build-clangxx -fsyntax-only -x c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++17 -c -fmodules -fcxx-modules -I %t 
 // FIXME: test c++20 (rdar://117419434)
 
-// Failing for Android since NDK 29, android/ndk#2242
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
-
 //--- header.h
 
 struct Trivial {
@@ -328,8 +325,8 @@ public struct Strct {
 // CHECK-NEXT:   _impl::$s8UseCxxTy16takeTrivialInoutyySo0E0VzF(swift::_impl::getOpaquePointer(x));
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK anonymousStruct Strct::getTransform() const {
+// CHECK: SWIFT_INLINE_THUNK anonymousStruct Strct::getTransform() const noexcept {
 // CHECK-NEXT: alignas(alignof(anonymousStruct)) char storage[sizeof(anonymousStruct)];
 
-// CHECK: SWIFT_INLINE_THUNK ns::anonStructInNS Strct::getTransform2() const {
+// CHECK: SWIFT_INLINE_THUNK ns::anonStructInNS Strct::getTransform2() const noexcept {
 // CHECK-NEXT: alignas(alignof(ns::anonStructInNS)) char storage[sizeof(ns::anonStructInNS)];

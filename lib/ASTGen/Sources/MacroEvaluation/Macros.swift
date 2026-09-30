@@ -424,7 +424,7 @@ func expandFreestandingMacro(
   macroPtr: UnsafeRawPointer,
   discriminatorText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
@@ -479,7 +479,7 @@ func expandFreestandingMacroImpl(
   macroRole: MacroRole,
   cContext: BridgedASTContext,
   expansionSyntax: FreestandingMacroExpansionSyntax,
-  sourceFilePtr: UnsafePointer<ExportedSourceFile>,
+  sourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>,
   discriminator: String
 ) -> String? {
 
@@ -565,11 +565,11 @@ func expandAttachedMacro(
   qualifiedTypeText: UnsafePointer<CChar>,
   conformanceListText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
-  customAttrSourceFilePtr: UnsafeRawPointer,
+  customAttrSourceFilePtr: UnsafeMutableRawPointer,
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
-  declarationSourceFilePtr: UnsafeRawPointer,
+  declarationSourceFilePtr: UnsafeMutableRawPointer,
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
-  parentDeclSourceFilePtr: UnsafeRawPointer?,
+  parentDeclSourceFilePtr: UnsafeMutableRawPointer?,
   parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
@@ -660,11 +660,11 @@ func expandAttachedMacroImpl(
   discriminator: String,
   qualifiedType: String,
   conformanceList: String,
-  customAttrSourceFilePtr: UnsafePointer<ExportedSourceFile>,
+  customAttrSourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>,
   customAttrNode: AttributeSyntax,
-  declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
+  declarationSourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>,
   attachedTo declarationNode: Syntax,
-  parentDeclSourceFilePtr: UnsafePointer<ExportedSourceFile>?,
+  parentDeclSourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>?,
   parentDeclNode: DeclSyntax?
 ) -> String? {
   let macroName: String = customAttrNode.attributeName.description

@@ -46,7 +46,7 @@ actor MyActor {
 // CHECK-IR-SAME:   ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // CHECK-IR-SAME:   ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // CHECK-IR-SAME:   ptr @"$e4main7MyActorC3fooyyYaFTu{{(.ptrauth[.0-9]*)?}}",
-// CHECK-IR-SAME:   ptr @got.swift_deletedAsyncMethodErrorTu{{(.ptrauth[.0-9]*)?}},
+// CHECK-IR-SAME:   ptr @_swift_dead_async_method_error_afp{{[^,]*}},
 // CHECK-IR-SAME:   ptr @"$e4main7MyActorCACycfC{{(.ptrauth[.0-9]*)?}}"
 // CHECK-IR-SAME: }>, align {{[48]}}
 
@@ -66,7 +66,7 @@ actor MyActor {
 // EXIST-IR-SAME:  ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // EXIST-IR-SAME:  ptr @swift_deletedMethodError{{(.ptrauth[.0-9]*)?}},
 // EXIST-IR-SAME:  ptr @"$e4main7MyActorC3fooyyYaFTu{{(.ptrauth[.0-9]*)?}}",
-// EXIST-IR-SAME:  ptr @got.swift_deletedAsyncMethodErrorTu{{(.ptrauth[.0-9]*)?}},
+// EXIST-IR-SAME:  ptr @_swift_dead_async_method_error_afp{{[^,]*}},
 // EXIST-IR-SAME:  ptr @"$e4main7MyActorCACycfC{{(.ptrauth[.0-9]*)?}}" }>
 
 // EXIST-IR-DAG: @"$e4main7MyActorCN" = {{.*}}alias{{.*}} ptr @"$e4main7MyActorCMf", i32 0, i32 1)

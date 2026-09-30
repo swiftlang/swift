@@ -27,7 +27,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/TaggedUnion.h"
-#include "llvm/ADT/PointerUnion.h"
 
 using namespace swift;
 

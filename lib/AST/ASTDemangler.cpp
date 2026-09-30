@@ -40,7 +40,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "clang/Tooling/Refactor/USRFinder.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
@@ -603,6 +602,7 @@ Type ASTBuilder::createFunctionType(
   // function types with lifetime dependencies; remove the
   // containsFunctionTypeWithLifetimeDependencies workaround in
   // lib/IRGen/IRGenDebugInfo.cpp when this lands.
+  // TODO: Handle coroutines here as well
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
@@ -612,7 +612,7 @@ Type ASTBuilder::createFunctionType(
                    .withSendable(flags.isSendable())
                    .build();
 
-  return FunctionType::get(funcParams, output, einfo);
+  return FunctionType::get(funcParams, /* yields */ {}, output, einfo);
 }
 
 static ParameterConvention

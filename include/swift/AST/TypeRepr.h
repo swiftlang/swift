@@ -19,7 +19,6 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -27,7 +26,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/Located.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
@@ -539,6 +537,7 @@ class FunctionTypeRepr : public TypeRepr {
   ArrayRef<TypeRepr *> PatternSubs;
 
   TupleTypeRepr *ArgsTy;
+  TupleTypeRepr *YieldsTy;
   TypeRepr *RetTy;
   TypeRepr *ThrownTy;
   SourceLoc AsyncLoc;
@@ -547,21 +546,16 @@ class FunctionTypeRepr : public TypeRepr {
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc asyncLoc, SourceLoc throwsLoc, 
-                   TypeRepr *thrownTy,
-                   SourceLoc arrowLoc,
-                   TypeRepr *retTy,
+                   SourceLoc asyncLoc, SourceLoc throwsLoc, TypeRepr *thrownTy,
+                   TupleTypeRepr *yieldsTy, SourceLoc arrowLoc, TypeRepr *retTy,
                    GenericParamList *patternGenericParams = nullptr,
                    ArrayRef<TypeRepr *> patternSubs = {},
                    ArrayRef<TypeRepr *> invocationSubs = {})
-    : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams),
-      InvocationSubs(invocationSubs),
-      PatternGenericParams(patternGenericParams),
-      PatternSubs(patternSubs),
-      ArgsTy(argsTy), RetTy(retTy), ThrownTy(thrownTy),
-      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
-  }
+      : TypeRepr(TypeReprKind::Function), GenericParams(genericParams),
+        InvocationSubs(invocationSubs),
+        PatternGenericParams(patternGenericParams), PatternSubs(patternSubs),
+        ArgsTy(argsTy), YieldsTy(yieldsTy), RetTy(retTy), ThrownTy(thrownTy),
+        AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {}
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericSignature getGenericSignature() const { return GenericSig; }
@@ -590,9 +584,11 @@ public:
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getThrownTypeRepr() const { return ThrownTy; }
+  TupleTypeRepr *getYieldsTypeRepr() const { return YieldsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool isAsync() const { return AsyncLoc.isValid(); }
   bool isThrowing() const { return ThrowsLoc.isValid(); }
+  bool isCoroutine() const;
 
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }

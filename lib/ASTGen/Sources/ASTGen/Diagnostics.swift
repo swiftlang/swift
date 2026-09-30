@@ -147,10 +147,10 @@ extension ASTGenDiagnostic {
     )
   }
 
-  static func invalidDefaultSpecifier(_ specifier: some SyntaxProtocol) -> Self {
+  static func invalidFileDefaultSpecifier(_ specifier: some SyntaxProtocol) -> Self {
     Self(
       node: specifier,
-      message: "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'"
+      message: "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'"
     )
   }
 }

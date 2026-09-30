@@ -416,3 +416,61 @@ func testGenericEraseConsumesCapture<T: Usable & ~Copyable>(_ v: consuming T) {
   let fn = { @called(once) in v as any Usable & ~Copyable }
   _ = fn()
 }
+
+func calledOnce(_ fn: @called(once) () -> Void) { fn() }
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVF : $@convention(thin) (@guaranteed Resource) -> () {
+// CHECK: bb0([[R:%.*]] : @guaranteed $Resource):
+// CHECK:  [[R_COPY:%.*]] = copy_value [[R]] : $Resource
+// CHECK:  [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_COPY]] : $Resource
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s30called_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVFyyXEfU_
+// CHECK:  [[R_ARG_COPY:%.*]] = copy_value [[R_MARKED]] : $Resource
+// CHECK:  [[PA:%.*]] = partial_apply [called_once] [[CLOSURE]]([[R_ARG_COPY]]) : $@convention(thin) (@guaranteed Resource) -> ()
+// CHECK:  {{%.*}} = convert_escape_to_noescape [[PA]] : $@called(once) @callee_owned () -> () to $@noescape @called(once) @callee_owned () -> ()
+// CHECK: } // end sil function '$s30called_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVFyyXEfU_ : $@convention(thin) (@guaranteed Resource) -> () {
+// CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @guaranteed $Resource):
+// CHECK:  [[R_COPY:%.*]] = copy_value [[R_CAPTURE]] : $Resource
+// CHECK:  [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_COPY]] : $Resource
+// CHECK:  [[R_BORROW:%.*]] = begin_borrow [[R_MARKED]] : $Resource
+// CHECK:  [[PEEK:%.*]] = function_ref @$s30called_once_consuming_captures8ResourceV4peekyyF
+// CHECK:  apply [[PEEK]]([[R_BORROW]]) : $@convention(method) (@guaranteed Resource) -> ()
+// CHECK:  end_borrow [[R_BORROW]] : $Resource
+// CHECK: } // end sil function '$s30called_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVFyyXEfU_'
+func testBorrowingParameterCaptureIsNotConsumed(_ r: borrowing Resource) {
+  calledOnce {
+    r.peek()
+  }
+
+  _ = r
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyF : $@convention(thin) () -> () {
+// CHECK: [[R_BOX:%.*]] = alloc_box ${ let Resource }, let, name "r"
+// CHECK: [[R_LEXICAL:%.*]] = begin_borrow [lexical] [var_decl] [[R_BOX]] : ${ let Resource }
+// CHECK: [[R_PROJ:%.*]] = project_box [[R_LEXICAL]] : ${ let Resource }, 0
+// CHECK: [[CLOSURE:%.*]] = function_ref @$s30called_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyFyyXEfU_
+// CHECK: [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_PROJ]] : $*Resource
+// CHECK: [[R_VALUE:%.*]] = load [copy] [[R_MARKED]] : $*Resource
+// CHECK: [[PA:%.*]] = partial_apply [called_once] [[CLOSURE]]([[R_VALUE]]) : $@convention(thin) (@guaranteed Resource) -> ()
+// CHECK: {{%.*}} = convert_escape_to_noescape [[PA]] : $@called(once) @callee_owned () -> () to $@noescape @called(once) @callee_owned () -> ()
+// CHECK: } // end sil function '$s30called_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyFyyXEfU_ : $@convention(thin) (@guaranteed Resource) -> () {
+// CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @guaranteed $Resource):
+// CHECK:  [[R_COPY:%.*]] = copy_value [[R_CAPTURE]] : $Resource
+// CHECK:  [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_COPY]] : $Resource
+// CHECK:  [[R_BORROW:%.*]] = begin_borrow [[R_MARKED]] : $Resource
+// CHECK:  [[PEEK:%.*]] = function_ref @$s30called_once_consuming_captures8ResourceV4peekyyF
+// CHECK:  apply [[PEEK]]([[R_BORROW]]) : $@convention(method) (@guaranteed Resource) -> ()
+// CHECK:  end_borrow [[R_BORROW]] : $Resource
+// CHECK: } // end sil function '$s30called_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyFyyXEfU_'
+func testLocalLetCaptureIsNotConsumed() {
+  let r = Resource()
+  calledOnce {
+    r.peek()
+  }
+
+  _ = r
+}

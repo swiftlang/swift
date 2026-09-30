@@ -19,7 +19,6 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleDependencies.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"

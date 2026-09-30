@@ -5,33 +5,62 @@
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: %if OS=macosx %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: %if OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
-// RUN: test ! -s %t/extra.txt
+// RUN: %if OS=macosx %{ test ! -s %t/extra.txt %}
+// RUN: %if OS=wasip1 %{ test ! -s %t/extra.txt %}
 
+// Linux has two valid dependency sets, because the embedded runtime calls
+// `arc4random_buf` when the C library provides it and `getrandom` when it
+// doesn't (glibc older than 2.36).
+//
+// Each list must stay sorted with no trailing blank line: GNU comm rejects
+// unsorted input, while the BSD comm on Darwin silently accepts it.
+// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_arc4random.txt %t/actual-dependencies.txt > %t/extra_arc4random.txt %}
+// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_getrandom.txt %t/actual-dependencies.txt > %t/extra_getrandom.txt %}
+// RUN: %if OS=linux-gnu %{ test ! -s %t/extra_arc4random.txt || test ! -s %t/extra_getrandom.txt %}
+
+// Runtime error reporting still uses the standard library's print.
 // Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
 // XFAIL: swift_embedded_platform
 
 //--- allowed-dependencies_macos.txt
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
 _arc4random_buf
+_flockfile
 _free
+_funlockfile
 _memmove
 _memset
 _posix_memalign
 _putchar
-
-//--- allowed-dependencies_linux.txt
+//--- allowed-dependencies_linux_arc4random.txt
 __stack_chk_fail
 __stack_chk_guard
 arc4random_buf
+flockfile
 free
+funlockfile
 memmove
 memset
 posix_memalign
 putchar
+stdout
+//--- allowed-dependencies_linux_getrandom.txt
+__errno_location
+__stack_chk_fail
+__stack_chk_guard
+flockfile
+free
+funlockfile
+getrandom
+memmove
+memset
+posix_memalign
+putchar
+stdout
 //--- allowed-dependencies_wasi.txt
 __indirect_function_table
 __memory_base

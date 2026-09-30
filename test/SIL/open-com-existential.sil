@@ -1,0 +1,94 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -emit-sib -module-name OpenCOM %s -o %t/OpenCOM.sib
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -emit-sorted-sil -module-name OpenCOM %t/OpenCOM.sib | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -inline %s | %FileCheck %s --check-prefix=CLONE
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -ownership-model-eliminator %s | %FileCheck %s --check-prefix=UNQUALIFIED
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -test-runner %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=FORWARD
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IInterface {}
+
+// Inlining twice must introduce two fresh archetypes and remap their uses.
+// CLONE-LABEL: sil [ossa] @clone_open
+// CLONE: [[FIRST:%[0-9]+]] = open_com_existential %0 : $any IInterface to $@opened([[FIRST_ID:[^,]+]], any IInterface) Self
+// CLONE: copy_value [[FIRST]] : $@opened([[FIRST_ID]], any IInterface) Self
+// CLONE: [[SECOND:%[0-9]+]] = open_com_existential %0 : $any IInterface to $@opened([[SECOND_ID:[^,]+]], any IInterface) Self
+// CLONE: copy_value [[SECOND]] : $@opened([[SECOND_ID]], any IInterface) Self
+// CLONE-NOT: apply
+// CLONE: return
+sil [ossa] @clone_open : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : @guaranteed $IInterface):
+  %function = function_ref @open_borrowed : $@convention(thin) (@guaranteed IInterface) -> ()
+  %first = apply %function(%value) : $@convention(thin) (@guaranteed IInterface) -> ()
+  %second = apply %function(%value) : $@convention(thin) (@guaranteed IInterface) -> ()
+  %result = tuple ()
+  return %result : $()
+}
+// Opening a borrowed interface keeps its borrow scope.
+// CHECK-LABEL: sil [ossa] @open_borrowed
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0 : $any IInterface to $@opened([[ID:[^,]+]], any IInterface) Self
+// CHECK: [[COPY:%[0-9]+]] = copy_value [[OPEN]]
+// CHECK: destroy_value [[COPY]]
+// FORWARD-LABEL: open_borrowed: forwarding_use_def_test
+// FORWARD: INTRODUCER: %0 = argument of bb0 : $any IInterface
+sil [ossa] @open_borrowed : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : @guaranteed $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(2, IInterface) Self
+  specify_test "forwarding_use_def_test %opened"
+  %copy = copy_value %opened : $@opened(2, IInterface) Self
+  destroy_value %copy : $@opened(2, IInterface) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// Opening transfers ownership of an owned interface value to the archetype.
+// CHECK-LABEL: sil [ossa] @open_owned
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0 : $any IInterface to $@opened([[ID:[^,]+]], any IInterface) Self
+// CHECK: destroy_value [[OPEN]] : $@opened([[ID]], any IInterface) Self
+// UNQUALIFIED-LABEL: sil @open_owned
+// UNQUALIFIED: [[OPEN:%[0-9]+]] = open_com_existential %0
+// UNQUALIFIED: release_value [[OPEN]]
+// FORWARD-LABEL: open_owned: forwarding_def_use_test
+// FORWARD: USE: operand #0 of destroy_value
+// FORWARD-LABEL: open_owned: forwarding_use_def_test
+// FORWARD: INTRODUCER: %0 = argument of bb0 : $any IInterface
+sil [ossa] @open_owned : $@convention(thin) (@owned IInterface) -> () {
+bb0(%value : @owned $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(1, IInterface) Self
+  specify_test "forwarding_def_use_test %value"
+  specify_test "forwarding_use_def_test %opened"
+  destroy_value %opened : $@opened(1, IInterface) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// Preserve an explicit forwarding ownership when the operand is undef.
+// CHECK-LABEL: sil [ossa] @open_undef
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential undef : $any IInterface to $@opened({{.*}}, any IInterface) Self, forwarding: @owned
+// CHECK: destroy_value [[OPEN]]
+sil [ossa] @open_undef : $@convention(thin) () -> () {
+bb0:
+  %opened = open_com_existential undef : $IInterface to $@opened(4, IInterface) Self, forwarding: @owned
+  destroy_value %opened : $@opened(4, IInterface) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// The instruction also supports SIL after ownership has been lowered.
+// CHECK-LABEL: sil @open_unqualified
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CHECK: fix_lifetime [[OPEN]]
+sil @open_unqualified : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(3, IInterface) Self
+  fix_lifetime %opened : $@opened(3, IInterface) Self
+  %result = tuple ()
+  return %result : $()
+}

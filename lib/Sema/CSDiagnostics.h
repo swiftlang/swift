@@ -2338,6 +2338,10 @@ public:
   /// result value.
   bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
+  /// Tailored diagnostic for `&x` passed to a subscript parameter of pointer
+  /// type, where the implicit inout-to-pointer conversion does not apply.
+  bool diagnoseInOutToPointerInSubscript() const;
+
   /// Situations like this:
   ///
   /// func foo(_: Int, _: String) {}
@@ -2647,11 +2651,12 @@ public:
 /// ```
 class MultiArgFuncKeyPathFailure final : public FailureDiagnostic {
   Type functionType;
+  Type expectedType;
 public:
   MultiArgFuncKeyPathFailure(const Solution &solution, Type functionType,
-                             ConstraintLocator *locator)
+                             Type expectedType, ConstraintLocator *locator)
   : FailureDiagnostic(solution, locator),
-  functionType(functionType) {}
+  functionType(functionType), expectedType(expectedType) {}
 
   bool diagnoseAsError() override;
 };

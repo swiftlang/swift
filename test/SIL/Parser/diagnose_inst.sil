@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
+
+// Round-trip (parse -> print -> parse -> print) test for the `diagnose`
+// instruction. `diagnose` is only valid in Raw SIL.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Klass {}
+
+// CHECK-LABEL: sil [ossa] @diagnose_unpermitted_copy : $@convention(thin) (@owned Klass) -> () {
+// CHECK: [[COPY:%.*]] = copy_value %0 : $Klass
+// CHECK: diagnose [unpermitted_copy] [[COPY]] : $Klass
+// CHECK: } // end sil function 'diagnose_unpermitted_copy'
+sil [ossa] @diagnose_unpermitted_copy : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0 : $Klass
+  diagnose [unpermitted_copy] %1 : $Klass
+  destroy_value %1 : $Klass
+  destroy_value %0 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Also exercise a non-OSSA function
+// CHECK-LABEL: sil @diagnose_on_object : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: diagnose [unpermitted_copy] %0 : $Builtin.NativeObject
+// CHECK: } // end sil function 'diagnose_on_object'
+sil @diagnose_on_object : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  diagnose [unpermitted_copy] %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -cxx-interoperability-mode=default -disable-availability-checking -I %S/Inputs
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple -I %S/Inputs
 
 import WitnessTable
 

@@ -895,6 +895,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
+  Opts.CASFSInputOverlay |= Args.hasArg(OPT_cas_fs_input_overlay);
+  if (Opts.CASFSInputOverlay && Opts.EnableCaching) {
+    // The content of the input files is read from disk, so it no longer
+    // contributes to the cache key.
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   "-cas-fs-input-overlay", "-cache-compile-job");
+    return true;
+  }
+
   return false;
 }
 
@@ -1751,6 +1760,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                        A->getOption().getPrefixedName(), A->getValue());
     }
+
+    // Preserve the stdcall convention of imported Win32 COM function types.
+    if (Opts.COMModel == LangOptions::COMInteropModel::Microsoft &&
+        Target.isOSWindows() && Target.getArch() == llvm::Triple::x86)
+      Opts.UseClangFunctionTypes = true;
   }
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -2235,6 +2249,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_solver_enable_type_var_joins,
                    OPT_solver_disable_type_var_joins,
                    Opts.SolverEnableTypeVariableJoins);
+
+  Opts.SolverEnablePromoteSupertypes =
+      Args.hasFlag(OPT_solver_enable_promote_supertypes,
+                   OPT_solver_disable_promote_supertypes,
+                   Opts.SolverEnablePromoteSupertypes);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
@@ -2894,6 +2913,31 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                      arg->getOption().getPrefixedName(), arg->getValue());
       return true;
     }
+  }
+
+  if (const Arg *arg = Args.getLastArg(OPT_serialize_diagnostics_EQ)) {
+    auto format =
+        llvm::StringSwitch<std::optional<DiagnosticOptions::SerializedFormat>>(
+            arg->getValue())
+            .Case("dia", DiagnosticOptions::SerializedFormat::LLVMBitcode)
+            .Case("sarif", DiagnosticOptions::SerializedFormat::SARIF)
+            .Default(std::nullopt);
+    if (!format) {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     arg->getOption().getPrefixedName(), arg->getValue());
+      return true;
+    }
+
+#if !SWIFT_BUILD_SARIF
+    // Accepting the argument would silently write no log at all.
+    if (*format == DiagnosticOptions::SerializedFormat::SARIF) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_serialize_diagnostics_sarif_unsupported_build);
+      return true;
+    }
+#endif
+
+    Opts.SerializedDiagnosticsFormat = *format;
   }
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
@@ -4373,6 +4417,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+  // These are the conditions clang uses to emit call site info for optimized
+  // binaries.
+  if (Opts.shouldOptimize() &&
+      Opts.DebugInfoLevel >= IRGenDebugInfoLevel::ASTTypes &&
+      Triple.supportsDebugEntryValues())
+    Opts.DebugCallsiteInfo = true;
 
   if (Args.hasArg(OPT_mergeable_symbols))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,

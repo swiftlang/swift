@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
@@ -130,6 +129,7 @@ CONSTANT_OWNERSHIP_INST(None, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(None, ClassMethod)
 CONSTANT_OWNERSHIP_INST(None, ClassifyBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, ObjCMethod)
+CONSTANT_OWNERSHIP_INST(None, COMMethod)
 CONSTANT_OWNERSHIP_INST(None, ExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, FloatLiteral)
 CONSTANT_OWNERSHIP_INST(None, FunctionRef)
@@ -179,8 +179,7 @@ CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(Owned, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
-// TODO: It would be great to get rid of these.
-CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
+// TODO: It would be great to get rid of this.
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
@@ -202,6 +201,15 @@ CONSTANT_OWNERSHIP_INST(None, DereferenceAddrBorrow)
 CONSTANT_OWNERSHIP_INST(None, DereferenceBorrowAddr)
 
 #undef CONSTANT_OWNERSHIP_INST
+
+// An immortal object doesn't need to be released, so the result doesn't need
+// any ownership. Otherwise the result is a newly "created" +1 reference.
+ValueOwnershipKind ValueOwnershipKindClassifier::visitRawPointerToRefInst(
+    RawPointerToRefInst *i) {
+  if (i->isImmortal())
+    return OwnershipKind::None;
+  return OwnershipKind::Owned;
+}
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitStructExtractInst(StructExtractInst *sei) {
   if (sei->getType().isTrivial(*sei->getFunction()) ||
@@ -314,6 +322,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
+FORWARDING_OWNERSHIP_INST(OpenCOMExistential)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)

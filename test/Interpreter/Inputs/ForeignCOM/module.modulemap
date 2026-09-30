@@ -1,0 +1,4 @@
+module ForeignCOM {
+  header "ForeignCOM.h"
+  export *
+}

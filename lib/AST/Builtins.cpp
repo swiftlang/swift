@@ -1295,6 +1295,7 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
 
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
+  case BuiltinValueKind::TakeFromRawPointer:
     builtinTy = Context.TheRawPointerType;
     ownership = ParamSpecifier::Default;
     break;
@@ -1494,7 +1495,8 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
-        return FunctionType::get(params, fnResultGen.build(builder), extInfo);
+        return FunctionType::get(params, /* yields */ {},
+                                 fnResultGen.build(builder), extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
@@ -1564,8 +1566,8 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      auto innerFunction =
-          FunctionType::get(params, linearFnResultGen.build(builder), info);
+      auto innerFunction = FunctionType::get(
+          params, /* yields */ {}, linearFnResultGen.build(builder), info);
       return innerFunction->withExtInfo(extInfo);
     }
   };
@@ -1730,7 +1732,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
     operationResultType = makeGenericParam().build(builder); // <T>
   }
   builder.addParameter(
-      makeConcrete(FunctionType::get({}, operationResultType, extInfo)),
+      makeConcrete(FunctionType::get({}, {}, operationResultType, extInfo)),
       ParamSpecifier::Default,
       areSendingArgsEnabled /*isSending*/); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
@@ -1741,7 +1743,7 @@ static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
-          _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
+        _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
       _typeparam(0));
 }
 
@@ -1820,7 +1822,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
                      .withSendingResult(hasSendingResult)
                      .build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({}, {}, genericParam, extInfo)));
 
   // -> Builtin.RawPointer
   builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
@@ -2267,7 +2269,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                    /*throws*/ false, Type())
           .withClangFunctionType(ClangType)
           .build();
-  auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
+  auto BlockTy = FunctionType::get(CFuncParams, /* yields */ {}, VoidTy, Thin);
   SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
   if (withContext) {
     ArgTypes.push_back(ContextTy);
@@ -2300,7 +2302,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
 
   auto voidTy = ctx.TheEmptyTupleType;
   auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
-  auto *fnTy = FunctionType::get(params, voidTy, extInfo);
+  auto *fnTy = FunctionType::get(params, /* yields */ {}, voidTy, extInfo);
 
   builder.addParameter(makeConcrete(fnTy));
 
@@ -2415,9 +2417,9 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
       .withThrows(/* throws */ true, E.build(builder))
       .build();
 
-  auto fnParamTy = FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
-                                     ctx.TheEmptyTupleType,
-                                     extInfo);
+  auto fnParamTy =
+      FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
+                        /* yields */ {}, ctx.TheEmptyTupleType, extInfo);
 
   builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
   builder.setResult(T);
@@ -2430,7 +2432,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
 static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
                                                 Identifier id) {
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-  auto fnType = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+  auto fnType = FunctionType::get({}, {}, ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", fnType)),
                             _unsafeRawPointer);
@@ -2449,8 +2451,8 @@ static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
       AnyFunctionType::Param(ctx.getUInt8Type()),
   };
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-  auto *functionType =
-      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  auto *functionType = FunctionType::get(params, /* yields */ {},
+                                         ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", functionType)),
                             _unsafeRawPointer);
@@ -2464,8 +2466,8 @@ static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
   };
   // (UInt8, UInt8) -> ()
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-  auto *functionType =
-      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  auto *functionType = FunctionType::get(params, /* yields */ {},
+                                         ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", functionType)),
                             _unsafeRawPointer);
@@ -2748,11 +2750,11 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
-  case IITDescriptor::Subdivide2Argument:
-  case IITDescriptor::Subdivide4Argument:
+  case IITDescriptor::Subdivide2:
+  case IITDescriptor::Subdivide4:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
-  case IITDescriptor::OneNthEltsVecArgument:
+  case IITDescriptor::OneNthEltsVec:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2778,24 +2780,24 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   }
   
   // The element type of a vector type.
-  case IITDescriptor::VecElementArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::VecElement: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     auto vecType = argType->getAs<BuiltinVectorType>();
     if (!vecType) return Type();
     return vecType->getElementType();
   }
 
-  case IITDescriptor::ExtendArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Extend: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     if (auto vecType = argType->getAs<BuiltinVectorType>())
       return vecType->getExtended(Context);
     return Type();
   }
 
-  case IITDescriptor::TruncArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Trunc: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     if (auto vecType = argType->getAs<BuiltinVectorType>())
       return vecType->getTruncated(Context);
@@ -2810,12 +2812,16 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   }
 
   // A type argument.
-  case IITDescriptor::Argument:
-    return getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Overloaded:
+    return getTypeArgument(D.getOverloadIndex());
+
+  // A fully dependent type that mirrors a previously specified overload type.
+  case IITDescriptor::Match:
+    return getTypeArgument(D.getOverloadIndex());
 
   // A vector of the same width as a type argument.
-  case IITDescriptor::SameVecWidthArgument: {
-    Type maybeVectorType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::SameVecWidth: {
+    Type maybeVectorType = getTypeArgument(D.getOverloadIndex());
     if (!maybeVectorType) return Type();
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
@@ -3192,6 +3198,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getGepOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::GepProjection:
+  case BuiltinValueKind::UnprotectedGepProjection:
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
@@ -3386,6 +3393,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CastFromNativeObject:
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
+  case BuiltinValueKind::TakeFromRawPointer:
     if (!Types.empty()) return nullptr;
     return getNativeObjectCast(Context, Id, BV);
 

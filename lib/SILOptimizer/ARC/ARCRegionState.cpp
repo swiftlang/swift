@@ -14,8 +14,6 @@
 #include "ARCRegionState.h"
 #include "ARCSequenceOptUtils.h"
 #include "RCStateTransitionVisitors.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Range.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"

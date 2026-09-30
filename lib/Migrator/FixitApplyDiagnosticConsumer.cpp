@@ -13,9 +13,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
-#include "swift/Migrator/Migrator.h"
-#include "swift/Migrator/MigratorOptions.h"
-#include "swift/AST/DiagnosticsSema.h"
 
 using namespace swift;
 using namespace swift::migrator;
