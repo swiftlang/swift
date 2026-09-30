@@ -920,7 +920,7 @@ bool ConstraintGraph::contractEdges() {
     // variable cannot end up as an 'inout' in that case.
     if (rep1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      auto bindings = CS.getBindingsFor(rep1);
+      const auto &bindings = CS.getConstraintGraph()[rep1].getPotentialBindings();
 
       // Check if there are any bindings. If there are no bindings, we
       // do not contract the edge. If there is at least one binding, and
