@@ -211,6 +211,25 @@ private struct ValidationTestCase {
   }
 }
 
+suite.test("ValidationError layout")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let error = UTF8.ValidationError(.truncatedScalar, 0..<2)
+
+  expectEqual(error.kind, .truncatedScalar)
+  expectEqual(error.kind.rawValue, 4)
+  expectEqual(error.byteOffsets.lowerBound, 0)
+  expectEqual(error.byteOffsets.upperBound, 2)
+
+  typealias Error = UTF8.ValidationError
+  typealias Fields = (Error.Kind, Range<Int>)
+  expectEqual(MemoryLayout<Error>.size, MemoryLayout<Fields>.size)
+  expectEqual(MemoryLayout<Error>.stride, MemoryLayout<Fields>.stride)
+  expectEqual(MemoryLayout<Error>.alignment, MemoryLayout<Fields>.alignment)
+}
+
 if #available(SwiftStdlib 6.2, *) {
   suite.test("UTF8Span/encoding errors") {
     func test(
