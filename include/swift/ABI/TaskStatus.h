@@ -375,6 +375,10 @@ public:
 
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
+//
+// This class is mirrored by TaskDependencyStatusRecord in
+// include/swift/RemoteInspection/RuntimeInternals.h. Any changes to the layout
+// here must also be made there.
 class TaskDependencyStatusRecord : public TaskStatusRecord {
   // A word sized storage which references what this task is waiting for. Note
   // that this is different from the waitQueue in the future fragment of a task
