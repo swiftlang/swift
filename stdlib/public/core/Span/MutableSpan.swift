@@ -894,7 +894,9 @@ extension MutableSpan where Element: ~Copyable {
     if self.isEmpty { return }
     withUnsafeMutableBufferPointer { destination in
       unsafe source.withUnsafeMutableBufferPointer {
-        let c = unsafe destination.moveUpdate(fromContentsOf: $0)
+        let c = unsafe destination.moveUpdate(
+          fromContentsOf: $0.extracting(first: $1)
+        )
         _internalInvariant(c == destination.count)
         $1 = 0
       }

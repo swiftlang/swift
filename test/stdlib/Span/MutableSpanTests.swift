@@ -494,6 +494,28 @@ suite.test("updateSubrange(_:moving:)")
   expectEqual(LifetimeTracked.instances, originalInstances)
 }
 
+suite.test("updateSubrange(_:moving:) with spare capacity")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  var destination = UniqueArray<Int>(copying: 0..<4)
+
+  var source = UniqueArray<Int>(capacity: 8)
+  source.append(10)
+  source.append(11)
+
+  var span = destination.mutableSpan
+  source.edit {
+    span.updateSubrange(2..<4, moving: &$0)
+  }
+  expectEqual(source.count, 0)
+  expectEqual(span[0], 0)
+  expectEqual(span[1], 1)
+  expectEqual(span[2], 10)
+  expectEqual(span[3], 11)
+}
+
 suite.test("updateElements(from:copying:)")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
