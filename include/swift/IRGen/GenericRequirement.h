@@ -167,16 +167,6 @@ namespace llvm {
 template <> struct DenseMapInfo<swift::GenericRequirement> {
   using GenericRequirement = swift::GenericRequirement;
   using CanTypeInfo = llvm::DenseMapInfo<swift::CanType>;
-  static GenericRequirement getEmptyKey() {
-    return GenericRequirement(GenericRequirement::Kind::Metadata,
-                              CanTypeInfo::getEmptyKey(),
-                              nullptr);
-  }
-  static GenericRequirement getTombstoneKey() {
-    return GenericRequirement(GenericRequirement::Kind::Metadata,
-                              CanTypeInfo::getTombstoneKey(),
-                              nullptr);
-  }
   static llvm::hash_code getHashValue(GenericRequirement req) {
     return hash_combine(CanTypeInfo::getHashValue(req.getTypeParameter()),
                         hash_value(req.getProtocol()));

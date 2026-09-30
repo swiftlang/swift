@@ -379,14 +379,6 @@ template <>
 struct DenseMapInfo<swift::DependencyTracker::MacroPluginDependency> {
   using MacroPluginDependency = swift::DependencyTracker::MacroPluginDependency;
 
-  static MacroPluginDependency getEmptyKey() {
-    return {DenseMapInfo<swift::Identifier>::getEmptyKey(), ""};
-  }
-
-  static MacroPluginDependency getTombstoneKey() {
-    return {DenseMapInfo<swift::Identifier>::getTombstoneKey(), ""};
-  }
-
   static unsigned getHashValue(MacroPluginDependency Val) {
     return hash_combine(Val.moduleName, Val.path);
   }

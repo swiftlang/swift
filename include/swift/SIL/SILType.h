@@ -1208,12 +1208,6 @@ struct DenseMapInfo<swift::SILType> {
   using SILType = swift::SILType;
   using PointerMapInfo = DenseMapInfo<void*>;
 public:
-  static SILType getEmptyKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getEmptyKey());
-  }
-  static SILType getTombstoneKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getTombstoneKey());
-  }
   static unsigned getHashValue(SILType t) {
     return PointerMapInfo::getHashValue(t.getOpaqueValue());
   }

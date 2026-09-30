@@ -798,12 +798,6 @@ namespace llvm {
 
 template <> struct DenseMapInfo<swift::PhiOperand> {
   static swift::PhiOperand getEmptyKey() { return swift::PhiOperand(); }
-  static swift::PhiOperand getTombstoneKey() {
-    swift::PhiOperand phiOper;
-    phiOper.predBlock =
-        llvm::DenseMapInfo<swift::SILBasicBlock *>::getTombstoneKey();
-    return phiOper;
-  }
   static unsigned getHashValue(swift::PhiOperand phiOper) {
     return llvm::hash_combine(phiOper.predBlock, phiOper.argIndex);
   }
@@ -814,12 +808,6 @@ template <> struct DenseMapInfo<swift::PhiOperand> {
 
 template <> struct DenseMapInfo<swift::PhiValue> {
   static swift::PhiValue getEmptyKey() { return swift::PhiValue(); }
-  static swift::PhiValue getTombstoneKey() {
-    swift::PhiValue phiValue;
-    phiValue.phiBlock =
-        llvm::DenseMapInfo<swift::SILBasicBlock *>::getTombstoneKey();
-    return phiValue;
-  }
   static unsigned getHashValue(swift::PhiValue phiValue) {
     return llvm::hash_combine(phiValue.phiBlock, phiValue.argIndex);
   }
