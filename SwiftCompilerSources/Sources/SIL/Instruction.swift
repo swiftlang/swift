@@ -1327,6 +1327,15 @@ class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
 
 final public class TupleAddrConstructorInst : Instruction {
   public var destinationOperand: Operand { operands[0] }
+
+  public var isInitializationOfDestination: Bool {
+    bridged.TupleAddrConstructorInst_isInitializationOfDest()
+  }
+  public func set(isInitializationOfDestination: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.TupleAddrConstructorInst_setIsInitializationOfDest(isInitializationOfDestination)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class StructInst : SingleValueInstruction {

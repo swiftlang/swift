@@ -1964,6 +1964,15 @@ void BridgedInstruction::CopyAddrInst_setIsInitializationOfDest(bool isInitializ
       isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
 }
 
+bool BridgedInstruction::TupleAddrConstructorInst_isInitializationOfDest() const {
+  return getAs<swift::TupleAddrConstructorInst>()->isInitializationOfDest();
+}
+
+void BridgedInstruction::TupleAddrConstructorInst_setIsInitializationOfDest(bool isInitializationOfDest) const {
+  getAs<swift::TupleAddrConstructorInst>()->setIsInitializationOfDest(
+      isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
+}
+
 bool BridgedInstruction::DeallocBoxInst_isDeadEnd() const {
   return getAs<swift::DeallocBoxInst>()->isDeadEnd();
 }
