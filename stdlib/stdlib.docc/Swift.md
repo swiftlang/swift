@@ -39,7 +39,6 @@ and community, visit [Swift.org](https://swift.org).
 
 ### Standard Library
 
-- <doc:essential-types>
 - <doc:swift-standard-library>
 
 ### Observation
