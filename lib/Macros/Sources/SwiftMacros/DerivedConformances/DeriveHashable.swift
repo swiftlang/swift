@@ -174,7 +174,7 @@ public struct DeriveHashableMacro: DeclarationMacro {
             "\(unsafeMark)hasher.combine(a\(i))"
           }
         } else {
-          stmtsInCase = [getUnreachableStatement()]
+          stmtsInCase = [unreachableStatement]
         }
         return
           """
