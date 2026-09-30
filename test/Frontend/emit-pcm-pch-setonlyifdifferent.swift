@@ -13,6 +13,9 @@
 // RUN: %{python} %S/../Inputs/getmtime.py %t/Header.h.pch > %t/Header.h.pch.stat.after
 // RUN: diff %t/Header.h.pch.stat.before %t/Header.h.pch.stat.after
 
+// Flaky test -- rdar://188831853
+// UNSUPPORTED: OS=windows-msvc
+
 //--- test.swift
 import Header
 func testFunc() {}
