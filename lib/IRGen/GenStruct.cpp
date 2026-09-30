@@ -1332,10 +1332,18 @@ namespace {
 
         // If we're an array, use the ArrayLayoutEntry.
         if (rawLayout->getArrayLikeTypeAndCount()) {
+          // Don't return yet as a deinit below could replace the
+          // array's destroy.
           auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
-          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
-                                                           loweredLikeType,
-                                                           countType);
+          likeTypeLayout = IGM.typeLayoutCache.getOrCreateArrayEntry(
+              likeTypeLayout, loweredLikeType, countType);
+        }
+
+        // If there's a deinit, use it to destroy instead of the like
+        // type's destroy
+        if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+          return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+              {likeTypeLayout}, T, getBestKnownAlignment().getValue(), *this);
         }
 
         // Otherwise, this is just going to use the same layout entry as the
