@@ -35,22 +35,32 @@ using namespace swift::PatternMatch;
 
 using llvm::MapVector;
 
+/// Whether \p BB is cloned for each unrolled iteration: it is in the loop or it
+/// is an exit prefix.
+static bool isInUnrolledRegion(SILLoop *Loop,
+                               ArrayRef<SILBasicBlock *> ExitPrefixes,
+                               SILBasicBlock *BB) {
+  return Loop->contains(BB) || llvm::is_contained(ExitPrefixes, BB);
+}
 
 namespace {
 
-/// Clone the basic blocks in a loop.
+/// Clone the basic blocks in a loop, along with the exit block prefixes which
+/// use the loop's stack allocations (see getExitPrefixEnd).
 ///
 /// Currently invalidates the DomTree.
 class LoopCloner : public SILCloner<LoopCloner> {
   SILLoop *Loop;
+  ArrayRef<SILBasicBlock *> ExitPrefixes;
 
   friend class SILInstructionVisitor<LoopCloner>;
   friend class SILCloner<LoopCloner>;
 
 public:
-  LoopCloner(SILLoop *Loop)
+  LoopCloner(SILLoop *Loop, ArrayRef<SILBasicBlock *> ExitPrefixes)
       : SILCloner<LoopCloner>(*Loop->getHeader()->getParent()), Loop(Loop),
-        mustCloneScopes(false), scopeCloner(*Loop->getHeader()->getParent()) {
+        ExitPrefixes(ExitPrefixes), mustCloneScopes(false),
+        scopeCloner(*Loop->getHeader()->getParent()) {
 
     // If any debug info-carrying instructions use a @pack_element type that was
     // opened inside the loop, we must clone the debug scopes. Otherwise, two
@@ -86,7 +96,7 @@ protected:
   // SILCloner CRTP override.
   SILValue getMappedValue(SILValue V) {
     if (auto *BB = V->getParentBlock()) {
-      if (!Loop->contains(BB))
+      if (!isInRegion(BB))
         return V;
     }
     return SILCloner<LoopCloner>::getMappedValue(V);
@@ -104,13 +114,22 @@ private:
       return scopeCloner.getOrCreateClonedScope(DS);
     return SILCloner<LoopCloner>::remapScope(DS);
   }
+
+  bool isInRegion(SILBasicBlock *BB) const {
+    return isInUnrolledRegion(Loop, ExitPrefixes, BB);
+  }
+
+  /// The blocks which are cloned.
+  auto getRegionBlocks() const {
+    return llvm::concat<SILBasicBlock *const>(Loop->getBlocks(), ExitPrefixes);
+  }
 };
 
 } // end anonymous namespace
 
 void LoopCloner::sinkAddressProjections() {
   SinkAddressProjections sinkProj;
-  for (auto *bb : Loop->getBlocks()) {
+  for (auto *bb : getRegionBlocks()) {
     for (auto &inst : *bb) {
       for (auto res : inst.getResults()) {
         if (!res->getType().isAddress()) {
@@ -118,7 +137,7 @@ void LoopCloner::sinkAddressProjections() {
         }
         for (auto use : res->getUses()) {
           auto *user = use->getUser();
-          if (Loop->contains(user)) {
+          if (isInRegion(user->getParent())) {
             continue;
           }
           bool canSink = sinkProj.analyzeAddressProjections(&inst);
@@ -133,6 +152,11 @@ void LoopCloner::sinkAddressProjections() {
 void LoopCloner::cloneLoop() {
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Loop->getExitBlocks(ExitBlocks);
+  // Exit prefixes are cloned, so stop cloning at their successors instead.
+  for (auto *&ExitBB : ExitBlocks) {
+    if (llvm::is_contained(ExitPrefixes, ExitBB))
+      ExitBB = ExitBB->getSingleSuccessorBlock();
+  }
 
   sinkAddressProjections();
   // Clone the entire loop.
@@ -308,15 +332,63 @@ static bool isPackIterationLoop(SILLoop *Loop) {
   return false;
 }
 
+/// An exit block may use stack allocations from the loop, for example to
+/// deallocate them when the loop exits early. Each unrolled iteration needs its
+/// own copy of these uses, so the exit block is split after the last of them,
+/// and this prefix of the exit block is cloned along with the loop.
+///
+/// Returns the last instruction of the exit prefix of \p ExitBB, or nullptr if
+/// \p ExitBB does not use the loop's stack allocations or cannot be split.
+static SILInstruction *getExitPrefixEnd(SILLoop *Loop, SILBasicBlock *ExitBB) {
+  // The prefix is cloned for each copy of the single exiting block.
+  if (!ExitBB->getSinglePredecessorBlock())
+    return nullptr;
+
+  SILInstruction *PrefixEnd = nullptr;
+  for (auto &Inst : *ExitBB) {
+    for (SILValue Op : Inst.getOperandValues()) {
+      auto *Def = Op->getDefiningInstruction();
+      if (Def && Def->isAllocatingStack() && Loop->contains(Def))
+        PrefixEnd = &Inst;
+    }
+  }
+  if (isa_and_nonnull<TermInst>(PrefixEnd))
+    return nullptr;
+  return PrefixEnd;
+}
+
 /// Check whether we can duplicate the instructions in the loop and use a
 /// heuristic that looks at the trip count and the cost of the instructions in
 /// the loop to determine whether we should unroll this loop.
+///
+/// The exit prefixes ending at \p ExitPrefixEnds are duplicated along with the
+/// loop.
 static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
+                                   ArrayRef<SILInstruction *> ExitPrefixEnds,
                                    IsSelfRecursiveAnalysis *SRA,
                                    DeadEndBlocks *deb) {
   assert(Loop->getSubLoops().empty() && "Expect innermost loops");
   if (TripCount > 32)
     return false;
+
+  // The instructions which are duplicated for each iteration.
+  SmallVector<SILInstruction *, 64> RegionInsts;
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &Inst : *BB)
+      RegionInsts.push_back(&Inst);
+  }
+  SmallVector<SILInstruction *, 8> ExitPrefixInsts;
+  for (auto *PrefixEnd : ExitPrefixEnds) {
+    for (auto &Inst : *PrefixEnd->getParent()) {
+      ExitPrefixInsts.push_back(&Inst);
+      if (&Inst == PrefixEnd)
+        break;
+    }
+  }
+  RegionInsts.append(ExitPrefixInsts.begin(), ExitPrefixInsts.end());
+  auto isInRegion = [&](SILInstruction *Inst) {
+    return Loop->contains(Inst) || llvm::is_contained(ExitPrefixInsts, Inst);
+  };
 
   // We can unroll a loop if we can duplicate the instructions it holds.
   uint64_t Cost = 0;
@@ -331,32 +403,31 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
   // Pack loops must be unrolled to specialize the body. This is critical for
   // performance, they should always be unrolled if possible.
   const bool isPackLoop = isPackIterationLoop(Loop);
-  for (auto *BB : Loop->getBlocks()) {
-    for (auto &Inst : *BB) {
-      if (!canDuplicateLoopInstruction(Loop, &Inst, deb))
+  for (auto *Inst : RegionInsts) {
+    if (!canDuplicateRegionInstruction(Inst, deb, isInRegion))
+      return false;
+    if (!isPackLoop && instructionInlineCost(*Inst) != InlineCost::Free)
+      ++Cost;
+    if (auto AI = FullApplySite::isa(Inst)) {
+      auto Callee = AI.getCalleeFunction();
+      // If the callee is unknown, it can be
+      // devirtualized/specialized/always inlined later on which can lead to
+      // code bloat, bailout. Pack-iteration loops are the exception: they
+      // must be unrolled to devirtualize the witness methods
+      // called on their pack elements, so don't bail out on their unknown
+      // callees.
+      if (!Callee && !isPackLoop) {
         return false;
-      if (!isPackLoop && instructionInlineCost(Inst) != InlineCost::Free)
-        ++Cost;
-      if (auto AI = FullApplySite::isa(&Inst)) {
-        auto Callee = AI.getCalleeFunction();
-        // If the callee is unknown, it can be
-        // devirtualized/specialized/always inlined later on which can lead to
-        // code bloat, bailout. Pack-iteration loops are the exception: they
-        // must be unrolled to devirtualize the witness methods
-        // called on their pack elements, so don't bail out on their unknown
-        // callees.
-        if (!Callee && !isPackLoop) {
-          return false;
-        }
-        if (!isPackLoop && Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
-          // If callee is rather big and potentially inlinable, it may be better
-          // not to unroll, so that the body of the callee can be inlined later.
-          Cost += Callee->size() * InsnsPerBB;
-        }
       }
-      if (Cost * TripCount > SILLoopUnrollThreshold)
-        return false;
-  }
+      if (!isPackLoop && Callee &&
+          getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
+        // If callee is rather big and potentially inlinable, it may be better
+        // not to unroll, so that the body of the callee can be inlined later.
+        Cost += Callee->size() * InsnsPerBB;
+      }
+    }
+    if (Cost * TripCount > SILLoopUnrollThreshold)
+      return false;
   }
   return true;
 }
@@ -421,12 +492,12 @@ static void foldLastIterationExit(SILBasicBlock *Exiting, bool ExitsOnTrue) {
 /// value to live out value in the cloned loop.
 void LoopCloner::collectLoopLiveOutValues(
     MapVector<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
-  for (auto *Block : Loop->getBlocks()) {
+  for (auto *Block : getRegionBlocks()) {
     // Look at block arguments.
     for (auto *Arg : Block->getArguments()) {
       for (auto *Op : Arg->getUses()) {
-        // Is this use outside the loop?
-        if (!Loop->contains(Op->getUser())) {
+        // Is this use outside the cloned region?
+        if (!isInRegion(Op->getParentBlock())) {
           auto ArgumentValue = SILValue(Arg);
           if (!LoopLiveOutValues.count(ArgumentValue))
             LoopLiveOutValues[ArgumentValue].push_back(
@@ -438,8 +509,8 @@ void LoopCloner::collectLoopLiveOutValues(
     for (auto &Inst : *Block) {
       for (SILValue result : Inst.getResults()) {
         for (auto *Op : result->getUses()) {
-          // Ignore uses inside the loop.
-          if (Loop->contains(Op->getUser()))
+          // Ignore uses inside the cloned region.
+          if (isInRegion(Op->getParentBlock()))
             continue;
 
           auto UsedValue = Op->get();
@@ -455,14 +526,15 @@ void LoopCloner::collectLoopLiveOutValues(
 
 static void
 updateSSA(SILFunction *Fn, SILLoop *Loop,
+          ArrayRef<SILBasicBlock *> ExitPrefixes,
           MapVector<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
   SILSSAUpdater SSAUp;
   for (auto &MapEntry : LoopLiveOutValues) {
-    // Collect out of loop uses of this value.
+    // Collect the uses of this value outside the cloned region.
     auto OrigValue = MapEntry.first;
     SmallVector<UseWrapper, 16> UseList;
     for (auto Use : OrigValue->getUses())
-      if (!Loop->contains(Use->getUser()->getParent()))
+      if (!isInUnrolledRegion(Loop, ExitPrefixes, Use->getParentBlock()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
     SSAUp.initialize(Fn, OrigValue->getType(), OrigValue->getOwnershipKind());
@@ -501,7 +573,15 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
   }
   uint64_t MaxTripCount = CountedExit->TripCount;
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount, SRA, deb)) {
+  SmallVector<SILInstruction *, 4> ExitPrefixEnds;
+  SmallVector<SILBasicBlock *, 8> ExitBlocks;
+  Loop->getExitBlocks(ExitBlocks);
+  for (auto *ExitBB : ExitBlocks) {
+    if (auto *PrefixEnd = getExitPrefixEnd(Loop, ExitBB))
+      ExitPrefixEnds.push_back(PrefixEnd);
+  }
+
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount, ExitPrefixEnds, SRA, deb)) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }
@@ -518,6 +598,17 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
                           << Header->getParent()->getName()
                           << " " << *Loop << "\n");
 
+  // Split each exit prefix into its own block, which is cloned for each
+  // iteration.
+  SmallVector<SILBasicBlock *, 4> ExitPrefixes;
+  for (auto *PrefixEnd : ExitPrefixEnds) {
+    auto *SplitBefore = &*std::next(PrefixEnd->getIterator());
+    SILBuilderWithScope Builder(SplitBefore);
+    splitBasicBlockAndBranch(Builder, SplitBefore, /*domInfo*/ nullptr,
+                             /*loopInfo*/ nullptr);
+    ExitPrefixes.push_back(PrefixEnd->getParent());
+  }
+
   SmallVector<SILBasicBlock *, 16> Headers;
   Headers.push_back(Header);
 
@@ -532,7 +623,7 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
   // Copy the body MaxTripCount-1 times.
   for (uint64_t Cnt = 1; Cnt < MaxTripCount; ++Cnt) {
     // Clone the blocks in the loop.
-    LoopCloner cloner(Loop);
+    LoopCloner cloner(Loop, ExitPrefixes);
     cloner.cloneLoop();
     Headers.push_back(cloner.getOpBasicBlock(Header));
     Latches.push_back(cloner.getOpBasicBlock(Latch));
@@ -566,7 +657,7 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
   foldLastIterationExit(LastExiting, CountedExit->ExitsOnTrue);
 
   // Fixup SSA form for loop values used outside the loop.
-  updateSSA(Loop->getFunction(), Loop, LoopLiveOutValues);
+  updateSSA(Loop->getFunction(), Loop, ExitPrefixes, LoopLiveOutValues);
   return true;
 }
 

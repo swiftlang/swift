@@ -406,15 +406,26 @@ bb4:
   return %8 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_copy_stack_allocation_with_dealloc_outside_loop :
-// CHECK:   = alloc_ref [stack]
-// CHECK: bb2:
-// CHECK:   dealloc_stack_ref
-// CHECK: bb3:
-// CHECK:   dealloc_stack_ref
-// CHECK-NEXT: tuple
-// CHECK-LABEL: } // end sil function 'dont_copy_stack_allocation_with_dealloc_outside_loop'
-sil [ossa] @dont_copy_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
+// Each iteration deallocates its own stack allocation when it exits the loop.
+//
+// CHECK-LABEL: sil [ossa] @unroll_stack_allocation_with_dealloc_outside_loop :
+// CHECK:         [[A0:%.*]] = alloc_ref [stack]
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]], [[LATCH0:bb[0-9]+]]
+// CHECK:       [[LATCH0]]:
+// CHECK-NEXT:    dealloc_ref [[A0]]
+// CHECK-NEXT:    dealloc_stack_ref [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_ref [stack]
+// CHECK:         dealloc_ref [[A1]]
+// CHECK-NEXT:    dealloc_stack_ref [[A1]]
+// CHECK-NEXT:    br [[MERGE:bb[0-9]+]]
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    dealloc_ref [[A0]]
+// CHECK-NEXT:    dealloc_stack_ref [[A0]]
+// CHECK-NEXT:    br [[MERGE]]
+// CHECK:       [[MERGE]]:
+// CHECK-NEXT:    tuple
+// CHECK-LABEL: } // end sil function 'unroll_stack_allocation_with_dealloc_outside_loop'
+sil [ossa] @unroll_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Int64, 0
  %1 = integer_literal $Builtin.Int64, 1
@@ -1075,4 +1086,363 @@ bb2:
 bb3:
   %16 = tuple ()
   return %16 : $()
+}
+
+sil @use_int_addr : $@convention(thin) (@in_guaranteed Int) -> ()
+sil @pred_element : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+
+// CHECK-LABEL: sil [ossa] @unroll_alloc_stack_deallocated_in_other_block :
+// CHECK-COUNT-3: = alloc_stack $Int
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_alloc_stack_deallocated_in_other_block'
+sil [ossa] @unroll_alloc_stack_deallocated_in_other_block : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @use_int_addr : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = alloc_stack $Int
+  store %0 to [trivial] %7 : $*Int
+  %9 = apply %4(%7) : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb2
+
+bb2:
+  dealloc_stack %7 : $*Int
+  %12 = builtin "add_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %13 = builtin "cmp_eq_Word"(%12 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %13, bb4, bb3
+
+bb3:
+  br bb1(%12 : $Builtin.Word)
+
+bb4:
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// The early exit destroys and deallocates the alloc_stack, which the rest of
+// the loop body still uses. Each iteration destroys and deallocates its own
+// alloc_stack when it exits early.
+//
+// CHECK-LABEL: sil [ossa] @unroll_loop_with_destroy_in_exit_block :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_loop_with_destroy_in_exit_block'
+sil [ossa] @unroll_loop_with_destroy_in_exit_block : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %5 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = alloc_stack $Klass
+  %9 = copy_value %0 : $Klass
+  store %9 to [init] %8 : $*Klass
+  %11 = apply %5() : $@convention(thin) () -> Builtin.Int1
+  cond_br %11, bb2, bb3
+
+bb2:
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  br bb6
+
+bb3:
+  %16 = apply %4(%8) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  %19 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %20 = builtin "cmp_eq_Word"(%19 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %20, bb5, bb4
+
+bb4:
+  br bb1(%19 : $Builtin.Word)
+
+bb5:
+  br bb6
+
+bb6:
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_pack_loop_with_dealloc_in_exit_block :
+// CHECK:         [[A0:%.*]] = alloc_stack $@pack_element
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK:         dealloc_stack [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_stack $@pack_element
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK:         dealloc_stack [[A1]]
+// CHECK:         [[A2:%.*]] = alloc_stack $@pack_element
+// CHECK:         cond_br {{%.*}}, [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]:
+// CHECK:         dealloc_stack [[A2]]
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_with_dealloc_in_exit_block'
+sil [ossa] @unroll_pack_loop_with_dealloc_in_exit_block : $@convention(thin) (@pack_guaranteed Pack{Int, Int64, Bool}) -> Builtin.Int1 {
+bb0(%0 : $*Pack{Int, Int64, Bool}):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @pred_element : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  %9 = integer_literal $Builtin.Int1, -1
+  br bb4(%9 : $Builtin.Int1)
+
+bb3:
+  %11 = dynamic_pack_index %6 of $Pack{Int, Int64, Bool}
+  %12 = open_pack_element %11 of <each T> at <Pack{Int, Int64, Bool}>, shape $each T, id 2
+  %13 = alloc_stack $@pack_element(2) each T
+  %14 = pack_element_get %11 of %0 : $*Pack{Int, Int64, Bool} as $*@pack_element(2) each T
+  copy_addr %14 to [init] %13 : $*@pack_element(2) each T
+  %16 = apply %4<@pack_element(2) each T>(%13) : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  destroy_addr %13 : $*@pack_element(2) each T
+  cond_br %16, bb5, bb6
+
+bb4(%19 : $Builtin.Int1):
+  return %19 : $Builtin.Int1
+
+bb5:
+  %21 = integer_literal $Builtin.Int1, 0
+  dealloc_stack %13 : $*@pack_element(2) each T
+  br bb4(%21 : $Builtin.Int1)
+
+bb6:
+  dealloc_stack %13 : $*@pack_element(2) each T
+  %25 = builtin "add_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%25 : $Builtin.Word)
+}
+
+// The early exit destroys and deallocates the pack element, which the rest of
+// the loop body still uses. Each iteration destroys and deallocates its own
+// pack element when it exits early. The exit prefix also defines a value used
+// after it, which needs a phi now that each iteration has its own prefix.
+//
+// CHECK-LABEL: sil [ossa] @unroll_pack_loop_with_destroy_in_exit_block :
+// CHECK:         [[A0:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{[0-9]+}}) each T, let, name "x"
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK:         [[R0:%.*]] = apply
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]([[R0]])
+// CHECK:       [[TAIL]]([[PHI:%.*]] : $Builtin.Int1):
+// CHECK-NEXT:    br {{bb[0-9]+}}([[PHI]])
+// CHECK:         [[A1:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{[0-9]+}}) each T, let, name "x"
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK:         [[R1:%.*]] = apply
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]([[R1]])
+// CHECK:         [[A2:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{[0-9]+}}) each T, let, name "x"
+// CHECK:         cond_br {{%.*}}, [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]:
+// CHECK-NEXT:    destroy_addr [[A2]]
+// CHECK:         [[R2:%.*]] = apply
+// CHECK-NEXT:    dealloc_stack [[A2]]
+// CHECK-NEXT:    br [[TAIL]]([[R2]])
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_with_destroy_in_exit_block'
+sil [ossa] @unroll_pack_loop_with_destroy_in_exit_block : $@convention(thin) (@pack_guaranteed Pack{Int, Int64, Bool}) -> Builtin.Int1 {
+bb0(%0 : $*Pack{Int, Int64, Bool}):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @pred_element : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  %5 = function_ref @use_element : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = builtin "cmp_eq_Word"(%7 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb2, bb3
+
+bb2:
+  %10 = integer_literal $Builtin.Int1, -1
+  br bb4(%10 : $Builtin.Int1)
+
+bb3:
+  %12 = dynamic_pack_index %7 of $Pack{Int, Int64, Bool}
+  %13 = open_pack_element %12 of <each T> at <Pack{Int, Int64, Bool}>, shape $each T, id 2
+  %14 = alloc_stack [lexical] [var_decl] $@pack_element(2) each T, let, name "x"
+  %15 = pack_element_get %12 of %0 : $*Pack{Int, Int64, Bool} as $*@pack_element(2) each T
+  copy_addr %15 to [init] %14 : $*@pack_element(2) each T
+  %17 = apply %4<@pack_element(2) each T>(%14) : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  cond_br %17, bb5, bb6
+
+bb4(%19 : $Builtin.Int1):
+  return %19 : $Builtin.Int1
+
+bb5:
+  destroy_addr %14 : $*@pack_element(2) each T
+  %22 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  %23 = apply %22() : $@convention(thin) () -> Builtin.Int1
+  dealloc_stack %14 : $*@pack_element(2) each T
+  br bb4(%23 : $Builtin.Int1)
+
+bb6:
+  %26 = apply %5<@pack_element(2) each T>(%14) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_addr %14 : $*@pack_element(2) each T
+  dealloc_stack %14 : $*@pack_element(2) each T
+  %28 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%28 : $Builtin.Word)
+}
+
+sil @make_error : $@convention(thin) () -> @owned any Error
+
+// The early exit destroys and deallocates the alloc_stack, then throws. Only
+// the exit prefix, up to the dealloc_stack, is cloned for each iteration. The
+// throw can't be duplicated, so the loop can only be unrolled because it stays
+// in the shared tail of the exit block.
+//
+// CHECK-LABEL: sil [ossa] @unroll_loop_with_throw_after_exit_prefix :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]
+// CHECK:       [[TAIL]]:
+// CHECK:         throw
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]
+// CHECK-NOT:     = alloc_stack
+// CHECK-NOT:     throw
+// CHECK-LABEL: } // end sil function 'unroll_loop_with_throw_after_exit_prefix'
+sil [ossa] @unroll_loop_with_throw_after_exit_prefix : $@convention(thin) (@guaranteed Klass) -> @error any Error {
+bb0(%0 : @guaranteed $Klass):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %5 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = alloc_stack $Klass
+  %9 = copy_value %0 : $Klass
+  store %9 to [init] %8 : $*Klass
+  %11 = apply %5() : $@convention(thin) () -> Builtin.Int1
+  cond_br %11, bb2, bb3
+
+bb2:
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  %15 = function_ref @make_error : $@convention(thin) () -> @owned any Error
+  %16 = apply %15() : $@convention(thin) () -> @owned any Error
+  throw %16 : $any Error
+
+bb3:
+  %18 = apply %4(%8) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  %21 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %22 = builtin "cmp_eq_Word"(%21 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %22, bb5, bb4
+
+bb4:
+  br bb1(%21 : $Builtin.Word)
+
+bb5:
+  %25 = tuple ()
+  return %25 : $()
+}
+
+// The early exit destroys and deallocates the alloc_stack from the loop, then
+// allocates another one, which is deallocated in a later block. Only the exit
+// prefix, up to the first dealloc_stack, is cloned for each iteration. The
+// second allocation can't be duplicated because it's deallocated outside the
+// exit block, so the loop can only be unrolled because it stays in the shared
+// tail of the exit block.
+//
+// CHECK-LABEL: sil [ossa] @unroll_loop_with_alloc_stack_after_exit_prefix :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]
+// CHECK:       [[TAIL]]:
+// CHECK-NEXT:    [[I:%.*]] = alloc_stack $Int
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]
+// CHECK-NOT:     = alloc_stack
+// CHECK:         dealloc_stack [[I]]
+// CHECK-LABEL: } // end sil function 'unroll_loop_with_alloc_stack_after_exit_prefix'
+sil [ossa] @unroll_loop_with_alloc_stack_after_exit_prefix : $@convention(thin) (@guaranteed Klass, Int) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : $Int):
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = integer_literal $Builtin.Word, 2
+  %5 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %6 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  %7 = function_ref @use_int_addr : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%9 : $Builtin.Word):
+  %10 = alloc_stack $Klass
+  %11 = copy_value %0 : $Klass
+  store %11 to [init] %10 : $*Klass
+  %13 = apply %6() : $@convention(thin) () -> Builtin.Int1
+  cond_br %13, bb2, bb3
+
+bb2:
+  destroy_addr %10 : $*Klass
+  dealloc_stack %10 : $*Klass
+  %17 = alloc_stack $Int
+  store %1 to [trivial] %17 : $*Int
+  %19 = apply %7(%17) : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb6
+
+bb3:
+  %21 = apply %5(%10) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %10 : $*Klass
+  dealloc_stack %10 : $*Klass
+  %24 = builtin "add_Word"(%9 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Word
+  %25 = builtin "cmp_eq_Word"(%24 : $Builtin.Word, %4 : $Builtin.Word) : $Builtin.Int1
+  cond_br %25, bb5, bb4
+
+bb4:
+  br bb1(%24 : $Builtin.Word)
+
+bb5:
+  br bb7
+
+bb6:
+  dealloc_stack %17 : $*Int
+  br bb7
+
+bb7:
+  %31 = tuple ()
+  return %31 : $()
 }
