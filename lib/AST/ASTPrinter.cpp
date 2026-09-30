@@ -366,7 +366,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
-      // Skip @c @implementation functions along with the attribute.
+      // Skip C-exported @implementation functions along with the attribute.
       if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (options.excludeAttrKind(DeclAttrKind::ObjCImplementation) &&
             AFD->isObjCImplementation() && AFD->getCDeclKind())
