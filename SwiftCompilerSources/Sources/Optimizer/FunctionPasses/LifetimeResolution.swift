@@ -892,10 +892,11 @@ private struct Resolver {
 
       case let tac as TupleAddrConstructorInst where tac.destinationOperand == address:
         addUse(.def(address), range)
-      case let copyAddr as CopyAddrInst:
-        if copyAddr.destination == address.value {
+
+      case let srcDestInst as SourceDestAddrInstruction:
+        if srcDestInst.destinationOperand == address {
           addUse(.def(address), range)
-        } else if copyAddr.isTakeOfSource {
+        } else if srcDestInst.isTakeOfSource {
           addUse(.take(address, .own), range)
         } else {
           addUse(.use(address, .own), range)
