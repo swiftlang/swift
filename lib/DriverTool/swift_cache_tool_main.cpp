@@ -65,24 +65,12 @@ enum ID {
 #undef OPTION
 };
 
-#define OPTTABLE_STR_TABLE_CODE
+#define OPTTABLE_CODE
 #include "SwiftCacheToolOptions.inc"
-#undef OPTTABLE_STR_TABLE_CODE
 
-#define OPTTABLE_PREFIXES_TABLE_CODE
-#include "SwiftCacheToolOptions.inc"
-#undef OPTTABLE_PREFIXES_TABLE_CODE
-
-static const OptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
-#include "SwiftCacheToolOptions.inc"
-#undef OPTION
-};
-
-class CacheToolOptTable : public llvm::opt::GenericOptTable {
+class CacheToolOptTable : public llvm::opt::OptTable {
 public:
-  CacheToolOptTable()
-      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
+  CacheToolOptTable() : OptTable(optionTables()) {}
 };
 
 class SwiftCacheToolInvocation {
