@@ -7,6 +7,11 @@ import CxxStdlib
 func pushToVectorDuringIter() {
   var vec = Vector([1, 2, 3])
   for el in vec { // expected-note {{conflicting access is here}}
-    vec.push_back(el) // expected-error {{overlapping accesses to 'vec', but modification requires exclusive access; consider copying to a local variable}}
+    vec.push_back(el) // expected-error {{overlapping accesses to 'vec', but modification requires exclusive access}}
+  }
+
+  var vecNC = makeVectorOfNonCopyable()
+  for el in vecNC { // expected-note {{conflicting access is here}}
+    vecNC.push_back(el) // expected-error {{overlapping accesses to 'vecNC', but modification requires exclusive access}}
   }
 }
