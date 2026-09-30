@@ -69,11 +69,13 @@ public struct FieldIndexTrie: CustomStringConvertible {
   public typealias IndexRange = Range<Int>
 
   private final class Node {
+    let type: Type                // The type of the field this node represents.
     let range: IndexRange         // The contiguous index range of this node and its entire sub-tree.
     let childKind: FieldKind?     // The kind of projection into the `children`
     let children: [Node]          // Index in this array corresponds to their field index.
 
-    init(range: Range<Int>, childKind: FieldKind?, children: [Node]) {
+    init(type: Type, range: Range<Int>, childKind: FieldKind?, children: [Node]) {
+      self.type = type
       self.range = range
       self.childKind = childKind
       self.children = children
@@ -122,7 +124,41 @@ public struct FieldIndexTrie: CustomStringConvertible {
       cursor += 1
     }
 
-    return Node(range: begin..<cursor, childKind: childKind, children: children)
+    return Node(type: type, range: begin..<cursor, childKind: childKind, children: children)
+  }
+
+  /// The path of nodes from the root down to the node for `leaf`, excluding the root.
+  private func pathToLeaf(_ leaf: Int) -> [(kind: FieldKind, index: Int, node: Node)] {
+    assert(wholeRange.contains(leaf), "leaf \(leaf) out of range \(wholeRange)")
+    var path: [(kind: FieldKind, index: Int, node: Node)] = []
+    var node = root
+    while let kind = node.childKind {
+      let index = node.children.firstIndex(where: { $0.range.contains(leaf) })!
+      node = node.children[index]
+      path.append((kind, index, node))
+    }
+    return path
+  }
+
+  /// The type of the field corresponding to `leaf`.
+  public func leafType(_ leaf: Int) -> Type {
+    (pathToLeaf(leaf).last?.node.type ?? root.type).objectType
+  }
+
+  /// Emits the projections from `base`, an address of this trie's type, down to the field for `leaf`.
+  public func emitElementAddress(forLeaf leaf: Int, from base: Value, _ builder: Builder) -> Value {
+    var address = base
+    for (kind, index, _) in pathToLeaf(leaf) {
+      switch kind {
+      case .structField:
+        address = builder.createStructElementAddr(structAddress: address, fieldIndex: index)
+      case .tupleField:
+        address = builder.createTupleElementAddr(tupleAddress: address, elementIndex: index)
+      default:
+        fatalError("unexpected projection kind \(kind)")
+      }
+    }
+    return address
   }
 
   /// The half-open leaf range covered by `path` from the root.

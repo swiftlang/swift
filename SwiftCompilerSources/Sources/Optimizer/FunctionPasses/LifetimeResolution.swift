@@ -167,6 +167,16 @@ struct ResolvableRoot {
     }
   }
 
+  // Change the storage such that it indicates a dynamic lifetime.
+  func convertToDynamic(_ context: MutatingContext) {
+    if let allocStack = storage as? AllocStackInst {
+      allocStack.setDynamicLifetime(context)
+    }
+    if let allocBox = storage as? AllocBoxInst {
+      allocBox.setDynamicLifetime(context)
+    }
+  }
+
   /// Find the sole project_box reachable from an alloc_box from SILGen.
   private static func findProjectBox(of boxValue: Value) -> (projectBox: ProjectBoxInst, isLexical: Bool)? {
     for use in boxValue.uses {
@@ -261,7 +271,7 @@ private struct Resolver {
     solveAvailability(indices)
 
     logState("\n** state before legalizeAvailability **")
-    legalizeAvailability()
+    legalizeAvailability(root, indices)
 
     logState("\n** final state **")
 
@@ -598,7 +608,12 @@ private struct Resolver {
     }
   }
 
-  mutating func legalizeAvailability() {
+  mutating func legalizeAvailability(_ root: ResolvableRoot, _ indices: FieldIndexTrie) {
+    typealias PartialAvailability = (inst: Instruction, avail: [Availability], range: FieldIndexTrie.IndexRange)
+    var partialDestroys: [PartialAvailability] = []
+    var destroysBeforeInit: [PartialAvailability] = []
+
+    // Do a first pass over blocks, collecting any needed partial destroys for a second step.
     for block in function.blocks {
       guard var events = state[block]?.events else { continue }
 
@@ -614,23 +629,49 @@ private struct Resolver {
                 .joined(separator: " ")
         log("availability at [\(fields)] | \(kind.inst)")
 
+        let summary = current[range].reduce(Availability.unknown, { $0.union($1) })
+
         var didDelete = false
 
         switch kind {
-        case .def:
-          // TODO: update any `store _ to [assign]` to a `store _ to [init]` if there is no availability.
-          // Otherwise, we need to conditionally destroy.
-          break
-        case let .end(op):
-          let fullyConsumed = current[range].allSatisfy { $0 == .no }
+        case let .def(op):
+          let nontrivial = range.filter { !indices.leafType($0).isTrivial(in: function) }
+          if nontrivial.isEmpty {
+            break
+          }
+          let defSummary = nontrivial.reduce(Availability.unknown, { $0.union(current[$1]) })
+          assert(defSummary != .unknown, "missing information!")
 
-          if fullyConsumed {
+          switch defSummary {
+          case .no:
+            makeDef(op.instruction, initialization: true)
+          case .yes:
+            if !makeDef(op.instruction, initialization: false) {
+              destroysBeforeInit.append((op.instruction, current, range))
+            }
+          default:
+            // Only some fields are available, so destroy those first to make this a full initialization.
+            destroysBeforeInit.append((op.instruction, current, range))
+            makeDef(op.instruction, initialization: true)
+          }
+        case let .end(op):
+          assert(summary != .unknown, "missing information!")
+
+          // If fully available, this lifetime ending instruction can stay as-is.
+          if summary == .yes {
+            break
+          }
+
+          // If completely unavailable (consumed), it's lifetime ended earlier, so delete this one.
+          if summary == .no {
             context.erase(instruction: op.instruction)
             didDelete = true
             break
           }
 
-        // TODO: handle destruction of conditionally initialized storage!
+          // Otherwise, it's partially available. It will be replaced with partial destroys later.
+          partialDestroys.append((op.instruction, current, range))
+          didDelete = true
 
         default:
           break
@@ -648,6 +689,130 @@ private struct Resolver {
       // Process the events for this block, removing any that must be dropped.
       events.list.removeAll(where: legalize)
       state[block]!.events = events
+    }
+
+    // Step 2: insert partial destroys where needed.
+    if partialDestroys.isEmpty && destroysBeforeInit.isEmpty {
+      return
+    }
+
+    // Only fields that are conditionally initialized where they must be destroyed need a runtime test.
+    var conditionalLeaves = Set<Int>()
+    for (_, avail, range) in partialDestroys + destroysBeforeInit {
+      conditionalLeaves.formUnion(range.filter { avail[$0] == .partial })
+    }
+
+    var controlVar: ControlVariable? = nil
+    if !conditionalLeaves.isEmpty {
+      controlVar = ControlVariable(for: root, numBits: indices.leafCount, context)
+    }
+
+    for (destroy, avail, range) in partialDestroys {
+      destroyAvailableFields(avail, range, before: destroy, root, indices, controlVar)
+
+      // Everything in range is now uninitialized.
+      controlVar?.update(range, initialized: false, before: destroy)
+      context.erase(instruction: destroy)
+    }
+
+    for (def, avail, range) in destroysBeforeInit {
+      destroyAvailableFields(avail, range, before: def, root, indices, controlVar)
+    }
+
+    if let controlVar {
+      trackControlVariable(controlVar, conditionalLeaves)
+      root.convertToDynamic(context)
+    }
+  }
+
+  // Converts a def into an initialization or assignment of its destination.
+  // - Returns false iff the def cannot be expressed as an assignment.
+  @discardableResult
+  func makeDef(_ inst: Instruction, initialization: Bool) -> Bool {
+    switch inst {
+    case let store as StoreInst:
+      if store.storeOwnership != .trivial {
+        store.set(ownership: initialization ? .initialize : .assign, context)
+      }
+    case let assign as AssignInst:
+      // TODO: handle `[reinit]` once class initializers are supported.
+      if assign.assignOwnership != .reinitialize {
+        assign.set(ownership: initialization ? .initialize : .reassign, context)
+      }
+    case let copyAddr as CopyAddrInst:
+      copyAddr.set(isInitializationOfDestination: initialization, context)
+    case let tupleAddrConstructor as TupleAddrConstructorInst:
+      tupleAddrConstructor.set(isInitializationOfDestination: initialization, context)
+    case is FullApplySite:
+      return initialization
+    default:
+      // TODO: handle assign_or_init, store_weak, store_unowned, etc.
+      log("unhandled def: \(inst)")
+    }
+    return true
+  }
+
+  // Keep the control variable's bits in sync with the availability of the fields at each event.
+  // This must happen after any partial destroys are inserted, so a def's bits are only set after
+  // the fields it overwrites have been tested.
+  func trackControlVariable(_ controlVar: ControlVariable, _ conditionalLeaves: Set<Int>) {
+    for block in function.blocks {
+      guard let events = state[block]?.events else { continue }
+
+      for (kind, range) in events.list where range.contains(where: conditionalLeaves.contains) {
+        switch kind {
+        case .def:
+          controlVar.update(range, initialized: true, before: kind.inst)
+        case .take, .end:
+          controlVar.update(range, initialized: false, before: kind.inst)
+        case .root:
+          break  // Initialized upon creation.
+        case .use, .unknown:
+          break
+        }
+      }
+    }
+  }
+
+  // Destroys only the available fields of partially available memory, testing the control variable
+  // for fields that are only conditionally available.
+  func destroyAvailableFields(_ current: [Availability], _ range: EventList.IndexRange, before inst: Instruction,
+                              _ root: ResolvableRoot, _ indices: FieldIndexTrie, _ controlVar: ControlVariable?) {
+    log("destroying available fields before \(inst)")
+
+    for leaf in range {
+      if current[leaf] == .no || indices.leafType(leaf).isTrivial(in: function) {
+        continue
+      }
+
+      if current[leaf] == .yes {
+        let builder = Builder(before: inst, context)
+        builder.createDestroyAddr(address: indices.emitElementAddress(forLeaf: leaf, from: root.address, builder))
+        continue
+      }
+
+      assert(current[leaf] == .partial)
+      guard let controlVar else { fatalError("missing control variable for conditional destroy") }
+
+      // Split the block into a diamond around the destroy of this field:
+      //
+      //   start:  cond_br (test bit), trueBlock, falseBlock
+      //   trueBlock:  destroy_addr field; br cont
+      //   falseBlock: br cont
+      //   cont:  <inst> ...
+      let condition = controlVar.test(leaf, before: inst)
+      let start = inst.parentBlock
+      let cont = context.splitBlock(before: inst)
+      let trueBlock = context.createBlock(after: start)
+      let falseBlock = context.createBlock(after: trueBlock)
+
+      let trueBuilder = Builder(atEndOf: trueBlock, location: inst.location, context)
+      trueBuilder.createDestroyAddr(address: indices.emitElementAddress(forLeaf: leaf, from: root.address, trueBuilder))
+      trueBuilder.createBranch(to: cont)
+
+      Builder(atEndOf: falseBlock, location: inst.location, context).createBranch(to: cont)
+      Builder(atEndOf: start, location: inst.location, context)
+        .createCondBranch(condition: condition, trueBlock: trueBlock, falseBlock: falseBlock)
     }
   }
 
@@ -1463,6 +1628,92 @@ private extension Function {
   // NOTE: This scans the entire function!
   var exitingBlocks: LazyFilterSequence<BasicBlockList> {
     return blocks.lazy.filter { $0.terminator.isFunctionExiting }
+  }
+}
+
+/// A "control" variable: a bit vector in memory, represented as an integer, tracking whether each field of a
+/// root is dynamically initialized. Bit `i` corresponds to leaf `i` of the root's FieldIndexTrie.
+private struct ControlVariable {
+  let address: Value
+  let intType: Type
+  let numBits: Int
+  let context: FunctionPassContext
+
+  init(for root: ResolvableRoot, numBits: Int, _ context: FunctionPassContext) {
+    guard numBits <= UInt.bitWidth else {
+      fatalError("TODO: control variable with more than \(UInt.bitWidth) bits")
+    }
+    let function = root.address.parentFunction
+    self.intType = context.getBuiltinIntegerType(bitWidth: numBits)
+    self.numBits = numBits
+    self.context = context
+
+    // Use an auto-generated location so the alloc_stack doesn't look like the storage of a user variable.
+    let loc = function.location.asAutoGenerated
+
+    // Create the control variable as the first instruction in the function so that it dominates all exits.
+    let entryBuilder = Builder(before: function.entryBlock.instructions.first!, location: loc, context)
+    self.address = entryBuilder.createAllocStack(intType)
+
+    // Initialize it at the root, which may be within a loop. An argument's root is the function entry.
+    let initBuilder: Builder
+    if let rootInst = root.address.definingInstruction {
+      initBuilder = Builder(before: rootInst, location: loc, context)
+    } else {
+      initBuilder = entryBuilder
+    }
+    let initial = initBuilder.createIntegerLiteral(root.startsInitialized ? Self.mask(of: 0..<numBits) : 0,
+                                                   type: intType)
+    initBuilder.createStore(source: initial, destination: address, ownership: .trivial)
+
+    // Deallocate before each function exit.
+    for block in function.exitingBlocks {
+      let exitBuilder = Builder(before: block.terminator, location: loc, context)
+      exitBuilder.createDeallocStack(address)
+    }
+  }
+
+  private static func mask(of range: Range<Int>) -> UInt {
+    let width = range.count
+    let ones: UInt = width == UInt.bitWidth ? ~0 : (1 << width) - 1
+    return ones << range.lowerBound
+  }
+
+  private func builder(before inst: Instruction) -> Builder {
+    Builder(before: inst, location: inst.location.asAutoGenerated, context)
+  }
+
+  /// Sets or clears the bits for `range`, just before `inst`.
+  func update(_ range: Range<Int>, initialized: Bool, before inst: Instruction) {
+    let builder = builder(before: inst)
+    let allBits = Self.mask(of: 0..<numBits)
+    let bits = Self.mask(of: range)
+
+    let newValue: Value
+    if bits == allBits {
+      newValue = builder.createIntegerLiteral(initialized ? allBits : 0, type: intType)
+    } else {
+      let oldValue = builder.createLoad(fromAddress: address, ownership: .trivial)
+      let operand = builder.createIntegerLiteral(initialized ? bits : allBits & ~bits, type: intType)
+      newValue = builder.createBuiltinBinaryFunction(name: initialized ? "or" : "and",
+                                                     operandType: intType, resultType: intType,
+                                                     arguments: [oldValue, operand])
+    }
+    builder.createStore(source: newValue, destination: address, ownership: .trivial)
+  }
+
+  /// Returns a `Builtin.Int1` that is true iff `bit` is set, computed just before `inst`.
+  func test(_ bit: Int, before inst: Instruction) -> Value {
+    let builder = builder(before: inst)
+    let value = builder.createLoad(fromAddress: address, ownership: .trivial)
+    if numBits == 1 {
+      return value
+    }
+    let boolType = context.getBuiltinIntegerType(bitWidth: 1)
+    let selected = builder.createBuiltinBinaryFunction(name: "and", operandType: intType, resultType: intType,
+      arguments: [value, builder.createIntegerLiteral(Self.mask(of: bit..<(bit + 1)), type: intType)])
+    return builder.createBuiltinBinaryFunction(name: "cmp_ne", operandType: intType, resultType: boolType,
+      arguments: [selected, builder.createIntegerLiteral(0, type: intType)])
   }
 }
 
