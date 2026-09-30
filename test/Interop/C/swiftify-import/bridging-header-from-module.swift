@@ -29,7 +29,7 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<CInt>, _ x: UnsafeMutablePointer<no_module_record_t>!) {
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<CInt>, _ x: UnsafeMutablePointer<no_module_record_t>!) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeBufferPointer {
         unsafe $0

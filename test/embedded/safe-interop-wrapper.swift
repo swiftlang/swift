@@ -15,7 +15,7 @@
 
 // expected-expansion@+13:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ p: inout MutableSpan<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ p: inout MutableSpan<CInt>) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -35,7 +35,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -enable-experimental-feature Embedded > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 578524af05531714a4450a0fa1453fe9277e7f25fd3fb5042c52e86a70083dcb
+// GENERATED-HASH: a0f97557f009615813c3505e14d4d225aa20bbba6588bf56a493a77ed0a018e5
 import Test
 
 func call_simple(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
@@ -43,6 +43,6 @@ func call_simple(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
 }
 
 @_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: inout MutableSpan<CInt>) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_simple(_ p: inout MutableSpan<CInt>) {
   return simple(&p)
 }

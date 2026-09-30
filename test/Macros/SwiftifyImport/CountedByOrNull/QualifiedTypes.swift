@@ -20,7 +20,7 @@ public func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () 
 @__swiftmacro_4test3foo15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
     let len = ptr.count
     return unsafe foo(ptr.baseAddress!, len)
@@ -29,7 +29,7 @@ public func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
 @__swiftmacro_4test3bar15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
     let len = ptr.count
     return unsafe bar(ptr.baseAddress!, len)

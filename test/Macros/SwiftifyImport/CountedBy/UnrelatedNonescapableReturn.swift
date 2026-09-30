@@ -28,7 +28,7 @@ public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt, _ extraNE: i
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_disfavoredOverload
 public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = ptr.withUnsafeBufferPointer {
@@ -43,7 +43,7 @@ public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
 @__swiftmacro_4test7myFunc215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr, copy extraNE) @_lifetime(ptr: copy ptr) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr, copy extraNE) @_lifetime(ptr: copy ptr) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableSpan<CInt>, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
