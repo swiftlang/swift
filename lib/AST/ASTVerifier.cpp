@@ -3787,11 +3787,6 @@ public:
       return true;
     }
     
-    template<typename T>
-    void checkSourceRangesBase(T ASTNode) {
-      checkSourceRanges(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
-    }
-    
     void checkSourceRanges(Expr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ranges", E);
 
