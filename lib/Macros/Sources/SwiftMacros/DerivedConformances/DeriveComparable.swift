@@ -14,7 +14,7 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
-// Note: this implementation is intentionnaly very close to `Equatable`'s derivation
+// Note: this implementation is intentionally very close to `Equatable`'s derivation
 // They will eventually be merged together.
 
 /// Macro that derives an `<` implementation for an enum, given
@@ -143,7 +143,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
         default: 
           \(getDiscriminant(info, scrutinee: "lhs", discrName: "index_lhs"))
           \(getDiscriminant(info, scrutinee: "rhs", discrName: "index_rhs"))
-          return index_lhs  < index_rhs
+          return index_lhs < index_rhs
         """
       )
     }
