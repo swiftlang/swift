@@ -683,7 +683,7 @@ void AsyncTask::destroyTaskDependency(TaskDependencyStatusRecord *dependencyReco
   _private().dependencyRecord = nullptr;
 }
 
-AsyncTask *&AsyncTask::getNextWaitingTask() {
+AsyncTask *AsyncTask::getNextWaitingTask() {
 #ifndef NDEBUG
   auto status = _private()._status().load(std::memory_order_relaxed);
   assert(status.hasTaskDependency());
@@ -691,6 +691,16 @@ AsyncTask *&AsyncTask::getNextWaitingTask() {
   auto *dependency = _private().dependencyRecord;
   assert(dependency != nullptr);
   return dependency->getNextWaitingTask();
+}
+
+void AsyncTask::setNextWaitingTask(AsyncTask *task) {
+#ifndef NDEBUG
+  auto status = _private()._status().load(std::memory_order_relaxed);
+  assert(status.hasTaskDependency());
+#endif
+  auto *dependency = _private().dependencyRecord;
+  assert(dependency != nullptr);
+  dependency->setNextWaitingTask(task);
 }
 
 // this -> task which is suspending
@@ -894,9 +904,10 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
 #else
     // Put the waiting task at the beginning of the wait queue.
     // NOTE: this acquire-release synchronizes with `completeFuture`.
-    auto nextWaitingTask = queueHead.getTask();
-    waitingTask->getNextWaitingTask() = nextWaitingTask;
-    auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
+    auto nextWaitingTask = queueHead.getTask(&fragment->waitQueue);
+    waitingTask->setNextWaitingTask(nextWaitingTask);
+    auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask,
+                                           &fragment->waitQueue);
     if (fragment->waitQueue.compare_exchange_weak(
             queueHead, newQueueHead,
             /*success*/ std::memory_order_release,
@@ -976,10 +987,9 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   }
 
   // Update the status to signal completion.
-  auto newQueueHead = WaitQueueItem::get(
-    hadErrorResult ? Status::Error : Status::Success,
-    nullptr
-  );
+  auto newQueueHead =
+      WaitQueueItem::get(hadErrorResult ? Status::Error : Status::Success,
+                         nullptr, &fragment->waitQueue);
 
   // NOTE: this acquire-release synchronizes with `waitFuture`.
   auto queueHead = fragment->waitQueue.exchange(
@@ -990,7 +1000,7 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   // access `this` after this point in that case.
 
   // Schedule every waiting task on the executor.
-  auto waitingTask = queueHead.getTask();
+  auto waitingTask = queueHead.getTask(&fragment->waitQueue);
 
   if (!waitingTask) {
     SWIFT_TASK_DEBUG_LOG("task %p had no waiting tasks", this);
