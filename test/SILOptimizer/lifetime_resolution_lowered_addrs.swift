@@ -1,5 +1,12 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify \
+// Coverage for LifetimeResolution when functions are not [opaque], i.e., address-only types are lowered to addresses.
+// For code that only works when opaque values is enabled, see sibling file without `lowered_addrs` in its name.
+
+// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -disable-sil-opaque-values -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s | %FileCheck %s
+
+// For extra coverage, compile with opaque values, but skip FileCheck.
+// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -enable-sil-opaque-values -verify \
+// RUN:   -enable-experimental-feature LifetimeDependence %s
 
 // REQUIRES: swift_feature_LifetimeDependence
 
@@ -158,7 +165,7 @@ func NEDependent() {
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}stress_copy_addrs
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}take_sequence_vars
 // CHECK:      [[FIRST:%.*]] = alloc_stack [var_decl] $String, var, name "longStr"
 // CHECK:      store {{.*}} to [init] [[FIRST]]
 // CHECK:      [[SECOND:%.*]] = alloc_stack [var_decl] $String, var, name "str"
@@ -172,7 +179,7 @@ func NEDependent() {
 // CHECK-NOT:  destroy_addr
 // CHECK:      return [[STR]]
 // CHECK-LABEL: } // end sil function
-func stress_copy_addrs() -> String {
+func take_sequence_vars() -> String {
   var longStr = "ascii"  // expected-warning {{was never mutated}}
   var str = longStr      // expected-warning {{was never mutated}}
   return str

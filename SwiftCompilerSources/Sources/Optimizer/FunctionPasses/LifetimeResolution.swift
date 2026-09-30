@@ -159,10 +159,8 @@ struct ResolvableRoot {
 
     extraLivenessUses = extraUses
 
-    // Only handle a loadable, nontrivial value (a class, or a noncopyable
-    // struct that just wraps one).
-    let objectType = address.type.objectType
-    guard objectType.isLoadable(in: function), !objectType.isTrivial(in: function) else {
+    // Currently, trivial values have no lifetime information.
+    guard !address.type.objectType.isTrivial(in: function) else {
       return nil
     }
   }
