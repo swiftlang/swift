@@ -1330,10 +1330,10 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
   out << "])";
 }
 
-/// Prints a string containing swift syntax describing the enum \p
-/// decl with relevant information to \p out.
-static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
-  out << "enumLike(EnumTypeInfo(isObjC: " << (decl->isObjC() ? "true" : "false")
+std::string swift::getEnumTypeInfoString(EnumDecl *decl) {
+  std::string s;
+  llvm::raw_string_ostream out(s);
+  out << "EnumTypeInfo(isObjC: " << (decl->isObjC() ? "true" : "false")
       << ", cases: [";
   llvm::interleaveComma(
       decl->getAllElements(), out,
@@ -1344,7 +1344,14 @@ static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
   } else {
     out << "nil";
   }
-  out << "))";
+  out << ")";
+  return s;
+}
+
+/// Prints a string containing swift syntax describing the enum \p
+/// decl with relevant information to \p out.
+static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
+  out << "enumLike(" << getEnumTypeInfoString(decl) << ")";
 }
 
 /// Prints a string containing swift syntax describing the stored property \p
