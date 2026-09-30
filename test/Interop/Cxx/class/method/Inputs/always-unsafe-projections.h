@@ -32,4 +32,21 @@ struct NotStd {
   int *append(int);
 };
 
+struct TemplateAndSafeOwner {
+  int *storage;
+  TemplateAndSafeOwner(const TemplateAndSafeOwner &);
+
+  // Returns whatever the caller passes in, not a projection of 'this'.
+  template <typename T> T identity(T t) const { return t; }
+
+  // With ImportUnsafeCxxMethodsAsAlwaysUnsafe, 'safe' suppresses the rename.
+  __attribute__((swift_attr("safe"))) int *vouchedProjection() const;
+
+  // ...except for begin and end, whose '__<name>Unsafe' stubs witness the
+  // conformance to CxxConvertibleToCollection.
+  // expected-note@+1 {{'begin' and 'end' are assumed to return iterators, which do not keep the underlying storage alive}}
+  __attribute__((swift_attr("safe"))) const int *begin() const;
+  __attribute__((swift_attr("safe"))) const int *end() const;
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_METHOD_ALWAYS_UNSAFE_PROJECTIONS_H
