@@ -327,9 +327,11 @@ struct MacroInfo {
 };
 }
 
+/// Return \p DC or its innermost enclosing function or closure. Closures
+/// are emitted as SIL functions of their own, with the closure as FunctionDC.
 static DeclContext *getInnermostFunctionContext(DeclContext *DC) {
   for (; DC; DC = DC->getParent())
-    if (DC->getContextKind() == DeclContextKind::AbstractFunctionDecl)
+    if (isa<AbstractFunctionDecl, AbstractClosureExpr>(DC))
       return DC;
   return nullptr;
 }
@@ -355,10 +357,10 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
-    // If the parent function of the macro expansion expression is not the
-    // current function, then the macro expanded to a closure or nested
-    // function. As far as the generated SIL is concerned this is the same as a
-    // function generated from a freestanding macro expansion.
+    // If the enclosing function or closure of the macro expansion expression
+    // is not the current function, then the macro expanded to a closure or
+    // nested function. As far as the generated SIL is concerned this is the
+    // same as a function generated from a freestanding macro expansion.
     DeclContext *MacroContext = getInnermostFunctionContext(Info.declContext);
     if (MacroContext != FunctionDC)
       Result.Freestanding = true;
