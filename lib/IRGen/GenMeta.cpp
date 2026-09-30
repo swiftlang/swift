@@ -1041,7 +1041,9 @@ namespace {
           declRef = declRef.asAutoDiffDerivativeFunction(
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
-          flags = flags.withIsAsync(true);
+          // A synchronous 'oneway' distributed thunk (Embedded) is not async
+          if (cast<AbstractFunctionDecl>(func.getDecl())->hasAsync())
+            flags = flags.withIsAsync(true);
           declRef = declRef.getDistributedThunkDeclRef();
         }
         addDiscriminator(flags, schema, declRef);

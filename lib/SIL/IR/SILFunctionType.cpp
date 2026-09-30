@@ -5568,9 +5568,12 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.isCoroutine())
     extInfo = extInfo.withCoroutine(true);
 
-  // Distributed thunks are always `async throws`
+  // Distributed thunks are always `throws`, and `async` unless the thunk was
+  // synthesized synchronous (for a synchronous `oneway` function in Embedded)
   if (constant.isDistributedThunk()) {
-    extInfo = extInfo.withAsync(true).withThrows(true, Type());
+    auto *thunk = constant.getDistributedThunk();
+    bool isAsync = !thunk || thunk->hasAsync();
+    extInfo = extInfo.withAsync(isAsync).withThrows(true, Type());
   }
 
   // The uncurried function is parameter-isolated if the inner type is.

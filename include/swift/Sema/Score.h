@@ -39,6 +39,11 @@ enum ScoreKind: unsigned int {
   /// Synchronous function in an asynchronous context or a conversion of
   /// a synchronous function to an asynchronous one.
   SK_SyncInAsync,
+  /// A reference to a 'oneway' function which is not the callee of a 'nowait'
+  /// call, or a reference to a non-'oneway' function which is. This lets
+  /// 'nowait x.f()' pick 'func f() oneway' and any other call of 'x.f()' pick
+  /// 'func f()' when both overloads exist
+  SK_OnewayMismatch,
   /// A use of the "forward" scan for trailing closures.
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
@@ -190,6 +195,9 @@ struct Score {
 
     case SK_SyncInAsync:
       return "sync-in-asynchronous";
+
+    case SK_OnewayMismatch:
+      return "oneway mismatch with nowait";
 
     case SK_ForwardTrailingClosure:
       return "forward scan when matching a trailing closure";

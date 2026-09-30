@@ -5128,6 +5128,7 @@ public:
                            fn->isUserAccessible(),
                            fn->isDistributedThunk(),
                            fn->hasSendingResult(),
+                           fn->isOneway(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -6293,7 +6294,8 @@ public:
         isolation,
         fnTy->hasSendingResult(),
         fnTy->isCalledOnce(),
-        fnTy->isCoroutine());
+        fnTy->isCoroutine(),
+        fnTy->isOneway());
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6317,7 +6319,8 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
-        fnTy->isCoroutine(),                                          
+        fnTy->isCoroutine(),
+        fnTy->isOneway(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);

@@ -4684,6 +4684,15 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
       }
     }
   }
+
+  // The trailing 'oneway' modifier prints after the effect specifiers, e.g.
+  // 'distributed func ping() oneway'
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    if (FD->isOneway()) {
+      Printer << " ";
+      Printer.printKeyword("oneway", Options);
+    }
+  }
 }
 
 bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
@@ -5533,6 +5542,11 @@ void PrintAST::visitUnsafeExpr(UnsafeExpr *expr) {
 
 void PrintAST::visitConsumeExpr(ConsumeExpr *expr) {
   Printer << "consume ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitNowaitExpr(NowaitExpr *expr) {
+  Printer << "nowait ";
   visit(expr->getSubExpr());
 }
 
@@ -7608,6 +7622,11 @@ public:
           Printer << ")";
         }
       }
+
+      if (T->isOneway()) {
+        Printer << " ";
+        Printer.printKeyword("oneway", Options);
+      }
     }
 
     if (T->hasExtInfo() && T->isCoroutine()) {
@@ -7682,6 +7701,11 @@ public:
           thrownError->print(Printer, Options);
           Printer << ")";
         }
+      }
+
+      if (T->isOneway()) {
+        Printer << " ";
+        Printer.printKeyword("oneway", Options);
       }
    }
 

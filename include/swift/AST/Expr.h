@@ -354,12 +354,13 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
     ThrowsIsSet : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
-    ShouldApplyDistributedThunk : 1
+    ShouldApplyDistributedThunk : 1,
+    IsNowaitOperand : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -2298,6 +2299,43 @@ public:
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
   static bool classof(const Expr *e) { return e->getKind() == ExprKind::Copy; }
+};
+
+/// NowaitExpr - A 'nowait' surrounding a Void-returning call, marking that the
+/// call should be dispatched fire-and-forget rather than awaited.
+///
+/// Pre-checking wraps the call in an implicit '{ try await <call> }' operation
+/// closure of type '() async throws -> Void', which SILGen runs in a new
+/// discarding task. For a synchronous 'oneway' callee in Embedded Swift (see
+/// 'FuncDecl::isSynchronouslyEnqueuedOneway()') CSApply replaces the closure
+/// with a synchronous expression which enqueues the call instead
+class NowaitExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc NowaitLoc;
+
+public:
+  NowaitExpr(SourceLoc nowaitLoc, Expr *sub, Type type = Type(),
+             bool implicit = false)
+      : Expr(ExprKind::Nowait, implicit, type), SubExpr(sub),
+        NowaitLoc(nowaitLoc) {}
+
+  static NowaitExpr *createImplicit(ASTContext &ctx, SourceLoc nowaitLoc,
+                                     Expr *sub, Type type = Type()) {
+    return new (ctx) NowaitExpr(nowaitLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return NowaitLoc; }
+  SourceLoc getNowaitLoc() const { return NowaitLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return NowaitLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Nowait;
+  }
 };
 
 /// BorrowExpr - A 'borrow' surrounding an lvalue/accessor expression at an
@@ -5004,6 +5042,7 @@ protected:
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
     Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
+    Bits.ApplyExpr.IsNowaitOperand = false;
   }
 
 public:
@@ -5119,6 +5158,14 @@ public:
   }
   void setShouldApplyDistributedThunk(bool flag) {
     Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
+  }
+
+  /// Whether this call is the operand of a 'nowait', e.g. the 'x.f()' in
+  /// 'nowait x.f()'. Overload resolution prefers a 'oneway' callee for such a
+  /// call, and a non-'oneway' callee for any other call
+  bool isNowaitOperand() const { return Bits.ApplyExpr.IsNowaitOperand; }
+  void setIsNowaitOperand(bool flag = true) {
+    Bits.ApplyExpr.IsNowaitOperand = flag;
   }
 
   ValueDecl *getCalledValue(bool skipFunctionConversions = false) const;

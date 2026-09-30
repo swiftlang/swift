@@ -612,6 +612,12 @@ namespace {
     /// a remote distributed actor in the given context.
     bool isDistributedThunk(ConcreteDeclRef ref, Expr *context);
 
+    /// Determine whether the apply expression on top of \c ExprStack is the
+    /// direct operand of a 'nowait' expression, i.e. it is reached from the
+    /// enclosing 'NowaitExpr' only by unwrapping the implicit 'try'/'await'
+    /// (and any parens) that 'nowait' pre-checking wraps its operand in
+    bool isDirectNowaitOperand() const;
+
   public:
     /// Build a reference to the given declaration.
     Expr *buildDeclRef(SelectedOverload overload, DeclNameLoc loc,
@@ -3818,6 +3824,398 @@ namespace {
 
     Expr *visitConsumeExpr(ConsumeExpr *expr) {
       return transformExprWithSubExpr(expr);
+    }
+
+    Expr *visitNowaitExpr(NowaitExpr *expr) {
+      // 'nowait' discards the result of the call, so it is unconditionally
+      // Void
+      cs.setType(expr, ctx.TheEmptyTupleType);
+
+      // Validate the target via the operation closure synthesized in
+      // pre-checking ('{ try await <call> }'). On error we still return the
+      // (Void-typed) node - the diagnostic halts compilation before SILGen
+      auto *closure = dyn_cast<ClosureExpr>(expr->getSubExpr());
+      if (!closure)
+        return expr;
+
+      // 'nowait' discards the result, so the call must return 'Void'. The
+      // single-expression closure's result type is the call's result type
+      if (cs.hasType(closure)) {
+        if (auto fnTy = cs.getType(closure)->getAs<FunctionType>()) {
+          Type resultTy = fnTy->getResult();
+          if (resultTy && !resultTy->hasError() && !resultTy->isVoid()) {
+            ctx.Diags.diagnose(expr->getNowaitLoc(),
+                               diag::nowait_call_returns_value);
+            return expr;
+          }
+        }
+      }
+
+      // 'nowait' cannot forward errors, so the callee must not throw. Look
+      // through the synthesized 'try'/'await' to the underlying call
+      if (Expr *body = closure->getSingleExpressionBody()) {
+        if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+          body = anyTry->getSubExpr();
+        if (auto *apply =
+                dyn_cast<ApplyExpr>(body->getSemanticsProvidingExpr())) {
+          if (auto *callee = dyn_cast_or_null<AbstractFunctionDecl>(
+                  apply->getCalledValue())) {
+            if (callee->hasThrows()) {
+              ctx.Diags.diagnose(expr->getNowaitLoc(),
+                                 diag::nowait_call_can_throw);
+              return expr;
+            }
+          }
+        }
+      }
+
+      // A synchronous 'oneway' target is lowered without any async code at
+      // the call site: replace the operation closure with a synchronous
+      // expression
+      if (Expr *lowered = lowerSynchronousOnewayNowait(closure))
+        expr->setSubExpr(lowered);
+
+      return expr;
+    }
+
+    /// Lower the operation closure '{ try await <call> }' of a 'nowait' call
+    /// of a synchronous 'oneway' function (see
+    /// 'FuncDecl::isSynchronouslyEnqueuedOneway()') to a synchronous
+    /// expression, so that the call site has no async code and can be in a
+    /// synchronous context:
+    ///
+    /// - A 'distributed' function becomes a direct call of its synchronous
+    ///   distributed thunk, which throws. The thunk enqueues a call on a
+    ///   local actor and uses 'remoteCallVoidOneway' for a remote one.
+    ///
+    ///     nowait a.f(x)  =>  a.f(x)   // via the distributed thunk
+    ///
+    /// - An actor-isolated method is enqueued on the actor:
+    ///
+    ///     nowait a.f(x)  =>  _enqueueOneway(on: a) {
+    ///                          [$nowait_arg0 = x] $nowait_actor in
+    ///                          $nowait_actor.f($nowait_arg0)
+    ///                        }
+    ///
+    /// - A global-actor-isolated function is enqueued on its global actor:
+    ///
+    ///     nowait c.f(x)  =>  _enqueueOnewayIsolated({
+    ///                          [$nowait_base = c, $nowait_arg0 = x] @GA in
+    ///                          $nowait_base.f($nowait_arg0)
+    ///                        })
+    ///
+    /// The receiver and the arguments are evaluated at the call site, in the
+    /// caller's isolation, just like the arguments of a direct call.
+    ///
+    /// Returns the new operand of the 'nowait', or null to keep the
+    /// task-based lowering
+    Expr *lowerSynchronousOnewayNowait(ClosureExpr *closure) {
+      Expr *body = closure->getSingleExpressionBody();
+      if (!body)
+        return nullptr;
+      while (true) {
+        if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+          body = anyTry->getSubExpr();
+        else if (auto *await = dyn_cast<AwaitExpr>(body))
+          body = await->getSubExpr();
+        else if (auto *paren = dyn_cast<ParenExpr>(body))
+          body = paren->getSubExpr();
+        else
+          break;
+      }
+
+      // A call on an existential receiver is wrapped in the opening of the
+      // existential; the lowered call of a distributed func is wrapped in it
+      // the same way
+      auto *openExistential = dyn_cast<OpenExistentialExpr>(body);
+      if (openExistential)
+        body = openExistential->getSubExpr();
+      auto wrapInOpenExistential = [&](Expr *lowered) -> Expr * {
+        if (!openExistential)
+          return lowered;
+        openExistential->setSubExpr(lowered);
+        openExistential->setType(lowered->getType());
+        cs.cacheType(openExistential);
+        return openExistential;
+      };
+
+      auto *apply = dyn_cast<ApplyExpr>(body);
+      if (!apply || isa<SelfApplyExpr>(apply))
+        return nullptr;
+
+      auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn());
+      ValueDecl *calleeVD =
+          apply->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!calleeVD && selfApply)
+        calleeVD = selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+      auto *callee = dyn_cast_or_null<FuncDecl>(calleeVD);
+      if (!callee || !callee->isSynchronouslyEnqueuedOneway())
+        return nullptr;
+
+      DeclContext *outerDC = closure->getParent();
+
+      // A 'distributed' function: call the synchronous distributed thunk
+      // directly. The actor isolation checker keeps the call synchronous and
+      // marks it as throwing, the thunk is used even for a known-local actor
+      // so that the call is always enqueued rather than run inline
+      if (callee->isDistributed()) {
+        if (!selfApply)
+          return nullptr;
+        apply->setShouldApplyDistributedThunk(true);
+        apply->setImplicitlyThrows(true);
+        Expr *lowered = wrapInOpenExistential(apply);
+        TypeChecker::contextualizeExpr(lowered, outerDC);
+        return lowered;
+      }
+
+      // TODO: Lower a call on an existential plain actor ('any Tellable') too.
+      // Its enqueued closure would have to be isolated to the opened
+      // existential, which the closure's captures do not support yet, so such
+      // a call keeps the task-based lowering
+      if (openExistential)
+        return nullptr;
+
+      auto isolation = getActorIsolation(callee);
+      bool isActorInstance = isolation.isActorInstanceIsolated() &&
+                             isolation.isActorInstanceForSelfParameter();
+      if (!isActorInstance && !isolation.isGlobalActor())
+        return nullptr;
+
+      auto *concurrency = ctx.getLoadedModule(ctx.Id_Concurrency);
+      if (!concurrency)
+        return nullptr;
+      auto lookupEnqueueFunc = [&](StringRef name) -> FuncDecl * {
+        SmallVector<ValueDecl *, 1> results;
+        concurrency->lookupValue(ctx.getIdentifier(name),
+                                 NLKind::QualifiedLookup, results);
+        if (results.size() != 1)
+          return nullptr;
+        return dyn_cast<FuncDecl>(results.front());
+      };
+
+      // The receiver, which is the actor to enqueue on for an actor-isolated
+      // method
+      Expr *base = selfApply ? selfApply->getBase() : nullptr;
+      Type actorTy;
+      FuncDecl *enqueueFunc = nullptr;
+      // Whether the receiver is the actor the calling function is already
+      // isolated to, e.g. 'nowait self.f(x)' in one of the actor's methods
+      bool isCallerActor = false;
+      if (isActorInstance) {
+        if (!base)
+          return nullptr;
+        actorTy = base->getType();
+        // Distributed actors are not 'Actor's (and their non-distributed
+        // methods cannot be called cross-actor anyway)
+        auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+        if (!actorTy || actorTy->hasLValueType() || !actorProto ||
+            lookupConformance(actorTy, actorProto).isInvalid())
+          return nullptr;
+
+        // TODO: Recognize a self-send from a closure isolated to the actor.
+        // The isolation of closures is only known after this rewrite, so only
+        // a call directly in a function body is recognized. A self-send from a
+        // nested closure is lowered like a send to another actor, so passing
+        // the actor's own state is conservatively diagnosed as a send
+        if (isa<AbstractFunctionDecl>(outerDC)) {
+          auto callerIsolation = getActorIsolationOfContext(outerDC);
+          if (callerIsolation.isActorInstanceIsolated()) {
+            if (auto *baseRef = dyn_cast<DeclRefExpr>(
+                    base->getSemanticsProvidingExpr())) {
+              isCallerActor = callerIsolation.getActorInstance() &&
+                              baseRef->getDecl() ==
+                                  callerIsolation.getActorInstance();
+            }
+          }
+        }
+
+        // A call on the caller's own actor is enqueued with a closure which
+        // captures that actor and inherits its isolation, so that the region
+        // checker sees a same-actor use: passing the actor's own state is
+        // fine, just like in a direct call. Otherwise the actor becomes the
+        // closure's 'isolated' parameter
+        enqueueFunc = lookupEnqueueFunc(isCallerActor ? "_enqueueOnewayIsolated"
+                                                      : "_enqueueOneway");
+      } else {
+        enqueueFunc = lookupEnqueueFunc("_enqueueOnewayIsolated");
+      }
+      if (!enqueueFunc)
+        return nullptr;
+
+      // Only arguments which are values (including variadic arrays) can be
+      // evaluated at the call site; fall back to the task-based lowering
+      // otherwise
+      auto *args = apply->getArgs();
+      for (auto arg : *args) {
+        Expr *argExpr = arg.getExpr();
+        if (arg.isInOut() || isa<PackExpansionExpr>(argExpr) ||
+            !argExpr->getType() || argExpr->getType()->hasLValueType())
+          return nullptr;
+        if (auto *vararg = dyn_cast<VarargExpansionExpr>(argExpr))
+          if (!isa<ArrayExpr>(vararg->getSubExpr()))
+            return nullptr;
+      }
+
+      SmallVector<CaptureListEntry, 4> captures;
+      auto captureValue = [&](Expr *value, StringRef name) -> Expr * {
+        Type valueTy = value->getType();
+        TypeChecker::contextualizeExpr(value, outerDC);
+        solution.setExprTypes(value);
+
+        auto *var = new (ctx) VarDecl(/*static*/ false,
+                                      VarDecl::Introducer::Let,
+                                      value->getLoc(),
+                                      ctx.getIdentifier(name), outerDC);
+        var->setImplicit();
+        var->setInterfaceType(valueTy->mapTypeOutOfEnvironment());
+
+        auto *pattern = NamedPattern::createImplicit(ctx, var, valueTy);
+        auto *pbd = PatternBindingDecl::createImplicit(
+            ctx, StaticSpellingKind::None, pattern, value, outerDC);
+        captures.push_back(CaptureListEntry(pbd));
+
+        auto *ref = new (ctx) DeclRefExpr(var, DeclNameLoc(value->getLoc()),
+                                          /*Implicit=*/true);
+        ref->setType(valueTy);
+        return ref;
+      };
+
+      // The receiver of a global-actor-isolated method is evaluated at the
+      // call site too, before the arguments, unless it is a metatype
+      bool captureGlobalActorBase = !isActorInstance && base &&
+                                    !base->getType()->is<AnyMetatypeType>();
+      if (captureGlobalActorBase && base->getType()->hasLValueType())
+        return nullptr;
+      if (captureGlobalActorBase)
+        selfApply->setBase(captureValue(base, "$nowait_base"));
+
+      // Evaluate the arguments at the call site, in order, just like the
+      // arguments of a direct call
+      for (unsigned i : indices(*args)) {
+        Expr *argExpr = args->getExpr(i);
+        std::string name = ("$nowait_arg" + llvm::Twine(i)).str();
+
+        // A default argument is evaluated at the call site too, unless it is
+        // isolated to the callee's actor (SE-0411), which is only satisfied
+        // in the enqueued body; or it is a caller-side default like '#line',
+        // which does not depend on where it is evaluated
+        if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+          if (defaultArg->isCallerSide())
+            continue;
+          auto required = defaultArg->getRequiredIsolation();
+          if (required.isActorIsolated())
+            continue;
+          args->setExpr(i, captureValue(argExpr, name));
+          continue;
+        }
+
+        // An '@autoclosure' is evaluated by the callee, and a non-escaping
+        // one cannot be captured anyway, so it is formed in the enqueued body
+        if (isa<AutoClosureExpr>(argExpr))
+          continue;
+
+        // The variadic arguments are evaluated at the call site into their
+        // array, which is then forwarded as the variadic parameter
+        if (auto *vararg = dyn_cast<VarargExpansionExpr>(argExpr)) {
+          auto *expansion = VarargExpansionExpr::createParamExpansion(
+              ctx, captureValue(vararg->getSubExpr(), name));
+          cs.cacheType(expansion);
+          args->setExpr(i, expansion);
+          continue;
+        }
+
+        args->setExpr(i, captureValue(argExpr, name));
+      }
+
+      SubstitutionMap enqueueSubs;
+      if (isActorInstance && !isCallerActor) {
+        enqueueSubs = SubstitutionMap::get(
+            enqueueFunc->getGenericSignature(), ArrayRef<Type>{actorTy},
+            LookUpConformanceInModule());
+      }
+      Type enqueueFnTy = enqueueFunc->getInterfaceType();
+      if (auto *genericFnTy = enqueueFnTy->getAs<GenericFunctionType>())
+        enqueueFnTy = genericFnTy->substGenericArgs(enqueueSubs);
+      auto *enqueueFnType = enqueueFnTy->castTo<FunctionType>();
+      Type bodyParamTy = enqueueFnType->getParams().back().getPlainType();
+
+      SmallVector<Argument, 2> enqueueArgs;
+      FunctionType *closureTy;
+      if (isCallerActor) {
+        // '() -> Void' inheriting the caller's actor isolation, erased to the
+        // '@isolated(any)' parameter of '_enqueueOnewayIsolated' below
+        closureTy = FunctionType::get({}, /*yields=*/{}, ctx.TheEmptyTupleType,
+                                    FunctionType::ExtInfoBuilder().build());
+        // The closure captures the actor 'self' just like the direct call
+        // would use it, 'nowait f()' does not need an explicit 'self.'
+        closure->setAllowsImplicitSelfCapture();
+      } else if (isActorInstance) {
+        // The actor becomes the closure's 'isolated' parameter, so that the
+        // call in the closure is a synchronous same-actor call
+        auto *actorParam = new (ctx) ParamDecl(
+            SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+            ctx.getIdentifier("$nowait_actor"), closure);
+        actorParam->setImplicit();
+        actorParam->setSpecifier(ParamSpecifier::Default);
+        actorParam->setInterfaceType(actorTy->mapTypeOutOfEnvironment());
+        actorParam->setIsolated();
+        closure->setParameterList(ParameterList::create(ctx, {actorParam}));
+
+        auto *actorRef = new (ctx) DeclRefExpr(
+            actorParam, DeclNameLoc(base->getLoc()), /*Implicit=*/true);
+        actorRef->setType(actorTy);
+        selfApply->setBase(actorRef);
+
+        // '(isolated A) -> Void', exactly the type '_enqueueOneway' expects
+        closureTy = bodyParamTy->castTo<FunctionType>();
+
+        TypeChecker::contextualizeExpr(base, outerDC);
+        enqueueArgs.push_back(Argument(SourceLoc(), ctx.Id_on, base));
+      } else {
+        Type globalActorTy =
+            outerDC->mapTypeIntoEnvironment(isolation.getGlobalActor());
+        closureTy = FunctionType::get(
+            {}, /*yields=*/{}, ctx.TheEmptyTupleType,
+            FunctionType::ExtInfoBuilder()
+                .withIsolation(
+                    FunctionTypeIsolation::forGlobalActor(globalActorTy))
+                .build());
+      }
+
+      // The closure's body is just the (now synchronous, same-isolation) call
+      closure->setBody(BraceStmt::createImplicit(ctx, {ASTNode(apply)}));
+      closure->setType(closureTy);
+      cs.cacheType(closure);
+
+      Expr *closureExpr = closure;
+      if (!captures.empty()) {
+        auto *captureList = CaptureListExpr::create(ctx, captures, closure);
+        captureList->setImplicit();
+        captureList->setType(closureTy);
+        cs.cacheType(captureList);
+        closureExpr = captureList;
+      }
+
+      // The closure parameter of '_enqueueOnewayIsolated' is
+      // '@isolated(any)', erase the closure's global actor to it
+      if (!bodyParamTy->isEqual(closureTy)) {
+        closureExpr = new (ctx) FunctionConversionExpr(closureExpr,
+                                                       bodyParamTy);
+        closureExpr->setImplicit();
+        cs.cacheType(closureExpr);
+      }
+      enqueueArgs.push_back(Argument::unlabeled(closureExpr));
+
+      auto *enqueueRef = new (ctx) DeclRefExpr(
+          ConcreteDeclRef(enqueueFunc, enqueueSubs), DeclNameLoc(),
+          /*Implicit=*/true, AccessSemantics::Ordinary, enqueueFnType);
+      cs.cacheType(enqueueRef);
+
+      auto *enqueueCall = CallExpr::createImplicit(
+          ctx, enqueueRef, ArgumentList::createImplicit(ctx, enqueueArgs));
+      enqueueCall->setType(ctx.TheEmptyTupleType);
+      cs.cacheType(enqueueCall);
+      return enqueueCall;
     }
 
     Expr *visitAnyTryExpr(AnyTryExpr *expr) {
@@ -8655,6 +9053,27 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       apply->setImplicitlyThrows(true);
     }
 
+    // A 'oneway' method has no reply for its caller to await; a plain call
+    // (or an explicit 'await') silently drops that fire-and-forget contract,
+    // so require it to be spelled with 'nowait'. This is only enforced when
+    // 'nowait' can be written, i.e. with the 'OnewayNowait' feature, and not
+    // for a 'oneway' function imported into a module without it. Skip
+    // 'SelfApplyExpr': a member call is a curried self-application
+    // ('g.thanks') wrapped in an outer call ('(...)'), both of which resolve
+    // to the same callee, so only the outer, user-visible call needs to be
+    // checked. Skip implicit calls: synthesized code (e.g. a distributed
+    // thunk's own call to the local method implementation) has no 'nowait' to
+    // write and isn't user-facing
+    if (ctx.LangOpts.hasFeature(Feature::OnewayNowait) &&
+        !isa<SelfApplyExpr>(apply) && !apply->isImplicit()) {
+      if (auto *FD = dyn_cast_or_null<FuncDecl>(callee.getDecl())) {
+        if (FD->isOneway() && !isDirectNowaitOperand()) {
+          ctx.Diags.diagnose(apply->getLoc(),
+                             diag::oneway_call_requires_nowait, FD);
+        }
+      }
+    }
+
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
@@ -8723,6 +9142,27 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Tail-recur to actually call the constructor.
   return finishApply(apply, openedType, locator, calleeLoc);
+}
+
+bool ExprRewriter::isDirectNowaitOperand() const {
+  // 'ExprStack' holds every ancestor of the apply expression currently being
+  // finished, with the apply itself on top. 'nowait' pre-checking wraps its
+  // operand in an implicit '{ try await <call> }' closure, but the
+  // 'ExprWalker' rewrites a closure's body via a nested 'applySolution' call
+  // and never pushes the 'ClosureExpr' itself onto 'ExprStack' (see
+  // 'ExprWalker::walkToExprPre'), so the closure is invisible here: walk up
+  // through any 'try'/'await'/parens and check whether the next ancestor is
+  // directly the 'NowaitExpr' that owns that closure
+  for (auto it = ExprStack.rbegin() + 1, end = ExprStack.rend(); it != end;
+       ++it) {
+    Expr *ancestor = *it;
+    if (isa<AwaitExpr>(ancestor) || isa<TryExpr>(ancestor) ||
+        isa<ParenExpr>(ancestor))
+      continue;
+
+    return isa<NowaitExpr>(ancestor);
+  }
+  return false;
 }
 
 bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {

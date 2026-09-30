@@ -4478,6 +4478,13 @@ bool swift::conflicting(const OverloadSignature& sig1,
       return false;
   } // else, if any of the methods was distributed, continue checking
 
+  // 'oneway' distinguishes overloads, also for distributed funcs: 'func x()'
+  // and 'func x() oneway' are distinct declarations. Their distributed thunks
+  // mangle differently ('Yo'), so they have distinct remote call targets, and
+  // 'nowait' picks the 'oneway' one while 'await' picks the other one
+  if (sig1.IsOneway != sig2.IsOneway)
+    return false;
+
   // If one is a macro and the other is not, they can't conflict.
   if (sig1.IsMacro != sig2.IsMacro)
     return false;
@@ -4757,6 +4764,9 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       signature.IsAsyncFunction = true;
     if (func->isDistributed())
       signature.IsDistributed = true;
+    if (auto *FD = dyn_cast<FuncDecl>(func))
+      if (FD->isOneway())
+        signature.IsOneway = true;
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
@@ -12035,6 +12045,15 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                              const_cast<FuncDecl *>(this)
                            },
                            nullptr);
+}
+
+bool FuncDecl::isSynchronouslyEnqueuedOneway() const {
+  if (!isOneway() || hasAsync())
+    return false;
+
+  auto &langOpts = getASTContext().LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+         langOpts.hasFeature(Feature::OnewayNowait);
 }
 
 bool FuncDecl::isStatic() const {

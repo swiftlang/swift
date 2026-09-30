@@ -100,6 +100,13 @@ protected:
   /// a critical role.
   bool AllowTypedThrows = true;
 
+  /// If enabled, the 'oneway' function type flavor ('Yo') is encoded in the
+  /// mangled name. Runtime type metadata cannot represent 'oneway' (the
+  /// runtime drops it when demangling), and runtimes before Swift 6.5 cannot
+  /// demangle it at all, so it is suppressed in the type names emitted for
+  /// runtime use (metadata and reflection)
+  bool AllowOneway = true;
+
   /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
   /// as if they're part of their original module. Disabled for debug mangling,
   /// because lldb wants to find declarations in the modules they're currently

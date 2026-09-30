@@ -26,8 +26,11 @@
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ActorIsolation.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -617,6 +620,7 @@ namespace {
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
     RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
+    RValue visitNowaitExpr(NowaitExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
     RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
     RValue visitTypeValueExpr(TypeValueExpr *E, SGFContext C);
@@ -7414,9 +7418,15 @@ RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitDefaultArgumentExpr(DefaultArgumentExpr *E,
                                                SGFContext C) {
-  // We should only be emitting this as an rvalue for caller-side default
-  // arguments such as magic literals. Other default arguments get handled
-  // specially.
+  // Default arguments in an argument list are handled specially. Only
+  // caller-side default arguments such as magic literals, and the default
+  // arguments which a 'nowait' call of a synchronous 'oneway' function
+  // evaluates at the call site (see 'lowerSynchronousOnewayNowait' in
+  // CSApply), are emitted as an rvalue
+  if (!E->isCallerSide())
+    return SGF.emitApplyOfDefaultArgGenerator(
+        E, E->getDefaultArgsOwner(), E->getParamIndex(),
+        E->getType()->getCanonicalType(), E->isImplicitlyAsync(), C);
   return SGF.emitRValue(E->getCallerSideDefaultExpr());
 }
 
@@ -7429,6 +7439,246 @@ RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
   // Use report_fatal_error to ensure we trap in release builds instead of
   // miscompiling.
   llvm::report_fatal_error("Found an ErrorExpr but didn't emit an error?");
+}
+
+RValue RValueEmitter::visitNowaitExpr(NowaitExpr *E, SGFContext C) {
+  // 'nowait <call>' lowers to an unstructured, discarding task that runs the
+  // wrapped operation closure and returns control to the caller immediately
+  auto &ctx = SGF.getASTContext();
+  SILLocation loc = E;
+
+  // A 'nowait' call to a synchronous 'oneway' function (Embedded only) has
+  // already been lowered by the type checker to a synchronous call of
+  // '_enqueueOneway' / '_enqueueOnewayIsolated' or, for a 'distributed'
+  // function, to a direct call of its synchronous distributed thunk. There is
+  // no operation closure here, just emit the call
+  if (!isa<AbstractClosureExpr>(E->getSubExpr())) {
+    SGF.emitIgnoredExpr(E->getSubExpr());
+    return SGF.emitEmptyTupleRValue(E, C);
+  }
+
+  // The operation closure: '{ try await <call> }', of type
+  // '() async throws -> Void' (thick)
+  ManagedValue operationVal = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  // flags: copy the enclosing task-locals (task-locals must propagate) and
+  // mark the task discarding (no future fragment - this is what gives us the
+  // lightweight task shape). We deliberately do NOT inherit the caller's
+  // actor context: the task should run on the target's executor (derived
+  // below), not the caller's
+  TaskCreateFlags taskFlags;
+  taskFlags.setCopyTaskLocals(true);
+  taskFlags.setEnqueueJob(true);
+  taskFlags.setIsDiscardingTask(true);
+  SILValue flags = SGF.emitWrapIntegerLiteral(
+      loc, SGF.getLoweredType(ctx.getIntType()), taskFlags.getOpaqueValue());
+
+  auto executorOptTy =
+      SGF.getLoweredType(ctx.TheExecutorType.wrapInOptionalType());
+  auto rawPtrOptTy =
+      SGF.getLoweredType(ctx.TheRawPointerType.wrapInOptionalType());
+
+  CanType taskExecutorElemTy;
+  if (auto proto = ctx.getProtocol(KnownProtocolKind::TaskExecutor)) {
+    taskExecutorElemTy =
+        proto->getDeclaredExistentialType()->getCanonicalType();
+  } else {
+    taskExecutorElemTy = ctx.TheExecutorType;
+  }
+  auto taskExecutorConsumingOptTy =
+      SGF.getLoweredType(taskExecutorElemTy.wrapInOptionalType());
+
+  ManagedValue initialSerialExecutor =
+      SGF.B.createManagedOptionalNone(loc, executorOptTy);
+
+  // Build '.some(actorTy's serial executor)' as a '(Builtin.Executor)?' via
+  // the 'buildDefaultActorExecutorRef' builtin, for a default-actor 'actorMV'
+  // of type 'actorTy'
+  auto buildSomeDefaultActorExecutor = [&](ManagedValue actorMV,
+                                           Type actorTy) -> SILValue {
+    auto builtinID = ctx.getIdentifier(
+        getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
+    auto *builtinFn = getBuiltinValueDecl(ctx, builtinID);
+    auto subs = SubstitutionMap::get(
+        cast<FuncDecl>(builtinFn)->getGenericSignature(),
+        ArrayRef<Type>{actorTy}, LookUpConformanceInModule());
+    SILValue actorBorrowed = actorMV.borrow(SGF, loc).getValue();
+    SILValue exec = SGF.B.createBuiltin(
+        loc, builtinID, SILType::getPrimitiveObjectType(ctx.TheExecutorType),
+        subs, {actorBorrowed});
+    return SGF.B.createEnum(loc, exec, ctx.getOptionalSomeDecl(), executorOptTy);
+  };
+
+  // Set 'actorTy's serial executor as the task's initial serial executor.
+  // Only default actors are handled this way; custom executors fall back to
+  // no initial executor (no FIFO, still correct via the operation closure's
+  // own 'await'). Returns whether an executor was derived
+  auto deriveDefaultActorExecutor = [&](ManagedValue actorMV,
+                                        Type actorTy) -> bool {
+    auto *cd = actorTy ? actorTy->getClassOrBoundGenericClass() : nullptr;
+    if (!cd || !cd->isDefaultActor(SGF.SGM.SwiftModule,
+                                   SGF.F.getResilienceExpansion()))
+      return false;
+    SILValue someExec = buildSomeDefaultActorExecutor(actorMV, actorTy);
+    initialSerialExecutor =
+        ManagedValue::forObjectRValueWithoutOwnership(someExec);
+    return true;
+  };
+
+  // Like 'deriveDefaultActorExecutor', but for a distributed-actor 'actorMV':
+  // the local-vs-remote instance kind is only known at runtime, so emit a
+  // diamond that checks 'isRemote' and sets the initial serial executor to
+  // '.none' on the remote path (no local executor to enqueue on - the
+  // distributed thunk performs the 'remoteCall' itself) or
+  // '.some(<default executor>)' on the local path (matching the
+  // non-distributed actor-instance case above, so the task enqueues directly
+  // on the local actor). This deliberately never materializes a remote proxy's
+  // executor. NOTE: exact submission-order FIFO for a local distributed target
+  // additionally depends on the distributed thunk being
+  // 'nonisolated(nonsending)'; today's '@concurrent' thunk hops to the generic
+  // executor on entry (before its own 'isRemote' check), which can reorder a
+  // burst of 'nowait' sends. Enqueuing on the local executor here is correct
+  // and forward-compatible with that separately-tracked thunk change. Only
+  // default actors are handled this way, same as 'deriveDefaultActorExecutor'.
+  // Returns whether an executor was derived
+  auto deriveDistributedActorExecutor = [&](ManagedValue actorMV,
+                                            Type actorTy) -> bool {
+    auto *cd = actorTy ? actorTy->getClassOrBoundGenericClass() : nullptr;
+    if (!cd || !cd->isDefaultActor(SGF.SGM.SwiftModule,
+                                   SGF.F.getResilienceExpansion()))
+      return false;
+
+    auto *isRemoteBB = SGF.createBasicBlock();
+    auto *isLocalBB = SGF.createBasicBlock();
+    auto *contBB = SGF.createBasicBlock();
+
+    SGF.emitDistributedIfRemoteBranch(loc, actorMV.getValue(), actorTy,
+                                      /*if remote=*/isRemoteBB,
+                                      /*if local=*/isLocalBB);
+
+    SGF.B.emitBlock(isRemoteBB);
+    SILValue noneExec =
+        SGF.B.createManagedOptionalNone(loc, executorOptTy).forward(SGF);
+    SGF.B.createBranch(loc, contBB, noneExec);
+
+    SGF.B.emitBlock(isLocalBB);
+    SILValue someExec;
+    {
+      // Pop the borrow's cleanup before branching to 'contBB': a cleanup
+      // pushed on one arm of a diamond must not survive past the merge,
+      // since the merge block is not dominated by this arm alone
+      FullExpr borrowScope(SGF.Cleanups, CleanupLocation(loc));
+      someExec = buildSomeDefaultActorExecutor(actorMV, actorTy);
+    }
+    SGF.B.createBranch(loc, contBB, someExec);
+
+    SGF.B.emitBlock(contBB);
+    SILValue merged =
+        contBB->createPhiArgument(executorOptTy, OwnershipKind::None);
+    initialSerialExecutor = ManagedValue::forObjectRValueWithoutOwnership(merged);
+    return true;
+  };
+
+  // FIFO: when we can statically tell the target's serial executor, pass it
+  // as the task's initial serial executor above, so that successive 'nowait'
+  // calls enqueue on it in program order. Dig the underlying call out of the
+  // operation closure '{ try await <call> }' to find the target
+  if (auto *closure = dyn_cast<ClosureExpr>(E->getSubExpr())) {
+    if (Expr *body = closure->getSingleExpressionBody()) {
+      if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+        body = anyTry->getSubExpr();
+      if (auto *call = dyn_cast<ApplyExpr>(body->getSemanticsProvidingExpr())) {
+        bool done = false;
+
+        // (1) actor-instance target: the call's 'self' base is an actor
+        // instance referenced without side effects (safe to re-evaluate).
+        // For a distributed actor, the local-vs-remote instance kind is
+        // only known at runtime, so the initial serial executor is derived
+        // via a runtime 'isRemote' check (see 'deriveDistributedActorExecutor'
+        // above)
+        if (auto *selfApply = dyn_cast<SelfApplyExpr>(call->getFn())) {
+          Expr *selfExpr = selfApply->getBase();
+          Expr *selfSemantic =
+              selfExpr ? selfExpr->getSemanticsProvidingExpr() : nullptr;
+          if (selfSemantic && isa<DeclRefExpr>(selfSemantic)) {
+            Type selfTy = selfExpr->getType();
+            if (auto *nominal = selfTy ? selfTy->getAnyNominal() : nullptr) {
+              if (nominal->isActor()) {
+                ManagedValue actorMV = SGF.emitRValueAsSingleValue(selfExpr);
+                done = nominal->isDistributedActor()
+                           ? deriveDistributedActorExecutor(actorMV, selfTy)
+                           : deriveDefaultActorExecutor(actorMV, selfTy);
+              }
+            }
+          }
+        }
+
+        // (2) global-actor target: the callee is isolated to a global actor;
+        // enqueue on that global actor's shared instance's executor
+        if (!done) {
+          // The outer call's getCalledValue() is null for a method call; get
+          // the method from the inner 'self'-apply (the dot-syntax call)
+          ValueDecl *calleeVD =
+              call->getCalledValue(/*skipFunctionConversions=*/true);
+          if (!calleeVD) {
+            if (auto *selfApply = dyn_cast<SelfApplyExpr>(call->getFn()))
+              calleeVD =
+                  selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+          }
+          if (auto *callee = dyn_cast_or_null<AbstractFunctionDecl>(calleeVD)) {
+            auto isolation = swift::getActorIsolation(callee);
+            if (isolation.isMainActor()) {
+              // The main actor is a singleton with a dedicated builtin (it
+              // does not go through the default-actor executor scheme)
+              auto builtinID = ctx.getIdentifier(
+                  getBuiltinName(BuiltinValueKind::BuildMainActorExecutorRef));
+              SILValue exec = SGF.B.createBuiltin(
+                  loc, builtinID,
+                  SILType::getPrimitiveObjectType(ctx.TheExecutorType),
+                  SubstitutionMap(), {});
+              SILValue someExec = SGF.B.createEnum(
+                  loc, exec, ctx.getOptionalSomeDecl(), executorOptTy);
+              initialSerialExecutor =
+                  ManagedValue::forObjectRValueWithoutOwnership(someExec);
+            } else if (isolation.isGlobalActor()) {
+              Type gaTy =
+                  SGF.F.mapTypeIntoEnvironment(isolation.getGlobalActor());
+              auto shared = SGF.emitLoadOfGlobalActorShared(
+                  loc, gaTy->getCanonicalType());
+              deriveDefaultActorExecutor(shared.first, shared.second);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  ManagedValue taskGroup = SGF.B.createManagedOptionalNone(loc, rawPtrOptTy);
+  ManagedValue initialTaskExecutor =
+      SGF.B.createManagedOptionalNone(loc, executorOptTy);
+  ManagedValue initialTaskExecutorConsuming =
+      SGF.B.createManagedOptionalNone(loc, taskExecutorConsumingOptTy);
+  ManagedValue taskName = SGF.B.createManagedOptionalNone(loc, rawPtrOptTy);
+
+  SILValue builtinArgs[] = {
+      flags,
+      initialSerialExecutor.forward(SGF),
+      taskGroup.forward(SGF),
+      initialTaskExecutor.forward(SGF),
+      initialTaskExecutorConsuming.forward(SGF),
+      taskName.forward(SGF),
+      operationVal.forward(SGF),
+  };
+
+  auto resultTy = SGF.getLoweredType(getAsyncTaskAndContextType(ctx));
+  SILValue result = SGF.B.createBuiltin(loc, BuiltinNames::CreateAsyncTask,
+                                        resultTy, SubstitutionMap(),
+                                        builtinArgs);
+
+  // Fire-and-forget: drop our reference to the unstructured task
+  SGF.emitManagedRValueWithCleanup(result);
+
+  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {

@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/ASTPrinter.h"
 
 using namespace swift;
@@ -1293,6 +1294,57 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
 bool TypeChecker::checkDistributedFunc(FuncDecl *func) {
   return swift::checkDistributedFunction(func);
+}
+
+/// Whether 'func' is a stub the '@Resolvable' macro synthesized for a protocol
+/// requirement, in 'extension P where Self: _DistributedActorStub'. The stub
+/// copies the requirement's attributes, and the requirement itself is
+/// diagnosed, so diagnosing the stub again would only duplicate the error
+static bool isResolvableMacroStub(FuncDecl *func) {
+  auto *ext = dyn_cast<ExtensionDecl>(func->getDeclContext());
+  if (!ext || !isa_and_nonnull<ProtocolDecl>(ext->getExtendedNominal()))
+    return false;
+
+  auto *SF = ext->getParentSourceFile();
+  if (!SF || SF->getFulfilledMacroRole() != MacroRole::Extension)
+    return false;
+
+  auto *stubProto = func->getASTContext().get_DistributedActorStubDecl();
+  if (!stubProto)
+    return false;
+
+  for (auto req : ext->getGenericSignature().getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getProtocolDecl() == stubProto)
+      return true;
+  }
+  return false;
+}
+
+void TypeChecker::checkDistributedOnewayAvailability(FuncDecl *func) {
+  if (!func->isDistributed() || !func->isOneway() || func->isImplicit())
+    return;
+
+  // Embedded Swift has no OS availability, the runtime ships with the binary
+  auto &C = func->getASTContext();
+  if (C.LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  if (isResolvableMacroStub(func))
+    return;
+
+  // A pre-6.5 recipient's 'executeDistributedTarget' demangles the remote
+  // call target identifier to count its parameters, and the older demangler
+  // fails on the 'Yo' (oneway) operator. The 'Yo' must stay in the identifier
+  // because it tells 'f()' and 'f() oneway' apart, so require the runtime
+  // which understands it
+  TypeChecker::checkAvailability(
+      func->getLoc(), C.getDistributedOnewayFunctionAvailability(), func,
+      [&](AvailabilityDomain domain, AvailabilityRange range) {
+        return C.Diags.diagnose(func->getLoc(),
+                                diag::oneway_distributed_only_version_newer,
+                                func, domain, range);
+      });
 }
 
 ConstructorDecl*

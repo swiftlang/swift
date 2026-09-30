@@ -3147,6 +3147,15 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
       }
     }
 
+    // Prefer a 'oneway' function as the callee of a 'nowait' call, and a
+    // non-'oneway' function everywhere else, so that 'nowait x.f()' picks
+    // 'func f() oneway' and 'await x.f()' picks 'func f()'
+    if (auto *func = dyn_cast<FuncDecl>(decl)) {
+      if (getASTContext().LangOpts.hasFeature(Feature::OnewayNowait) &&
+          func->isOneway() != isNowaitCallee(locator))
+        increaseScore(SK_OnewayMismatch, locator);
+    }
+
     if (isa<SubscriptDecl>(decl)) {
       if (locator->isResultOfKeyPathDynamicMemberLookup() ||
           locator->isKeyPathSubscriptComponent()) {

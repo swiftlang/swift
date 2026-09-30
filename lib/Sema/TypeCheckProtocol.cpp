@@ -940,6 +940,18 @@ RequirementMatch swift::matchWitness(
       }
     }
 
+    // 'oneway' is part of the function's identity: a 'oneway' requirement is
+    // only witnessed by a 'oneway' function and a non-'oneway' requirement
+    // only by a non-'oneway' one, so that 'func f()' and 'func f() oneway'
+    // requirements each match their own overload
+    if (auto *reqFunc = dyn_cast<FuncDecl>(req)) {
+      if (auto *witnessFunc = dyn_cast<FuncDecl>(witness)) {
+        if (reqFunc->isOneway() != witnessFunc->isOneway())
+          return RequirementMatch(witness, MatchKind::TypeConflict,
+                                  witnessType);
+      }
+    }
+
     if (witnessFnType->hasExtInfo()) {
       // If the witness is 'async', the requirement must be.
       if (witnessFnType->getExtInfo().isAsync() &&

@@ -102,3 +102,121 @@ public func extractIsolation<each Arg, Result>(
   return Builtin.extractFunctionIsolation(fn)
 }
 #endif
+
+// ==== -----------------------------------------------------------------------
+// MARK: Fire-and-forget 'oneway' enqueue
+
+#if $Embedded
+/// Run `body(value)` on `executor` from a new discarding task, without
+/// waiting for it.
+///
+/// The task copies the task locals of the caller, inherits its priority the
+/// same way `Task.init` does, and starts on `executor`, so tasks enqueued on
+/// the same serial executor run in the order they were enqueued. The task's
+/// operation never suspends and never hops, so it has no async suspension
+/// points of its own.
+///
+/// `body` must be isolated to `executor`; this is not checked.
+///
+/// `Value` is class-constrained so that the task's operation captures it as
+/// a single direct reference. An unconstrained generic value would be
+/// captured indirectly, and the generic specializer would then need an async
+/// reabstraction thunk around the specialized operation, whose call into it
+/// is a suspension point of its own.
+///
+/// SPI: used by the compiler to lower fire-and-forget calls to synchronous
+/// `oneway` functions. Do not use
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+@unsafe
+public func _enqueueOnewayUnchecked<Value: AnyObject>(
+  on executor: UnownedSerialExecutor,
+  _ value: Value,
+  _ body: @escaping (Value) -> Void
+) {
+  // The operation below only ever runs on 'executor', after this function
+  // returned, and nothing else uses these values
+  nonisolated(unsafe) let capturedValue = value
+  nonisolated(unsafe) let capturedBody = body
+
+  // Starts on 'executor' (the task's initial serial executor) and must not
+  // hop off it: '@_unsafeInheritExecutor' suppresses the hop to the generic
+  // executor that a nonisolated async function would otherwise start with.
+  // It is 'throws' only to match the task operation type exactly, so that
+  // no reabstraction thunk (with its own suspension point) is needed
+  @_unsafeInheritExecutor
+  func _unsafeInheritExecutor_onewayOperation() async throws {
+    capturedBody(capturedValue)
+  }
+
+  let flags = taskCreateFlags(
+    priority: nil, isChildTask: false, copyTaskLocals: true,
+    inheritContext: false, enqueueJob: true,
+    addPendingGroupTaskUnconditionally: false,
+    isDiscardingTask: true, isSynchronousStart: false)
+  let builtinSerialExecutor: Builtin.Executor? = unsafe executor.executor
+
+  // Fire-and-forget: drop our reference to the task right away
+  _ = Builtin.createDiscardingTask(
+    flags: flags,
+    initialSerialExecutor: builtinSerialExecutor,
+    operation: _unsafeInheritExecutor_onewayOperation)
+}
+
+/// Run the synchronous `body` on `actor` from a new discarding task, without
+/// waiting for it.
+///
+/// The task copies the task locals of the caller and starts on the actor's
+/// executor, so calls enqueued on the same actor run in the order they were
+/// enqueued. See ``_enqueueOnewayUnchecked(on:_:_:)``.
+///
+/// SPI: used by the compiler to lower `nowait` calls to synchronous `oneway`
+/// actor methods. Do not use
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func _enqueueOneway<A: Actor>(
+  on actor: A,
+  _ body: @escaping (isolated A) -> Void
+) {
+  // The body only ever runs on the actor's executor, so it is safe to drop
+  // the 'isolated' from its parameter. An 'isolated' parameter is passed like
+  // any other, so both function types have the same representation.
+  // 'Builtin.reinterpretCast' converts the function value in place, where
+  // 'unsafeBitCast' would wrap it in two reabstraction thunks
+  let unisolatedBody: (A) -> Void = Builtin.reinterpretCast(body)
+  unsafe _enqueueOnewayUnchecked(
+    on: actor.unownedExecutor, actor, unisolatedBody)
+}
+
+/// Run the synchronous, global-actor-isolated `body` on its global actor from
+/// a new discarding task, without waiting for it.
+///
+/// The task copies the task locals of the caller and starts on the global
+/// actor's executor, so calls enqueued on the same global actor run in the
+/// order they were enqueued. See ``_enqueueOnewayUnchecked(on:_:_:)``.
+///
+/// SPI: used by the compiler to lower `nowait` calls to synchronous `oneway`
+/// global-actor-isolated functions. Do not use
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func _enqueueOnewayIsolated(
+  _ body: @escaping @isolated(any) () -> Void
+) {
+  guard let isolation = Builtin.extractFunctionIsolation(body) else {
+    fatalError("'oneway' call without an isolation to enqueue it on")
+  }
+  // The body only ever runs on its isolation's executor, so it is safe to
+  // call it as a plain synchronous function there. An '@isolated(any)'
+  // function value has the same representation as any other thick function:
+  // its isolation is stored inside the closure context, which the invocation
+  // function receives as usual, so dropping the '@isolated(any)' is a plain
+  // 'convert_function'. 'Builtin.reinterpretCast' converts the function value
+  // in place, where 'unsafeBitCast' would wrap it in two reabstraction thunks
+  let unisolatedBody: () -> Void = Builtin.reinterpretCast(body)
+  unsafe _enqueueOnewayUnchecked(
+    on: isolation.unownedExecutor, isolation as AnyObject
+  ) { _ in
+    unisolatedBody()
+  }
+}
+#endif // $Embedded

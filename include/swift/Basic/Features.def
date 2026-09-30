@@ -696,6 +696,14 @@ EXPERIMENTAL_FEATURE(TargetAttribute, true)
 /// Enable distributed actors in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 
+/// The trailing 'oneway' function modifier and the 'nowait' fire-and-forget
+/// call expression. 'oneway' marks a Void-returning actor or distributed method
+/// as fire-and-forget (no reply is awaited), and calls to it must be spelled
+/// with 'nowait'. 'nowait' runs a Void-returning call in a new discarding task.
+/// In Embedded Swift a 'nowait' call of a synchronous 'oneway' method is
+/// enqueued on the actor without any async code at the call site
+EXPERIMENTAL_FEATURE(OnewayNowait, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

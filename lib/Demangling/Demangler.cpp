@@ -1077,6 +1077,8 @@ NodePointer Demangler::demangleTypeAnnotation() {
     return createNode(Node::Kind::IsolatedAnyFunctionType);
   case 'b':
     return createNode(Node::Kind::ConcurrentFunctionType);
+  case 'o':
+    return createNode(Node::Kind::OnewayFunctionType);
   case 'c':
     return createWithChild(
         Node::Kind::GlobalActorFunctionType, popTypeAndGetChild());
@@ -1787,6 +1789,9 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   // sendable?
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
 
+  // oneway?
+  addChild(FuncType, popNode(Node::Kind::OnewayFunctionType));
+
   // async?
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
@@ -1851,6 +1856,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ConcurrentFunctionType)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::OnewayFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::AsyncAnnotation)

@@ -1467,6 +1467,11 @@ namespace {
       return CS.getType(expr->getSubExpr());
     }
 
+    Type visitNowaitExpr(NowaitExpr *expr) {
+      // 'nowait <call>' always produces Void
+      return CS.getASTContext().TheEmptyTupleType;
+    }
+
     Type visitForceTryExpr(AnyTryExpr *expr) {
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding |
