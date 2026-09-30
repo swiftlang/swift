@@ -434,7 +434,11 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     //   %3 = partial_apply %2(%1)      // re-abstraction
     //   apply %f(%3)
     // ```
-    if partialApply.isPartialApplyOfThunk {
+    // The thunk's partial_apply is cloned into the specialized function. 
+    // It may have substitutions that reference archetypes of the caller, bailout.
+    if partialApply.isPartialApplyOfThunk,
+       !partialApply.substitutionMap.replacementTypes.contains(where: { $0.hasArchetype })
+    {
       // Keep the recorded dependencies only if the thunk's argument provides the root closure;
       // otherwise the thunk's partial_apply itself is tried as the root, below.
       var argumentDependencies = [CapturedDependency]()
