@@ -1131,3 +1131,61 @@ bb0(%0 : @owned $AnyObject):
   return %r
 }
 
+// A reabstraction thunk is looked through to find the root closure, but the thunk's
+// partial_apply itself is still cloned into the specialized callee. If the thunk is
+// generic and specialized on an archetype of the caller (here: an opened existential),
+// the clone would reference an archetype whose definition stays in the caller.
+
+sil [ossa] @closure_body : $@convention(thin) () -> ()
+
+sil [reabstraction_thunk] [ossa] @generic_thunk : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [ossa] @take_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @opened_archetype_thunk :
+// CHECK:         [[T:%.*]] = function_ref @generic_thunk
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[T]]<@opened
+// CHECK:         [[F:%.*]] = function_ref @take_closure :
+// CHECK:         apply [[F]]([[PA]])
+// CHECK:       } // end sil function 'opened_archetype_thunk'
+sil [ossa] @opened_archetype_thunk : $@convention(thin) (@in_guaranteed any P) -> () {
+bb0(%0 : $*any P):
+  %1 = open_existential_addr immutable_access %0 : $*any P to $*@opened(1, any P) Self
+  %2 = function_ref @closure_body : $@convention(thin) () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = function_ref @generic_thunk : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<@opened(1, any P) Self>(%3) : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = function_ref @take_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %5 : $@noescape @callee_guaranteed () -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// A concrete substitution does not depend on the caller, so specializing is fine.
+// CHECK-LABEL: sil [ossa] @concrete_thunk :
+// CHECK:         [[F:%.*]] = function_ref @$s12take_closure0B5_bodyTf1c_n :
+// CHECK:         apply [[F]]()
+// CHECK:       } // end sil function 'concrete_thunk'
+sil [ossa] @concrete_thunk : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @closure_body : $@convention(thin) () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = function_ref @generic_thunk : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<S>(%3) : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = function_ref @take_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %5 : $@noescape @callee_guaranteed () -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
