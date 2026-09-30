@@ -74,6 +74,7 @@ add_library(swift_StringProcessing
   Utility/Protocols.swift
   Utility/TypeVerification.swift
   Utility/RegexFactory.swift
+  Utility/UndoableArray.swift
   Utility/ASTBuilder.swift)
 
 set_target_properties(swift_StringProcessing PROPERTIES
