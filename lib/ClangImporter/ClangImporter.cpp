@@ -8037,15 +8037,15 @@ StructDecl *
 ClangImporter::instantiateCXXClassTemplate(
     clang::ClassTemplateDecl *decl,
     ArrayRef<clang::TemplateArgument> arguments) {
-  void *InsertPos = nullptr;
-  auto *ctsd = decl->findSpecialization(arguments, InsertPos);
+  llvm::FoldingSetInsertToken InsertToken;
+  auto *ctsd = decl->findSpecialization(arguments, InsertToken);
   if (!ctsd) {
     ctsd = clang::ClassTemplateSpecializationDecl::Create(
         decl->getASTContext(), decl->getTemplatedDecl()->getTagKind(),
         decl->getDeclContext(), decl->getTemplatedDecl()->getBeginLoc(),
         decl->getLocation(), decl, arguments, /*StrictPackMatch*/ false,
         nullptr);
-    decl->AddSpecialization(ctsd, InsertPos);
+    decl->AddSpecialization(ctsd, InsertToken);
   }
 
   auto CanonType = decl->getASTContext().getCanonicalTagType(ctsd);
