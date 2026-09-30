@@ -1608,6 +1608,12 @@ MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
                       {stringParam("", "infos")},
                       MacroIntroducedDeclName::getArbitrary());
     break;
+  case BuiltinDerivedConformanceMacroKind::AdditiveArithmetic:
+    macro =
+        makeMacro("_deriveAdditiveArithmetic", "DeriveAdditiveArithmeticMacro",
+                  {stringParam("", "infos"), stringParam("", "req")},
+                  MacroIntroducedDeclName::getArbitrary());
+    break;
   case BuiltinDerivedConformanceMacroKind::NumKinds:
     llvm_unreachable("not a real kind");
   }
