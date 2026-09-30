@@ -36,7 +36,7 @@ func borrowedArg(_ n: borrowing NC) { useNC(n) }
 // Copying a Copyable field of a borrowed noncopyable value is permitted.
 // CHECK-LABEL: sil hidden {{.*}}@$s4main28consumeBorrowedCopyableFieldyyAA2NCVF :
 // CHECK:       [[K:%.*]] = struct_extract {{%.*}}, #NC.k
-// CHECK-NEXT:  [[C:%.*]] = copy_value [[K]]
+// CHECK:       [[C:%.*]] = copy_value [[K]]
 // CHECK:       apply {{%.*}}([[C]])
 // CHECK-NOT:   copy_value
 // CHECK-LABEL: } // end sil function '$s4main28consumeBorrowedCopyableFieldyyAA2NCVF'

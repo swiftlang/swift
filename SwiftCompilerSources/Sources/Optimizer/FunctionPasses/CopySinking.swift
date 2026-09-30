@@ -105,6 +105,24 @@ import SIL
 ///     end_borrow %1
 /// ```
 ///
+/// 5. Sinks a `copy_value` to its single use if the use is in the same block:
+///
+/// ```
+///   %1 = copy_value %0
+///   %2 = alloc_stack $T
+///   store %1 to [init] %2
+/// ```
+/// ->
+/// ```
+///   %2 = alloc_stack $T
+///   %1 = copy_value %0
+///   store %1 to [init] %2
+/// ```
+///
+/// This does the same as the non-OSSA RetainSinking pass, which moved a `retain_value` behind
+/// other instructions. It results in better LLVM code, for example LLVM's LICM can hoist loop
+/// invariant calls, like witness table accessors, over instructions which are not retains.
+///
 /// The optimization can be done if:
 /// * The `copy_value` or `load [copy]` has a single use.
 /// * The source operand has guaranteed ownership. In case 2 the source is a phi of the same block
@@ -143,6 +161,9 @@ let copySinking = FunctionPass(name: "copy-sinking") {
         }
       }
     }
+    if sinkCopiesToTheirUses(in: block, context) {
+      changed = true
+    }
     switch block.terminator {
     case let switchEnum as SwitchEnumInst:
       if trySinkCopiesOver(terminator: switchEnum, context) {
@@ -162,6 +183,47 @@ let copySinking = FunctionPass(name: "copy-sinking") {
 
   if changed {
     updateBorrowedFrom(in: function, context)
+  }
+}
+
+private func sinkCopiesToTheirUses(in block: BasicBlock, _ context: FunctionPassContext) -> Bool {
+  var changed = false
+  // Iterate in reverse order, so that moving a copy doesn't affect the iteration.
+  for inst in block.instructions.reversed() {
+    if let copy = inst as? CopyValueInst,
+       let use = copy.uses.singleUse,
+       use.instruction.parentBlock == block,
+       use.instruction != copy.next,
+       sourceIsAlive(of: copy, until: use.instruction, context)
+    {
+      copy.move(before: use.instruction, context)
+      changed = true
+    }
+  }
+  return changed
+}
+
+/// Returns true if the source of `copy` is still alive at `endInstruction` which is located
+/// in the same block as `copy`.
+private func sourceIsAlive(of copy: CopyValueInst, until endInstruction: Instruction,
+                           _ context: FunctionPassContext) -> Bool
+{
+  let source = copy.fromValue
+  switch source.ownership {
+  case .owned:
+    for inst in InstructionList(first: copy.next!) {
+      if inst == endInstruction {
+        return true
+      }
+      if inst.operands.contains(where: { $0.value == source && $0.endsLifetime }) {
+        return false
+      }
+    }
+    fatalError("endInstruction not in the same block as copy")
+  case .guaranteed:
+    return isContainedInBorrowScope(from: copy, to: endInstruction, context)
+  case .none, .unowned:
+    return false
   }
 }
 
