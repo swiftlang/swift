@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+echo "Instruction, Pass Name, Count"
+
+awk '
+BEGIN { FS = ", "; OFS = ", " }
+$1 == "function" && $2 == "missing_salvage" { stats[$8 OFS $4] += $6 }
+END { for (k in stats) print k, stats[k] }
+' "$@" | sort -t, -k3 -rn
