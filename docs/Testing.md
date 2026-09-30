@@ -23,8 +23,6 @@ We use multiple approaches to test the Swift toolchain.
   locally before committing.  (Usually on a single platform, and not necessarily
   all tests.)
 * Buildbots run all tests, on all supported platforms.
-  [Smoke testing](ContinuousIntegration.md#smoke-testing)
-  skips the iOS, tvOS, and watchOS platforms.
 
 ### Testsuite subsets
 
