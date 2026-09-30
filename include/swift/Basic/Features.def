@@ -548,6 +548,9 @@ EXPERIMENTAL_FEATURE(CxxImplementation, true)
 /// Allow a Swift class to subclass a C++ foreign reference type.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 
+/// Enable C++ existential wrappers for Swift protocol types.
+EXPERIMENTAL_FEATURE(CxxExistentialInterop, false)
+
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
 // * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp
