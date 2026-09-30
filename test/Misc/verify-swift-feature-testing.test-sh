@@ -34,6 +34,7 @@ EXCEPTIONAL_FILES = [
     # Uses the pseudo-feature CodeGenerationModel=
     pathlib.Path("test/Frontend/code-generation-model-feature.swift"),
     pathlib.Path("test/embedded/arc-opt-runtime-helpers.swift"),
+    pathlib.Path("test/embedded/linkage/associated_conformance_specialized_witness_table.swift"),
     pathlib.Path("test/embedded/linkage/c.swift"),
     pathlib.Path("test/embedded/linkage/cxx.swift"),
     pathlib.Path("test/embedded/linkage/diamond.swift"),
@@ -44,6 +45,7 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/embedded/linkage/interface.swift"),
     pathlib.Path("test/embedded/linkage/leaf_application.swift"),
     pathlib.Path("test/embedded/linkage/silgen_name_var_interface_emission.swift"),
+    pathlib.Path("test/embedded/linkage/sugared_associated_conformance_witness_table.swift"),
     pathlib.Path("test/embedded/serialization.swift"),
     # Uses a script that hides usage of the CoroutineAccessor feature.
     pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
