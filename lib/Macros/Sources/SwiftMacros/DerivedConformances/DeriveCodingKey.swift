@@ -57,7 +57,7 @@ enum CodingKeyWitness: TypeInfoProtocol {
 
   static func fromSyntax(node: ExprSyntax) throws -> CodingKeyWitness {
     switch node.trimmedDescription {
-    case "`init`", "init": return .`init`
+    case "init": return .`init`
     case "valueVar": return .valueVar
     default:
       fatalError(
