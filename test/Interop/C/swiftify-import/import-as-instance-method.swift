@@ -108,7 +108,7 @@ module Instance {
 @__swiftmacro_So1AV5basic15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public mutating func basic(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -123,7 +123,7 @@ public mutating func basic(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So5basic15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.basic(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.basic(self:_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -138,7 +138,7 @@ public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So1AV3bar15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public mutating func bar(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -153,7 +153,7 @@ public mutating func bar(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So7renamed15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.bar(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.bar(self:_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -168,7 +168,7 @@ public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>)
 @__swiftmacro_So1AV9constSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func constSelf(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -183,7 +183,7 @@ public func constSelf(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So9constSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.constSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.constSelf(self:_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -198,7 +198,7 @@ public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So1AV7valSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func valSelf(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -213,7 +213,7 @@ public func valSelf(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So7valSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.valSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.valSelf(self:_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func valSelf(_ a: A, _ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -228,7 +228,7 @@ public func valSelf(_ a: A, _ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So1AV17lifetimeBoundSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
 public func lifetimeBoundSelf(_ len: CInt) -> MutableSpan<CInt> {
     let _resultValue: UnsafeMutablePointer<CInt>? = unsafe lifetimeBoundSelf(len)
     if unsafe _resultValue == nil {
@@ -241,7 +241,7 @@ public func lifetimeBoundSelf(_ len: CInt) -> MutableSpan<CInt> {
 @__swiftmacro_So17lifetimeBoundSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.lifetimeBoundSelf(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow a) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.lifetimeBoundSelf(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow a) @_disfavoredOverload
 public func lifetimeBoundSelf(_ a: A, _ len: CInt) -> MutableSpan<CInt> {
     let _resultValue: UnsafeMutablePointer<CInt>? = unsafe lifetimeBoundSelf(a, len)
     if unsafe _resultValue == nil {
@@ -254,7 +254,7 @@ public func lifetimeBoundSelf(_ a: A, _ len: CInt) -> MutableSpan<CInt> {
 @__swiftmacro_So1CV7refSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public final func refSelf(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -269,7 +269,7 @@ public final func refSelf(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So7refSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "C.refSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "C.refSelf(self:_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func refSelf(_ c: C!, _ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -284,7 +284,7 @@ public func refSelf(_ c: C!, _ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So4DRefa7refSelf15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public final func refSelf(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -299,7 +299,7 @@ public final func refSelf(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So9refSelfCF15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "D.refSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "D.refSelf(self:_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func refSelfCF(_ d: D!, _ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -314,7 +314,7 @@ public func refSelfCF(_ d: D!, _ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So1BV11nonescaping15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func nonescaping(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -329,7 +329,7 @@ public func nonescaping(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So1BV24nonescapingLifetimebound15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(&self) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(&self) @_disfavoredOverload
 public mutating func nonescapingLifetimebound(_ len: CInt) -> MutableSpan<CInt> {
     let _resultValue: UnsafeMutablePointer<CInt>? = unsafe nonescapingLifetimebound(len)
     if unsafe _resultValue == nil {
@@ -342,7 +342,7 @@ public mutating func nonescapingLifetimebound(_ len: CInt) -> MutableSpan<CInt> 
 @__swiftmacro_So1AV4init15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public /*not inherited*/ init!(pointerA p: UnsafeMutableBufferPointer<CInt>) {
     let len = CInt(exactly: p.count)!
     unsafe self.init(countA: len, pointerA: p.baseAddress)
@@ -351,7 +351,7 @@ public /*not inherited*/ init!(pointerA p: UnsafeMutableBufferPointer<CInt>) {
 @__swiftmacro_So7createA15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.init(countA:pointerA:)") @_alwaysEmitIntoClient @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.init(countA:pointerA:)") @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func createA(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<A>! {
     let len = CInt(exactly: p.count)!
     return unsafe createA(len, p.baseAddress)
@@ -360,7 +360,7 @@ public func createA(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePoint
 @__swiftmacro_So1AV4init15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public /*not inherited*/ init!(pointerA2 p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -375,7 +375,7 @@ public /*not inherited*/ init!(pointerA2 p: inout MutableSpan<CInt>) {
 @__swiftmacro_So8createA215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "A.init(countA2:pointerA2:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "A.init(countA2:pointerA2:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func createA2(_ p: inout MutableSpan<CInt>) -> UnsafeMutablePointer<A>! {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
@@ -390,7 +390,7 @@ public func createA2(_ p: inout MutableSpan<CInt>) -> UnsafeMutablePointer<A>! {
 @__swiftmacro_So1CV4init15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public /*not inherited*/ final convenience init!(pointerC p: UnsafeMutableBufferPointer<CInt>) {
     let len = CInt(exactly: p.count)!
     unsafe self.init(countC: len, pointerC: p.baseAddress)
@@ -399,7 +399,7 @@ public /*not inherited*/ final convenience init!(pointerC p: UnsafeMutableBuffer
 @__swiftmacro_So7createC15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "C.init(countC:pointerC:)") @_alwaysEmitIntoClient @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "C.init(countC:pointerC:)") @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func createC(_ p: UnsafeMutableBufferPointer<CInt>) -> C! {
     let len = CInt(exactly: p.count)!
     return unsafe createC(len, p.baseAddress)
@@ -408,7 +408,7 @@ public func createC(_ p: UnsafeMutableBufferPointer<CInt>) -> C! {
 @__swiftmacro_So7createD15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(swift, obsoleted: 3, renamed: "D.init(countD:pointerD:)") @_alwaysEmitIntoClient @_disfavoredOverload
+@available(swift, obsoleted: 3, renamed: "D.init(countD:pointerD:)") @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func createD(_ p: UnsafeMutableBufferPointer<CInt>) -> Unmanaged<D>! {
     let len = CInt(exactly: p.count)!
     return unsafe createD(len, p.baseAddress)

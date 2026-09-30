@@ -39,7 +39,7 @@ public func impNullableSpan(p: OpaquePointer!, _ size: CInt) -> OpaquePointer! {
 @__swiftmacro_4test29nonnullUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func nonnullUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer {
     return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(unsafe nonnullUnsafeRawBufferPointer(size)), count: Int(size))
 }
@@ -47,7 +47,7 @@ public func nonnullUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointe
 @__swiftmacro_4test30nullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer? {
     let _resultValue = unsafe nullableUnsafeRawBufferPointer(size)
     if unsafe _resultValue == nil {
@@ -59,7 +59,7 @@ public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPoint
 @__swiftmacro_4test33impNullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func impNullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer {
     return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(unsafe impNullableUnsafeRawBufferPointer(size)), count: Int(size))
 }
@@ -67,7 +67,7 @@ public func impNullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPo
 @__swiftmacro_4test11nonnullSpan15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_disfavoredOverload
 public func nonnullSpan(p: RawSpan) -> RawSpan {
     let size = CInt(exactly: p.byteCount)!
     let _pPtr = p.withUnsafeBytes {
@@ -82,7 +82,7 @@ public func nonnullSpan(p: RawSpan) -> RawSpan {
 @__swiftmacro_4test12nullableSpan15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_disfavoredOverload
 public func nullableSpan(p: RawSpan?) -> RawSpan? {
     let size = CInt(exactly: p?.byteCount ?? 0)!
     let _pPtr = p?.withUnsafeBytes {
@@ -101,7 +101,7 @@ public func nullableSpan(p: RawSpan?) -> RawSpan? {
 @__swiftmacro_4test15impNullableSpan15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_disfavoredOverload
 public func impNullableSpan(p: RawSpan) -> RawSpan {
     let size = CInt(exactly: p.byteCount)!
     let _pPtr = p.withUnsafeBytes {
