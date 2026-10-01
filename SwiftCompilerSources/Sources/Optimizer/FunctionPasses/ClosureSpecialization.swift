@@ -389,7 +389,21 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
      !callee.mayBindDynamicSelf,
 
      // Don't support self-recursive functions because that would result in duplicate mapping of values when cloning.
-     callee != apply.parentFunction
+     callee != apply.parentFunction,
+
+     // Avoid an infinite specialization loop: if a closure is called and also captured in another
+     // closure which is passed to a recursive call, each specialization of the callee contains a call
+     // which can be specialized again, with even more propagated closures. E.g.
+     //
+     //   func foo(_ c: @escaping () -> ()) {
+     //     c()
+     //     foo({ c() })
+     //   }
+     //
+     // Note that specializing nested closures in multiple rounds legitimately creates closure
+     // specializations of closure specializations, e.g. three levels in closure_specialization_nested.sil.
+     // A limit of 2 for the callee is good enough and will not be exceeded in "regular" optimization scenarios.
+     callee.closureSpecializationLevel <= 2
   {
     return true
   }

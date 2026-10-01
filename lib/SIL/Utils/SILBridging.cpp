@@ -362,6 +362,49 @@ SwiftInt BridgedFunction::specializationLevel() const {
   return getSpecializationLevelRecursive(getFunction()->getName(), demangler);
 }
 
+SwiftInt BridgedFunction::closureSpecializationLevel() const {
+  using namespace Demangle;
+  Demangle::StackAllocatedDemangler<1024> demangler;
+
+  // Count the function signature specializations which propagate closures:
+  //
+  // kind=Global
+  //   kind=FunctionSignatureSpecialization     // a closure specialization ...
+  //     kind=SpecializationPassID
+  //     kind=FunctionSignatureSpecializationParam
+  //       kind=FunctionSignatureSpecializationParamKind, index=5   // ClosureProp
+  //       ...
+  //   kind=FunctionSignatureSpecialization     // ... of a closure specialization
+  //     ...
+  //   kind=Function                            // ... of the original function
+  //
+  Node *root = demangler.demangleSymbol(getFunction()->getName());
+  if (!root || root->getKind() != Node::Kind::Global)
+    return 0;
+
+  SwiftInt level = 0;
+  for (Node *spec : *root) {
+    if (spec->getKind() != Node::Kind::FunctionSignatureSpecialization)
+      continue;
+    for (Node *param : *spec) {
+      if (param->getKind() != Node::Kind::FunctionSignatureSpecializationParam ||
+          param->getNumChildren() == 0)
+        continue;
+      Node *kindNd = param->getFirstChild();
+      if (kindNd->getKind() !=
+          Node::Kind::FunctionSignatureSpecializationParamKind)
+        continue;
+      auto kind = FunctionSigSpecializationParamKind(kindNd->getIndex());
+      if (kind == FunctionSigSpecializationParamKind::ClosureProp ||
+          kind == FunctionSigSpecializationParamKind::EscapingClosureProp) {
+        ++level;
+        break;
+      }
+    }
+  }
+  return level;
+}
+
 bool BridgedFunction::isAutodiffVJP() const {
   enum class AutoDiffFunctionComponent : char { JVP = 'f', VJP = 'r' };
 
