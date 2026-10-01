@@ -29,6 +29,8 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 
+#include <optional>
+
 namespace llvm {
 class Triple;
 }
@@ -57,10 +59,19 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
+  /// True when this module's SIL is lowered into a single LLVM module
+  /// (WMO, or a single-file module), false when each source file's
+  /// SIL is lowered into its own LLVM module by a separate
+  /// `-primary-file` job. std::nullopt when there's no
+  /// IRGenModule/SILModule to ask and it doesn't matter (e.g. TBDGen
+  /// only cares about the exported symbols).
+  std::optional<bool> IsWholeModule;
+
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isStaticLibrary);
+                       bool forcePublicDecls, bool isStaticLibrary,
+                       std::optional<bool> isWholeModule);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -78,6 +89,9 @@ public:
   /// expression's context. This flag ensures that private accessors are
   /// forward-declared as public external in the expression's module.
   bool forcePublicDecls() const { return ForcePublicDecls; }
+
+  /// See IsWholeModule.
+  std::optional<bool> isWholeModule() const { return IsWholeModule; }
 };
 
 /// Selector for type metadata symbol kinds.
@@ -1801,6 +1815,10 @@ public:
   }
   bool isNominalTypeDescriptor() const {
     return getKind() == Kind::NominalTypeDescriptor;
+  }
+  bool isTypeMetadataAddressPoint() const {
+    return getKind() == Kind::TypeMetadata &&
+           getMetadataAddress() == TypeMetadataAddress::AddressPoint;
   }
 
   /// Determine whether this entity will be weak-imported.
