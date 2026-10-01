@@ -158,11 +158,6 @@ struct ResolvableRoot {
     }
 
     extraLivenessUses = extraUses
-
-    // Currently, trivial values have no lifetime information.
-    guard !address.type.objectType.isTrivial(in: function) else {
-      return nil
-    }
   }
 
   // Change the storage such that it indicates a dynamic lifetime.
@@ -872,8 +867,10 @@ private struct Resolver {
           } else {
             addUse(.use(address, .own), range)
           }
-        default:
-          fatalError("unexpected load: \(load)")
+        case .trivial:
+          // We cannot meaningfully transform `load [trivial]` into a take or copy, as it currently has no ownership.
+          // Treat it as a generic use.
+          addUse(.unknown(load), range)
         }
       case let store as StoringInstruction where store.destination == address.value:
         addUse(.def(address), range)

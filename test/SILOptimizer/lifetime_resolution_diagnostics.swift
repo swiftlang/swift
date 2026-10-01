@@ -312,6 +312,31 @@ func tupleElementUseAfterConsume() {
   use(t.1)          // valid: distinct element
 }
 
+func trivialUseBeforeInit() {
+  var t: (Int, Int)  // expected-note {{variable defined here}}
+  t.0 = 1
+  _ = t.1  // expected-error {{variable 't' used before being initialized}}
+  _ = t.0
+
+
+  var control_flow: Int  // expected-note {{variable defined here}}
+  if .random() {
+    control_flow = 1
+  }
+  _ = control_flow  // expected-error {{variable 'control_flow' used before being initialized}}
+
+
+  let deferredLet: Int  // expected-note {{constant defined here}}
+  if .random() { deferredLet = 1 }
+  _ = 1 + deferredLet  // expected-error {{constant 'deferredLet' used before being initialized}}
+
+  // Until we have lifetimes for trivial types, we should expect a warning for any consumes
+  var x: Int
+  x = 5
+  _ = consume x  // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
+  _ = x
+}
+
 // FIXME: this case is still missing diagnostics! (rdar://188752216)
 func consumeCopyableFields() {
   let p = Pair(a: C(), b: C())
