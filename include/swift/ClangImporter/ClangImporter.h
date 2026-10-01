@@ -50,6 +50,7 @@ namespace clang {
   class DiagnosticConsumer;
   class EnumConstantDecl;
   class EnumDecl;
+  class LangOptions;
   class MacroInfo;
   class Module;
   class ModuleMacro;
@@ -824,6 +825,13 @@ public:
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
+
+  /// Whether this is the native throwing facade of a C++ exception adapter.
+  bool isCxxExceptionBridge(const FuncDecl *decl) const;
+
+  /// Recover either half of a generated exception bridge for serialization.
+  FuncDecl *getCxxExceptionBridgeAdapter(const FuncDecl *facade) const;
+  FuncDecl *getCxxExceptionBridgeFacade(const FuncDecl *adapter) const;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -930,8 +938,11 @@ bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 /// Within a translation unit a swift_attr propagates to later redeclarations
 /// only, and a chain assembled across modules is not merged at all, so an
 /// attribute is not necessarily visible on the declaration at hand.
-bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+bool hasSwiftAttributeOnAnyRedecl(const clang::Decl *decl,
                                   ArrayRef<StringRef> attrs);
+
+/// Whether any declaration of \p decl is annotated with SWIFT_THROWS.
+bool hasCxxThrowsAttr(const clang::FunctionDecl *decl);
 
 /// Whether the given Clang record is imported as a foreign reference type,
 /// including when it has no definition. Accounts for inherited reference-ness
@@ -1077,6 +1088,12 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
+
+/// Returns why this compilation cannot import SWIFT_THROWS functions as
+/// throwing, or an empty string if it can.
+StringRef
+getCxxExceptionBridgingUnavailableReason(const LangOptions &langOpts,
+                                         const clang::LangOptions &clangOpts);
 
 /// Determines the ownership convention of functions that return libkern's
 /// OSObject or one of its subclasses.
