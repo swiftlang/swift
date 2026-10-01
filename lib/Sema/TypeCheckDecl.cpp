@@ -1140,6 +1140,9 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 /// Given the raw value literal expression for an enum case, produces the
 /// auto-incremented raw value for the subsequent case, or returns null if
 /// the value is not auto-incrementable.
+///
+/// The literal is implicit, but takes the case's location, so that a
+/// diagnostic about the value has somewhere to point.
 static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
                                              EnumElementDecl *forElt,
                                              LiteralExpr *prevValue) {
@@ -1151,13 +1154,13 @@ static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
     return nullptr;
 
   case AutomaticEnumValueKind::String:
-    return new (Ctx) StringLiteralExpr(forElt->getNameStr(), SourceLoc(),
+    return new (Ctx) StringLiteralExpr(forElt->getNameStr(), forElt->getLoc(),
                                               /*Implicit=*/true);
 
   case AutomaticEnumValueKind::Integer:
     // If there was no previous value, start from zero.
     if (!prevValue) {
-      return new (Ctx) IntegerLiteralExpr("0", SourceLoc(),
+      return new (Ctx) IntegerLiteralExpr("0", forElt->getLoc(),
                                                  /*Implicit=*/true);
     }
 
@@ -1340,9 +1343,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     // Using magic literals like #file as raw value is not supported right now.
     // TODO: We could potentially support #file, #function, #line and #column.
     auto &Diags = ED->getASTContext().Diags;
-    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
-                            ? elt->getLoc()
-                            : uncheckedRawValueOf(elt)->getLoc();
+    SourceLoc diagLoc = uncheckedRawValueOf(elt)->getLoc();
 
     // Only Integer/Float/String/Bool literals can serve as raw values. Reject
     // any other literal here.
@@ -1371,8 +1372,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
 
     RawValueSource prevSource = insertIterPair.first->second;
     auto foundElt = prevSource.sourceElt;
-    diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
-        ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
+    diagLoc = uncheckedRawValueOf(foundElt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
 
     if (foundElt != prevSource.lastExplicitValueElt &&
