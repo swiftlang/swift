@@ -1006,7 +1006,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
   // The VJP (and the pullback nested in it) is generated after AddressLowering
   // in lowered-address form, so it shares the original's lowered state.
-  vjp->setHasLoweredAddresses(original->hasLoweredAddresses());
+  vjp->inheritDerivedFrom(original);
 
   if (original->getInlineStrategy() == AlwaysInline ||
       original->getInlineStrategy() == HeuristicAlwaysInline)
@@ -1058,7 +1058,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   // The JVP (and the differential nested in it) is generated after
   // AddressLowering in lowered-address form, so it shares the original's
   // lowered state.
-  jvp->setHasLoweredAddresses(original->hasLoweredAddresses());
+  jvp->inheritDerivedFrom(original);
 
   if (original->getInlineStrategy() == AlwaysInline ||
       original->getInlineStrategy() == HeuristicAlwaysInline)
