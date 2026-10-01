@@ -134,7 +134,7 @@ public struct DeriveCodingKeyMacro: DeclarationMacro {
       // If we can't use the raw value path for a string argument, then we match against
       // the enum elements names.
       let cases = enumInfo.cases.compactMap { c -> String? in
-        guard let guards = c.constructionGuards() else { return nil }
+        guard let guards = c.constructionGuards else { return nil }
         let body = (guards + ["self = .\(c.name)"]).joined(separator: "\n  ")
         return
           """
