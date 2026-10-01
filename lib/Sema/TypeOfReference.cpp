@@ -2096,8 +2096,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     }
   }
 
-  // Member type could be `@called(once)` if the method is consuming and base is
-  // non-Copyable.
+  // Member type could be `@called(atMostOnce)` if the method is consuming and
+  // base is non-Copyable.
   if (Context.LangOpts.hasFeature(Feature::CalledAttribute)) {
     if (auto *method = dyn_cast<FuncDecl>(value);
         method && method->isInstanceMethod() && method->getSelfAccessKind() == SelfAccessKind::Consuming) {

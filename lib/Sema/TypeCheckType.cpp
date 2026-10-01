@@ -4289,7 +4289,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(once) is consuming by default and we don't
+      // @called(atMostOnce) is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;
@@ -4810,7 +4810,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         parsedClangFunctionType = nullptr;
       }
 
-      if (!repr->isInvalid() && called->isOnce())
+      if (!repr->isInvalid() && called->isAtMostOnce())
         isCalledOnce = true;
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
@@ -5075,7 +5075,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
   bool isCalledOnce = false;
   if (auto *called = claim<CalledTypeAttr>(attrs)) {
-    isCalledOnce = called->isOnce();
+    isCalledOnce = called->isAtMostOnce();
   }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
@@ -5777,7 +5777,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        // `@called(once)` functions always have consuming semantics
+        // `@called(atMostOnce)` functions always have consuming semantics
         // regardless of whether they are @escaping or not.
         if (fnTy->isCalledOnce())
           break;

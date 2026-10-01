@@ -21,21 +21,21 @@ struct Box: ~Copyable {
 
 func sendAgain(_ ns: sending NS) {}
 
-func calledOnce(_: @called(once) () -> Void) {}
+func calledAtMostOnce(_: @called(atMostOnce) () -> Void) {}
 func manyTimes(_: () -> Void) {}
 
-struct CalledOnceTask {
-  init(_ ns: @called(once) () -> Void) {}
+struct CalledAtMostOnceTask {
+  init(_ ns: @called(atMostOnce) () -> Void) {}
 }
 
 func testBasic(_ ns: sending NS) {
-  _ = CalledOnceTask { [sending ns] in
+  _ = CalledAtMostOnceTask { [sending ns] in
     sendAgain(ns)
   }
 }
 
 func testDoubleSend(_ ns: sending NS) {
-  _ = CalledOnceTask { @called(once) [sending ns] in
+  _ = CalledAtMostOnceTask { @called(atMostOnce) [sending ns] in
     sendAgain(ns)
     // expected-error@-1 {{sending 'ns' risks causing data races}}
     // expected-note@-2 {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
@@ -44,23 +44,23 @@ func testDoubleSend(_ ns: sending NS) {
 }
 
 func testMultipleSendingCaptures(_ ns1: sending NS, _ ns2: sending NS) {
-  _ = CalledOnceTask { @called(once) [sending ns1, sending ns2] in
+  _ = CalledAtMostOnceTask { @called(atMostOnce) [sending ns1, sending ns2] in
     sendAgain(ns1)
     sendAgain(ns2)
   }
 }
 
 func testMixedSendingAndOrdinary(_ ns1: sending NS, x: Int) {
-  _ = CalledOnceTask { @called(once) [sending ns1] in
+  _ = CalledAtMostOnceTask { @called(atMostOnce) [sending ns1] in
     print(x)
     sendAgain(ns1)
   }
 }
 
-func testNestedRejectedThroughNonCalledOnceIntermediate(ns1: sending NS) {
-  let _: @called(once) () -> Void = {
+func testNestedRejectedThroughNonCalledAtMostOnceIntermediate(ns1: sending NS) {
+  let _: @called(atMostOnce) () -> Void = {
     manyTimes {
-      calledOnce { [sending ns1] in
+      calledAtMostOnce { [sending ns1] in
         sendAgain(ns1)
         // expected-error@-1 {{sending 'ns1' risks causing data races}}
         // expected-note@-2 {{'ns1' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
@@ -68,9 +68,9 @@ func testNestedRejectedThroughNonCalledOnceIntermediate(ns1: sending NS) {
     }
   }
 
-  let _: @called(once) () -> Void = { [sending ns1] in
+  let _: @called(atMostOnce) () -> Void = { [sending ns1] in
     manyTimes {
-      calledOnce { [sending ns1] in
+      calledAtMostOnce { [sending ns1] in
         sendAgain(ns1)
         // expected-error@-1 {{sending 'ns1' risks causing data races}}
         // expected-note@-2 {{'ns1' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
@@ -80,16 +80,16 @@ func testNestedRejectedThroughNonCalledOnceIntermediate(ns1: sending NS) {
 }
 
 func testNestedAcceptedWithExplicitChain(ns1: sending NS) {
-  let _: @called(once) () -> Void = { [sending ns1] in
-    calledOnce { [sending ns1] in
+  let _: @called(atMostOnce) () -> Void = { [sending ns1] in
+    calledAtMostOnce { [sending ns1] in
       sendAgain(ns1)
     }
   }
 }
 
-func testOuterCalledOnceAloneIsNotEnough(ns1: sending NS) {
-  let _: @called(once) () -> Void = {
-    calledOnce { [sending ns1] in
+func testOuterCalledAtMostOnceAloneIsNotEnough(ns1: sending NS) {
+  let _: @called(atMostOnce) () -> Void = {
+    calledAtMostOnce { [sending ns1] in
       sendAgain(ns1)
       // expected-error@-1 {{sending 'ns1' risks causing data races}}
       // expected-note@-2 {{'ns1' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
@@ -100,7 +100,7 @@ func testOuterCalledOnceAloneIsNotEnough(ns1: sending NS) {
 func testConsumingWithUseAfterIndirectSend(_ ns: sending NS) {
   let box = Box(ns)
 
-  _ = CalledOnceTask { [sending box] in // expected-error {{sending 'box' risks causing data races}} expected-note {{'box' used after being passed as a 'sending' parameter; Later uses could race}}
+  _ = CalledAtMostOnceTask { [sending box] in // expected-error {{sending 'box' risks causing data races}} expected-note {{'box' used after being passed as a 'sending' parameter; Later uses could race}}
       let ns = box.takeNS()
       sendAgain(ns)
   }
@@ -109,12 +109,12 @@ func testConsumingWithUseAfterIndirectSend(_ ns: sending NS) {
 }
 
 // Make sure that each PartitionOpError kind is exercised through a
-// `@called(once)` closure with a `sending` capture. The goal here is not to
+// `@called(atMostOnce)` closure with a `sending` capture. The goal here is not to
 // pin exact wording (that's covered above) but to make sure each emitter
 // produces *some* real diagnostic for this SIL shape rather than falling
 // through to `emitUnknownPatternError`/`RegionIsolationUnknownPattern`.
 
-actor CalledOnceActor {
+actor CalledAtMostOnceActor {
   var ns = NS()
   func makeNS() -> NS { NS() }
 }
@@ -125,27 +125,27 @@ actor CalledOnceActor {
 
 // SentNeverSendable: sending an actor-isolated capture (`ns` here resolves
 // to `self.ns`, captured while already inside the actor-isolated method).
-extension CalledOnceActor {
+extension CalledAtMostOnceActor {
   func testSentNeverSendableActorIsolatedCapture() {
-    _ = CalledOnceTask { [sending ns] in
+    _ = CalledAtMostOnceTask { [sending ns] in
       sendAgain(ns) // expected-error {{sending 'self.ns' risks causing data races}} expected-note {{'self'-isolated 'self.ns' is captured by a nonisolated closure. nonisolated uses in closure may race against later actor-isolated uses}}
     }
   }
 }
 
-// AssignNeverSendableIntoSendingResult: a `@called(once)` closure with a
+// AssignNeverSendableIntoSendingResult: a `@called(atMostOnce)` closure with a
 // `sending` result, returning a captured value that was never itself sent.
-func calledOnceResult(_ f: @escaping @called(once) () -> sending NS) {}
+func calledAtMostOnceResult(_ f: @escaping @called(atMostOnce) () -> sending NS) {}
 
 func testAssignNeverSendableIntoSendingResult(ns: NS) {
-  calledOnceResult { ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' cannot be a 'sending' result. Code in the current task may race with caller uses}}
+  calledAtMostOnceResult { ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' cannot be a 'sending' result. Code in the current task may race with caller uses}}
 }
 
-// NonSendableIsolationCrossingResult: inside a `@called(once)` closure with
+// NonSendableIsolationCrossingResult: inside a `@called(atMostOnce)` closure with
 // a `sending` capture, an isolation-crossing call (actor -> @concurrent)
 // returns a non-Sendable result.
-func testNonSendableIsolationCrossingResult(a: CalledOnceActor) async {
-  _ = CalledOnceTask { [sending a] in
+func testNonSendableIsolationCrossingResult(a: CalledAtMostOnceActor) async {
+  _ = CalledAtMostOnceTask { [sending a] in
     Task {
       let ns = await a.makeNS() // expected-error {{non-Sendable 'NS'-typed result can not be returned from actor-isolated instance method 'makeNS()' to @concurrent context}}
       print(ns)
@@ -156,7 +156,7 @@ func testNonSendableIsolationCrossingResult(a: CalledOnceActor) async {
 // InOutSendingParametersInSameRegion: two `inout sending` parameters of
 // the enclosing function end up in the same region.
 func testInOutSendingParametersInSameRegionUnaffected(_ x: inout sending NS, _ y: inout sending NS) {
-  let _: @called(once) () -> Void = {
+  let _: @called(atMostOnce) () -> Void = {
     x = y
   }
 } // expected-error {{'inout sending' parameters 'x' and 'y' can be potentially accessed from each other at function return risking data races in caller}}
@@ -165,11 +165,11 @@ func testInOutSendingParametersInSameRegionUnaffected(_ x: inout sending NS, _ y
 // InOutSendingNotInitializedAtExit: `inout` parameters can be captured by
 // closures, including non-escaping ones, so a `sending` capture of an
 // `inout sending` parameter is reachable -- sending it away via the
-// `@called(once)` closure counts as consuming the parameter, and the
+// `@called(atMostOnce)` closure counts as consuming the parameter, and the
 // function must reinitialize it with a disconnected value before returning,
 // exactly as it would for an ordinary direct send.
 func testInOutSendingCaptureNotReinitialized(_ x: inout sending NS) {
-  _ = CalledOnceTask { [sending x] in
+  _ = CalledAtMostOnceTask { [sending x] in
     // expected-error@-1 {{sending 'x' risks causing data races}}
     // expected-note@-2 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
     sendAgain(x)
@@ -179,7 +179,7 @@ func testInOutSendingCaptureNotReinitialized(_ x: inout sending NS) {
 // ... and is accepted once `x` is reinitialized with a disconnected value
 // before the function returns.
 func testInOutSendingCaptureReinitialized(_ x: inout sending NS) {
-  _ = CalledOnceTask { [sending x] in
+  _ = CalledAtMostOnceTask { [sending x] in
     sendAgain(x)
   }
   x = NS()
@@ -189,7 +189,7 @@ func testInOutSendingCaptureReinitialized(_ x: inout sending NS) {
 // but with a value (`y`) that isn't itself disconnected -- distinct from
 // the "not reinitialized at all" case above.
 func testInOutSendingCaptureReinitWithNonDisconnectedValue(_ x: inout sending NS, y: NS) {
-  _ = CalledOnceTask { [sending x] in
+  _ = CalledAtMostOnceTask { [sending x] in
     sendAgain(x)
   }
   x = y
@@ -201,7 +201,7 @@ func testInOutSendingCaptureReinitWithNonDisconnectedValue(_ x: inout sending NS
 // distinct from both cases above, and from the underlying send via
 // `[sending x]` itself, which is otherwise fine here.
 func testInOutSendingCaptureAliasedWithReturnValue(_ x: inout sending NS) -> sending NS {
-  _ = CalledOnceTask { [sending x] in
+  _ = CalledAtMostOnceTask { [sending x] in
     sendAgain(x)
   }
   let fresh = NS()
@@ -211,12 +211,12 @@ func testInOutSendingCaptureAliasedWithReturnValue(_ x: inout sending NS) -> sen
 }
 
 // IncompatibleRegionMerge: two values from different global actors, merged
-// directly (not sent) inside a `@called(once)` closure body. This needs the
+// directly (not sent) inside a `@called(atMostOnce)` closure body. This needs the
 // closure to be neither actor-isolated (which would route through
 // translateIsolatedPartialApply, sending every capture individually) nor
 // have any of its captures marked `sending` (which routes the merge through
 // a send diagnostic instead, via `SentNeverSendable`) -- an `@concurrent`
-// `@called(once)` closure with plain, unmarked captures is what actually
+// `@called(atMostOnce)` closure with plain, unmarked captures is what actually
 // reaches `translateSILCalledOncePartialApply`'s `operandsToMerge` path and
 // the underlying `Merge` PartitionOp. This diagnostic warns until a future
 // language mode, not v6 (see also
@@ -225,7 +225,7 @@ func testInOutSendingCaptureAliasedWithReturnValue(_ x: inout sending NS) -> sen
 actor CustomActorInstance {}
 @globalActor struct CustomActor { static let shared = CustomActorInstance() }
 
-struct CalledOnceAsyncTask { init(_ ns: @escaping @called(once) () async -> Void) {} }
+struct CalledAtMostOnceAsyncTask { init(_ ns: @escaping @called(atMostOnce) () async -> Void) {} }
 
 @MainActor
 struct MergeAcrossGlobalActors {
@@ -235,7 +235,7 @@ struct MergeAcrossGlobalActors {
   init() {
     let a = mainField! // expected-note {{'a' is exposed to main actor-isolated code}}
     let b = customField! // expected-note {{'b' is exposed to global actor 'CustomActor'-isolated code}}
-    _ = CalledOnceAsyncTask { @concurrent in
+    _ = CalledAtMostOnceAsyncTask { @concurrent in
       // expected-warning@-1 {{executing operation could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races; this will be an error in a future Swift language mode}}
       _ = a
       _ = b

@@ -2852,8 +2852,8 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     // Let go of borrows introduced for stack closures.
     if (pai->isOnStack() && pai->getFunction()->hasOwnership()) {
       pai->visitOnStackLifetimeEnds([&](Operand *op) -> bool {
-        // A `@called(once)` closure's context can be consumed directly by a
-        // `try_apply`, a terminator with no single "next instruction" to
+        // A `@called(atMostOnce)` closure's context can be consumed directly by
+        // a `try_apply`, a terminator with no single "next instruction" to
         // insert after -- the cleanup has to be duplicated at the start of
         // every successor block instead.
         if (auto *term = dyn_cast<TermInst>(op->getUser())) {

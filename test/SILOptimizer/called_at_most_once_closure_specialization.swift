@@ -26,20 +26,20 @@ struct Resource: ~Copyable {
 func applyInt(_ f: (Int) -> Int, _ x: Int) -> Int { f(x) }
 
 @inline(never)
-func callOnce(_ fn: @called(once) () -> Void) { fn() }
+func callAtMostOnce(_ fn: @called(atMostOnce) () -> Void) { fn() }
 
 @inline(never)
-func callOnceEscaping(_ fn: @escaping @called(once) () -> Void) { fn() }
+func callAtMostOnceEscaping(_ fn: @escaping @called(atMostOnce) () -> Void) { fn() }
 
 // A single owned Copyable capture
 @inline(never)
 func testLocalVariableClass(_ t: Tracker, _ y: Int) {
-  callOnce {
+  callAtMostOnce {
     t.x += y
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@guaranteed Tracker, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
@@ -49,12 +49,12 @@ func testLocalVariableClass(_ t: Tracker, _ y: Int) {
 // Mixed owned Copyable + borrowed ~Copyable captures
 @inline(never)
 func testMixedCaptures(_ t: Tracker, _ v: borrowing BorrowableValue, _ delta: Int) {
-  callOnce {
+  callAtMostOnce {
     t.x += v.peek() + delta
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@owned Tracker, @guaranteed BorrowableValue, Int) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@owned Tracker, @guaranteed BorrowableValue, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[V:%.*]] : @guaranteed $BorrowableValue, [[DELTA:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed BorrowableValue, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[V]], [[DELTA]])
@@ -63,12 +63,12 @@ func testMixedCaptures(_ t: Tracker, _ v: borrowing BorrowableValue, _ delta: In
 
 @inline(never)
 func testConsumingNoncopyableCapture(_ r: consuming Resource) {
-  callOnce {
+  callAtMostOnce {
     r.use()
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> () {
 // CHECK: bb0([[R:%.*]] : @owned $Resource):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> ()
 // CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_once] [[CLOSURE_IMPL]]([[R]]) : $@convention(thin) (@owned Resource) -> ()
@@ -80,12 +80,12 @@ func testConsumingNoncopyableCapture(_ r: consuming Resource) {
 
 @inline(never)
 func testEscapingCapture(_ t: Tracker, _ y: Int) {
-  callOnceEscaping {
+  callAtMostOnceEscaping {
     t.x += y
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnceEscaping{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnceEscaping{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}} : $@convention(thin) (@guaranteed Tracker, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
@@ -94,17 +94,17 @@ func testEscapingCapture(_ t: Tracker, _ y: Int) {
 
 @inline(never)
 func testOnStackCallSite(_ t: Tracker, _ y: Int) {
-  callOnce { t.x += y }
+  callAtMostOnce { t.x += y }
 }
 
 @inline(never)
 func testOnStackCallSite2(_ t: Tracker, _ y: Int) {
-  callOnce { t.x -= y }
+  callAtMostOnce { t.x -= y }
 }
 
 @inline(never)
 func testEscapingCallSite(_ t: Tracker, _ y: Int) {
-  callOnceEscaping { t.x += y }
+  callAtMostOnceEscaping { t.x += y }
 }
 
 // Captured closure value triggers multiple rounds of specialization
@@ -112,12 +112,12 @@ func testEscapingCallSite(_ t: Tracker, _ y: Int) {
 @inline(never)
 func testNestedClosureCapture(_ t: Tracker, _ y: Int) {
   let inner: (Int) -> Int = { $0 + t.x }
-  callOnce {
+  callAtMostOnce {
     t.x = applyInt(inner, y)
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callOnce{{.*}} : $@convention(thin) (@owned Tracker, @owned @callee_guaranteed (Int) -> Int, Int) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}} : $@convention(thin) (@owned Tracker, @owned @callee_guaranteed (Int) -> Int, Int) -> () {
 // CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[INNER:%.*]] : @owned $@callee_guaranteed (Int) -> Int, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed @callee_guaranteed (Int) -> Int, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[INNER]], [[Y]])

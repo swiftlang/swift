@@ -1662,8 +1662,8 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
       return std::make_pair(Type(), false);
     }
     std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
-      // Fold away the @called(once) dependence if present, the function type will
-      // just become non-@called(once).
+      // Fold away the @called(atMostOnce) dependence if present, the function
+      // type will just become non-@called(atMostOnce).
       return std::make_pair(Type(), false);
     }
   };

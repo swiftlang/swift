@@ -3950,7 +3950,9 @@ public:
   CalledAttr(ExecutionSemantics semantics)
       : CalledAttr(SourceLoc(), SourceRange(), semantics) {}
 
-  bool isOnce() const { return getSemantics() == ExecutionSemantics::Once; }
+  bool isAtMostOnce() const {
+    return getSemantics() == ExecutionSemantics::AtMostOnce;
+  }
 
   ExecutionSemantics getSemantics() const {
     return ExecutionSemantics(Bits.CalledAttr.Semantics);
@@ -4889,7 +4891,7 @@ public:
 
 class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
 public:
-  enum class Semantics : uint8_t { Once };
+  enum class Semantics : uint8_t { AtMostOnce };
 
 private:
   SourceLoc SemanticsLoc;
@@ -4901,7 +4903,7 @@ public:
     Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
   }
 
-  bool isOnce() const { return getSemantics() == Semantics::Once; }
+  bool isAtMostOnce() const { return getSemantics() == Semantics::AtMostOnce; }
 
   Semantics getSemantics() const {
     return Semantics(Bits.CalledTypeAttr.Semantics);

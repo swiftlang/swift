@@ -78,8 +78,8 @@ public:
   /// consisting solely of the standard heap metadata.
   ///
   /// \param unownedFields Indices of fields that the generated destructor must
-  /// never destroy because they aren't owned. For example, a `@called(once)`
-  /// on-stack closure with a borrowed ~Copyable capture.
+  /// never destroy because they aren't owned. For example, a
+  /// `@called(atMostOnce)` on-stack closure with a borrowed ~Copyable capture.
   ///
   /// \param isStackAllocated True if the object this metadata describes lives
   /// on the stack. Its destructor must not try to free the object's memory.

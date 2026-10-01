@@ -684,8 +684,8 @@ static StringRef getDumpString(ExplicitSafety safety) {
 }
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
-  case ExecutionSemantics::Once:
-    return "once";
+  case ExecutionSemantics::AtMostOnce:
+    return "atMostOnce";
   }
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {

@@ -2940,9 +2940,9 @@ ConstraintSystem::matchFunctionExecutionSemantics(
     return SolutionKind::Unsolved;
   };
 
-  // First check to see if we have any @called(once) dependent function types,
-  // if any of them still have unresolved type variables we need to wait until
-  // they're fully resolved.
+  // First check to see if we have any @called(atMostOnce) dependent function
+  // types, if any of them still have unresolved type variables we need to wait
+  // until they're fully resolved.
   auto dep1 = func1->getCalledOnceDependentType();
   if (dep1) {
     dep1 = simplifyType(dep1);
@@ -12587,7 +12587,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
-    // Infer `@called(once)` from the contextual type.
+    // Infer `@called(atMostOnce)` from the contextual type.
     if (!closureExtInfo.isCalledOnce()) {
       if (auto calledOnceTy = contextualFnType->getCalledOnceDependentType()) {
         closureExtInfo = closureExtInfo.withCalledOnceDependentType(calledOnceTy);

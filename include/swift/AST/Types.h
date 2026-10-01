@@ -3888,9 +3888,9 @@ public:
   /// variables if present.
   Type getSendableDependentType() const;
 
-  /// A dependent type that determines whether the function is @called(once).
-  /// This is only used within the constraint system, and will contain type
-  /// variables if present.
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// will contain type variables if present.
   Type getCalledOnceDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
@@ -4094,7 +4094,7 @@ public:
   /// Return the function type setting sendable to \p newValue.
   AnyFunctionType *withSendable(bool newValue) const;
 
-  /// Return the function type setting @called(once) to \p newValue.
+  /// Return the function type setting @called(atMostOnce) to \p newValue.
   AnyFunctionType *withCalledOnce(bool newValue) const;
 
   /// Return the function type without yields (and coroutine flag)
@@ -4273,9 +4273,9 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError()];
   }
 
-  /// A dependent type that determines whether the function is @called(once).
-  /// This is only used within the constraint system, and will contain type
-  /// variables if present.
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// will contain type variables if present.
   Type getCalledOnceDependentType() const {
     if (!hasCalledOnceDependentType())
       return Type();

@@ -2546,7 +2546,7 @@ public:
           "applied argument types do not match suffix of function type's "
           "inputs");
       if (PAI->isOnStack()) {
-        // A `@called(once)` closure is allowed to have consuming captures
+        // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
         require(PAI->isCalledOnce() ||

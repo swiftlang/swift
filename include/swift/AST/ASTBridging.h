@@ -2662,7 +2662,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {
 };
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCalledTypeAttrSemantics {
-  BridgedCalledTypeAttrSemantics_Once,
+  BridgedCalledTypeAttrSemantics_AtMostOnce,
 };
 
 SWIFT_NAME("BridgedConventionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"

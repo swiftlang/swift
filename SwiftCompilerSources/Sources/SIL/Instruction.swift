@@ -1655,7 +1655,8 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
-  /// True is this is a partial application of a `@called(once)` function value.
+  /// True is this is a partial application of a `@called(atMostOnce)` function
+  /// value.
   public var isCalledOnce: Bool { bridged.PartialApplyInst_isCalledOnce() }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack

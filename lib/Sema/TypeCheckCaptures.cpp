@@ -756,7 +756,7 @@ public:
         recordConsumingUse(V);
     }
 
-    // - calling `@called(once)` value
+    // - calling `@called(atMostOnce)` value
     // - passing a value to a `consuming` parameter
     // - calling a `consuming` method ("self" is consumed).
     if (auto *callSite = dyn_cast<ApplyExpr>(E)) {
@@ -765,7 +765,7 @@ public:
       bool isInitializer = false;
       if (auto *callee =
               callSite->getCalledValue(/*skipFunctionConversions=*/true)) {
-        // Calling a `@called(once)` value is a consuming operation.
+        // Calling a `@called(atMostOnce)` value is a consuming operation.
         if (fnTy->isCalledOnce())
           recordConsumingUse(callee);
 
