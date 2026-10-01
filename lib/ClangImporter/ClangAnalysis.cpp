@@ -28,7 +28,11 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
 }
 
-bool importer::hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
+  return hasSwiftAttributeOnAnyRedecl(decl, {"import_throws"});
+}
+
+bool importer::hasSwiftAttributeOnAnyRedecl(const clang::Decl *decl,
                                             ArrayRef<StringRef> attrs) {
   return llvm::any_of(decl->redecls(), [&](const clang::Decl *redecl) {
     return hasSwiftAttribute(redecl, attrs);

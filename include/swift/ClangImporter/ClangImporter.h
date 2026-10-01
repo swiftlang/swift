@@ -50,6 +50,7 @@ namespace clang {
   class DiagnosticConsumer;
   class EnumConstantDecl;
   class EnumDecl;
+  class LangOptions;
   class MacroInfo;
   class Module;
   class ModuleMacro;
@@ -74,6 +75,7 @@ namespace dependencies {
 
 namespace swift {
 enum class ResultConvention : uint8_t;
+class AbstractFunctionDecl;
 class ASTContext;
 class CASOptions;
 class CompilerInvocation;
@@ -823,7 +825,34 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+
+  /// The inverse of \c getOriginalForVirtualThunk: if \p decl is the original
+  /// method of a virtual method thunk, which is renamed to
+  /// `__staticCall_<name>`, returns the thunk.
+  FuncDecl *getVirtualThunkForOriginal(const FuncDecl *decl) const;
+
+  /// Records that synthesizing the body of \p member, which is inherited from
+  /// a C++ base class, created the function \p helper that the body calls.
+  void recordInheritedMemberHelper(AbstractFunctionDecl *member,
+                                   FuncDecl *helper);
+
+  /// If \p helper was created while synthesizing the body of a member that is
+  /// inherited from a C++ base class, returns that member.
+  AbstractFunctionDecl *
+  getInheritedMemberForHelper(const FuncDecl *helper) const;
+
+  /// Returns the helper that the body of \p member, which is inherited from a
+  /// C++ base class, calls. Synthesizes the body if needed.
+  FuncDecl *getHelperForInheritedMember(AbstractFunctionDecl *member);
+
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
+
+  /// Whether this is the native throwing facade of a C++ exception adapter.
+  bool isCxxExceptionBridge(const FuncDecl *decl) const;
+
+  /// Recover either half of a generated exception bridge for serialization.
+  FuncDecl *getCxxExceptionBridgeAdapter(const FuncDecl *facade) const;
+  FuncDecl *getCxxExceptionBridgeFacade(const FuncDecl *adapter) const;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -930,8 +959,11 @@ bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 /// Within a translation unit a swift_attr propagates to later redeclarations
 /// only, and a chain assembled across modules is not merged at all, so an
 /// attribute is not necessarily visible on the declaration at hand.
-bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+bool hasSwiftAttributeOnAnyRedecl(const clang::Decl *decl,
                                   ArrayRef<StringRef> attrs);
+
+/// Whether any declaration of \p decl is annotated with SWIFT_THROWS.
+bool hasCxxThrowsAttr(const clang::FunctionDecl *decl);
 
 /// Whether the given Clang record is imported as a foreign reference type,
 /// including when it has no definition. Accounts for inherited reference-ness
@@ -1077,6 +1109,12 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
+
+/// Returns why this compilation cannot import SWIFT_THROWS functions as
+/// throwing, or an empty string if it can.
+StringRef
+getCxxExceptionBridgingUnavailableReason(const LangOptions &langOpts,
+                                         const clang::LangOptions &clangOpts);
 
 /// Determines the ownership convention of functions that return libkern's
 /// OSObject or one of its subclasses.
