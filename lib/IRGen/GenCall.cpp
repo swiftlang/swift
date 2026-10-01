@@ -1571,17 +1571,16 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
   return true;
 }
 
-static std::optional<clang::CallingConv>
-getNonDefaultClangCallingConvention(IRGenModule &IGM,
-                                    CanSILFunctionType fnType) {
+static const clang::FunctionType *
+getClangFunctionType(CanSILFunctionType fnType) {
   auto representation = fnType->getRepresentation();
   if (representation != SILFunctionTypeRepresentation::CFunctionPointer &&
       representation != SILFunctionTypeRepresentation::CXXMethod)
-    return std::nullopt;
+    return nullptr;
 
   auto *clangType = fnType->getClangTypeInfo().getType();
   if (!clangType)
-    return std::nullopt;
+    return nullptr;
 
   const clang::FunctionType *functionType = nullptr;
   if (auto *pointer = clangType->getAs<clang::PointerType>())
@@ -1593,6 +1592,15 @@ getNonDefaultClangCallingConvention(IRGenModule &IGM,
     functionType = clangType->getAs<clang::FunctionType>();
 
   ASSERT(functionType && "unexpected Clang function type");
+  return functionType;
+}
+
+static std::optional<clang::CallingConv>
+getNonDefaultClangCallingConvention(IRGenModule &IGM,
+                                    CanSILFunctionType fnType) {
+  auto *functionType = getClangFunctionType(fnType);
+  if (!functionType)
+    return std::nullopt;
   auto callingConv = functionType->getCallConv();
   // Both representations otherwise use the platform C convention. Compare
   // against the free-function default so that a method's default thiscall
