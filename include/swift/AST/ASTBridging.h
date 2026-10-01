@@ -82,6 +82,8 @@ class RequirementRepr;
 class Type;
 class CanType;
 class TypeBase;
+class ScopeDescriptor;
+class ScopeSpecifier;
 class StmtConditionElement;
 class SubstitutionMap;
 enum class RequirementReprKind : unsigned;
@@ -2702,6 +2704,70 @@ BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceLoc nameLoc, swift::SourceRange parensRange,
     BridgedCalledTypeAttrSemantics semantics, swift::SourceLoc semanticsLoc);
+
+class BridgedScopeDescriptor {
+  enum class Kind { ScopeName, AccessedValue, Self, SelfAccess, Immortal } kind;
+  swift::Identifier name;
+  swift::SourceLoc loc;
+
+  BridgedScopeDescriptor(Kind kind, swift::Identifier name,
+                         swift::SourceLoc loc)
+      : kind(kind), name(name), loc(loc) {}
+
+public:
+  SWIFT_NAME("forScopeName(_:loc:)")
+  static BridgedScopeDescriptor forScopeName(swift::Identifier name,
+                                             swift::SourceLoc loc) {
+    return {Kind::ScopeName, name, loc};
+  }
+
+  SWIFT_NAME("forAccessedValue(_:loc:)")
+  static BridgedScopeDescriptor forAccessedValue(swift::Identifier name,
+                                                 swift::SourceLoc loc) {
+    return {Kind::AccessedValue, name, loc};
+  }
+
+  SWIFT_NAME("forSelf(loc:isAccess:)")
+  static BridgedScopeDescriptor forSelf(swift::SourceLoc loc, bool isAccess) {
+    return {isAccess ? Kind::SelfAccess : Kind::Self, swift::Identifier(), loc};
+  }
+
+  SWIFT_NAME("forImmortal(loc:)")
+  static BridgedScopeDescriptor forImmortal(swift::SourceLoc loc) {
+    return {Kind::Immortal, swift::Identifier(), loc};
+  }
+
+  swift::ScopeDescriptor unbridged() const;
+};
+
+class BridgedScopeSpecifier {
+  /// Null when not specifying a scope restriction by name, e.g. `array` in
+  /// `@_scoped(array)`.
+  swift::Identifier label;
+  swift::SourceLoc labelLoc;
+  BridgedScopeDescriptor scope;
+
+  BridgedScopeSpecifier(swift::Identifier label, swift::SourceLoc labelLoc,
+                        BridgedScopeDescriptor scope)
+      : label(label), labelLoc(labelLoc), scope(scope) {}
+
+public:
+  SWIFT_NAME("create(label:labelLoc:scope:)")
+  static BridgedScopeSpecifier create(swift::Identifier label,
+                                      swift::SourceLoc labelLoc,
+                                      BridgedScopeDescriptor scope) {
+    return {label, labelLoc, scope};
+  }
+
+  swift::ScopeSpecifier unbridged() const;
+};
+
+SWIFT_NAME("BridgedScopedTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
+           "specifiers:)")
+BridgedScopedTypeAttr BridgedScopedTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedArrayRef cSpecifiers);
 
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs

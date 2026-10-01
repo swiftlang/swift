@@ -114,3 +114,37 @@ BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
   return new (cContext.unbridged())
       CalledTypeAttr(atLoc, nameLoc, parensRange, {semantics, semanticsLoc});
 }
+
+ScopeDescriptor BridgedScopeDescriptor::unbridged() const {
+  switch (kind) {
+  case Kind::ScopeName:
+    return ScopeDescriptor::forScopeName({ScopeName(name), loc});
+  case Kind::AccessedValue:
+    return ScopeDescriptor::forAccessedValue({name, loc});
+  case Kind::Self:
+    return ScopeDescriptor::forSelf(loc, /*isAccess=*/false);
+  case Kind::SelfAccess:
+    return ScopeDescriptor::forSelf(loc, /*isAccess=*/true);
+  case Kind::Immortal:
+    return ScopeDescriptor::forImmortal(loc);
+  }
+  llvm_unreachable("bad kind");
+}
+
+ScopeSpecifier BridgedScopeSpecifier::unbridged() const {
+  std::optional<Located<ScopeName>> unbridgedLabel;
+  if (!label.empty())
+    unbridgedLabel = {ScopeName(label), labelLoc};
+  return ScopeSpecifier(unbridgedLabel, scope.unbridged());
+}
+
+BridgedScopedTypeAttr
+BridgedScopedTypeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                                   SourceLoc nameLoc, SourceRange parensRange,
+                                   BridgedArrayRef cSpecifiers) {
+  SmallVector<ScopeSpecifier, 2> specifiers;
+  for (auto cSpecifier : cSpecifiers.unbridged<BridgedScopeSpecifier>())
+    specifiers.push_back(cSpecifier.unbridged());
+  return ScopedTypeAttr::create(cContext.unbridged(), atLoc, nameLoc,
+                                parensRange, specifiers);
+}

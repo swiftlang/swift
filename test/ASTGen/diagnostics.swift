@@ -4,11 +4,13 @@
 // RUN:   -target %target-swift-5.9-abi-triple \
 // RUN:   -enable-bare-slash-regex \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature DefaultIsolationPerFile
+// RUN:   -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:   -enable-experimental-feature ScopeRestrictions
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_DefaultIsolationPerFile
+// REQUIRES: swift_feature_ScopeRestrictions
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -86,3 +88,22 @@ default @Test
 
 default test
 // expected-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+
+func scopedMissingLParen(b: @_scoped Int) {}
+// expected-error@-1:29{{expected arguments for '_scoped' attribute}}
+
+func scopedNotAName(b: @_scoped(0) Int) {}
+// expected-error@-1:33{{invalid argument in '_scoped' attribute}}
+
+func scopedKeywordLabel(a: Int, p: @_scoped(default: a) Int) {}
+// expected-error@-1:45{{invalid argument in '_scoped' attribute}}
+
+func scopedImmortalAccess(b: @_scoped(&immortal) Int) {}
+// expected-error@-1:39{{invalid argument in '_scoped' attribute}}
+
+func scopedTrailingComma(a: Int, b: @_scoped(a,) Int) {}
+// expected-error@-1:47{{invalid argument in '_scoped' attribute}}
+
+func scopedLabelWithoutSpecifier(b: @_scoped(left:) Int) {}
+// expected-error@-1:51{{expected value in attribute}}
+// expected-note@-2:51{{insert value}}
