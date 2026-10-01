@@ -98,6 +98,10 @@ extension ASTGenVisitor {
         return (self.generateCalledTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
+      case .Scoped:
+        // TODO: Generate a ScopedTypeAttr.
+        break
+
       // SIL type attributes are not supported.
       case .Autoreleased,
         .BlockStorage,
