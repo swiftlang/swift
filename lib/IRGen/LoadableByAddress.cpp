@@ -4451,14 +4451,16 @@ protected:
     auto *defInst = load->getOperand()->getDefiningInstruction();
     auto *nextInst = &*std::next(load->getIterator());
     // Forward the address of the load if its sole user immediately follows the
-    // load instructions and if it was not the result of a coroutine.
+    // load instructions and if it was not the result of a coroutine yield or
+    // project_box of an indirect box.
     // Don't do this if the user forwards the address to a result which is used
     // beyond the following instruction, because then the address would be
     // needed at those uses. For example after the load's source location is
     // deallocated.
     if (isSoleUserOf(load, nextInst) &&
         !forwardsAddressBeyondNextInstruction(assignment, nextInst) &&
-        (!defInst || !isa<BeginApplyInst>(defInst))) {
+        (!defInst ||
+         (!isa<BeginApplyInst>(defInst) && !isa<ProjectBoxInst>(defInst)))) {
       assignment.markForDeletion(load);
       assignment.mapValueToAddress(origValue, load->getOperand());
       return;
