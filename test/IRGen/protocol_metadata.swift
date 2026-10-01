@@ -33,8 +33,8 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-LABEL: @"$s17protocol_metadata1BMp" = hidden constant
 // CHECK-SAME:   i32 65603,
 // CHECK-SAME:   @"$s17protocol_metadataMXM"
-// CHECK-SAME:   i32 0,
 // CHECK-SAME:   [[B_NAME]]
+// CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 1,
 // CHECK: }
 
