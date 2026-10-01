@@ -3192,10 +3192,12 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
 }
 
 bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
-  if (decl->isResilient() || decl->hasGenericParamList())
+  if (decl->isResilient())
     return true;
   // The size and alignment are also unknown when a field is resilient.
-  return !interopContext.getIrABIDetails().getTypeSizeAlignment(decl);
+  return !interopContext.getIrABIDetails().getTypeSizeAlignment(
+      decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
+                                        : ResilienceExpansion::Maximal);
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
