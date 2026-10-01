@@ -251,6 +251,9 @@ class ModuleDecl
   /// .swiftinterface file that this module was produced from (if any).
   mutable version::Version InterfaceCompilerVersion;
 
+  /// Whether this module is compiled in strict C++ exception mode.
+  bool CxxExceptionBridgingStrict = false;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -757,6 +760,13 @@ public:
   void setHasCxxInteroperability(bool enabled = true) {
     Bits.ModuleDecl.HasCxxInteroperability = enabled;
   }
+
+  /// Whether this module is compiled with the experimental feature
+  /// CxxExceptionBridgingStrict, which changes imported C++ function types.
+  bool isCxxExceptionBridgingStrict() const {
+    return CxxExceptionBridgingStrict;
+  }
+  void setCxxExceptionBridgingStrict() { CxxExceptionBridgingStrict = true; }
 
   CXXStdlibKind getCXXStdlibKind() const {
     return static_cast<CXXStdlibKind>(Bits.ModuleDecl.CXXStdlibKind);

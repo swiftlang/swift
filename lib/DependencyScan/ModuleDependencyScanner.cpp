@@ -708,15 +708,28 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
     if (ScanASTContext.LangOpts.EnableCXXInterop) {
       StringRef mainModuleName = mainModule->getName().str();
+      // Throwing C++ facades call this private Clang module even though the
+      // source file does not import it. Explicit builds need its PCM before
+      // the importer synthesizes those facades.
+      if (importer::getCxxExceptionBridgingUnavailableReason(
+              ScanASTContext.LangOpts, ScanASTContext.getClangModuleLoader()
+                                           ->getClangInstance()
+                                           .getLangOpts())
+              .empty())
+        mainDependencies.addModuleImport(
+            "_SwiftCxxExceptionSupport",
+            /*isExported=*/false, AccessLevel::Internal, &alreadyAddedModules);
       if (mainModuleName != CXX_MODULE_NAME)
         mainDependencies.addModuleImport(CXX_MODULE_NAME, /* isExported */ false,
                                          AccessLevel::Public,
                                          &alreadyAddedModules);
-      if (llvm::none_of(llvm::ArrayRef<StringRef>{CXX_MODULE_NAME,
-                            ScanASTContext.Id_CxxStdlib.str(), "std"},
-                        [mainModuleName](StringRef Name) {
-                          return mainModuleName == Name;
-                        }))
+      if (ScanASTContext.LangOpts.useCxxStdlibOverlay() &&
+          llvm::none_of(
+              llvm::ArrayRef<StringRef>{
+                  CXX_MODULE_NAME, ScanASTContext.Id_CxxStdlib.str(), "std"},
+              [mainModuleName](StringRef Name) {
+                return mainModuleName == Name;
+              }))
         mainDependencies.addModuleImport(ScanASTContext.Id_CxxStdlib.str(),
                                          /* isExported */ false,
                                          AccessLevel::Public,
@@ -1512,6 +1525,10 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
 
   llvm::StringSet<> enquedIdentifiers;
   auto enqueIfNeeded = [&](const ScannerImportStatementInfo &importInfo) {
+    if (!ScanASTContext.LangOpts.useCxxStdlibOverlay() &&
+        importInfo.importIdentifier == ScanASTContext.Id_CxxStdlib.str()) {
+      return;
+    }
     // Avoid querying the underlying Clang module
     if (moduleID.ModuleName == importInfo.importIdentifier)
       return;
@@ -1541,6 +1558,9 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   auto recordResolvedModuleImport =
       [this, &moduleLookupResult, &importedSwiftDependencies,
        moduleID](const ScannerImportStatementInfo &moduleImport) {
+        if (!ScanASTContext.LangOpts.useCxxStdlibOverlay() &&
+            moduleImport.importIdentifier == ScanASTContext.Id_CxxStdlib.str())
+          return;
         if (moduleID.ModuleName == moduleImport.importIdentifier)
           return;
         auto lookupResult = moduleLookupResult[moduleImport.importIdentifier];
@@ -1712,6 +1732,10 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   auto scanForSwiftDependency =
       [this, &lookupResultLock,
        &swiftOverlayLookupResult](Identifier moduleIdentifier) {
+        if (!ScanASTContext.LangOpts.useCxxStdlibOverlay() &&
+            (moduleIdentifier == ScanASTContext.Id_CxxStdlib ||
+             moduleIdentifier.str() == "std"))
+          return;
         auto moduleDependencies = withDependencyScanningWorker(
             [moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
               return ScanningWorker->scanFilesystemForSwiftModuleDependency(
@@ -1745,6 +1769,10 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   auto recordResult = [this, &swiftOverlayLookupResult,
                        &swiftOverlayDependencies,
                        moduleID](const std::string &moduleName) {
+    if (!ScanASTContext.LangOpts.useCxxStdlibOverlay() &&
+        (moduleName == ScanASTContext.Id_CxxStdlib.str() ||
+         moduleName == "std"))
+      return;
     auto lookupResult = swiftOverlayLookupResult[moduleName];
     if (moduleName != moduleID.ModuleName) {
 
@@ -1773,7 +1801,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
   // C++ Interop requires additional handling
   bool lookupCxxStdLibOverlay =
-      ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
+      ScanCompilerInvocation.getLangOptions().EnableCXXInterop &&
+      ScanCompilerInvocation.getLangOptions().useCxxStdlibOverlay();
   if (lookupCxxStdLibOverlay &&
       moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
     const auto &moduleInfo = DependencyCache.findKnownDependency(moduleID);

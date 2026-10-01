@@ -150,6 +150,8 @@ class ExtendedValidationInfo {
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
+    unsigned RequiresCxxExceptionBridging : 1;
+    unsigned IsCxxExceptionBridgingStrict : 1;
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
@@ -290,6 +292,20 @@ public:
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
+  }
+
+  bool requiresCxxExceptionBridging() const {
+    return Bits.RequiresCxxExceptionBridging;
+  }
+  void setRequiresCxxExceptionBridging(bool val) {
+    Bits.RequiresCxxExceptionBridging = val;
+  }
+
+  bool isCxxExceptionBridgingStrict() const {
+    return Bits.IsCxxExceptionBridgingStrict;
+  }
+  void setIsCxxExceptionBridgingStrict(bool val) {
+    Bits.IsCxxExceptionBridgingStrict = val;
   }
 
   CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }

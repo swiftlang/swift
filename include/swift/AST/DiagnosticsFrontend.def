@@ -584,6 +584,12 @@ NOTE(swift_will_maintain_compat,none,
 WARNING(enable_interop_flag_deprecated,none,
         "the '-enable-experimental-cxx-interop' flag is deprecated; please pass "
         "'-cxx-interoperability-mode=' instead", ())
+ERROR(cxx_exception_mode_requires_interop,none,
+      "experimental feature 'CxxExceptionBridgingStrict' requires C++ "
+      "interoperability", ())
+ERROR(cxx_exception_mode_requires_feature,none,
+      "experimental feature 'CxxExceptionBridgingStrict' requires "
+      "'-enable-experimental-feature CxxExceptionBridging'", ())
 
 ERROR(layout_string_instantiation_without_layout_strings,none,
       "-enable-layout-string-value-witnesses-instantiation can not be enabled "
