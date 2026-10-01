@@ -74,6 +74,7 @@ namespace dependencies {
 
 namespace swift {
 enum class ResultConvention : uint8_t;
+class AbstractFunctionDecl;
 class ASTContext;
 class CASOptions;
 class CompilerInvocation;
@@ -823,6 +824,26 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+
+  /// The inverse of \c getOriginalForVirtualThunk: if \p decl is the original
+  /// method of a virtual method thunk, which is renamed to
+  /// `__staticCall_<name>`, returns the thunk.
+  FuncDecl *getVirtualThunkForOriginal(const FuncDecl *decl) const;
+
+  /// Records that synthesizing the body of \p member, which is inherited from
+  /// a C++ base class, created the function \p helper that the body calls.
+  void recordInheritedMemberHelper(AbstractFunctionDecl *member,
+                                   FuncDecl *helper);
+
+  /// If \p helper was created while synthesizing the body of a member that is
+  /// inherited from a C++ base class, returns that member.
+  AbstractFunctionDecl *
+  getInheritedMemberForHelper(const FuncDecl *helper) const;
+
+  /// Returns the helper that the body of \p member, which is inherited from a
+  /// C++ base class, calls. Synthesizes the body if needed.
+  FuncDecl *getHelperForInheritedMember(AbstractFunctionDecl *member);
+
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;

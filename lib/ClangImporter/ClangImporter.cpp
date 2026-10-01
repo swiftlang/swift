@@ -6137,6 +6137,7 @@ static MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
           derivedRecord, baseRecord);
   if (!castFn)
     return nullptr;
+  importer->recordInheritedMemberHelper(funcDecl, castFn);
 
   auto *staticCastRefExpr =
       new (ctx) DeclRefExpr(ConcreteDeclRef(castFn), DeclNameLoc(),
@@ -6264,6 +6265,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
                                   /*implicit=*/true);
     return {body, /*isTypeChecked=*/true};
   }
+  static_cast<ClangImporter *>(ctx.getClangModuleLoader())
+      ->recordInheritedMemberHelper(funcDecl, forwardedFunc);
 
   SmallVector<Expr *, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
@@ -6546,6 +6549,8 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   }
   auto *baseGetterMethod = cast<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(baseGetterCxxMethod));
+  static_cast<ClangImporter *>(ctx.getClangModuleLoader())
+      ->recordInheritedMemberHelper(getterDecl, baseGetterMethod);
 
   Argument selfArg = [&]() {
     auto selfDecl = getterDecl->getImplicitSelfDecl();
@@ -8643,6 +8648,29 @@ ValueDecl *ClangImporter::getForwardingSource(const ValueDecl *decl) {
 FuncDecl *
 ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
   return Impl.getOriginalForVirtualThunk(decl);
+}
+
+FuncDecl *
+ClangImporter::getVirtualThunkForOriginal(const FuncDecl *decl) const {
+  return Impl.virtualOriginalToThunk.lookup(decl);
+}
+
+void ClangImporter::recordInheritedMemberHelper(AbstractFunctionDecl *member,
+                                                FuncDecl *helper) {
+  Impl.inheritedMemberForHelper.try_emplace(helper, member);
+  Impl.helperForInheritedMember[member] = helper;
+}
+
+AbstractFunctionDecl *
+ClangImporter::getInheritedMemberForHelper(const FuncDecl *helper) const {
+  return Impl.inheritedMemberForHelper.lookup(helper);
+}
+
+FuncDecl *
+ClangImporter::getHelperForInheritedMember(AbstractFunctionDecl *member) {
+  // The helper is created when the body is synthesized.
+  (void)member->getBody();
+  return Impl.helperForInheritedMember.lookup(member);
 }
 
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {

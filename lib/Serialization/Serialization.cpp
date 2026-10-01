@@ -2483,6 +2483,30 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   }
 
   case DeclContextKind::AbstractFunctionDecl: {
+    if (auto *entryPoint = dyn_cast<FuncDecl>(DC);
+        entryPoint && entryPoint->hasClangNode()) {
+      auto *importer =
+          static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+      const AbstractFunctionDecl *anchor = nullptr;
+      auto kind = CxxSynthesizedEntryPointKind::StaticVirtualCall;
+      if (importer) {
+        anchor = importer->getVirtualThunkForOriginal(entryPoint);
+        if (!anchor) {
+          anchor = importer->getInheritedMemberForHelper(entryPoint);
+          kind = CxxSynthesizedEntryPointKind::InheritedMemberHelper;
+        }
+      }
+      if (anchor) {
+        // A fresh importer cannot find this entry point by name. Reference the
+        // source-visible function that the importer creates it for instead.
+        writeCrossReference(anchor, pathLen + 1);
+        abbrCode = DeclTypeAbbrCodes
+            [XRefCxxSynthesizedEntryPointPathPieceLayout::Code];
+        XRefCxxSynthesizedEntryPointPathPieceLayout::emitRecord(
+            Out, ScratchRecord, abbrCode, static_cast<uint8_t>(kind));
+        break;
+      }
+    }
     if (auto fn = dyn_cast<AccessorDecl>(DC)) {
       auto storage = fn->getStorage();
       writeCrossReference(storage->getDeclContext(), pathLen + 2);
@@ -7067,6 +7091,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
+  registerDeclTypeAbbr<XRefCxxSynthesizedEntryPointPathPieceLayout>();
 
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
   registerDeclTypeAbbr<SelfProtocolConformanceLayout>();
