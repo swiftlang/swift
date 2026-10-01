@@ -1401,6 +1401,10 @@ ERROR(nonfinal_operator_in_class,none,
 ERROR(foreign_reference_subclass_must_be_final,none,
       "%kind0 must be 'final' because it subclasses a C++ foreign reference type",
       (const ValueDecl *))
+ERROR(foreign_reference_subclass_init_cannot_fail,none,
+      "%kind0 cannot be %select{throwing|failable}1 because it is declared in a "
+      "class that subclasses a C++ foreign reference type",
+      (const ValueDecl *, bool))
 ERROR(operator_in_unrelated_type,none,
       "member operator %2%select{| of protocol %0}1 must have at least one "
       "argument of type %select{%0|'Self'}1",

@@ -784,6 +784,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
+  // New specializations miss the earlier SILCombine before LetPropertiesOpt.
+  // Simplify their closure calls before running closure specialization.
+  P.addSILCombine();
   P.addClosureSpecialization();
   P.addDeadDebugVariableElimination();
 
