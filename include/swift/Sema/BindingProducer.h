@@ -114,9 +114,9 @@ public:
 private:
   /// Find type variables referenced by this conjunction element.
   /// If this is a closure body element, it would look inside \c ASTNode.
-  void
-  findReferencedVariables(ConstraintSystem &cs,
-                          SmallPtrSetImpl<TypeVariableType *> &typeVars) const;
+  void findReferencedVariables(
+      ConstraintSystem &cs,
+      SmallPtrSetVector<TypeVariableType *, 4> &typeVars) const;
 };
 
 class TypeVariableBinding {

@@ -320,7 +320,7 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   if (!fixedType->hasTypeVariable())
     return;
 
-  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
   fixedType->getTypeVariables(referencedVars);
 
   for (auto *referencedVar : referencedVars) {
@@ -505,7 +505,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
 
   auto &node = (*this)[typeVar];
 
-  llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
   fixed->getTypeVariables(referencedVars);
 
   for (auto otherTypeVar : referencedVars) {

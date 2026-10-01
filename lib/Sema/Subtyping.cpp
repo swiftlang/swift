@@ -259,7 +259,7 @@ swift::constraints::getConversionBehavior(Type type) {
     if (canType->hasParameterPack())
       return true;
 
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
     canType->getTypeVariables(referencedTypeVars);
     for (auto *typeVar : referencedTypeVars) {
       if (typeVar->getImpl().isPackExpansion())

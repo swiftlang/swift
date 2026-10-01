@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/BindingProducer.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/Subtyping.h"
@@ -725,12 +726,12 @@ class TypeVariableRefFinder : public ASTWalker {
   ConstraintSystem &CS;
   ASTNode Parent;
 
-  llvm::SmallPtrSetImpl<TypeVariableType *> &ReferencedVars;
+  SmallPtrSetVector<TypeVariableType *, 4> &ReferencedVars;
 
 public:
   TypeVariableRefFinder(
       ConstraintSystem &cs, ASTNode parent, ContextualTypeInfo context,
-      llvm::SmallPtrSetImpl<TypeVariableType *> &referencedVars)
+      SmallPtrSetVector<TypeVariableType *, 4> &referencedVars)
       : CS(cs), Parent(parent), ReferencedVars(referencedVars) {
     if (auto ty = context.getType())
       inferVariables(ty);
@@ -894,7 +895,7 @@ private:
       return;
 
     if (type->hasTypeVariable()) {
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      SmallPtrSetVector<TypeVariableType *, 4> typeVars;
       type->getTypeVariables(typeVars);
 
       // Some of the type variables could be non-representative, so
@@ -909,7 +910,8 @@ private:
 }
 
 void ConjunctionElement::findReferencedVariables(
-    ConstraintSystem &cs, SmallPtrSetImpl<TypeVariableType *> &typeVars) const {
+    ConstraintSystem &cs,
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVars) const {
   auto referencedVars = Element->getTypeVariables();
   typeVars.insert(referencedVars.begin(), referencedVars.end());
 
