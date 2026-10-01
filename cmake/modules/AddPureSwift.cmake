@@ -3,7 +3,7 @@ include(macCatalystUtils)
 # Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_add_dependencies TARGET)
   foreach(DEPENDENCY ${ARGN})
-    string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
+    string(REGEX REPLACE "[<>:\"/\\|?*]" _ sanitized ${DEPENDENCY})
     set(depfile "${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift")
     add_custom_command(OUTPUT ${depfile}
       COMMAND ${CMAKE_COMMAND} -E touch ${depfile}
@@ -164,6 +164,18 @@ function(_set_swift_cxx_interop_options name)
       # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
       "SHELL:-Xcc -Xclang -Xcc -fmodule-format=raw"
     )
+
+    # When LLVM is built as a DLL with clang-cl, its libraries are compiled
+    # with `/Zc:dllexportInlines-` (see `llvm_add_library` in AddLLVM.cmake).
+    # The C++ headers imported into Swift modules must be parsed with the same
+    # setting, otherwise the importer emits dllimport references to inline
+    # members that LLVM.dll does not export. `-fno-dllexport-inlines` is the
+    # cc1 spelling of that flag.
+    if(LLVM_BUILD_LLVM_DYLIB AND NOT LLVM_DYLIB_EXPORT_INLINES AND
+       MSVC AND CMAKE_CXX_COMPILER_ID MATCHES Clang)
+      target_compile_options(${name} PRIVATE
+        "SHELL:-Xcc -Xclang -Xcc -fno-dllexport-inlines")
+    endif()
   endif()
 
   # Prior to 5.9, we have to use the experimental flag for C++ interop.
