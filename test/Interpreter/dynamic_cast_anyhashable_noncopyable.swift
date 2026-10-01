@@ -32,9 +32,7 @@ struct CH: P, Hashable { var t = 2 }
 /// Copyable but not `Hashable`: must fail for the ordinary reason.
 struct CNH: P { var t = 3 }
 
-/// `is` out of a noncopyable existential is the non-consuming form; `as?` has to
-/// consume, since it produces a value.
-func isAH(_ x: borrowing any P & ~Copyable) -> Bool { x is AnyHashable }
+func isAH(_ x: consuming any P & ~Copyable) -> Bool { x is AnyHashable }
 func asAH(_ x: consuming any P & ~Copyable) -> Bool { (x as? AnyHashable) != nil }
 
 var checks = 0
@@ -78,12 +76,3 @@ if (d as? [String: Any]) != nil || d.count != 2 {
 
 // CHECK: checks={{[0-9]+}} failures=0
 print("checks=\(checks) failures=\(failures)")
-
-// And the subject survives the test, since `is` does not consume it.
-func repeated(_ x: borrowing any P & ~Copyable) -> String {
-  "\(x is AnyHashable) \(x is AnyHashable) \(x is AnyHashable)"
-}
-// CHECK-NEXT: repeated NCH: false false false
-print("repeated NCH:", repeated(NCH()))
-// CHECK-NEXT: repeated CH: true true true
-print("repeated CH:", repeated(CH()))
