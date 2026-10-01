@@ -411,6 +411,9 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
+    /// Whether this module requires C++ exception bridging in its clients.
+    unsigned RequiresCxxExceptionBridging : 1;
+
     /// Whether this module uses the platform default C++ stdlib, or an
     /// overridden C++ stdlib.
     unsigned CXXStdlibKind : 8;
@@ -669,6 +672,10 @@ public:
   /// Was this module built with C++ interop enabled.
   bool isBuiltWithCxxInterop() const {
     return Bits.HasCxxInteroperability;
+  }
+
+  bool requiresCxxExceptionBridging() const {
+    return Bits.RequiresCxxExceptionBridging;
   }
 
   llvm::VersionTuple getUserModuleVersion() const {
