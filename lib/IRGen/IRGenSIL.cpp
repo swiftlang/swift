@@ -2886,6 +2886,10 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
   Builder.SetInsertPoint(llBB);
+  // Blocks are not emitted in control flow order; the current location may
+  // come from an unrelated block.
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->clearLoc(Builder);
 
   bool InEntryBlock = BB->pred_empty();
 
