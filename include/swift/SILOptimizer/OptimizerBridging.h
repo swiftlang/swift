@@ -207,6 +207,14 @@ struct BridgedPassContext {
       void *_Nonnull context,
       void (*_Nonnull callback)(void *_Nonnull context, BridgedType type)) const;
 
+  /// Visits the conformance of every non-generic witness table in this module
+  /// which IRGen emits eagerly in Embedded Swift, i.e. the ones of
+  /// `@export(interface)` conformances.
+  void visitConformancesWithEagerlyEmittedWitnessTables(
+      void *_Nonnull context,
+      void (*_Nonnull callback)(void *_Nonnull context,
+                                BridgedConformance conformance)) const;
+
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;

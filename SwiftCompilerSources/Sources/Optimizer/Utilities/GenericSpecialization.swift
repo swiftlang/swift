@@ -224,22 +224,40 @@ private func specializeDeinit(forType type: Type,
 
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
 func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassContext) {
-  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
-         existingSpecialization.isSpecialized
-  {
-    return
-  }
+  var visited = Set<Conformance>()
+  specializeWitnessTable(for: conformance, visited: &visited, context)
+}
 
+private func specializeWitnessTable(for conformance: Conformance,
+                                    visited: inout Set<Conformance>,
+                                    _ context: ModulePassContext)
+{
   guard conformance.isConcrete else {
     // If the conformance is abstract the witness table is specialized elsewhere - at the
     // place where the concrete conformance is referenced.
     return
   }
 
+  // Conformances which only differ in type sugar share a witness table, so only deal with
+  // the canonical one. Otherwise the `visited` check below can miss a conformance and the
+  // same witness table is created twice.
+  let conformance = conformance.canonical
+
+  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
+         existingSpecialization.isSpecialized
+  {
+    return
+  }
+
   let baseConf = conformance.isInherited ? conformance.inheritedConformance: conformance
   if !baseConf.isSpecialized {
-    var visited = Set<Conformance>()
     specializeDefaultMethods(for: conformance, visited: &visited, context)
+    return
+  }
+
+  // Avoid infinite recursion, which may happen if an associated conformance is the
+  // conformance itself.
+  guard visited.insert(conformance).inserted else {
     return
   }
 
@@ -272,7 +290,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
     case .baseProtocol(let requirement, _):
       let selfTy = requirement.selfInterfaceType
       let baseConf = conformance.getAssociatedConformance(ofAssociatedType: selfTy, to: requirement)
-      specializeWitnessTable(for: baseConf, context)
+      specializeWitnessTable(for: baseConf, visited: &visited, context)
       return .baseProtocol(requirement: requirement, witness: baseConf)
     case .associatedType(let requirement, let witness):
       let substType = witness.subst(with: conformance.specializedSubstitutions)
@@ -285,10 +303,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       // The associated conformance is abstract if the associated type is an opaque result
       // type. Keep the abstract conformance in the entry - IRGen looks through the opaque
       // type - but make sure the underlying type's witness table exists.
-      let underlyingConf = concreteAssociateConf.lookingThroughOpaqueTypes(context)
-      if underlyingConf.isConcrete, underlyingConf.isSpecialized {
-        specializeWitnessTable(for: underlyingConf, context)
-      }
+      specializeNestedConformance(concreteAssociateConf, visited: &visited, context)
       return .associatedConformance(requirement: requirement,
                                     witness: concreteAssociateConf)
     }
@@ -381,7 +396,7 @@ private func specializeNestedConformance(_ conformance: Conformance,
   }
   let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
   if baseConf.isSpecialized {
-    specializeWitnessTable(for: conformance, context)
+    specializeWitnessTable(for: conformance, visited: &visited, context)
   } else {
     specializeDefaultMethods(for: conformance, visited: &visited, context)
   }

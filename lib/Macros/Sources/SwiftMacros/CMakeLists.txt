@@ -22,6 +22,7 @@ add_swift_macro_library(SwiftMacros
   DerivedConformances/DeriveRawRepresentable.swift
   DerivedConformances/DeriveEquatable.swift
   DerivedConformances/DeriveHashable.swift
+  DerivedConformances/DeriveComparable.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
     SwiftSyntax

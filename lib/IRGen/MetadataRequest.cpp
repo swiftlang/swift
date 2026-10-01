@@ -2148,7 +2148,7 @@ namespace {
 
       auto layout = type.getExistentialLayout();
 
-      if (!layout.getParameterizedProtocols().empty()) {
+      if (layout.needsExtendedShape()) {
         return emitExtendedExistentialTypeMetadata(type);
       }
 

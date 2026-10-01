@@ -48,11 +48,12 @@ NominalTypeDecl *SILWitnessTable::getConformingNominal() const {
 
 void SILWitnessTable::addWitnessTable() {
   if (isSpecialized()) {
+    auto *key = SILModule::getSpecializedWitnessTableKey(Conformance);
     // Make sure we have not seen this witness table yet.
-    assert(Mod.specializedWitnessTableMap.find(Conformance) ==
+    assert(Mod.specializedWitnessTableMap.find(key) ==
            Mod.specializedWitnessTableMap.end() && "Attempting to create duplicate "
            "witness table.");
-    Mod.specializedWitnessTableMap[Conformance] = this;
+    Mod.specializedWitnessTableMap[key] = this;
   } else {
     // Make sure we have not seen this witness table yet.
     assert(Mod.WitnessTableMap.find(cast<RootProtocolConformance>(Conformance)) ==
