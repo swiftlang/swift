@@ -145,6 +145,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | Top-level `@_cdecl` functions  | Yes                                                      |
 | Top-level Swift functions      | Yes |
 | Swift Methods                  | Yes (see the **Methods** section below for more details) |
+| Throwing functions (`throws`)  | Yes (see the note below). Typed throws (`throws(E)`) is not supported |
 | Primitive parameter or result types  | Yes           |
 | Swift `struct`/`enum`/`class` parameter or result types  | Yes           |
 | `inout` parameters             | Yes                                                      |
@@ -156,6 +157,16 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | Variadic parameters            | No                                                       |
 | Multiple return values         | No                                                       |
 
+Throwing functions, methods, initializers, getters and subscripts are exposed
+to C++ only when the Swift module is compiled with
+`-enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX`, and
+the C++ code that includes the generated header defines the
+`SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR` macro. See
+[Handling Swift Errors In C++](UserGuide-CallingSwiftFromC++.md#handling-swift-errors-in-c)
+for details. They are not supported yet on Windows and on arm64e. In Embedded
+Swift, `swift::Error::what()` returns a fixed string and `as<T>()` is not
+supported.
+
 **Structs**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
@@ -163,7 +174,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | Fixed layout structs           | Yes                                                      |
 | Resilient / opaque structs     | Yes                                                      |
 | Copy and destroy semantics     | Yes                                                      |
-| Initializers                   | Yes (except for throwing initializers)                   |
+| Initializers                   | Yes, including throwing initializers (see the note on throwing functions above) |
 
 **Enums**
 
@@ -183,7 +194,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 |--------------------------------|----------------------------------------------------------|
 | Class reference values         | Yes                                                      |
 | ARC semantics                  | Yes (C++ copy constructor,assignment operator, destructor perform ARC operations)  |
-| Initializers                   | Yes (except for throwing initializers) |
+| Initializers                   | Yes, including throwing initializers (see the note on throwing functions above) |
 
 **Methods**
 
@@ -200,6 +211,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | Setter accessors               | Yes, via `set<name>`                                     |
 | Mutation accessors             | No                                                       |
 | Static property accessors      | Yes                         |
+| Throwing getter accessors      | Yes, including throwing subscripts (see the note on throwing functions above) |
 
 **Generics**
 
