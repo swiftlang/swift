@@ -6474,7 +6474,10 @@ IRGenModule::getAddrOfWitnessTable(const ProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 
-  auto entity = LinkEntity::forProtocolWitnessTable(conf);
+  // Conformances which only differ in type sugar have the same witness table
+  // symbol.
+  auto entity = LinkEntity::forProtocolWitnessTable(
+      const_cast<ProtocolConformance *>(conf)->getCanonicalConformance());
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 

@@ -2661,10 +2661,21 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
 
+  // Whether `wt` is the specialized witness table of `conf`. Specialized
+  // witness tables are shared by conformances which only differ in type sugar.
+  auto isSpecializedTableOf = [](SILWitnessTable *wt,
+                                 const ProtocolConformance *conf) {
+    auto canonical = [](const ProtocolConformance *c) {
+      return const_cast<ProtocolConformance *>(c)->getCanonicalConformance();
+    };
+    return wt && wt->isSpecialized() &&
+           canonical(wt->getConformance()) == canonical(conf);
+  };
+
   auto *specConf = conformance;
   if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(inheritedC);
-    if (wt && wt->getConformance() == inheritedC) {
+    if (isSpecializedTableOf(wt, inheritedC)) {
       info = new SpecializedConformanceInfo(inheritedC);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -2676,7 +2687,7 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // directly use it.
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(specConf)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(specConf);
-    if (wt && wt->getConformance() == sc) {
+    if (isSpecializedTableOf(wt, sc)) {
       info = new SpecializedConformanceInfo(sc);
       Conformances.try_emplace(conformance, info);
       return *info;

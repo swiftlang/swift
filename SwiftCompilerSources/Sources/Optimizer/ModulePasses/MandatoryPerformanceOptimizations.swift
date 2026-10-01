@@ -50,6 +50,16 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // existentials -- are handled in `optimize` when their instructions are
     // visited.
     specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
+
+    // Likewise, IRGen emits the witness tables of `@export(interface)`
+    // conformances eagerly. Their base-protocol and associated conformance
+    // entries point directly to the witness tables of the nested
+    // conformances, which must be specialized if they are generic (e.g. the
+    // `SubSequence: Collection` conformance `Slice<Self>: Collection`).
+    for conformance in moduleContext.conformancesWithEagerlyEmittedWitnessTables {
+      specializeWitnessTable(for: conformance, moduleContext)
+      worklist.addWitnessMethods(of: conformance, moduleContext)
+    }
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }

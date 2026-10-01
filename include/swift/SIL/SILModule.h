@@ -265,8 +265,17 @@ private:
 
   /// Lookup table for specialized witness tables from conformances.
   /// Currently only used in embedded mode.
+  ///
+  /// Keyed by the canonical conformance (see getSpecializedWitnessTableKey),
+  /// because conformances which only differ in type sugar share a witness
+  /// table symbol.
   llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
   specializedWitnessTableMap;
+
+  static const ProtocolConformance *
+  getSpecializedWitnessTableKey(const ProtocolConformance *C) {
+    return const_cast<ProtocolConformance *>(C)->getCanonicalConformance();
+  }
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
@@ -895,8 +904,13 @@ public:
 
   /// Attempt to deserialize witness table for protocol conformance \p PC.
   ///
+  /// If \p referencedFromInitExistential is true, then in Embedded Swift the
+  /// witness tables of the conformances it references are deserialized as
+  /// well, as for a conformance used to form an existential.
+  ///
   /// Returns true if linking succeeded, false otherwise.
-  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode,
+                        bool referencedFromInitExistential = false);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
