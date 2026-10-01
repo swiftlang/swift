@@ -171,6 +171,7 @@ In addition to using an array literal, you can also create an array using these 
 - ``Swift/Array/withUnsafeBufferPointer(_:)``
 - ``Swift/Array/withUnsafeMutableBufferPointer(_:)``
 - ``Swift/Array/withUnsafeBytes(_:)``
+- ``Swift/Array/withUnsafeBytes(of:)``
 - ``Swift/Array/withUnsafeMutableBytes(_:)``
 - ``Swift/Array/withContiguousStorageIfAvailable(_:)-1wj7c``
 - ``Swift/Array/withContiguousMutableStorageIfAvailable(_:)-77ste``
