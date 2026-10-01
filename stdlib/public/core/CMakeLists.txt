@@ -52,6 +52,7 @@ split_embedded_sources(
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
   EMBEDDED ByteOrder.swift
+  EMBEDDED Cell.swift
   EMBEDDED CString.swift
   EMBEDDED CTypes.swift
   EMBEDDED Character.swift
@@ -66,6 +67,7 @@ split_embedded_sources(
     NORMAL CommandLine.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
+  EMBEDDED ConstCell.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguousArrayBuffer.swift
   EMBEDDED ContiguouslyStored.swift
@@ -273,6 +275,7 @@ split_embedded_sources(
   EMBEDDED UnsafeRawPointer.swift
   EMBEDDED ValidUTF8Buffer.swift
   EMBEDDED VarArgs.swift
+  EMBEDDED Volatile.swift
   EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED Zip.swift
   EMBEDDED _InlineArray.swift
@@ -380,6 +383,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenti
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "RawLayout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 # For `@DebugDescription`. `SWIFT_HOST_PLUGINS_DIR` is computed once in

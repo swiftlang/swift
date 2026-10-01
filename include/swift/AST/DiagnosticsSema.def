@@ -4522,6 +4522,12 @@ ERROR(dynamic_self_stored_property_init,none,
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
 
+// Experimental types
+
+ERROR(type_requires_experimental_feature,none,
+      "using '%0' requires an experimental feature; use '-enable-experimental-feature %1'",
+      (StringRef, StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
 //------------------------------------------------------------------------------

@@ -699,6 +699,9 @@ EXPERIMENTAL_FEATURE(TargetAttribute, true)
 /// Enable distributed actors in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 
+/// Enable usage of `Cell`, `ConstCell`, and `Volatile` from the standard library.
+EXPERIMENTAL_FEATURE(Cells, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

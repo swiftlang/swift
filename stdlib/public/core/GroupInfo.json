@@ -212,7 +212,7 @@
     "RawSpan.swift",
     "Span.swift"
   ],
-  "UTF8Span": [ 
+  "UTF8Span": [
     "UTF8EncodingError.swift",
     "UTF8Span.swift",
     "UTF8SpanBits.swift",
@@ -283,7 +283,10 @@
     "Exclusivity.swift",
     "Ref.swift",
     "MutableRef.swift",
-    "UniqueBox.swift"
+    "UniqueBox.swift",
+    "Cell.swift",
+    "ConstCell.swift",
+    "Volatile.swift"
   ],
   "Result": [
     "Result.swift"
