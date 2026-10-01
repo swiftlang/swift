@@ -198,6 +198,14 @@ do {
   }
 }
 
+do {
+  func padded(_: [(before: Int, after: Int)]) {}
+
+  func forward(size: (left: Int, right: Int)) {
+    padded([(0, 0), (0, 0), size])
+  }
+}
+
 // Tests for a special form of inference where we have both a
 // subtype and a supertype binding for a type variable, and the
 // subtype binding contains a type variable but the supertype
