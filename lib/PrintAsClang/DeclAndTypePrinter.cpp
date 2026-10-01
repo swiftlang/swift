@@ -1234,6 +1234,12 @@ private:
 
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
+      // The C++ thunks of a throwing function use the Swift error support
+      // types, which are only declared when the consumer opted into them.
+      bool needsErrorGuard = AFD->hasThrows();
+      ClangSyntaxPrinter declGuardPrinter(AFD->getASTContext(), os);
+      if (needsErrorGuard)
+        declGuardPrinter.printSwiftErrorBindingsGuardBegin();
       printDocumentationComment(AFD);
       DeclAndTypeClangFunctionPrinter declPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
@@ -1257,11 +1263,17 @@ private:
                                    /*isStatic=*/isClassMethod,
                                    /*isDefinition=*/false, dispatchInfo);
       }
+      if (needsErrorGuard)
+        declGuardPrinter.printSwiftErrorBindingsGuardEnd();
 
       DeclAndTypeClangFunctionPrinter defPrinter(
           owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
           owningPrinter.typeMapping, owningPrinter.interopContext,
           owningPrinter);
+      ClangSyntaxPrinter defGuardPrinter(AFD->getASTContext(),
+                                         owningPrinter.outOfLineDefinitionsOS);
+      if (needsErrorGuard)
+        defGuardPrinter.printSwiftErrorBindingsGuardBegin();
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         if (SD)
@@ -1282,6 +1294,8 @@ private:
                                   /*isStatic=*/isClassMethod,
                                   /*isDefinition=*/true, dispatchInfo);
       }
+      if (needsErrorGuard)
+        defGuardPrinter.printSwiftErrorBindingsGuardEnd();
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
       return;
@@ -2014,7 +2028,15 @@ private:
       if (!canPrintOverloadOfFunction(FD))
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
+      // The C++ thunk of a throwing function uses the Swift error support
+      // types, which are only declared when the consumer opted into them.
+      bool needsErrorGuard = FD->hasThrows();
+      ClangSyntaxPrinter guardPrinter(FD->getASTContext(), os);
+      if (needsErrorGuard)
+        guardPrinter.printSwiftErrorBindingsGuardBegin();
       printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
+      if (needsErrorGuard)
+        guardPrinter.printSwiftErrorBindingsGuardEnd();
       recordEmittedDeclInCurrentCxxLexicalScope(FD);
       return;
     }
