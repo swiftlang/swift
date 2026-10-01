@@ -106,6 +106,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
@@ -6884,10 +6885,16 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         return nullptr;
     }
 
+    // The synthesized body forwards every parameter to the base method.
+    SmallVector<ParamDecl *, 4> params;
+    for (auto [index, param] : llvm::enumerate(*fn->getParameters()))
+      params.push_back(SwiftDeclSynthesizer::cloneParamForForwarding(
+          context, param, "__param" + Twine(index)));
+
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
         fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
-        fn->getGenericParams(), fn->getParameters(),
+        fn->getGenericParams(), ParameterList::create(context, params),
         fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
@@ -8290,10 +8297,9 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
   // parameters along to the clang function.
   SmallVector<ParamDecl *, 4> newParams;
 
-  for (auto param : *newDecl->getParameters()) {
-    auto *newParamDecl = ParamDecl::clone(newDecl->getASTContext(), param);
-    newParams.push_back(newParamDecl);
-  }
+  for (auto [index, param] : llvm::enumerate(*newDecl->getParameters()))
+    newParams.push_back(SwiftDeclSynthesizer::cloneParamForForwarding(
+        newDecl->getASTContext(), param, "__param" + Twine(index)));
 
   auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
                              ->getInterfaceType()

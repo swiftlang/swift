@@ -6,6 +6,11 @@ struct Struct {
   void templateTypeParamNotUsedInSignature() const {}
 
   template <typename T>
+  int templateTypeParamNotUsedInSignatureWithUnnamedParam(int) const {
+    return 8;
+  }
+
+  template <typename T>
   T templateTypeParamUsedInReturnType(int x) const { return x; }
 
   template <typename T>
@@ -38,6 +43,11 @@ U multiTemplateTypeParamOneUsedInSignature(U u) { return u; }
 
 template <typename T, typename U>
 void multiTemplateTypeParamNotUsedInSignatureWithUnrelatedParams(int x, int y) {}
+
+template <typename T, typename U>
+int multiTemplateTypeParamNotUsedInSignatureWithUnnamedParams(int, int) {
+  return 7;
+}
 
 template <typename T>
 T templateTypeParamUsedInReturnType(int x) { return x; }
