@@ -185,6 +185,17 @@ func detachedAmpersand(a: inout Int, b: @_scoped(& a) S) {}
 func integerSpecifier(b: @_scoped(0) S) {}
 // expected-error@-1:35{{expected identifier or 'self' in '_scoped' attribute}}
 
+func dollarSpecifier(b: @_scoped($0) S) {}
+// expected-error@-1:34{{expected identifier or 'self' in '_scoped' attribute}}
+
+func capitalSelf(b: @_scoped(Self) S) {}
+// expected-error@-1:30{{expected identifier or 'self' in '_scoped' attribute}}
+
+// FIXME: probably deserves better recovery...
+func memberSpecifier(a: Int, b: @_scoped(a.b) S) {}
+// expected-error@-1:43{{expected ',' separator}}{{43-43=,}}
+// expected-error@-2:43{{expected identifier or 'self' in '_scoped' attribute}}
+
 // Indistinguishable from a missing ',', which is how it is recovered.
 func missingRParen(b: @_scoped(immortal S) {}
 // expected-error@-1:41{{expected ',' separator}}{{40-40=,}}
