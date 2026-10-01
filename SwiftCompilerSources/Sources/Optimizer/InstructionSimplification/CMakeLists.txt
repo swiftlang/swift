@@ -52,6 +52,7 @@ swift_compiler_sources(Optimizer
   SimplifyStructExtract.swift
   SimplifySwitchEnum.swift
   SimplifySwitchEnumAddr.swift
+  SimplifyThinToThickFunction.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
   SimplifyTuplePackElementAddr.swift
