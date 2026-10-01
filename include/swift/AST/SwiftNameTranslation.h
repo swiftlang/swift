@@ -79,6 +79,8 @@ enum RepresentationError {
   UnrepresentableRequiresClientEmission,
   UnrepresentableGeneric,
   UnrepresentableGenericRequirements,
+  UnrepresentableNestedInGenericContext,
+  UnrepresentableTooManyGenericParameters,
   UnrepresentableThrows,
   UnrepresentableIndirectEnum,
   UnrepresentableEnumCaseType,
