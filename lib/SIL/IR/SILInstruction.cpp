@@ -1102,6 +1102,11 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     }
   }
 
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastInst>(this)) {
+    if (!cast->preservesOwnership())
+      return MemoryBehavior::MayHaveSideEffects;
+  }
+
   // Handle full apply sites that have a resolvable callee function with an
   // effects attribute.
   if (isa<FullApplySite>(this)) {
