@@ -114,6 +114,10 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
     // The `DynamicCastTest()` runtime was added in Swift 6.5.
     // For older runtimes, we have to make do with the regular casting
     // endpoint, which requires a temporary buffer to put the result into.
+    //
+    // The copy that entails is safe because Sema rejects casting out of a
+    // non-'Copyable' existential at these deployment targets.  See
+    // checkNoncopyableExistentialCastingAvailability().
     auto targetSILType =
         IGF.IGM.getLoweredType(AbstractionPattern::getOpaque(), targetType);
     auto &targetTI = IGF.getTypeInfo(targetSILType);

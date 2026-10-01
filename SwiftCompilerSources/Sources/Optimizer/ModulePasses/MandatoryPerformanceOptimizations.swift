@@ -160,8 +160,12 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
   }
 
   func specializeVTable(for type: Type, instruction: Instruction) {
+    // A class type containing archetypes can appear in the unspecialized code
+    // of a class-bound generic function (e.g. a witness thunk). There is
+    // nothing to specialize the vtable with, so don't.
     if context.options.enableEmbeddedSwift,
-       type.isClass
+       type.isClass,
+       !type.hasArchetype
     {
       Optimizer.specializeVTable(forClassType: type, errorLocation: instruction.location, moduleContext) {
         worklist.pushIfNotVisited($0)

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableCasting
+// RUN: %target-typecheck-verify-swift -target %target-future-triple -enable-experimental-feature NoncopyableCasting
 
 // REQUIRES: swift_feature_NoncopyableCasting
 
