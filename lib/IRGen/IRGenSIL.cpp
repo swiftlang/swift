@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExtInfo.h"
@@ -2679,6 +2680,29 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
     processType(result.getReturnValueType(IRGen.SIL, type, context));
 }
 
+/// If \p f implements a C++ virtual method, emit the class's vtable (for a key
+/// function) and the method's adjusting thunks.
+static void emitCxxVirtualMethodTables(IRGenModule &IGM, SILFunction *f) {
+  SILDeclRef declRef = f->getDeclRef();
+  if (declRef.isNull() || !declRef.hasDecl() ||
+      !declRef.getDecl()->getAttrs().hasAttribute<CxxDeclAttr>())
+    return;
+
+  const Decl *interface = declRef.getDecl()->getImplementedObjCDecl();
+  if (!interface)
+    return;
+  if (auto *thunk = dyn_cast<FuncDecl>(interface))
+    if (auto *original =
+            IGM.Context.getClangModuleLoader()->getOriginalForVirtualThunk(
+                thunk))
+      interface = original;
+
+  auto *method =
+      dyn_cast_or_null<clang::CXXMethodDecl>(interface->getClangDecl());
+  if (method && method->isVirtual())
+    clang::CodeGen::emitVirtualMethodTables(IGM.getClangCGM(), method);
+}
+
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
@@ -2708,6 +2732,8 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   }
 
   IRGenSILFunction(*this, f, llvmF).emitSILFunction();
+
+  emitCxxVirtualMethodTables(*this, f);
 }
 
 void IRGenSILFunction::emitSILFunction() {
