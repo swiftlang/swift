@@ -86,3 +86,9 @@ func useTemplateAndSafe(_ o: TemplateAndSafeOwner,
   _ = unsafe o.__beginUnsafe()
   _ = unsafe o.__endUnsafe()
 }
+
+func useCustomNamed(_ c: inout CustomNamed) {
+  // Kept its name because of a custom Swift name, not because the feature let
+  // it; like without the feature, it is only '@unsafe'.
+  _ = c.get()
+}
