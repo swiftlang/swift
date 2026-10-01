@@ -34,12 +34,11 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 
   @export(implementation)
   deinit {
-    if _count > 0 {
+    if count > 0 {
       unsafe _start().withMemoryRebound(
-        to: Element.self, capacity: _count
+        to: Element.self, capacity: count
       ) {
-        [ workaround = _count ] in
-        _ = unsafe $0.deinitialize(count: workaround)
+        _ = unsafe $0.deinitialize(count: count)
       }
     }
   }
