@@ -499,13 +499,12 @@ public:
       Visitor.addDynamicFunction(AFD, *dynKind);
     }
 
-    if (auto cdeclAttr = AFD->getAttrs().getAttribute<CDeclAttr>()) {
-      if (cdeclAttr->Underscored) {
-        // A @_cdecl("...") function has an extra symbol, with the name from the
-        // attribute.
-        addFunction(SILDeclRef(AFD).asForeign());
-      }
-    }
+    // @_cdecl and @objc-on-a-top-level-function with bridged types emit a
+    // foreign thunk with an extra C symbol. Export it. C-compatible @objc
+    // globals use the single-symbol model and are already handled above.
+    if (AFD->getCDeclKind() == ForeignLanguage::ObjectiveC &&
+        !AFD->hasOnlyCEntryPoint())
+      addFunction(SILDeclRef(AFD).asForeign());
 
     {
       // Distributed functions emit a number of thunks that we need to replicate here.
