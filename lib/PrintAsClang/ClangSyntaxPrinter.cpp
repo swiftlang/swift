@@ -310,24 +310,32 @@ void ClangSyntaxPrinter::printSwiftTypeMetadataAccessFunctionCall(
 
 void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
     StringRef metadataVariable, StringRef vwTableVariable, int indent) {
+  printValueWitnessTableAccessSequenceFromTypeMetadataPointer(
+      (metadataVariable + "._0").str(), "vwTableAddr", vwTableVariable, indent);
+}
+
+void ClangSyntaxPrinter::
+    printValueWitnessTableAccessSequenceFromTypeMetadataPointer(
+        StringRef metadataPointer, StringRef vwTableAddrVariable,
+        StringRef vwTableVariable, int indent) {
   os << std::string(indent, ' ');
-  os << "auto *vwTableAddr = ";
+  os << "auto *" << vwTableAddrVariable << " = ";
   os << "reinterpret_cast<";
   printSwiftImplQualifier();
-  os << "ValueWitnessTable **>(" << metadataVariable << "._0) - 1;\n";
+  os << "ValueWitnessTable **>(" << metadataPointer << ") - 1;\n";
   os << "#ifdef __arm64e__\n";
   os << std::string(indent, ' ');
   os << "auto *" << vwTableVariable << " = ";
   os << "reinterpret_cast<";
   printSwiftImplQualifier();
   os << "ValueWitnessTable *>(ptrauth_auth_data(";
-  os << "reinterpret_cast<void *>(*vwTableAddr), "
-        "ptrauth_key_process_independent_data, ";
-  os << "ptrauth_blend_discriminator(vwTableAddr, "
+  os << "reinterpret_cast<void *>(*" << vwTableAddrVariable << "), ";
+  os << "ptrauth_key_process_independent_data, ";
+  os << "ptrauth_blend_discriminator(" << vwTableAddrVariable << ", "
      << SpecialPointerAuthDiscriminators::ValueWitnessTable << ")));\n";
   os << "#else\n";
   os << std::string(indent, ' ');
-  os << "auto *" << vwTableVariable << " = *vwTableAddr;\n";
+  os << "auto *" << vwTableVariable << " = *" << vwTableAddrVariable << ";\n";
   os << "#endif\n";
 }
 
