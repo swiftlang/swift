@@ -1572,7 +1572,12 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
-    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr);
+    // An enum marked `@nonexhaustive` cannot be switched over exhaustively
+    // from another module, even when it's defined in a module that isn't
+    // built with library evolution. Adding a case to such an enum is
+    // therefore not a source-breaking change.
+    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr) &&
+                       !ED->getAttrs().hasAttribute<NonexhaustiveAttr>();
     if (auto RT = ED->getRawType()) {
       if (auto *D = RT->getNominalOrBoundGenericNominal()) {
         EnumRawTypeName = D->getName().str();
