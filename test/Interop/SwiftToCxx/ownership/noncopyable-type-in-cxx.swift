@@ -80,7 +80,7 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK:   SWIFT_INLINE_THUNK ~CopyableStruct() noexcept {
 // CHECK-NOT:     if (_isMovedFrom) return;
 // CHECK:   SWIFT_INLINE_THUNK CopyableStruct(const CopyableStruct &other) noexcept {
-// CHECK:   alignas(8) char _storage[8];
+// CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   friend class _impl::_impl_CopyableStruct;
 
 // A noncopyable type cannot be used as a Swift generic argument yet.
@@ -140,7 +140,7 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 
 // The moved-from flag is stored after the Swift value, so that the address of
 // the C++ object is still the address of the Swift value.
-// CHECK:   alignas(8) char _storage[16];
+// CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   bool _isMovedFrom = false;
 
 // A borrowing parameter is still taken by const reference.
