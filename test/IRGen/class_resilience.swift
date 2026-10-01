@@ -55,8 +55,10 @@
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMF"
 // -- metadata bounds:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMo"
-// --       metadata positive size in words (not used):
-// CHECK-SAME:   i32 0,
+// --       extra class flags (has resilient superclass):
+// --       HasObjCResilientClassStub if the target supports class stubs
+// CHECK-objc-SAME:   i32 {{0|1}},
+// CHECK-native-SAME: i32 0,
 // --       num immediate members:
 // CHECK-SAME:   i32 4,
 // --       num fields:
