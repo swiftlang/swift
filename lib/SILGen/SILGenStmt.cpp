@@ -708,9 +708,13 @@ SILGenFunction::prepareIndirectResultInit(
 }
 
 static Expr *lookThroughProjections(Expr *expr) {
-  auto *lookupExpr = dyn_cast<LookupExpr>(expr);
+  auto *semanticExpr = expr->getSemanticsProvidingExpr();
+  if (auto *inoutExpr = dyn_cast<InOutExpr>(semanticExpr)) {
+    return lookThroughProjections(inoutExpr->getSubExpr());
+  }
+  auto *lookupExpr = dyn_cast<LookupExpr>(semanticExpr);
   if (!lookupExpr) {
-    return expr;
+    return semanticExpr;
   }
   return lookThroughProjections(lookupExpr->getBase());
 }
