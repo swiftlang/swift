@@ -943,7 +943,6 @@ public:
     auto TypeRefMdSec = lookup("swift5_typeref");
     auto ReflStrMdSec = lookup("swift5_reflstr");
     auto ConformMdSec = lookup("swift5_protocol_conformances");
-    auto MPEnumMdSec = lookup("swift5_mpenum");
 
     ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
                            {AssocTySec.first, AssocTySec.second},
@@ -952,7 +951,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
     return addReflectionInfo(info);
   }
