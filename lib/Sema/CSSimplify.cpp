@@ -7293,7 +7293,7 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
   // though since pack expansions can be present in fixed types for nested
   // type vars.
   auto baseTy = cs.simplifyType(type->getDependentMemberRoot());
-  llvm::SmallPtrSet<TypeVariableType *, 2> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   baseTy->getTypeVariables(typeVars);
   return llvm::any_of(typeVars, [](const TypeVariableType *typeVar) {
     return typeVar->getImpl().isPackExpansion();
@@ -7808,7 +7808,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         bool afterPack = false;
         for (auto element : tuple->getElements()) {
           if (afterPack && !element.hasName()) {
-            SmallPtrSet<TypeVariableType *, 2> typeVars;
+            SmallPtrSetVector<TypeVariableType *, 4> typeVars;
             element.getType()->getTypeVariables(typeVars);
 
             bool hasUnresolvedPack = llvm::any_of(typeVars, [](auto *tv) {
@@ -14172,7 +14172,7 @@ static bool hasUnresolvedPackVars(Type type) {
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
   // or pack expansions.
-  SmallPtrSet<TypeVariableType *, 2> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   type->getTypeVariables(typeVars);
   return llvm::any_of(typeVars, [](const TypeVariableType *typeVar) {
     return typeVar->getImpl().canBindToPack() ||
@@ -14208,7 +14208,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
   // or pack expansions.
-  SmallPtrSet<TypeVariableType *, 2> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   packTy->getTypeVariables(typeVars);
   for (auto *typeVar : typeVars) {
     if (typeVar->getImpl().canBindToPack() ||
@@ -16397,16 +16397,13 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
       // Extract any type variables present in the parameter's result builder.
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
       if (auto builderTy = getOpenedResultBuilderTypeFor(*this, locator))
-        builderTy->getTypeVariables(typeVars);
-
-      SmallVector<TypeVariableType *, 4> referencedVars{typeVars.begin(),
-                                                        typeVars.end()};
+        builderTy->getTypeVariables(referencedVars);
 
       auto *loc = getConstraintLocator(locator);
-      addUnsolvedConstraint(
-          Constraint::create(*this, kind, first, second, loc, referencedVars));
+      addUnsolvedConstraint(Constraint::create(*this, kind, first, second, loc,
+                                               referencedVars.getArrayRef()));
       return SolutionKind::Solved;
     }
   }

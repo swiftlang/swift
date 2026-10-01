@@ -248,7 +248,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
                                            Type type,
                                            bool *involvesOtherTypeVariables) {
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   type->getTypeVariables(typeVars);
 
   bool occurs = typeVars.count(typeVar);

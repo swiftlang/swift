@@ -2041,7 +2041,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
 
-  SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
   binding.BindingType->getTypeVariables(referencedTypeVars);
 
   // If type variable is not allowed to bind to `lvalue`,
@@ -2085,7 +2085,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       // count" for each adjacent variable, so we might remove one
       // prematurely.
       {
-        SmallPtrSet<TypeVariableType *, 4> referencedVars;
+        SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
         existing->BindingType->getTypeVariables(referencedVars);
         for (auto *var : referencedVars)
           ReferencedVars.erase(var);
@@ -2892,7 +2892,7 @@ bool swift::constraints::inference::checkTypeOfBinding(
     TypeVariableType *typeVar, Type type) {
   // If the type references the type variable, don't permit the binding.
   if (type->hasTypeVariable()) {
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
     type->getTypeVariables(referencedTypeVars);
     if (referencedTypeVars.count(typeVar))
       return false;
@@ -3324,7 +3324,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   if (type->getWithoutSpecifierType()
           ->lookThroughAllOptionalTypes()
           ->is<DependentMemberType>()) {
-    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
     type->getTypeVariables(referencedVars);
 
     bool containsSelf = false;

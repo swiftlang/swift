@@ -38,6 +38,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -872,7 +873,8 @@ public:
   ///
   /// \param typeVariables This vector is populated with the set of
   /// type variables referenced by this type.
-  void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
+  void
+  getTypeVariables(SmallPtrSetVector<TypeVariableType *, 4> &typeVariables);
 
 public:
   /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
