@@ -22,6 +22,7 @@
 // for OptionalTypeKind
 #include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -143,6 +144,13 @@ public:
   void printTypeName(raw_ostream &os, Type ty, const ModuleDecl *moduleContext);
 
   void printAvailability(raw_ostream &os, const Decl *D);
+
+  /// Orders the same-named C++ overload candidates in \p declarations so that
+  /// the ones with fewer conformance requirements are printed first, and win
+  /// if their C++ signatures collide. Requirements that need a witness table
+  /// count more than marker protocol requirements. Does nothing without
+  /// GenerateBindingsForHashableRequirementsInCXX.
+  void orderCxxOverloadsForEmission(MutableArrayRef<const Decl *> declarations);
 
   /// Is \p ED empty of members and protocol conformances to include?
   bool isEmptyExtensionDecl(const ExtensionDecl *ED);

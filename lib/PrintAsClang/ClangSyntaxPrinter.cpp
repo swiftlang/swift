@@ -20,6 +20,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclTemplate.h"
@@ -334,11 +335,11 @@ void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
 void ClangSyntaxPrinter::printCTypeMetadataTypeFunction(
     const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
     llvm::ArrayRef<GenericRequirement> genericRequirements) {
-  // FIXME: Support generic requirements > 3.
-  if (!genericRequirements.empty())
-    os << "static_assert(" << genericRequirements.size()
-       << " <= " << NumDirectGenericTypeMetadataAccessFunctionArgs
-       << ", \"unsupported generic requirement list for metadata func\");\n";
+  // FIXME: Support generic requirements > 3. getDeclRepresentation rejects
+  // types that would need them.
+  ASSERT(genericRequirements.size() <=
+             NumDirectGenericTypeMetadataAccessFunctionArgs &&
+         "generic metadata accessor requires an indirect argument buffer");
   os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
   os << "SWIFT_EXTERN ";
   printSwiftImplQualifier();
@@ -409,10 +410,25 @@ void ClangSyntaxPrinter::printGenericSignatureParams(
 
 void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
     const GenericRequirement &requirement) {
-  assert(requirement.isAnyMetadata() &&
-         "protocol requirements not supported yet!");
+  assert((requirement.isAnyMetadata() || requirement.isAnyWitnessTable()) &&
+         "unsupported generic requirement");
   auto *gtpt = requirement.getTypeParameter()->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
+  if (requirement.isAnyWitnessTable()) {
+    // Look up the witness table for the required protocol conformance via the
+    // Swift runtime. _SwiftCxxInteroperability.h only declares the protocol
+    // descriptor for Hashable (see cxx_translation::isExposableToCxx).
+    ASSERT(requirement.getProtocol()->isSpecificProtocol(
+               KnownProtocolKind::Hashable) &&
+           "no protocol descriptor declared for this protocol");
+    printSwiftImplQualifier();
+    os << "getConformanceWitnessTable<";
+    printGenericTypeParamTypeName(gtpt);
+    os << ", ";
+    printSwiftImplQualifier();
+    os << "HashableProtocolDescriptor>()";
+    return;
+  }
   os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);
   os << ">::getTypeMetadata()";

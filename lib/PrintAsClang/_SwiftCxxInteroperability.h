@@ -113,6 +113,36 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+extern "C" const void *_Nullable swift_conformsToProtocol(
+    const void *_Nonnull type, const void *_Nonnull protocol) noexcept;
+
+// Older Apple runtimes do not have the conformance execution context APIs, so
+// they are weakly imported there.
+#if defined(__APPLE__) && __has_attribute(weak_import)
+#define SWIFT_CONFORMANCE_EXECUTION_CONTEXT_IMPORT __attribute__((weak_import))
+#else
+#define SWIFT_CONFORMANCE_EXECUTION_CONTEXT_IMPORT
+#endif
+
+extern "C" SWIFT_IMPORT_STDLIB_SYMBOL size_t
+    swift_ConformanceExecutionContextSize
+        SWIFT_CONFORMANCE_EXECUTION_CONTEXT_IMPORT;
+
+extern "C" const void *_Nullable swift_conformsToProtocolWithExecutionContext(
+    const void *_Nonnull type, const void *_Nonnull protocol,
+    void *_Nonnull context) noexcept SWIFT_CONFORMANCE_EXECUTION_CONTEXT_IMPORT;
+
+extern "C" bool
+swift_isInConformanceExecutionContext(const void *_Nonnull type,
+                                      const void *_Nonnull context) noexcept
+    SWIFT_CONFORMANCE_EXECUTION_CONTEXT_IMPORT;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
+// Protocol descriptor for Swift.Hashable.
+extern "C" SWIFT_IMPORT_STDLIB_SYMBOL size_t $sSHMp;
+#pragma clang diagnostic pop
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
 
@@ -163,6 +193,85 @@ SWIFT_INLINE_THUNK void opaqueFree(void *_Nonnull p) noexcept {
 #endif
 #endif
 }
+
+SWIFT_INLINE_PRIVATE_HELPER bool
+hasConformanceExecutionContextRuntimeSupport() noexcept {
+#if defined(__APPLE__) && __has_attribute(weak_import)
+  return &swift_ConformanceExecutionContextSize != nullptr &&
+         swift_conformsToProtocolWithExecutionContext != nullptr &&
+         swift_isInConformanceExecutionContext != nullptr;
+#else
+  return true;
+#endif
+}
+
+template <size_t MessageSize>
+[[noreturn]] SWIFT_INLINE_PRIVATE_HELPER void
+fatalConformanceLookup(const char (&message)[MessageSize]) noexcept {
+  _swift_stdlib_reportFatalError("Fatal error", 11, message,
+                                 static_cast<int>(MessageSize - 1),
+                                 /*flags=*/0);
+  abort();
+}
+
+/// A protocol conformance that was looked up at runtime.
+struct ConformanceLookupResult {
+  void *_Nonnull typeMetadata;
+  void *_Nonnull witnessTable;
+  /// Records the global actor of an isolated conformance, or null if the
+  /// runtime does not support conformance execution contexts. It only refers
+  /// to runtime metadata, so it stays valid for the lifetime of the process.
+  const void *_Nullable executionContext;
+};
+
+/// Looks up the conformance of the Swift type identified by the given type
+/// metadata to the Swift protocol identified by the given protocol descriptor.
+/// Aborts if the type does not conform.
+SWIFT_INLINE_PRIVATE_HELPER ConformanceLookupResult
+lookupConformance(void *_Nonnull typeMetadata,
+                  const void *_Nonnull protocolDescriptor) noexcept {
+  if (!hasConformanceExecutionContextRuntimeSupport()) {
+    // Older Apple runtimes do not expose conformance execution contexts.
+    // Preserve their dynamic-cast behavior for back deployment.
+    const void *_Nullable witnessTable =
+        swift_conformsToProtocol(typeMetadata, protocolDescriptor);
+    if (!witnessTable)
+      fatalConformanceLookup(
+          "Swift protocol conformance required by generic requirements is "
+          "unavailable\n");
+    return {typeMetadata, const_cast<void *>(witnessTable), nullptr};
+  }
+
+  // The runtime publishes the size of this opaque context dynamically. It is
+  // kept with the witness table, see getConformanceWitnessTable.
+  size_t contextSize = swift_ConformanceExecutionContextSize;
+  void *_Nonnull context = opaqueAlloc(contextSize, alignof(void *));
+  __builtin_memset(context, 0, contextSize);
+
+  const void *_Nonnull signedProtocolDescriptor = protocolDescriptor;
+#ifdef __arm64e__
+  signedProtocolDescriptor = ptrauth_sign_unauthenticated(
+      const_cast<void *>(protocolDescriptor),
+      ptrauth_key_process_dependent_data,
+      ptrauth_string_discriminator("ProtocolDescriptor"));
+#endif
+
+  const void *_Nullable witnessTable =
+      swift_conformsToProtocolWithExecutionContext(
+          typeMetadata, signedProtocolDescriptor, context);
+  if (!witnessTable)
+    fatalConformanceLookup(
+        "Swift protocol conformance required by generic requirements is "
+        "unavailable\n");
+  return {typeMetadata, const_cast<void *>(witnessTable), context};
+}
+
+/// Identifies the Swift.Hashable protocol in getConformanceWitnessTable.
+struct HashableProtocolDescriptor {
+  static SWIFT_INLINE_PRIVATE_HELPER const void *_Nonnull get() noexcept {
+    return &$sSHMp;
+  }
+};
 
 /// Base class for a container for an opaque Swift value, like resilient struct.
 class OpaqueStorage {
@@ -297,6 +406,29 @@ template <class T> static inline const constexpr bool isOpaqueLayout = false;
 /// Swift ability to work with it in a generic context.
 template <class T>
 static inline const constexpr bool isSwiftBridgedCxxRecord = false;
+
+/// Returns the witness table for the conformance of the Swift type `T` to the
+/// Swift protocol whose descriptor `ProtocolDescriptor::get()` returns. Aborts
+/// if `T` does not conform, or if the conformance is isolated to a global
+/// actor and the caller is not running on it.
+///
+/// The conformance is looked up once per instantiation. An isolated
+/// conformance can only be used on its global actor, so the execution context
+/// is still checked on every call when the runtime supports it.
+template <class T, class ProtocolDescriptor>
+SWIFT_INLINE_PRIVATE_HELPER void
+    *_Nonnull getConformanceWitnessTable() noexcept {
+  static const ConformanceLookupResult conformance = lookupConformance(
+      TypeMetadataTrait<T>::getTypeMetadata(), ProtocolDescriptor::get());
+  const void *_Nullable context = conformance.executionContext;
+  if (context &&
+      !swift_isInConformanceExecutionContext(
+          conformance.typeMetadata, static_cast<const void *_Nonnull>(context)))
+    fatalConformanceLookup(
+        "Swift protocol conformance is unavailable in the current execution "
+        "context\n");
+  return conformance.witnessTable;
+}
 
 /// Returns the opaque pointer to the given value.
 template <class T>
