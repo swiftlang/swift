@@ -6898,7 +6898,21 @@ public:
   }
 
   bool shouldDesugarTypeAliasType(TypeAliasType *T) {
-    return Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType;
+    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType)
+      return true;
+
+    // Implicit typealiases for generic parameters (such as the witness
+    // `typealias Element = Element` inferred for an associated type) are not
+    // printed in module interfaces, so references to them would not resolve.
+    // Print the underlying type instead.
+    if (Options.IsForSwiftInterface) {
+      auto *alias = T->getDecl();
+      if (alias->isImplicit() &&
+          alias->getUnderlyingType()->is<GenericTypeParamType>())
+        return true;
+    }
+
+    return false;
   }
 
   void visitTypeAliasType(TypeAliasType *T,
