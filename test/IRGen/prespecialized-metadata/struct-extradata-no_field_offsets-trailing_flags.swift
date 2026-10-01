@@ -72,10 +72,9 @@
 // CHECK-SAME:       ), 
 // CHECK-SAME:       [[INT]] ptrtoint (
 // CHECK-SAME:         ptr getelementptr inbounds (
-// CHECK-SAME:           <{ i32, i32, i32, i32, i32, i16, i16 }>, 
+// CHECK-SAME:           i8, 
 // CHECK-SAME:           $s4main4PairVMP
-// CHECK-SAME:           i32 0, 
-// CHECK-SAME:           i32 4
+// CHECK-SAME:           [[INT]] 16
 // CHECK-SAME:         ) to [[INT]]
 // CHECK-SAME:       )
 // CHECK-SAME:     )
