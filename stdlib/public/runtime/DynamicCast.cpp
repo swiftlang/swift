@@ -101,6 +101,13 @@ static inline OpaqueValue *destFor(OpaqueValue *destLocation) {
   return destLocation;
 }
 
+/// Whether \p srcType can be stored in a container that requires a `Copyable`,
+/// `Escapable` payload, including `AnyHashable` and various plain existentials
+/// which cannot record suppressed protocols such as `~Copyable`.
+static bool canInhabitPlainExistential(const Metadata *srcType) {
+  return !checkInvertibleRequirements(srcType, InvertibleProtocolSet());
+}
+
 /// Answer a test by conversion-casting into a temporary.
 ///
 /// This is the fallback for cases where test-only behavior isn't fully
@@ -1016,7 +1023,12 @@ tryCastToAnyHashable(
     );
   }
   if (!hashableConformance) {
-    // Failed.
+    // Fail if there's no `Hashable` conformance
+    return DynamicCastResult::Failure;
+  } else if (!canInhabitPlainExistential(srcType)) {
+    // Fail if it's `Hashable` but can't go into an `AnyHashable` box
+    srcFailureType = srcType;
+    destFailureType = destType;
     return DynamicCastResult::Failure;
   } else if (isTestOnlyCast(destLocation)) {
     // Test-only success
@@ -1623,17 +1635,6 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   return true;
 }
 
-/// Whether \p srcType can be stored in a plain (non-extended) existential.
-///
-/// `MetadataKind::Existential` -- `Any`, `AnyObject`, `any P`, `Error` -- has
-/// no room to record suppressed requirements, so such a container always
-/// requires its payload to be both `Copyable` and `Escapable`. An existential
-/// that suppresses either is `MetadataKind::ExtendedExistential` and is handled
-/// by tryCastToExtendedExistential, which checks its own requirement signature.
-static bool canInhabitPlainExistential(const Metadata *srcType) {
-  return !checkInvertibleRequirements(srcType, InvertibleProtocolSet());
-}
-
 // Cast to unconstrained `Any`
 static DynamicCastResult
 tryCastToUnconstrainedOpaqueExistential(
@@ -1971,6 +1972,7 @@ tryCastToErrorExistential(
   auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
   assert(destExistentialType->getRepresentation()
          == ExistentialTypeRepresentation::Error);
+
   // Null when testing, so a missed write below derefs null immediately rather
   // than storing somewhere unexpected.
   auto destBoxAddr = isTestOnlyCast(destLocation)
@@ -1986,33 +1988,44 @@ tryCastToErrorExistential(
   case MetadataKind::Class: {  // Class => Error
     assert(destExistentialType->NumProtocols == 1);
     const WitnessTable *errorWitness;
-    if (_conformsToProtocols(
-            srcValue, srcType, destExistentialType, &errorWitness,
-            prohibitIsolatedConformances)) {
-      // Conforming to Error is the whole question. Everything below produces the
-      // box, so a test stops here -- and skips swift_allocError entirely.
-      if (isTestOnlyCast(destLocation)) {
-        return DynamicCastResult::TestSuccess;
-      }
+
+    // Does it conform to `Error` ??
+    if (!_conformsToProtocols(
+	  srcValue, srcType, destExistentialType, &errorWitness,
+	  prohibitIsolatedConformances)) {
+      return DynamicCastResult:: Failure;
+    }
+
+    // Can it be boxed?
+    if (!canInhabitPlainExistential(srcType)) {
+      srcFailureType = srcType;
+      destFailureType = destType;
+      return DynamicCastResult::Failure;
+    }
+
+    // If test-only, we just need the verdict, not the result
+    if (isTestOnlyCast(destLocation)) {
+      return DynamicCastResult::TestSuccess;
+    }
+
 #if SWIFT_OBJC_INTEROP
-      // If it already holds an NSError, just use that.
-      if (auto embedded = getErrorEmbeddedNSErrorIndirect(
-            srcValue, srcType, errorWitness)) {
-        *destBoxAddr = reinterpret_cast<SwiftError *>(embedded);
-        return DynamicCastResult::SuccessViaCopy;
-      }
+    // If it already holds an NSError, that's our result
+    if (auto embedded = getErrorEmbeddedNSErrorIndirect(
+	  srcValue, srcType, errorWitness)) {
+      *destBoxAddr = reinterpret_cast<SwiftError *>(embedded);
+      return DynamicCastResult::SuccessViaCopy;
+    }
 #endif
 
-      BoxPair destBox = swift_allocError(
-        srcType, errorWitness, srcValue, takeOnSuccess);
-      *destBoxAddr = reinterpret_cast<SwiftError *>(destBox.object);
-      if (takeOnSuccess) {
-        return DynamicCastResult::SuccessViaTake;
-      } else {
-        return DynamicCastResult::SuccessViaCopy;
-      }
+    // Box in a new Error existential
+    BoxPair destBox = swift_allocError(
+      srcType, errorWitness, srcValue, takeOnSuccess);
+    *destBoxAddr = reinterpret_cast<SwiftError *>(destBox.object);
+    if (takeOnSuccess) {
+      return DynamicCastResult::SuccessViaTake;
+    } else {
+      return DynamicCastResult::SuccessViaCopy;
     }
-    return DynamicCastResult::Failure;
   }
 
   default:
@@ -2611,7 +2624,8 @@ static DynamicCastResult tryCastToCOMExistential(
 
   if (isTestOnlyCast(destLocation)) {
     // Release the no-longer-needed result. Release is slot 2 of IUnknown.
-    auto release = reinterpret_cast<_SwiftCOMLifetimeFunction>(vtable[2]);
+    auto **resultVtable = *reinterpret_cast<void ***>(resultInterface);
+    auto release = reinterpret_cast<_SwiftCOMLifetimeFunction>(resultVtable[2]);
     release(resultInterface);
     return DynamicCastResult::TestSuccess;
   }
@@ -2737,6 +2751,12 @@ tryCast(
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
   bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
+  // Sanity: test-only is incompatible with deferred checks
+  // Failure indicates a structural problem with the cast logic in this file.
+  assert(!(isTestOnlyCast(destLocation) && mayDeferChecks) &&
+         "a test-only cast cannot defer checks: there is no destination to "
+         "defer them to");
+
   destFailureType = destType;
   srcFailureType = srcType;
 
@@ -3072,7 +3092,7 @@ tryCast(
 }
 
 /******************************************************************************/
-/****************************** Main Entrypoint *******************************/
+/********************** Main Conversion Cast Entrypoint ***********************/
 /******************************************************************************/
 
 /// ABI: Perform a dynamic cast to an arbitrary type.
@@ -3097,16 +3117,9 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
   bool prohibitIsolatedConformances =
       flags & DynamicCastFlags::ProhibitIsolatedConformances;
 
-  // A null destination means "test only" to tryCast(), so a conversion must
-  // never reach it with one. It can: a zero-sized destination type has no
-  // storage, so `alloc_stack` lowers to a null pointer that IRGen passes here as
-  // an ordinary destination. `enum Stop: Error { case stop }` is the shape --
-  // size 0, and `as? Stop` really does want a value written.
-  //
-  // Point those at a scratch byte instead. Nothing can read more than zero bytes
-  // through it, since only a zero-sized type gets here, so one suitably aligned
-  // byte is always enough -- and giving the strategies a real address keeps the
-  // convention unambiguous without threading a flag through all of them.
+  // A null destination means "test only" to tryCast(), so ensure we have a
+  // non-null destination pointer.  This can only occur for zero-sized types for
+  // which allocators may return nullptr.
   alignas(MaximumAlignment) char zeroSizedScratch[1];
   if (destLocation == nullptr) {
     assert(destType->vw_size() == 0 &&
@@ -3149,7 +3162,7 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 }
 
 /******************************************************************************/
-/**************************** Non-consuming Test ******************************/
+/****************** Main Entrypoint for Non-consuming Test ********************/
 /******************************************************************************/
 
 static bool
