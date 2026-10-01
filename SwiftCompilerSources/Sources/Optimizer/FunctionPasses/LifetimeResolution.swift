@@ -98,15 +98,27 @@ struct ResolvableRoot {
 
   /// Build from a storage allocation (`alloc_box` / `alloc_stack`). Callers holding only
   /// an address must first walk up to the allocation.
-  init?(_ val: Value, _ context: FunctionPassContext) {
+  init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache, _ context: FunctionPassContext) {
     let function = val.parentFunction
     var extraUses: [Instruction] = []
 
     switch val {
     case let allocStack as AllocStackInst:
       storage = val
-      startsInitialized = false
-      address = Self.lookThroughMarkUninitialized(storage)
+
+      if let mu = Self.findMarkUninitialized(storage) {
+        address = mu
+
+        let indicies = indexCache.fieldIndices(for: storage.type.objectType)
+
+        // If this is the 'self' for an empty type in its initializer, we don't have any fields to initialize.
+        // So, treat the storage as being born initialized
+        startsInitialized = mu.kind == .rootSelf && !indicies.hasFields
+
+      } else {
+        address = storage
+        startsInitialized = false
+      }
 
       varDecl = allocStack.varDecl
       isLet = allocStack.debugVariable?.isLet() ?? true   // TODO: find a more reliable way to discover this.
@@ -124,7 +136,12 @@ struct ResolvableRoot {
       startsInitialized = false
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
-      let box = Self.lookThroughMarkUninitialized(storage)
+      let box: Value
+      if let mu = Self.findMarkUninitialized(storage) {
+        box = mu
+      } else {
+        box = storage
+      }
       box.uses.endingLifetime.forEach { extraUses.append($0.instruction) }
       // TODO: add copies of the box too
 
@@ -192,11 +209,11 @@ struct ResolvableRoot {
   }
 
   // A stack-backed local `let` or `var`; its `mark_uninitialized [var]` is the address.
-  private static func lookThroughMarkUninitialized(_ value: Value) -> Value {
+  private static func findMarkUninitialized(_ value: Value) -> MarkUninitializedInst? {
     if let mu = value.uses.singleUser(ofType: MarkUninitializedInst.self) {
       return mu
     }
-    return value
+    return nil
   }
 }
 
@@ -220,7 +237,7 @@ private struct Resolver {
 
   // - Returns: true iff legalization was successful
   mutating func run(on value: Value, _ indexCache: inout FieldIndexTrieCache) -> Bool {
-    guard let root = ResolvableRoot(value, context) else {
+    guard let root = ResolvableRoot(value, &indexCache, context) else {
       return false
     }
 

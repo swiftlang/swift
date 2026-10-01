@@ -87,11 +87,14 @@ public struct FieldIndexTrie: CustomStringConvertible {
 
   private let root: Node
 
-  /// The total number of leaf subelements.
+  /// The total number of leaf subelements. This is always at least 1, even for types with no fields.
   public var leafCount: Int { wholeRange.upperBound }
 
   /// The range covering every leaf: `0..<leafCount`.
   public var wholeRange: Range<Int> { root.range }
+
+  /// Does this type have any visible, initializable fields?
+  public var hasFields: Bool { root.children.count > 0 }
 
   public init(of type: Type, in function: Function) {
     var cursor = 0

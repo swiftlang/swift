@@ -337,6 +337,59 @@ func trivialUseBeforeInit() {
   _ = x
 }
 
+struct EmptyStruct {
+  init() {}
+}
+
+enum EmptyEnum {
+  // FIXME: It is correct to emit an error here, but the message needs improving,
+  //        as it's actually considered a delegating initializer.
+  //        Here's what DI emits: 'self.init' isn't called on all paths before returning from initializer
+
+  init() {}  // expected-error {{variable 'self' used before being initialized}} // expected-note {{variable defined here}}
+}
+
+class EmptyClass {
+  init() {}
+}
+
+func testEmpties_ubi() {
+  let s: EmptyStruct  // expected-note {{defined here}}
+  _ = s  // expected-error {{used before being initialized}}
+
+  let e: EmptyEnum // expected-note {{defined here}}
+  _ = e // expected-error {{used before being initialized}}
+
+  let c: EmptyClass // expected-note {{defined here}}
+  _ = c // expected-error {{used before being initialized}}
+}
+
+func testEmpties_uac() {
+  let s: EmptyStruct
+  s = EmptyStruct()
+  _ = consume s  // expected-warning {{has no effect}}
+  _ = s
+
+  let e: EmptyEnum
+  e = EmptyEnum()
+  _ = consume e  // expected-warning {{has no effect}}
+  _ = e
+
+  let c: EmptyClass
+  c = EmptyClass()
+  _ = consume c  // expected-note {{consumed here}}
+  _ = c          // expected-error {{'c' used after consume}}
+}
+
+struct Point {
+  var x: Int = 0
+  var y: Int
+  init(oops: ()) {} // expected-error {{variable 'self' used before being initialized}}  // expected-note {{variable defined here}}
+  init(stillOops: ()) { self.x = 0 }  // expected-error {{variable 'self' used before being initialized}}  // expected-note {{variable defined here}}
+  init(correct: ()) { self.y = 0 }
+}
+
+
 // FIXME: this case is still missing diagnostics! (rdar://188752216)
 func consumeCopyableFields() {
   let p = Pair(a: C(), b: C())
