@@ -230,14 +230,19 @@ bool SerializedSILLoader::invalidateDifferentiabilityWitness(
 
 // FIXME: Not the best interface. We know exactly which FileUnits may have SIL
 // those in the main module.
-void SerializedSILLoader::getAllForModule(Identifier Mod,
-                                          FileUnit *PrimaryFile) {
+std::optional<SILStage>
+SerializedSILLoader::getAllForModule(Identifier Mod, FileUnit *PrimaryFile) {
+  std::optional<SILStage> lowestSIBFloor;
   for (auto &Des : LoadedSILSections) {
     if (Des->getModuleIdentifier() == Mod) {
       Des->getAll(PrimaryFile ?
                   Des->getFile() != PrimaryFile : false);
+      if (auto floor = Des->getRecordedStageFloor())
+        if (!lowestSIBFloor || *floor < *lowestSIBFloor)
+          lowestSIBFloor = floor;
     }
   }
+  return lowestSIBFloor;
 }
 
 void SerializedSILLoader::getAllSILFunctions() {

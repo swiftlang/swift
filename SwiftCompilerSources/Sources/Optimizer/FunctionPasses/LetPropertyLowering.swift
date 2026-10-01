@@ -42,7 +42,7 @@ import SIL
 let letPropertyLowering = FunctionPass(name: "let-property-lowering") {
   (function: Function, context: FunctionPassContext) in
 
-  assert(context.silStage == .raw, "let-property-lowering must run before RawSILInstLowering")
+  assert(context.stageFloor == .raw, "let-property-lowering must run before RawSILInstLowering")
 
   if context.hadError {
     // If DefiniteInitialization (or other passes) already reported an error, we cannot assume valid SIL anymore.

@@ -32,6 +32,7 @@ class SILFunction;
 class SILGlobalVariable;
 class SILProperty;
 class SILModule;
+enum class SILStage;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
@@ -96,7 +97,13 @@ public:
   ///
   /// Otherwise, definitions not in the primary file are brought in
   /// with external linkage.
-  void getAllForModule(Identifier Mod, FileUnit *PrimaryFile);
+  ///
+  /// Returns the lowest stage floor recorded by the SIBs that were read, or
+  /// std::nullopt if none of the sections read was a SIB. The module's own
+  /// floor is left alone: only the caller knows whether the SIBs are the whole
+  /// of what it is lowering.
+  std::optional<SILStage> getAllForModule(Identifier Mod,
+                                          FileUnit *PrimaryFile);
 
   /// Deserialize all SILFunctions in all SILModules.
   void getAllSILFunctions();
