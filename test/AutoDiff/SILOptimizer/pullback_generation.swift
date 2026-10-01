@@ -199,13 +199,16 @@ func f4(a: NonTrivial) -> Float {
 // CHECK: %[[#]] = apply %[[#T5]]<Float>(%[[#T2]], %[[#T3]], %[[#T6]]) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
 // CHECK: destroy_value %[[#ARG0]] : $NonTrivial
 
+@inline(never)
+func always_false() -> Bool { return false }
+
 @differentiable(reverse)
 func move_value(x: Float) -> Float {
   var result = x
   repeat {
     let temp = result
     result = temp
-  } while 0 == 1
+  } while always_false()
   return result
 }
 
