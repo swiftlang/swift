@@ -1303,13 +1303,6 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   return safe();
 }
 
-bool importer::keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
-                                             ASTContext &ctx) {
-  return ctx.LangOpts.hasFeature(
-             Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
-         shouldRenameCXXMethodAsUnsafe(method, ctx);
-}
-
 /// Whether a note at \p loc would land in a system header. Such a note names
 /// something the user cannot annotate (a libc++ implementation detail, say), so
 /// it is dropped in favour of explaining a type they control.
