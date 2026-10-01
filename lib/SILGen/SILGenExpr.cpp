@@ -7579,9 +7579,10 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
   if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
     FormalEvaluationScope writeback(SGF);
 
-    // If we're relying on ManualOwnership for explicit-copies enforcement,
-    // avoid doing address-based emission for loadable types.
-    if (subType.isLoadableOrOpaque(SGF.F) && SGF.B.hasManualOwnershipAttr()) {
+    // If we're not relying on the @moveOnly wrapper for explicit-copies
+    //  enforcement, avoid doing address-based emission for loadable types.
+    if (subType.isLoadableOrOpaque(SGF.F) &&
+        !SGF.usingWrapperTypeImplicitCopyEnforcement()) {
       // Do a read on the lvalue. If we get back an address, do a load before
       // emitting the explicit copy.
       LValue lv =

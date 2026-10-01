@@ -609,6 +609,8 @@ static ManagedValue createInputFunctionArgument(
     }
 
     // ManualOwnership checks everything for implicit copies already.
+    // LifetimeResolution still looks for the @noImplicitCopies attribute,
+    // but does not rely on the wrapper for enforcement.
     if (B.hasManualOwnershipAttr())
       isNoImplicitCopy = false;
   }

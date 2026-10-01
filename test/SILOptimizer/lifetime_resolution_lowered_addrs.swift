@@ -6,7 +6,7 @@
 
 // For extra coverage, compile with opaque values, but skip FileCheck.
 // RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -enable-sil-opaque-values -verify \
-// RUN:   -enable-experimental-feature LifetimeDependence %s
+// RUN:   -enable-experimental-feature LifetimeDependence %s -o /dev/null
 
 // REQUIRES: swift_feature_LifetimeDependence
 
@@ -231,3 +231,16 @@ func copyVarBranchReturn(_ c: Bool) -> Kl {
   if c { return b }
   return a
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}noUses1bySS_tF
+// CHECK: bb0(%0 : @noImplicitCopy @guaranteed $String):
+// CHECK-NOT: moveonlywrapper
+// CHECK: } // end sil function
+func noUses(b: borrowing String) {}
+
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}noUses1cySSn_tF
+// CHECK: bb0(%0 : @noImplicitCopy @_eagerMove @owned $String):
+// CHECK-NOT: moveonlywrapper
+// CHECK: } // end sil function
+func noUses(c: consuming String) {}

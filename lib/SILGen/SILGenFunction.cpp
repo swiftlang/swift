@@ -2092,3 +2092,11 @@ SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
     return &found;
   } while (true);
 }
+
+bool SILGenFunction::usingWrapperTypeImplicitCopyEnforcement() {
+  // If we're relying on ManualOwnership or LifetimeResolution for
+  // explicit-copies enforcement, we don't need the MoveOnlyWrapper.
+  // Just the @noImplicitCopy flag on the binding is enough.
+  return !(B.hasManualOwnershipAttr() ||
+           getASTContext().SILOpts.EnableLifetimeResolution);
+}
