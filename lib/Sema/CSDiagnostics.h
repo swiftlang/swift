@@ -1010,6 +1010,25 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a mismatch between two function types that are otherwise
+/// identical but have \c @convention(_:cType:) attributes with different C
+/// types.
+class FunctionCTypeMismatchFailure final : public ContextualFailure {
+public:
+  FunctionCTypeMismatchFailure(const Solution &solution, Type fromType,
+                               Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {
+#ifndef NDEBUG
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->getExtInfo().getClangTypeInfo() !=
+           fnType2->getExtInfo().getClangTypeInfo());
+#endif
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to conversion between two types with different
 /// execution semantics i.e. '@called(once)' function and regular one:
 ///

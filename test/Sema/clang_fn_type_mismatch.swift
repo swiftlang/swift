@@ -11,15 +11,17 @@ let f1 : (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)? = getFuncti
 // with differing cTypes doesn't work.
 
 let _ : @convention(c) (Int) -> Int = f1!
-// expected-error@-1{{cannot convert value of type '@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' to specified type '@convention(c) (Int) -> Int'}}
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
 
 let _ : (@convention(c) (Int) -> Int)? = f1
-// expected-error@-1{{cannot assign value of type '(@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to type '(@convention(c) (Int) -> Int)?'}}
-// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' and '@convention(c) (Int) -> Int') are expected to be equal}}
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
 
 let _ : (@convention(c, cType: "void *(*)(void *)") (Int) -> Int)? = f1
-// expected-error@-1{{cannot assign value of type '(@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to type '(@convention(c, cType: "void *(*)(void *)") (Int) -> Int)?'}}
-// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' and '@convention(c, cType: "void *(*)(void *)") (Int) -> Int') are expected to be equal}}
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'void *(*)(void *)'}}
+
+// We only use the special diagnostic when there are no other type mismatches.
+let _ : @convention(c, cType: "void *(*)(void *)") (OpaquePointer?) -> Int = f1!
+// expected-error@-1{{cannot convert value of type '@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' to specified type '@convention(c, cType: "void *(*)(void *)") (OpaquePointer?) -> Int'}}
 
 
 // Converting from @convention(c) -> @convention(swift) works
@@ -44,11 +46,37 @@ let _ : @convention(c, cType: "size_t (*)(size_t)") (Int) -> Int = fs
 let f2 : (@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Swift.Int) -> Swift.Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Swift.Int) -> Swift.Int)?)? = getHigherOrderFunctionPointer()!
 
 let _ : (@convention(c) ((@convention(c) (Swift.Int) -> Swift.Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Swift.Int) -> Swift.Int)?)? = f2!
-// expected-error@-1{{cannot convert value of type '@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '@convention(c) ((@convention(c) (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?'}}
+// expected-error@-1{{cannot convert function with underlying C type 'unsigned long (*(*)(unsigned long (*)(unsigned long)))(unsigned long)' to C type 'unsigned long (*(*)(long (*)(long)))(unsigned long)'}}
 
 let _ : (@convention(c) ((@convention(c) (Swift.Int) -> Swift.Int)?) -> (@convention(c) (Swift.Int) -> Swift.Int)?)? = f2!
-// expected-error@-1{{cannot convert value of type '@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '@convention(c) ((@convention(c) (Int) -> Int)?) -> (@convention(c) (Int) -> Int)?'}}
+// expected-error@-1{{cannot convert function with underlying C type 'unsigned long (*(*)(unsigned long (*)(unsigned long)))(unsigned long)' to C type 'long (*(*)(long (*)(long)))(long)'}}
 
 let f3 = getFunctionPointer3
 
 let _ : @convention(c) (UnsafeMutablePointer<ctypes.Dummy>?) -> UnsafeMutablePointer<ctypes.Dummy>? = f3()!
+
+
+// If there are several solutions that add the fix in different places, they're
+// treated as identical, not incomparable.
+
+func identity<T>(_ x: T) -> T { x }
+
+let _ : @convention(c) (Int) -> Int = identity(f1!)
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
+
+let _ : (@convention(c) (Int) -> Int)? = identity(f1)
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
+
+let g1 : [@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int] = [f1!]
+let _ : [@convention(c) (Int) -> Int] = identity(g1)
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
+
+let _ : @convention(c) (Int) -> Int = identity(identity(f1!))
+// expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
+
+let fs2 : @convention(c) (Int) -> Int = { $0 }
+func useInTernary(_ cond: Bool) {
+  let _ : @convention(c) (Int) -> Int = cond ? identity(f1!) : fs2
+  // expected-error@-1{{cannot convert function with underlying C type 'size_t (*)(size_t)' to C type 'long (*)(long)'}}
+}
+

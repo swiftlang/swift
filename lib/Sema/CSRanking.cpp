@@ -1575,6 +1575,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
+    // Don't penalize solutions that only differ in which direction an
+    // AllowFunctionCTypeMismatch fix was applied from.
+    if (cs.onlyMismatchesInFunctionCTypes(type1, type2))
+      continue;
+
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
