@@ -2244,6 +2244,15 @@ ERROR(sil_failed_to_parse_sil_optional,none,
       "Expected SIL optional value of the form '[' NAME ']'", ())
 
 //------------------------------------------------------------------------------
+// MARK: Scope restrictions
+//------------------------------------------------------------------------------
+
+ERROR(expected_scope_specifier, PointsToFirstBadToken,
+      "expected identifier or 'self' in '_scoped' attribute", ())
+ERROR(immortal_scope_cannot_be_access, none,
+      "cannot depend on the access scope of 'immortal'", ())
+
+//------------------------------------------------------------------------------
 // MARK: nonisolated(nonsending)
 //------------------------------------------------------------------------------
 

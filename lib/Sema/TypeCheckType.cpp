@@ -3785,6 +3785,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
+  // TODO: Lower the specifiers into a type scope application instead of
+  // dropping the attribute.
+  if (auto scoped = claim<ScopedTypeAttr>(attrs)) {
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+        !scoped->isInvalid()) {
+      diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
+               "@_scoped", false, Feature::ScopeRestrictions.getName());
+      scoped->setInvalid();
+    }
+  }
+
   // Handle a type attribute that can only be used in inheritance clauses.
   // Returns true if we need to exit early, false otherwise.
   auto handleInheritedOnly = [&](AtTypeAttrBase *attr) {
