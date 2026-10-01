@@ -1,0 +1,4 @@
+module BaseSDK {
+  header "BaseSDK.h"
+  export *
+}
