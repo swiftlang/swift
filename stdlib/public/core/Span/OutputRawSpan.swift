@@ -303,6 +303,7 @@ extension OutputRawSpan {
     _precondition(
       MemoryLayout<T>.size <= freeCapacity, "OutputRawSpan capacity overflow"
     )
+    guard MemoryLayout<T>.size > 0 else { return }
     unsafe _tail().initializeMemory(as: T.self, to: value)
     _count &+= MemoryLayout<T>.size
   }
@@ -374,8 +375,10 @@ extension OutputRawSpan {
   internal mutating func _append<T: BitwiseCopyable>(
     repeating repeatedValue: T, count: Int, as type: T.Type
   ) {
+    _precondition(count >= 0, "Can't append a negative number of values")
     let total = count * MemoryLayout<T>.stride
     _precondition(total <= freeCapacity, "OutputRawSpan capacity overflow")
+    guard count > 0 else { return }
     unsafe _tail().initializeMemory(
       as: T.self, repeating: repeatedValue, count: count
     )

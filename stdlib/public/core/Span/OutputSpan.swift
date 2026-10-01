@@ -334,6 +334,7 @@ extension OutputSpan where Element: ~Copyable {
   public mutating func removeLast(_ n: Int) {
     _precondition(n >= 0, "Can't remove a negative number of elements")
     _precondition(n <= count, "OutputSpan underflow")
+    guard count > 0 else { return }
     _count &-= n
     unsafe _tail().withMemoryRebound(to: Element.self, capacity: n) {
       _ = unsafe $0.deinitialize(count: n)
@@ -368,6 +369,7 @@ extension OutputSpan {
   @_lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
     _precondition(count <= freeCapacity, "OutputSpan capacity overflow")
+    guard count > 0 else { return }
     unsafe _tail().initializeMemory(
       as: Element.self, repeating: repeatedValue, count: count
     )
