@@ -2058,11 +2058,30 @@ static void emitPHINodesForType(IRGenSILFunction &IGF, SILType type,
   }
 }
 
+/// Returns true if \p bb is a case destination of a switch_enum which is its
+/// only predecessor. The switch_enum binds the payload argument of such a block
+/// directly, so it needs neither phi nodes nor a waypoint block.
+static bool isSingleSwitchEnumCaseDest(SILBasicBlock *bb) {
+  if (bb->args_empty()) {
+    return false;
+  }
+  auto *predBB = bb->getSinglePredecessorBlock();
+  if (!predBB || predBB == bb) {
+    return false;
+  }
+  auto *sei = dyn_cast<SwitchEnumInst>(predBB->getTerminator());
+  return sei && (!sei->hasDefault() || sei->getDefaultBB() != bb);
+}
+
 static PHINodeVector
 emitPHINodesForBBArgs(IRGenSILFunction &IGF,
                       SILBasicBlock *silBB,
                       llvm::BasicBlock *llBB) {
   PHINodeVector phis;
+  if (isSingleSwitchEnumCaseDest(silBB)) {
+    return phis;
+  }
+
   unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
 
   IGF.Builder.SetInsertPoint(llBB);
@@ -5223,15 +5242,16 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
     auto casePair = inst.getCase(i);
 
     // If the destination BB accepts the case argument, set up a waypoint BB so
-    // we can feed the values into the argument's PHI node(s).
-    //
-    // FIXME: This is cheesy when the destination BB has only the switch
-    // as a predecessor.
-    if (!casePair.second->args_empty())
+    // we can feed the values into the argument's PHI node(s). This is not
+    // needed if the switch is the only predecessor of the destination BB.
+    if (!casePair.second->args_empty() &&
+        !isSingleSwitchEnumCaseDest(casePair.second)) {
       dests.push_back({casePair.first,
         llvm::BasicBlock::Create(IGF.IGM.getLLVMContext())});
-    else
+    }
+    else {
       dests.push_back({casePair.first, IGF.getLoweredBB(casePair.second).bb});
+    }
   }
 
   llvm::BasicBlock *defaultDest = nullptr;
@@ -5255,6 +5275,26 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
   // Bind arguments for cases that want them.
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
     auto casePair = inst->getCase(i);
+
+    if (isSingleSwitchEnumCaseDest(casePair.second)) {
+      // Project the payload at the start of the destination BB and bind the
+      // argument to it directly. The destination BB is dominated by the
+      // switch, so it is emitted after this point.
+      SILBasicBlock *destBB = casePair.second;
+      assert(destBB->getNumArguments() == 1 &&
+             "switch_enum destination must have a single argument");
+      llvm::BasicBlock *origBB = Builder.GetInsertBlock();
+      Builder.SetInsertPoint(getLoweredBB(destBB).bb);
+
+      Explosion inValue = getLoweredExplosion(inst->getOperand(), &Builder);
+      Explosion projected;
+      emitProjectLoadableEnum(*this, inst->getOperand()->getType(),
+                               inValue, casePair.first, projected);
+      setLoweredExplosion(destBB->getArgument(0), projected);
+
+      Builder.SetInsertPoint(origBB);
+      continue;
+    }
 
     if (!casePair.second->args_empty()) {
       auto waypointBB = dests[i].second;
