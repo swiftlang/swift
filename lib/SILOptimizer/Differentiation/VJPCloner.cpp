@@ -1671,7 +1671,7 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     auto pbTupleMetatypeSILType =
         SILType::getPrimitiveObjectType(pbTupleMetatypeType);
     auto pbTupleMetatype =
-        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+        builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
 
     auto rawBufferValue = builder.createBuiltin(
         loc,
