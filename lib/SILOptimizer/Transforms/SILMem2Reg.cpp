@@ -533,9 +533,13 @@ static bool isCaptured(SILValue def, bool *inSingleBlock) {
 
     if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
       if (sbi->getDest() == def) {
-        if (isCaptured(sbi, inSingleBlock)) {
+        bool sbiInSingleBlock = false;
+        if (isCaptured(sbi, &sbiInSingleBlock)) {
           return true;
         }
+        // All uses of the store_borrow must also be in the single block.
+        if (!sbiInSingleBlock)
+          singleBlock = nullptr;
         continue;
       }
     }
