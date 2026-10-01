@@ -247,7 +247,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  
+
   /// True if values of this type can be passed by value when borrowed.
   /// If this bit is true, then borrows of the value are independent of the
   /// value's address, so a value can be passed in registers or memcpy'd
@@ -268,7 +268,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
                                    (isBB ? 0 : IsNonBitwiseBorrowable));
   }
-  
+
   /// True if values of this type can be copied.
   /// NOTE: This is NOT accurate for types that are conditionally Copyable.
   /// You may need to use `checkInvertibleRequirements`.
@@ -277,7 +277,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
                                    (isCopyable ? 0 : IsNonCopyable));
   }
-  
+
   /// True if values of this type are addressable-for-dependencies, meaning
   /// that values of this type should be passed indirectly to functions that
   /// produce lifetime-dependent values that could possibly contain pointers
@@ -835,7 +835,7 @@ public:
                                  ? IsConformanceOfProtocolMask
                                  : 0));
   }
-  
+
   ConformanceFlags withHasGlobalActorIsolation(
                                            bool hasGlobalActorIsolation) const {
     return ConformanceFlags((Value & ~HasGlobalActorIsolation)
@@ -1362,7 +1362,7 @@ public:
         (Data & ~InvertedProtocolMask) |
         (inverted.rawBits() << InvertedProtocolshift));
   }
-  
+
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1662,7 +1662,7 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
-  
+
   /// Whether this raw layout type is bitwise borrowable.
   ///
   /// No raw layout types are yet, but should we change our mind about that in the future,
@@ -1826,6 +1826,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// fragment, and the link to the next waiter in a task dependency record.
   const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
   const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
+
+  /// Result type metadata stored in a future task or task group.
+  const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
