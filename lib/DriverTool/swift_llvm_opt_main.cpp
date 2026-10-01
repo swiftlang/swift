@@ -289,7 +289,10 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
         return 1;
       }
     }
-    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "", false, false));
+    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "",
+                                      /*ShouldPreserveUseListOrder=*/false,
+                                      /*EmitSummaryIndex=*/false,
+                                      /*ShouldRenumberMetadata=*/true));
     MPM.run(*M, MAM);
   }
 
