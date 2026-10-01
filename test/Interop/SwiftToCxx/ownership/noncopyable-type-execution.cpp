@@ -45,7 +45,7 @@ static_assert(std::is_copy_constructible<CopyableStruct>::value,
 
 // The moved-from flag is stored after the Swift value, so the Swift value is
 // still at offset zero and can be handed to Swift as-is.
-static_assert(sizeof(MoveOnlyStruct) > 16,
+static_assert(sizeof(MoveOnlyStruct) > 2 * sizeof(swift::Int),
               "the moved-from flag is stored next to the Swift value");
 static_assert(std::is_standard_layout<MoveOnlyStruct>::value,
               "the Swift value must stay at offset zero");
