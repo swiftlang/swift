@@ -112,6 +112,8 @@ public:
     if (auto cxxRecord = deleteExpr->getDestroyedType()->getAsCXXRecordDecl())
       if (auto dtor = cxxRecord->getDestructor())
         callback(dtor);
+    if (auto operatorDelete = deleteExpr->getOperatorDelete())
+      callback(operatorDelete);
     return true;
   }
 
