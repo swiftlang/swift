@@ -8626,6 +8626,80 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     }
   }
 
+  // If an immediately-applied @preconcurrency conversion strips concurrency
+  // from the final result type, factor that part through the application. Keep
+  // any conversion around the declaration reference underneath SelfApplyExpr;
+  // direct-call SILGen relies on that shape to recognize method calls.
+  Type preconcurrencyResultType;
+  Type originalResultType;
+  auto isPreconcurrencyResultAdjustment = [&](Type original, Type adjusted) {
+    return !original->isEqual(adjusted) &&
+           original
+               ->stripConcurrency(/*recurse=*/false, /*dropGlobalActor=*/true)
+               ->isEqual(adjusted);
+  };
+
+  if (callee && callee.getDecl()->preconcurrency()) {
+    if (auto *selfApply = dyn_cast<SelfApplyExpr>(fn)) {
+      if (auto *conversion =
+              dyn_cast<FunctionConversionExpr>(selfApply->getFn())) {
+        auto *originalFullType =
+            cs.getType(conversion->getSubExpr())->castTo<FunctionType>();
+        auto *adjustedFullType = cs.getType(conversion)->castTo<FunctionType>();
+        auto *originalFnType =
+            originalFullType->getResult()->castTo<FunctionType>();
+        auto *adjustedFnType =
+            adjustedFullType->getResult()->castTo<FunctionType>();
+
+        originalResultType = originalFnType->getResult();
+        preconcurrencyResultType = adjustedFnType->getResult();
+        if (isPreconcurrencyResultAdjustment(originalResultType,
+                                             preconcurrencyResultType)) {
+          auto *intermediateFnType = FunctionType::get(
+              adjustedFnType->getParams(), adjustedFnType->getYields(),
+              originalResultType, adjustedFnType->getExtInfo());
+          auto *intermediateFullType = FunctionType::get(
+              adjustedFullType->getParams(), adjustedFullType->getYields(),
+              intermediateFnType, adjustedFullType->getExtInfo());
+
+          if (originalFullType->isEqual(intermediateFullType)) {
+            selfApply->setFn(conversion->getSubExpr());
+          } else {
+            selfApply->setFn(cs.cacheType(new (ctx) FunctionConversionExpr(
+                conversion->getSubExpr(), intermediateFullType)));
+          }
+          cs.setType(selfApply, intermediateFnType);
+        } else {
+          preconcurrencyResultType = Type();
+          originalResultType = Type();
+        }
+      }
+    } else if (auto *conversion = dyn_cast<FunctionConversionExpr>(fn)) {
+      auto *originalFnType =
+          cs.getType(conversion->getSubExpr())->castTo<FunctionType>();
+      auto *adjustedFnType = cs.getType(conversion)->castTo<FunctionType>();
+      originalResultType = originalFnType->getResult();
+      preconcurrencyResultType = adjustedFnType->getResult();
+
+      if (isPreconcurrencyResultAdjustment(originalResultType,
+                                           preconcurrencyResultType)) {
+        auto *intermediateFnType = FunctionType::get(
+            adjustedFnType->getParams(), adjustedFnType->getYields(),
+            originalResultType, adjustedFnType->getExtInfo());
+
+        if (originalFnType->isEqual(intermediateFnType)) {
+          fn = conversion->getSubExpr();
+        } else {
+          fn = cs.cacheType(new (ctx) FunctionConversionExpr(
+              conversion->getSubExpr(), intermediateFnType));
+        }
+      } else {
+        preconcurrencyResultType = Type();
+        originalResultType = Type();
+      }
+    }
+  }
+
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.
   // FIXME: It would be nicer if we could build the ASTs properly in the
@@ -8676,6 +8750,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
+
+    // Perform a result conversion that was factored out of an immediately
+    // applied @preconcurrency function conversion.
+    if (preconcurrencyResultType) {
+      result = adjustTypeForDeclReference(result, originalResultType,
+                                          preconcurrencyResultType, locator);
+    }
 
     // If we have a covariant result type, perform the conversion now.
     if (covariantResultType) {
