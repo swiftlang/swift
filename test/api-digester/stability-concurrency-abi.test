@@ -77,6 +77,8 @@ Protocol SerialExecutor has added inherited protocol Copyable
 Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
 Protocol Actor has added inherited protocol SendableMetatype
+Protocol GlobalActor has added inherited protocol SendableMetatype
+Protocol GlobalActor has generic signature change from <Self.ActorType : _Concurrency.Actor> to <Self : Swift.SendableMetatype, Self.ActorType : _Concurrency.Actor>
 Protocol Executor has added inherited protocol SendableMetatype
 Protocol SerialExecutor has added inherited protocol SendableMetatype
 

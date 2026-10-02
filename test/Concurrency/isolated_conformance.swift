@@ -156,6 +156,13 @@ protocol R: SendableMetatype {
   func f() { }
 }
 
+// expected-error@+2:8{{cannot form main actor-isolated conformance of 'IsolatedGlobalActor' to SendableMetatype-inheriting protocol 'GlobalActor'}}
+@globalActor
+struct IsolatedGlobalActor: @MainActor GlobalActor {
+  @MainActor static let shared = SomeActor()
+  @MainActor static var sharedUnownedExecutor: UnownedSerialExecutor { shared.unownedExecutor }
+}
+
 // ----------------------------------------------------------------------------
 // Use checking of isolated conformances.
 // ----------------------------------------------------------------------------
