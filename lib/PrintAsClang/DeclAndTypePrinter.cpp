@@ -269,14 +269,15 @@ private:
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || isa<TypeDecl>(VD) || isa<AccessorDecl>(VD))
         continue;
-      if (!shouldInclude(VD)) {
-        // Explain the members that are left out only because they can't be
-        // represented in C++.
-        if (outputLang == OutputLanguageMode::Cxx &&
-            owningPrinter.shouldInclude(VD, /*ignoreCxxRepresentation=*/true))
-          printUnavailableInCxxMemberComment(
-              VD, owningPrinter.getUnsupportedDeclReason(VD));
+      switch (owningPrinter.getDeclInclusion(VD)) {
+      case DeclInclusion::Excluded:
         continue;
+      case DeclInclusion::Unrepresentable:
+        printUnavailableInCxxMemberComment(
+            VD, owningPrinter.getUnsupportedDeclReason(VD));
+        continue;
+      case DeclInclusion::Included:
+        break;
       }
       if (!AllowDelayed && owningPrinter.objcDelayedMembers.count(VD)) {
         os << "// '" << VD->getName()
@@ -3162,28 +3163,19 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
   return true;
 }
 
-bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
-                                       bool ignoreCxxRepresentation) {
+DeclAndTypePrinter::DeclInclusion
+DeclAndTypePrinter::getDeclInclusion(const ValueDecl *VD) {
   if (VD->isInvalid())
-    return false;
+    return DeclInclusion::Excluded;
 
   if (requiresExposedAttribute && !hasExposeAttr(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
   if (hasExposeNotCxxAttr(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
   if (!isVisible(VD))
-    return false;
-
-  if (outputLang == OutputLanguageMode::Cxx && !ignoreCxxRepresentation) {
-    if (!isExposedToThisModule(M, VD, exposedModules))
-      return false;
-    if (!cxx_translation::isExposableToCxx(VD, this))
-      return false;
-    if (!isEnumExposableToCxx(VD, *this))
-      return false;
-  }
+    return DeclInclusion::Excluded;
 
   // In C output mode print only the C variant `@c` (no `@_cdecl`),
   // while in other modes print only `@_cdecl`.
@@ -3194,17 +3186,17 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
   // A @cxx function implements a C++ declaration that already exists in an
   // imported C++ header; never redeclare it in a generated header.
   if (cdeclKind == ForeignLanguage::Cxx)
-    return false;
+    return DeclInclusion::Excluded;
 
   if (cdeclKind &&
       (*cdeclKind == ForeignLanguage::C) !=
        (outputLang == OutputLanguageMode::C))
-    return false;
+    return DeclInclusion::Excluded;
 
   // C output mode only prints @c functions and enums.
   if (outputLang == OutputLanguageMode::C &&
       !cdeclKind && !isa<EnumDecl>(VD)) {
-    return false;
+    return DeclInclusion::Excluded;
   }
 
   // The C mode prints @c enums and reject other enums,
@@ -3212,24 +3204,35 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
   if (isa<EnumDecl>(VD) &&
       VD->getAttrs().hasAttribute<CDeclAttr>() !=
         (outputLang == OutputLanguageMode::C)) {
-    return false;
+    return DeclInclusion::Excluded;
   }
 
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return false;
+    return DeclInclusion::Excluded;
 
   if (isAsyncAlternativeOfOtherDecl(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
   if (excludeForObjCImplementation(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
-  return true;
+  // Check representability after the exclusions above so intentionally hidden
+  // declarations don't get an unavailable comment.
+  if (outputLang == OutputLanguageMode::Cxx) {
+    if (!isExposedToThisModule(M, VD, exposedModules))
+      return DeclInclusion::Unrepresentable;
+    if (!cxx_translation::isExposableToCxx(VD, this))
+      return DeclInclusion::Unrepresentable;
+    if (!isEnumExposableToCxx(VD, *this))
+      return DeclInclusion::Unrepresentable;
+  }
+
+  return DeclInclusion::Included;
 }
 
 std::string DeclAndTypePrinter::getUnsupportedDeclReason(const ValueDecl *VD) {
-  auto representation = cxx_translation::getDeclRepresentation(
-      VD, /*layoutQueries=*/this);
+  auto representation =
+      cxx_translation::getDeclRepresentation(VD, /*layoutQueries=*/this);
   if (!representation.isUnsupported() || !representation.error)
     return "";
   auto diag = cxx_translation::diagnoseRepresenationError(
@@ -3250,7 +3253,7 @@ const ModuleDecl *DeclAndTypePrinter::getUnexposedModule(Type ty) {
   auto *module = nominal->getModuleContext();
   if (!module->isStdlibModule() &&
       !isExposedToThisModule(M, nominal, exposedModules) &&
-      shouldInclude(nominal, /*ignoreCxxRepresentation=*/true))
+      getDeclInclusion(nominal) != DeclInclusion::Excluded)
     return module;
   if (auto *boundGeneric = ty->getAs<BoundGenericType>())
     for (auto arg : boundGeneric->getGenericArgs())

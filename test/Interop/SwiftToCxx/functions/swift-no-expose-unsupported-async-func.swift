@@ -30,6 +30,12 @@ public final class ClassWithAsyncMethod {
     public init() {}
     public func asyncMethod(_ x: Double) async -> Double { return 2 * x }
     public func syncMethod() {}
+
+    // Hidden members don't get comments even when they aren't representable.
+    private func privateAsyncMethod() async {}
+    func internalAsyncMethod() async {}
+    @_expose(!Cxx)
+    public func notExposedAsyncMethod() async {}
 }
 
 public struct StructWithAsyncMethod {
