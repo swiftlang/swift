@@ -3735,6 +3735,7 @@ function Build-XML2([Hashtable] $Platform,
     -CXXCompiler $CXXCompiler `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_C_FLAGS = @("-w");
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       LIBXML2_WITH_C14N = "NO";
       LIBXML2_WITH_CATALOG = "NO";
