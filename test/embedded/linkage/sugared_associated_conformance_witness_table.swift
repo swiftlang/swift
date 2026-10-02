@@ -33,5 +33,5 @@ public struct S: P {
 // SIL-COUNT-1: sil_witness_table shared [specialized] Wrapper<S>: specialize <S>
 // SIL-NOT: sil_witness_table shared [specialized] Wrapper<S>: specialize <S>
 
-// IR-DAG: @"$e5Repro1SVAA1PAAWP" = {{.*}}global {{.*}}@"$e5Repro7WrapperVyAA1SVGAA1PAAWP"
-// IR-DAG: @"$e5Repro7WrapperVyAA1SVGAA1PAAWP" = {{.*}}global [4 x ptr] [ptr null, ptr @"$e5Repro7WrapperVyAA1SVGAA1PAAWP"
+// IR-DAG: @"$e5Repro1SVAA1PAAWP" = {{.*}}global {{.*}}@"$e5Repro7WrapperVyAA1SVGAA1PAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
+// IR-DAG: @"$e5Repro7WrapperVyAA1SVGAA1PAAWP" = {{.*}}global [4 x ptr] [ptr null, ptr @"$e5Repro7WrapperVyAA1SVGAA1PAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
