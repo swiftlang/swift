@@ -33,3 +33,13 @@ func retainPair<T: IItem>(_ pointer: Builtin.RawPointer) -> (T, T) {
   Builtin.bridgeFromRawPointer(pointer)
   // expected-error@-1 {{invalid use of builtin: bridgeFromRawPointer result must have an object or interface pointer representation}}
 }
+
+func take<T: IItem>(_ pointer: Builtin.RawPointer) -> T? {
+  Builtin.takeFromRawPointer(pointer)
+  // expected-error@-1 {{invalid use of builtin: takeFromRawPointer result must have an object or interface pointer representation}}
+}
+
+func take<T: IItem>(_ pointer: Builtin.RawPointer) -> (T, T) {
+  Builtin.takeFromRawPointer(pointer)
+  // expected-error@-1 {{invalid use of builtin: takeFromRawPointer result must have an object or interface pointer representation}}
+}

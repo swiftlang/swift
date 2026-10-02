@@ -456,22 +456,21 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(result);
 }
 
-static ManagedValue emitAddressOnlyFromRawPointer(SILGenFunction &SGF,
-                                                  SILLocation loc,
-                                                  const TypeLowering &lowering,
-                                                  ManagedValue pointer,
-                                                  SGFContext C) {
+static ManagedValue emitAddressOnlyFromRawPointer(
+    SILGenFunction &SGF, SILLocation loc, const TypeLowering &lowering,
+    ManagedValue pointer, SGFContext C, IsTake_t isTake) {
   auto source = pointer.materialize(SGF, loc);
   auto address = SGF.B.createUncheckedAddrCast(
       loc, source.getValue(), lowering.getLoweredType().getAddressType());
   if (lowering.isLoadableOrOpaque(SGF.F)) {
-    auto value =
-        SGF.B.emitLoadValueOperation(loc, address, LoadOwnershipQualifier::Copy);
+    auto ownership =
+        isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+    auto value = SGF.B.emitLoadValueOperation(loc, address, ownership);
     return SGF.emitManagedRValueWithCleanup(value, lowering);
   }
   return SGF.B.bufferForExpr(
       loc, lowering.getLoweredType(), lowering, C, [&](SILValue buffer) {
-        SGF.B.createCopyAddr(loc, address, buffer, IsNotTake, IsInitialization);
+        SGF.B.createCopyAddr(loc, address, buffer, isTake, IsInitialization);
       });
 }
 
@@ -496,7 +495,8 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
           "pointer representation");
       return SGF.emitUndef(destLowering.getLoweredType());
     }
-    return emitAddressOnlyFromRawPointer(SGF, loc, destLowering, args[0], C);
+    return emitAddressOnlyFromRawPointer(SGF, loc, destLowering, args[0], C,
+                                         IsNotTake);
   }
 
   assert(destLowering.isLoadable());
@@ -530,6 +530,10 @@ static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
 
   auto &lowering = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   auto type = lowering.getLoweredType();
+  if (!lowering.isLoadable() && isCOMConstrainedArchetype(type))
+    return emitAddressOnlyFromRawPointer(SGF, loc, lowering, args[0], C,
+                                         IsTake);
+
   if (!lowering.isLoadable() ||
       (!type.getASTType().isCOMExistentialType() &&
        !type.isBridgeableObjectType() && !type.is<BuiltinNativeObjectType>())) {

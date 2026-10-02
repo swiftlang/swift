@@ -66,3 +66,74 @@ exerciseClassCopy()
 checkDestruction()
 print("generic class copy balanced")
 // CHECK-NEXT: generic class copy balanced
+
+@inline(never)
+func adopt<T: IValue>(_ pointer: UnsafeRawPointer,
+                      matching value: borrowing T) -> () -> UnsafeRawPointer {
+  let adds = GetForeignCOMAddRefCalls()
+  let releases = GetForeignCOMReleaseCalls()
+  let owned: T = Builtin.takeFromRawPointer(pointer._rawValue)
+  precondition(GetForeignCOMAddRefCalls() == adds)
+  precondition(GetForeignCOMReleaseCalls() == releases)
+  let borrowed = UnsafeRawPointer(Builtin.bridgeToRawPointer(value))
+  precondition(borrowed == pointer)
+  return { UnsafeRawPointer(Builtin.bridgeToRawPointer(owned)) }
+}
+
+@inline(never)
+func adopt<T: IProperty>(_ pointer: UnsafeRawPointer,
+                         matching value: borrowing T) -> () -> UnsafeRawPointer {
+  let adds = GetForeignCOMAddRefCalls()
+  let releases = GetForeignCOMReleaseCalls()
+  let owned: T = Builtin.takeFromRawPointer(pointer._rawValue)
+  precondition(GetForeignCOMAddRefCalls() == adds)
+  precondition(GetForeignCOMReleaseCalls() == releases)
+  let borrowed = UnsafeRawPointer(Builtin.bridgeToRawPointer(value))
+  precondition(borrowed == pointer)
+  return { UnsafeRawPointer(Builtin.bridgeToRawPointer(owned)) }
+}
+
+enum InterfaceKind {
+  case value
+  case property
+}
+
+@inline(never)
+func captureAdoptedInterface(_ interface: InterfaceKind) -> () -> UnsafeRawPointer {
+  // The closure owns the adopted factory reference. The borrowed exemplar
+  // owns a separate reference which is released when this function returns.
+  let object = ForeignCOMObject_Create(42)!
+  switch interface {
+  case .value:
+    let storage = ForeignCOMObject_GetValueStorage(object)!
+    let value = storage.load(as: (any IExtended).self)
+    return adopt(storage.load(as: UnsafeRawPointer.self), matching: value)
+  case .property:
+    let storage = ForeignCOMObject_GetPropertyStorage(object)!
+    let value = storage.load(as: (any IProperty).self)
+    return adopt(storage.load(as: UnsafeRawPointer.self), matching: value)
+  }
+}
+
+@inline(never)
+func exerciseAdoption(of interface: InterfaceKind) {
+  let captured = captureAdoptedInterface(interface)
+  precondition(GetForeignCOMReferenceCount() == 1)
+  precondition(GetForeignCOMDestructionCount() == 0)
+  switch interface {
+  case .value:
+    let value: any IValue = Builtin.bridgeFromRawPointer(captured()._rawValue)
+    precondition(value.value(0) == 42)
+  case .property:
+    let value: any IProperty = Builtin.bridgeFromRawPointer(captured()._rawValue)
+    precondition(value.value == 42)
+  }
+  precondition(GetForeignCOMQueryInterfaceCalls() == 0)
+  withExtendedLifetime(captured) {}
+}
+exerciseAdoption(of: .value)
+checkDestruction()
+exerciseAdoption(of: .property)
+checkDestruction()
+print("generic adoption balanced")
+// CHECK-NEXT: generic adoption balanced

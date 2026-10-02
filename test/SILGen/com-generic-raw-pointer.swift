@@ -76,3 +76,35 @@ func borrowClass<T: IClassItem>(_ value: borrowing T) -> Builtin.RawPointer {
 func retainClass<T: IClassItem>(_ pointer: Builtin.RawPointer) -> T {
   Builtin.bridgeFromRawPointer(pointer)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}4take{{.*}} : $@convention(thin) <T where T : IItem>
+// CHECK: [[ADDRESS:%.*]] = unchecked_addr_cast {{%.*}} : $*Builtin.RawPointer to $*T
+// CHECK-NEXT: copy_addr [take] [[ADDRESS]] to [init] %0 : $*T
+// CHECK: return
+// OPAQUE-LABEL: sil hidden [ossa] [opaque] @$s{{.*}}4take{{.*}} : $@convention(thin) <T where T : IItem>
+// OPAQUE: [[ADDRESS:%.*]] = unchecked_addr_cast {{%.*}} : $*Builtin.RawPointer to $*T
+// OPAQUE-NEXT: [[VALUE:%.*]] = load [take] [[ADDRESS]] : $*T
+// OPAQUE: return [[VALUE]]
+// CANON-LABEL: sil hidden{{.*}} @$s{{.*}}4take{{.*}} : $@convention(thin) <T where T : IItem>
+// CANON: [[ADDRESS:%.*]] = unchecked_addr_cast {{%.*}} : $*Builtin.RawPointer to $*T
+// CANON-NEXT: copy_addr [take] [[ADDRESS]] to [init] %0 : $*T
+// CANON: return
+func take<T: IItem>(_ pointer: Builtin.RawPointer) -> T {
+  Builtin.takeFromRawPointer(pointer)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}4take{{.*}} : $@convention(thin) <T where T : IClassItem>
+// CHECK: [[ADDRESS:%.*]] = unchecked_addr_cast {{%.*}} : $*Builtin.RawPointer to $*T
+// CHECK-NEXT: copy_addr [take] [[ADDRESS]] to [init] %0 : $*T
+// CHECK: return
+// OPAQUE-LABEL: sil hidden [ossa] [opaque] @$s{{.*}}4take{{.*}} : $@convention(thin) <T where T : IClassItem>
+// OPAQUE: [[ADDRESS:%.*]] = unchecked_addr_cast {{%.*}} : $*Builtin.RawPointer to $*T
+// OPAQUE-NEXT: [[VALUE:%.*]] = load [take] [[ADDRESS]] : $*T
+// OPAQUE: return [[VALUE]]
+// CANON-LABEL: sil hidden{{.*}} @$s{{.*}}4take{{.*}} : $@convention(thin) <T where T : IClassItem>
+// CANON: [[ADDRESS:%.*]] = unchecked_addr_cast {{%.*}} : $*Builtin.RawPointer to $*T
+// CANON-NEXT: copy_addr [take] [[ADDRESS]] to [init] %0 : $*T
+// CANON: return
+func take<T: IClassItem>(_ pointer: Builtin.RawPointer) -> T {
+  Builtin.takeFromRawPointer(pointer)
+}
