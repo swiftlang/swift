@@ -8173,6 +8173,17 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         MF.getIdentifier(internalLabelID));
   }
 
+  // If we have no Clang function type, and `UseClangFunctionTypes` is
+  // enabled, construct one from the Swift type signature.
+  if (MF.getContext().LangOpts.UseClangFunctionTypes && !clangFunctionType &&
+      shouldStoreClangType(*representation)) {
+    clangFunctionType = MF.getContext().getClangFunctionType(
+        params, resultTy.get(), *representation);
+    if (!clangFunctionType)
+      return MF.diagnoseFatal();
+    info = info.intoBuilder().withClangFunctionType(clangFunctionType).build();
+  }
+
   SmallVector<AnyFunctionType::Yield, 1> yields;
   if (coro)
     SET_OR_RETURN_ERROR(yields, MF.readYieldList());
