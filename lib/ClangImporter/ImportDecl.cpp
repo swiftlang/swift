@@ -4711,11 +4711,9 @@ namespace {
         return;
       }
 
-      // Keeping the original name means every use has to be acknowledged. A
-      // method template is left alone: calls refer to its specialization, which
-      // is imported, and promoted, as a method of its own.
+      // Keeping the original name means every use has to be acknowledged.
       auto *unsafeAttr = swiftDecl->getAttrs().getAttribute<UnsafeAttr>();
-      if (!funcTemplate && (!unsafeAttr || !unsafeAttr->isAlways())) {
+      if (!unsafeAttr || !unsafeAttr->isAlways()) {
         bool implicit = !unsafeAttr || unsafeAttr->isImplicit();
         if (unsafeAttr)
           swiftDecl->getAttrs().removeAttribute(unsafeAttr);
