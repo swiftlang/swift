@@ -1,5 +1,5 @@
 // This test is flaky on freebsd and windows, occasionally crashing in `c-index-test`.
-// UNSUPPORTED: rdar168250323
+// REQUIRES: rdar168250323
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/SlashA.swiftmodule %S/Inputs/slash.swift
