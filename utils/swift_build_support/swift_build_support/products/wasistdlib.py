@@ -97,6 +97,7 @@ class WASIStdlib(cmake_product.CMakeProduct):
 
     def _append_threading_options(self, cmake_options):
         cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
+        cmake_options.define('SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
 
     def test(self, host_target):
         self._test(host_target, 'wasm32-wasip1')
@@ -193,3 +194,6 @@ class WASIThreadsStdlib(WASIStdlib):
                              '-Xcc;-mthread-model;-Xcc;posix;'
                              '-Xcc;-pthread;-Xcc;-ftls-model=local-exec')
         cmake_options.define('SWIFT_ENABLE_WASI_THREADS:BOOL', 'TRUE')
+        cmake_options.define('SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'FALSE')
+        cmake_options.define('SWIFT_CONCURRENCY_GLOBAL_EXECUTOR:STRING',
+                             'singlethreaded')
