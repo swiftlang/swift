@@ -48,14 +48,17 @@ func testLocalVariable() {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s35called_once_closure_stack_promotion33testConsumingCaptureIsNotPromotedyyF : $@convention(thin) () -> () {
-// CHECK: [[CLOSURE:%.*]] = function_ref @$s35called_once_closure_stack_promotion33testConsumingCaptureIsNotPromotedyyFyyXEfU_
-// CHECK: [[NC:%.*]] = load {{%.*}}
-// CHECK: [[PA:%.*]] = partial_apply [called_once] [[CLOSURE]]([[NC]]) : $@convention(thin) (@owned NC) -> ()
-// CHECK-NOT: [on_stack]
-// CHECK: convert_escape_to_noescape [[PA]]
-// CHECK: } // end sil function '$s35called_once_closure_stack_promotion33testConsumingCaptureIsNotPromotedyyF'
-func testConsumingCaptureIsNotPromoted() {
+// CHECK-LABEL: sil hidden @$s35called_once_closure_stack_promotion30testConsumingCaptureIsPromotedyyF : $@convention(thin) () -> () {
+// CHECK: [[NC_STACK:%.*]] = alloc_stack [lexical] [var_decl] $NC, let, name "nc1"
+// CHECK: [[CLOSURE:%.*]] = function_ref @$s35called_once_closure_stack_promotion30testConsumingCaptureIsPromotedyyFyyXEfU_
+// CHECK: [[NC:%.*]] = load [[NC_STACK]]
+// CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_once] [[CLOSURE]]([[NC]]) : $@convention(thin) (@owned NC) -> ()
+// CHECK: [[CALLEE:%.*]] = function_ref @$s35called_once_closure_stack_promotion0A4OnceyyyyXEnF
+// CHECK: apply [[CALLEE]]([[PA]])
+// CHECK-NEXT: dealloc_stack [[PA]]
+// CHECK: dealloc_stack [[NC_STACK]]
+// CHECK: } // end sil function '$s35called_once_closure_stack_promotion30testConsumingCaptureIsPromotedyyF'
+func testConsumingCaptureIsPromoted() {
   let nc1 = NC()
   calledOnce {
     nc1.take()

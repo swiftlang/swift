@@ -2546,8 +2546,12 @@ public:
           "applied argument types do not match suffix of function type's "
           "inputs");
       if (PAI->isOnStack()) {
-        require(!substConv.getSILArgumentConvention(argIdx)
-                     .isOwnedConventionInCaller(),
+        // A `@called(once)` closure is allowed to have consuming captures
+        // and it always has a destructor (even when a closure is
+        // non-escaping) which is responsible for destroying them.
+        require(PAI->isCalledOnce() ||
+                    !substConv.getSILArgumentConvention(argIdx)
+                         .isOwnedConventionInCaller(),
                 "on-stack closures do not support owned arguments");
       }
     }

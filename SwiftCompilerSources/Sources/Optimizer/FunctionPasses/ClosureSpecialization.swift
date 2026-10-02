@@ -765,6 +765,15 @@ private struct SpecializationInfo {
           // the same way to the specialized version.
           if capturedArg.ownership != .none &&
               (argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume) {
+            if capturedArg.type.isMoveOnly {
+              // A move-only value cannot be copied. Transfer it directly to the specialized
+              // call instead, and clear the original `partial_apply`'s operand (it isn't being
+              // deleted here, only folded into a direct call) so that a later cleanup pass
+              // doesn't also try to destroy the same value when it deletes the now-dead
+              // `partial_apply`.
+              argOp.set(to: Undef.get(type: capturedArg.type, context), context)
+              return capturedArg
+            }
             return capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
           }
           return capturedArg
