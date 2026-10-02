@@ -609,8 +609,8 @@ extension Sequence {
     where predicate: (Element) throws(E) -> Bool
   ) throws(E) -> Int {
     var count = 0
-    for e in self {
-      count += try predicate(e) ? 1 : 0
+    for e in self where try predicate(e) {
+      count += 1
     }
     return count
   }
