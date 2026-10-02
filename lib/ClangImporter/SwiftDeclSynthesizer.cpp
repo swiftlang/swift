@@ -3061,13 +3061,6 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         ctorDecl->getAccess() == clang::AS_protected ||
         ctorDecl->isCopyOrMoveConstructor() || ctorDecl->isVariadic())
       continue;
-
-    bool hasDefaultArg = !ctorDecl->parameters().empty() &&
-                         ctorDecl->parameters().back()->hasDefaultArg();
-    // TODO: Add support for default args in ctors for C++ foreign reference
-    // types.
-    if (hasDefaultArg)
-      continue;
     ctorDeclsForSynth.push_back(ctorDecl);
   }
 
@@ -3155,11 +3148,19 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
       if (paramBeginLoc.isInvalid() || paramEndLoc.isInvalid())
         paramBeginLoc = paramEndLoc = cxxRecordDeclLoc;
 
+      clang::Expr *defaultArg = nullptr;
+      if (origParam->hasDefaultArg() &&
+          ImporterImpl.isDefaultArgSafeToImport(origParam))
+        defaultArg = origParam->getDefaultArg();
+
       auto *param = clang::ParmVarDecl::Create(
           clangCtx, synthCxxMethodDecl, paramBeginLoc, paramEndLoc, paramIdent,
           origParam->getType(),
           clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
-          clang::SC_None, /*DefArg=*/nullptr);
+          clang::SC_None, defaultArg);
+      param->setScopeInfo(/*scopeDepth=*/0, /*parameterIndex=*/i);
+      if (hasUnsafeAPIAttr(origParam))
+        param->addAttr(clang::SwiftAttrAttr::Create(clangCtx, "import_unsafe"));
       param->setIsUsed();
       synthParams.push_back(param);
     }
