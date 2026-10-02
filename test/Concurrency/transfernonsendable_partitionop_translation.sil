@@ -2285,6 +2285,71 @@ bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass):
 }
 
 
+// CHECK-LABEL: begin running test {{.*}} on test_mark_dependence_nonescaping: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %1 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %3 = mark_dependence [nonescaping] %2 : $NonSendableKlass on %1 : $NonSendableKlass
+// CHECK-NEXT: require %%0:   %3 = mark_dependence [nonescaping] %2 : $NonSendableKlass on %1 : $NonSendableKlass
+// CHECK-NEXT: require %%1:   %3 = mark_dependence [nonescaping] %2 : $NonSendableKlass on %1 : $NonSendableKlass
+// CHECK-NEXT: merge %%0 with %%1:   %3 = mark_dependence [nonescaping] %2 : $NonSendableKlass on %1 : $NonSendableKlass
+// CHECK-NEXT: assign_direct %%2 = %%0:   %3 = mark_dependence [nonescaping] %2 : $NonSendableKlass on %1 : $NonSendableKlass
+// CHECK-NEXT: end running test {{.*}} on test_mark_dependence_nonescaping: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_mark_dependence_nonescaping : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass):
+  %2 = copy_value %0
+  %3 = mark_dependence [nonescaping] %2 : $NonSendableKlass on %1 : $NonSendableKlass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_value %3
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// A Sendable address can be rooted in a mutable capture box. The box, not the
+// address value, is the source region that a nonescaping dependence must keep
+// in use.
+// CHECK-LABEL: begin running test {{.*}} on test_mark_dependence_nonescaping_sendable_address_base: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK: [[BOX:%%[0-9]+]]: TrackableValue. State: {{.*}}[is_sendable: no]
+// CHECK-NEXT:     Rep Value:   %1 = alloc_box ${ var Int }, var, name "value"
+// CHECK: [[DEPENDENT:%%[0-9]+]]: TrackableValue. State: {{.*}}[is_sendable: no]
+// CHECK-NEXT:     Rep Value:   %4 = mark_dependence [nonescaping] %0 : $Int on %3 : $*Int
+// CHECK: require [mutable_base_of_sendable_val] [[BOX]]:   %4 = mark_dependence [nonescaping] %0 : $Int on %3 : $*Int
+// CHECK-NEXT: assign_fresh [[DEPENDENT]]:   %4 = mark_dependence [nonescaping] %0 : $Int on %3 : $*Int
+// CHECK-NEXT: merge [[DEPENDENT]] with [[BOX]]:   %4 = mark_dependence [nonescaping] %0 : $Int on %3 : $*Int
+// CHECK-NEXT: end running test {{.*}} on test_mark_dependence_nonescaping_sendable_address_base: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_mark_dependence_nonescaping_sendable_address_base : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }, var, name "value"
+  %2 = project_box %1, 0
+  store %0 to [init] %2
+  %3 = begin_access [read] [dynamic] %2
+  %4 = mark_dependence [nonescaping] %0 : $Int on %3 : $*Int
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  end_access %3
+  destroy_value %1
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// A nonescaping dependence with a genuinely Sendable base does not make its
+// Sendable result region-tracked.
+// CHECK-LABEL: begin running test {{.*}} on test_mark_dependence_nonescaping_sendable_base: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK: [[SENDABLE_DEPENDENT:%%[0-9]+]]: TrackableValue. State: {{.*}}[is_sendable: yes]
+// CHECK-NEXT:     Rep Value:   %2 = mark_dependence [nonescaping] %0 : $Int on %1 : $SendableKlass
+// CHECK-NEXT: end running test {{.*}} on test_mark_dependence_nonescaping_sendable_base: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_mark_dependence_nonescaping_sendable_base : $@convention(thin) (Int, @guaranteed SendableKlass) -> () {
+bb0(%0 : $Int, %1 : @guaranteed $SendableKlass):
+  %2 = mark_dependence [nonescaping] %0 : $Int on %1 : $SendableKlass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %r = tuple ()
+  return %r : $()
+}
+
+
 // CHECK-LABEL: begin running test {{.*}} on test_builtin: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 // CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %0 = integer_literal $Builtin.Int64, 1
