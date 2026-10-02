@@ -2510,6 +2510,10 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
   }
 
+  // Enable C++ interop so the PCM build injects the libstdc++ module map.
+  if (ScanASTContext.LangOpts.EnableCXXInterop)
+    swiftArgs.push_back("-cxx-interoperability-mode=default");
+
   // Add args reported by the scanner.
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);
