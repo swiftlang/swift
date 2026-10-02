@@ -134,16 +134,27 @@ public:
     cxxDeclEmissionScope = &scope;
   }
 
-  /// Returns true if \p VD should be included in a compatibility header for
+  enum class DeclInclusion {
+    Included,
+    /// The declaration is intentionally omitted or invalid.
+    Excluded,
+    /// The declaration would otherwise be included, but cannot be represented
+    /// in C++ or comes from a module that isn't exposed to this header.
+    Unrepresentable,
+  };
+
+  /// Classifies whether \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
   /// Imported inherited members may be exposed by their supplied header even
   /// when this header's exposure options would exclude them.
-  ///
-  /// In C++ mode, \p VD must also be representable in C++ and come from a
-  /// module that is exposed to C++, unless \p ignoreCxxRepresentation is true.
+  DeclInclusion getDeclInclusion(const ValueDecl *VD,
+                                bool isImportedInheritedMember = false);
+
   bool shouldInclude(const ValueDecl *VD,
-                     bool isImportedInheritedMember = false,
-                     bool ignoreCxxRepresentation = false);
+                     bool isImportedInheritedMember = false) {
+    return getDeclInclusion(VD, isImportedInheritedMember) ==
+           DeclInclusion::Included;
+  }
 
   /// Returns why \p VD can't be represented in C++, as described by
   /// \c cxx_translation::getDeclRepresentation, or an empty string if it
