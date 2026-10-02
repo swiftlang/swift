@@ -176,6 +176,8 @@ NOTE(incomplete_protocol, none, "protocol %0 is incomplete", (const clang::Named
 NOTE(incomplete_record, none, "record '%0' is not defined (incomplete)", (StringRef))
 NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
 NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy or destroy", (StringRef))
+NOTE(record_non_trivial_weak_ref, none, "record '%0' contains a weak reference and cannot be imported", (StringRef))
+NOTE(record_non_trivial_strong_ref, none, "record '%0' contains strong references and cannot be imported without enabling experimental feature ImportCStructsWithArcFields", (StringRef))
 NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
 NOTE(foreign_reference_type_by_value, none,
@@ -433,6 +435,9 @@ ERROR(redundant_conformance_protocol,none,
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
+NOTE(record_field_weak_nonnull, none,
+     "field %0 cannot import as both __weak and _Nonnull",
+     (const clang::NamedDecl*))
 NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(record_method_not_imported, none, "method %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(objc_property_not_imported, none, "property %0 unavailable (cannot import)", (const clang::NamedDecl*))
