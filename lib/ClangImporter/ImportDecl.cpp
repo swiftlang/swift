@@ -5247,11 +5247,22 @@ namespace {
           decl, importer::convertClangAccess(decl->getAccess()), loc, name, loc,
           ArrayRef<InheritedEntry>(), genericParamList, dc);
 
-      auto attr = AvailableAttr::createUniversallyUnavailable(
-          Impl.SwiftContext, "Un-specialized class templates are not currently "
-                             "supported. Please use a specialization of this "
-                             "type.");
-      structDecl->addAttribute(attr);
+      bool canNameSpecializations =
+          Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::CxxConcreteTemplateTypes) &&
+          decl->getDeclContext()->isFileContext() &&
+          llvm::all_of(*decl->getTemplateParameters(), [](auto *param) {
+            auto *typeParam = dyn_cast<clang::TemplateTypeParmDecl>(param);
+            return typeParam && !typeParam->isParameterPack();
+          });
+      if (!canNameSpecializations) {
+        auto attr = AvailableAttr::createUniversallyUnavailable(
+            Impl.SwiftContext,
+            "Un-specialized class templates are not currently "
+            "supported. Please use a specialization of this "
+            "type.");
+        structDecl->addAttribute(attr);
+      }
 
       return structDecl;
     }

@@ -4017,6 +4017,17 @@ public:
 
     // Diagnose unsupported cases.
     if (!extType->hasError() && extType->getAnyNominal()) {
+      // A Swift alias can resolve to a C++ specialization even though
+      // structural extension lookup only found the primary template. Do not
+      // suggest rewriting it to direct syntax, which cannot bind either.
+      auto *nominal = extType->getAnyNominal();
+      if (ED->getASTContext().LangOpts.hasFeature(
+              Feature::CxxConcreteTemplateTypes) &&
+          isa_and_nonnull<clang::ClassTemplateSpecializationDecl>(
+              nominal->getClangDecl())) {
+        ED->diagnose(diag::cannot_extend_nominal, nominal);
+        return;
+      }
       auto canExtType = extType->getCanonicalType();
       if (auto existential = canExtType->getAs<ExistentialType>()) {
         ED->diagnose(diag::unsupported_existential_extension, extType)
