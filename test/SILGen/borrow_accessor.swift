@@ -1225,3 +1225,31 @@ class KlassBorrowMutateUMBP<Element> {
 // CHECK-SIL:   return [[REG17]]
 // CHECK-SIL: }
 
+
+// Forwarding a mutate accessor through a subscript on a stored property.
+// The subscript's base is wrapped in an implicit InOutExpr.
+public struct SubscriptBaseWrapper {
+  var _w = Wrapper()
+
+  var k: Klass {
+    borrow {
+      return _w[0]
+    }
+    mutate {
+      return &_w[0]
+    }
+  }
+}
+
+public struct NCSubscriptBaseWrapper: ~Copyable {
+  var _w = NCWrapper()
+
+  var nc: NC {
+    borrow {
+      return _w[0]
+    }
+    mutate {
+      return &_w[0]
+    }
+  }
+}
