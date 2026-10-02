@@ -3389,7 +3389,7 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
-    } else if (fn->isCalledOnce()) {
+    } else if (fn->hasCalledAtMostOnceSemantics()) {
       return appendOperator("XO");
     }
     return appendOperator("c");

@@ -607,7 +607,9 @@ Type ASTBuilder::createFunctionType(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
                    /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult(),
-                   extFlags.isCalledOnce())
+                   extFlags.isCalledOnce()
+                       ? std::optional(ExecutionSemantics::AtMostOnce)
+                       : std::nullopt)
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();

@@ -1156,7 +1156,8 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, calledOnce, throwing, async;
+  bool noEscape, sendable, throwing, async;
+  std::optional<ExecutionSemantics> executionSemantics;
   Type sendableDep;
   Type executionSemanticsDep;
   Type thrownError;
@@ -1202,17 +1203,15 @@ extInfoJoinMeetImpl(Operation op,
       elts.push_back(rhsExecutionSemanticsDep);
       executionSemanticsDep =
           TupleType::get(elts, lhsSendableDep->getASTContext());
-      calledOnce = false;
     } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
-      if (rhsInfo.isCalledOnce())
+      if (rhsInfo.hasCalledAtMostOnceSemantics())
         executionSemanticsDep = lhsExecutionSemanticsDep;
-      calledOnce = false;
     } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
-      if (lhsInfo.isCalledOnce())
+      if (lhsInfo.hasCalledAtMostOnceSemantics())
         executionSemanticsDep = rhsExecutionSemanticsDep;
-      calledOnce = false;
-    } else {
-      calledOnce = lhsInfo.isCalledOnce() && rhsInfo.isCalledOnce();
+    } else if (lhsInfo.hasCalledAtMostOnceSemantics() &&
+               rhsInfo.hasCalledAtMostOnceSemantics()) {
+      executionSemantics = lhsInfo.getExecutionSemantics();
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
@@ -1257,21 +1256,19 @@ extInfoJoinMeetImpl(Operation op,
       // types.
       return std::nullopt;
     } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
-      if (rhsInfo.isCalledOnce()) {
-        calledOnce = true;
-      } else {
-        calledOnce = false;
+      if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = rhsInfo.getExecutionSemantics();
+      else
         executionSemanticsDep = lhsExecutionSemanticsDep;
-      }
     } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
-      if (lhsInfo.isCalledOnce()) {
-        calledOnce = true;
-      } else {
-        calledOnce = false;
+      if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = lhsInfo.getExecutionSemantics();
+      else
         executionSemanticsDep = rhsExecutionSemanticsDep;
-      }
+    } else if (lhsInfo.hasCalledAtMostOnceSemantics()) {
+      executionSemantics = lhsInfo.getExecutionSemantics();
     } else {
-      calledOnce = lhsInfo.isCalledOnce() || rhsInfo.isCalledOnce();
+      executionSemantics = rhsInfo.getExecutionSemantics();
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
@@ -1298,7 +1295,7 @@ extInfoJoinMeetImpl(Operation op,
       .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
-      .withCalledOnce(calledOnce)
+      .withExecutionSemantics(executionSemantics)
       .withExecutionSemanticsDependentType(executionSemanticsDep)
       .build();
 }

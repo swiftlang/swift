@@ -6281,20 +6281,14 @@ public:
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
-    FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-        resultType,
+    FunctionTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, resultType,
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        clangType,
-        fnTy->isNoEscape(),
-        fnTy->isSendable(),
-        fnTy->isAsync(),
-        fnTy->isThrowing(),
-        S.addTypeRef(fnTy->getThrownError()),
+        clangType, fnTy->isNoEscape(), fnTy->isSendable(), fnTy->isAsync(),
+        fnTy->isThrowing(), S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation,
-        fnTy->hasSendingResult(),
-        fnTy->isCalledOnce(),
-        fnTy->isCoroutine());
+        isolation, fnTy->hasSendingResult(),
+        fnTy->hasCalledAtMostOnceSemantics(), fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6311,14 +6305,14 @@ public:
     auto genericSig = fnTy->getGenericSignature();
     auto isolation = encodeIsolation(fnTy->getIsolation());
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-    GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(fnTy->getResult()),
+    GenericFunctionTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
-        fnTy->isCoroutine(),                                          
+        isolation, fnTy->hasSendingResult(),
+        fnTy->hasCalledAtMostOnceSemantics(), fnTy->isCoroutine(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);

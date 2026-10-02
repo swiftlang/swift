@@ -942,14 +942,14 @@ case TypeKind::Id:
         // Transform the @called(atMostOnce) dependent type if present.
         if (auto executionSemanticsDep =
                 origExtInfo.getExecutionSemanticsDependentType()) {
-          auto [newExecutionSemanticsDep, isCalledOnce] =
+          auto [newExecutionSemanticsDep, executionSemantics] =
               asDerived().transformExecutionSemanticsDependentType(
                   executionSemanticsDep);
           if (!newExecutionSemanticsDep) {
             // If we're no longer @called(atMostOnce) dependent, update the
-            // @called(atMostOnce) bit.
+            // execution semantics.
             extInfo = extInfo->withExecutionSemanticsDependentType(Type());
-            extInfo = extInfo->withCalledOnce(isCalledOnce);
+            extInfo = extInfo->withExecutionSemantics(executionSemantics);
             isUnchanged = false;
           } else if (newExecutionSemanticsDep.getPointer() !=
                      executionSemanticsDep.getPointer()) {
@@ -1218,9 +1218,9 @@ case TypeKind::Id:
     return std::make_pair(ty, false);
   }
 
-  std::pair<Type, /*calledOnce*/ bool>
+  std::pair<Type, std::optional<ExecutionSemantics>>
   transformExecutionSemanticsDependentType(Type ty) {
-    return std::make_pair(ty, false);
+    return std::make_pair(ty, std::nullopt);
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

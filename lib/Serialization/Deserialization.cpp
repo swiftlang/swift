@@ -8117,7 +8117,9 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ {}, hasSendingResult, calledOnce)
+                  /*LifetimeDependenceInfo */ {}, hasSendingResult,
+                  calledOnce ? std::optional(ExecutionSemantics::AtMostOnce)
+                             : std::nullopt)
                   .withSendable(sendable)
                   .withAsync(async)
                   .withCoroutine(coro)

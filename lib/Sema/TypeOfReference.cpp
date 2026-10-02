@@ -2109,7 +2109,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
         newExtInfo = methodTy->getExtInfo().withExecutionSemanticsDependentType(
             baseObjTy);
       else if (baseObjTy->isNoncopyable())
-        newExtInfo = methodTy->getExtInfo().withCalledOnce();
+        newExtInfo = methodTy->getExtInfo().withExecutionSemantics(
+            ExecutionSemantics::AtMostOnce);
 
       if (newExtInfo) {
         auto *newMethodTy = methodTy->withExtInfo(*newExtInfo);

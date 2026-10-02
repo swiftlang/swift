@@ -7275,10 +7275,11 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
-    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
+    if (!Options.excludeAttrKind(TypeAttrKind::Called) &&
+        info.getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
       Printer.printSimpleAttr("@called(atMostOnce)") << " ";
     }
-    
+
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();

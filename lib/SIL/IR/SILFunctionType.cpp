@@ -3616,7 +3616,7 @@ static CanSILFunctionType getNativeSILFunctionType(
         }
       }
 
-      if (substInterfaceType->isCalledOnce())
+      if (substInterfaceType->hasCalledAtMostOnceSemantics())
         return getSILFunctionTypeForConventions(DefaultCalledOnceConventions());
 
       return getSILFunctionTypeForConventions(

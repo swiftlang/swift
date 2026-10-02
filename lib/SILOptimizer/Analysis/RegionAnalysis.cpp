@@ -705,7 +705,7 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
       // All of the non-Sendable captures of non-escaping @called(atMostOnce)
       // closures that aren't explicitly `sending` can be sent.
       if (auto *closure = declRef.getClosureExpr();
-          closure && closure->isCalledOnce()) {
+          closure && closure->hasCalledAtMostOnceSemantics()) {
         auto *closureTy = closure->getType()->castTo<FunctionType>();
         if (closureTy->getExtInfo().isNoEscape())
           return true;

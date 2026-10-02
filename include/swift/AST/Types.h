@@ -414,7 +414,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 18 };
+  enum { NumAFTExtInfoBits = 19 };
   enum { NumSILExtInfoBits = 16 };
 
   // clang-format off
@@ -4094,8 +4094,9 @@ public:
   /// Return the function type setting sendable to \p newValue.
   AnyFunctionType *withSendable(bool newValue) const;
 
-  /// Return the function type setting @called(atMostOnce) to \p newValue.
-  AnyFunctionType *withCalledOnce(bool newValue) const;
+  /// Return the function type setting the execution semantics to \p newValue.
+  AnyFunctionType *
+  withExecutionSemantics(std::optional<ExecutionSemantics> newValue) const;
 
   /// Return the function type without yields (and coroutine flag)
   AnyFunctionType *getWithoutYields() const;
@@ -4123,7 +4124,14 @@ public:
     return getExtInfo().getDifferentiabilityKind();
   }
 
-  bool isCalledOnce() const;
+  std::optional<ExecutionSemantics> getExecutionSemantics() const;
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getExecutionSemantics().has_value();
+  }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
