@@ -3829,6 +3829,13 @@ suppressingFeatureAvailabilityOSVersionQueryKind(
   action();
 }
 
+static void
+suppressingFeatureCChar32IsUInt32(PrintOptions &options,
+                                  llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCChar32IsUInt32, true);
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(const PrintOptions &_options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4217,7 +4224,14 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
-    printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
+    if (Options.SuppressCChar32IsUInt32 && usesFeatureCChar32IsUInt32(decl)) {
+      // Compilers without $CChar32IsUInt32 expect the old definition.
+      // Unqualified lookup is fine: this is only printed in the stdlib's own
+      // interface, where 'Unicode' always refers to Swift.Unicode.
+      Printer << "Unicode.Scalar";
+    } else {
+      printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
+    }
     printDeclGenericRequirements(decl);
   }
 }
