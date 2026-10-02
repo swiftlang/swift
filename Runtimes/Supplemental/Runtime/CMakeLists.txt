@@ -92,11 +92,11 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
 # Generate BacktracingDT 6.2
-set(backgtracingdt62_version)
+set(backtracingdt62_version)
 if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND CMAKE_OSX_DEPLOYMENT_TARGET AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "26.0")
-  set(backtracingdt62_version "macOS ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  set(backtracingdt62_version "macOS ${CMAKE_OSX_DEPLOYMENT_TARGET}, iOS ${CMAKE_OSX_DEPLOYMENT_TARGET}")
 else()
-  set(backtracingdt62_version "macOS 26.0")
+  set(backtracingdt62_version "macOS 26.0, iOS 26.0")
 endif()
 
 add_compile_options(
