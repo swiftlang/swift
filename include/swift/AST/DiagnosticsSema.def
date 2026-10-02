@@ -917,9 +917,6 @@ REMARK(serialization_scheduled_recovered_hidden_type_layout,none,
 NOTE(serialization_hidden_type_layout_abi_exposure,none,
      "layout of %kind0 is ABI-exposed through %kind1",
      (const ValueDecl *, const ValueDecl *))
-ERROR(serialization_hidden_type_in_function_type,none,
-      "cannot use hidden type %1 in function type of stored property %0",
-      (const ValueDecl *, Type))
 ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))

@@ -7669,45 +7669,6 @@ void Serializer::handleHiddenTypeLayoutRequirement(
                    abiExposedLeaf, requirement.ABIExposedType);
 }
 
-void Serializer::diagnoseHiddenTypeInFunctionType(
-    const HiddenTypeLayoutRequirement &requirement) {
-  auto *storage = requirement.LayoutAffectingStorage;
-  auto *abiExposedLeaf =
-      storage->getDeclContext()->getSelfNominalTypeDecl();
-  assert(abiExposedLeaf);
-
-  auto &diags = getASTContext().Diags;
-  diags.diagnose(storage->getLoc(),
-                 diag::serialization_hidden_type_in_function_type,
-                 storage, requirement.HiddenType);
-
-  // Point at the import that hides the type from clients.
-  if (requirement.Origin == HiddenTypeLayoutOrigin::ImplementationOnly) {
-    if (auto *nominal = requirement.HiddenType->getAnyNominal()) {
-      auto *hiddenModule = nominal->getModuleContext();
-      if (auto *sf = storage->getDeclContext()->getParentSourceFile()) {
-        SourceLoc importLoc;
-        for (auto &import : sf->getImports()) {
-          if (import.module.importedModule != hiddenModule ||
-              import.importLoc.isInvalid())
-            continue;
-          importLoc = import.importLoc;
-          if (import.options.contains(ImportFlags::ImplementationOnly))
-            break;
-        }
-        if (importLoc.isValid())
-          diags.diagnose(importLoc,
-                         diag::implementation_only_conflict_here);
-      }
-    }
-  }
-
-  if (abiExposedLeaf != requirement.ABIExposedType)
-    diags.diagnose(requirement.ABIExposedType->getLoc(),
-                   diag::serialization_hidden_type_layout_abi_exposure,
-                   abiExposedLeaf, requirement.ABIExposedType);
-}
-
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
@@ -7855,22 +7816,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   }
 
   auto &langOpts = M->getASTContext().LangOpts;
-  // Hidden types in function types cannot be serialized: clients cannot
-  // resolve the function type and compute a smaller layout, overrunning the
-  // buffer. Diagnose them unconditionally in non-resilient modules.
-  bool shouldSerializeHiddenLayouts = langOpts.hasFeature(
-      Feature::SerializeAbstractTypeLayoutForHiddenTypes);
-  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+  if (langOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     forEachRequiredHiddenTypeLayout(
         M, files, [&](const HiddenTypeLayoutRequirement &requirement) {
-          if (requirement.InFunctionType &&
-              requirement.Origin !=
-                  HiddenTypeLayoutOrigin::RecoveredHiddenType) {
-            diagnoseHiddenTypeInFunctionType(requirement);
-            return;
-          }
-          if (!shouldSerializeHiddenLayouts)
-            return;
           handleHiddenTypeLayoutRequirement(requirement);
         });
   }

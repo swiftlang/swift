@@ -37,9 +37,6 @@ struct HiddenTypeLayoutRequirement {
   HiddenTypeLayoutOrigin Origin;
   NominalTypeDecl *ABIExposedType;
   ValueDecl *LayoutAffectingStorage;
-  /// Whether the hidden type was found inside a function type. Such
-  /// references cannot be serialized and are diagnosed instead.
-  bool InFunctionType = false;
 };
 
 /// Find hidden types that contribute to this module's client-visible ABI.

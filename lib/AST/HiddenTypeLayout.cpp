@@ -40,11 +40,10 @@ void swift::forEachRequiredHiddenTypeLayout(
   auto reportHiddenType = [&](const Decl *layoutDecl, Type hiddenType,
                               HiddenTypeLayoutOrigin origin,
                               NominalTypeDecl *abiExposedType,
-                              ValueDecl *layoutAffectingStorage,
-                              bool inFunctionType) {
+                              ValueDecl *layoutAffectingStorage) {
     assert(abiExposedType && layoutAffectingStorage);
     callback({layoutDecl, hiddenType, origin, abiExposedType,
-              layoutAffectingStorage, inFunctionType});
+              layoutAffectingStorage});
   };
 
   auto isInternalBridgingHeaderImportedType =
@@ -75,8 +74,7 @@ void swift::forEachRequiredHiddenTypeLayout(
           if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
             reportHiddenType(layoutInfo, type,
                              HiddenTypeLayoutOrigin::RecoveredHiddenType,
-                             abiExposedType, layoutAffectingStorage,
-                             inFunctionType);
+                             abiExposedType, layoutAffectingStorage);
           return;
         }
 
@@ -89,8 +87,9 @@ void swift::forEachRequiredHiddenTypeLayout(
         }
 
         if (auto *fnType = type->getAs<AnyFunctionType>()) {
-          // Clients cannot resolve a function type whose signature
-          // references a hidden type, so recurse to diagnose it.
+          // A function value has fixed size, but clients can only use it
+          // when the signature resolves. Recurse so hidden signature types
+          // get serialized layouts.
           for (auto param : fnType->getParams())
             processTypeForHiddenLayouts(param.getPlainType(), useDC,
                                         abiExposedType, layoutAffectingStorage,
@@ -137,8 +136,7 @@ void swift::forEachRequiredHiddenTypeLayout(
                                                  /*assumeImported=*/false)) {
           reportHiddenType(nominal, type,
                            HiddenTypeLayoutOrigin::ImplementationOnly,
-                           abiExposedType, layoutAffectingStorage,
-                           inFunctionType);
+                           abiExposedType, layoutAffectingStorage);
           return;
         }
 
@@ -148,7 +146,7 @@ void swift::forEachRequiredHiddenTypeLayout(
             reportHiddenType(
                 nominal, type,
                 HiddenTypeLayoutOrigin::InternalBridgingHeader, abiExposedType,
-                layoutAffectingStorage, inFunctionType);
+                layoutAffectingStorage);
           return;
         }
 

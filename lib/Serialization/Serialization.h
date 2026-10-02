@@ -380,11 +380,6 @@ private:
   void handleHiddenTypeLayoutRequirement(
       const HiddenTypeLayoutRequirement &requirement);
 
-  /// Diagnose a hidden type referenced in a function type in an
-  /// ABI-exposed layout.
-  void diagnoseHiddenTypeInFunctionType(
-      const HiddenTypeLayoutRequirement &requirement);
-
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);
 

@@ -44,11 +44,8 @@
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/IndirectEnumIOIPayload.swiftmodule %t/IndirectEnumIOIPayload.swift -I %t/InternalModule -parse-as-library -module-name IndirectEnumIOIPayload -Rhidden-type-layout-serialization -verify
 
-// The closure-nested diagnostic fires independent of the experimental
-// feature: without it, clients silently compute a smaller layout for the
-// enclosing type and overrun the buffer at runtime.
-// RUN: not %target-swift-frontend -emit-module -emit-module-path %t/ClosureLeak.swiftmodule %t/ClosureLeak.swift -I %t/InternalModule -parse-as-library -module-name ClosureLeak -suppress-warnings -verify
-// RUN: not %target-swift-frontend -emit-module -emit-module-path %t/ClosureLeakMainActor.swiftmodule %t/ClosureLeakMainActor.swift -I %t/InternalModule -parse-as-library -module-name ClosureLeakMainActor -suppress-warnings -verify
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/ClosureLeak.swiftmodule %t/ClosureLeak.swift -I %t/InternalModule -parse-as-library -module-name ClosureLeak -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/ClosureLeakMainActor.swiftmodule %t/ClosureLeakMainActor.swift -I %t/InternalModule -parse-as-library -module-name ClosureLeakMainActor -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -internal-import-bridging-header %t/HiddenTypes.h -emit-module -emit-module-path %t/PublicStructInternalBridgingHeaderField.swiftmodule %t/PublicStructInternalBridgingHeaderField.swift -parse-as-library -module-name PublicStructInternalBridgingHeaderField -Rhidden-type-layout-serialization -verify -verify-additional-prefix internal-bridging-header-
 // RUN: %llvm-bcanalyzer -dump %t/PublicStructInternalBridgingHeaderField.swiftmodule | %FileCheck %s --check-prefix HIDDEN-CLANG-RECORD
@@ -324,12 +321,11 @@ public struct PublicInternalBridgingHeaderWrapper {
 
 //--- ClosureLeak.swift
 @_implementationOnly import Internal
-// expected-note@-1 2 {{imported as implementation-only here}}
 
 struct ClosureDeps {
-  // expected-error@+1 {{cannot use hidden type 'InternalType' in function type of stored property 'onTap'}}
+  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'ClosureDeps' through property 'onTap'}}
   var onTap: () -> [InternalType]
-  // expected-error@+1 {{cannot use hidden type 'InternalType' in function type of stored property 'onEvent'}}
+  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'ClosureDeps' through property 'onEvent'}}
   var onEvent: (InternalType) -> Void
   init() {
     self.onTap = { [] }
@@ -337,8 +333,8 @@ struct ClosureDeps {
   }
 }
 
-// expected-note@+2 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
-// expected-note@+1 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
+// expected-hidden-layout-note@+2 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
+// expected-hidden-layout-note@+1 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
 public class ClosureManager {
   private var deps: ClosureDeps
   public init() { self.deps = ClosureDeps() }
@@ -352,15 +348,14 @@ public struct ClosureUser {
 
 //--- ClosureLeakMainActor.swift
 @_implementationOnly import Internal
-// expected-note@-1 {{imported as implementation-only here}}
 
 struct MainActorClosureDeps {
-  // expected-error@+1 {{cannot use hidden type 'InternalType' in function type of stored property 'isComplete'}}
+  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'MainActorClosureDeps' through property 'isComplete'}}
   var isComplete: @MainActor (InternalType) -> Bool
   init() { self.isComplete = { _ in true } }
 }
 
-// expected-note@+1 {{layout of struct 'MainActorClosureDeps' is ABI-exposed through struct 'MainActorClosureUser'}}
+// expected-hidden-layout-note@+1 {{layout of struct 'MainActorClosureDeps' is ABI-exposed through struct 'MainActorClosureUser'}}
 public struct MainActorClosureUser {
   private var deps: MainActorClosureDeps
   public var visible: Int64 = 1
