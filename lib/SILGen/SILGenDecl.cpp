@@ -560,11 +560,8 @@ public:
 
     // If our instance type is not already @moveOnly wrapped, and it's a
     // no-implicit-copy parameter, wrap it.
-    //
-    // Unless the function is using ManualOwnership, which checks for
-    // no-implicit-copies using a different mechanism.
     if (!isNoImplicitCopy && instanceType->isCopyable() &&
-        !SGF.B.hasManualOwnershipAttr()) {
+        SGF.usingWrapperTypeImplicitCopyEnforcement()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name resolve -enable-lifetime-resolution %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name resolve -enable-lifetime-resolution -disable-sil-opaque-values %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name resolve -enable-lifetime-resolution -enable-sil-opaque-values %s | %FileCheck %s --check-prefix=OPAQUE
 
 // Verifies the raw SILGen emission of the `consume` operator when

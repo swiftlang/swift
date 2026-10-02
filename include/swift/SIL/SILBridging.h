@@ -939,10 +939,12 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool PartialApplyInst_isStackAllocationNested() const;
   BRIDGED_INLINE void PartialApplyInst_setStackAllocationIsNested(bool) const;
   BRIDGED_INLINE bool AllocStackInst_hasDynamicLifetime() const;
+  BRIDGED_INLINE void AllocStackInst_setDynamicLifetime() const;
   BRIDGED_INLINE bool AllocStackInst_isFromVarDecl() const;
   BRIDGED_INLINE bool AllocStackInst_usesMoveableValueDebugInfo() const;
   BRIDGED_INLINE bool AllocStackInst_isLexical() const;
   BRIDGED_INLINE bool AllocBoxInst_hasDynamicLifetime() const;
+  BRIDGED_INLINE void AllocBoxInst_setDynamicLifetime() const;
   BRIDGED_INLINE bool AllocRefInstBase_isObjc() const;
   BRIDGED_INLINE bool AllocRefInstBase_canAllocOnStack() const;
   BRIDGED_INLINE bool AllocRefInstBase_isStackAllocationNested() const;
@@ -968,6 +970,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
   BRIDGED_INLINE void StoreInst_setStoreOwnership(SwiftInt rawOwnership) const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
+  BRIDGED_INLINE void AssignInst_setAssignOwnership(SwiftInt assignOwnership) const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
   BRIDGED_INLINE void MarkDependenceInstruction_resolveToNonEscaping() const;
   BRIDGED_INLINE void MarkDependenceInstruction_settleToEscaping() const;
@@ -982,6 +985,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE void CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const;
   BRIDGED_INLINE void CopyAddrInst_setIsInitializationOfDest(bool isInitializationOfDest) const;
+  BRIDGED_INLINE bool TupleAddrConstructorInst_isInitializationOfDest() const;
+  BRIDGED_INLINE void TupleAddrConstructorInst_setIsInitializationOfDest(bool isInitializationOfDest) const;
   BRIDGED_INLINE bool DeallocBoxInst_isDeadEnd() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isInitializationOfDest() const;

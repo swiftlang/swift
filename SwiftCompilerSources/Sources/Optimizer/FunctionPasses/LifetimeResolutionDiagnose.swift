@@ -35,21 +35,24 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
     }
   }
 
+  var indexCache = FieldIndexTrieCache(for: function)
+  var reported = ReportedUseBeforeInits()
   for assign in undefInits {
-    diagnoseUseBeforeInit(assign, context)
+    diagnoseUseBeforeInit(assign, &indexCache, &reported, context)
   }
   for diagnose in unpermittedCopies {
-    diagnoseUnpermittedCopy(diagnose, context)
+    diagnoseUnpermittedCopy(diagnose, &indexCache, context)
   }
 }
 
 // `diagnose [unpermitted_copy] %x`: report the demoted copy as though it were an illegal consuming use.
-private func diagnoseUnpermittedCopy(_ marker: DiagnoseInst, _ context: FunctionPassContext) {
+private func diagnoseUnpermittedCopy(_ marker: DiagnoseInst, _ indexCache: inout FieldIndexTrieCache,
+                                     _ context: FunctionPassContext) {
   defer { context.erase(instruction: marker) }
 
   switch marker.operand.value.definingInstruction {
   case let load as LoadInst:
-    diagnoseUnpermittedCopy(ofAddress: load, context)
+    diagnoseUnpermittedCopy(ofAddress: load, &indexCache, context)
   case let copy as CopyValueInst:
     diagnoseUnpermittedCopy(ofValue: copy, marker, context)
   default:
@@ -58,8 +61,9 @@ private func diagnoseUnpermittedCopy(_ marker: DiagnoseInst, _ context: Function
   }
 }
 
-private func diagnoseUnpermittedCopy(ofAddress load: LoadInst, _ context: FunctionPassContext) {
-  let root = allocation(backing: load.address).flatMap { ResolvableRoot($0, context) }
+private func diagnoseUnpermittedCopy(ofAddress load: LoadInst, _ indexCache: inout FieldIndexTrieCache,
+                                     _ context: FunctionPassContext) {
+  let root = allocation(backing: load.address).flatMap { ResolvableRoot($0, &indexCache, context) }
   let name: StringRef = root?.varDecl?.userFacingName ?? ""
 
   // Error at the offending downstream use; note at the consume that was demoted.
@@ -89,11 +93,27 @@ private func diagnoseUnpermittedCopy(ofValue copy: CopyValueInst, _ marker: Diag
     at: consumingInst.location)
 }
 
+// The (storage, offending use) pairs already diagnosed. One use can observe several
+// undef stores of the same storage, but should be reported only once.
+private struct ReportedUseBeforeInits {
+  private var reported: [(storage: Value, use: Instruction?)] = []
+
+  // Returns false if this pair was already recorded.
+  mutating func insert(storage: Value, use: Instruction?) -> Bool {
+    if reported.contains(where: { $0.storage == storage && $0.use == use }) {
+      return false
+    }
+    reported.append((storage, use))
+    return true
+  }
+}
+
 // `assign undef to [init] %addr`: report use-before-init at the first read that observes the undef store.
-private func diagnoseUseBeforeInit(_ marker: AssignInst, _ context: FunctionPassContext) {
+private func diagnoseUseBeforeInit(_ marker: AssignInst, _ indexCache: inout FieldIndexTrieCache,
+                                   _ reported: inout ReportedUseBeforeInits, _ context: FunctionPassContext) {
   let rootAddress = marker.destination
   guard let allocation = allocation(backing: rootAddress),
-        let root = ResolvableRoot(allocation, context) else { return }
+        let root = ResolvableRoot(allocation, &indexCache, context) else { return }
   // `%select{variable|constant}`: 1 == constant (`let`), 0 == variable (`var`).
   let name: StringRef = root.varDecl?.userFacingName ?? ""
   let isLet = root.isLet ? 1 : 0
@@ -103,6 +123,7 @@ private func diagnoseUseBeforeInit(_ marker: AssignInst, _ context: FunctionPass
   let definedHere = markUninit?.location ?? root.address.definingInstruction!.location
 
   let offending = findOffendingUse(ofAddress: rootAddress, after: marker, context)
+  guard reported.insert(storage: allocation, use: offending) else { return }
   let errorLoc = offending?.location ?? definedHere
   context.diagnosticEngine.diagnose(.variable_used_before_initialized,
     name, isLet, at: errorLoc)

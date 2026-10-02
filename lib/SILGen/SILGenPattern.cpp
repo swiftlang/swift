@@ -1422,7 +1422,8 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   //
   // If we're relying on ManualOwnership for explicit-copies enforcement,
   // we don't need the MoveOnlyWrapper.
-  if (!bindValue.getType().isMoveOnly() && !SGF.B.hasManualOwnershipAttr()) {
+  if (!bindValue.getType().isMoveOnly() &&
+      SGF.usingWrapperTypeImplicitCopyEnforcement()) {
     if (bindValue.getType().isAddress()) {
       bindValue = ManagedValue::forBorrowedAddressRValue(
         SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));

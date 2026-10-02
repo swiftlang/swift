@@ -1776,6 +1776,10 @@ bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
 }
 
+void BridgedInstruction::AllocStackInst_setDynamicLifetime() const {
+  getAs<swift::AllocStackInst>()->setDynamicLifetime();
+}
+
 bool BridgedInstruction::AllocStackInst_isFromVarDecl() const {
   return getAs<swift::AllocStackInst>()->isFromVarDecl();
 }
@@ -1790,6 +1794,10 @@ bool BridgedInstruction::AllocStackInst_isLexical() const {
 
 bool BridgedInstruction::AllocBoxInst_hasDynamicLifetime() const {
   return getAs<swift::AllocBoxInst>()->hasDynamicLifetime();
+}
+
+void BridgedInstruction::AllocBoxInst_setDynamicLifetime() const {
+  getAs<swift::AllocBoxInst>()->setDynamicLifetime();
 }
 
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {
@@ -1909,6 +1917,10 @@ SwiftInt BridgedInstruction::AssignInst_getAssignOwnership() const {
   return (SwiftInt)getAs<swift::AssignInst>()->getOwnershipQualifier();
 }
 
+void BridgedInstruction::AssignInst_setAssignOwnership(SwiftInt assignOwnership) const {
+  getAs<swift::AssignInst>()->setOwnershipQualifier((swift::AssignOwnershipQualifier)assignOwnership);
+}
+
 BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_dependenceKind() const {
   return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
 }
@@ -1971,6 +1983,15 @@ void BridgedInstruction::CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const {
 
 void BridgedInstruction::CopyAddrInst_setIsInitializationOfDest(bool isInitializationOfDest) const {
   return getAs<swift::CopyAddrInst>()->setIsInitializationOfDest(
+      isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
+}
+
+bool BridgedInstruction::TupleAddrConstructorInst_isInitializationOfDest() const {
+  return getAs<swift::TupleAddrConstructorInst>()->isInitializationOfDest();
+}
+
+void BridgedInstruction::TupleAddrConstructorInst_setIsInitializationOfDest(bool isInitializationOfDest) const {
+  getAs<swift::TupleAddrConstructorInst>()->setIsInitializationOfDest(
       isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
 }
 

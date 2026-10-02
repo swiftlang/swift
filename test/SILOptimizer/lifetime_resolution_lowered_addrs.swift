@@ -1,5 +1,12 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify \
+// Coverage for LifetimeResolution when functions are not [opaque], i.e., address-only types are lowered to addresses.
+// For code that only works when opaque values is enabled, see sibling file without `lowered_addrs` in its name.
+
+// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -disable-sil-opaque-values -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s | %FileCheck %s
+
+// For extra coverage, compile with opaque values, but skip FileCheck.
+// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -enable-sil-opaque-values -verify \
+// RUN:   -enable-experimental-feature LifetimeDependence %s -o /dev/null
 
 // REQUIRES: swift_feature_LifetimeDependence
 
@@ -158,7 +165,7 @@ func NEDependent() {
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}stress_copy_addrs
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}take_sequence_vars
 // CHECK:      [[FIRST:%.*]] = alloc_stack [var_decl] $String, var, name "longStr"
 // CHECK:      store {{.*}} to [init] [[FIRST]]
 // CHECK:      [[SECOND:%.*]] = alloc_stack [var_decl] $String, var, name "str"
@@ -172,8 +179,68 @@ func NEDependent() {
 // CHECK-NOT:  destroy_addr
 // CHECK:      return [[STR]]
 // CHECK-LABEL: } // end sil function
-func stress_copy_addrs() -> String {
+func take_sequence_vars() -> String {
   var longStr = "ascii"  // expected-warning {{was never mutated}}
   var str = longStr      // expected-warning {{was never mutated}}
   return str
 }
+
+// The copy into `b` stays a copy, since `a` is still used afterwards.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}copyVarThenUseSource
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "a"
+// CHECK:      [[B:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "b"
+// CHECK:      [[A_BA:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: copy_addr [[A_BA]] to [init] [[B]]
+// CHECK:      [[B_BA:%.*]] = begin_access [read] [unknown] [[B]]
+// CHECK-NEXT: load [take] [[B_BA]]
+// CHECK:      [[A_BA2:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: [[RET:%.*]] = load [take] [[A_BA2]]
+// CHECK-NOT:  destroy_addr
+// CHECK:      return [[RET]]
+// CHECK-LABEL: } // end sil function
+func copyVarThenUseSource() -> Kl {
+  var a = Kl()  // expected-warning {{was never mutated}}
+  var b = a     // expected-warning {{was never mutated}}
+  Use(b)
+  return a
+}
+
+// Each path consumes one variable and destroys the other.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}copyVarBranchReturn
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "a"
+// CHECK:      [[B:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "b"
+// CHECK:      [[A_BA:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: copy_addr [[A_BA]] to [init] [[B]]
+// CHECK:      cond_br
+
+// CHECK:      [[B_BA:%.*]] = begin_access [read] [unknown] [[B]]
+// CHECK-NEXT: load [take] [[B_BA]]
+// CHECK-NOT:  destroy_addr [[B]]
+// CHECK:      destroy_addr [[A]]
+// CHECK:      br
+
+// CHECK:      [[A_BA2:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: load [take] [[A_BA2]]
+// CHECK-NOT:  destroy_addr [[A]]
+// CHECK:      destroy_addr [[B]]
+// CHECK-NOT:  destroy_addr
+// CHECK-LABEL: } // end sil function
+func copyVarBranchReturn(_ c: Bool) -> Kl {
+  var a = Kl()  // expected-warning {{was never mutated}}
+  var b = a     // expected-warning {{was never mutated}}
+  if c { return b }
+  return a
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}noUses1bySS_tF
+// CHECK: bb0(%0 : @noImplicitCopy @guaranteed $String):
+// CHECK-NOT: moveonlywrapper
+// CHECK: } // end sil function
+func noUses(b: borrowing String) {}
+
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}noUses1cySSn_tF
+// CHECK: bb0(%0 : @noImplicitCopy @_eagerMove @owned $String):
+// CHECK-NOT: moveonlywrapper
+// CHECK: } // end sil function
+func noUses(c: consuming String) {}
