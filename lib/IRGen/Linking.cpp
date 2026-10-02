@@ -1837,6 +1837,19 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     return getSILFunction()->hasNonUniqueDefinition();
   }
 
+  // A coroutine function pointer is defined wherever its function is.
+  switch (getKind()) {
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+    return getUnderlyingEntityForCoroFunctionPointer().hasNonUniqueDefinition();
+  default:
+    break;
+  }
+
   if (getKind() == Kind::SILGlobalVariable ||
       getKind() == Kind::ReadOnlyGlobalObject)
     return getSILGlobalVariable()->hasNonUniqueDefinition();

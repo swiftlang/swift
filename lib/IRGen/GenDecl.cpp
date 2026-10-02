@@ -1154,9 +1154,10 @@ void IRGenModule::emitGlobalLists() {
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   // Embedded Swift only emits specialized function (except when they are
   // protocol witness methods). So don't emit generic functions, even if they're
-  // externally visible.
+  // externally visible. A function whose type is only generic because of
+  // substitutions, e.g., one with an opaque result type, is not generic.
   if (f.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
-      f.getLoweredFunctionType()->getSubstGenericSignature()) {
+      f.getLoweredFunctionType()->getInvocationGenericSignature()) {
     return true;
   }
 
@@ -2254,6 +2255,12 @@ void IRGenModule::emitVTableStubs() {
            I != getSILModule().zombies_end(); ++I) {
     const SILFunction &F = *I;
     if (! F.isExternallyUsedSymbol())
+      continue;
+
+    // In Embedded Swift, a function without a unique definition (e.g., an
+    // unspecialized generic) is emitted on demand into each module that uses
+    // it, so nothing can refer to this module's symbol for it.
+    if (F.hasNonUniqueDefinition())
       continue;
 
     if (!stub) {
