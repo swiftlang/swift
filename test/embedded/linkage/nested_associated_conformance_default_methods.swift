@@ -44,5 +44,5 @@ public struct S: P {
   public func slice() -> Wrapper<S> { Wrapper(base: self) }
 }
 
-// CHECK-DAG: @"$e5Repro7WrapperVyAA1SVGAA1PAAWP" = {{.*}}global {{.*}}@"$e5Repro3IdxCAA1QAAWP"
-// CHECK-DAG: @"$e5Repro3IdxCAA1QAAWP" = {{.*}}constant [2 x ptr] [ptr null, ptr @"$e5Repro3IdxCAA1QA2aDP1qSiyFTWAC_Tgq5"]
+// CHECK-DAG: @"$e5Repro7WrapperVyAA1SVGAA1PAAWP" = {{.*}}global {{.*}}@"$e5Repro3IdxCAA1QAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
+// CHECK-DAG: @"$e5Repro3IdxCAA1QAAWP" = {{.*}}constant [2 x ptr] [ptr null, ptr @"$e5Repro3IdxCAA1QA2aDP1qSiyFTWAC_Tgq5{{(\.ptrauth(\.[0-9]+)?)?}}"]
