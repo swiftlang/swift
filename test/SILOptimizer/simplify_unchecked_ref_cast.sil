@@ -24,6 +24,7 @@ bb0:
 
 // CHECK-LABEL: sil [ossa] @test_ossa :
 // CHECK:         %0 = alloc_ref
+// CHECK-O-NEXT:  debug_value undef : $AnyObject, var, name "x"
 // CHECK-O-NEXT:  unchecked_ref_cast %0 : $X
 // CHECK-ONONE:   unchecked_ref_cast %2 : $AnyObject
 // CHECK:       } // end sil function 'test_ossa'

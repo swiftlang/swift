@@ -45,27 +45,6 @@ namespace swift {
 
 class SILInstruction;
 
-/// Drops all of the debug uses of \p value.
-/// Unlike deleteAllDebugUses, this preserves the debug_value instruction
-/// but replaces its operand with undef and strips non-fragment DIExpr parts.
-/// Use this when salvage has NOT already created a replacement debug_value.
-inline void killAllDebugUses(SILValue value) {
-  SmallVector<Operand *, 4> debugUses;
-  for (auto *use : value->getUses()) {
-    if (isa<DebugValueInst>(use->getUser()))
-      debugUses.push_back(use);
-  }
-  for (auto *use : debugUses)
-    cast<DebugValueInst>(use->getUser())->killOperand(use->getOperandNumber());
-}
-
-/// Drops all of the debug uses of any result of \p inst.
-inline void killAllDebugUses(SILInstruction *inst) {
-  for (SILValue v : inst->getResults()) {
-    killAllDebugUses(v);
-  }
-}
-
 /// This iterator filters out any debug (or non-debug) instructions from a range
 /// of uses, provided by the underlying ValueBaseUseIterator.
 /// If \p nonDebugInsts is true, then the iterator provides a view to all non-
@@ -205,6 +184,23 @@ inline Operand *getAnyDebugUse(SILValue value) {
   if (ii == ie)
     return nullptr;
   return *ii;
+}
+
+/// Drops all of the debug uses of \p value.
+/// Unlike deleteAllDebugUses, this preserves the debug_value instruction
+/// but replaces its operand with undef and strips non-fragment DIExpr parts.
+/// Use this when salvage has NOT already created a replacement debug_value.
+inline void killAllDebugUses(SILValue value) {
+  while (Operand *use = getAnyDebugUse(value)) {
+    cast<DebugValueInst>(use->getUser())->killOperand(use->getOperandNumber());
+  }
+}
+
+/// Drops all of the debug uses of any result of \p inst.
+inline void killAllDebugUses(SILInstruction *inst) {
+  for (SILValue v : inst->getResults()) {
+    killAllDebugUses(v);
+  }
 }
 
 /// Return true if the def-use graph rooted at \p V contains any non-debug,

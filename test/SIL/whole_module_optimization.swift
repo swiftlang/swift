@@ -16,9 +16,10 @@ private func privateFn() -> Int32 {
 // CHECK-LABEL: sil @$s4main9getAnswers5Int32VyF
 // CHECK-SINGLE-FILE-LABEL: sil @$s4main9getAnswers5Int32VyF
 public func getAnswer() -> Int32 {
-  // CHECK: %0 = integer_literal $Builtin.Int32, 42
-  // CHECK-NEXT: %1 = struct $Int32 (%0 : $Builtin.Int32)
-  // CHECK-NEXT: return %1 : $Int32
+  // CHECK: debug_value undef : {{.*}}, let, name "fn", argno 1
+  // CHECK-NEXT: %1 = integer_literal $Builtin.Int32, 42
+  // CHECK-NEXT: %2 = struct $Int32 (%1 : $Builtin.Int32)
+  // CHECK-NEXT: return %2 : $Int32
 
   // CHECK-SINGLE-FILE: [[F1:%.*]] = function_ref @$s4main9privateFn33_4704C82F83811927370AA02DFDC75B5ALLs5Int32VyF
   // CHECK-SINGLE-FILE: [[F1T:%.*]] = thin_to_thick_function [[F1]] {{.*}} to $@noescape

@@ -1817,6 +1817,8 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
       Inst->getLoc(), remappedOperands, *VarInfo,
       Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
 
+  bool unrepresentableType = false;
+
   // Clone the debug-only reconstruction block if present.
   if (auto *SrcDebugBB = Inst->getDebugReconstructionBlock()) {
     SILBasicBlock *NewDebugBB =
@@ -1832,18 +1834,25 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
     if (llvm::any_of(*NewDebugBB, [](const SILInstruction &I) {
           return I.getNumTypeDependentOperands() != 0;
         })) {
-      // Drop the debug_value.
-      NewInst->eraseFromParent();
-      return;
-    }
-
-    // Type substitutions may map an address-only (generic) type to something
-    // else, in which case, the op_deref must be converted to a load.
-    if (NewInst->hasDeref()) {
+      unrepresentableType = true;
+    } else if (NewInst->hasDeref()) {
+      // Type substitutions may map an address-only (generic) type to something
+      // else, in which case, the op_deref must be converted to a load.
       auto *ret = cast<ReturnInst>(NewDebugBB->getTerminator());
       if (ret->getOperand()->getType().isLoadableOrOpaque(*NewInst->getFunction()))
         NewInst->convertDerefToLoad();
     }
+  }
+
+  // Local archetypes are unstable and not representable. Any variable with
+  // a local archetype is dropped by IRGen. Rewrite them to use void.
+  if (unrepresentableType || NewInst->getVarType().hasLocalArchetype()) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto *VoidInst = getBuilder().createVoidVariableDebugValue(
+        Inst->getLoc(), *VarInfo, Inst->usesMoveableValueDebugInfo(),
+        Inst->hasTrace());
+    NewInst->eraseFromParent();
+    NewInst = VoidInst;
   }
 
   recordClonedInstruction(Inst, NewInst);
