@@ -376,8 +376,8 @@ public func mutSpansAllOrNull(_ p1: inout MutableSpan<CInt>?, _ p2: inout Mutabl
 // the extractor; the Optional sharer's check is nil-aware. Return is a
 // non-Optional MutableSpan (since `.countedBy` hides nullability).
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
-public func mutSpansMixedReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt> {
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+public func mutSpansMixedReturn(_ p1: consuming MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt> {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
       @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
@@ -414,8 +414,8 @@ public func mutSpansMixedReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout Mutab
 // keeps the wrapper's return type Optional, exercising the early-return-nil
 // path alongside the shared-count infrastructure.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
-public func mutSpansMixedOrNullReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+public func mutSpansMixedOrNullReturn(_ p1: consuming MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
       @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {

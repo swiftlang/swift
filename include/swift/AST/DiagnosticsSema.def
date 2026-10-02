@@ -8826,6 +8826,12 @@ ERROR(failed_to_expand_derived_conformance, none,
       "failed to expand derived conformance to %0; " SWIFT_BUG_REPORT_MESSAGE,
       (Type))
 
+WARNING(swiftify_legacy_nonconsuming_lifetimebound_param_missing, none,
+        "the loaded _SwiftifyImport macro plugin does not support the "
+        "'legacyNonconsumingLifetimebound' parameter; generated safe wrappers "
+        "will retain the legacy 'inout' convention for __lifetimebound "
+        "Mutable[Raw]Span parameters instead of the current 'consuming' default", ())
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------

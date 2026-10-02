@@ -33,19 +33,17 @@ func callFuncWithMutableSafeWrapper(_ span: inout MutableSpan<CInt>, ) {
     FuncWithMutableSafeWrapper(&span)
 }
 
-@_lifetime(span: copy span)
-func callFuncWithMutableSafeWrapper2(_ span: inout MutableSpan<CInt>, ) {
+func callFuncWithMutableSafeWrapper2(_ span: consuming MutableSpan<CInt>) {
     // expected-default-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'SpanOfInt'}}
     // expected-default-error@+1{{cannot convert value of type 'SpanOfInt'}}
-    let _: MutableSpan<CInt> = FuncWithMutableSafeWrapper2(&span)
+    let _: MutableSpan<CInt> = FuncWithMutableSafeWrapper2(span)
 }
 
-@_lifetime(span: copy span)
-func callMixedFuncWithMutableSafeWrapper1(_ span: inout MutableSpan<CInt>, ) {
+func callMixedFuncWithMutableSafeWrapper1(_ span: consuming MutableSpan<CInt>) {
     // expected-default-error@+3{{missing argument for parameter #2 in call}}
-    // expected-default-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
+    // expected-default-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
     // expected-default-error@+1{{cannot convert value of type 'SpanOfInt'}}
-    let _: MutableSpan<CInt> = MixedFuncWithMutableSafeWrapper1(&span)
+    let _: MutableSpan<CInt> = MixedFuncWithMutableSafeWrapper1(span)
 }
 
 func MixedFuncWithMutableSafeWrapper2(_ v: VecOfInt) {
