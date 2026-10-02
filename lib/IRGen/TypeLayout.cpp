@@ -1612,14 +1612,21 @@ void AlignedGroupEntry::computeProperties() {
 }
 
 void AlignedGroupEntry::Profile(llvm::FoldingSetNodeID &id) const {
-  AlignedGroupEntry::Profile(id, entries, minimumAlignment);
+  AlignedGroupEntry::Profile(id, entries, ty, minimumAlignment);
 }
 
 void AlignedGroupEntry::Profile(llvm::FoldingSetNodeID &id,
                                 const std::vector<TypeLayoutEntry *> &entries,
+                                SILType ty,
                                 Alignment::int_type minimumAlignment) {
   for (auto *entry : entries)
     id.AddPointer(entry);
+  // Include the type itself in the cache key if it has a deinit, which
+  // destroy() calls, so that we won't mix up the deinits of distinct types that
+  // happen to have identical field entries.
+  auto *nominal = ty.getASTType()->getAnyNominal();
+  if (nominal && nominal->hasValueTypeDestructor())
+    id.AddPointer(ty.getASTType().getPointer());
   id.AddInteger(minimumAlignment);
 }
 
@@ -4353,7 +4360,7 @@ AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
     const std::vector<TypeLayoutEntry *> &entries, SILType ty,
     Alignment::int_type minimumAlignment, const TypeInfo &ti) {
   llvm::FoldingSetNodeID id;
-  AlignedGroupEntry::Profile(id, entries, minimumAlignment);
+  AlignedGroupEntry::Profile(id, entries, ty, minimumAlignment);
   void *insertPos;
   if (auto *entry = alignedGroupEntries.FindNodeOrInsertPos(id, insertPos)) {
     return entry;
