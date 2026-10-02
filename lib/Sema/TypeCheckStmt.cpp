@@ -3759,7 +3759,17 @@ bool swift::shouldUseIterable(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  // Always prefer conformance to Sequence over Iterable when
+  // Always try to use Iterable for sequences that conform to
+  // CxxIterable when it is available.
+  if (auto cxxIterable =
+          ctx.getProtocol(KnownProtocolKind::CxxIterable)) {
+    if (auto conf = lookupConformance(seqTy, cxxIterable)) {
+      auto availability = AvailabilityContext::forLocation(loc, dc);
+      return !availability.hasUnsatisfiedRestrictionsForConformance(conf);
+    }
+  }
+
+  // Else, always prefer conformance to Sequence over Iterable when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
