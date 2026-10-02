@@ -380,10 +380,8 @@ private:
   void handleHiddenTypeLayoutRequirement(
       const HiddenTypeLayoutRequirement &requirement);
 
-  /// Diagnose a hidden type referenced in a function type that contributes
-  /// to an ABI-exposed layout. Unlike direct references, these cannot be
-  /// given an abstract layout, so they are always errors, independent of
-  /// whether hidden type layout serialization is enabled.
+  /// Diagnose a hidden type referenced in a function type in an
+  /// ABI-exposed layout.
   void diagnoseHiddenTypeInFunctionType(
       const HiddenTypeLayoutRequirement &requirement);
 

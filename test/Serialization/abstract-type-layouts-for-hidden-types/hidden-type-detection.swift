@@ -324,13 +324,12 @@ public struct PublicInternalBridgingHeaderWrapper {
 
 //--- ClosureLeak.swift
 @_implementationOnly import Internal
+// expected-note@-1 2 {{imported as implementation-only here}}
 
 struct ClosureDeps {
-  // expected-error@+1 {{stored property 'onTap' has a function type that references hidden type 'InternalType', whose size is unknown to clients; clients may compute a smaller layout for class 'ClosureManager' and allocate too little memory, overrunning the heap}}
-  // expected-note@+1 {{store the closure in a 'final class', whose layout is a single pointer in every module, or remove the hidden type from the closure's signature}}
+  // expected-error@+1 {{cannot use hidden type 'InternalType' in function type of stored property 'onTap'}}
   var onTap: () -> [InternalType]
-  // expected-error@+1 {{stored property 'onEvent' has a function type that references hidden type 'InternalType', whose size is unknown to clients; clients may compute a smaller layout for class 'ClosureManager' and allocate too little memory, overrunning the heap}}
-  // expected-note@+1 {{store the closure in a 'final class', whose layout is a single pointer in every module, or remove the hidden type from the closure's signature}}
+  // expected-error@+1 {{cannot use hidden type 'InternalType' in function type of stored property 'onEvent'}}
   var onEvent: (InternalType) -> Void
   init() {
     self.onTap = { [] }
@@ -353,10 +352,10 @@ public struct ClosureUser {
 
 //--- ClosureLeakMainActor.swift
 @_implementationOnly import Internal
+// expected-note@-1 {{imported as implementation-only here}}
 
 struct MainActorClosureDeps {
-  // expected-error@+1 {{stored property 'isComplete' has a function type that references hidden type 'InternalType', whose size is unknown to clients; clients may compute a smaller layout for struct 'MainActorClosureUser' and allocate too little memory, overrunning the heap}}
-  // expected-note@+1 {{store the closure in a 'final class', whose layout is a single pointer in every module, or remove the hidden type from the closure's signature}}
+  // expected-error@+1 {{cannot use hidden type 'InternalType' in function type of stored property 'isComplete'}}
   var isComplete: @MainActor (InternalType) -> Bool
   init() { self.isComplete = { _ in true } }
 }

@@ -89,12 +89,8 @@ void swift::forEachRequiredHiddenTypeLayout(
         }
 
         if (auto *fnType = type->getAs<AnyFunctionType>()) {
-          // Function values have fixed size, but clients cannot resolve the
-          // function type at all when its signature references a hidden
-          // type, so the field silently drops out of the layout clients
-          // compute for the enclosing type and the enclosing buffer is
-          // overrun at runtime. Recurse to find such references so they can
-          // be diagnosed instead of scheduled for layout serialization.
+          // Clients cannot resolve a function type whose signature
+          // references a hidden type, so recurse to diagnose it.
           for (auto param : fnType->getParams())
             processTypeForHiddenLayouts(param.getPlainType(), useDC,
                                         abiExposedType, layoutAffectingStorage,
@@ -109,13 +105,10 @@ void swift::forEachRequiredHiddenTypeLayout(
           return;
         }
 
-        // The generic arguments of a type named in a function signature are
-        // part of the signature: clients cannot resolve the function type
-        // without them. Diagnose hidden types there instead of scheduling a
-        // layout that clients could never use. (Outside of function types
-        // the arguments are intentionally not walked: a resilient wrapper
-        // such as Array has fixed size regardless of its element type, and
-        // same-module generics are handled through substitution below.)
+        // Generic arguments named in a function signature are part of the
+        // signature. (Outside function types they are not walked: resilient
+        // wrappers have fixed size, and same-module generics resolve through
+        // substitution below.)
         if (inFunctionType) {
           if (auto *bgt = type->getAs<BoundGenericType>()) {
             for (Type arg : bgt->getGenericArgs())
@@ -208,9 +201,7 @@ void swift::forEachRequiredHiddenTypeLayout(
             auto *storage = prop->getModuleContext() == module
                                 ? prop
                                 : layoutAffectingStorage;
-            // Reset: the contents of a visible nominal's definition are
-            // resolved through the nominal's own declaration, which clients
-            // can see, so hidden types found here are still serializable.
+            // Reset: nominal definitions resolve through the nominal itself.
             processTypeForHiddenLayouts(storedType, prop->getDeclContext(),
                                         abiExposedType, storage,
                                         /*inFunctionType=*/false);

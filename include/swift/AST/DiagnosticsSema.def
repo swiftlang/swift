@@ -918,14 +918,8 @@ NOTE(serialization_hidden_type_layout_abi_exposure,none,
      "layout of %kind0 is ABI-exposed through %kind1",
      (const ValueDecl *, const ValueDecl *))
 ERROR(serialization_hidden_type_in_function_type,none,
-      "stored property %0 has a function type that references hidden type %1, "
-      "whose size is unknown to clients; clients may compute a smaller layout "
-      "for %kind2 and allocate too little memory, overrunning the heap",
-      (const ValueDecl *, Type, const NominalTypeDecl *))
-NOTE(serialization_hidden_type_in_function_type_fix,none,
-     "store the closure in a 'final class', whose layout is a single pointer "
-     "in every module, or remove the hidden type from the closure's signature",
-     ())
+      "cannot use hidden type %1 in function type of stored property %0",
+      (const ValueDecl *, Type))
 ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))
