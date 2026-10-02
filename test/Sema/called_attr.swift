@@ -20,6 +20,21 @@ do {
   // expected-error@-1 {{invalid conversion from '@called(atMostOnce)' function of type '@called(atMostOnce) () -> Void' to function type '() -> Void'}}
 }
 
+struct Storage {
+  // expected-note@-1 {{consider adding '~Copyable' to struct 'Storage'}}
+
+  let atMostOnce: @called(atMostOnce) () -> Void
+  // expected-error@-1 {{stored property 'atMostOnce' of 'Copyable'-conforming struct 'Storage' has non-Copyable type '@called(atMostOnce) () -> Void'}}
+}
+
+struct NCStorage: ~Copyable {
+  let atMostOnce: @called(atMostOnce) () -> Void
+
+  init(atMostOnce: @escaping @called(atMostOnce) () -> Void) {
+    self.atMostOnce = atMostOnce
+  }
+}
+
 // Argument conversions
 func argumentConversions(fn: @escaping () -> Void, atMostOnce: @called(atMostOnce) () -> Void) {
   func atMostOnceFn(_ f: @called(atMostOnce) () -> Void) {}
@@ -68,7 +83,7 @@ protocol Q {
 }
 
 struct S3: Q {
-  func run(_: @called(atMostOnce) () -> Void) {} // Ok (because `@called(atMostOnce)` is more narrow then plain escaping type.
+  func run(_: @called(atMostOnce) () -> Void) {} // Ok (because `@called(atMostOnce)` is more narrow then plain escaping type)
 }
 
 func testClosures() {
