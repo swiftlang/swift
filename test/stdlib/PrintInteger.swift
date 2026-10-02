@@ -41,7 +41,7 @@ PrintTests.test("CustomStringConvertible") {
 #endif
   hasDescription(CChar8(42))
   hasDescription(CChar16(42))
-  hasDescription(CChar32(42)!)
+  hasDescription(CChar32(42))
 }
 
 PrintTests.test("Printable") {
@@ -63,7 +63,7 @@ PrintTests.test("Printable") {
 #endif
   expectPrinted("42", CChar8(42))
   expectPrinted("42", CChar16(42))
-  expectPrinted("*", CChar32(42)!)
+  expectPrinted("42", CChar32(42))
 
   if (UInt64(Int.max) > 0x1_0000_0000 as UInt64) {
     expectPrinted("-9223372036854775808", Int.min)
@@ -159,7 +159,7 @@ PrintTests.test("Printable") {
 #endif
   expectPrinted("42", CChar8(42))
   expectPrinted("42", CChar16(42))
-  expectPrinted("*", CChar32(42)!)
+  expectPrinted("42", CChar32(42))
 }
 
 runAllTests()

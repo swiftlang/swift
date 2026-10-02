@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// Test the behavior of printing Unicode.Scalar in the compatibility header.
-// This is wrong, it should either be rejected and considered non-representable
-// or actually be printed using a C / Objective-C compatible type.
+// Test the behavior of printing Unicode.Scalar / CChar32 / CWideChar in the
+// compatibility header.
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %s -emit-module -verify -o %t -emit-module-doc \
