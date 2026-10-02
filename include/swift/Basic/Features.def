@@ -299,6 +299,12 @@ LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
 LANGUAGE_FEATURE(BuiltinAllocRawTyped, 0, "Builtin.allocRawTyped/deallocRawTyped")
 LANGUAGE_FEATURE(BuiltinTypedAllocationID, 0, "Builtin.typedAllocationID")
 
+// The stdlib's CChar32 is a typealias for UInt32 rather than Unicode.Scalar.
+// Compilers without this feature ship a CxxStdlib overlay that requires
+// CChar32 == Unicode.Scalar, so the stdlib interface prints the old typealias
+// for them.
+SUPPRESSIBLE_LANGUAGE_FEATURE(CChar32IsUInt32, 0, "CChar32 is UInt32")
+
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
 SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")

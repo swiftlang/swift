@@ -71,6 +71,10 @@ FeatureSet getUniqueFeaturesUsed(Decl *decl);
 
 bool usesFeatureIsolatedDeinit(const Decl *decl);
 
+/// Whether \p decl is the stdlib's CChar32 typealias with a new (non-
+/// Unicode.Scalar) underlying type.
+bool usesFeatureCChar32IsUInt32(const Decl *decl);
+
 } // end namespace swift
 
 #endif /* SWIFT_AST_FEATURES_H */
