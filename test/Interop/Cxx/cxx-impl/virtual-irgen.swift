@@ -21,24 +21,24 @@ import Virtual
 // The classes whose key function is implemented below. The Microsoft ABI has
 // no key functions, so Swift emits no vftables.
 
-// CHECK-SYSV: @_ZTV5Shape = {{(dso_local )?}}constant { [5 x ptr] } { [5 x ptr] [ptr null, ptr @_ZTI5Shape, ptr @_ZNK5Shape4areaEv, ptr @_ZN5Shape5scaleEi, ptr @_ZNK5Shape9perimeterEv] }
+// CHECK-SYSV: @_ZTV5Shape = {{(dso_local )?}}constant { [5 x ptr] } { [5 x ptr] [ptr null, ptr @_ZTI5Shape, ptr @_ZNK5Shape4areaEv{{(\.ptrauth)?}}, ptr @_ZN5Shape5scaleEi{{(\.ptrauth)?}}, ptr @_ZNK5Shape9perimeterEv{{(\.ptrauth)?}}] }
 // CHECK-SYSV: @_ZTI5Shape = {{(dso_local )?}}constant
 // CHECK-SYSV: @_ZTS5Shape = {{(dso_local )?}}constant [7 x i8] c"5Shape\00"
 
-// CHECK-SYSV: @_ZTV8Abstract = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI8Abstract, ptr @_ZNK8Abstract6anchorEv, ptr @__cxa_pure_virtual] }
+// CHECK-SYSV: @_ZTV8Abstract = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI8Abstract, ptr @_ZNK8Abstract6anchorEv{{(\.ptrauth)?}}, ptr @__cxa_pure_virtual{{(\.ptrauth(\.[0-9]+)?)?}}] }
 
-// CHECK-SYSV: @_ZTV9MIDerived = {{(dso_local )?}}constant { [7 x ptr], [3 x ptr] } { [7 x ptr] [ptr null, ptr @_ZTI9MIDerived, ptr @[[MI_COMPLETE_DTOR:_ZN9MIDerivedD[12]Ev]], ptr @_ZN9MIDerivedD0Ev, ptr @_ZN9MIDerived6firstAEv, ptr @_ZN9MIDerived8miAnchorEv, ptr @_ZNK9MIDerived5fromBEv],
-// CHECK-SYSV-64-SAME: [3 x ptr] [ptr inttoptr (i64 -16 to ptr), ptr @_ZTI9MIDerived, ptr @_ZThn16_NK9MIDerived5fromBEv] }
+// CHECK-SYSV: @_ZTV9MIDerived = {{(dso_local )?}}constant { [7 x ptr], [3 x ptr] } { [7 x ptr] [ptr null, ptr @_ZTI9MIDerived, ptr @[[MI_COMPLETE_DTOR:_ZN9MIDerivedD[12]Ev]]{{(\.ptrauth)?}}, ptr @_ZN9MIDerivedD0Ev{{(\.ptrauth)?}}, ptr @_ZN9MIDerived6firstAEv{{(\.ptrauth)?}}, ptr @_ZN9MIDerived8miAnchorEv{{(\.ptrauth)?}}, ptr @_ZNK9MIDerived5fromBEv{{(\.ptrauth)?}}],
+// CHECK-SYSV-64-SAME: [3 x ptr] [ptr inttoptr (i64 -16 to ptr), ptr @_ZTI9MIDerived, ptr @_ZThn16_NK9MIDerived5fromBEv{{(\.ptrauth)?}}] }
 // CHECK-SYSV-32-SAME: [3 x ptr] [ptr inttoptr (i32 -8 to ptr), ptr @_ZTI9MIDerived, ptr @_ZThn8_NK9MIDerived5fromBEv] }
 // CHECK-SYSV: @_ZTI9MIDerived = {{(dso_local )?}}constant
 
-// CHECK-SYSV-64: @_ZTV8VDerived = {{(dso_local )?}}constant { [5 x ptr], [4 x ptr] } { [5 x ptr] [ptr inttoptr (i64 16 to ptr), ptr null, ptr @_ZTI8VDerived, ptr @_ZN8VDerived7vAnchorEv, ptr @_ZNK8VDerived8vbMethodEv], [4 x ptr] [ptr inttoptr (i64 -16 to ptr), ptr inttoptr (i64 -16 to ptr), ptr @_ZTI8VDerived, ptr @_ZTv0_n24_NK8VDerived8vbMethodEv] }
+// CHECK-SYSV-64: @_ZTV8VDerived = {{(dso_local )?}}constant { [5 x ptr], [4 x ptr] } { [5 x ptr] [ptr inttoptr (i64 16 to ptr), ptr null, ptr @_ZTI8VDerived, ptr @_ZN8VDerived7vAnchorEv{{(\.ptrauth)?}}, ptr @_ZNK8VDerived8vbMethodEv{{(\.ptrauth)?}}], [4 x ptr] [ptr inttoptr (i64 -16 to ptr), ptr inttoptr (i64 -16 to ptr), ptr @_ZTI8VDerived, ptr @_ZTv0_n24_NK8VDerived8vbMethodEv{{(\.ptrauth)?}}] }
 // CHECK-SYSV-32: @_ZTV8VDerived = {{(dso_local )?}}constant { [5 x ptr], [4 x ptr] } { [5 x ptr] [ptr inttoptr (i32 8 to ptr), ptr null, ptr @_ZTI8VDerived, ptr @_ZN8VDerived7vAnchorEv, ptr @_ZNK8VDerived8vbMethodEv], [4 x ptr] [ptr inttoptr (i32 -8 to ptr), ptr inttoptr (i32 -8 to ptr), ptr @_ZTI8VDerived, ptr @_ZTv0_n12_NK8VDerived8vbMethodEv] }
 // CHECK-SYSV: @_ZTT8VDerived = {{(dso_local )?}}unnamed_addr constant [2 x ptr]
 
-// CHECK-SYSV: @_ZTV6Engine = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI6Engine, ptr @_ZNK6Engine6statusEv, ptr @_ZN6Engine5boostEi] }
+// CHECK-SYSV: @_ZTV6Engine = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI6Engine, ptr @_ZNK6Engine6statusEv{{(\.ptrauth)?}}, ptr @_ZN6Engine5boostEi{{(\.ptrauth)?}}] }
 
-// CHECK-SYSV: @_ZTV14AbstractEngine = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI14AbstractEngine, ptr @_ZNK14AbstractEngine8aeAnchorEv, ptr @__cxa_pure_virtual] }
+// CHECK-SYSV: @_ZTV14AbstractEngine = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI14AbstractEngine, ptr @_ZNK14AbstractEngine8aeAnchorEv{{(\.ptrauth)?}}, ptr @__cxa_pure_virtual{{(\.ptrauth(\.[0-9]+)?)?}}] }
 
 // The classes whose key function stays in C++.
 // NOVTABLE-SYSV-NOT: @_ZTV10SimpleBase
@@ -147,11 +147,11 @@ extension VDerived {
   // CHECK-SYSV-LABEL: define{{.*}} i32 @_ZNK8VDerived8vbMethodEv(ptr {{.*}}%0)
   // CHECK-SYSV-64-LABEL: define{{.*}} i32 @_ZTv0_n24_NK8VDerived8vbMethodEv(ptr {{.*}}%this)
   // CHECK-SYSV-32-LABEL: define{{.*}} i32 @_ZTv0_n12_NK8VDerived8vbMethodEv(ptr {{.*}}%this)
-  // CHECK-SYSV:   [[VTABLE:%.*]] = load ptr, ptr %this1
-  // CHECK-SYSV-64:   [[VCALL_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, ptr [[VTABLE]], i64 -24
+  // CHECK-SYSV:   load ptr, ptr %this1
+  // CHECK-SYSV-64:   [[VCALL_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, ptr {{%.*}}, i64 -24
   // CHECK-SYSV-64:   [[VCALL_OFFSET:%.*]] = load i64, ptr [[VCALL_OFFSET_ADDR]]
   // CHECK-SYSV-64:   [[ADJUSTED:%.*]] = getelementptr inbounds i8, ptr %this1, i64 [[VCALL_OFFSET]]
-  // CHECK-SYSV-32:   [[VCALL_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, ptr [[VTABLE]], i64 -12
+  // CHECK-SYSV-32:   [[VCALL_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, ptr {{%.*}}, i64 -12
   // CHECK-SYSV-32:   [[VCALL_OFFSET:%.*]] = load i32, ptr [[VCALL_OFFSET_ADDR]]
   // CHECK-SYSV-32:   [[ADJUSTED:%.*]] = getelementptr inbounds i8, ptr %this1, i32 [[VCALL_OFFSET]]
   // CHECK-SYSV:   call {{.*}}i32 @_ZNK8VDerived8vbMethodEv(ptr {{.*}}[[ADJUSTED]])
