@@ -12,13 +12,13 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Foo.swiftmodule -emit-module-source-info-path %t/Foo.swiftsourceinfo %s -parse-as-library -serialized-path-obfuscate %s=/CHANGED_FOO -serialized-path-obfuscate /original-sourceinfo=./virtual -module-name Foo -prefix-map-sourceinfo
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print=Foo -source-filename=x -I %t | %FileCheck %s --check-prefix=CHECK-SOURCEINFO-MAPPED
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print=Foo -source-filename=x -I %t -sourceinfo-prefix-map /CHANGED_FOO=/UNMAPPED_FOO | %FileCheck %s --check-prefix=CHECK-SOURCEINFO-UNMAPPED
-// RUN: %llvm-bcanalyzer -dump -show-binary-blobs %t/Foo.swiftsourceinfo | %FileCheck %s --check-prefix=CHECK-PATHS -DFILE=/CHANGED_FOO --implicit-check-not SOURCE_DIR --implicit-check-not /original-sourceinfo
+// RUN: %llvm-bcanalyzer -dump -show-binary-blobs %t/Foo.swiftsourceinfo | %FileCheck %s --enable-yaml-compatibility --check-prefix=CHECK-PATHS -DFILE=/CHANGED_FOO --implicit-check-not SOURCE_DIR --implicit-check-not /original-sourceinfo
 
 // --- 2. Test -file-prefix-map ---
 // RUN: %target-swift-frontend -emit-module -o %t/Foo2.swiftmodule -emit-module-source-info-path %t/Foo2.swiftsourceinfo %s -parse-as-library -file-prefix-map %s=/CHANGED_FOO_FILE_MAP -file-prefix-map /original-sourceinfo=./virtual -module-name Foo2 -prefix-map-sourceinfo
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print=Foo2 -source-filename=x -I %t | %FileCheck %s --check-prefix=CHECK-FILEMAP-MAPPED
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print=Foo2 -source-filename=x -I %t -sourceinfo-prefix-map /CHANGED_FOO_FILE_MAP=/UNMAPPED_FOO_FILE_MAP | %FileCheck %s --check-prefix=CHECK-FILEMAP-UNMAPPED
-// RUN: %llvm-bcanalyzer -dump -show-binary-blobs %t/Foo2.swiftsourceinfo | %FileCheck %s --check-prefix=CHECK-PATHS -DFILE=/CHANGED_FOO_FILE_MAP --implicit-check-not SOURCE_DIR --implicit-check-not /original-sourceinfo
+// RUN: %llvm-bcanalyzer -dump -show-binary-blobs %t/Foo2.swiftsourceinfo | %FileCheck %s --enable-yaml-compatibility --check-prefix=CHECK-PATHS -DFILE=/CHANGED_FOO_FILE_MAP --implicit-check-not SOURCE_DIR --implicit-check-not /original-sourceinfo
 
 // Prefix mapping must cover declaration and documentation locations, not just
 // the source-file list printed by -print-module-metadata. Inspect the complete
@@ -28,9 +28,10 @@
 // CHECK-PATHS-SAME: ./virtual/declaration.swift\x00
 
 // Mapping remains opt-in, even when -file-prefix-map is supplied.
+// Binary blob dumps escape Windows backslashes; sanitize those escaped paths.
 // RUN: %target-swift-frontend -emit-module -o %t/Unmapped.swiftmodule -emit-module-source-info-path %t/Unmapped.swiftsourceinfo %s -parse-as-library -file-prefix-map %s=/CHANGED_FOO_FILE_MAP -file-prefix-map /original-sourceinfo=./virtual -module-name Unmapped
-// RUN: %llvm-bcanalyzer -dump -show-binary-blobs %t/Unmapped.swiftsourceinfo | %FileCheck %s --check-prefix=CHECK-ORIGINAL --implicit-check-not ./virtual --implicit-check-not /CHANGED_FOO_FILE_MAP
-// CHECK-ORIGINAL: <TEXT_DATA{{.*}}blob data = 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}Serialization{{[/\\]}}prefix_map_sourceinfo.swift\x00
+// RUN: %llvm-bcanalyzer -dump -show-binary-blobs %t/Unmapped.swiftsourceinfo | %FileCheck %s --enable-yaml-compatibility --check-prefix=CHECK-ORIGINAL --implicit-check-not ./virtual --implicit-check-not /CHANGED_FOO_FILE_MAP
+// CHECK-ORIGINAL: <TEXT_DATA{{.*}}blob data = 'SOURCE_DIR{{[/\\]+}}test{{[/\\]+}}Serialization{{[/\\]+}}prefix_map_sourceinfo.swift\x00
 // CHECK-ORIGINAL-SAME: /original-sourceinfo/documented.swift\x00
 // CHECK-ORIGINAL-SAME: /original-sourceinfo/declaration.swift\x00
 
