@@ -30,7 +30,7 @@ int main() {
   // passThroughCChar16
   VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCChar16ys6UInt16VADF, 0xFE1);
   // passThroughCChar32
-  VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF, 0x100FE);
+  VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCChar32ys6UInt32VADF, 0x100FE);
 
   // passThroughCSignedChar
   VERIFY_PASSTHROUGH_VALUE($s9Functions22passThroughCSignedCharys4Int8VADF, -1);
