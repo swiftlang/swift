@@ -3425,6 +3425,10 @@ public:
   /// marker for lifetime resolution so that it can reason about the formal
   /// scopes of variables.
   void enterLetBindingFormalScopeCleanup(VarDecl *vd);
+
+  /// Are we using the SILMoveOnlyWrappedType to check bindings that are
+  /// @noImplicitCopy?
+  bool usingWrapperTypeImplicitCopyEnforcement();
 };
 
 

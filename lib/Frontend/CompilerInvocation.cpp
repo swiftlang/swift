@@ -3419,8 +3419,19 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableRecompilationToOSSAModule |=
       Args.hasArg(OPT_enable_recompilation_to_ossa_module);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+
+  Opts.EnableLifetimeResolution =
+      Args.hasFlag(OPT_enable_lifetime_resolution,
+                   OPT_disable_lifetime_resolution,
+                   Opts.EnableLifetimeResolution);
+
+  // By default, enable SIL Opaque Values when using LifetimeResolution.
+  const bool OpaqueValuesDefaultEnablement = Opts.EnableLifetimeResolution;
+
   Opts.EnableSILOpaqueValues = Args.hasFlag(
-      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
+      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values,
+      OpaqueValuesDefaultEnablement);
+
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableThrowsPrediction = Args.hasFlag(
       OPT_enable_throws_prediction, OPT_disable_throws_prediction,
@@ -3468,10 +3479,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
                    OPT_disable_lifetime_dependence_diagnostics,
                    Opts.EnableLifetimeDependenceDiagnostics);
-  Opts.EnableLifetimeResolution =
-      Args.hasFlag(OPT_enable_lifetime_resolution,
-                   OPT_disable_lifetime_resolution,
-                   Opts.EnableLifetimeResolution);
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);

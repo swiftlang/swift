@@ -216,6 +216,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<DeallocStackInst>(user) || isa<InitBlockStorageHeaderInst>(user) ||
         isa<GetAsyncContinuationAddrInst>(user) ||
         isa<ExistentialMetatypeInst>(user) ||
+        isa<DiagnoseInst>(user) ||
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||

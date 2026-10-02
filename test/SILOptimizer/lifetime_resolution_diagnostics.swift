@@ -133,6 +133,19 @@ func consumeOfCopyableLetIntoBinding() {
   use(q)
 }
 
+func inoutConsume_error(_ s: inout String) {
+  if .random() {
+    _ = consume s  // expected-error {{'' used after consume}}  // expected-note {{consumed here}}
+  }
+}
+func inoutConsume_fixed(_ s: inout String) {
+  if .random() {
+    _ = consume s
+    s = ""
+  }
+  return
+}
+
 // --- simple ~Copyable (loadable), backed by alloc_box ---
 
 func ncUseAfterConsume() {
@@ -299,7 +312,85 @@ func tupleElementUseAfterConsume() {
   use(t.1)          // valid: distinct element
 }
 
-// FIXME: this case is still missing diagnostics!
+func trivialUseBeforeInit() {
+  var t: (Int, Int)  // expected-note {{variable defined here}}
+  t.0 = 1
+  _ = t.1  // expected-error {{variable 't' used before being initialized}}
+  _ = t.0
+
+
+  var control_flow: Int  // expected-note {{variable defined here}}
+  if .random() {
+    control_flow = 1
+  }
+  _ = control_flow  // expected-error {{variable 'control_flow' used before being initialized}}
+
+
+  let deferredLet: Int  // expected-note {{constant defined here}}
+  if .random() { deferredLet = 1 }
+  _ = 1 + deferredLet  // expected-error {{constant 'deferredLet' used before being initialized}}
+
+  // Until we have lifetimes for trivial types, we should expect a warning for any consumes
+  var x: Int
+  x = 5
+  _ = consume x  // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
+  _ = x
+}
+
+struct EmptyStruct {
+  init() {}
+}
+
+enum EmptyEnum {
+  // FIXME: It is correct to emit an error here, but the message needs improving,
+  //        as it's actually considered a delegating initializer.
+  //        Here's what DI emits: 'self.init' isn't called on all paths before returning from initializer
+
+  init() {}  // expected-error {{variable 'self' used before being initialized}} // expected-note {{variable defined here}}
+}
+
+class EmptyClass {
+  init() {}
+}
+
+func testEmpties_ubi() {
+  let s: EmptyStruct  // expected-note {{defined here}}
+  _ = s  // expected-error {{used before being initialized}}
+
+  let e: EmptyEnum // expected-note {{defined here}}
+  _ = e // expected-error {{used before being initialized}}
+
+  let c: EmptyClass // expected-note {{defined here}}
+  _ = c // expected-error {{used before being initialized}}
+}
+
+func testEmpties_uac() {
+  let s: EmptyStruct
+  s = EmptyStruct()
+  _ = consume s  // expected-warning {{has no effect}}
+  _ = s
+
+  let e: EmptyEnum
+  e = EmptyEnum()
+  _ = consume e  // expected-warning {{has no effect}}
+  _ = e
+
+  let c: EmptyClass
+  c = EmptyClass()
+  _ = consume c  // expected-note {{consumed here}}
+  _ = c          // expected-error {{'c' used after consume}}
+}
+
+struct Point {
+  var x: Int = 0
+  var y: Int
+  init(oops: ()) {} // expected-error {{variable 'self' used before being initialized}}  // expected-note {{variable defined here}}
+  init(stillOops: ()) { self.x = 0 }  // expected-error {{variable 'self' used before being initialized}}  // expected-note {{variable defined here}}
+  init(correct: ()) { self.y = 0 }
+}
+
+
+// FIXME: this case is still missing diagnostics! (rdar://188752216)
 func consumeCopyableFields() {
   let p = Pair(a: C(), b: C())
   _ = consume p.a
@@ -317,4 +408,30 @@ func testStringSwitch(_ s: String) -> Int {
 
 func testArray(_ s: Array<String>) -> String {
   return s[0]
+}
+
+
+struct Initializers: ~Copyable {
+  let x: C
+  init(test: Void) throws {
+    self.x = try Self.f()
+    _ = self    // expected-note {{consumed here}}
+    try self.doStuff()  // expected-error {{'self' used after consume}}
+  }
+  private func doStuff() throws {}
+
+  private static func f() throws -> C { C() }
+}
+struct TrivialPair { var a: Int; var b: Int }
+struct TrivialNested { var p: TrivialPair; var c: Int }
+func useNested(_ n: TrivialNested) {}
+
+// A single use that reads several uninitialized leaves is diagnosed once.
+func multiLeafUseBeforeInit() {
+  let n: TrivialNested  // expected-note {{constant defined here}}
+  useNested(n)  // expected-error {{constant 'n' used before being initialized}}
+
+  var m: TrivialNested  // expected-note {{variable defined here}}
+  m.p.a = 1
+  useNested(m)  // expected-error {{variable 'm' used before being initialized}}
 }
