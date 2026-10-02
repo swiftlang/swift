@@ -42,6 +42,25 @@ func run() {
   } catch {
     preconditionFailure("unexpected error")
   }
+  precondition(try! value.nonnegative == 42)
+  precondition(try! readNonnegative(value) == 42)
+  other.value = -1
+  do {
+    _ = try value.nonnegative
+    preconditionFailure("expected the extension getter to throw")
+  } catch ValueError.negative {
+    precondition(value.value(1) == 0)
+  } catch {
+    preconditionFailure("unexpected error")
+  }
+  do {
+    _ = try readNonnegative(value)
+    preconditionFailure("expected the generic call to throw")
+  } catch ValueError.negative {
+    precondition(value.value(2) == 1)
+  } catch {
+    preconditionFailure("unexpected error")
+  }
   precondition(GetForeignCOMQueryInterfaceCalls() == 0)
   withExtendedLifetime((value, other)) {}
 }
