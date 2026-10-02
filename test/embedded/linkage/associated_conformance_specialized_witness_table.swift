@@ -41,7 +41,7 @@ public struct Buf: MyBidi {
   public func before(_ i: Int) -> Int { i - 1 }
 }
 
-// CHECK-DAG: @"$e5Repro3BufVAA6MyCollAAWP" = {{.*}}global {{.*}}@"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP"
-// CHECK-DAG: @"$e5Repro3BufVAA6MyBidiAAWP" = {{.*}}global {{.*}}@"$e5Repro7MySliceVyAA3BufVGAA0B4BidiAAWP"
+// CHECK-DAG: @"$e5Repro3BufVAA6MyCollAAWP" = {{.*}}global {{.*}}@"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
+// CHECK-DAG: @"$e5Repro3BufVAA6MyBidiAAWP" = {{.*}}global {{.*}}@"$e5Repro7MySliceVyAA3BufVGAA0B4BidiAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-DAG: @"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP" = {{.*}}{{global|constant}} [
 // CHECK-DAG: @"$e5Repro7MySliceVyAA3BufVGAA0B4BidiAAWP" = {{.*}}{{global|constant}} [

@@ -25,4 +25,4 @@ public struct Buf: MyColl {
 }
 public func makeAny() -> any MyColl { MySlice(base: Buf()) }
 
-// CHECK: @"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP" = {{.*}}global [5 x ptr] [{{.*}}@"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP"
+// CHECK: @"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP" = {{.*}}global [5 x ptr] [{{.*}}@"$e5Repro7MySliceVyAA3BufVGAA0B4CollAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
