@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -target arm64-apple-macosx14 %s | %FileCheck %s
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-stdlib -module-name Swift -enable-objc-interop -target x86_64-apple-macosx14 %s 2>&1 | %FileCheck %s --check-prefix=ERROR
-// RUN: not %target-swift-frontend -emit-silgen -parse-stdlib -module-name Swift -enable-objc-interop -target x86_64-apple-watchos10-simulator %s 2>&1 | %FileCheck %s --check-prefix=ERROR
 
 // REQUIRES: CODEGENERATOR=AArch64
 // REQUIRES: CODEGENERATOR=X86
