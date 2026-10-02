@@ -633,6 +633,20 @@ The `unknownDefault` case value is not a constructible case and you will get a c
 
 Swift class types that are usable from C++ are available in their corresponding module namespace. They’re bridged over as a C++ class that stores a referenced counted pointer inside of it. Its initializers, methods and properties are exposed as members of the C++ class.
 
+### Const class references (experimental)
+
+Passing `-enable-experimental-feature GenerateConstClassMembersInCXX` when
+generating the header makes class instance methods and property accessors
+`const` in C++. A `const` wrapper preserves its reference to the Swift object;
+methods and property setters can still mutate that object, just as they can
+through a Swift `let` reference. Ordinary and `borrowing` methods use the
+existing reference without copying the C++ wrapper. A `consuming` method
+receives a retained copy, preserving the wrapper's ownership of the object.
+
+This option changes C++ member-function pointer types. Without it, class
+methods and property accessors keep their existing non-`const` signatures.
+Subscript getters are already `const` in both modes.
+
 ### Reference counting in C++
 
 C++ class types that represent Swift classes perform automatic
