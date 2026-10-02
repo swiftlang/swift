@@ -7491,7 +7491,7 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
-    if (info.isCalledOnce()) {
+    if (info.getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@called");
       Printer << "(atMostOnce)";

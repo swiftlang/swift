@@ -7302,7 +7302,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   auto PartialApplyIsolation = SILFunctionTypeIsolation::forUnknown();
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
-  bool IsCalledOnce = false;
+  std::optional<ExecutionSemantics> PartialApplySemantics;
 
   StringRef AttrName;
   SourceLoc AttrLoc;
@@ -7357,7 +7357,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     if (AttrName == "called_once") {
       assert(!bool(AttrValue));
-      IsCalledOnce = true;
+      PartialApplySemantics = ExecutionSemantics::AtMostOnce;
       continue;
     }
 
@@ -7543,7 +7543,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
-        PartialApplyIsolation, IsCalledOnce,
+        PartialApplyIsolation, PartialApplySemantics,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
                    : PartialApplyInst::OnStackKind::NotOnStack,
         isNested ? *isNested : StackAllocationIsNested);

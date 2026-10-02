@@ -322,7 +322,7 @@ static bool hasCalledAtMostOnceSemantics(EitherFunctionType eitherFnTy) {
   }
 
   auto silFnTy = cast<const SILFunctionType *>(eitherFnTy);
-  return silFnTy->isCalledOnce();
+  return silFnTy->hasCalledAtMostOnceSemantics();
 }
 
 /// Whether the given function type conforms to Copyable.

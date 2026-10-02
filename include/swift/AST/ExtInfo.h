@@ -1243,8 +1243,8 @@ class SILExtInfoBuilder {
   //   |    0 .. 4    |      5      |     6    |     7      |   8
   //   |differentiability|unimplementable|erased isolation|nonisolated(nonsending)|
   //   |     9 .. 11     |      12       |      13        |    14                 |
-  //   | called_once |
-  //   |      15     |
+  //   | execution_semantics |
+  //   |       15 .. 16      |
   enum : unsigned {
     RepresentationMask = 0x1F << 0,
     PseudogenericMask = 1 << 5,
@@ -1256,8 +1256,9 @@ class SILExtInfoBuilder {
     UnimplementableMask = 1 << 12,
     ErasedIsolationMask = 1 << 13,
     NonisolatedNonsendingIsolationMask = 1 << 14,
-    CalledOnceMask = 1 << 15,
-    NumMaskBits = 16
+    ExecutionSemanticsMaskOffset = 15,
+    ExecutionSemanticsMask = 0x3 << ExecutionSemanticsMaskOffset,
+    NumMaskBits = 17
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -1277,14 +1278,15 @@ class SILExtInfoBuilder {
   static unsigned makeBits(Representation rep, bool isPseudogeneric,
                            bool isNoEscape, bool isSendable, bool isAsync,
                            bool isUnimplementable,
-                           bool isCalledOnce,
+                           std::optional<ExecutionSemantics> executionSemantics,
                            SILFunctionTypeIsolation isolation,
                            DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) | (isSendable ? SendableMask : 0) |
            (isAsync ? AsyncMask : 0) |
            (isUnimplementable ? UnimplementableMask : 0) |
-           (isCalledOnce ? CalledOnceMask : 0) |
+           (encodeExecutionSemantics(executionSemantics)
+            << ExecutionSemanticsMaskOffset) |
            (isolation.isNonisolatedNonsending()
                 ? NonisolatedNonsendingIsolationMask
                 : 0) |
@@ -1297,20 +1299,22 @@ public:
   /// An ExtInfoBuilder for a typical Swift function: thick, @escaping,
   /// non-pseudogeneric, non-differentiable.
   SILExtInfoBuilder()
-      : SILExtInfoBuilder(
-            makeBits(SILFunctionTypeRepresentation::Thick, false, false, false,
-                     false, false, false, SILFunctionTypeIsolation::forUnknown(),
-                     DifferentiabilityKind::NonDifferentiable),
-            ClangTypeInfo(nullptr), /*LifetimeDependenceInfo*/ {}) {}
+      : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
+                                   false, false, false, false, std::nullopt,
+                                   SILFunctionTypeIsolation::forUnknown(),
+                                   DifferentiabilityKind::NonDifferentiable),
+                          ClangTypeInfo(nullptr),
+                          /*LifetimeDependenceInfo*/ {}) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync, bool isUnimplementable,
-                    bool isCalledOnce, SILFunctionTypeIsolation isolation,
+                    std::optional<ExecutionSemantics> executionSemantics,
+                    SILFunctionTypeIsolation isolation,
                     DifferentiabilityKind diffKind, const clang::Type *type,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo)
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
-                                   isAsync, isUnimplementable, isCalledOnce, isolation,
-                                   diffKind),
+                                   isAsync, isUnimplementable,
+                                   executionSemantics, isolation, diffKind),
                           ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
   // Constructor for polymorphic type.
@@ -1318,8 +1322,7 @@ public:
       : SILExtInfoBuilder(
             makeBits(info.getSILRepresentation(), isPseudogeneric,
                      info.isNoEscape(), info.isSendable(), info.isAsync(),
-                     /*unimplementable*/ false,
-                     info.hasCalledAtMostOnceSemantics(),
+                     /*unimplementable*/ false, info.getExecutionSemantics(),
                      SILFunctionTypeIsolation::fromAST(info.getIsolation()),
                      info.getDifferentiabilityKind()),
             info.getClangTypeInfo(), info.getLifetimeDependencies()) {}
@@ -1363,7 +1366,17 @@ public:
     return bits & UnimplementableMask;
   }
 
-  constexpr bool isCalledOnce() const { return bits & CalledOnceMask; }
+  constexpr std::optional<ExecutionSemantics> getExecutionSemantics() const {
+    return decodeExecutionSemantics((bits & ExecutionSemanticsMask) >>
+                                    ExecutionSemanticsMaskOffset);
+  }
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  constexpr bool hasCalledAtMostOnceSemantics() const {
+    return getExecutionSemantics().has_value();
+  }
 
   /// Does this function type have nonisolated(nonsending) isolation
   /// (i.e. is it the lowering of an nonisolated(nonsending) function type)?
@@ -1479,9 +1492,11 @@ public:
                              clangTypeInfo, lifetimeDependencies);
   }
 
-  [[nodiscard]] SILExtInfoBuilder withCalledOnce(bool once = true) const {
-    return SILExtInfoBuilder(once ? (bits | CalledOnceMask)
-                                  : (bits & ~CalledOnceMask),
+  [[nodiscard]] SILExtInfoBuilder withExecutionSemantics(
+      std::optional<ExecutionSemantics> executionSemantics) const {
+    return SILExtInfoBuilder((bits & ~ExecutionSemanticsMask) |
+                                 (encodeExecutionSemantics(executionSemantics)
+                                  << ExecutionSemanticsMaskOffset),
                              clangTypeInfo, lifetimeDependencies);
   }
 
@@ -1585,10 +1600,11 @@ public:
 
   /// A default ExtInfo but with a Thin convention.
   static SILExtInfo getThin() {
-    return SILExtInfoBuilder(
-               SILExtInfoBuilder::Representation::Thin, false, false, false,
-               false, false, false, SILFunctionTypeIsolation::forUnknown(),
-               DifferentiabilityKind::NonDifferentiable, nullptr, {})
+    return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
+                             false, false, false, false, std::nullopt,
+                             SILFunctionTypeIsolation::forUnknown(),
+                             DifferentiabilityKind::NonDifferentiable, nullptr,
+                             {})
         .build();
   }
 
@@ -1619,8 +1635,15 @@ public:
     return builder.isUnimplementable();
   }
 
-  constexpr bool isCalledOnce() const {
-    return builder.isCalledOnce();
+  constexpr std::optional<ExecutionSemantics> getExecutionSemantics() const {
+    return builder.getExecutionSemantics();
+  }
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  constexpr bool hasCalledAtMostOnceSemantics() const {
+    return builder.hasCalledAtMostOnceSemantics();
   }
 
   constexpr bool hasNonisolatedNonsendingIsolation() const {

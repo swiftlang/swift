@@ -2232,7 +2232,7 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        if (outType->isCalledOnce()) {
+        if (outType->hasCalledAtMostOnceSemantics()) {
           // Move value into the apply.
           cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
           consumedFields.set(fieldIndex);
@@ -2721,7 +2721,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
       // @called(atMostOnce) closures always get a context even if they are
       // stack promoted because they can have consuming captures.
-      if (outType->isCalledOnce()) {
+      if (outType->hasCalledAtMostOnceSemantics()) {
         assert(!outType->isTrivialNoEscape());
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures

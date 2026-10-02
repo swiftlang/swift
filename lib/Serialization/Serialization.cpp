@@ -6404,12 +6404,10 @@ public:
         S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
         stableCoroutineKind, stableCalleeConvention, stableRepresentation,
         fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
-        fnTy->isCalledOnce(), fnTy->getIsolation().getKind(),
-        stableDiffKind, fnTy->hasErrorResult(),
-        fnTy->getParameters().size(),
-        fnTy->getNumYields(), fnTy->getNumResults(),
-        invocationSigID, invocationSubstMapID, patternSubstMapID,
-        clangTypeID, variableData);
+        fnTy->hasCalledAtMostOnceSemantics(), fnTy->getIsolation().getKind(),
+        stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
+        fnTy->getNumYields(), fnTy->getNumResults(), invocationSigID,
+        invocationSubstMapID, patternSubstMapID, clangTypeID, variableData);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {

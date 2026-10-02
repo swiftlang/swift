@@ -1161,7 +1161,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     // A `@called(atMostOnce)` on-stack closure can also own (consume) its
     // captures, and is responsible for releasing them via its destructor.
     // Release such captures here to make up for that.
-    if (pa->isCalledOnce()) {
+    if (pa->hasCalledAtMostOnceSemantics()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
         if (!argOp.isConsuming())

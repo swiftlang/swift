@@ -2549,7 +2549,7 @@ public:
         // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
-        require(PAI->isCalledOnce() ||
+        require(PAI->hasCalledAtMostOnceSemantics() ||
                     !substConv.getSILArgumentConvention(argIdx)
                          .isOwnedConventionInCaller(),
                 "on-stack closures do not support owned arguments");

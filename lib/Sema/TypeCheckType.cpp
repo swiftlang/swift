@@ -5073,14 +5073,15 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  bool isCalledOnce = false;
+  std::optional<ExecutionSemantics> executionSemantics;
   if (auto *called = claim<CalledTypeAttr>(attrs)) {
-    isCalledOnce = called->isAtMostOnce();
+    if (called->isAtMostOnce())
+      executionSemantics = ExecutionSemantics::AtMostOnce;
   }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isCalledOnce, isolation, diffKind, clangFnType,
+      executionSemantics, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic

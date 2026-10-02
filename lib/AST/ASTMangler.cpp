@@ -2351,7 +2351,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
-  if (fn->isCalledOnce())
+  if (fn->hasCalledAtMostOnceSemantics())
     OpArgs.push_back('O');
 
   // Differentiability kind.

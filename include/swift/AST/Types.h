@@ -415,7 +415,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 19 };
-  enum { NumSILExtInfoBits = 16 };
+  enum { NumSILExtInfoBits = 17 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -5647,7 +5647,16 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
-  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+  std::optional<ExecutionSemantics> getExecutionSemantics() const {
+    return getExtInfo().getExecutionSemantics();
+  }
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getExtInfo().hasCalledAtMostOnceSemantics();
+  }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }
@@ -6290,7 +6299,7 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick &&
-           !isCalledOnce();
+           !hasCalledAtMostOnceSemantics();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }

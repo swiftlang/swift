@@ -904,8 +904,10 @@ public:
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
 
-  /// Returns true if this SILType is a `@called(atMostOnce)` function type.
-  bool isCalledOnce() const;
+  /// Returns true if this SILType is a function type whose values can be
+  /// called at most once, which is true for every kind of `@called` attribute.
+  /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
+  bool hasCalledAtMostOnceSemantics() const;
 
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {

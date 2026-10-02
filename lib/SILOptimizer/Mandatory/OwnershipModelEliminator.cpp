@@ -505,7 +505,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       // In `@called(atMostOnce)` case, consumed captures don't need the
       // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
       // value.
-      if (inst->isCalledOnce()) {
+      if (inst->hasCalledAtMostOnceSemantics()) {
         auto argConv = applySite.getArgumentConvention(argOp);
         if (!(op->getType().isMoveOnly() &&
               !argConv.isOwnedConventionInCaller()))

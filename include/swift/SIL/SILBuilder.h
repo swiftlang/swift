@@ -379,7 +379,7 @@ public:
       SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
           PartialApplyInst::OnStackKind::NotOnStack,
-      bool isCalledOnce = false);
+      std::optional<ExecutionSemantics> executionSemantics = std::nullopt);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -592,7 +592,7 @@ public:
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
           SILFunctionTypeIsolation::forUnknown(),
-      bool IsCalledOnce = false,
+      std::optional<ExecutionSemantics> Semantics = std::nullopt,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
@@ -610,8 +610,8 @@ public:
            "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested,
-        IsCalledOnce, ArgLocs));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, Semantics,
+        ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(

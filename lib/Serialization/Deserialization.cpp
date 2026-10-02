@@ -8691,12 +8691,14 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!isolation)
     return MF.diagnoseFatal();
 
-  auto extInfo =
-      SILFunctionType::ExtInfoBuilder(
-          *representation, pseudogeneric, noescape, sendable, async,
-          unimplementable, calledOnce, *isolation, *diffKind, clangFunctionType,
-          /*LifetimeDependenceInfo*/ {})
-          .build();
+  auto extInfo = SILFunctionType::ExtInfoBuilder(
+                     *representation, pseudogeneric, noescape, sendable, async,
+                     unimplementable,
+                     calledOnce ? std::optional(ExecutionSemantics::AtMostOnce)
+                                : std::nullopt,
+                     *isolation, *diffKind, clangFunctionType,
+                     /*LifetimeDependenceInfo*/ {})
+                     .build();
 
   // Process the coroutine kind.
   auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
