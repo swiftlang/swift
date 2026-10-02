@@ -61,3 +61,16 @@ extension Box {
   public static func wrap(_ v: Int32) -> Tracked { return Tracked(v) }
 }
 
+// int readTracked(const Tracked &t);
+@unsafe @cxx @implementation
+public func readTracked(_ t: Tracked) -> Int32 { return t.value }
+
+// void bumpTracked(Tracked &t);
+@unsafe @cxx @implementation
+public func bumpTracked(_ t: inout Tracked) { t.value += 1 }
+
+// void assignTracked(Tracked &dst, const Tracked &src);
+@unsafe @cxx @implementation
+public func assignTracked(_ dst: inout Tracked, _ src: Tracked) {
+  dst = src
+}

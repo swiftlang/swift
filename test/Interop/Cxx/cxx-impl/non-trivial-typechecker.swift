@@ -71,6 +71,20 @@ extension Box {
 }
 
 
+// References
+
+@unsafe @cxx @implementation
+func readTracked(_ t: Tracked) -> Int32 { return t.value }
+
+@unsafe @cxx @implementation
+func bumpTracked(_ t: inout Tracked) { t.value += 1 }
+
+@unsafe @cxx @implementation
+func assignTracked(_ dst: inout Tracked, _ src: Tracked) {
+  dst = src
+}
+
+
 // Rejections
 
 // expected-error@+2{{global function cannot be marked '@cxx' because parameter 't' of non-trivial C++ class type is 'borrowing'}}

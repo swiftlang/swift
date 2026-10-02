@@ -68,6 +68,12 @@ struct Box {
   static Tracked wrap(int v);
 };
 
+// By reference.
+
+int readTracked(const Tracked &t);
+void bumpTracked(Tracked &t);
+void assignTracked(Tracked &dst, const Tracked &src);
+
 // Rejected: implementations spelled `borrowing` or `consuming`.
 
 int takesTrackedBorrowing(Tracked t);
