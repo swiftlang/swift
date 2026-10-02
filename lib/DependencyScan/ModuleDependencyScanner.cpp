@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticSuppression.h"
@@ -23,19 +24,19 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
-#include "clang/CAS/IncludeTree.h"
 #include "clang/Basic/DiagnosticOptions.h"
+#include "clang/CAS/IncludeTree.h"
 #include "clang/DependencyScanning/DependencyScanningUtils.h"
 #include "clang/DependencyScanning/DependencyScanningWorker.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -211,6 +212,140 @@ static std::vector<std::string> inputSpecificClangScannerCommand(
   return result;
 }
 
+namespace {
+/// Aggregates the results of a stream of by-name Clang module queries into
+/// result containers shared by all workers.
+///
+/// Clang reports a query's results before the query can still fail, so they
+/// are buffered in queryModuleDeps and queryVisibleModules, and folded into
+/// discoveredDependencyInfos and visibleModules only once finishQuery reports
+/// success.
+///
+/// Each drainClangModuleQueries call creates its own consumer, so the buffers
+/// need no synchronization. The shared containers are updated under
+/// resultAccessLock.
+class AggregatingDependencyConsumer
+    : public clang::dependencies::DependencyConsumer {
+  const llvm::DenseSet<clang::dependencies::ModuleID> &alreadySeen;
+  llvm::StringMap<clang::dependencies::ModuleDeps> &discoveredDependencyInfos;
+  llvm::StringMap<std::vector<std::string>> &visibleModules;
+  std::mutex &resultAccessLock;
+  std::function<void(StringRef, bool)> onFinishQuery;
+
+  // Results of the current query.
+  std::vector<clang::dependencies::ModuleDeps> queryModuleDeps;
+  std::vector<std::string> queryVisibleModules;
+
+public:
+  AggregatingDependencyConsumer(
+      const llvm::DenseSet<clang::dependencies::ModuleID> &alreadySeen,
+      llvm::StringMap<clang::dependencies::ModuleDeps>
+          &discoveredDependencyInfos,
+      llvm::StringMap<std::vector<std::string>> &visibleModules,
+      std::mutex &resultAccessLock,
+      std::function<void(StringRef, bool)> onFinishQuery)
+      : alreadySeen(alreadySeen),
+        discoveredDependencyInfos(discoveredDependencyInfos),
+        visibleModules(visibleModules), resultAccessLock(resultAccessLock),
+        onFinishQuery(std::move(onFinishQuery)) {}
+
+  // A clang module lookup only needs to record the module graph and the visible
+  // modules.
+  void
+  handleDependencyOutputOpts(const clang::DependencyOutputOptions &) override {}
+  void handleFileDependency(StringRef) override {}
+  void handlePrebuiltModuleDependency(
+      clang::dependencies::PrebuiltModuleDep) override {}
+  void handleDirectModuleDependency(clang::dependencies::ModuleID) override {}
+  void handleContextHash(std::string) override {}
+
+  void handleModuleDependency(clang::dependencies::ModuleDeps deps) override {
+    if (!alreadySeen.contains(deps.ID))
+      queryModuleDeps.push_back(std::move(deps));
+  }
+  void handleVisibleModule(std::string moduleName) override {
+    queryVisibleModules.push_back(std::move(moduleName));
+  }
+
+  void finishQuery(StringRef moduleName, bool success) override {
+    if (success) {
+      std::lock_guard<std::mutex> guard(resultAccessLock);
+      for (auto &deps : queryModuleDeps) {
+        // Copy the name out before moving from deps.
+        std::string depName = deps.ID.ModuleName;
+        discoveredDependencyInfos.try_emplace(depName, std::move(deps));
+      }
+      visibleModules.insert_or_assign(moduleName,
+                                      std::move(queryVisibleModules));
+    }
+    queryModuleDeps.clear();
+    queryVisibleModules.clear();
+    onFinishQuery(moduleName, success);
+  }
+};
+
+/// A fixed list of module names that workers take from concurrently. Each
+/// name is handed out exactly once.
+class ConcurrentModuleNameQueue {
+  std::vector<std::string> names;
+  std::atomic<size_t> next{0};
+
+public:
+  explicit ConcurrentModuleNameQueue(std::vector<std::string> names)
+      : names(std::move(names)) {}
+
+  size_t size() const { return names.size(); }
+
+  std::optional<std::string> pop() {
+    size_t index = next.fetch_add(1);
+    if (index >= names.size())
+      return std::nullopt;
+    // Nobody else reads names[index] once it has been handed out.
+    return std::move(names[index]);
+  }
+};
+
+/// Captures the Clang scanner's diagnostics as text, and reports the text of
+/// each failed by-name query through Swift's diagnostic engine.
+///
+/// FIXME: Consider reporting each Clang diagnostic directly through the
+/// worker's DiagnosticEngine instead of capturing them as text.
+class ClangScanDiagnosticCapture {
+  DiagnosticEngine &diags;
+  std::string buffer;
+  llvm::raw_string_ostream bufferOS{buffer};
+  std::unique_ptr<clang::DiagnosticOptions> diagOpts;
+  clang::TextDiagnosticPrinter printer;
+
+public:
+  ClangScanDiagnosticCapture(DiagnosticEngine &diags,
+                             ArrayRef<std::string> commandLine)
+      : diags(diags),
+        diagOpts(clang::dependencies::createScanningDiagOptions(commandLine)),
+        printer(bufferOS, *diagOpts) {}
+
+  clang::DiagnosticConsumer &getConsumer() { return printer; }
+
+  /// Report the diagnostics of a query if it failed, then clear them.
+  void finishQuery(StringRef moduleName, bool success) {
+    // Empty messages are cached clang loadModule failures whose diagnostic
+    // was already reported on the first lookup.
+    if (!success && !buffer.empty() &&
+        buffer.find("fatal error: module '" + moduleName.str() +
+                    "' not found") == std::string::npos)
+      diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error, buffer);
+    buffer.clear();
+  }
+
+  /// Diagnostics left after a failed scan come from building the compiler
+  /// instance, before any query ran.
+  void finishScan(bool success) {
+    if (!success && !buffer.empty())
+      diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error, buffer);
+  }
+};
+} // namespace
+
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     SwiftDependencyScanningService &globalScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
@@ -219,14 +354,12 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     std::shared_ptr<llvm::cas::ObjectStore> CAS,
     std::shared_ptr<llvm::cas::ActionCache> ActionCache,
     DependencyScannerDiagnosticReporter &DiagnosticReporter,
-    llvm::PrefixMapper *Mapper, bool ShareClangCompilerInstance)
+    llvm::PrefixMapper *Mapper)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
-      clangScanningTool(*globalScanningService.ClangScanningService),
-      CAS(CAS), ActionCache(ActionCache),
-      diagnosticReporter(DiagnosticReporter),
-      ShareClangCompilerInstance(ShareClangCompilerInstance) {
+      clangScanningTool(*globalScanningService.ClangScanningService), CAS(CAS),
+      ActionCache(ActionCache), diagnosticReporter(DiagnosticReporter) {
   assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
          "Need to be the same CAS instance");
   assert(globalScanningService.ClangScanningService->getActionCache() ==
@@ -236,7 +369,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
   workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(workerSourceMgr);
-  for (auto &scannerDiagConsumer : DiagnosticReporter.Diagnostics.getConsumers())
+  for (auto &scannerDiagConsumer :
+       DiagnosticReporter.Diagnostics.getConsumers())
     workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
 
   workerASTContext = std::unique_ptr<ASTContext>(
@@ -320,41 +454,51 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
                                                      isTestableImport);
 }
 
+bool ModuleDependencyScanningWorker::drainClangModuleQueries(
+    llvm::function_ref<std::optional<std::string>()> getNextModuleName,
+    LookupModuleOutputCallback lookupModuleCallback,
+    const llvm::DenseSet<clang::dependencies::ModuleID> &alreadySeenModules,
+    llvm::StringMap<clang::dependencies::ModuleDeps> &discoveredDependencyInfos,
+    llvm::StringMap<std::vector<std::string>> &visibleModules,
+    std::mutex &resultAccessLock) {
+  ClangScanDiagnosticCapture diagCapture(*workerDiagnosticEngine,
+                                         clangScanningModuleCommandLineArgs);
+
+  auto controller =
+      clangScanningTool.createActionController(lookupModuleCallback);
+
+  AggregatingDependencyConsumer depConsumer(
+      alreadySeenModules, discoveredDependencyInfos, visibleModules,
+      resultAccessLock, [&](StringRef moduleName, bool success) {
+        diagCapture.finishQuery(moduleName, success);
+      });
+
+  // The by-name API is a drain: it pulls names from the callback
+  // getNextModuleName until the names are exhausted, reusing one Clang compilewithDependencyScanningWorkerr
+  // instance for all of them.
+  bool success = clangScanningTool.getByNameDependencies(
+      clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs,
+      diagCapture.getConsumer(), *controller, getNextModuleName, depConsumer);
+  diagCapture.finishScan(success);
+  return success;
+}
+
 std::optional<clang::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     Identifier moduleName, LookupModuleOutputCallback lookupModuleOutput,
-    const llvm::DenseSet<clang::dependencies::ModuleID>
-        &alreadySeenModules) {
+    const llvm::DenseSet<clang::dependencies::ModuleID> &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
 
-  // Capture any diagnostics the Clang scanner emits into a string so that we
-  // can surface them through the Swift diagnostic engine on failure. The
-  // by-name scanning API reports errors via a diagnostic consumer rather than
-  // returning them as an llvm::Error, matching the translation-unit scan below.
-  // FIXME: consider sending the diagnostics consumer owned by
-  // workerDiagnosticEngine instead of creating one here.
-  std::string errorStr;
-  llvm::raw_string_ostream errorOS(errorStr);
-  auto diagOpts = clang::dependencies::createScanningDiagOptions(
-      clangScanningModuleCommandLineArgs);
-  clang::TextDiagnosticPrinter diagConsumer(errorOS, *diagOpts);
-
-  // The action controller drives module-output lookups for this query. It only
-  // needs to live for the duration of the scan below: the by-name scan consults
-  // it while building the compiler instance and clones it internally for each
-  // individual query.
+  ClangScanDiagnosticCapture diagCapture(*workerDiagnosticEngine,
+                                         clangScanningModuleCommandLineArgs);
   auto controller =
       clangScanningTool.createActionController(lookupModuleOutput);
 
   clang::dependencies::FullDependencyConsumer depConsumer(alreadySeenModules);
 
-  // The by-name API is a drain: it pulls names from the callback until the
-  // callback is exhausted, reusing one Clang compiler instance for all of them.
-  // Hand it exactly one name, which makes this a single query against a
-  // freshly-built compiler instance.
-  // FIXME: Revise the lamda so that a single call pulls a name from a
-  // concurrent queue till the queue is drained to re-enable Clang compiler
-  // instance sharing.
+  // Hand the clang scanner one name in contrast to sending a stream of names
+  // to the clang scanner. Sending the scanner a single name has the effect of
+  // asking clang to create a new compiler instance for each name it queries.
   bool delivered = false;
   auto getNextName = [&]() -> std::optional<std::string> {
     if (delivered)
@@ -363,20 +507,12 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     return moduleName.str().str();
   };
 
-  if (!clangScanningTool.getByNameDependencies(
-          clangScanningWorkingDirectoryPath,
-          clangScanningModuleCommandLineArgs, diagConsumer, *controller,
-          getNextName, depConsumer)) {
-    auto message = errorOS.str();
-    // Empty messages are cached clang loadModule failures whose diagnostic was
-    // already reported on the first lookup.
-    if (!message.empty() &&
-        message.find("fatal error: module '" + moduleName.str().str() +
-                     "' not found") == std::string::npos)
-      workerDiagnosticEngine->diagnose(
-          SourceLoc(), diag::clang_dependency_scan_error, message);
+  bool success = clangScanningTool.getByNameDependencies(
+      clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs,
+      diagCapture.getConsumer(), *controller, getNextName, depConsumer);
+  diagCapture.finishQuery(moduleName.str(), success);
+  if (!success)
     return std::nullopt;
-  }
 
   return depConsumer.takeTranslationUnitDeps();
 }
@@ -417,10 +553,14 @@ ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
   return *clangModuleDependencies;
 }
 
-template <typename Function, typename... Args>
+template <bool CountLookup, typename Function, typename... Args>
 auto ModuleDependencyScanner::withDependencyScanningWorker(Function &&F,
                                                            Args &&...ArgList) {
-  NumLookups++;
+  // It is not always the case that we need to increment NumLookups,
+  // because it is not necessarily true that a single withDependencyScanningWorker
+  // call maps to a single lookup.
+  if constexpr (CountLookup)
+    NumLookups++;
   auto getWorker = [this]() -> std::unique_ptr<ModuleDependencyScanningWorker> {
     std::lock_guard<std::mutex> guard(WorkersLock);
     // If we have run out of workers, something has gone wrong as we must never
@@ -622,7 +762,8 @@ ModuleDependencyScanner::ModuleDependencyScanner(
                      : 1),
       ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
       CAS(ScanningService.ClangScanningService->getCAS()),
-      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
+      ActionCache(ScanningService.ClangScanningService->getActionCache()),
+      ShareClangCompilerInstance(ShareClangCompilerInstance) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
@@ -647,7 +788,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
         ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
         DependencyTracker, CAS, ActionCache, ScanDiagnosticReporter,
-        PrefixMapper.get(), ShareClangCompilerInstance));
+        PrefixMapper.get()));
 }
 
 ModuleDependencyScanner::~ModuleDependencyScanner() = default;
@@ -1238,7 +1379,67 @@ void ModuleDependencyScanner::performClangModuleLookup(
     const ImportStatementInfoMap &unresolvedImportsMap,
     const ImportStatementInfoMap &unresolvedOptionalImportsMap,
     BatchClangModuleLookupResult &result) {
+  llvm::SetVector<StringRef> moduleNames;
+  for (const auto *importsMap :
+       {&unresolvedImportsMap, &unresolvedOptionalImportsMap})
+    for (const auto &imports : llvm::make_second_range(*importsMap))
+      for (const auto &importInfo : imports)
+        moduleNames.insert(importInfo.importIdentifier);
+
   auto seenClangModules = DependencyCache.getAlreadySeenClangModules();
+  if (ShareClangCompilerInstance)
+    performClangModuleLookupSharingCompilerInstances(moduleNames.getArrayRef(),
+                                                     seenClangModules, result);
+  else
+    performClangModuleLookupPerName(moduleNames.getArrayRef(), seenClangModules,
+                                    result);
+}
+
+void ModuleDependencyScanner::performClangModuleLookupSharingCompilerInstances(
+    ArrayRef<StringRef> moduleNames,
+    const llvm::DenseSet<clang::dependencies::ModuleID> &seenClangModules,
+    BatchClangModuleLookupResult &result) {
+  std::mutex resultAccessLock;
+  ConcurrentModuleNameQueue moduleNameQueue(
+      {moduleNames.begin(), moduleNames.end()});
+
+  auto getNextModuleName = [&]() -> std::optional<std::string> {
+    auto moduleName = moduleNameQueue.pop();
+    if (moduleName)
+      ScanDiagnosticReporter.registerNamedClangModuleQuery();
+    return moduleName;
+  };
+
+  auto scanForClangModuleDependencies = [&]() {
+    withDependencyScanningWorker</*CountLookup=*/false>(
+        [&](ModuleDependencyScanningWorker *ScanningWorker) {
+          auto lookupModuleOutput = [this](const auto &cd, auto mok) -> auto {
+            return clangModuleOutputPathLookup(cd, mok);
+          };
+          return ScanningWorker->drainClangModuleQueries(
+              getNextModuleName, lookupModuleOutput, seenClangModules,
+              result.discoveredDependencyInfos, result.visibleModules,
+              resultAccessLock);
+        });
+  };
+
+  // Count each name as one lookup here: a single
+  // withDependencyScanningWorker call below drains many names, so those
+  // calls don't count.
+  NumLookups += moduleNames.size();
+
+  // A worker builds its compiler instance before it takes a name, so don't
+  // start more workers than there are names.
+  for (size_t i = 0, e = std::min<size_t>(NumThreads, moduleNames.size());
+       i < e; ++i)
+    ScanningThreadPool.async(scanForClangModuleDependencies);
+  ScanningThreadPool.wait();
+}
+
+void ModuleDependencyScanner::performClangModuleLookupPerName(
+    ArrayRef<StringRef> moduleNames,
+    const llvm::DenseSet<clang::dependencies::ModuleID> &seenClangModules,
+    BatchClangModuleLookupResult &result) {
   std::mutex resultAccessLock;
   auto scanForClangModuleDependency = [this, &result, &resultAccessLock,
                                        &seenClangModules](
@@ -1264,21 +1465,9 @@ void ModuleDependencyScanner::performClangModuleLookup(
   };
 
   // Enque asynchronous lookup tasks
-  llvm::StringSet<> queriedIdentifiers;
-  for (const auto &unresolvedImports : unresolvedImportsMap)
-    for (const auto &unresolvedImportInfo : unresolvedImports.second)
-      if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
-        ScanningThreadPool.async(
-            scanForClangModuleDependency,
-            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
-
-  for (const auto &unresolvedImports : unresolvedOptionalImportsMap)
-    for (const auto &unresolvedImportInfo : unresolvedImports.second)
-      if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
-        ScanningThreadPool.async(
-            scanForClangModuleDependency,
-            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
-
+  for (StringRef moduleName : moduleNames)
+    ScanningThreadPool.async(scanForClangModuleDependency,
+                             getModuleImportIdentifier(moduleName));
   ScanningThreadPool.wait();
 }
 
