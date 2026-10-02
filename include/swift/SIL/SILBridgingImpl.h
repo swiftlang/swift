@@ -380,6 +380,10 @@ bool BridgedType::isLoadable(BridgedFunction f) const {
   return unbridged().isLoadable(f.getFunction());
 }
 
+bool BridgedType::isABIAccessible(BridgedFunction f) const {
+  return f.getFunction()->isTypeABIAccessible(unbridged());
+}
+
 bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
