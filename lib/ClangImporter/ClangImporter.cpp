@@ -8456,6 +8456,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (!newDecl)
     return failurePlaceholder();
 
+  auto *specialization = newDecl;
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
     if (!subst.empty()) {
       newDecl = rewriteIntegerTypes(subst, decl, fn);
@@ -8470,6 +8471,11 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
                                                cast<FuncDecl>(newDecl));
     }
   }
+
+  // The call resolves to a declaration built above in place of the imported
+  // specialization, so give it the specialization's attributes.
+  if (newDecl != specialization)
+    cloneImportedAttributes(specialization, newDecl);
 
   fnIt->getSecond() = newDecl;
   return ConcreteDeclRef(newDecl);
