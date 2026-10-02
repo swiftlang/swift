@@ -5127,7 +5127,7 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                ArrayRef<AnyFunctionType::Yield> yields,
                                Type result, Type globalActor, Type thrownError,
                                Type sendableDependentType,
-                               Type calledOnceDependentType) {
+                               Type executionSemanticsDependentType) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
@@ -5143,8 +5143,8 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
     properties |= RecursiveTypeProperties::SolverAllocated;
     properties |= RecursiveTypeProperties::HasTypeVariable;
   }
-  if (calledOnceDependentType) {
-    ASSERT(calledOnceDependentType->hasTypeVariable());
+  if (executionSemanticsDependentType) {
+    ASSERT(executionSemanticsDependentType->hasTypeVariable());
     properties |= RecursiveTypeProperties::SolverAllocated;
     properties |= RecursiveTypeProperties::HasTypeVariable;
   }
@@ -5393,17 +5393,18 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   Type thrownError;
   Type globalActor;
   Type sendableDependentType;
-  Type calledOnceDependentType;
+  Type executionSemanticsDependentType;
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
     sendableDependentType = info->getSendableDependentType();
-    calledOnceDependentType = info->getCalledOnceDependentType();
+    executionSemanticsDependentType =
+        info->getExecutionSemanticsDependentType();
   }
 
   auto properties = getFunctionRecursiveProperties(
       params, yields, result, globalActor, thrownError, sendableDependentType,
-      calledOnceDependentType);
+      executionSemanticsDependentType);
   auto arena = getArena(properties);
 
   if (info.has_value()) {
@@ -5437,7 +5438,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0) +
                       (sendableDependentType ? 1 : 0) +
-                      (calledOnceDependentType ? 1 : 0);
+                      (executionSemanticsDependentType ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
@@ -5513,8 +5514,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
       getTrailingObjects<Type>()[typeIdx] = sendableDependentType;
       typeIdx += 1;
     }
-    if (Type calledOnceDependentType = info->getCalledOnceDependentType()) {
-      getTrailingObjects<Type>()[typeIdx] = calledOnceDependentType;
+    if (Type executionSemanticsDependentType =
+            info->getExecutionSemanticsDependentType()) {
+      getTrailingObjects<Type>()[typeIdx] = executionSemanticsDependentType;
       typeIdx += 1;
     }
     auto lifetimeDependenceInfo = info->getLifetimeDependencies();
@@ -5593,7 +5595,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     // Generic functions can't currently have Sendable or @called(atMostOnce)
     // dependence.
     ASSERT(!info->getSendableDependentType());
-    ASSERT(!info->getCalledOnceDependentType());
+    ASSERT(!info->getExecutionSemanticsDependentType());
   }
 
   if (thrownError) {

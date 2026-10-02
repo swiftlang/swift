@@ -453,7 +453,7 @@ protected:
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
     HasSendableDependence : 1,
-    HasCalledOnceDependence : 1
+    HasExecutionSemanticsDependence : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -3775,8 +3775,8 @@ protected:
           !Info.value().getLifetimeDependencies().empty();
       Bits.AnyFunctionType.HasSendableDependence =
           !Info->getSendableDependentType().isNull();
-      Bits.AnyFunctionType.HasCalledOnceDependence =
-          !Info->getCalledOnceDependentType().isNull();
+      Bits.AnyFunctionType.HasExecutionSemanticsDependence =
+          !Info->getExecutionSemanticsDependentType().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3790,7 +3790,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
       Bits.AnyFunctionType.HasSendableDependence = false;
-      Bits.AnyFunctionType.HasCalledOnceDependence = false;
+      Bits.AnyFunctionType.HasExecutionSemanticsDependence = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3865,8 +3865,8 @@ public:
     return Bits.AnyFunctionType.HasSendableDependence;
   }
 
-  bool hasCalledOnceDependentType() const {
-    return Bits.AnyFunctionType.HasCalledOnceDependence;
+  bool hasExecutionSemanticsDependentType() const {
+    return Bits.AnyFunctionType.HasExecutionSemanticsDependence;
   }
 
   bool hasLifetimeDependencies() const {
@@ -3891,7 +3891,7 @@ public:
   /// A dependent type that determines whether the function is
   /// @called(atMostOnce). This is only used within the constraint system, and
   /// will contain type variables if present.
-  Type getCalledOnceDependentType() const;
+  Type getExecutionSemanticsDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3943,10 +3943,10 @@ public:
 
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
-    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getGlobalActor(), getThrownError(),
-                   getSendableDependentType(), getCalledOnceDependentType(),
-                   getLifetimeDependencies());
+    return ExtInfo(
+        Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(), getGlobalActor(),
+        getThrownError(), getSendableDependentType(),
+        getExecutionSemanticsDependentType(), getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4216,7 +4216,7 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return hasGlobalActor() + hasThrownError() + hasSendableDependentType() +
-           hasCalledOnceDependentType();
+           hasExecutionSemanticsDependentType();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4276,8 +4276,8 @@ public:
   /// A dependent type that determines whether the function is
   /// @called(atMostOnce). This is only used within the constraint system, and
   /// will contain type variables if present.
-  Type getCalledOnceDependentType() const {
-    if (!hasCalledOnceDependentType())
+  Type getExecutionSemanticsDependentType() const {
+    if (!hasExecutionSemanticsDependentType())
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError() +
                                       hasSendableDependentType()];

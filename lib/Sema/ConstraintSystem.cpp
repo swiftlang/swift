@@ -1774,7 +1774,8 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     return std::make_pair(Type(), isSendableCapture(ty));
   }
 
-  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+  std::pair<Type, /*calledOnce*/ bool>
+  transformExecutionSemanticsDependentType(Type ty) {
     ty = simplify(ty);
 
     // If we still have type variables, we keep the dependence.

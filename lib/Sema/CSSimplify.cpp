@@ -2943,13 +2943,13 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   // First check to see if we have any @called(atMostOnce) dependent function
   // types, if any of them still have unresolved type variables we need to wait
   // until they're fully resolved.
-  auto dep1 = func1->getCalledOnceDependentType();
+  auto dep1 = func1->getExecutionSemanticsDependentType();
   if (dep1) {
     dep1 = simplifyType(dep1);
     if (dep1->hasTypeVariable())
       return formUnsolved();
   }
-  auto dep2 = func2->getCalledOnceDependentType();
+  auto dep2 = func2->getExecutionSemanticsDependentType();
   if (dep2) {
     dep2 = simplifyType(dep2);
     if (dep2->hasTypeVariable())
@@ -12589,8 +12589,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
     // Infer `@called(atMostOnce)` from the contextual type.
     if (!closureExtInfo.isCalledOnce()) {
-      if (auto calledOnceTy = contextualFnType->getCalledOnceDependentType()) {
-        closureExtInfo = closureExtInfo.withCalledOnceDependentType(calledOnceTy);
+      if (auto executionSemanticsTy =
+              contextualFnType->getExecutionSemanticsDependentType()) {
+        closureExtInfo = closureExtInfo.withExecutionSemanticsDependentType(
+            executionSemanticsTy);
       } else if (contextualFnType->isCalledOnce()) {
         closureExtInfo = closureExtInfo.withCalledOnce();
       }
