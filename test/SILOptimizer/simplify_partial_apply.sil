@@ -100,3 +100,95 @@ bb0(%0 : $String, %1 : $Bool):
   return %r : $()
 }
 
+
+sil @closure_without_args : $@convention(thin) () -> ()
+sil @generic_closure_without_args : $@convention(thin) <T> () -> ()
+sil @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+sil @use_noescape_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+sil @use_called_once_closure : $@convention(thin) (@guaranteed @noescape @called(once) @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil @test_partial_apply_without_args
+// CHECK:         [[F:%.*]] = function_ref @closure_without_args
+// CHECK:         [[C:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+// CHECK-NOT:     partial_apply
+// CHECK:         apply {{%.*}}([[C]])
+// CHECK:       } // end sil function 'test_partial_apply_without_args'
+sil @test_partial_apply_without_args : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
+  %2 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_on_stack_partial_apply_without_args
+// CHECK:         [[F:%.*]] = function_ref @closure_without_args
+// CHECK:         [[C:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     dealloc_stack
+// CHECK:         apply {{%.*}}([[C]])
+// CHECK-NOT:     dealloc_stack
+// CHECK:       } // end sil function 'test_on_stack_partial_apply_without_args'
+sil @test_on_stack_partial_apply_without_args : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] [on_stack] %0() : $@convention(thin) () -> ()
+  %2 = function_ref @use_noescape_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %1 : $@noescape @callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// A partial_apply with substitutions still needs a context for the generic
+// arguments.
+// CHECK-LABEL: sil @test_generic_partial_apply_without_args
+// CHECK:         partial_apply [callee_guaranteed] {{%.*}}<Int>()
+// CHECK-NOT:     thin_to_thick_function
+// CHECK:       } // end sil function 'test_generic_partial_apply_without_args'
+sil @test_generic_partial_apply_without_args : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @generic_closure_without_args : $@convention(thin) <T> () -> ()
+  %1 = partial_apply [callee_guaranteed] %0<Int>() : $@convention(thin) <T> () -> ()
+  %2 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// thin_to_thick_function can't produce a @called(once) function type.
+// CHECK-LABEL: sil @test_called_once_partial_apply_without_args
+// CHECK:         partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK-NOT:     thin_to_thick_function
+// CHECK:       } // end sil function 'test_called_once_partial_apply_without_args'
+sil @test_called_once_partial_apply_without_args : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] [on_stack] [called_once] %0() : $@convention(thin) () -> ()
+  %2 = function_ref @use_called_once_closure : $@convention(thin) (@guaranteed @noescape @called(once) @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @called(once) @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %1 : $@noescape @called(once) @callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_without_args_ossa
+// CHECK:         [[F:%.*]] = function_ref @closure_without_args
+// CHECK:         [[C:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+// CHECK-NOT:     partial_apply
+// CHECK:         apply {{%.*}}([[C]])
+// CHECK:       } // end sil function 'test_partial_apply_without_args_ossa'
+sil [ossa] @test_partial_apply_without_args_ossa : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
+  %2 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %1 : $@callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
