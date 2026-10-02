@@ -2477,6 +2477,11 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   invocation.getMutCASOpts() = clang::CASOptions();
   invocation.getMutFrontendOpts().CASIncludeTreeID.clear();
 
+  // Enable C++ interop so the PCM build writes the same Swift lookup tables as
+  // the scan's importer and injects the libstdc++ module map.
+  if (ScanASTContext.LangOpts.EnableCXXInterop)
+    swiftArgs.push_back("-cxx-interoperability-mode=default");
+
   if (!ScanASTContext.CASOpts.EnableCaching) {
     auto &overlayFiles = invocation.getMutHeaderSearchOpts().VFSOverlayFiles;
     filterClangSystemVFSOverlay(overlayFiles, ScanASTContext.SearchPathOpts);
@@ -2486,6 +2491,28 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     for (auto overlay : overlayFiles) {
       swiftArgs.push_back("-vfsoverlay");
       swiftArgs.push_back(overlay);
+    }
+
+    // <clang-imported-headers-vfs-overlay.yaml> is in-memory only and was
+    // just filtered out, so a direct-cc1 -emit-pcm job must reconstruct it by
+    // running the Clang driver. Forward the scan's search-path options when
+    // VFS files were injected.
+    auto *clangImporter =
+        static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
+    const auto &fileMapping = clangImporter->getClangFileMapping();
+    if (!fileMapping.redirectedFiles.empty() ||
+        !fileMapping.overridenFiles.empty()) {
+      const auto &searchPathOpts = ScanASTContext.SearchPathOpts;
+      auto forwardOption = [&](StringRef option,
+                               std::optional<StringRef> value) {
+        if (!value)
+          return;
+        swiftArgs.push_back(option.str());
+        swiftArgs.push_back(value->str());
+      };
+      forwardOption("-sysroot", searchPathOpts.getSysRoot());
+      if (!searchPathOpts.RuntimeResourcePath.empty())
+        forwardOption("-resource-dir", searchPathOpts.RuntimeResourcePath);
     }
   }
 
