@@ -1240,6 +1240,29 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n"
 /// memory becomes the result of the call.
 BUILTIN_SIL_OPERATION(Emplace, "emplace", Special)
 
+/// applyActorIsolatedUnchecked: <A: AnyObject, T: ~Copyable>(
+///   _ fn: (isolated A) throws -> T, _ actor: A
+/// ) rethrows -> T
+///
+/// Calls the non-escaping function `fn` with `actor` as its isolated
+/// parameter, without checking that the caller is isolated to `actor`.
+///
+/// The caller must have established that isolation already.
+BUILTIN_SIL_OPERATION(ApplyActorIsolatedUnchecked, "applyActorIsolatedUnchecked", Special)
+
+/// applyGlobalActorIsolatedUnchecked: <G: GlobalActor, T: ~Copyable>(
+///   _ fn: @G () throws -> T
+/// ) rethrows -> T
+///
+/// Calls the non-escaping, global actor isolated function `fn` without
+/// checking that the caller is isolated to the global actor `G`.
+///
+/// The caller must have established that isolation already.
+///
+/// `@G` is not expressible in source; the parameter type is isolated to the
+/// generic global actor `G`, which is bound from the argument's isolation
+BUILTIN_SIL_OPERATION(ApplyGlobalActorIsolatedUnchecked, "applyGlobalActorIsolatedUnchecked", Special)
+
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)

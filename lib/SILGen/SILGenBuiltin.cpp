@@ -12,13 +12,16 @@
 
 #include "SpecializedEmitter.h"
 
+#include "ArgumentScope.h"
 #include "ArgumentSource.h"
+#include "Callee.h"
 #include "Cleanup.h"
 #include "ExecutorBreadcrumb.h"
 #include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "ResultPlan.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
@@ -2339,6 +2342,59 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   
   // If the result is loadable, load it.
   return SGF.B.createLoadTake(loc, result);
+}
+
+/// Apply the non-escaping closure argument of a builtin, ignoring the
+/// closure's isolation -- effectively assuming that we are in the right isolation context already.
+static ManagedValue emitApplyIgnoringIsolation(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               ManagedValue fn,
+                                               ArrayRef<ManagedValue> fnArgs,
+                                               SubstitutionMap subs,
+                                               SGFContext C) {
+  // The result is the builtin's last generic parameter. The closure was
+  // emitted at the builtin's generic abstraction, so its result is opaque
+  auto substResultType =
+      subs.getReplacementTypes().back()->getCanonicalType();
+
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern::getOpaque(),
+                                substResultType);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, C);
+  ArgumentScope argScope(SGF, loc);
+
+  // The builtin rethrows; if there is nowhere to throw to, the closure
+  // argument is known not to throw
+  ApplyOptions options;
+  if (!SGF.ThrowDest.isValid())
+    options |= ApplyFlags::DoesNotThrow;
+
+  return SGF
+      .emitApply(std::move(resultPlan), std::move(argScope), loc, fn,
+                 SubstitutionMap(), fnArgs, calleeTypeInfo, options, C,
+                 std::nullopt)
+      .getAsSingleValue(SGF, loc);
+}
+
+static ManagedValue
+emitBuiltinApplyActorIsolatedUnchecked(SILGenFunction &SGF, SILLocation loc,
+                                       SubstitutionMap subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
+  assert(args.size() == 2 && "expected (fn, actor)");
+  return emitApplyIgnoringIsolation(SGF, loc, args[0], args.drop_front(), subs,
+                                    C);
+}
+
+static ManagedValue
+emitBuiltinApplyGlobalActorIsolatedUnchecked(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap subs,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(args.size() == 1 && "expected (fn)");
+  return emitApplyIgnoringIsolation(SGF, loc, args[0], {}, subs, C);
 }
 
 static ManagedValue emitBuiltinTaskAddCancellationHandler(

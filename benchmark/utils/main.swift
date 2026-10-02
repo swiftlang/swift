@@ -30,6 +30,7 @@ import ArraySetElement
 import ArraySliceTests
 import ArraySubscript
 import ArrayTests
+import AssumeIsolated
 import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
@@ -248,6 +249,7 @@ register(ArraySetElement.benchmarks)
 register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
 register(ArrayTests.benchmarks)
+register(AssumeIsolated.benchmarks)
 register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)

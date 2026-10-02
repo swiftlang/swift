@@ -169,9 +169,6 @@ extension DistributedActor {
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
-    typealias YesActor = (isolated Self) throws -> T
-    typealias NoActor = (Self) throws -> T
-
     guard __isLocalActor(self) else {
       fatalError("Cannot assume to be 'isolated \(Self.self)' since distributed actor '\(self)' is a remote actor reference.")
     }
@@ -182,12 +179,21 @@ extension DistributedActor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
+#if $BuiltinApplyIsolatedUnchecked
+    // Apply the closure directly, ignoring its isolation: no escaping
+    // conversion, so no closure context allocation and no escape check
+    return try Builtin.applyActorIsolatedUnchecked(operation, self)
+#else
+    typealias YesActor = (isolated Self) throws -> T
+    typealias NoActor = (Self) throws -> T
+
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
+      let rawFn: NoActor = Builtin.reinterpretCast(fn)
       return try rawFn(self)
     }
+#endif
   }
 
   @available(SwiftStdlib 5.9, *)

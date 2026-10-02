@@ -2429,6 +2429,71 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getApplyActorIsolatedUnchecked(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 2,
+                                 /* wantsAdditionalAnyObjectRequirement */ true);
+
+  // <A: AnyObject, T: ~Copyable>(
+  //   _: (isolated A) throws -> T, _: A
+  // ) rethrows -> T
+
+  auto A = makeGenericParam(0);
+  auto T = makeGenericParam(1);
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+
+  auto extInfo = ASTExtInfoBuilder()
+      .withNoEscape()
+      .withThrows()
+      .withIsolation(FunctionTypeIsolation::forParameter())
+      .build();
+
+  auto isolatedParam =
+      FunctionType::Param(A.build(builder), Identifier(),
+                          ParameterTypeFlags().withIsolated(true));
+  auto fnParamTy = FunctionType::get({isolatedParam}, /* yields */ {},
+                                     T.build(builder), extInfo);
+
+  builder.addParameter(makeConcrete(fnParamTy));
+  builder.addParameter(A);
+  builder.setResult(T);
+  builder.setRethrows();
+
+  return builder.build(id);
+}
+
+static ValueDecl *getApplyGlobalActorIsolatedUnchecked(ASTContext &ctx,
+                                                Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 2);
+
+  // <G: GlobalActor, T: ~Copyable>(_: @G () throws -> T) rethrows -> T
+  //
+  // Note: `@G` is not valid source syntax today, although we'd like it to be.
+  // A function type cannot be isolated to a generic global actor in source.
+  // The type is constructed directly here; the solver binds `G` from the
+  // argument's concrete global actor isolation (e.g. `@MainActor`)
+
+  auto G = makeGenericParam(0);
+  builder.addConformanceRequirement(G, KnownProtocolKind::GlobalActor);
+  auto T = makeGenericParam(1);
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+
+  auto extInfo =
+      ASTExtInfoBuilder()
+          .withNoEscape()
+          .withThrows()
+          .withIsolation(FunctionTypeIsolation::forGlobalActor(G.build(builder)))
+          .build();
+
+  auto fnParamTy =
+      FunctionType::get({}, /* yields */ {}, T.build(builder), extInfo);
+
+  builder.addParameter(makeConcrete(fnParamTy));
+  builder.setResult(T);
+  builder.setRethrows();
+
+  return builder.build(id);
+}
+
 static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
                                                 Identifier id) {
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
@@ -3700,6 +3765,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     
   case BuiltinValueKind::Emplace:
     return getEmplace(Context, Id);
+
+  case BuiltinValueKind::ApplyActorIsolatedUnchecked:
+    return getApplyActorIsolatedUnchecked(Context, Id);
+
+  case BuiltinValueKind::ApplyGlobalActorIsolatedUnchecked:
+    return getApplyGlobalActorIsolatedUnchecked(Context, Id);
 
   case BuiltinValueKind::TaskAddCancellationHandler:
     return getTaskAddCancellationHandler(Context, Id);
