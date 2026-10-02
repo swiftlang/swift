@@ -2267,6 +2267,14 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
   }
 
+  // Pass the C++ interoperability mode so the frontend injects the same C++
+  // standard library module map (libstdc++ on Linux) that this module was
+  // scanned against. That module map exists only in ClangImporter's file
+  // system, so without it the -emit-pcm command cannot read the module map.
+  // The C++ standard library choice itself is already in the Clang arguments.
+  if (ScanASTContext.LangOpts.EnableCXXInterop)
+    swiftArgs.push_back("-cxx-interoperability-mode=default");
+
   // Add args reported by the scanner.
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);
