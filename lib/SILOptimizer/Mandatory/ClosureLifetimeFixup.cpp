@@ -597,16 +597,6 @@ static SILValue tryRewriteToPartialApplyStack(
   if (!origPA)
     return SILValue();
 
-  // TODO: Make it possible to stack-promote `@called(once)` closure with
-  //       consuming captures.
-  if (origPA->isCalledOnce()) {
-    ApplySite origSite(origPA);
-    for (auto &arg : origPA->getArgumentOperands()) {
-      if (origSite.getArgumentConvention(arg).isOwnedConventionInCaller())
-        return SILValue();
-    }
-  }
-
   auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
   if (cvt->getOperand() != origPA)
     convertOrPartialApply = cast<ConvertFunctionInst>(cvt->getOperand());
@@ -660,9 +650,14 @@ static SILValue tryRewriteToPartialApplyStack(
 
       // A `@called(once)` closure's on-stack context takes ownership of
       // its Copyable captured arguments unlike regular closures that always
-      // borrow. This is done because a `@called(once)` closure has a destructor.
+      // borrow. This is done because a `@called(once)` closure has a
+      // destructor. A move-only consuming capture has to be transferred
+      // into the closure, not borrowed as well.
+      bool isConsumedInCaller = ApplySite(origPA)
+                                    .getArgumentConvention(arg)
+                                    .isOwnedConventionInCaller();
       if (origPA->isCalledOnce() && !foundNoImplicitCopy &&
-          !argValue->getType().isMoveOnly()) {
+          (!argValue->getType().isMoveOnly() || isConsumedInCaller)) {
         args.push_back(argValue);
         continue;
       }

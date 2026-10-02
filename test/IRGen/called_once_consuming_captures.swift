@@ -37,15 +37,18 @@ final class Tracker {
 }
 
 // A closure whose only capture is consumed (`Direct_Owned`): the whole
-// context is drained by the forwarder, so it's deallocated as if it were
-// never initialized -- no field destructor runs on release.
+// context is drained by the forwarder. Since the context is stack-allocated
+// (as any `@called(once)` closure now is), it's reclaimed by the caller's
+// own `dealloc_stack` -- the forwarder has nothing left to release once the
+// capture is taken.
 //
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test16allOwnedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
 // CHECK:  [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
 // CHECK:  [[X_ADDR:%.*]] = getelementptr inbounds{{.*}} %T4test8ResourceV, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK:  [[VALUE:%.*]] = load i64, ptr [[X_ADDR]]
-// CHECK:  call void @swift_deallocUninitializedObject(ptr %0,
+// CHECK-NOT: call void @swift_deallocUninitializedObject
 // CHECK:  tail call swiftcc void @"$s4test16allOwnedCapturesyySiFyyXEfU_"(i64 [[VALUE]])
+// CHECK: ret void
 public func allOwnedCaptures(_ x: Int) {
   let r = Resource(x: x)
   callOnce { r.use() }
@@ -54,8 +57,8 @@ public func allOwnedCaptures(_ x: Int) {
 // A closure that mixes a consumed capture (`Direct_Owned`, `r`) with a
 // borrowed one (`Direct_Guaranteed`, `t`): the forwarder still needs to
 // release the surviving `t` field, but must skip the already-taken `r`
-// field, then free the context's memory as uninitialized rather than run
-// its normal shared destructor over every field.
+// field. The context itself is stack-allocated, so there's no separate
+// "free as uninitialized" call once `t` has been released.
 //
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test13mixedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
 // CHECK:  [[TRACKER_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
@@ -67,7 +70,8 @@ public func allOwnedCaptures(_ x: Int) {
 // CHECK:  [[TO_DESTROY_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
 // CHECK:  [[TO_DESTROY:%.*]] = load ptr, ptr [[TO_DESTROY_ADDR]]
 // CHECK:  call void @swift_release(ptr [[TO_DESTROY]])
-// CHECK:  call void @swift_deallocUninitializedObject(ptr %0,
+// CHECK-NOT: call void @swift_deallocUninitializedObject
+// CHECK: ret void
 public func mixedCaptures(_ x: Int) {
   let r = Resource(x: x)
   let t = Tracker()
