@@ -50,7 +50,8 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     MACCATALYST_BUILD_FLAVOR zippered
     INSTALL_IN_COMPONENT compiler
     INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY
-    INSTALL_WITH_SHARED)
+    INSTALL_WITH_SHARED
+    INSTALL_WITH_STATIC)
 
 # stdlib-less builds skip the upper CMakeLists.txt, so the `embedded-libraries`
 # target never gets defined.
