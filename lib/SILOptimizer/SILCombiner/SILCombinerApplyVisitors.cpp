@@ -76,29 +76,8 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   return true;
 }
 
-SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *pai) {
-  // partial_apply without any substitutions or arguments is just a
-  // thin_to_thick_function. thin_to_thick_function supports only thin operands.
-  if (!pai->hasSubstitutions() && (pai->getNumArguments() == 0) &&
-      pai->getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::Thin) {
-    if (!pai->isOnStack())
-      return Builder.createThinToThickFunction(pai->getLoc(), pai->getCallee(),
-                                               pai->getType());
-
-    // Remove dealloc_stack of partial_apply [stack].
-    // Iterating while delete use a copy.
-    SmallVector<Operand *, 8> uses(pai->getUses());
-    for (auto *use : uses)
-      if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser()))
-        eraseInstFromFunction(*dealloc);
-    auto *thinToThick = Builder.createThinToThickFunction(
-        pai->getLoc(), pai->getCallee(), pai->getType());
-    replaceInstUsesWith(*pai, thinToThick);
-    eraseInstFromFunction(*pai);
-    return nullptr;
-  }
-
+SILInstruction *
+SILCombiner::legacyVisitPartialApplyInst(PartialApplyInst *pai) {
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
   // -> %closure_typeB
