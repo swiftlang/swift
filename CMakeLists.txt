@@ -484,8 +484,12 @@ if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
   endif()
 endif()
 
-# LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
-# need it.
+# LLVM_VERSION_MAJOR conditions for Swift sources in the compiler and Lit tests,
+# where (in)equality operations cannot be metaprogrammed.
+#
+# NB: Before you bump the below minimum, please make sure to audit all
+#     occurrences of LLVM_VERSION_MAJOR_AT_LEAST_<current minimum>.
+#
 set(SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR 23)
 if(LLVM_VERSION_MAJOR LESS ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR})
   message(FATAL_ERROR
