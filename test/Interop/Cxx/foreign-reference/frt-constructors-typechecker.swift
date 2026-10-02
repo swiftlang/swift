@@ -36,3 +36,21 @@ func ctorWithAvailabilityAttr() {
   let _ = FRTMixedAvailabilityCtors(1, 2) // expected-error {{'init(_:_:)' is unavailable: cannot construct from two ints}}
   let _ = FRTMixedAvailabilityCtors(1, 2, 3) // expected-warning {{'init(_:_:_:)' is deprecated: don't construct from three ints}}
 }
+
+@available(SwiftStdlib 5.8, *)
+func ctorWithDefaultArgs() {
+  let parent = FRTCtorWithDefaultPointerArg()
+  let _ = FRTCtorWithDefaultPointerArg(parent)
+
+  let _ = FRTCtorWithDefaultIntArgs(1)
+  let _ = FRTCtorWithDefaultIntArgs(1, 2)
+  let _ = FRTCtorWithDefaultIntArgs(1, 2, 3)
+  let _ = FRTCtorWithDefaultIntArgs() // expected-error {{missing argument for parameter #1 in call}}
+
+  let _ = FRTCtorWithDefaultViewArg() // expected-error {{missing argument for parameter #1 in call}}
+  let _ = FRTCtorWithDefaultViewArg(FRTCtorArgView(ptr: nil))
+  let _ = FRTCtorWithUnsafeDefaultViewArg()
+
+  let _ = FRTTemplateCtorWithDefaultArgInt() // expected-error {{missing argument for parameter #1 in call}}
+  let _ = FRTTemplateCtorWithDefaultArgInt(7)
+}

@@ -2944,8 +2944,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.
-  // TODO: support default arguments of constructors
-  // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       impl->isDefaultArgSafeToImport(param) &&
