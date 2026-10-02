@@ -568,13 +568,13 @@ public:
   }
 };
 
-class StringWriter {
+class PathWriter {
   const SerializationOptions &Options;
   llvm::StringMap<uint32_t> IndexMap;
   llvm::SmallString<1024> Buffer;
 
 public:
-  explicit StringWriter(const SerializationOptions &Options)
+  explicit PathWriter(const SerializationOptions &Options)
       : Options(Options) {}
 
   uint32_t getPathOffset(StringRef Path) {
@@ -601,7 +601,7 @@ public:
 };
 
 static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
-                        endian::Writer &Writer, StringWriter &Strings) {
+                        endian::Writer &Writer, PathWriter &Strings) {
   Writer.write<uint32_t>(Loc.Offset);
   Writer.write<uint32_t>(Loc.Line);
   Writer.write<uint32_t>(Loc.Column);
@@ -619,11 +619,11 @@ static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
  See: \c decl_locs_block::DocRangesLayout
  */
 class DocRangeWriter {
-  StringWriter &Strings;
+  PathWriter &Strings;
   llvm::DenseMap<const Decl *, uint32_t> DeclOffsetMap;
   llvm::SmallString<1024> Buffer;
 public:
-  DocRangeWriter(StringWriter &Strings) : Strings(Strings) {
+  DocRangeWriter(PathWriter &Strings) : Strings(Strings) {
     /**
      Offset 0 is reserved to mean "no offset", meaning that a declaration
      didn't have a doc comment.
@@ -670,10 +670,10 @@ public:
 struct BasicDeclLocsTableWriter : public ASTWalker {
   llvm::SmallString<1024> Buffer;
   DeclUSRsTableWriter &USRWriter;
-  StringWriter &FWriter;
+  PathWriter &FWriter;
   DocRangeWriter &DocWriter;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
-                           StringWriter &FWriter,
+                           PathWriter &FWriter,
                            DocRangeWriter &DocWriter): USRWriter(USRWriter),
                            FWriter(FWriter),
                            DocWriter(DocWriter) {}
@@ -747,7 +747,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
                                 ModuleOrSourceFile MSF,
                                 DeclUSRsTableWriter &USRWriter,
-                                StringWriter &FWriter,
+                                PathWriter &FWriter,
                                 DocRangeWriter &DocWriter) {
   assert(MSF);
   const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
@@ -763,12 +763,12 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
 }
 
 static void emitFileListRecord(llvm::BitstreamWriter &Out,
-                               ModuleOrSourceFile MSF, StringWriter &FWriter,
+                               ModuleOrSourceFile MSF, PathWriter &FWriter,
                                const SerializationOptions &options) {
   assert(MSF);
 
   struct SourceFileListWriter {
-    StringWriter &FWriter;
+    PathWriter &FWriter;
     const SerializationOptions &options;
 
     llvm::SmallString<0> Buffer;
@@ -817,7 +817,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       writer.write<uint64_t>(info.getFileSize());
     }
 
-    SourceFileListWriter(StringWriter &FWriter, const SerializationOptions &options)
+    SourceFileListWriter(PathWriter &FWriter, const SerializationOptions &options)
         : FWriter(FWriter), options(options) {
       Buffer.reserve(1024);
     }
@@ -908,7 +908,7 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
     {
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
-      StringWriter FPWriter(options);
+      PathWriter FPWriter(options);
       DocRangeWriter DocWriter(FPWriter);
       emitFileListRecord(S.Out, DC, FPWriter, options);
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
