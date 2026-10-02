@@ -181,6 +181,17 @@ UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
 UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
+bool swift::usesFeatureCChar32IsUInt32(const Decl *decl) {
+  auto *TAD = dyn_cast<TypeAliasDecl>(decl);
+  if (!TAD || !TAD->getName().is("CChar32"))
+    return false;
+  if (!TAD->getDeclContext()->isModuleScopeContext() ||
+      !TAD->getModuleContext()->isStdlibModule())
+    return false;
+  auto underlying = TAD->getUnderlyingType();
+  return underlying && !underlying->isUnicodeScalar();
+}
+
 static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
   auto *SD = dyn_cast<SubscriptDecl>(decl);
   if (!SD)
