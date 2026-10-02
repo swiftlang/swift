@@ -325,7 +325,8 @@ public struct PublicInternalBridgingHeaderWrapper {
 struct ClosureDeps {
   // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'ClosureDeps' through property 'onTap'}}
   var onTap: () -> [InternalType]
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'ClosureDeps' through property 'onEvent'}}
+  // A second field sharing the same hidden type needs no new layout and
+  // produces no second remark.
   var onEvent: (InternalType) -> Void
   init() {
     self.onTap = { [] }
@@ -333,7 +334,6 @@ struct ClosureDeps {
   }
 }
 
-// expected-hidden-layout-note@+2 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
 // expected-hidden-layout-note@+1 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
 public class ClosureManager {
   private var deps: ClosureDeps
