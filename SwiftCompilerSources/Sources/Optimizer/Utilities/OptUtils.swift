@@ -1281,6 +1281,23 @@ extension StoreInst: CopyLikeInstruction {
   private var load: LoadInst { source as! LoadInst }
 }
 
+extension Instruction {
+  /// Returns this instruction as a copy if it is a `copy_addr`, or a `store` of a single-use `load` in the same block.
+  var asCopyLikeInstruction: CopyLikeInstruction? {
+    switch self {
+    case let copy as CopyAddrInst:
+      return copy
+    case let store as StoreInst:
+      guard let load = store.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == store.parentBlock else {
+        return nil
+      }
+      return store
+    default:
+      return nil
+    }
+  }
+}
+
 func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
   var toDelete = functions
   while true {

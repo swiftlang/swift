@@ -2681,13 +2681,13 @@ bb2:
 
 // CHECK-LABEL:   sil [ossa] @dont_hoist_multi_store
 // CHECK:         {{^}}bb0
-// CHECK:         {{^}}bb1
 // CHECK:           alloc_stack
-// CHECK:           store
-// CHECK:           apply
-// CHECK:           store
-// CHECK:           dealloc_stack
-// CHECK:         {{^}}bb2:
+// CHECK-NOT:       store
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store
+// CHECK:         {{^}}bb3:
+// CHECK-NEXT:      store %1
+// CHECK-NEXT:      dealloc_stack
 // CHECK:           return
 sil [ossa] @dont_hoist_multi_store : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
 bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
@@ -2713,16 +2713,17 @@ bb2:
   return %52 : $()
 }
 
-// We do not currently hoist the store and alloc_stack if the store does not write directly to the alloc_stack.
+// We do not currently hoist the store if it does not write directly to the alloc_stack.
 //
 // CHECK-LABEL:   sil [ossa] @dont_hoist_access_path
 // CHECK:         {{^}}bb0
-// CHECK:         {{^}}bb1
 // CHECK:           alloc_stack
-// CHECK:           struct_element_addr
-// CHECK:           store
-// CHECK:           dealloc_stack
-// CHECK:         {{^}}bb2:
+// CHECK-NOT:       store
+// CHECK:         {{^}}bb1
+// CHECK-NOT:       store
+// CHECK:         {{^}}bb3:
+// CHECK-NEXT:      store %0
+// CHECK-NEXT:      dealloc_stack
 // CHECK:           return
 sil [ossa] @dont_hoist_access_path : $@convention(thin) (Int, S, Builtin.Word) -> () {
 bb0(%0 : $Int, %1 : @unowned $S, %2 : $Builtin.Word):
@@ -2747,12 +2748,13 @@ bb2:
 
 // CHECK-LABEL:   sil [ossa] @dont_hoist_write_effect
 // CHECK:         {{^}}bb0
-// CHECK:         {{^}}bb1
 // CHECK:           alloc_stack
+// CHECK-NOT:       store
+// CHECK:         {{^}}bb1
 // CHECK:           store
 // CHECK:           apply
-// CHECK:           dealloc_stack
-// CHECK:         {{^}}bb2:
+// CHECK:         {{^}}bb3:
+// CHECK-NEXT:      dealloc_stack
 // CHECK:           return
 sil [ossa] @dont_hoist_write_effect : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
 bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
@@ -2782,12 +2784,14 @@ bb2:
 
 // CHECK-LABEL:   sil [ossa] @dont_hoist_unknown_effect
 // CHECK:         {{^}}bb0
-// CHECK:         {{^}}bb1
 // CHECK:           alloc_stack
+// CHECK-NOT:       store
+// CHECK:         {{^}}bb1
 // CHECK:           store
 // CHECK:           apply
-// CHECK:           dealloc_stack
-// CHECK:         {{^}}bb2:
+// CHECK:           apply
+// CHECK:         {{^}}bb3:
+// CHECK-NEXT:      dealloc_stack
 // CHECK:           return
 sil [ossa] @dont_hoist_unknown_effect : $@convention(thin) (Builtin.FixedArray<4, Builtin.Int32>, Builtin.FixedArray<4, Builtin.Int32>, Builtin.Word) -> () {
 bb0(%0 : $Builtin.FixedArray<4, Builtin.Int32>, %1 : $Builtin.FixedArray<4, Builtin.Int32>, %2 : $Builtin.Word):
@@ -3142,11 +3146,13 @@ bb6:
 
 // CHECK-LABEL: sil [ossa] @dont_hoist_invariant_store_or_alloc : $@convention(thin) (Builtin.Word, Builtin.Word) -> Builtin.Word {
 // CHECK:       bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
-// CHECK:       bb1({{.*}}):
 // CHECK:         = alloc_stack
-// CHECK:         store
-// CHECK:         dealloc_stack
-// CHECK:       bb2:
+// CHECK-NOT:     store
+// CHECK:       bb1({{.*}}):
+// CHECK-NOT:     store
+// CHECK:       bb3:
+// CHECK-NEXT:    store
+// CHECK-NEXT:    dealloc_stack
 // CHECK:       } // end sil function 'dont_hoist_invariant_store_or_alloc'
 sil [ossa] @dont_hoist_invariant_store_or_alloc : $@convention(thin) (Builtin.Word, Builtin.Word) -> Builtin.Word {
 bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
