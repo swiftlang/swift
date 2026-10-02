@@ -15930,6 +15930,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::NotCompileTimeLiteral:
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::AllowInvalidPackElement:
+  case FixKind::AllowPackElementWithNesting:
   case FixKind::AllowInvalidPackReference:
   case FixKind::AllowInvalidPackExpansion:
   case FixKind::IgnoreWhereClauseInPackIteration:
