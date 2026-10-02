@@ -1689,3 +1689,34 @@ bb0(%0 : @guaranteed $Wrapper):
   return %r
 }
 
+
+//
+// CHECK-LABEL: sil [ossa] @debug_value_past_consume_availability :
+// CHECK-NOT:     copy_value
+// CHECK:       } // end sil function 'debug_value_past_consume_availability'
+class DebugC {}
+struct DebugSurface { let surface: DebugC }
+struct DebugTensor { let surface: DebugSurface }
+struct DebugOuter { let tensor: DebugTensor }
+
+sil [ossa] @debug_value_past_consume_availability : $@convention(method) (@guaranteed DebugOuter) -> () {
+bb0(%0 : @guaranteed $DebugOuter):
+  %1 = struct_extract %0 : $DebugOuter, #DebugOuter.tensor
+  %2 = copy_value %1 : $DebugTensor
+  %3 = destructure_struct %2 : $DebugTensor
+  %4 = destructure_struct %3 : $DebugSurface
+  cond_br undef, bb1, bb2
+
+bb1:
+  debug_value %3 : $DebugSurface
+  destroy_value %4 : $DebugC
+  br bb3
+
+bb2:
+  destroy_value %4 : $DebugC
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
