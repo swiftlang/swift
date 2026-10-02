@@ -114,6 +114,21 @@ extension MutableSpan where Element: ~Copyable {
     let ms = unsafe MutableSpan(_unsafeElements: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: start)
   }
+
+  /// Create a mutable span over the single value passed as a parameter.
+  ///
+  /// The `MutableSpan` created by this initializer will represent a
+  /// mutation of `value`.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be mutated through the span
+  @export(implementation)
+  @_lifetime(&value)
+  public init(ofOne value: inout Element) {
+    let address = Builtin.unprotectedAddressOf(&value)
+    let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, mutating: &value)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
