@@ -134,9 +134,6 @@ extension MainActor {
       _ operation: @MainActor () throws(E) -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) throws(E) -> T {
-    typealias YesActor = @MainActor () throws(E) -> T
-    typealias NoActor = () throws(E) -> T
-
     /// This is guaranteed to be fatal if the check fails,
     /// as this is our "safe" version of this API.
     let executor: Builtin.Executor = unsafe Self.shared.unownedExecutor.executor
@@ -149,6 +146,14 @@ extension MainActor {
       #endif
     }
 
+#if $BuiltinApplyIsolatedUnchecked
+    // Apply the closure directly, ignoring its isolation: no escaping
+    // conversion, so no closure context allocation and no escape check
+    return try Builtin.applyGlobalActorIsolatedUnchecked(operation)
+#else
+    typealias YesActor = @MainActor () throws(E) -> T
+    typealias NoActor = () throws(E) -> T
+
     // To do the unsafe cast, we have to pretend it's @escaping
     // Use a builtin cast rather than unsafeBitCast, which would require runtime
     // metadata for the typed throws function type (only available since
@@ -158,6 +163,7 @@ extension MainActor {
       let rawFn: NoActor = Builtin.reinterpretCast(fn)
       return try rawFn()
     }
+#endif
   }
 
   @available(SwiftStdlib 5.9, *)
