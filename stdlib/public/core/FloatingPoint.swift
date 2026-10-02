@@ -332,13 +332,11 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// 
   /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
-  /// This value is rounded toward zero to keep user computations with angles
-  /// from inadvertently ending up in the wrong quadrant. A type that conforms
-  /// to the `FloatingPoint` protocol provides the value for `pi` at its best
-  /// possible precision.
+  /// A type that conforms to the `FloatingPoint` protocol provides the
+  /// value for `pi` at its best possible precision.
   ///
   ///     print(Double.pi)
-  ///     // Prints "3.14159265358979"
+  ///     // Prints "3.141592653589793"
   static var pi: Self { get }
 
   // NOTE: Rationale for "ulp" instead of "epsilon":
