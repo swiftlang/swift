@@ -792,6 +792,24 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     auto &Entry = found->second;
     auto val = Entry.value;
 
+    // Preconcurrency erasure can change a let declaration's function type
+    // without changing the SIL value stored in VarLocs. Capture parameter
+    // lowering uses the declaration type, so reconcile @Sendable before use.
+    auto convertFunctionToCaptureType = [&](ManagedValue value) {
+      auto captureType = getLoweredType(type);
+      if (value.getType() == captureType)
+        return value;
+
+      auto valueFnType = value.getType().getAs<SILFunctionType>();
+      auto captureFnType = captureType.getAs<SILFunctionType>();
+      if (!valueFnType || !captureFnType ||
+          valueFnType->withSendable(captureFnType->isSendable()) !=
+              captureFnType)
+        return value;
+
+      return B.createConvertFunction(loc, value, captureType);
+    };
+
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
       assert(!isPack);
@@ -811,7 +829,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           if (eliminateMoveOnlyWrapper)
             guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
                 loc, guaranteed);
-          capturedArgs.push_back(guaranteed);
+          capturedArgs.push_back(convertFunctionToCaptureType(guaranteed));
           break;
         }
 
@@ -846,7 +864,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (interfaceType->is<ReferenceStorageType>())
         val = emitConversionFromSemanticValue(loc, val, getLoweredType(type));
 
-      capturedArgs.push_back(emitManagedRValueWithCleanup(val));
+      capturedArgs.push_back(convertFunctionToCaptureType(
+          emitManagedRValueWithCleanup(val)));
       break;
     }
     case CaptureKind::Consuming: {
