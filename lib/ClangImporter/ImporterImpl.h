@@ -858,8 +858,11 @@ public:
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   // Cache for already-specialized function templates and any thunks they may
-  // have.
-  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+  // have, per Swift declaration of the template: e.g. a member template and its
+  // '__<name>Unsafe' migration stub share a C++ specialization, but resolve to
+  // different Swift declarations.
+  llvm::DenseMap<std::pair<clang::FunctionDecl *, const ValueDecl *>,
+                 ValueDecl *>
       specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
