@@ -37,6 +37,13 @@ struct HiddenTypeLayoutRequirement {
   HiddenTypeLayoutOrigin Origin;
   NominalTypeDecl *ABIExposedType;
   ValueDecl *LayoutAffectingStorage;
+  /// Whether the hidden type was found nested inside a function type (for
+  /// example, in the signature of a closure stored in a struct). Such
+  /// references cannot be given an abstract layout: clients cannot resolve
+  /// the function type at all and silently compute a smaller layout for the
+  /// enclosing type, so they are diagnosed as errors instead of scheduled
+  /// for layout serialization.
+  bool InFunctionType = false;
 };
 
 /// Find hidden types that contribute to this module's client-visible ABI.

@@ -44,6 +44,12 @@
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/IndirectEnumIOIPayload.swiftmodule %t/IndirectEnumIOIPayload.swift -I %t/InternalModule -parse-as-library -module-name IndirectEnumIOIPayload -Rhidden-type-layout-serialization -verify
 
+// The closure-nested diagnostic fires independent of the experimental
+// feature: without it, clients silently compute a smaller layout for the
+// enclosing type and overrun the buffer at runtime.
+// RUN: not %target-swift-frontend -emit-module -emit-module-path %t/ClosureLeak.swiftmodule %t/ClosureLeak.swift -I %t/InternalModule -parse-as-library -module-name ClosureLeak -suppress-warnings -verify
+// RUN: not %target-swift-frontend -emit-module -emit-module-path %t/ClosureLeakMainActor.swiftmodule %t/ClosureLeakMainActor.swift -I %t/InternalModule -parse-as-library -module-name ClosureLeakMainActor -suppress-warnings -verify
+
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -internal-import-bridging-header %t/HiddenTypes.h -emit-module -emit-module-path %t/PublicStructInternalBridgingHeaderField.swiftmodule %t/PublicStructInternalBridgingHeaderField.swift -parse-as-library -module-name PublicStructInternalBridgingHeaderField -Rhidden-type-layout-serialization -verify -verify-additional-prefix internal-bridging-header-
 // RUN: %llvm-bcanalyzer -dump %t/PublicStructInternalBridgingHeaderField.swiftmodule | %FileCheck %s --check-prefix HIDDEN-CLANG-RECORD
 
@@ -314,4 +320,50 @@ public struct PublicInternalBridgingHeaderWrapper {
   private var hidden: HiddenCStruct
   public var visible: Int64 = 1
   public init() { self.hidden = HiddenCStruct(value: 0) }
+}
+
+//--- ClosureLeak.swift
+@_implementationOnly import Internal
+
+struct ClosureDeps {
+  // expected-error@+1 {{stored property 'onTap' has a function type that references hidden type 'InternalType', whose size is unknown to clients; clients may compute a smaller layout for class 'ClosureManager' and allocate too little memory, overrunning the heap}}
+  // expected-note@+1 {{store the closure in a 'final class', whose layout is a single pointer in every module, or remove the hidden type from the closure's signature}}
+  var onTap: () -> [InternalType]
+  // expected-error@+1 {{stored property 'onEvent' has a function type that references hidden type 'InternalType', whose size is unknown to clients; clients may compute a smaller layout for class 'ClosureManager' and allocate too little memory, overrunning the heap}}
+  // expected-note@+1 {{store the closure in a 'final class', whose layout is a single pointer in every module, or remove the hidden type from the closure's signature}}
+  var onEvent: (InternalType) -> Void
+  init() {
+    self.onTap = { [] }
+    self.onEvent = { _ in }
+  }
+}
+
+// expected-note@+2 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
+// expected-note@+1 {{layout of struct 'ClosureDeps' is ABI-exposed through class 'ClosureManager'}}
+public class ClosureManager {
+  private var deps: ClosureDeps
+  public init() { self.deps = ClosureDeps() }
+}
+
+public struct ClosureUser {
+  private var deps: ClosureDeps
+  public var visible: Int64 = 1
+  public init() { self.deps = ClosureDeps() }
+}
+
+//--- ClosureLeakMainActor.swift
+@_implementationOnly import Internal
+
+struct MainActorClosureDeps {
+  // expected-error@+1 {{stored property 'isComplete' has a function type that references hidden type 'InternalType', whose size is unknown to clients; clients may compute a smaller layout for struct 'MainActorClosureUser' and allocate too little memory, overrunning the heap}}
+  // expected-note@+1 {{store the closure in a 'final class', whose layout is a single pointer in every module, or remove the hidden type from the closure's signature}}
+  var isComplete: @MainActor (InternalType) -> Bool
+  init() { self.isComplete = { _ in true } }
+}
+
+// expected-note@+1 {{layout of struct 'MainActorClosureDeps' is ABI-exposed through struct 'MainActorClosureUser'}}
+public struct MainActorClosureUser {
+  private var deps: MainActorClosureDeps
+  public var visible: Int64 = 1
+  public init() { self.deps = MainActorClosureDeps() }
 }

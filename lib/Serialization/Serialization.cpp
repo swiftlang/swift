@@ -7669,6 +7669,26 @@ void Serializer::handleHiddenTypeLayoutRequirement(
                    abiExposedLeaf, requirement.ABIExposedType);
 }
 
+void Serializer::diagnoseHiddenTypeInFunctionType(
+    const HiddenTypeLayoutRequirement &requirement) {
+  auto *abiExposedLeaf = requirement.LayoutAffectingStorage->getDeclContext()
+                             ->getSelfNominalTypeDecl();
+  assert(abiExposedLeaf);
+
+  auto &diags = getASTContext().Diags;
+  diags.diagnose(requirement.LayoutAffectingStorage->getLoc(),
+                 diag::serialization_hidden_type_in_function_type,
+                 requirement.LayoutAffectingStorage, requirement.HiddenType,
+                 requirement.ABIExposedType);
+  diags.diagnose(requirement.LayoutAffectingStorage->getLoc(),
+                 diag::serialization_hidden_type_in_function_type_fix);
+
+  if (abiExposedLeaf != requirement.ABIExposedType)
+    diags.diagnose(requirement.ABIExposedType->getLoc(),
+                   diag::serialization_hidden_type_layout_abi_exposure,
+                   abiExposedLeaf, requirement.ABIExposedType);
+}
+
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
@@ -7816,11 +7836,24 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   }
 
   auto &langOpts = M->getASTContext().LangOpts;
-  if (langOpts.hasFeature(
-          Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
-      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+  // Hidden types nested in function types cannot be given an abstract
+  // layout at all: clients fail to resolve the function type and silently
+  // compute a smaller layout for the enclosing type, overrunning the buffer
+  // at runtime. Diagnose those unconditionally in non-resilient modules,
+  // independent of whether layout serialization is enabled.
+  bool shouldSerializeHiddenLayouts = langOpts.hasFeature(
+      Feature::SerializeAbstractTypeLayoutForHiddenTypes);
+  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     forEachRequiredHiddenTypeLayout(
         M, files, [&](const HiddenTypeLayoutRequirement &requirement) {
+          if (requirement.InFunctionType &&
+              requirement.Origin !=
+                  HiddenTypeLayoutOrigin::RecoveredHiddenType) {
+            diagnoseHiddenTypeInFunctionType(requirement);
+            return;
+          }
+          if (!shouldSerializeHiddenLayouts)
+            return;
           handleHiddenTypeLayoutRequirement(requirement);
         });
   }

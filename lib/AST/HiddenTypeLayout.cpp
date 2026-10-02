@@ -40,10 +40,11 @@ void swift::forEachRequiredHiddenTypeLayout(
   auto reportHiddenType = [&](const Decl *layoutDecl, Type hiddenType,
                               HiddenTypeLayoutOrigin origin,
                               NominalTypeDecl *abiExposedType,
-                              ValueDecl *layoutAffectingStorage) {
+                              ValueDecl *layoutAffectingStorage,
+                              bool inFunctionType) {
     assert(abiExposedType && layoutAffectingStorage);
     callback({layoutDecl, hiddenType, origin, abiExposedType,
-              layoutAffectingStorage});
+              layoutAffectingStorage, inFunctionType});
   };
 
   auto isInternalBridgingHeaderImportedType =
@@ -64,24 +65,64 @@ void swift::forEachRequiredHiddenTypeLayout(
   // hidden from clients, schedule it to receive a hidden representation.
   // Otherwise, recurse into non-resilient structs and enums, or the public
   // class root, looking for hidden component types.
-  std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *)>
+  std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *,
+                       bool)>
       processTypeForHiddenLayouts =
           [&](Type type, DeclContext *useDC,
               NominalTypeDecl *abiExposedType,
-              ValueDecl *layoutAffectingStorage) {
+              ValueDecl *layoutAffectingStorage, bool inFunctionType) {
         if (auto *hiddenType = type->getAs<HiddenType>()) {
           if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
             reportHiddenType(layoutInfo, type,
                              HiddenTypeLayoutOrigin::RecoveredHiddenType,
-                             abiExposedType, layoutAffectingStorage);
+                             abiExposedType, layoutAffectingStorage,
+                             inFunctionType);
           return;
         }
 
         if (auto *tupleType = type->getAs<TupleType>()) {
           for (auto elt : tupleType->getElements())
             processTypeForHiddenLayouts(elt.getType(), useDC, abiExposedType,
-                                        layoutAffectingStorage);
+                                        layoutAffectingStorage,
+                                        inFunctionType);
           return;
+        }
+
+        if (auto *fnType = type->getAs<AnyFunctionType>()) {
+          // Function values have fixed size, but clients cannot resolve the
+          // function type at all when its signature references a hidden
+          // type, so the field silently drops out of the layout clients
+          // compute for the enclosing type and the enclosing buffer is
+          // overrun at runtime. Recurse to find such references so they can
+          // be diagnosed instead of scheduled for layout serialization.
+          for (auto param : fnType->getParams())
+            processTypeForHiddenLayouts(param.getPlainType(), useDC,
+                                        abiExposedType, layoutAffectingStorage,
+                                        /*inFunctionType=*/true);
+          processTypeForHiddenLayouts(fnType->getResult(), useDC,
+                                      abiExposedType, layoutAffectingStorage,
+                                      /*inFunctionType=*/true);
+          if (Type thrownError = fnType->getThrownError())
+            processTypeForHiddenLayouts(thrownError, useDC, abiExposedType,
+                                        layoutAffectingStorage,
+                                        /*inFunctionType=*/true);
+          return;
+        }
+
+        // The generic arguments of a type named in a function signature are
+        // part of the signature: clients cannot resolve the function type
+        // without them. Diagnose hidden types there instead of scheduling a
+        // layout that clients could never use. (Outside of function types
+        // the arguments are intentionally not walked: a resilient wrapper
+        // such as Array has fixed size regardless of its element type, and
+        // same-module generics are handled through substitution below.)
+        if (inFunctionType) {
+          if (auto *bgt = type->getAs<BoundGenericType>()) {
+            for (Type arg : bgt->getGenericArgs())
+              processTypeForHiddenLayouts(arg, useDC, abiExposedType,
+                                          layoutAffectingStorage,
+                                          /*inFunctionType=*/true);
+          }
         }
 
         NominalTypeDecl *nominal = nullptr;
@@ -103,7 +144,8 @@ void swift::forEachRequiredHiddenTypeLayout(
                                                  /*assumeImported=*/false)) {
           reportHiddenType(nominal, type,
                            HiddenTypeLayoutOrigin::ImplementationOnly,
-                           abiExposedType, layoutAffectingStorage);
+                           abiExposedType, layoutAffectingStorage,
+                           inFunctionType);
           return;
         }
 
@@ -113,7 +155,7 @@ void swift::forEachRequiredHiddenTypeLayout(
             reportHiddenType(
                 nominal, type,
                 HiddenTypeLayoutOrigin::InternalBridgingHeader, abiExposedType,
-                layoutAffectingStorage);
+                layoutAffectingStorage, inFunctionType);
           return;
         }
 
@@ -166,8 +208,12 @@ void swift::forEachRequiredHiddenTypeLayout(
             auto *storage = prop->getModuleContext() == module
                                 ? prop
                                 : layoutAffectingStorage;
+            // Reset: the contents of a visible nominal's definition are
+            // resolved through the nominal's own declaration, which clients
+            // can see, so hidden types found here are still serializable.
             processTypeForHiddenLayouts(storedType, prop->getDeclContext(),
-                                        abiExposedType, storage);
+                                        abiExposedType, storage,
+                                        /*inFunctionType=*/false);
           }
         } else if (auto *innerEnum = dyn_cast<EnumDecl>(nominal)) {
           for (auto *elt : innerEnum->getAllElements()) {
@@ -179,7 +225,8 @@ void swift::forEachRequiredHiddenTypeLayout(
                                   : layoutAffectingStorage;
               processTypeForHiddenLayouts(payloadType.subst(substitutions),
                                           elt->getDeclContext(), abiExposedType,
-                                          storage);
+                                          storage,
+                                          /*inFunctionType=*/false);
             }
           }
         }
@@ -201,7 +248,7 @@ void swift::forEachRequiredHiddenTypeLayout(
       if (isABIAccessibleValueType || isPublicClass) {
         processTypeForHiddenLayouts(
             nominal->getDeclaredInterfaceType(), nominal, nominal,
-            /*layoutAffectingStorage=*/nullptr);
+            /*layoutAffectingStorage=*/nullptr, /*inFunctionType=*/false);
       }
     }
 
