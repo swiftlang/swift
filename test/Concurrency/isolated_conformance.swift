@@ -185,9 +185,19 @@ func acceptSendableP<T: Sendable & P>(_: T) { }
 func acceptSendableMetaP<T: SendableMetatype & P>(_: T) { }
 // expected-note@-1 3{{'acceptSendableMetaP' declared here}}
 
+func acceptMultipleP<T: P, U: P>(_: T, _: U) { }
+
+struct NonisolatedP: P {
+  func f() { }
+}
+
 @MainActor
 func testIsolationConformancesInCall(c: C) {
   acceptP(c) // okay
+  acceptMultipleP(c, c) // okay
+  acceptMultipleP(c, CMismatchedIsolation()) // expected-warning{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot be used in main actor-isolated context}}
+  acceptMultipleP(CMismatchedIsolation(), c) // expected-warning{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot be used in main actor-isolated context}}
+  acceptMultipleP(NonisolatedP(), CMismatchedIsolation()) // expected-warning{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot be used in main actor-isolated context}}
 
   acceptSendableP(c) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
   acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
@@ -202,11 +212,17 @@ func testIsolatedConformancesOfActor(a: SomeActor) {
 @SomeGlobalActor
 func testIsolatedConformancesOfOtherGlobalActor(c: CMismatchedIsolation) {
   acceptP(c)
+  acceptMultipleP(c, c) // okay
+  acceptMultipleP(c, C()) // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in global actor 'SomeGlobalActor'-isolated context}}
+  acceptMultipleP(C(), c) // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in global actor 'SomeGlobalActor'-isolated context}}
   acceptSendableMetaP(c)  // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
 }
 
 func testIsolationConformancesFromOutside(c: C) {
   acceptP(c) // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  acceptMultipleP(c, CMismatchedIsolation())
+  // expected-warning@-1{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  // expected-warning@-2{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot be used in nonisolated context}}
   let _: any P = c // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
   let _ = PWrapper<C>() // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
 }
