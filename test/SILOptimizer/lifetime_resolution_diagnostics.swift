@@ -422,3 +422,16 @@ struct Initializers: ~Copyable {
 
   private static func f() throws -> C { C() }
 }
+struct TrivialPair { var a: Int; var b: Int }
+struct TrivialNested { var p: TrivialPair; var c: Int }
+func useNested(_ n: TrivialNested) {}
+
+// A single use that reads several uninitialized leaves is diagnosed once.
+func multiLeafUseBeforeInit() {
+  let n: TrivialNested  // expected-note {{constant defined here}}
+  useNested(n)  // expected-error {{constant 'n' used before being initialized}}
+
+  var m: TrivialNested  // expected-note {{variable defined here}}
+  m.p.a = 1
+  useNested(m)  // expected-error {{variable 'm' used before being initialized}}
+}

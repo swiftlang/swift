@@ -36,8 +36,9 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   }
 
   var indexCache = FieldIndexTrieCache(for: function)
+  var reported = ReportedUseBeforeInits()
   for assign in undefInits {
-    diagnoseUseBeforeInit(assign, &indexCache, context)
+    diagnoseUseBeforeInit(assign, &indexCache, &reported, context)
   }
   for diagnose in unpermittedCopies {
     diagnoseUnpermittedCopy(diagnose, &indexCache, context)
@@ -92,9 +93,24 @@ private func diagnoseUnpermittedCopy(ofValue copy: CopyValueInst, _ marker: Diag
     at: consumingInst.location)
 }
 
+// The (storage, offending use) pairs already diagnosed. One use can observe several
+// undef stores of the same storage, but should be reported only once.
+private struct ReportedUseBeforeInits {
+  private var reported: [(storage: Value, use: Instruction?)] = []
+
+  // Returns false if this pair was already recorded.
+  mutating func insert(storage: Value, use: Instruction?) -> Bool {
+    if reported.contains(where: { $0.storage == storage && $0.use == use }) {
+      return false
+    }
+    reported.append((storage, use))
+    return true
+  }
+}
+
 // `assign undef to [init] %addr`: report use-before-init at the first read that observes the undef store.
 private func diagnoseUseBeforeInit(_ marker: AssignInst, _ indexCache: inout FieldIndexTrieCache,
-                                   _ context: FunctionPassContext) {
+                                   _ reported: inout ReportedUseBeforeInits, _ context: FunctionPassContext) {
   let rootAddress = marker.destination
   guard let allocation = allocation(backing: rootAddress),
         let root = ResolvableRoot(allocation, &indexCache, context) else { return }
@@ -107,6 +123,7 @@ private func diagnoseUseBeforeInit(_ marker: AssignInst, _ indexCache: inout Fie
   let definedHere = markUninit?.location ?? root.address.definingInstruction!.location
 
   let offending = findOffendingUse(ofAddress: rootAddress, after: marker, context)
+  guard reported.insert(storage: allocation, use: offending) else { return }
   let errorLoc = offending?.location ?? definedHere
   context.diagnosticEngine.diagnose(.variable_used_before_initialized,
     name, isLet, at: errorLoc)

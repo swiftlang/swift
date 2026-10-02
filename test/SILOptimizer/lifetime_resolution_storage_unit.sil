@@ -557,11 +557,13 @@ bb0:
   return %t
 }
 
-// A field used before being initialized still triggers the use-before-init repair for that field.
+// Only the field that is both demanded and uninitialized is repaired with an undef.
 // Field `a` is stored but never consumed, so the trailing destroy_addr is narrowed to `a`.
 // CHECK-LABEL: sil [ossa] @fs_partial_use_before_init :
 // CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
-// CHECK-NEXT:     assign undef to [init] [[ROOT]]
+// CHECK-NEXT:     [[UB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
+// CHECK-NEXT:     assign undef to [init] [[UB]] : $*K
+// CHECK-NOT:      assign undef
 // CHECK:          [[AB:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.b
 // CHECK-NEXT:     load [take] [[AB]] : $*K
 // CHECK:          [[AA:%.*]] = struct_element_addr [[ROOT]] : $*Two, #Two.a
@@ -588,6 +590,47 @@ bb0:
 
   destroy_addr %root : $*Two
   dealloc_stack %0 : $*Two
+  %t = tuple ()
+  return %t
+}
+
+// Each demanded, uninitialized leaf gets its own undef, in leaf order, even through nested fields.
+// Leaf `p.a` is initialized, so it receives none.
+// CHECK-LABEL: sil [ossa] @fs_nested_use_before_init :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK-NEXT:     [[P:%.*]] = struct_element_addr [[ROOT]] : $*Nested, #Nested.p
+// CHECK-NEXT:     [[PB:%.*]] = struct_element_addr [[P]] : $*Two, #Two.b
+// CHECK-NEXT:     assign undef to [init] [[PB]] : $*K
+// CHECK-NEXT:     [[K:%.*]] = struct_element_addr [[ROOT]] : $*Nested, #Nested.k
+// CHECK-NEXT:     assign undef to [init] [[K]] : $*K
+// CHECK-NOT:      assign undef
+// CHECK:       } // end sil function
+sil [ossa] @fs_nested_use_before_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Nested, var, name "n", type $Nested
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+
+  %va = apply %getFn() : $@convention(thin) () -> @owned K
+  %p = struct_element_addr %root : $*Nested, #Nested.p
+  %pa = struct_element_addr %p : $*Two, #Two.a
+  store %va to [init] %pa : $*K
+
+  %pb = struct_element_addr %p : $*Two, #Two.b
+  %lb = load [copy] %pb : $*K
+  apply %useFn(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %lb : $K
+
+  %k = struct_element_addr %root : $*Nested, #Nested.k
+  %lk = load [copy] %k : $*K
+  apply %useFn(%lk) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %lk : $K
+
+  destroy_addr %root : $*Nested
+  dealloc_stack %0 : $*Nested
   %t = tuple ()
   return %t
 }

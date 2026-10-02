@@ -267,7 +267,7 @@ private struct Resolver {
     solveDemand(indices)
 
     logState("\n** state before legalizeDemand **")
-    legalizeDemand(for: root)
+    legalizeDemand(for: root, indices)
 
     ////////////////
     // Step 2: Determine availability at lifetime ends, handling partially initialized destroys.
@@ -356,7 +356,7 @@ private struct Resolver {
 
   // Legalize the SIL from the solved demand, leaving markers behind for LifetimeResolutionDiagnose
   // to turn into user-facing diagnostics for any misuses that were corrected by this phase.
-  mutating func legalizeDemand(for root: ResolvableRoot) {
+  mutating func legalizeDemand(for root: ResolvableRoot, _ indices: FieldIndexTrie) {
     for block in function.blocks {
       guard var events = state[block]?.events else { continue }
       defer { state[block]!.events = events }
@@ -366,13 +366,14 @@ private struct Resolver {
       var current = state[block]!.demand.map { $0.exit }
 
       for i in events.list.indices.reversed() {
-        legalize(event: &events.list[i], successorDemand: &current, root)
+        legalize(event: &events.list[i], successorDemand: &current, root, indices)
       }
     }
   }
 
   // Legalize a single event with respect to the demand reaching it from its successor instruction.
-  func legalize(event: inout EventList.Event, successorDemand current: inout [Demand], _ root: ResolvableRoot) {
+  func legalize(event: inout EventList.Event, successorDemand current: inout [Demand], _ root: ResolvableRoot,
+                _ indices: FieldIndexTrie) {
     let noDemand = current[event.range].allSatisfy { $0 == .nothing }
     let someDemand = !noDemand
 
@@ -413,8 +414,9 @@ private struct Resolver {
       newKind = transform(kind, to: .load(.take), root.isLexical)
 
     case let .root(r) where someDemand && !r.startsInitialized:
-      // Unsatisfied demand reaching the root means there exists a use-before-init.
-      initializeWithUndef(address: root.address, after: root.startInstruction)
+      // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
+      let demanded = event.range.filter { current[$0] != .nothing }
+      initializeWithUndef(leaves: demanded, of: root, indices)
 
     default:
       break
@@ -563,11 +565,14 @@ private struct Resolver {
     }
   }
 
-  // Emit an `assign undef to [init] address`.
-  func initializeWithUndef(address: Value, after inst: Instruction) {
-    let builder = Builder(after: inst, context)
-    let undef = Undef.get(type: address.type.objectType, context)
-    builder.createAssign(source: undef, destination: address, ownership: .initialize)
+  // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.
+  func initializeWithUndef(leaves: [Int], of root: ResolvableRoot, _ indices: FieldIndexTrie) {
+    let builder = Builder(after: root.startInstruction, context)
+    for leaf in leaves {
+      let address = indices.emitElementAddress(forLeaf: leaf, from: root.address, builder)
+      let undef = Undef.get(type: address.type.objectType, context)
+      builder.createAssign(source: undef, destination: address, ownership: .initialize)
+    }
   }
 
   // Forward dataflow solving for the availability of fields, to a fixed-point.
