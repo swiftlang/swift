@@ -48,6 +48,7 @@ add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     # by `_StringProcessing`.
     -Xfrontend -disable-implicit-string-processing-module-import
     -enable-experimental-feature AllowRuntimeSymbolDeclarations
+    -Xfrontend -enable-sil-opaque-values
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   INSTALL_IN_COMPONENT stdlib
