@@ -1111,10 +1111,42 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
+  /// Returns a key for the C++ type that a parameter of the given standard
+  /// library integer type is printed as. Two types get the same key if and
+  /// only if they are the same C++ type on the target, e.g. `CLong` (`long`)
+  /// and `Int` (`ptrdiff_t`) on 64-bit Linux and Darwin, but not `Int` and
+  /// `Int64` (`long long`) on 64-bit Darwin.
+  std::string getCxxIntegerTypeKey(Type type) const {
+    auto &typeMapping = owningPrinter.typeMapping;
+    // Like the printer, stop at the first type alias with a known C++
+    // spelling, e.g. `CLong` or `CChar`.
+    const TypeDecl *typeDecl = nullptr;
+    while (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
+      if (typeMapping.getKnownCxxTypeInfo(aliasTy->getDecl())) {
+        typeDecl = aliasTy->getDecl();
+        break;
+      }
+      type = aliasTy->getSinglyDesugaredType();
+    }
+    if (!typeDecl)
+      typeDecl = type->getAnyNominal();
+    if (auto intType = typeMapping.getKnownCxxIntegerType(typeDecl))
+      return clang::TargetInfo::getTypeName(*intType);
+    // Types like `char`, `char16_t` or `__int128` are distinct from all other
+    // integer types.
+    auto typeInfo = typeMapping.getKnownCxxTypeInfo(typeDecl);
+    ASSERT(typeInfo && "standard library integer type without a C++ name");
+    return typeInfo->name.str();
+  }
+
   /// Returns the C++ parameter type strings for a function as they would
-  /// appear in the C++ inline thunk signature.
+  /// appear in the C++ inline thunk signature. By default, all integer types
+  /// are considered the same. If \p distinguishIntegerTypes is set, integer
+  /// types are only considered the same if they are the same C++ type on the
+  /// target, \see getCxxIntegerTypeKey.
   llvm::SmallVector<std::string, 4>
-  getCxxParamTypes(const AbstractFunctionDecl *funcDecl) const {
+  getCxxParamTypes(const AbstractFunctionDecl *funcDecl,
+                   bool distinguishIntegerTypes) const {
     llvm::SmallVector<std::string, 4> result;
     auto *params = funcDecl->getParameters();
     if (!params)
@@ -1124,9 +1156,11 @@ private:
       auto type = param->getInterfaceType();
       // In C++ different integer types have different bitwidths. To
       // avoid producing redefinition errors, we are conservative with
-      // these types and consider all integral types the same.
+      // these types and consider all integral types the same, unless
+      // \p distinguishIntegerTypes is set.
       if (type->isStdlibInteger()) {
-        result.push_back("int");
+        result.push_back(distinguishIntegerTypes ? getCxxIntegerTypeKey(type)
+                                                 : "int");
       } else {
         std::string typeStr;
         llvm::raw_string_ostream typeOS(typeStr);
@@ -1140,17 +1174,17 @@ private:
   /// Returns true if the given function overload is safe to emit in the current
   /// C++ lexical scope. If \p cxxNameOverride is non-empty, it is used as the
   /// C++ function name instead of the default name derived from the
-  /// declaration.
-  bool
-  canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl,
-                             StringRef cxxNameOverride = StringRef()) const {
+  /// declaration. \see getCxxParamTypes for \p distinguishIntegerTypes.
+  bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl,
+                                  StringRef cxxNameOverride = StringRef(),
+                                  bool distinguishIntegerTypes = false) const {
     assert(outputLang == OutputLanguageMode::Cxx);
     auto &overloads =
         owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
     auto cxxName = cxxNameOverride.empty()
                        ? cxx_translation::getNameForCxx(funcDecl)
                        : cxxNameOverride;
-    auto paramTypes = getCxxParamTypes(funcDecl);
+    auto paramTypes = getCxxParamTypes(funcDecl, distinguishIntegerTypes);
     auto [overloadIt, inserted] = overloads.try_emplace(
         cxxName,
         llvm::SmallVector<CxxDeclEmissionScope::EmittedFunctionOverload, 2>(
@@ -1213,17 +1247,37 @@ private:
       // Check for naming conflicts between accessors and explicit methods
       // using the unified emittedFunctionOverloads map.
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        // Subscript accessors emit as operator[] and cannot conflict with
-        // named methods, so skip the overload check for them.
-        if (!SD) {
+        auto printSkippedComment = [&](StringRef comment) {
+          os << comment;
+          owningPrinter.outOfLineDefinitionsOS << comment;
+        };
+        if (SD) {
+          // Subscript getters are all emitted as 'operator []', so they can
+          // only conflict with each other, e.g. when two subscripts differ
+          // only in their result type or argument labels. Unlike for methods,
+          // distinct C++ integer types are kept apart, as subscripts taking
+          // e.g. Int32 and Int64 were always emitted as separate overloads.
+          if (!canPrintOverloadOfFunction(AFD, "operator []",
+                                          /*distinguishIntegerTypes=*/true)) {
+            std::string comment;
+            llvm::raw_string_ostream commentOS(comment);
+            commentOS << "  // skip emitting subscript '";
+            SD->getName().print(commentOS);
+            commentOS << " -> ";
+            SD->getElementInterfaceType().print(commentOS);
+            commentOS << "'. 'operator []' with the same parameter types "
+                         "already declared.\n";
+            printSkippedComment(comment);
+            return;
+          }
+        } else {
           std::string remappedName = remapPropertyName(accessor, resultTy);
           if (!canPrintOverloadOfFunction(AFD, remappedName)) {
-            auto comment = ("  // skip emitting accessor method for \'" +
-                            accessor->getStorage()->getBaseIdentifier().str() +
-                            "\'. \'" + remappedName + "\' already declared.\n")
-                               .str();
-            os << comment;
-            owningPrinter.outOfLineDefinitionsOS << comment;
+            printSkippedComment(
+                ("  // skip emitting accessor method for \'" +
+                 accessor->getStorage()->getBaseIdentifier().str() + "\'. \'" +
+                 remappedName + "\' already declared.\n")
+                    .str());
             return;
           }
         }
