@@ -12,8 +12,8 @@ import Builtin
 // BLOCK_IS_GLOBAL | BLOCK_HAS_SIGNATURE.
 // CHECK: [[GLOBAL_DESCRIPTOR:@block_descriptor[.0-9]*]] = internal constant { [[WORD:i32|i64]], [[WORD]], ptr } { [[WORD]] 0, [[WORD]] {{32|48}}, ptr {{@.*}} }
 // CHECK: @_NSConcreteGlobalBlock = external global %objc_class
-// CHECK: [[GLOBAL_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke, ptr [[GLOBAL_DESCRIPTOR]] }, %swift.function { ptr @callee, ptr null } }
-// CHECK: [[CONVERTED_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke, ptr {{@block_descriptor[.0-9]*}} }, %swift.function { ptr @sendable_callee, ptr null } }
+// CHECK: [[GLOBAL_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke{{(\.ptrauth(\.[0-9]+)?)?}}, ptr [[GLOBAL_DESCRIPTOR]] }, %swift.function { ptr @callee{{(\.ptrauth(\.[0-9]+)?)?}}, ptr null } }
+// CHECK: [[CONVERTED_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke{{(\.ptrauth(\.[0-9]+)?)?}}, ptr {{@block_descriptor[.0-9]*}} }, %swift.function { ptr @sendable_callee{{(\.ptrauth(\.[0-9]+)?)?}}, ptr null } }
 // CHECK: @_NSConcreteStackBlock = external global %objc_class
 // CHECK-NOT: _NSConcreteGlobalBlock
 
