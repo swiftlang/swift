@@ -36,6 +36,12 @@ struct SymbolGraphOptions {
   /// included in the graph.
   AccessLevel MinimumAccessLevel = AccessLevel::Public;
 
+  /// The minimum access level that setters must have in order to be shown in
+  /// declaration fragments, as in `{ get set }` rather than `{ get }`. Setters
+  /// that are as accessible as their property or subscript are always shown.
+  /// If unset, `MinimumAccessLevel` is used.
+  std::optional<AccessLevel> MinimumSetterAccessLevel = std::nullopt;
+
   /// Emit members gotten through class inheritance or protocol default
   /// implementations with compound, "SYNTHESIZED" USRs.
   bool EmitSynthesizedMembers = false;

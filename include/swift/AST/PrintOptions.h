@@ -533,6 +533,12 @@ public:
   /// Print all decls that have at least this level of access.
   AccessLevel AccessFilter = AccessLevel::Private;
 
+  /// Restrict setter visibility independently of AccessFilter, if specified.
+  /// A setter at the declaration's own access level remains visible.
+  /// This affects abstract accessors and whether stored properties are shown
+  /// as read-only.
+  std::optional<AccessLevel> SetterAccessFilter;
+
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
 
