@@ -122,7 +122,9 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
         countType = loweredType.getRawLayoutSubstitutedCountType();
       }
 
-      auto loweredLikeType = IGM.getLoweredType(likeType);
+      // The storage is accessed generically, so use opaque abstraction.
+      auto loweredLikeType =
+          IGM.getLoweredType(AbstractionPattern::getOpaque(), likeType);
       auto &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
       auto likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo);
 
