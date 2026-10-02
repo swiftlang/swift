@@ -934,6 +934,15 @@ static bool isSinkBarrier(SILInstruction *Inst) {
   return false;
 }
 
+/// Returns true if \p inst can be sunk past the instructions skipped by the
+/// scan, which are not sink barriers but may still read memory. If any of them
+/// may read memory, conservatively don't sink \p inst if it may write memory,
+/// since that would reorder the write after the read.
+static bool canSinkPastSkippedInsts(SILInstruction *inst,
+                                    bool skippedMayReadMemory) {
+  return !skippedMayReadMemory || !inst->mayWriteToMemory();
+}
+
 using ValueInBlock = std::pair<SILValue, SILBasicBlock *>;
 using ValueToBBArgIdxMap = llvm::DenseMap<ValueInBlock, int>;
 
@@ -1008,6 +1017,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
                                      const ValueToBBArgIdxMap &valueToArgIdxMap,
                                      OperandRelation &opRelation) {
   int SkipBudget = SinkSearchWindow;
+  bool skippedMayReadMemory = false;
 
   SILBasicBlock::iterator InstToSink = BB->getTerminator()->getIterator();
   SILBasicBlock *IdenBlock = Iden->getParent();
@@ -1042,6 +1052,9 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
     // then return it.
     if (canSinkInstruction(&*InstToSink) &&
         Iden->isIdenticalTo(&*InstToSink, operandCompare)) {
+      if (!canSinkPastSkippedInsts(&*InstToSink, skippedMayReadMemory)) {
+        return nullptr;
+      }
       LLVM_DEBUG(llvm::dbgs() << "Found an identical instruction.");
       return &*InstToSink;
     }
@@ -1054,6 +1067,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
     if (InstToSink == BB->begin())
       return nullptr;
 
+    skippedMayReadMemory |= InstToSink->mayReadFromMemory();
     --SkipBudget;
     InstToSink = std::prev(InstToSink);
     LLVM_DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
@@ -1408,6 +1422,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
   }
 
   unsigned SkipBudget = SinkSearchWindow;
+  bool skippedMayReadMemory = false;
 
   // Start scanning backwards from the terminator.
   auto InstToSink = FirstPred->getTerminator()->getIterator();
@@ -1418,7 +1433,8 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
     // Save the duplicated instructions in case we need to remove them.
     SmallVector<SILInstruction *, 4> Dups;
 
-    if (canSinkInstruction(&*InstToSink)) {
+    if (canSinkInstruction(&*InstToSink) &&
+        canSinkPastSkippedInsts(&*InstToSink, skippedMayReadMemory)) {
 
       OperandRelation opRelation = NotDeterminedYet;
 
@@ -1467,6 +1483,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
 
         // Restart the scan.
         InstToSink = FirstPred->getTerminator()->getIterator();
+        skippedMayReadMemory = false;
         LLVM_DEBUG(llvm::dbgs() << "Restarting scan. Next inst: "
                                 << *InstToSink);
         continue;
@@ -1485,6 +1502,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
       return Changed;
     }
 
+    skippedMayReadMemory |= InstToSink->mayReadFromMemory();
     --SkipBudget;
     InstToSink = std::prev(InstToSink);
     LLVM_DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
