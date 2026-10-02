@@ -30,7 +30,6 @@
 
 #include <cstddef>
 
-#include "swift/Basic/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 
@@ -45,14 +44,18 @@
 #if defined(dispatch_STATIC)
 #pragma comment(lib, "dispatch.lib")
 #endif
-#else
-#include <dlfcn.h>
 #endif
 #endif
 
+#if defined(__APPLE__)
 #if __has_include(<dispatch/private.h>)
 #include <dispatch/private.h>
-#define SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE 1
+#else
+/// Apple's libdispatch always exports this, but the public SDK doesn't declare
+/// it.
+extern "C" void dispatch_async_swift_job(dispatch_queue_t queue, void *obj,
+                                        dispatch_qos_class_t qos);
+#endif
 #endif
 
 #include "Error.h"
@@ -73,75 +76,26 @@ static void __swift_run_job(void *_job) {
   metadata->VTableInvoke(job, nullptr, 0);
 }
 
-/// The type of a function pointer for enqueueing a Job object onto a dispatch
-/// queue.
-typedef void (*dispatchEnqueueFuncType)(dispatch_queue_t queue, void *obj,
-                                        dispatch_qos_class_t qos);
-
-/// Initialize dispatchEnqueueFunc and then call through to the proper
-/// implementation.
-static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
-                                          dispatch_qos_class_t qos);
-
-/// A function pointer to the function used to enqueue a Job onto a dispatch
-/// queue. Initially set to initializeDispatchEnqueueFunc, so that the first
-/// call will initialize it. initializeDispatchEnqueueFunc sets it to point
-/// either to dispatch_async_swift_job when it's available, otherwise to
-/// dispatchEnqueueDispatchAsync.
-static std::atomic<dispatchEnqueueFuncType> dispatchEnqueueFunc{
-    initializeDispatchEnqueueFunc};
-
-/// A small adapter that dispatches a Job onto a queue using dispatch_async_f.
-static void dispatchEnqueueDispatchAsync(dispatch_queue_t queue, void *obj,
-                                         dispatch_qos_class_t qos) {
-  dispatch_async_f(queue, obj, __swift_run_job);
-}
-
-static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
-                                          dispatch_qos_class_t qos) {
-  dispatchEnqueueFuncType func = nullptr;
-
-  // Always fall back to plain dispatch_async_f for back-deployed concurrency.
-#if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
-#if SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE
-  if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
-    func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
-#elif defined(_WIN32)
-#if SwiftConcurrency_HAS_DISPATCH_ASYNC_SWIFT_JOB
-#if defined(dispatch_STATIC)
-  func = dispatch_async_swift_job;
-#else
-  func = function_cast<dispatchEnqueueFuncType>(
-      GetProcAddress(LoadLibraryW(L"dispatch.dll"),
-      "dispatch_async_swift_job"));
-#endif
-#endif
-#else
-  func = function_cast<dispatchEnqueueFuncType>(
-      dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
-#endif
-#endif
-
-  if (!func)
-    func = dispatchEnqueueDispatchAsync;
-
-  dispatchEnqueueFunc.store(func, std::memory_order_relaxed);
-
-  func(queue, obj, qos);
-}
-
-/// Enqueue a Job onto a dispatch queue using dispatchEnqueueFunc.
+/// Enqueue a Job onto a dispatch queue.
 static void dispatchEnqueue(dispatch_queue_t queue, SwiftJob *job,
                             dispatch_qos_class_t qos, void *executorQueue) {
   job->schedulerPrivate[Job::DispatchQueueIndex] = executorQueue;
-  dispatchEnqueueFunc.load(std::memory_order_relaxed)(queue, job, qos);
+#if defined(__APPLE__)
+  // dispatch_async_swift_job is SPI available in macOS 12 and iOS 15, so older
+  // deployment targets need the dispatch_async_f fallback below.
+  if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
+    dispatch_async_swift_job(queue, job, qos);
+    return;
+  }
+#endif
+  dispatch_async_f(queue, job, __swift_run_job);
 }
 
 static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
-#if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+#if defined(__APPLE__)
 static constexpr size_t dispatchQueueCooperativeFlag = 4;
 #else
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
@@ -152,18 +106,12 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   if (numericPriority >= globalQueueCacheCount)
     swift_Concurrency_fatalError(0, "invalid job priority %#zx", numericPriority);
 
-#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
-  std::memory_order loadOrder = std::memory_order_acquire;
-#else
-  std::memory_order loadOrder = std::memory_order_relaxed;
-#endif
-
   auto *ptr = &globalQueueCache[numericPriority];
-  auto queue = ptr->load(loadOrder);
+  auto queue = ptr->load(std::memory_order_relaxed);
   if (SWIFT_LIKELY(queue))
     return queue;
 
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
+#if !defined(__APPLE__)
   const int DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS = -3;
 
   // Create a new cooperative concurrent queue and swap it in.
