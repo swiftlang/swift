@@ -319,6 +319,12 @@ enum class ImplFunctionDifferentiabilityKind {
   Linear,
 };
 
+enum class ImplFunctionExecutionSemantics {
+  None,
+  AtMostOnce,
+  Once,
+};
+
 enum class ImplFunctionIsolation {
   Unknown,
   NonisolatedNonsending,
@@ -334,23 +340,25 @@ class ImplFunctionTypeFlags {
   unsigned Isolation : 2;
   unsigned DifferentiabilityKind : 3;
   unsigned HasSendingResult : 1;
-  unsigned CalledOnce : 1;
+  unsigned ExecutionSemantics : 2;
 
 public:
   ImplFunctionTypeFlags()
       : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
         Isolation(0), DifferentiabilityKind(0), HasSendingResult(0),
-        CalledOnce(0) {}
+        ExecutionSemantics(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
                         ImplFunctionIsolation isolation,
                         ImplFunctionDifferentiabilityKind diffKind,
-                        bool hasSendingResult, bool calledOnce)
+                        bool hasSendingResult,
+                        ImplFunctionExecutionSemantics executionSemantics)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
         Concurrent(concurrent), Async(async), Isolation(unsigned(isolation)),
         DifferentiabilityKind(unsigned(diffKind)),
-        HasSendingResult(hasSendingResult), CalledOnce(calledOnce) {}
+        HasSendingResult(hasSendingResult),
+        ExecutionSemantics(unsigned(executionSemantics)) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
@@ -358,7 +366,7 @@ public:
         rep, Pseudogeneric, Escaping, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags
@@ -367,7 +375,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags
@@ -376,7 +384,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         true, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags
@@ -385,7 +393,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags
@@ -394,7 +402,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation::Erased,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags withNonisolatedNonsendingIsolation() const {
@@ -402,7 +410,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation::NonisolatedNonsending,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags
@@ -411,15 +419,15 @@ public:
         ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, CalledOnce);
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
-    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
-                                 Escaping, Concurrent, Async,
-                                 ImplFunctionIsolation(Isolation), diffKind,
-                                 HasSendingResult, CalledOnce);
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
+        Async, ImplFunctionIsolation(Isolation), diffKind, HasSendingResult,
+        ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
   ImplFunctionTypeFlags withSendingResult() const {
@@ -427,15 +435,16 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind), true,
-        CalledOnce);
+        ImplFunctionExecutionSemantics(ExecutionSemantics));
   }
 
-  ImplFunctionTypeFlags withCalledOnce() const {
+  ImplFunctionTypeFlags
+  withExecutionSemantics(ImplFunctionExecutionSemantics semantics) const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, /*CalledOnce=*/true);
+        HasSendingResult, semantics);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
@@ -460,7 +469,9 @@ public:
 
   bool hasSendingResult() const { return HasSendingResult; }
 
-  bool isCalledOnce() const { return CalledOnce; }
+  ImplFunctionExecutionSemantics getExecutionSemantics() const {
+    return ImplFunctionExecutionSemantics(ExecutionSemantics);
+  }
 
   bool isDifferentiable() const {
     return getDifferentiabilityKind() !=
@@ -1176,8 +1187,9 @@ protected:
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
                           Node->getKind() == NodeKind::EscapingObjCBlock);
 
-      extFlags = extFlags.withCalledOnce(Node->getKind() ==
-                                         NodeKind::CalledOnceFunctionType);
+      if (Node->getKind() == NodeKind::CalledOnceFunctionType)
+        extFlags = extFlags.withExecutionSemantics(
+            FunctionMetadataExecutionSemantics::AtMostOnce);
 
       auto result =
           decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,
@@ -1280,7 +1292,8 @@ protected:
         } else if (child->getKind() == NodeKind::ImplErasedIsolation) {
           flags = flags.withErasedIsolation();
         } else if (child->getKind() == NodeKind::ImplCalledOnceFunction) {
-          flags = flags.withCalledOnce();
+          flags = flags.withExecutionSemantics(
+              ImplFunctionExecutionSemantics::AtMostOnce);
         } else if (child->getKind() == NodeKind::ImplParameter) {
           if (decodeImplFunctionParam(child, depth + 1, parameters))
             return MAKE_NODE_TYPE_ERROR0(child,

@@ -1159,6 +1159,14 @@ struct TargetFunctionMetadataDifferentiabilityKind {
 using FunctionMetadataDifferentiabilityKind =
     TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
+/// Execution semantics for function type metadata.
+/// Duplicates `ExecutionSemantics` in AST/AttrKind.h, plus `None`.
+enum class FunctionMetadataExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce = 1,
+  Once = 2,
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -1308,7 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    IsCalledOnce = 0x00000020U,
+    // Values for the enumerated execution semantics. Reserved; the compiler
+    // doesn't emit them yet.
+    ExecutionSemanticsMask = 0x00000060U, // two bits
+    ExecutionSemanticsShift = 5,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1351,9 +1362,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withCalledOnce(bool newValue = true) const {
+  withExecutionSemantics(FunctionMetadataExecutionSemantics semantics) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~IsCalledOnce) | (newValue ? IsCalledOnce : 0));
+        (Data & ~ExecutionSemanticsMask) |
+        (int_type(semantics) << ExecutionSemanticsShift));
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1377,8 +1389,9 @@ public:
     return bool(Data & HasSendingResult);
   }
 
-  bool isCalledOnce() const {
-    return bool(Data & IsCalledOnce);
+  FunctionMetadataExecutionSemantics getExecutionSemantics() const {
+    return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
+                                              ExecutionSemanticsShift);
   }
 
   int_type getIntValue() const {
