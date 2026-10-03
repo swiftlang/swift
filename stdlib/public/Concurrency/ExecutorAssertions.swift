@@ -337,9 +337,6 @@ extension Actor {
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
-    typealias YesActor = (isolated Self) throws -> T
-    typealias NoActor = (Self) throws -> T
-
     /// This is guaranteed to be fatal if the check fails,
     /// as this is our "safe" version of this API.
     let executor: Builtin.Executor = unsafe self.unownedExecutor.executor
@@ -348,12 +345,21 @@ extension Actor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
+#if $BuiltinApplyIsolatedUnchecked
+    // Apply the closure directly, ignoring its isolation: no escaping
+    // conversion, so no closure context allocation and no escape check
+    return try Builtin.applyActorIsolatedUnchecked(operation, self)
+#else
+    typealias YesActor = (isolated Self) throws -> T
+    typealias NoActor = (Self) throws -> T
+
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
+      let rawFn: NoActor = Builtin.reinterpretCast(fn)
       return try rawFn(self)
     }
+#endif
   }
 
   @available(SwiftStdlib 5.9, *)
