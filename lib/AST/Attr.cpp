@@ -370,6 +370,18 @@ CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
   switch (semantics) {
   case CalledTypeAttr::Semantics::AtMostOnce:
     return "atMostOnce";
+  case CalledTypeAttr::Semantics::ExactlyOnce:
+    return "exactlyOnce";
+  }
+  llvm_unreachable("bad kind");
+}
+
+ExecutionSemantics CalledTypeAttr::getExecutionSemantics() const {
+  switch (getSemantics()) {
+  case Semantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case Semantics::ExactlyOnce:
+    return ExecutionSemantics::Once;
   }
   llvm_unreachable("bad kind");
 }

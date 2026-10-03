@@ -2400,12 +2400,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
-  // @called(atMostOnce) implies `consumed`.
+  // Every kind of @called implies `consumed`.
   if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-    if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
-      if (cast<CalledTypeAttr>(calledAttr)->isAtMostOnce())
-        return ParamSpecifier::Consuming;
-    }
+    if (attributedTy->has(TypeAttrKind::Called))
+      return ParamSpecifier::Consuming;
   }
 
   return ParamSpecifier::Default;

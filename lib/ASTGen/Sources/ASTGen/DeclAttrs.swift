@@ -2819,6 +2819,7 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
+        case "exactlyOnce": return .once
         case "atMostOnce": return .atMostOnce
         default: return nil
         }
