@@ -21,7 +21,6 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 public struct ContinuousClock: Sendable {
   /// A continuous point in time used for `ContinuousClock`.
   public struct Instant: Sendable {
@@ -57,7 +56,6 @@ extension Duration {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension Clock where Self == ContinuousClock {
   /// A clock that measures time that always increments but does not stop
   /// incrementing while the system is asleep.
@@ -69,7 +67,6 @@ extension Clock where Self == ContinuousClock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock: Clock {
   /// The current continuous instant.
   public var now: ContinuousClock.Instant {
@@ -134,7 +131,6 @@ extension ContinuousClock: Clock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
   @export(implementation)
@@ -144,7 +140,6 @@ extension ContinuousClock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 
