@@ -2994,7 +2994,7 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
 
           if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
             Ctx.Diags.diagnose(V->getLoc(),
-                               diag::sending_capture_decl_requires_called_once);
+                               diag::sending_capture_decl_requires_called_closure);
             V->setInvalid();
             continue;
           }

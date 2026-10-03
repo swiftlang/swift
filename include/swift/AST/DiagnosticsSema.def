@@ -2700,9 +2700,9 @@ ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
       "'CalledAttribute' is enabled",
       ())
-ERROR(sending_capture_decl_requires_called_once,none,
-      "'sending' capture may only be declared in a '@called(atMostOnce)' "
-      "closure",
+ERROR(sending_capture_decl_requires_called_closure,none,
+      "'sending' capture may only be declared in a '@called(atMostOnce)' or "
+      "'@called(exactlyOnce)' closure",
       ())
 
 // Alignment attribute

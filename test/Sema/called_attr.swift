@@ -213,7 +213,7 @@ func testSendingCaptures() {
   }
 
   _ = { [sending ns] in ns }
-  // expected-error@-1 {{'sending' capture may only be declared in a '@called(atMostOnce)' closure}}
+  // expected-error@-1 {{'sending' capture may only be declared in a '@called(atMostOnce)' or '@called(exactlyOnce)' closure}}
 
   func calledAtMostOnce(_: @called(atMostOnce) () -> Void) {}
   func manyTimes(_: () -> Void) {}
@@ -223,8 +223,18 @@ func testSendingCaptures() {
   }
 
   manyTimes { [sending x = NS()] in
-    // expected-error@-1 {{'sending' capture may only be declared in a '@called(atMostOnce)' closure}}
+    // expected-error@-1 {{'sending' capture may only be declared in a '@called(atMostOnce)' or '@called(exactlyOnce)' closure}}
     _ = x
+  }
+
+  func calledExactlyOnce(_: @called(exactlyOnce) () -> Void) {}
+
+  _ = { @called(exactlyOnce) [sending ns] in
+    ns
+  }
+
+  calledExactlyOnce { [sending x = NS()] in
+    _ = x // Ok
   }
 }
 
