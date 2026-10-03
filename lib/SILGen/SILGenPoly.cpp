@@ -6914,13 +6914,19 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   }
 
   // We do not, conversion is trivial.
+  //
+  // Only a thick function can have execution semantics; thin-to-thick adds
+  // them.
   auto expectedEI = expectedFnType->getExtInfo().intoBuilder();
-  auto newEI = expectedEI.withRepresentation(fnType->getRepresentation())
-                   .withNoEscape(fnType->getRepresentation() ==
-                                         SILFunctionType::Representation::Thick
-                                     ? fnType->isNoEscape()
-                                     : expectedFnType->isNoEscape())
-                   .build();
+  bool isThick =
+      fnType->getRepresentation() == SILFunctionType::Representation::Thick;
+  auto newEI =
+      expectedEI.withRepresentation(fnType->getRepresentation())
+          .withNoEscape(isThick ? fnType->isNoEscape()
+                                : expectedFnType->isNoEscape())
+          .withExecutionSemantics(
+              isThick ? expectedFnType->getExecutionSemantics() : std::nullopt)
+          .build();
   auto newFnType =
       adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
                          fnType->getWitnessMethodConformanceOrInvalid());

@@ -5,43 +5,43 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil [ossa] @take_called_at_most_once : $@convention(thin) (@owned @called(atMostOnce) @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0(%0 : @owned $@called(atMostOnce) @callee_guaranteed () -> ()):
-// CHECK:   destroy_value %0 : $@called(atMostOnce) @callee_guaranteed () -> ()
+// CHECK-LABEL: sil [ossa] @take_called_at_most_once : $@convention(thin) (@owned @called(atMostOnce) @callee_owned () -> ()) -> () {
+// CHECK: bb0(%0 : @owned $@called(atMostOnce) @callee_owned () -> ()):
+// CHECK:   destroy_value %0 : $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function 'take_called_at_most_once'
-sil [ossa] @take_called_at_most_once : $@convention(thin) (@owned @called(atMostOnce) @callee_guaranteed () -> ()) -> () {
-bb0(%0 : @owned $@called(atMostOnce) @callee_guaranteed () -> ()):
-  destroy_value %0 : $@called(atMostOnce) @callee_guaranteed () -> ()
+sil [ossa] @take_called_at_most_once : $@convention(thin) (@owned @called(atMostOnce) @callee_owned () -> ()) -> () {
+bb0(%0 : @owned $@called(atMostOnce) @callee_owned () -> ()):
+  destroy_value %0 : $@called(atMostOnce) @callee_owned () -> ()
   %1 = tuple ()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @produce_called_at_most_once : $@convention(thin) () -> @owned @called(atMostOnce) @callee_guaranteed () -> () {
+// CHECK-LABEL: sil [ossa] @produce_called_at_most_once : $@convention(thin) () -> @owned @called(atMostOnce) @callee_owned () -> () {
 // CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
-// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]() : $@convention(thin) () -> ()
-// CHECK:   [[R:%.*]] = convert_function [[PA]] : $@callee_guaranteed () -> () to $@called(atMostOnce) @callee_guaranteed () -> ()
-// CHECK:   return [[R]] : $@called(atMostOnce) @callee_guaranteed () -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [[F]]() : $@convention(thin) () -> ()
+// CHECK:   [[R:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@called(atMostOnce) @callee_owned () -> ()
+// CHECK:   return [[R]] : $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function 'produce_called_at_most_once'
-sil [ossa] @produce_called_at_most_once : $@convention(thin) () -> @owned @called(atMostOnce) @callee_guaranteed () -> () {
+sil [ossa] @produce_called_at_most_once : $@convention(thin) () -> @owned @called(atMostOnce) @callee_owned () -> () {
 bb0:
   %f = function_ref @thin_callee : $@convention(thin) () -> ()
-  %pa = partial_apply [callee_guaranteed] %f() : $@convention(thin) () -> ()
-  %r = convert_function %pa : $@callee_guaranteed () -> () to $@called(atMostOnce) @callee_guaranteed () -> ()
-  return %r : $@called(atMostOnce) @callee_guaranteed () -> ()
+  %pa = partial_apply %f() : $@convention(thin) () -> ()
+  %r = convert_function %pa : $@callee_owned () -> () to $@called(atMostOnce) @callee_owned () -> ()
+  return %r : $@called(atMostOnce) @callee_owned () -> ()
 }
 
 // `partial_apply` can directly produce a `@called(atMostOnce)` result via the
 // `[called(atMostOnce)]` attribute, without a separate `convert_function`.
-// CHECK-LABEL: sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @called(atMostOnce) @callee_guaranteed () -> () {
+// CHECK-LABEL: sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @called(atMostOnce) @callee_owned () -> () {
 // CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
-// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [called(atMostOnce)] [[F]]() : $@convention(thin) () -> ()
-// CHECK:   return [[PA]] : $@called(atMostOnce) @callee_guaranteed () -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [called(atMostOnce)] [[F]]() : $@convention(thin) () -> ()
+// CHECK:   return [[PA]] : $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function 'produce_called_at_most_once_directly'
-sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @called(atMostOnce) @callee_guaranteed () -> () {
+sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @called(atMostOnce) @callee_owned () -> () {
 bb0:
   %f = function_ref @thin_callee : $@convention(thin) () -> ()
-  %pa = partial_apply [callee_guaranteed] [called(atMostOnce)] %f() : $@convention(thin) () -> ()
-  return %pa : $@called(atMostOnce) @callee_guaranteed () -> ()
+  %pa = partial_apply [called(atMostOnce)] %f() : $@convention(thin) () -> ()
+  return %pa : $@called(atMostOnce) @callee_owned () -> ()
 }
 
 // The same attribute applied to a `partial_apply` that captures an argument,

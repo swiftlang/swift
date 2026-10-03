@@ -2049,6 +2049,23 @@ public:
       return checkLegalSILType(F, objectType, I);
     }
 
+    // `@called` function values have a context. Thin functions, including
+    // closure bodies and thunks, never have execution semantics themselves;
+    // `partial_apply` or `thin_to_thick_function` adds them to the value.
+    // Calling an escaping `@called` value consumes its context; only a
+    // non-escaping one, such as a stack-promoted closure, can be
+    // `@callee_guaranteed`.
+    if (auto fnTy = dyn_cast<SILFunctionType>(rvalueType)) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
+        require(fnTy->getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+                "@called function types must be thick");
+        require(fnTy->isNoEscape() || fnTy->getCalleeConvention() ==
+                                          ParameterConvention::Direct_Owned,
+                "escaping @called function types must be @callee_owned");
+      }
+    }
+
     // Metatypes should have explicit representations.
     if (auto metatype = dyn_cast<AnyMetatypeType>(rvalueType)) {
       require(metatype->hasRepresentation(),
@@ -5475,11 +5492,13 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
+    // The result can add execution semantics, because it forms the value.
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
             .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
             .withNoEscape(resFTy->isNoEscape())
+            .withExecutionSemantics(resFTy->getExecutionSemantics())
             .build();
     require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
                                              useClangTypes(opFTy)),

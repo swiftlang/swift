@@ -10,7 +10,7 @@ func makeClosure() -> @called(atMostOnce) () -> Void {
 // CHECK: bb0([[F:%.*]] : @owned $@noescape @called(atMostOnce) @callee_owned () -> ()):
 // CHECK:  [[LOCAL:%.*]] = alloc_box ${ let @called(atMostOnce) @callee_owned () -> () }, let, name "local"
 // CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s19called_at_most_once18testCallAtMostOnceyyyyXEnFyyXOofU_ : $@convention(thin) () -> ()
-// CHECK:  [[CLOSURE_CALLED_ONCE:%.*]] = convert_function [[CLOSURE_REF]] : $@convention(thin) () -> () to $@convention(thin) @called(atMostOnce) () -> ()
+// CHECK:  [[CLOSURE_CALLED_ONCE:%.*]] = thin_to_thick_function [[CLOSURE_REF]] : $@convention(thin) () -> () to $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function '$s19called_at_most_once18testCallAtMostOnceyyyyXEnF'
 func testCallAtMostOnce(_ f: @called(atMostOnce) () -> Void) {
   let local: @called(atMostOnce) () -> Void = {}
@@ -29,7 +29,7 @@ func run() {
 // CHECK: bb0([[F:%.*]] : @owned $@called(atMostOnce) @callee_owned () -> ()):
 // CHECK:  [[LOCAL:%.*]] = alloc_box ${ let @called(atMostOnce) @callee_owned () -> () }, let, name "local"
 // CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s19called_at_most_once26testCallAtMostOnceEscapingyyyyXOonFyyXOofU_ : $@convention(thin) () -> ()
-// CHECK:  [[CLOSURE_CALLED_ONCE:%.*]] = convert_function [[CLOSURE_REF]] : $@convention(thin) () -> () to $@convention(thin) @called(atMostOnce) () -> ()
+// CHECK:  [[CLOSURE_CALLED_ONCE:%.*]] = thin_to_thick_function [[CLOSURE_REF]] : $@convention(thin) () -> () to $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function '$s19called_at_most_once26testCallAtMostOnceEscapingyyyyXOonF'
 func testCallAtMostOnceEscaping(_ f: @escaping @called(atMostOnce) () -> Void) {
   let local: @called(atMostOnce) () -> Void = {}
