@@ -1019,7 +1019,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
       // All of the non-Sendable captures of non-escaping @called(atMostOnce)
       // closures that aren't explicitly `sending` are disconnected.
       if (auto *closure = declRef.getClosureExpr();
-          closure && closure->isCalledOnce()) {
+          closure && closure->hasCalledAtMostOnceSemantics()) {
         auto *closureTy = closure->getType()->castTo<FunctionType>();
         if (closureTy->getExtInfo().isNoEscape())
           return SILIsolationInfo::getDisconnected(

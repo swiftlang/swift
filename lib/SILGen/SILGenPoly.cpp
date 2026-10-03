@@ -5841,12 +5841,9 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
     thunkArgs.push_back(ManagedValue::forObjectRValueWithoutOwnership(value));
   }
 
-  return
-    SGF.B.createPartialApply(loc, thunkValue,
-                             interfaceSubs, thunkArgs,
-                             toType->getCalleeConvention(),
-                             toType->getIsolation(),
-                             toType->isCalledOnce());
+  return SGF.B.createPartialApply(
+      loc, thunkValue, interfaceSubs, thunkArgs, toType->getCalleeConvention(),
+      toType->getIsolation(), toType->getExecutionSemantics());
 }
 
 static ManagedValue createDifferentiableFunctionThunk(

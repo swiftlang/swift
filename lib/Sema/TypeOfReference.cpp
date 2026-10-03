@@ -2106,10 +2106,11 @@ ConstraintSystem::getTypeOfMemberReferencePre(
 
       std::optional<AnyFunctionType::ExtInfo> newExtInfo;
       if (baseObjTy->hasTypeVariable())
-        newExtInfo =
-            methodTy->getExtInfo().withCalledOnceDependentType(baseObjTy);
+        newExtInfo = methodTy->getExtInfo().withExecutionSemanticsDependentType(
+            baseObjTy);
       else if (baseObjTy->isNoncopyable())
-        newExtInfo = methodTy->getExtInfo().withCalledOnce();
+        newExtInfo = methodTy->getExtInfo().withExecutionSemantics(
+            ExecutionSemantics::AtMostOnce);
 
       if (newExtInfo) {
         auto *newMethodTy = methodTy->withExtInfo(*newExtInfo);

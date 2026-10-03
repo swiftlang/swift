@@ -2117,7 +2117,8 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 
       // A `@called(atMostOnce)` closure's context is consumed directly by the
       // `apply`/`try_apply` its passed to.
-      if (isCalledOnce() && isa<ApplyInst, TryApplyInst>(use->getUser())) {
+      if (hasCalledAtMostOnceSemantics() &&
+          isa<ApplyInst, TryApplyInst>(use->getUser())) {
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
@@ -2165,7 +2166,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
     // `destroy_value`.
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       consumingOperand = &dvi->getOperandRef();
-    } else if (isCalledOnce()) {
+    } else if (hasCalledAtMostOnceSemantics()) {
       // `@called(atMostOnce)` is consumed by an apply, look up the operand
       // where it appears.
       for (auto &operand : inst->getAllOperands()) {

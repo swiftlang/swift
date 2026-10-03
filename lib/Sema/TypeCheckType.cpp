@@ -4274,7 +4274,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->isCalledOnce()) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
@@ -4799,7 +4799,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
-  bool isCalledOnce = false;
+  std::optional<ExecutionSemantics> executionSemantics;
   if (auto called = claim<CalledTypeAttr>(attrs)) {
     if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
       if (representation != FunctionTypeRepresentation::Swift) {
@@ -4811,7 +4811,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       }
 
       if (!repr->isInvalid() && called->isAtMostOnce())
-        isCalledOnce = true;
+        executionSemantics = ExecutionSemantics::AtMostOnce;
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,
@@ -4822,7 +4822,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult, isCalledOnce);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult, executionSemantics);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -5073,14 +5073,15 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  bool isCalledOnce = false;
+  std::optional<ExecutionSemantics> executionSemantics;
   if (auto *called = claim<CalledTypeAttr>(attrs)) {
-    isCalledOnce = called->isAtMostOnce();
+    if (called->isAtMostOnce())
+      executionSemantics = ExecutionSemantics::AtMostOnce;
   }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isCalledOnce, isolation, diffKind, clangFnType,
+      executionSemantics, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
@@ -5779,7 +5780,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
       if (fnTy->isNoEscape()) {
         // `@called(atMostOnce)` functions always have consuming semantics
         // regardless of whether they are @escaping or not.
-        if (fnTy->isCalledOnce())
+        if (fnTy->hasCalledAtMostOnceSemantics())
           break;
 
         diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),

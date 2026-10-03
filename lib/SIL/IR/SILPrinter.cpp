@@ -1873,7 +1873,7 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->isCalledOnce()) {
+    if (CI->getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
       *this << "[called_once] ";
     }
     visitApplyInstBase(CI);

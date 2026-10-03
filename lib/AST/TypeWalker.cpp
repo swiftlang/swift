@@ -131,8 +131,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
-    if (auto calledOnceDep = ty->getCalledOnceDependentType()) {
-      if (doIt(calledOnceDep))
+    if (auto executionSemanticsDep = ty->getExecutionSemanticsDependentType()) {
+      if (doIt(executionSemanticsDep))
         return true;
     }
 

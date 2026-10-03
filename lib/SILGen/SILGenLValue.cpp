@@ -1254,7 +1254,7 @@ namespace {
               isReadAccess(getAccessKind())
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         NoConsumeOrAssign
-              : Value.getType().isCalledOnce()
+              : Value.getType().hasCalledAtMostOnceSemantics()
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         ConsumableAndAssignable
                   : MarkUnresolvedNonCopyableValueInst::CheckKind::

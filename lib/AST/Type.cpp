@@ -1661,10 +1661,11 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
       // just become non-Sendable.
       return std::make_pair(Type(), false);
     }
-    std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+    std::pair<Type, std::optional<ExecutionSemantics>>
+    transformExecutionSemanticsDependentType(Type ty) {
       // Fold away the @called(atMostOnce) dependence if present, the function
       // type will just become non-@called(atMostOnce).
-      return std::make_pair(Type(), false);
+      return std::make_pair(Type(), std::nullopt);
     }
   };
   return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
@@ -4604,10 +4605,10 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
-Type AnyFunctionType::getCalledOnceDependentType() const {
+Type AnyFunctionType::getExecutionSemanticsDependentType() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getCalledOnceDependentType();
+    return cast<FunctionType>(this)->getExecutionSemanticsDependentType();
   case TypeKind::GenericFunction:
     return Type();
   default:
@@ -4665,9 +4666,11 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
   return getLifetimeDependenceFor(resultIndex);
 }
 
-bool AnyFunctionType::isCalledOnce() const {
-  ASSERT(!hasCalledOnceDependentType() && "Query CalledOnce dependence first");
-  return getExtInfo().isCalledOnce();
+std::optional<ExecutionSemantics>
+AnyFunctionType::getExecutionSemantics() const {
+  ASSERT(!hasExecutionSemanticsDependentType() &&
+         "Query execution semantics dependence first");
+  return getExtInfo().getExecutionSemantics();
 }
 
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
@@ -4710,15 +4713,16 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   if (sendableDependentType)
     sendableDependentType = sendableDependentType->getCanonicalType();
 
-  Type calledOnceDependentType = getCalledOnceDependentType();
-  if (calledOnceDependentType)
-    calledOnceDependentType = calledOnceDependentType->getCanonicalType();
+  Type executionSemanticsDependentType = getExecutionSemanticsDependentType();
+  if (executionSemanticsDependentType)
+    executionSemanticsDependentType =
+        executionSemanticsDependentType->getCanonicalType();
 
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
                  globalActor, thrownError, sendableDependentType,
-                 calledOnceDependentType, getLifetimeDependencies());
+                 executionSemanticsDependentType, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -5154,11 +5158,13 @@ AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   return withExtInfo(info);
 }
 
-AnyFunctionType *AnyFunctionType::withCalledOnce(bool newValue) const {
-  auto info = getExtInfo().intoBuilder().withCalledOnce(newValue).build();
+AnyFunctionType *AnyFunctionType::withExecutionSemantics(
+    std::optional<ExecutionSemantics> newValue) const {
+  auto info =
+      getExtInfo().intoBuilder().withExecutionSemantics(newValue).build();
   return withExtInfo(info);
 }
-  
+
 AnyFunctionType *AnyFunctionType::getWithoutYields() const {
   auto resultType = getResult();
   auto noCoroExtInfo = getExtInfo().intoBuilder()

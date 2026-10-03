@@ -705,7 +705,7 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
       // All of the non-Sendable captures of non-escaping @called(atMostOnce)
       // closures that aren't explicitly `sending` can be sent.
       if (auto *closure = declRef.getClosureExpr();
-          closure && closure->isCalledOnce()) {
+          closure && closure->hasCalledAtMostOnceSemantics()) {
         auto *closureTy = closure->getType()->castTo<FunctionType>();
         if (closureTy->getExtInfo().isNoEscape())
           return true;
@@ -2362,11 +2362,12 @@ class PartitionOpTranslator {
   /// if it's a closure, attempt to undo send of it's implicitly
   /// sending captures if the values weren't actually sent in the
   /// body of the closure.
-  void tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(
-      Operand *calledOnceArgument) {
+  void tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(
+      Operand *calledAtMostOnceSemanticsArgument) {
     // Dig up partial_apply that represents the closure.
-    auto *pai = getUnderlyingPartialApply(calledOnceArgument->get());
-    if (!pai || !pai->isCalledOnce())
+    auto *pai =
+        getUnderlyingPartialApply(calledAtMostOnceSemanticsArgument->get());
+    if (!pai || !pai->hasCalledAtMostOnceSemantics())
       return;
 
     auto *calleeFn = pai->getCalleeFunction();
@@ -2394,7 +2395,8 @@ class PartitionOpTranslator {
       assert(argIndex < calleeFn->getArguments().size());
 
       if (!calleeInfo.wasValueEverSent(calleeFn->getArgument(argIndex)))
-        builder.addUndoSend(trackedValue->value, calledOnceArgument->getUser());
+        builder.addUndoSend(trackedValue->value,
+                            calledAtMostOnceSemanticsArgument->getUser());
     }
   }
 
@@ -2816,7 +2818,7 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
-  void translateSILNoEscapeCalledOncePartialApply(PartialApplyInst *pai) {
+  void translateSILNoEscapeCalledAtMostOncePartialApply(PartialApplyInst *pai) {
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
         << "Translating non-escaping `@called(atMostOnce)` Partial Apply!\n");
@@ -2836,7 +2838,7 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
-  void translateSILCalledOncePartialApply(PartialApplyInst *pai) {
+  void translateSILCalledAtMostOncePartialApply(PartialApplyInst *pai) {
     ApplySite applySite(pai);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs() << "Translating `@called(atMostOnce)` Partial Apply!\n");
@@ -2942,15 +2944,15 @@ public:
 
     // `@called(atMostOnce)` closures are allowed to have `sending` captures
     // which need special handling.
-    if (pai->isCalledOnce()) {
+    if (pai->hasCalledAtMostOnceSemantics()) {
       // no-escaping closures treat non-Sendable captures that aren't explicitly
       // `sending` as individually sent and undo if the values were never
       // actually sent in the body.
       if (isNoEscapePartialApply(pai)) {
-        return translateSILNoEscapeCalledOncePartialApply(pai);
+        return translateSILNoEscapeCalledAtMostOncePartialApply(pai);
       }
 
-      return translateSILCalledOncePartialApply(pai);
+      return translateSILCalledAtMostOncePartialApply(pai);
     }
 
     SmallVector<SILValue, 8> directResults;
@@ -2998,7 +3000,7 @@ public:
     SmallVector<Operand *, 8> nonSendingParameters;
     // Non-escaping `@called(atMostOnce)` closures require a post-call undo
     // of their un-sent captures.
-    SmallVector<Operand *, 2> nonescapingCalledOnceArguments;
+    SmallVector<Operand *, 2> nonescapingCalledAtMostOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
 
     // NOTE: We want to process indirect parameters as if they are
@@ -3023,9 +3025,9 @@ public:
         // Non-escaping @called(atMostOnce) closures require special
         // handling to undo send of non-Sendable captures that
         // weren't sent in the body.
-        if (argumentType.isCalledOnce() &&
+        if (argumentType.hasCalledAtMostOnceSemantics() &&
             argumentType.containsNoEscapeFunction()) {
-          nonescapingCalledOnceArguments.push_back(&op);
+          nonescapingCalledAtMostOnceArguments.push_back(&op);
         }
 
         nonSendingParameters.push_back(&op);
@@ -3058,8 +3060,8 @@ public:
 
       // Attempt to undo send of captures that weren't sent in the body of
       // a non-escaping `@called(atMostOnce)` closure.
-      for (Operand *op : nonescapingCalledOnceArguments) {
-        tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(op);
+      for (Operand *op : nonescapingCalledAtMostOnceArguments) {
+        tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(op);
       }
     };
 

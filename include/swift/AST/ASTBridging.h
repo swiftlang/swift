@@ -1450,6 +1450,8 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext,
                                swift::SourceLoc atLoc, swift::SourceRange range,
                                bool isAlways);
 
+BRIDGED_OPTIONAL(swift::ExecutionSemantics, ExecutionSemantics)
+
 SWIFT_NAME("BridgedCalledAttr.createParsed(_:atLoc:range:semantics:)")
 BridgedCalledAttr
 BridgedCalledAttr_createParsed(BridgedASTContext cContext,

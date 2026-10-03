@@ -692,7 +692,7 @@ private struct SpecializationInfo {
       // `clonedRootClosure`'s own operand instead. Leaving such a closure's `partial_apply` behind
       // would still run its destructor at runtime, which would release whatever garbage is left
       // in that now-`Undef`'d capture slot.
-      if clonedRootClosure.isCalledOnce {
+      if clonedRootClosure.hasCalledAtMostOnceSemantics {
         _ = cloner.context.tryDeleteDeadClosure(closure: clonedRootClosure, needKeepArgsAlive: !argsAreKeptAlive)
       }
     }
@@ -759,7 +759,7 @@ private struct SpecializationInfo {
     let newCapturedArguments = rootClosures.flatMap { partialApply in
       partialApply.argumentOperands.map { argOp -> Value in
         let capturedArg = argOp.value
-        if partialApply.isCalledOnce {
+        if partialApply.hasCalledAtMostOnceSemantics {
           // A `@called(atMostOnce)` closure can consume its captures and always gets a destructor even
           // if it's stack-promoted. So all of the arguments that are consumed have to be passed
           // the same way to the specialized version.
@@ -980,7 +980,7 @@ private extension ParameterInfo {
     let argType = type.loweredType(in: partialApply.parentFunction)
     let specializedParamConvention = if self.convention.isIndirect {
       self.convention
-    } else if partialApply.isCalledOnce {
+    } else if partialApply.hasCalledAtMostOnceSemantics {
       if argType.isTrivial(in: callee) {
         ArgumentConvention.directUnowned
       } else if argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume {

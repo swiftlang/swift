@@ -2331,7 +2331,7 @@ public:
     // Escaping `@called(atMostOnce)` closures are allowed to implicitly capture
     // `self` because the call (which is a consuming operation) would break
     // the cycle.
-    if (isCalledOnce(CE)) {
+    if (hasCalledAtMostOnceSemantics(CE)) {
       return false;
     }
 
@@ -2358,9 +2358,9 @@ public:
     return false;
   }
 
-  static bool isCalledOnce(const AbstractClosureExpr *ACE) {
+  static bool hasCalledAtMostOnceSemantics(const AbstractClosureExpr *ACE) {
     if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-      return funcTy->isCalledOnce();
+      return funcTy->hasCalledAtMostOnceSemantics();
     }
 
     return false;
@@ -2986,7 +2986,7 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
             return Action::Stop();
           }
 
-          if (!captureList->getClosureBody()->isCalledOnce()) {
+          if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
             Ctx.Diags.diagnose(V->getLoc(),
                                diag::sending_capture_decl_requires_called_once);
             V->setInvalid();

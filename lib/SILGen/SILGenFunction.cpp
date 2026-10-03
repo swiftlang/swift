@@ -1118,23 +1118,23 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       forwardedArgs.push_back(capture.forward(*this));
 
     // A `@called(atMostOnce)` closure value's callee convention must be
-    // `Direct_Owned` to match DefaultCalledOnceConventions, or the
-    // ABI-difference check treats it as needing a reabstraction thunk
-    // (which then fails: thunks are always Thin, and Thin + CalledOnce
-    // is an invalid combination).
-    auto calleeConvention = typeContext.ExpectedLoweredType->isCalledOnce()
-                                ? ParameterConvention::Direct_Owned
-                                : ParameterConvention::Direct_Guaranteed;
+    // `Direct_Owned` to match DefaultCalledAtMostOnceSemanticsConventions, or
+    // the ABI-difference check treats it as needing a reabstraction thunk
+    // (which then fails: thunks are always Thin, and Thin + `@called` is an
+    // invalid combination).
+    auto calleeConvention =
+        typeContext.ExpectedLoweredType->hasCalledAtMostOnceSemantics()
+            ? ParameterConvention::Direct_Owned
+            : ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
                             : SILFunctionTypeIsolation::forUnknown());
-    auto toClosure =
-      B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention, resultIsolation,
-                           PartialApplyInst::OnStackKind::NotOnStack,
-                           StackAllocationIsNested, nullptr,
-                           typeContext.ExpectedLoweredType->isCalledOnce());
+    auto toClosure = B.createPartialApply(
+        loc, functionRef, subs, forwardedArgs, calleeConvention,
+        resultIsolation, PartialApplyInst::OnStackKind::NotOnStack,
+        StackAllocationIsNested, nullptr,
+        typeContext.ExpectedLoweredType->getExecutionSemantics());
     result = emitManagedRValueWithCleanup(toClosure);
   }
 

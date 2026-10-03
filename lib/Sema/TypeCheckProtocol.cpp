@@ -125,8 +125,9 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // `@called(atMostOnce)` requirement but a `@called(atMostOnce)` function
     // type cannot satisfy a plain one.
     // FIXME: Should we check for a Sendable bound on the requirement type?
-    bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping &&
-                          adjustment != TypeAdjustment::CalledOnceToPlain);
+    bool inRequirement =
+        (adjustment != TypeAdjustment::NoescapeToEscaping &&
+         adjustment != TypeAdjustment::ExecutionSemanticsToPlain);
     Type adjustedReqtType =
       adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
@@ -150,7 +151,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
   applyAdjustment(TypeAdjustment::NonsendableToSendable);
-  applyAdjustment(TypeAdjustment::CalledOnceToPlain);
+  applyAdjustment(TypeAdjustment::ExecutionSemanticsToPlain);
 
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc

@@ -933,7 +933,8 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ObjCProtocolInst_getProtocol() const;
   BRIDGED_INLINE SwiftInt ObjectInst_getNumBaseElements() const;
   BRIDGED_INLINE SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg() const;
-  BRIDGED_INLINE bool PartialApplyInst_isCalledOnce() const;
+  BRIDGED_INLINE BridgedOptionalExecutionSemantics
+  PartialApplyInst_getExecutionSemantics() const;
   BRIDGED_INLINE bool PartialApplyInst_isOnStack() const;
   BRIDGED_INLINE bool PartialApplyInst_hasUnknownResultIsolation() const;
   BRIDGED_INLINE bool PartialApplyInst_isStackAllocationNested() const;
@@ -1505,8 +1506,8 @@ struct BridgedBuilder{
       BridgedValue fn, BridgedValueArray bridgedCapturedArgs,
       BridgedArgumentConvention calleeConvention,
       BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
-      bool isOnStack, bool isNested,
-      bool isCalledOnce,
+      bool isOnStack, bool isNested, bool hasExecutionSemantics,
+      swift::ExecutionSemantics executionSemantics,
       OptionalBridgedInstruction argLocsFrom) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
