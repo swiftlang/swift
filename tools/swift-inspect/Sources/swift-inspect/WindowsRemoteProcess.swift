@@ -419,7 +419,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       throw _Win32Error(functionName: "GetProcAddress", error: GetLastError())
     }
 
-    func getTlsDirectoryIndex(module: HMODULE) throws -> (index: DWORD, size: SIZE_T) {
+    func getTlsDirectoryIndex(module: HMODULE) throws -> (index: DWORD, size: UInt64) {
       let base = UInt64(UInt(bitPattern: module))
       let directory = try dataDirectory(IMAGE_DIRECTORY_ENTRY_TLS, of: module)
       guard directory.VirtualAddress != 0 else {
@@ -428,7 +428,10 @@ internal final class WindowsRemoteProcess: RemoteProcess {
 
       let tls = try pointee(base + UInt64(directory.VirtualAddress), as: IMAGE_TLS_DIRECTORY64.self)
 
-      return try (pointee(tls.AddressOfIndex, as: DWORD.self), tls.EndAddressOfRawData - tls.StartAddressOfRawData)
+      // The loader initializes each thread's TLS block with the raw data
+      // followed by SizeOfZeroFill zero bytes.
+      let size = tls.EndAddressOfRawData - tls.StartAddressOfRawData + UInt64(tls.SizeOfZeroFill)
+      return try (pointee(tls.AddressOfIndex, as: DWORD.self), size)
     }
 
     let (tlsIndex, tlsSize) = try getTlsDirectoryIndex(module: self.hSwiftConcurrency)
@@ -506,11 +509,90 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
   }
 
+  /// Finds the address of the export `name` in `module` by reading the export
+  /// directory from the remote process's memory.
+  ///
+  /// `GetProcAddress` can't be used here: it searches modules in *this*
+  /// process, which might not have the same module loaded, or might have it
+  /// loaded at a different base address or in a different version.
+  ///
+  /// - Returns: The address of the export in the remote process, or `nil` if
+  ///   `module` has no such export.
+  private func remoteExportAddress(of name: String, in module: HMODULE) throws -> swift_addr_t? {
+    let base = UInt64(UInt(bitPattern: module))
+    let directory = try dataDirectory(IMAGE_DIRECTORY_ENTRY_EXPORT, of: module)
+    guard directory.VirtualAddress != 0 else { return nil }
+
+    let exports = try readRemoteMemory(
+      address: base + UInt64(directory.VirtualAddress), as: IMAGE_EXPORT_DIRECTORY.self)
+
+    // Compares the NUL-terminated string at `address` with `target` like strcmp.
+    let target = Array(name.utf8) + [0]
+    func compare(remoteStringAt address: swift_addr_t) throws -> Int {
+      try withRemoteMemory(address: address, size: target.count) { remote in
+        for (r, t) in zip(remote, target) {
+          if r != t { return r < t ? -1 : 1 }
+          if r == 0 { break }
+        }
+        return 0
+      }
+    }
+
+    // The loader requires the name pointer table to be sorted, so binary search it.
+    var low = 0
+    var high = Int(exports.NumberOfNames)
+    while low < high {
+      let mid = low + (high - low) / 2
+      let nameRVA = try readRemoteMemory(
+        address: base + UInt64(exports.AddressOfNames) + UInt64(mid * MemoryLayout<DWORD>.size),
+        as: DWORD.self)
+      let order = try compare(remoteStringAt: base + UInt64(nameRVA))
+      if order < 0 {
+        low = mid + 1
+      } else if order > 0 {
+        high = mid
+      } else {
+        let ordinal = try readRemoteMemory(
+          address: base + UInt64(exports.AddressOfNameOrdinals) + UInt64(mid * MemoryLayout<WORD>.size),
+          as: WORD.self)
+        guard DWORD(ordinal) < exports.NumberOfFunctions else { return nil }
+        let rva = try readRemoteMemory(
+          address: base + UInt64(exports.AddressOfFunctions) + UInt64(Int(ordinal) * MemoryLayout<DWORD>.size),
+          as: DWORD.self)
+        // An RVA inside the export directory is a forwarder string, not an
+        // address within this module.
+        if rva >= directory.VirtualAddress && rva - directory.VirtualAddress < directory.Size {
+          return nil
+        }
+        return base + UInt64(rva)
+      }
+    }
+    return nil
+  }
+
+  private lazy var currentTaskTLSOffset: Result<Int, Error> = Result { try getCurrentTaskTLSOffset() }
+
+  /// Returns the offset of the current-task pointer within each thread's
+  /// swift_Concurrency.dll TLS block.
+  private func getCurrentTaskTLSOffset() throws -> Int {
+    // The runtime exports the offset, resolved by the linker from the same
+    // SECREL relocation the runtime uses to access the thread-local variable.
+    // See `_swift_concurrency_debug_current_task_tls_offset` in
+    // stdlib/public/Concurrency/Debug.h.
+    if let address = try remoteExportAddress(
+        of: "_swift_concurrency_debug_current_task_tls_offset", in: hSwiftConcurrency) {
+      return Int(try readRemoteMemory(address: address, as: UInt32.self))
+    }
+
+    // Older runtimes don't export the offset. In those, the current-task
+    // pointer is the first variable in the TLS block after the 8-byte-aligned
+    // `_tls_start` byte from the CRT, so it's at offset 8.
+    return 8
+  }
+
   internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
-    // FIXME: Offset '8' is subject to change; we need to expose a function in swift_Concurrency.dll,
-    // which computes it based on the address of the thread_local variable which holds the task pointer
     do {
-      return try currentTasks(offset: 8)
+      return try currentTasks(offset: currentTaskTLSOffset.get())
     } catch {
       print("ERROR: \(error)")
       return []
@@ -538,10 +620,9 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       if tlsStartBase == 0 { return nil }
       
       let currentTaskPointer = tlsStartBase.advanced(by: offset)
-      guard let pointer = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) else {
+      guard let currentTask = try? readRemoteMemory(address: currentTaskPointer, as: UInt.self) else {
         return nil
       }
-      let currentTask = pointer.load(as: UInt.self)
       return (threadID: threadInfo.threadID, currentTask: swift_addr_t(currentTask))
     }
   }
