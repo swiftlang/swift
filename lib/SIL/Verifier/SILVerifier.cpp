@@ -2403,6 +2403,10 @@ public:
 
   void checkBeginApplyInst(BeginApplyInst *AI) {
     checkFullApplySite(AI);
+    
+    require(F.getFunctionStage() == SILStage::Raw
+            || !AI->isUnresolved(),
+            "begin_apply instructions must be fully resolved except in raw SIL");
 
     SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
     auto yieldResults = AI->getYieldedValues();
@@ -3230,6 +3234,10 @@ public:
                     "result must be same type as operand");
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
+            
+    require(F.getFunctionStage() == SILStage::Raw
+            || !BAI->isUnresolved(),
+            "begin_access instructions must be fully resolved except in raw SIL");
 
     checkAccessEnforcement(BAI);
 
