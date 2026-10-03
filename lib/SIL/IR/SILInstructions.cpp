@@ -3353,9 +3353,9 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     StringRef objcString) {
   llvm::FoldingSetNodeID id;
   Profile(id, signature, rootType, valueType, components, objcString);
-  
-  void *insertPos;
-  auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
+
+  llvm::FoldingSetInsertToken insertToken;
+  auto existing = M.KeyPathPatterns.lookup(id, insertToken);
   if (existing)
     return existing;
   
@@ -3382,7 +3382,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
                                            components, objcString,
                                            maxOperandNo + 1);
-  M.KeyPathPatterns.InsertNode(newPattern, insertPos);
+  M.KeyPathPatterns.insert(newPattern, insertToken);
   return newPattern;
 }
 
