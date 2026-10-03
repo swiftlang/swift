@@ -1040,6 +1040,7 @@ protected:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
     case NodeKind::CalledOnceFunctionType:
+    case NodeKind::CalledAtMostOnceFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -1189,6 +1190,9 @@ protected:
 
       if (Node->getKind() == NodeKind::CalledOnceFunctionType)
         extFlags = extFlags.withExecutionSemantics(
+            FunctionMetadataExecutionSemantics::Once);
+      else if (Node->getKind() == NodeKind::CalledAtMostOnceFunctionType)
+        extFlags = extFlags.withExecutionSemantics(
             FunctionMetadataExecutionSemantics::AtMostOnce);
 
       auto result =
@@ -1292,6 +1296,9 @@ protected:
         } else if (child->getKind() == NodeKind::ImplErasedIsolation) {
           flags = flags.withErasedIsolation();
         } else if (child->getKind() == NodeKind::ImplCalledOnceFunction) {
+          flags = flags.withExecutionSemantics(
+              ImplFunctionExecutionSemantics::Once);
+        } else if (child->getKind() == NodeKind::ImplCalledAtMostOnceFunction) {
           flags = flags.withExecutionSemantics(
               ImplFunctionExecutionSemantics::AtMostOnce);
         } else if (child->getKind() == NodeKind::ImplParameter) {
