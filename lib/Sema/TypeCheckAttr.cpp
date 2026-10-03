@@ -2537,6 +2537,11 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
   if (auto *cAttr = D->getAttrs().getAttribute<CDeclAttr>())
     diagnose(attr->getLocation(), diag::cxx_incompatible_with_cdecl, cAttr, D);
 
+  // What a @cxx implementation overrides is declared in C++.
+  if (auto *overrideAttr = D->getAttrs().getAttribute<OverrideAttr>())
+    diagnoseAndRemoveAttr(overrideAttr, diag::cxx_override_attr,
+                          cast<ValueDecl>(D));
+
   // @cxx currently requires @implementation.
   // AllowInvalid=true so that if @implementation is present but malformed, its
   // own diagnostics cover the problem.

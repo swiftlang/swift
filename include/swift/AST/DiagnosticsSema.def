@@ -2269,6 +2269,10 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_override_attr,none,
+      "'override' cannot be combined with '@cxx'; whether %0 overrides a base "
+      "class method is determined by its C++ declaration",
+      (const ValueDecl *))
 ERROR(cxx_self_ownership_unsupported,none,
       "%kindonly0 cannot be marked '@cxx' because 'self' is "
       "'%select{borrowing|consuming}1'; a C++ method receives 'this' from its "
