@@ -161,6 +161,26 @@ void LowerHopToActor::rewriteInstructions() {
 
     // Set the executor value as the operand for all reachable instructions.
     auto reachableInsts = domInst.second;
+
+    // extract_executor needs Builtin.Executor, but lowered hop_to_executor
+    // requires Optional<Builtin.Executor>. If an extract causes the executor to
+    // be computed, wrap that value before reusing it for hops.
+    SILValue hopExecutor = executor;
+    if (!isOptionalBuiltinExecutor(executor->getType())) {
+      bool hasHop = false;
+      for (auto inst : reachableInsts) {
+        if (isa<HopToExecutorInst>(inst)) {
+          hasHop = true;
+          break;
+        }
+      }
+      if (hasHop) {
+        hopExecutor = builder.createOptionalSome(
+            derivationInst->getLoc(), executor,
+            SILType::getOptionalType(executor->getType()));
+      }
+    }
+
     for (auto inst : reachableInsts) {
       if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
         extract->replaceAllUsesWith(executor);
@@ -168,7 +188,7 @@ void LowerHopToActor::rewriteInstructions() {
         continue;
       }
 
-      inst->setOperand(0, executor);
+      inst->setOperand(0, hopExecutor);
     }
   }
 }
