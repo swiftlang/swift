@@ -2312,23 +2312,65 @@ public:
              : nullptr;
   }
 
+  /// The canonical mangled type of the existential's Self parameter.
+  llvm::StringRef getCanonicalSelfTypeMangling() const {
+    // Self is at depth 0, or depth 1 after generalization parameters.
+    llvm::StringRef selfType = getNumGenSigParams() ? "qd__" : "x";
+    if (getReqSigParams()[getNumReqSigParams() - 1].hasKeyArgument())
+      return selfType;
+
+    // Canonicalization can equate Self with a generalization parameter.
+    for (const auto &req : getRequirementSignature().getRequirements()) {
+      if (req.getKind() != GenericRequirementKind::SameType)
+        continue;
+      if (req.getMangledTypeName() == selfType)
+        return req.getParam();
+      if (req.getParam() == selfType)
+        return req.getMangledTypeName();
+    }
+    return selfType;
+  }
+
+  /// Whether a requirement supplies a witness table stored in the container.
+  bool isContainerWitnessTableRequirement(
+      const TargetGenericRequirementDescriptor<Runtime> &req) const {
+    if (!req.Flags.hasKeyArgument() ||
+        req.getKind() != GenericRequirementKind::Protocol)
+      return false;
+
+    return req.getParam() == getCanonicalSelfTypeMangling();
+  }
+
+  /// The number of witness tables stored in each existential container.
+  unsigned getNumContainerWitnessTables() const {
+    unsigned numWitnessTables = 0;
+    for (const auto &req : getRequirementSignature().getRequirements()) {
+      if (isContainerWitnessTableRequirement(req))
+        ++numWitnessTables;
+    }
+    return numWitnessTables;
+  }
+
   /// Return the amount of space used in the existential container
   /// for storing the existential arguments (including both the
   /// type metadata and the conformances).
   unsigned getContainerSignatureLayoutSizeInWords() const {
-    unsigned rawSize = ReqSigHeader.getArgumentLayoutSizeInWords();
+    // Only parameters introduced by the requirement signature are stored
+    // in the container. Generalization arguments are in the type metadata.
+    unsigned numWitnessTables = getNumContainerWitnessTables();
+    // Opaque containers retain Self metadata even when Self is not a key
+    // parameter in the requirement signature.
+    unsigned rawSize = numWitnessTables +
+                       getNumReqSigParams() - getNumGenSigParams();
     switch (Flags.getSpecialKind()) {
-    // The default and explicitly-sized-value-layout cases don't optimize
-    // the storage of the signature.
     case SpecialKind::None:
     case SpecialKind::ExplicitLayout:
       return rawSize;
 
-    // The class and metadata cases don't store type metadata.
+    // The class and metatype cases don't store type metadata.
     case SpecialKind::Class:
     case SpecialKind::Metatype:
-      // Requirement signatures won't have non-key parameters.
-      return rawSize - ReqSigHeader.NumParams;
+      return numWitnessTables;
     }
 
     // Assume any future cases don't optimize metadata storage.
