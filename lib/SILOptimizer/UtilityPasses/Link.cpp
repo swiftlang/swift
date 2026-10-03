@@ -114,6 +114,18 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
                            SILLinkage::HiddenExternal, /*byAsmName=*/false);
     linkUsedFunctionByName("swift_getDefaultExecutor",
                            SILLinkage::HiddenExternal, /*byAsmName=*/false);
+
+    linkUsedFunctionByName("_task_serialExecutor_checkIsolated",
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
+    linkUsedFunctionByName("_task_serialExecutor_getExecutorRef",
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
+    linkUsedFunctionByName("_task_serialExecutor_isIsolatingCurrentContext",
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
+    linkUsedFunctionByName("_task_serialExecutor_getTaskExecutorRef",
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
+    linkUsedFunctionByName("_task_taskExecutor_getTaskExecutorRef",
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
+
     linkEmbeddedRuntimeWitnessTables();
   }
 
