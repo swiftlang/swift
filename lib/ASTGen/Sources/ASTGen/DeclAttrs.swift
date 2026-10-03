@@ -270,7 +270,6 @@ extension ASTGenVisitor {
         .Frozen,
         .GKInspectable,
         .GlobalActor,
-        .HasHiddenStoredProperties,
         .HasInitialValue,
         .HasMissingDesignatedInitializers,
         .HasStorage,

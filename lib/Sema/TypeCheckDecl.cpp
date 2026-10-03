@@ -2578,9 +2578,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (auto *parentDecl = hiddenDecl->ParentDecl)
       parent = parentDecl->getDeclaredInterfaceType()->getCanonicalType();
 
-    auto hiddenType = HiddenType::get(
-        Context, hiddenDecl->MangledName, hiddenDecl->getModuleContext(),
-        hiddenDecl, parent);
+    auto hiddenType =
+        HiddenType::get(Context, hiddenDecl->MangledName, hiddenDecl, parent);
     return MetatypeType::get(hiddenType, Context);
   }
 

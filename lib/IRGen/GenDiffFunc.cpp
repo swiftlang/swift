@@ -91,6 +91,12 @@ public:
       : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
               isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
 
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -275,6 +281,12 @@ public:
                      IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
               isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+  }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
