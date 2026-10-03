@@ -304,24 +304,20 @@ extension Task {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// This property returns the actual cancellation state of the task, regardless of whether
-  /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
-  /// if you need cancellation checking that respects active shields.
-  ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
-  /// The instance property ``Task/isCancelled-property``
-  /// is not contextual and therefore does not respect cancellation shields.
+  /// The instance property ``Task/isCancelled``
+  /// is not contextual and therefore ignores cancellation shields.
   /// If a task was cancelled and is executing with an active cancellation shield,
-  /// these properties will return the _actual_ cancellation status of the specific task.
+  /// this property will return the _actual_ cancellation status of the specific task.
   ///
-  /// Prefer using ``Task/isCancelled-type.property`` (the static property) in most situations when checking
-  /// the cancellation status from inside the task.
+  /// Use ``Task/isCancelled-type.property`` (the static property)
+  /// when you need cancellation checking that respects cancellation shields.
   ///
-  /// - SeeAlso: ```Task/isCancelled-type.property``
+  /// - SeeAlso: ``Task/isCancelled-type.property``
   /// - SeeAlso: ``Task/checkCancellation()``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   @_transparent
   public var isCancelled: Bool {
     // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
@@ -343,12 +339,11 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// ### Interaction with Task Cancellation Shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
-  ///
+  /// If cancellation has been suppressed by an active task cancellation shield, 
+  /// reading `isCancelled` on a cancelled task returns `false`.
+  /// 
   /// - SeeAlso: ``checkCancellation()``
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   public static var isCancelled: Bool {
     unsafe withUnsafeCurrentTask { task in
       if #available(SwiftStdlib 6.4, *) {
@@ -398,8 +393,13 @@ extension Task where Success == Never, Failure == Never {
   /// when the current call site is inside a `withDeadline` block whose
   /// deadline has elapsed; `.unspecified` otherwise.
   ///
-  /// - SeeAlso: `isCancelled()`
-  /// - SeeAlso: ``CancellationError/Reason``
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// calling `checkCancellation()` on a cancelled task doesn't throw an error.
+  ///
+  /// - SeeAlso: ``Task/isCancelled-type.property``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
@@ -415,7 +415,7 @@ extension Task where Success == Never, Failure == Never {
 
 /// An error that indicates a task was canceled.
 ///
-/// This error is also thrown automatically by `Task.checkCancellation()`,
+/// This error is also thrown automatically by ``checkCancellation()``,
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
@@ -730,7 +730,7 @@ public func withTaskCancellationShield<Value, Failure>(
 @available(SwiftStdlib 6.4, *)
 extension Task where Success == Never, Failure == Never {
   /// Checks if the current task is executing in a scope with a task cancellation shield activated by the
-  /// ``withTaskCancellationShield(operation:)-(()->Value)`` function.
+  /// ``withTaskCancellationShield(operation:)-2lzl8`` function.
   ///
   /// An active task cancellation shield prevents a task's ability to observe if it was cancelled,
   /// i.e. the ``Task/isCancelled-type.property`` property will always return `false` when the task is executing
@@ -744,7 +744,7 @@ extension Task where Success == Never, Failure == Never {
   /// Cancellation shields are not automatically inherited by child tasks; each child task must install
   /// its own shield if needed if it, independently, wanted to ignore cancellation during a specific scope.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   /// - SeeAlso: ``UnsafeCurrentTask/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
