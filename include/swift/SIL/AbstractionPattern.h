@@ -1027,6 +1027,7 @@ public:
   bool isConcreteType() const;
 
   bool requiresClass() const;
+  Type getSuperclassBound() const;
   LayoutConstraint getLayoutConstraint() const;
   bool conformsToKnownProtocol(
     CanType substTy, KnownProtocolKind protocolKind) const;
