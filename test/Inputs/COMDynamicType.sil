@@ -1,0 +1,29 @@
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000006")
+public protocol ISource: AnyObject {}
+public protocol Native: AnyObject {}
+
+sil [ossa] @com_dynamic_type : $@convention(thin) (@guaranteed any ISource) -> (@thick Any.Type, @thick Any.Type) {
+bb0(%source : @guaranteed $any ISource):
+  %first = existential_metatype $@thick Any.Type, %source : $any ISource
+  %second = existential_metatype $@thick Any.Type, %source : $any ISource
+  %pair = tuple (%first : $@thick Any.Type, %second : $@thick Any.Type)
+  return %pair : $(@thick Any.Type, @thick Any.Type)
+}
+
+sil [ossa] @com_unused_dynamic_type : $@convention(thin) (@guaranteed any ISource) -> () {
+bb0(%source : @guaranteed $any ISource):
+  %type = existential_metatype $@thick Any.Type, %source : $any ISource
+  %result = tuple ()
+  return %result : $()
+}
+
+sil [ossa] @native_dynamic_type : $@convention(thin) (@guaranteed any Native) -> (@thick any Native.Type, @thick any Native.Type) {
+bb0(%source : @guaranteed $any Native):
+  %first = existential_metatype $@thick any Native.Type, %source : $any Native
+  %second = existential_metatype $@thick any Native.Type, %source : $any Native
+  %pair = tuple (%first : $@thick any Native.Type, %second : $@thick any Native.Type)
+  return %pair : $(@thick any Native.Type, @thick any Native.Type)
+}

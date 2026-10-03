@@ -1067,6 +1067,10 @@ unsigned Operand::getOperandNumber() const {
 }
 
 MemoryBehavior SILInstruction::getMemoryBehavior() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return MemoryBehavior::MayHaveSideEffects;
+  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
@@ -1198,6 +1202,10 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 bool SILInstruction::mayRelease() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return true;
+  }
   // Overrule a "DoesNotRelease" of dynamic casts. If a dynamic cast is not
   // RC identity preserving it can release it's source (in some cases - we are
   // conservative here).

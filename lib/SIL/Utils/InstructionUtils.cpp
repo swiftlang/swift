@@ -914,7 +914,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = opType;
     switch (opType.getPreferredExistentialRepresentation()) {
     case ExistentialRepresentation::COM:
-      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+      return RuntimeEffect::Casting | RuntimeEffect::Releasing;
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::Boxed:
     case ExistentialRepresentation::Opaque:
