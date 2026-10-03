@@ -5863,6 +5863,19 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 AbstractionPattern outputOrigType,
                                 CanAnyFunctionType outputSubstType,
                                 const TypeLowering &expectedTL) {
+  // A move-only wrapper isn't represented in the Swift-level type system, so
+  // the thunk below is built for the unwrapped function type. Strip the
+  // wrapper off the value as well, or the partial_apply won't line up. This
+  // shows up for a 'consuming' closure parameter, which is emitted into a
+  // move-only box and loaded back out still wrapped.
+  if (fn.getType().isMoveOnlyWrapped()) {
+    if (fn.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      fn = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, fn);
+    } else {
+      fn = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, fn);
+    }
+  }
+
   auto substSourceType = fn.getType().castTo<SILFunctionType>();
   auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
   

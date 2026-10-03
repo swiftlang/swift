@@ -73,3 +73,20 @@ struct Butt {
         return r
     }
 }
+
+// A consuming closure parameter is emitted into a move-only box. Reabstracting
+// it for a generic context has to strip the wrapper off the loaded value, or
+// the thunk's partial_apply gets a $@moveOnly operand where the thunk expects
+// the bare function type.
+// https://github.com/swiftlang/swift/issues/75188
+
+func genericTake<T>(_ t: T) {}
+
+// CHECK-LABEL: sil {{.*}} @${{.*}}29passConsumingClosureToGeneric
+// CHECK:   [[LOAD:%.*]] = load [copy]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [owned] [[LOAD]]
+// CHECK:   [[THUNK:%.*]] = function_ref @$sIeg_ytIegr_TR
+// CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[UNWRAP]])
+func passConsumingClosureToGeneric(fn: consuming @escaping () -> Void) {
+    genericTake(fn)
+}
