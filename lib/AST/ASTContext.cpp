@@ -7265,6 +7265,10 @@ ASTContext::getClangTemplateArguments(
                                                    templateArgs);
 }
 
+clang::QualType ASTContext::getClangTypeForClassTemplateArgument(Type type) {
+  return getClangTypeConverter().convertClassTemplateArgument(type);
+}
+
 const Decl *
 ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
   auto &impl = getImpl();

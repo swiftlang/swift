@@ -1486,6 +1486,14 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
 
   if (!repr->hasGenericArgList()) {
     if (auto *const unboundTy = type->getAs<UnboundGenericType>()) {
+      if (getASTContext().LangOpts.hasFeature(
+              Feature::CxxConcreteTemplateTypes) &&
+          isa_and_nonnull<clang::ClassTemplateDecl>(
+              unboundTy->getDecl()->getClangDecl())) {
+        diagnose(loc, diag::cxx_class_template_requires_concrete_arguments,
+                 type);
+        return ErrorType::get(getASTContext());
+      }
       if (!options.is(TypeResolverContext::TypeAliasDecl) &&
           !options.is(TypeResolverContext::ExtensionBinding)) {
         // If the resolution object carries an opener, attempt to open
@@ -1637,6 +1645,37 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
   SmallVector<Type, 2> args;
   if (resolveGenericArguments(decl, decl, repr, options, args))
     return ErrorType::get(ctx);
+
+  if (ctx.LangOpts.hasFeature(Feature::CxxConcreteTemplateTypes)) {
+    if (auto *classTemplate =
+            dyn_cast_or_null<clang::ClassTemplateDecl>(decl->getClangDecl())) {
+      // Extension binding finds the primary template before resolving its
+      // arguments, so it cannot attach members to the concrete type yet.
+      if (options.is(TypeResolverContext::ExtensionBinding)) {
+        diagnose(loc, diag::cannot_extend_nominal, cast<NominalTypeDecl>(decl));
+        return ErrorType::get(ctx);
+      }
+      SmallVector<clang::TemplateArgument, 2> templateArguments;
+      for (auto arg : args) {
+        auto clangType = ctx.getClangTypeForClassTemplateArgument(arg);
+        if (clangType.isNull()) {
+          diagnose(loc, diag::cxx_class_template_argument_not_supported, arg);
+          return ErrorType::get(ctx);
+        }
+        templateArguments.emplace_back(clangType);
+      }
+
+      auto *specialization =
+          ctx.getClangModuleLoader()->lookupCXXClassTemplateSpecialization(
+              classTemplate, templateArguments);
+      if (!specialization) {
+        diagnose(loc, diag::cxx_class_template_specialization_not_found,
+                 decl->getName());
+        return ErrorType::get(ctx);
+      }
+      return specialization->getDeclaredInterfaceType();
+    }
+  }
 
   // Construct the substituted type.
   const auto result = resolution.applyUnboundGenericArguments(

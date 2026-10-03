@@ -3850,6 +3850,13 @@ NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
 
   auto *result = nominalTypes[0];
 
+  // Structural extension lookup does not resolve C++ template arguments,
+  // including those written in Swift typealiases. Never attach members to
+  // the primary-template placeholder.
+  if (ctx.LangOpts.hasFeature(Feature::CxxConcreteTemplateTypes) &&
+      isa_and_nonnull<clang::ClassTemplateDecl>(result->getClangDecl()))
+    return nullptr;
+
   // Tuple extensions are experimental, if the feature isn't enabled let's not
   // bind this extension at all. This fixes a bunch of crashers that we don't
   // yet properly handle with the feature enabled.

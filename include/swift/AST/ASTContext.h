@@ -935,6 +935,11 @@ public:
       ArrayRef<Type> genericArgs,
       SmallVectorImpl<clang::TemplateArgument> &templateArgs);
 
+  /// Convert a concrete type used to name an existing C++ specialization.
+  /// Unlike parameter conversion, this preserves raw pointer constness and
+  /// does not bridge Swift types or erase optionality.
+  clang::QualType getClangTypeForClassTemplateArgument(Type type);
+
   /// Get the Swift declaration that a Clang declaration was exported from,
   /// if applicable.
   const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
