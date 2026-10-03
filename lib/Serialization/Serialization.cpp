@@ -2990,6 +2990,20 @@ static uint8_t getRawStableDifferentiabilityKind(
   llvm_unreachable("bad differentiability kind");
 }
 
+/// Translate from the execution semantics of a function type to the
+/// Serialization enum values, which are guaranteed to be stable.
+static uint8_t getRawStableFunctionTypeExecutionSemantics(
+    std::optional<swift::ExecutionSemantics> semantics) {
+  if (!semantics)
+    return uint8_t(serialization::FunctionTypeExecutionSemantics::None);
+
+  switch (*semantics) {
+  case swift::ExecutionSemantics::AtMostOnce:
+    return uint8_t(serialization::FunctionTypeExecutionSemantics::AtMostOnce);
+  }
+  llvm_unreachable("bad execution semantics");
+}
+
 #undef SIMPLE_CASE
 
 /// Returns true if the declaration of \p decl depends on \p problemContext
@@ -6288,7 +6302,9 @@ public:
         fnTy->isThrowing(), S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation, fnTy->hasSendingResult(),
-        fnTy->hasCalledAtMostOnceSemantics(), fnTy->isCoroutine());
+        getRawStableFunctionTypeExecutionSemantics(
+            fnTy->getExecutionSemantics()),
+        fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6312,8 +6328,9 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation, fnTy->hasSendingResult(),
-        fnTy->hasCalledAtMostOnceSemantics(), fnTy->isCoroutine(),
-        S.addGenericSignatureRef(genericSig));
+        getRawStableFunctionTypeExecutionSemantics(
+            fnTy->getExecutionSemantics()),
+        fnTy->isCoroutine(), S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6404,10 +6421,12 @@ public:
         S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
         stableCoroutineKind, stableCalleeConvention, stableRepresentation,
         fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
-        fnTy->hasCalledAtMostOnceSemantics(), fnTy->getIsolation().getKind(),
-        stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
-        fnTy->getNumYields(), fnTy->getNumResults(), invocationSigID,
-        invocationSubstMapID, patternSubstMapID, clangTypeID, variableData);
+        getRawStableFunctionTypeExecutionSemantics(
+            fnTy->getExecutionSemantics()),
+        fnTy->getIsolation().getKind(), stableDiffKind, fnTy->hasErrorResult(),
+        fnTy->getParameters().size(), fnTy->getNumYields(),
+        fnTy->getNumResults(), invocationSigID, invocationSubstMapID,
+        patternSubstMapID, clangTypeID, variableData);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {

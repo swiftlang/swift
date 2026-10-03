@@ -3429,6 +3429,21 @@ getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
   return std::nullopt;
 }
 
+/// Translate from the Serialization execution semantics enum values to the
+/// execution semantics of a function type. Returns \c std::nullopt for an
+/// unknown value; a known value of \c None maps to an inner \c std::nullopt.
+static std::optional<std::optional<swift::ExecutionSemantics>>
+getActualFunctionTypeExecutionSemantics(uint8_t semantics) {
+  switch (semantics) {
+  case (uint8_t)serialization::FunctionTypeExecutionSemantics::None:
+    return std::optional<swift::ExecutionSemantics>();
+  case (uint8_t)serialization::FunctionTypeExecutionSemantics::AtMostOnce:
+    return std::optional(swift::ExecutionSemantics::AtMostOnce);
+  default:
+    return std::nullopt;
+  }
+}
+
 /// Translate from the Serialization differentiability kind enum values to the
 /// AST strongly-typed enum.
 ///
@@ -8047,8 +8062,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            SmallVectorImpl<uint64_t> &scratch,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
-  uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasSendingResult, calledOnce, coro;
+  uint8_t rawRepresentation, rawDiffKind, rawExecutionSemantics;
+  bool noescape = false, sendable, async, throws, hasSendingResult, coro;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -8058,14 +8073,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult, calledOnce, coro);
+        hasSendingResult, rawExecutionSemantics, coro);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, calledOnce,
-        coro,
-        rawGenericSig);
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
+        rawExecutionSemantics, coro, rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
   }
@@ -8085,6 +8099,11 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
   if (!diffKind.has_value())
+    return MF.diagnoseFatal();
+
+  auto executionSemantics =
+      getActualFunctionTypeExecutionSemantics(rawExecutionSemantics);
+  if (!executionSemantics.has_value())
     return MF.diagnoseFatal();
 
   const clang::Type *clangFunctionType = nullptr;
@@ -8114,16 +8133,15 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     isolation = swift::FunctionTypeIsolation::forGlobalActor(globalActorTy.get());
   }
 
-  auto info = FunctionType::ExtInfoBuilder(
-                  *representation, noescape, throws, thrownError, *diffKind,
-                  clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ {}, hasSendingResult,
-                  calledOnce ? std::optional(ExecutionSemantics::AtMostOnce)
-                             : std::nullopt)
-                  .withSendable(sendable)
-                  .withAsync(async)
-                  .withCoroutine(coro)
-                  .build();
+  auto info =
+      FunctionType::ExtInfoBuilder(
+          *representation, noescape, throws, thrownError, *diffKind,
+          clangFunctionType, isolation,
+          /*LifetimeDependenceInfo */ {}, hasSendingResult, *executionSemantics)
+          .withSendable(sendable)
+          .withAsync(async)
+          .withCoroutine(coro)
+          .build();
 
   auto resultTy = MF.getTypeChecked(resultID);
   if (!resultTy)
@@ -8650,7 +8668,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool unimplementable;
   bool sendable;
   bool noescape;
-  bool calledOnce;
+  uint8_t rawExecutionSemantics;
   uint8_t rawIsolation;
   bool hasErrorResult;
   unsigned numParams;
@@ -8665,7 +8683,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      calledOnce, rawIsolation, rawDiffKind, hasErrorResult,
+      rawExecutionSemantics, rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -8691,12 +8709,15 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!isolation)
     return MF.diagnoseFatal();
 
+  auto executionSemantics =
+      getActualFunctionTypeExecutionSemantics(rawExecutionSemantics);
+  if (!executionSemantics.has_value())
+    return MF.diagnoseFatal();
+
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable,
-                     calledOnce ? std::optional(ExecutionSemantics::AtMostOnce)
-                                : std::nullopt,
-                     *isolation, *diffKind, clangFunctionType,
+                     unimplementable, *executionSemantics, *isolation,
+                     *diffKind, clangFunctionType,
                      /*LifetimeDependenceInfo*/ {})
                      .build();
 

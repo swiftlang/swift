@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1032; // per-function SIL stage
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1033; // @called execution semantics field
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -280,6 +280,14 @@ enum class DifferentiabilityKind : uint8_t {
   Linear,
 };
 using DifferentiabilityKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class FunctionTypeExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce,
+};
+using FunctionTypeExecutionSemanticsField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing the
 // module version.
@@ -1412,7 +1420,7 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
-    BCFixed<1>,                      // called once
+    FunctionTypeExecutionSemanticsField, // execution semantics
     BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
@@ -1521,7 +1529,7 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result,
-    BCFixed<1>,                      // called once
+    FunctionTypeExecutionSemanticsField, // execution semantics
     BCFixed<1>,                      // coroutine?
     GenericSignatureIDField          // generic signature
 
@@ -1539,7 +1547,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
-    BCFixed<1>,                         // @called(atMostOnce)?
+    FunctionTypeExecutionSemanticsField, // execution semantics
     SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
