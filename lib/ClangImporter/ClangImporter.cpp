@@ -682,7 +682,10 @@ void importer::getNormalInvocationArguments(
             .str());
   }
 
-  if (LangOpts.EnableCXXInterop) {
+  // With an immutable file system (e.g. clang include-tree), module maps are
+  // already captured by the dependency scanner and command-line module map
+  // files are dropped, so don't add the shim module map.
+  if (LangOpts.EnableCXXInterop && !ctx.CASOpts.HasImmutableFileSystem) {
     if (auto path = getCxxShimModuleMapPath(searchPathOpts, LangOpts, triple)) {
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     }
