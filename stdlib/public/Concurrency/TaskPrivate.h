@@ -35,6 +35,7 @@
 #include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
 #include <new>
+#include <optional>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
@@ -100,33 +101,6 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 AsyncTask *_swift_task_clearCurrent();
 /// Set the active task reference for the current thread.
 AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
-
-/// Options controlling `_swift_task_getCancellationScope`.
-enum class GetCancellationScopeFlags : uintptr_t {
-  None = 0,
-  /// Look past any `TaskCancellationShieldRecord` encountered before the
-  /// innermost scope. By default a shield installed above the innermost
-  /// scope masks it and the search returns nullptr.
-  IgnoringTaskCancellationShield = 1 << 0,
-};
-
-/// Return the innermost `TaskCancellationScopeRecord` in `task`'s records,
-/// respecting shield masking, or nullptr if none is visible.
-///
-/// The caller must have already checked `HasTaskCancellationScope` on the
-/// task's status; this function takes the record lock unconditionally.
-///
-/// A `TaskCancellationShieldRecord` seen before any cancellation scope
-/// means the call site is inside a shield deeper than the innermost scope
-/// - the search returns nullptr so callers observe the task "as-if" no
-/// scope were installed, matching "as-if child task" semantics for
-/// `withDeadline` etc. Pass `IgnoringTaskCancellationShield` to bypass
-/// that masking.
-class TaskCancellationScopeRecord;
-TaskCancellationScopeRecord *
-_swift_task_getCancellationScope(AsyncTask *task,
-                                 GetCancellationScopeFlags flags =
-                                     GetCancellationScopeFlags::None);
 
 /// Cancel the task group and all the child tasks that belong to `group`.
 ///
@@ -258,6 +232,47 @@ SWIFT_CC(swift)
 bool addStatusRecordToSelf(TaskStatusRecord *record,  ActiveTaskStatus& taskStatus,
      llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
 
+/// Add a status record to the input task while holding its status record lock.
+///
+/// This behaves like `addStatusRecord`, except that it always takes the lock.
+/// If the current thread already holds the lock, it takes it recursively. The
+/// old status passed to
+/// `testAddRecord` is the status while holding the lock, so the function can
+/// inspect the other records of the task. `testAddRecord` may be called more
+/// than once and must be idempotent.
+SWIFT_CC(swift)
+bool addStatusRecordWithLock(AsyncTask *task, TaskStatusRecord *record,
+     ActiveTaskStatus& taskStatus,
+     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+/// Returns the reason of the cancellation that the code at the innermost
+/// record of `status` observes, or `std::nullopt` if it doesn't observe one.
+///
+/// The nearest cancellation scope decides, even if it isn't cancelled. Outside
+/// of any scope, the task decides. A cancellation shield prevents the code
+/// inside of it from observing the cancellation of everything outside of it.
+///
+/// If the task has a cancellation scope, the caller must hold the status record
+/// lock.
+std::optional<size_t> getObservedCancellationReason(ActiveTaskStatus status);
+
+/// Returns the reason of the cancellation that the code the current task runs
+/// observes, or `std::nullopt` if it doesn't observe one. Takes the status
+/// record lock if the task has a cancellation scope.
+std::optional<size_t> getObservedCancellationReason(AsyncTask *task);
+
+/// Add a status record to the current task, and pass the cancellation that
+/// the code of the task observes to `testAddRecord`.
+///
+/// Checking the cancellation and adding the record is atomic with the
+/// cancellation of the task and of its scopes: a concurrent cancellation either
+/// reaches the new record, or `testAddRecord` observes it. `testAddRecord` may
+/// be called more than once and must be idempotent.
+bool addStatusRecordObservingCancellation(
+    AsyncTask *task, TaskStatusRecord *record,
+    llvm::function_ref<bool(std::optional<size_t>, ActiveTaskStatus &)>
+        testAddRecord);
+
 /// Remove the status record from input task which may not be the current task.
 /// This may be called asynchronously from the current task.  After this call
 /// returns, the record's memory can be freely modified or deallocated.  The
@@ -358,11 +373,12 @@ void updateStatusRecord(
         nullptr);
 
 /// A helper function for updating a new child task that is created with
-/// information from the parent or the group that it was going to be added to.
+/// information from the parent. The child starts out cancelled with
+/// `cancellationReason`, if there is one.
 SWIFT_CC(swift)
-void updateNewChildWithParentAndGroupState(AsyncTask *child,
-                                           ActiveTaskStatus parentStatus,
-                                           TaskGroup *group);
+void updateNewChildWithParentState(AsyncTask *child,
+                                   ActiveTaskStatus parentStatus,
+                                   std::optional<size_t> cancellationReason);
 
 // ==== ------------------------------------------------------------------------
 
@@ -705,20 +721,16 @@ public:
   }
 
   // IsCancelled
-  /// Is the task currently cancelled?
-  /// This does take into account cancellation shields, i.e. while a shield is
-  /// active this function will always return 'false'.
-  bool isCancelled(bool ignoreShield = false) const {
-    return (Flags & IsCancelled) &&
-           (ignoreShield || !(Flags & HasActiveTaskCancellationShield));
-  }
-  bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
-  ActiveTaskStatus withCancelled() const {
-    return withFlags(Flags | IsCancelled);
-  }
+  /// Is the task itself cancelled?
+  ///
+  /// Cancellation shields and cancellation scopes only affect the code that
+  /// runs inside of them, so they are not taken into account. See
+  /// `getObservedCancellationReason` for the cancellation that the code of the
+  /// task observes.
+  bool isTaskCancelled() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled(size_t reason) const {
     // Reasons are set only once, when transitioning from not-cancelled to
-    // cancelled. Callers should have checked `!isCancelled()` first.
+    // cancelled. Callers should have checked `!isTaskCancelled()` first.
     uintptr_t reasonBits = 0;
     switch (CancellationReason(reason)) {
     case CancellationReason::Unspecified:
@@ -731,8 +743,8 @@ public:
   }
 
   // CancellationReason
-  /// Read the cancellation-reason bit. Meaningful only when `isCancelled()`
-  /// (or `isCancelledIgnoringShield()`) returns true. Returns the raw
+  /// Read the cancellation-reason bit. Meaningful only when
+  /// `isTaskCancelled()` returns true. Returns the raw
   /// value of `CancellationError.Reason`.
   ///
   /// The explicit `switch` below is exhaustive on purpose,
@@ -975,7 +987,7 @@ public:
   void traceStatusChanged(AsyncTask *task, ActiveTaskStatus oldStatus,
                           bool isStarting) {
     uint8_t maxPriority = static_cast<uint8_t>(getStoredPriority());
-    bool cancelled = isCancelled();
+    bool cancelled = isTaskCancelled();
     bool escalated = isStoredPriorityEscalated();
     bool running = isRunning();
     bool enqueued = isDirectlyEnqueued();
@@ -983,7 +995,7 @@ public:
 
     if (!isStarting &&
         maxPriority == static_cast<uint8_t>(oldStatus.getStoredPriority()) &&
-        cancelled == oldStatus.isCancelled() &&
+        cancelled == oldStatus.isTaskCancelled() &&
         escalated == oldStatus.isStoredPriorityEscalated() &&
         running == wasRunning && enqueued == oldStatus.isDirectlyEnqueued())
       return;
@@ -1405,7 +1417,7 @@ inline bool AsyncTask::localValuePop() {
 // `cancellationShieldPush` / `cancellationShieldPop` are implemented in
 // TaskStatus.cpp because they push/pop a `TaskCancellationShieldRecord`
 // alongside the fast-path shield bit; the record makes shield-vs-scope
-// ordering visible to the scope search in `_swift_task_getCancellationScope`.
+// ordering visible to `getObservedCancellationReason`.
 
 } // end namespace swift
 
