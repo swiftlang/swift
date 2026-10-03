@@ -2567,6 +2567,16 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+      // Only an exactly-once closure can capture an exactly-once value. The
+      // move checker diagnoses consumption of a value that is captured by
+      // address instead.
+      if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
+        require(p.value()->getType().isAddress() ||
+                    !argFnTy->isCalledOnce() ||
+                    PAI->getFunctionType()->isCalledOnce(),
+                "only an exactly-once closure can capture an exactly-once "
+                "value");
+      }
       if (PAI->isOnStack()) {
         // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
@@ -5738,6 +5748,13 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+
+    require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
+                                         resTI->getExecutionSemantics()),
+            "convert_function cannot drop execution semantics");
+    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
+            "convert_function cannot form an exactly-once value; a thunk "
+            "must form it");
   }
 
   void checkThunkInst(ThunkInst *ti) {
