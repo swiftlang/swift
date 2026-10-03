@@ -130,6 +130,7 @@ extension Command.Flag {
   static let U = dash("U")
   static let W = dash("W")
   static let std = dash("std")
+  static let Xclang = dash("Xclang")
 
   // Swift
   static let cxxInteroperabilityMode = 
@@ -218,6 +219,10 @@ extension KnownCommand {
 
     .init(.std, option: .equals),
     .init(.target, option: .spaced),
+
+    // Keep '-Xclang' together with its value; dropping it would leave a bare
+    // frontend-only flag that the driver rejects.
+    .init(.Xclang, option: .spaced),
   ])
 
   // FIXME: We currently only parse a small subset of the supported driver
