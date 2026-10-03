@@ -3439,6 +3439,8 @@ getActualFunctionTypeExecutionSemantics(uint8_t semantics) {
     return std::optional<swift::ExecutionSemantics>();
   case (uint8_t)serialization::FunctionTypeExecutionSemantics::AtMostOnce:
     return std::optional(swift::ExecutionSemantics::AtMostOnce);
+  case (uint8_t)serialization::FunctionTypeExecutionSemantics::Once:
+    return std::optional(swift::ExecutionSemantics::Once);
   default:
     return std::nullopt;
   }
