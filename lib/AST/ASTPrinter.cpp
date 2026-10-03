@@ -4900,9 +4900,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       // we can find a type repr and if that type has a sending type repr. In
       // such a case, look through the sending type repr since we handle it here
       // ourselves.
-      bool usedTypeReprPrinting = false;
+      bool printedResultType = false;
       NonRecursivePrintOptions nrOptions = getNonRecursiveOptions(decl);
-      if (willUseTypeReprPrinting(ResultTyLoc, CurrentType, Options)) {
+      if (Options.FunctionResultType) {
+        Options.FunctionResultType(decl, Printer);
+        printedResultType = true;
+      } else if (willUseTypeReprPrinting(ResultTyLoc, CurrentType, Options)) {
         if (auto repr = ResultTyLoc.getTypeRepr()) {
           // If we are printing a sending result... and we found that we have
           // to use type repr printing, look through sending type repr.
@@ -4911,12 +4914,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             repr = sendingRepr->getBase();
           }
           repr->print(Printer, Options, nrOptions);
-          usedTypeReprPrinting = true;
+          printedResultType = true;
         }
       }
 
-      // If we printed using type repr printing, do not print again.
-      if (!usedTypeReprPrinting) {
+      if (!printedResultType) {
         printTypeLoc(ResultTyLoc, nrOptions);
       }
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);

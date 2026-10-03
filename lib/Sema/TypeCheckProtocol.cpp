@@ -4028,10 +4028,11 @@ static Type getTupleConformanceTypeWitness(DeclContext *dc,
   return TupleType::get(TupleTypeElt(expansionTy), dc->getASTContext());
 }
 
-bool swift::
-printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS,
-                     bool withExplicitObjCAttr) {
+static bool printRequirementStubImpl(ValueDecl *Requirement,
+                                     DeclContext *Adopter, Type AdopterTy,
+                                     SourceLoc TypeLoc, raw_ostream &OS,
+                                     bool withExplicitObjCAttr,
+                                     Type OpaqueResultType = Type()) {
   // We sometimes use this for @implementation extensions too.
   bool forProtocol = isa<ProtocolDecl>(Requirement->getDeclContext());
 
@@ -4138,6 +4139,12 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
+    if (OpaqueResultType) {
+      Options.FunctionResultType = [&](const FuncDecl *, ASTPrinter &Printer) {
+        Printer << "some ";
+        OpaqueResultType.print(Printer, Options);
+      };
+    }
 
     // Can the conforming declaration declare a stored property?
     auto ImplementedAdopter = Adopter->getImplementedObjCContext();
@@ -4166,6 +4173,158 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   return true;
 }
 
+bool swift::printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
+                                 Type AdopterTy, SourceLoc TypeLoc,
+                                 raw_ostream &OS, bool withExplicitObjCAttr) {
+  return printRequirementStubImpl(Requirement, Adopter, AdopterTy, TypeLoc, OS,
+                                  withExplicitObjCAttr);
+}
+
+namespace {
+struct OpaqueResultStub {
+  AssociatedTypeDecl *AssociatedType;
+  FuncDecl *Method;
+  Type Constraint;
+};
+} // namespace
+
+/// Find associated types that can be inferred from a single opaque result.
+/// Each opaque result introduces a distinct type, so it cannot stand in for
+/// an associated type shared by several requirements or used in an input.
+static SmallVector<OpaqueResultStub, 2>
+findOpaqueResultStubs(NormalProtocolConformance *Conf,
+                      ArrayRef<ASTContext::MissingWitness> MissingWitnesses) {
+  SmallVector<OpaqueResultStub, 2> Stubs;
+  auto *Proto = Conf->getProtocol();
+  auto *DC = Conf->getDeclContext();
+  auto *Nominal = DC->getSelfNominalTypeDecl();
+
+  // Inherited requirements and noncopyable/nonescapable types need additional
+  // checks before changing how their associated types are inferred.
+  if (Proto->isInvalid() ||
+      Conf->getSourceKind() != ConformanceEntryKind::Explicit ||
+      llvm::any_of(Proto->getInheritedProtocols(),
+                   [](ProtocolDecl *Inherited) {
+                     return !Inherited->getInvertibleProtocolKind();
+                   }) ||
+      !Proto->getInverseRequirements().empty() ||
+      isa<BuiltinTupleDecl>(Nominal))
+    return Stubs;
+
+  for (const auto &Missing : MissingWitnesses) {
+    auto *Assoc = dyn_cast<AssociatedTypeDecl>(Missing.requirement);
+    if (!Assoc || Assoc->isInvalid() || Assoc->getProtocol() != Proto ||
+        Assoc->hasDefaultDefinitionType())
+      continue;
+
+    auto Witness = Conf->getTypeWitnessUncached(Assoc);
+    // Failed inference synthesizes an implicit error typealias. It does not
+    // represent a user-supplied witness.
+    if ((Witness.getWitnessDecl() && !Witness.getWitnessDecl()->isImplicit()) ||
+        (Witness.getWitnessType() && !Witness.getWitnessType()->hasError()))
+      continue;
+
+    // Preserve explicit type witnesses, including invalid ones, and defaults
+    // provided by protocol extensions.
+    SmallVector<ValueDecl *, 4> TypeMembers;
+    DC->lookupQualified(Nominal, Assoc->createNameRef(), Nominal->getLoc(),
+                        {NLFlags::ProtocolMembers}, TypeMembers);
+    if (llvm::any_of(TypeMembers, [&](ValueDecl *Member) {
+          return Member != Assoc && Member != Witness.getWitnessDecl();
+        }))
+      continue;
+
+    Type AssocTy = Assoc->getDeclaredInterfaceType();
+    auto ContainsAssoc = [&](Type Ty) {
+      return Ty && Ty.findIf([&](Type Part) { return Part->isEqual(AssocTy); });
+    };
+
+    FuncDecl *Method = nullptr;
+    bool Eligible = true;
+    for (auto *Member : Proto->getMembers()) {
+      auto *VD = dyn_cast<ValueDecl>(Member);
+      if (!VD || VD == Assoc || !ContainsAssoc(VD->getInterfaceType()))
+        continue;
+      auto *FD = dyn_cast<FuncDecl>(VD);
+      if (Method || !FD || FD->isInvalid() || FD->getGenericParams() ||
+          FD->isOperator() || FD->getTrailingWhereClause() ||
+          FD->isCoroutine() ||
+          !FD->getResultInterfaceType()->isEqual(AssocTy) ||
+          llvm::any_of(*FD->getParameters(),
+                       [](ParamDecl *Param) {
+                         return Param->getInterfaceType()->hasTypeParameter();
+                       }) ||
+          (FD->getThrownInterfaceType() &&
+           FD->getThrownInterfaceType()->hasTypeParameter())) {
+        Eligible = false;
+        break;
+      }
+      Method = FD;
+    }
+    if (!Eligible || !Method ||
+        !lookupValueWitnesses(DC, Method, /*ignoringNames=*/nullptr).empty())
+      continue;
+    if (llvm::any_of(Proto->getMembers(), [&](Decl *Member) {
+          auto *Other = dyn_cast<ValueDecl>(Member);
+          return Other && Other != Method &&
+                 Other->getName() == Method->getName();
+        }))
+      continue;
+
+    auto Sig = Proto->getGenericSignature();
+    if (!Sig)
+      continue;
+    Type Constraint =
+        Sig->getUpperBound(AssocTy, /*forExistentialSelf=*/true,
+                           /*includeParameterizedProtocols=*/true);
+    if (!Constraint || Constraint->hasError() ||
+        Constraint->hasTypeParameter() || !Constraint->isConstraintType())
+      continue;
+
+    SmallVector<Type, 2> Members;
+    if (auto *Composition = Constraint->getAs<ProtocolCompositionType>()) {
+      if (Composition->hasInverse() || Composition->hasExplicitAnyObject())
+        continue;
+      Members.append(Composition->getMembers().begin(),
+                     Composition->getMembers().end());
+    } else {
+      Members.push_back(Constraint);
+    }
+    if (Members.empty())
+      continue;
+
+    SmallVector<Requirement, 2> ExpressibleRequirements;
+    for (Type Member : Members) {
+      if (auto *Parameterized = Member->getAs<ParameterizedProtocolType>()) {
+        Parameterized->getRequirements(AssocTy, ExpressibleRequirements);
+      } else if (!Member->is<ProtocolType>()) {
+        Eligible = false;
+      }
+    }
+
+    // The upper bound can omit same-type constraints. Only accept constraints
+    // that the printed primary associated type arguments actually express.
+    for (const auto &Req : Proto->getRequirementSignature().getRequirements()) {
+      if (!ContainsAssoc(Req.getFirstType()) &&
+          (Req.getKind() == RequirementKind::Layout ||
+           !ContainsAssoc(Req.getSecondType())))
+        continue;
+      if (Req.getKind() == RequirementKind::Conformance &&
+          Req.getFirstType()->isEqual(AssocTy))
+        continue;
+      if (llvm::any_of(ExpressibleRequirements, [&](const Requirement &Other) {
+            return Req.getCanonical() == Other.getCanonical();
+          }))
+        continue;
+      Eligible = false;
+      break;
+    }
+    if (Eligible)
+      Stubs.push_back({Assoc, Method, Constraint});
+  }
+  return Stubs;
+}
+
 /// Print the stubs for an array of witnesses, either type or value, to
 /// FixitString. If for a witness we cannot have stub printed, insert it to
 /// NoStubRequirements.
@@ -4183,6 +4342,30 @@ printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
         NoStubRequirements.insert(Missing.requirement);
       }
     });
+}
+
+static std::string printOpaqueResultStubFixitString(
+    SourceLoc TypeLoc, NormalProtocolConformance *Conf,
+    ArrayRef<ASTContext::MissingWitness> MissingWitnesses,
+    ArrayRef<OpaqueResultStub> Stubs) {
+  std::string FixIt;
+  llvm::raw_string_ostream OS(FixIt);
+  for (const auto &Missing : MissingWitnesses) {
+    auto Stub = llvm::find_if(Stubs, [&](const OpaqueResultStub &Stub) {
+      return Missing.requirement == Stub.AssociatedType;
+    });
+    if (Stub != Stubs.end()) {
+      printRequirementStubImpl(
+          Stub->Method, Conf->getDeclContext(), Conf->getType(), TypeLoc, OS,
+          /*withExplicitObjCAttr=*/false, Stub->Constraint);
+    } else if (llvm::none_of(Stubs, [&](const OpaqueResultStub &Stub) {
+                 return Missing.requirement == Stub.Method;
+               })) {
+      printRequirementStub(Missing.requirement, Conf->getDeclContext(),
+                           Conf->getType(), TypeLoc, OS);
+    }
+  }
+  return FixIt;
 }
 
 /// Filter the given array of protocol requirements and produce a new vector
@@ -4337,6 +4520,13 @@ static void diagnoseProtocolStubFixit(
   if (!FixIt.empty()) {
     Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
       fixItInsertAfter(FixitLocation, FixIt);
+  }
+  auto OpaqueStubs = findOpaqueResultStubs(Conf, MissingWitnesses);
+  if (!OpaqueStubs.empty()) {
+    auto OpaqueFixIt = printOpaqueResultStubFixitString(
+        TypeLoc, Conf, MissingWitnesses, OpaqueStubs);
+    Diags.diagnose(ComplainLoc, diag::missing_witnesses_opaque_results)
+        .fixItInsertAfter(FixitLocation, OpaqueFixIt);
   }
   for (const auto &Missing : MissingWitnesses) {
     auto VD = Missing.requirement;

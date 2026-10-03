@@ -32,6 +32,7 @@ class CanType;
 class Decl;
 class Pattern;
 class ValueDecl;
+class FuncDecl;
 class ExtensionDecl;
 class NominalTypeDecl;
 class TypeBase;
@@ -703,6 +704,9 @@ public:
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
+
+  /// If set, prints a function's result type in place of its declared type.
+  std::function<void(const FuncDecl *, ASTPrinter &)> FunctionResultType;
 
   swift::BracketOptions BracketOptions;
 
