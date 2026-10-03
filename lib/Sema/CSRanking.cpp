@@ -1001,8 +1001,11 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
         newYields.emplace_back(getStrippedType(yield.getType(), ctx),
                                yield.getFlags());
       }
-      auto newExtInfo = funcType->getExtInfo().withRepresentation(
-          AnyFunctionType::Representation::Swift);
+      auto extInfo = funcType->getExtInfo();
+      auto representation = extInfo.hasContext()
+                                ? AnyFunctionType::Representation::Swift
+                                : AnyFunctionType::Representation::Thin;
+      auto newExtInfo = extInfo.withRepresentation(representation);
       return FunctionType::get(
         newParams, newYields,
         getStrippedType(funcType->getResult(), ctx), newExtInfo);
