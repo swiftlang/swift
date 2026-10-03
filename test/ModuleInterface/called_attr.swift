@@ -43,3 +43,32 @@ public struct Test: ~Copyable {
   public func f(_: (@called(atMostOnce) () -> Void) -> Void) {}
 }
 
+// CHECK: #if compiler(>=5.3) && $CalledAttribute
+// CHECK: public typealias ExactlyOnceFnType = @called(exactlyOnce) () -> ()
+// CHECK: #endif
+public typealias ExactlyOnceFnType = @called(exactlyOnce) () -> ()
+
+// CHECK: #if compiler(>=5.3) && $CalledAttribute
+// CHECK: public func exactlyOnce1(_: consuming @called(exactlyOnce) () -> ())
+// CHECK: #endif
+public func exactlyOnce1(_: @called(exactlyOnce) () -> ()) {}
+
+// CHECK: #if compiler(>=5.3) && $CalledAttribute
+// CHECK: public func exactlyOnce2(_: consuming @autoclosure @called(exactlyOnce) () -> ())
+// CHECK: #endif
+public func exactlyOnce2(_: @autoclosure @called(exactlyOnce) () -> ()) {}
+
+// CHECK: #if compiler(>=5.3) && $CalledAttribute
+// CHECK: public func exactlyOnce3(_: () -> @called(exactlyOnce) () -> Swift::Void)
+// CHECK: #endif
+public func exactlyOnce3(_: () -> @called(exactlyOnce) () -> Void) {}
+
+// CHECK: #if compiler(>=5.3) && $CalledAttribute
+// CHECK: public func exactlyOnce4(_: consuming @escaping @called(exactlyOnce) () -> ())
+// CHECK: #endif
+public func exactlyOnce4(_: @escaping @called(exactlyOnce) () -> ()) {}
+
+// CHECK: #if compiler(>=5.3) && $CalledAttribute
+// CHECK: public func exactlyOnce5(_: (consuming @called(exactlyOnce) () -> Swift::Void) -> Swift::Void)
+// CHECK: #endif
+public func exactlyOnce5(_: (@called(exactlyOnce) () -> Void) -> Void) {}

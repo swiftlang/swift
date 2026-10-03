@@ -4438,7 +4438,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Called: {
     auto semantics = parseSingleAttrOption<ExecutionSemantics>(
         *this, Loc, AttrRange, AttrName, DK,
-        {{Context.Id_atMostOnce, ExecutionSemantics::AtMostOnce}});
+        {{Context.Id_exactlyOnce, ExecutionSemantics::Once},
+         {Context.Id_atMostOnce, ExecutionSemantics::AtMostOnce}});
     if (!semantics)
       return makeParserSuccess();
 
@@ -5527,14 +5528,15 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
     bool invalid = false;
     std::optional<CalledTypeAttr::Semantics> semantics;
-    if (isIdentifier(Tok, "atMostOnce")) {
+    if (isIdentifier(Tok, "exactlyOnce")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::ExactlyOnce;
+    } else if (isIdentifier(Tok, "atMostOnce")) {
       semanticsLoc = consumeToken(tok::identifier);
       semantics = CalledTypeAttr::Semantics::AtMostOnce;
     } else {
-      if (!justChecking) {
-        diagnose(Tok, diag::attr_called_expected_semantics)
-            .fixItReplace(Tok.getLoc(), "atMostOnce");
-      }
+      if (!justChecking)
+        diagnose(Tok, diag::attr_called_expected_semantics);
       invalid = true;
       consumeIf(tok::identifier);
     }
