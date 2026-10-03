@@ -1986,6 +1986,26 @@ static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
   return std::nullopt;
 }
 
+/// Which invertible protocol, if any, an existential's own layout suppresses.
+static std::optional<InvertibleProtocolKind>
+checkExistentialForInvertibleReqs(CanType type) {
+  if (!type.isExistentialType())
+    return std::nullopt;
+
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
+    switch (ip) {
+    case InvertibleProtocolKind::Copyable:
+      if (type->isNoncopyable())
+        return ip;
+      break;
+    case InvertibleProtocolKind::Escapable:
+      if (!type->isEscapable())
+        return ip;
+    }
+  }
+  return std::nullopt;
+}
+
 /// Older runtimes won't check for required invertible protocol conformances
 /// at runtime during a cast.
 ///
@@ -2000,27 +2020,41 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 
   auto type = srcType->getCanonicalType();
 
-  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
-    if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
-      std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
-      switch (*missing) {
-      case InvertibleProtocolKind::Copyable:
-        diag =
-            diag::availability_copyable_generics_casting_only_version_newer;
-        break;
-      case InvertibleProtocolKind::Escapable:
-        diag =
-            diag::availability_escapable_generics_casting_only_version_newer;
-        break;
-      }
+  // Either a generic argument that suppresses a requirement (`Wrapper<NC>`) or
+  // an existential that suppresses one in its own layout (`any P & ~Copyable`).
+  // Both need a runtime that understands `InvertedProtocols` requirements.
+  std::optional<InvertibleProtocolKind> missing;
+  bool fromExistential = false;
+  if (auto boundTy = dyn_cast<BoundGenericType>(type))
+    missing = checkGenericArgsForInvertibleReqs(boundTy);
+  if (!missing) {
+    missing = checkExistentialForInvertibleReqs(type);
+    fromExistential = missing.has_value();
+  }
 
-      // Enforce the availability restriction.
-      return TypeChecker::checkAvailability(
-          refLoc,
-          refDC->getASTContext().getNoncopyableGenericsAvailability(),
-          *diag,
-          refDC);
+  if (missing) {
+    std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
+    switch (*missing) {
+    case InvertibleProtocolKind::Copyable:
+      diag = fromExistential
+          ? diag::availability_copyable_existential_casting_only_version_newer
+          : diag::availability_copyable_generics_casting_only_version_newer;
+      break;
+    case InvertibleProtocolKind::Escapable:
+      diag = fromExistential
+          ? diag::availability_escapable_existential_casting_only_version_newer
+          : diag::availability_escapable_generics_casting_only_version_newer;
+      break;
     }
+
+    // Enforce the availability restriction.
+    return TypeChecker::checkAvailability(
+        refLoc,
+        fromExistential
+            ? refDC->getASTContext().getParameterizedExistentialAvailability()
+            : refDC->getASTContext().getNoncopyableGenericsAvailability(),
+        *diag,
+        refDC);
   }
   return false;
 }
@@ -2108,6 +2142,11 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
 
   auto type = refType->getCanonicalType();
 
+  // For casts, we do need the extended existential shape metadata,
+  // since casts do not open the existential.
+  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
+    return true;
+
   // SILGen emits these conversions by opening the outermost level of
   // existential, so we never need to emit type metadata for an
   // existential in such a position.  We necessarily have type metadata
@@ -2116,9 +2155,6 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
   if (type.isAnyExistentialType()) return false;
 
   if (checkTypeMetadataAvailabilityInternal(type, refLoc, refDC))
-    return true;
-
-  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
     return true;
 
   return false;
