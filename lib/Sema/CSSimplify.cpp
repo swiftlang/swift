@@ -34,6 +34,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -2425,22 +2426,67 @@ isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
        || isThickRepresentation(potentialSuperRepr);
 }
 
-/// Returns true if `constraint extInfo1 extInfo2` is satisfied.
-static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
-                                         FunctionType::ExtInfo einfo2,
-                                         ConstraintKind kind,
-                                         ConstraintSystemOptions options) {
+bool ConstraintSystem::onlyMismatchesInFunctionCTypes(Type type1,
+                                                      Type type2) const {
+  // Are we even using clang function types?
+  if (!Options.contains(ConstraintSystemFlags::UseClangFunctionTypes))
+    return false;
+
+  // Identical types have no mismatches at all.
+  if (type1->isEqual(type2))
+    return false;
+
+  /// Matcher that ignores function type mismatches if they are identical except
+  /// for their clang types.
+  class CTypeAgnosticMatcher final : public TypeMatcher<CTypeAgnosticMatcher> {
+  public:
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      return false;
+    }
+
+    bool mismatch(AnyFunctionType *firstFn, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      auto secondFn = dyn_cast<AnyFunctionType>(secondType);
+      if (!secondFn)
+        return false;
+
+      auto firstExtInfo = firstFn->getExtInfo();
+      auto secondExtInfo = secondFn->getExtInfo();
+
+      // Do they have different C types?
+      if (firstExtInfo.getClangTypeInfo() == secondExtInfo.getClangTypeInfo())
+        return false;
+
+      // Are the types otherwise identical by our criteria?
+      auto strippedFirstFn =
+            firstFn->withExtInfo(firstExtInfo.withClangFunctionType(nullptr));
+      auto strippedSecondFn =
+            secondFn->withExtInfo(secondExtInfo.withClangFunctionType(nullptr));
+      return match(strippedFirstFn, strippedSecondFn);
+    }
+  };
+  return CTypeAgnosticMatcher().match(type1, type2);
+}
+
+bool ConstraintSystem::matchFunctionRepresentations(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    ConstraintLocatorBuilder locator) {
+  auto einfo1 = func1->getExtInfo();
+  auto einfo2 = func2->getExtInfo();
   auto rep1 = einfo1.getRepresentation();
   auto rep2 = einfo2.getRepresentation();
   bool clangTypeMismatch =
-      (options.contains(ConstraintSystemFlags::UseClangFunctionTypes) &&
+      (Options.contains(ConstraintSystemFlags::UseClangFunctionTypes) &&
        (einfo1.getClangTypeInfo() != einfo2.getClangTypeInfo()));
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
-    return (rep1 == rep2) && !clangTypeMismatch;
+    if (rep1 == rep2 && !clangTypeMismatch)
+      return true;
+    break;
 
   case ConstraintKind::Subtype: {
     // Breakdown of cases:
@@ -2456,7 +2502,9 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
     // 3. isSubtypeOf(rep1, rep2) == true and rep1 == rep2:
     //    In this case, the function returns !clangTypeMismatch, as we forbid
     //    conversions between @convention(c) functions with different cTypes.
-    return isSubtypeOf(rep1, rep2) && ((rep1 != rep2) || !clangTypeMismatch);
+    if (isSubtypeOf(rep1, rep2) && ((rep1 != rep2) || !clangTypeMismatch))
+      return true;
+    break;
   }
 
   // [NOTE: diagnose-swift-to-c-convention-change]: @convention(swift) ->
@@ -2485,10 +2533,9 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
     //           (OpaquePointer?) -> () = ...
     // let _ : @convention(c, cType: "void (*)(MyCtx *)")
     //           (OpaquePointer?) -> () = g // error
-    if ((rep1 == rep2) && clangTypeMismatch) {
-      return false;
-    }
-    return true;
+    if ((rep1 != rep2) || !clangTypeMismatch)
+      return true;
+    break;
 
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::ApplicableFunction:
@@ -2527,7 +2574,15 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
     return true;
   }
 
-  llvm_unreachable("Unhandled ConstraintKind in switch.");
+  // C type mismatches have a tailored diagnostic that shows the (usually
+  // invisible) C types instead of the (outwardly identical) Swift types.
+  if (shouldAttemptFixes() && onlyMismatchesInFunctionCTypes(func1, func2)) {
+    auto fix = AllowFunctionCTypeMismatch::create(
+        *this, func1, func2, getConstraintLocator(locator));
+    return !recordFix(fix);
+  }
+
+  return false;
 }
 
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
@@ -3331,10 +3386,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     increaseScore(SK_FunctionConversion, locator);
   }
 
-  if (!matchFunctionRepresentations(func1->getExtInfo(), func2->getExtInfo(),
-                                    kind, Options)) {
+  if (!matchFunctionRepresentations(func1, func2, kind, locator))
     return SolutionKind::Error;
-  }
 
   // Determine how we match up the input/result types.
   ConstraintKind subKind;
@@ -15592,6 +15645,18 @@ static bool isAugmentingFix(ConstraintFix *fix) {
   }
 }
 
+/// If true, the mismatch this fix is trying to solve may be discovered at
+/// several different levels of a recursive structure, and we should silently
+/// drop all but the outermost fix.
+static bool isRecordedAgainByDescendants(FixKind kind) {
+  switch (kind) {
+  case FixKind::AllowFunctionCTypeMismatch:
+    return true;
+  default:
+    return false;
+  }
+}
+
 bool ConstraintSystem::recordFix(ConstraintFix *fix, FixImpact impact,
                                  PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
@@ -15619,6 +15684,11 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, FixImpact impact,
       return false;
     }
   }
+
+  if (isRecordedAgainByDescendants(fix->getKind()) &&
+        hasFixForAncestorOf(fix->getLocator(), fix->getKind()))
+    // Drop this duplicate fix.
+    return false;
 
   // Record the fix.
 
@@ -16243,6 +16313,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
+  case FixKind::AllowFunctionCTypeMismatch:
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:
