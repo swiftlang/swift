@@ -704,8 +704,19 @@ ManagedValue Lowering::emitTypeTestOperand(SILGenFunction &SGF,
     return SGF.emitBorrowedLValue(operand, std::move(lv));
   }
 
-  return SGF.emitRValueAsSingleValue(operand,
-                                     SGFContext::AllowImmediatePlusZero);
+  // If the operand is an address, we can use it directly
+  ManagedValue value =
+      SGF.emitRValueAsSingleValue(operand, SGFContext::AllowImmediatePlusZero);
+  if (value.getType().isAddress())
+    return value;
+
+  // If it's not an address, borrow the value into a temporary
+  // allocation for the casting runtime.
+  SILValue temp = SGF.emitTemporaryAllocation(operand, value.getType());
+  ManagedValue borrowed =
+      SGF.emitFormalEvaluationManagedBeginBorrow(operand, value.getValue());
+  return SGF.emitFormalEvaluationManagedStoreBorrow(operand,
+                                                    borrowed.getValue(), temp);
 }
 
 SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
