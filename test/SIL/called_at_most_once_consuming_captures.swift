@@ -31,7 +31,7 @@ struct Slot: ~Copyable {
 
 // `consume` operator.
 func testExplicitConsumeOfCapturedStruct(r: consuming Resource) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     let taken = consume r
     taken.use()
   }
@@ -40,7 +40,7 @@ func testExplicitConsumeOfCapturedStruct(r: consuming Resource) {
 
 // Source of an assignment.
 func testAssignmentConsumesCapturedStruct(r: consuming Resource) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     var local = Resource()
     local = r
     local.use()
@@ -52,7 +52,7 @@ func testAssignmentConsumesCapturedStruct(r: consuming Resource) {
 func testConsumingParamCallConsumesCapture(r: consuming Resource) {
   func consumeResource(_: consuming Resource) {}
 
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     consumeResource(r)
   }
   g()
@@ -68,14 +68,14 @@ func testConsumingInitParamConsumesCapture(r: consuming Resource) {
     init(_: consuming Resource) {}
   }
   
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     let w = Wrapper(r: r)
     _ = w
   }
   g()
 
   let localResource = Resource()
-  let h = { @called(once) in
+  let h = { @called(atMostOnce) in
     let w = ConsumingWrapper(localResource)
     _ = w
   }
@@ -84,7 +84,7 @@ func testConsumingInitParamConsumesCapture(r: consuming Resource) {
 
 // Calling a `consuming` method (`self` is consumed).
 func testConsumingMethodCallConsumesCapture(r: consuming Resource) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     r.use()
   }
   g()
@@ -92,7 +92,7 @@ func testConsumingMethodCallConsumesCapture(r: consuming Resource) {
 
 // Intiailization consumes the value
 func testLocalBindingConsumesCapture(r: consuming Resource) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     let taken = r
     taken.use()
   }
@@ -111,12 +111,12 @@ func tesReassignmentOfProperties(r1: consuming Resource, r2: consuming Resource)
   var s = S()
   let c = C()
   
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     s.prop = r1
   }
   g()
 
-  let h = { @called(once) in
+  let h = { @called(atMostOnce) in
     c.prop = r2
   }
   h()
@@ -124,18 +124,18 @@ func tesReassignmentOfProperties(r1: consuming Resource, r2: consuming Resource)
   // Make sure that the same value cannot be consumed twice by different closures
   
   let r3 = Resource() // expected-error {{'r3' consumed more than once}}
-  let _ = { @called(once) in // expected-note {{consumed here}}
+  let _ = { @called(atMostOnce) in // expected-note {{consumed here}}
     s.prop = r3 
   }
 
-  let _ = { @called(once) in // expected-note {{consumed again here}}
+  let _ = { @called(atMostOnce) in // expected-note {{consumed again here}}
     c.prop = r3
   }
 }
 
 // Capture aliasing.
 func testCaptureListConsumesCapture(r: consuming Resource) {
-  let g = { @called(once) [taken = r] in
+  let g = { @called(atMostOnce) [taken = r] in
     taken.use()
   }
   g()
@@ -143,7 +143,7 @@ func testCaptureListConsumesCapture(r: consuming Resource) {
 
 // `return` is a consuming use.
 func testReturnConsumesCapture(r: consuming Resource) -> Resource {
-  let g: @called(once) () -> Resource = { @called(once) in
+  let g: @called(atMostOnce) () -> Resource = { @called(atMostOnce) in
     return r
   }
   return g()
@@ -152,7 +152,7 @@ func testReturnConsumesCapture(r: consuming Resource) -> Resource {
 func testBorrowingCallDoesNotConsumeCapture(r: consuming Resource) {
   func borrowResource(_: borrowing Resource) {}
 
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     r.peek() // borrowing use
     borrowResource(r)
     r.use() // consume
@@ -161,7 +161,7 @@ func testBorrowingCallDoesNotConsumeCapture(r: consuming Resource) {
 }
 
 func testDoubleConsumeOfCapturedValue(r: consuming Resource) { // expected-error 2 {{'r' consumed more than once}}
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     r.use() // expected-note 2 {{consumed here}}
     r.use() // expected-note 2 {{consumed again here}}
   }
@@ -169,28 +169,28 @@ func testDoubleConsumeOfCapturedValue(r: consuming Resource) { // expected-error
 }
 
 func testRegularClosureCannotConsumeCapturedStruct(r: consuming Resource) { // expected-error {{missing reinitialization of closure capture 'r' after consume}}
-  let g = { // not @called(once)
+  let g = { // not @called(atMostOnce)
     r.use() // expected-note {{consumed here}}
   }
   g()
 }
 
 func testNestedClosurePropagatesConsumedCapture(r: consuming Resource) {
-  let inner = { @called(once) in r.use() }
-  let outer = { @called(once) in inner() }
+  let inner = { @called(atMostOnce) in r.use() }
+  let outer = { @called(atMostOnce) in inner() }
   outer()
 }
 
 func testCaptureNotConsumedWhenOnlyBorrowedAcrossNesting(r: consuming Resource) {
-  let inner = { @called(once) in r.peek() }
-  let outer = { @called(once) in inner() }
+  let inner = { @called(atMostOnce) in r.peek() }
+  let outer = { @called(atMostOnce) in inner() }
   outer()
   r.use() // expected-error {{noncopyable 'r' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
 }
 
-func testConsumingCalledOnceNestedInRegularClosure(r: consuming Resource) { // expected-error {{reinitialization of closure capture 'r' after consume}}
+func testConsumingCalledAtMostOnceNestedInRegularClosure(r: consuming Resource) { // expected-error {{reinitialization of closure capture 'r' after consume}}
   let f = {
-    let g = { @called(once) in // expected-note {{consumed here}}
+    let g = { @called(atMostOnce) in // expected-note {{consumed here}}
       r.use()
     }
     g()
@@ -199,7 +199,7 @@ func testConsumingCalledOnceNestedInRegularClosure(r: consuming Resource) { // e
 }
 
 func testConsumingGetterConsumesCapture(_ box: consuming Box) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     let v = box.r
     _ = v
   }
@@ -207,7 +207,7 @@ func testConsumingGetterConsumesCapture(_ box: consuming Box) {
 }
 
 func testConsumingSetterConsumesCapture(_ slot: consuming Slot, _ r: consuming Resource) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     slot.r = r
   }
   g()
@@ -219,14 +219,14 @@ protocol Usable: ~Copyable {
 }
 
 func testGenericConsumingCaptureIsAddressOnly<T: Usable & ~Copyable>(_ t: consuming T) {
-  let g = { @called(once) in
+  let g = { @called(atMostOnce) in
     t.use()
   }
   g()
 }
 
 func testGenericConsumingCaptureIsAddressOnlyMultiUse<T: Usable & ~Copyable>(_ t: consuming T) { // expected-error {{'t' used after consume}}
-  let g = { @called(once) in // expected-note {{consumed here}}
+  let g = { @called(atMostOnce) in // expected-note {{consumed here}}
     t.use()
   }
   _ = g
@@ -241,16 +241,16 @@ func testCasts() {
   }
 
   func testIdentityCast(_ x: consuming NC) -> NC {
-    { @called(once) in x as NC }()
+    { @called(atMostOnce) in x as NC }()
   }
 
   func testErase(_ c: consuming S) {
-    let fn = { @called(once) in c as any Usable & ~Copyable }
+    let fn = { @called(atMostOnce) in c as any Usable & ~Copyable }
     _ = fn()
   }
 
   func genericErase<T: Usable & ~Copyable>(_ v: consuming T) {
-    let fn = { @called(once) in v as any Usable & ~Copyable }
+    let fn = { @called(atMostOnce) in v as any Usable & ~Copyable }
     _ = fn()
   }
 }

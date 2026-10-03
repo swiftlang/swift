@@ -2328,7 +2328,7 @@ public:
       return false;
     }
 
-    // Escaping `@called(once)` closures are allowed to implicitly capture
+    // Escaping `@called(atMostOnce)` closures are allowed to implicitly capture
     // `self` because the call (which is a consuming operation) would break
     // the cycle.
     if (isCalledOnce(CE)) {
@@ -2960,7 +2960,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 }
 
 /// Diagnose cases where a `sending` capture is associated with a
-/// non-`@called(once)` closure.
+/// non-`@called(atMostOnce)` closure.
 static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
                                                       const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())

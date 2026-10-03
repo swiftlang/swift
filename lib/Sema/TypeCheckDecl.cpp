@@ -2400,10 +2400,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
-  // @called(once) implies `consumed`.
+  // @called(atMostOnce) implies `consumed`.
   if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
     if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
-      if (cast<CalledTypeAttr>(calledAttr)->isOnce())
+      if (cast<CalledTypeAttr>(calledAttr)->isAtMostOnce())
         return ParamSpecifier::Consuming;
     }
   }
@@ -2515,7 +2515,7 @@ static Type validateParameterType(ParamDecl *decl) {
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(once) is consuming by default and we don't
+      // @called(atMostOnce) is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;

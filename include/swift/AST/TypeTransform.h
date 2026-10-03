@@ -939,12 +939,13 @@ case TypeKind::Id:
           }
         }
 
-        // Transform the @called(once) dependent type if present.
+        // Transform the @called(atMostOnce) dependent type if present.
         if (auto calledOnceDep = origExtInfo.getCalledOnceDependentType()) {
           auto [newCalledOnceDep, isCalledOnce] =
               asDerived().transformCalledOnceDependentType(calledOnceDep);
           if (!newCalledOnceDep) {
-            // If we're no longer @called(once) dependent, update the @called(once) bit.
+            // If we're no longer @called(atMostOnce) dependent, update the
+            // @called(atMostOnce) bit.
             extInfo = extInfo->withCalledOnceDependentType(Type());
             extInfo = extInfo->withCalledOnce(isCalledOnce);
             isUnchanged = false;

@@ -7276,7 +7276,7 @@ public:
     }
 
     if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
-      Printer.printSimpleAttr("@called(once)") << " ";
+      Printer.printSimpleAttr("@called(atMostOnce)") << " ";
     }
     
     // Print lifetime dependencies using Swift syntax.
@@ -7493,7 +7493,7 @@ public:
     if (info.isCalledOnce()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@called");
-      Printer << "(once)";
+      Printer << "(atMostOnce)";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
       Printer << " ";
     }

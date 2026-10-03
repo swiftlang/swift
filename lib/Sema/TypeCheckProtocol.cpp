@@ -117,13 +117,13 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function type not in a parameter is, more or less, implicitly @escaping.
     // For Sendable, we want to behave as though it was not necessary because
     // function types that aren't in a parameter can be Sendable or not.
-    // For `@called(once)`, we want to behave as though it was not necessary
-    // because function types that aren't in a parameter can be called once
-    // or not.
-    // For `@called(once)`, we want to behave as though it was necessary, just
-    // like noescape, because a plain function type can always satisfy a
-    // `@called(once)` requirement but a `@called(once)` function type cannot
-    // satisfy a plain one.
+    // For `@called(atMostOnce)`, we want to behave as though it was not
+    // necessary because function types that aren't in a parameter can be
+    // called once or not.
+    // For `@called(atMostOnce)`, we want to behave as though it was necessary,
+    // just like noescape, because a plain function type can always satisfy a
+    // `@called(atMostOnce)` requirement but a `@called(atMostOnce)` function
+    // type cannot satisfy a plain one.
     // FIXME: Should we check for a Sendable bound on the requirement type?
     bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping &&
                           adjustment != TypeAdjustment::CalledOnceToPlain);

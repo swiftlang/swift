@@ -2819,7 +2819,7 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
-        case "once": return .once
+        case "atMostOnce": return .atMostOnce
         default: return nil
         }
       }

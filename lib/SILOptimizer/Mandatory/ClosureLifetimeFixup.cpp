@@ -420,7 +420,7 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
       if (m->hasGuaranteedInitialKind())
         continue;
 
-    // A `@called(once)` closure's on-stack context takes ownership of its
+    // A `@called(atMostOnce)` closure's on-stack context takes ownership of its
     // Copyable captures directly.
     if (pai->isCalledOnce() && !arg.get()->getType().isAddress())
       continue;
@@ -541,7 +541,7 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
       continue;
     }
 
-    // `@called(once)` is always consumed by a call.
+    // `@called(atMostOnce)` is always consumed by a call.
     if (v->getType().isCalledOnce() &&
         (isa<ApplyInst>(consumer) || isa<TryApplyInst>(consumer))) {
       lifetimeEnds.push_back(consumer);
@@ -648,9 +648,9 @@ static SILValue tryRewriteToPartialApplyStack(
         }
       }
 
-      // A `@called(once)` closure's on-stack context takes ownership of
+      // A `@called(atMostOnce)` closure's on-stack context takes ownership of
       // its Copyable captured arguments unlike regular closures that always
-      // borrow. This is done because a `@called(once)` closure has a
+      // borrow. This is done because a `@called(atMostOnce)` closure has a
       // destructor. A move-only consuming capture has to be transferred
       // into the closure, not borrowed as well.
       bool isConsumedInCaller = ApplySite(origPA)
@@ -968,9 +968,10 @@ static SILValue tryRewriteToPartialApplyStack(
           builder.createEndBorrow(newPA->getLoc(), argBorrow);
         }
 
-        // Unlike regular on-stack closures `@called(once)` don't borrow their
-        // non-trivially destroyable Copyable captures because they always have
-        // a destructor and so no separate cleanup for such values in necessary.
+        // Unlike regular on-stack closures `@called(atMostOnce)` don't borrow
+        // their non-trivially destroyable Copyable captures because they always
+        // have a destructor and so no separate cleanup for such values in
+        // necessary.
         if (newPA->isCalledOnce() && !argBorrow &&
             !argValue->getType().isAddress())
           return SILValue();
@@ -982,8 +983,8 @@ static SILValue tryRewriteToPartialApplyStack(
                                        newPA->getLoc());
     };
 
-    // `try_apply` is a terminator: a `@called(once)` closure consumed as the
-    // callee of a throwing call ends its lifetime at the call itself, but
+    // `try_apply` is a terminator: a `@called(atMostOnce)` closure consumed as
+    // the callee of a throwing call ends its lifetime at the call itself, but
     // there is no "next instruction in the same block" to insert after. The
     // consuming callee operand is spent before either successor runs, so the
     // cleanup has to be duplicated at the start of both.
@@ -1523,10 +1524,10 @@ static bool fixupClosureLifetimes(SILFunction &fn,
       if (!cvt)
         continue;
 
-      // @called(once) has owned convention so it's always lifetime guaranteed
-      // due to owned convention, but that only means no extra `destroy_value`.
-      // Stack promotion should still be attempted were call that takes it is
-      // a lifetime ending use.
+      // @called(atMostOnce) has owned convention so it's always lifetime
+      // guaranteed due to owned convention, but that only means no extra
+      // `destroy_value`. Stack promotion should still be attempted were call
+      // that takes it is a lifetime ending use.
       bool isCalledOnce = cvt->getType().isCalledOnce();
       if (cvt->isLifetimeGuaranteed() && !isCalledOnce)
         continue;
@@ -1548,8 +1549,8 @@ static bool fixupClosureLifetimes(SILFunction &fn,
         continue;
       }
 
-      // A `@called(once)` conversion's ownership is already fully accounted
-      // for even when on-stack promotion above didn't apply.
+      // A `@called(atMostOnce)` conversion's ownership is already fully
+      // accounted for even when on-stack promotion above didn't apply.
       if (isCalledOnce) {
         assert(cvt->isLifetimeGuaranteed());
         continue;

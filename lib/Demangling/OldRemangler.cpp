@@ -1833,7 +1833,7 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
                                                       unsigned depth) {
-  // The old mangler does not encode @called(once).
+  // The old mangler does not encode @called(atMostOnce).
   return ManglingError::Success;
 }
 

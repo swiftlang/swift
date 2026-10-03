@@ -846,7 +846,7 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
   case Node::Kind::NoEscapeFunctionType:
     break;
   case Node::Kind::CalledOnceFunctionType:
-    Printer << "@called(once) ";
+    Printer << "@called(atMostOnce) ";
     break;
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
@@ -2921,7 +2921,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@isolated(any)";
     return nullptr;
   case Node::Kind::ImplCalledOnceFunction:
-    Printer << "@called(once)";
+    Printer << "@called(atMostOnce)";
     return nullptr;
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.

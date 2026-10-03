@@ -3155,7 +3155,7 @@ public:
                                         ConstraintLocatorBuilder locator);
 
   /// Match the execution semantics between two functions currently
-  /// represented by `@called(once)` bit.
+  /// represented by `@called(atMostOnce)` bit.
   SolutionKind
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,

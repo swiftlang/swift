@@ -368,8 +368,8 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 const char *
 CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
   switch (semantics) {
-  case CalledTypeAttr::Semantics::Once:
-    return "once";
+  case CalledTypeAttr::Semantics::AtMostOnce:
+    return "atMostOnce";
   }
   llvm_unreachable("bad kind");
 }
@@ -2246,8 +2246,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "nonexhaustive";
   case DeclAttrKind::Called:
     switch (cast<CalledAttr>(this)->getSemantics()) {
-    case ExecutionSemantics::Once:
-      return "called(once)";
+    case ExecutionSemantics::AtMostOnce:
+      return "called(atMostOnce)";
     }
   case DeclAttrKind::Target:
     return "_target";

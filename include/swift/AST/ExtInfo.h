@@ -593,9 +593,10 @@ class ASTExtInfoBuilder {
   /// a concrete dependent type should set the Sendable bit instead.
   Type sendableDependentType;
 
-  /// A dependent type that determines whether the function is @called(once).
-  /// Only used within the constraint system, and must contain type variables,
-  /// a concrete dependent type should set the Sendable bit instead.
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). Only used within the constraint system, and must
+  /// contain type variables, a concrete dependent type should set the Sendable
+  /// bit instead.
   Type calledOnceDependentType;
 
   ArrayRef<LifetimeDependenceInfo> lifetimeDependencies;
@@ -700,9 +701,9 @@ public:
   /// variables if present.
   Type getSendableDependentType() const { return sendableDependentType; }
 
-  /// A dependent type that determines whether the function is @called(once). This
-  /// is only used within the constraint system, and will contain type
-  /// variables if present.
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// will contain type variables if present.
   Type getCalledOnceDependentType() const { return calledOnceDependentType; }
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
@@ -996,9 +997,9 @@ public:
     return builder.getSendableDependentType();
   }
 
-  /// A dependent type that determines whether the function is @called(once). This
-  /// is only used within the constraint system, and will contain type
-  /// variables if present.
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// will contain type variables if present.
   Type getCalledOnceDependentType() const {
     return builder.getCalledOnceDependentType();
   }
