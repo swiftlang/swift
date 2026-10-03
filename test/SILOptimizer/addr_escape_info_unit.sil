@@ -96,6 +96,10 @@ sil @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) 
 [%0: noescape]
 }
 
+sil @no_arguments_2 : $@convention(thin) () -> ()
+
+sil @addressable_dependent_inout_arg : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
 // CHECK-NEXT:    ==>   %7 = apply %6(%5) : $@convention(thin) (@in Int) -> ()
@@ -1092,4 +1096,31 @@ bb0(%0 : @guaranteed $Outer):
   dealloc_stack %1 : $*Outer
   %ret = tuple ()
   return %ret : $()
+}
+
+// CHECK-LABEL: Address escape information for addressable_dependent_inout_stays_conservative:
+// CHECK:      value:{{.*}}alloc_stack $Addressable
+// CHECK-NEXT:   ==> {{.*}}@lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   ==> {{.*}}$@convention(thin) () -> ()
+// CHECK-LABEL: End function addressable_dependent_inout_stays_conservative
+sil [ossa] @addressable_dependent_inout_stays_conservative : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to [trivial] %2
+
+  %f = function_ref @addressable_dependent_inout_arg : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  destroy_value %a
+
+  %g = function_ref @no_arguments_2 : $@convention(thin) () -> ()
+  %h = apply %g() : $@convention(thin) () -> ()
+
+  fix_lifetime %1
+  destroy_addr %1
+  dealloc_stack %1
+
+  %r = tuple ()
+  return %r : $()
 }

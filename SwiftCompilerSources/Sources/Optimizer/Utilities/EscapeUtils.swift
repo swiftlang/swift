@@ -158,6 +158,9 @@ protocol EscapeVisitor {
 
   /// If true, the traversal follows loaded values.
   var followLoads: Bool { get }
+
+  /// If true, the traversal follows an `@in_guaranteed` argument's address into the lifetime-dependent result which captures it.
+  var followBorrowedAddressableCaptures: Bool { get }
 }
 
 extension EscapeVisitor {
@@ -172,6 +175,8 @@ extension EscapeVisitor {
   var followTrivialTypes: Bool { false }
 
   var followLoads: Bool { true }
+
+  var followBorrowedAddressableCaptures: Bool { true }
 }
 
 /// A visitor which returns a `result`.
@@ -661,6 +666,13 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
                 !hasAddressResult(apply) {
         // The result does not depend on the argument's address.
         return .continueWalk
+      } else if !visitor.followBorrowedAddressableCaptures,
+                !hasAddressResult(apply),
+                onlyResultDependsOnAddress(of: apply, argOp: argOp) {
+        // The argument's address is captured only by the result, which is declared to depend on a
+        // scoped borrow of an `@in_guaranteed` argument. For a client which only asks about
+        // writes, such a capture cannot contribute one.
+        return .continueWalk
       }
     }
 
@@ -706,6 +718,26 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     guard let fas = apply as? FullApplySite else { return false }
     let convention = fas.functionConvention
     return convention.hasAddressResult
+  }
+
+  /// True if the only reason why `argOp` is addressable is a lifetime dependence of `apply`'s direct result on it, and the argument is passed read-only.
+  private func onlyResultDependsOnAddress(of apply: ApplySite, argOp: Operand) -> Bool {
+    guard apply.convention(of: argOp) == .indirectInGuaranteed else {
+      return false
+    }
+
+    for targetOperand in apply.argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = apply.parameterDependence(target: targetOperand, source: argOp), dep.isAddressable(for: argOp.value) {
+        return false
+      }
+    }
+    guard let resultDep = apply.resultDependence(on: argOp) else {
+      return false
+    }
+    return resultDep.isAddressable(for: argOp.value)
   }
 
   private mutating func indirectResultEscapes(of beginApply: BeginApplyInst, path: Path) -> Bool {
