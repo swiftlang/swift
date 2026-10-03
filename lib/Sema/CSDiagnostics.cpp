@@ -7643,8 +7643,22 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
 
 bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     diagnoseAsError() {
-  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
-                 getToType());
+  auto getSemantics = [](Type type) -> std::optional<ExecutionSemantics> {
+    if (auto *fnType = type->getAs<FunctionType>())
+      return fnType->getExecutionSemantics();
+    return std::nullopt;
+  };
+
+  // The source has the execution semantics, unless the constraint required
+  // the two types to be equal.
+  auto semantics = getSemantics(getFromType());
+  if (!semantics)
+    semantics = getSemantics(getToType());
+
+  emitDiagnostic(diag::called_attr_function_type_mismatch,
+                 CalledAttr::getSemanticsName(
+                     semantics.value_or(ExecutionSemantics::AtMostOnce)),
+                 getFromType(), getToType());
   return true;
 }
 

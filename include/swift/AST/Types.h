@@ -4133,6 +4133,12 @@ public:
     return getExecutionSemantics().has_value();
   }
 
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  bool isCalledOnce() const {
+    return getExecutionSemantics() == ExecutionSemantics::Once;
+  }
+
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -5657,6 +5663,9 @@ public:
   bool hasCalledAtMostOnceSemantics() const {
     return getExtInfo().hasCalledAtMostOnceSemantics();
   }
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }

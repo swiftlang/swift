@@ -44,6 +44,38 @@ func testWithConvention(_: @convention(block) @called(atMostOnce) () -> Void) {}
 // expected-supported-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
 // expected-forbidden-error@-2 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 
+typealias ExactlyOnceFnType = @called(exactlyOnce) () -> () // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testExactlyOnceInParameter(_: @called(exactlyOnce) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testExactlyOnceInParameterEscaping(_: @escaping @called(exactlyOnce) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testExactlyOnceInParameterAutoclosure(_: @autoclosure @called(exactlyOnce) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testExactlyOnceInParameterExplicitOwnership(_: borrowing @called(exactlyOnce) () -> ()) {}
+// expected-supported-error@-1 {{'@called(exactlyOnce)' cannot be used together with 'borrowing'}}
+// expected-forbidden-error@-2 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testExactlyOnceInParameterExplicitOwnership(_: inout @called(exactlyOnce) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testExactlyOnceInParameterConsuming(_: consuming @called(exactlyOnce) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+// expected-forbidden-error@-2 {{'consuming' cannot be applied to nonescaping closure}}
+
+func testExactlyOnceInResultPosition(_: () -> @called(exactlyOnce) () -> Void) {}
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testInvalidSemantics(_: @called(twice) () -> Void) {}
+// expected-error@-1 {{expected 'exactlyOnce' or 'atMostOnce' as the '@called' execution semantics}}
+
+func testMissingSemantics(_: @called() () -> Void) {}
+// expected-error@-1 {{expected 'exactlyOnce' or 'atMostOnce' as the '@called' execution semantics}}
+
 func testInvalidResult() -> @called(atMostOnce) Int {
   // expected-error@-1 {{'@called' only applies to function types}}
 }
@@ -54,6 +86,14 @@ func testClosure() {
   _ = { @called(atMostOnce) (x: Int, y: String) -> Void in }
   // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 
+  _ = { @called(exactlyOnce) in 42 }
+  // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+  _ = { @called(exactlyOnce) (x: Int, y: String) -> Void in }
+  // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+  _ = { @called(twice) in }
+  // expected-error@-1 {{unknown option 'twice' for attribute 'called'}}
+
   @called(atMostOnce) func local() {}
   // expected-supported-error@-1 {{'@called(atMostOnce)' attribute cannot be applied to this declaration}}
   // expected-forbidden-error@-2 {{'called(atMostOnce)' attribute is only valid when experimental feature CalledAttribute is enabled}}
@@ -62,6 +102,10 @@ func testClosure() {
   // expected-supported-error@-1 {{'@called(atMostOnce)' attribute cannot be applied to this declaration}}
   // expected-forbidden-error@-2 {{'called(atMostOnce)' attribute is only valid when experimental feature CalledAttribute is enabled}}
   _ = x
+
+  @called(exactlyOnce) func exactlyOnceLocal() {}
+  // expected-supported-error@-1 {{'@called(exactlyOnce)' attribute cannot be applied to this declaration}}
+  // expected-forbidden-error@-2 {{'called(exactlyOnce)' attribute is only valid when experimental feature CalledAttribute is enabled}}
 }
 
 func testSendingCaptures() {

@@ -108,6 +108,8 @@ BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
     switch (bridgedSemantics) {
     case BridgedCalledTypeAttrSemantics_AtMostOnce:
       return CalledTypeAttr::Semantics::AtMostOnce;
+    case BridgedCalledTypeAttrSemantics_ExactlyOnce:
+      return CalledTypeAttr::Semantics::ExactlyOnce;
     }
     llvm_unreachable("bad kind");
   }();

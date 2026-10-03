@@ -307,6 +307,7 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
+        case "exactlyOnce": return .exactlyOnce
         case "atMostOnce": return .atMostOnce
         default:
           // TODO: Diagnose.

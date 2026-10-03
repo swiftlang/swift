@@ -4279,7 +4279,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
         diagnose(eltTypeRepr->getLoc(),
-                 diag::called_once_cannot_be_used_with_borrowing);
+                 diag::called_attr_cannot_be_used_with_borrowing,
+                 CalledAttr::getSemanticsName(*fnTy->getExecutionSemantics()));
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
 
@@ -4810,8 +4811,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         parsedClangFunctionType = nullptr;
       }
 
-      if (!repr->isInvalid() && called->isAtMostOnce())
-        executionSemantics = ExecutionSemantics::AtMostOnce;
+      if (!repr->isInvalid())
+        executionSemantics = called->getExecutionSemantics();
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,
@@ -5074,10 +5075,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   }
 
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto *called = claim<CalledTypeAttr>(attrs)) {
-    if (called->isAtMostOnce())
-      executionSemantics = ExecutionSemantics::AtMostOnce;
-  }
+  if (auto *called = claim<CalledTypeAttr>(attrs))
+    executionSemantics = called->getExecutionSemantics();
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
