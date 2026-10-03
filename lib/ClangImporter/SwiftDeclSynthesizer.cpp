@@ -3134,6 +3134,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         synthCxxMethodDecl &&
         "Unable to synthesize static factory for c++ foreign reference type");
     synthCxxMethodDecl->setAccess(clang::AccessSpecifier::AS_public);
+    synthCxxMethodDecl->setImplicit();
 
     llvm::SmallVector<clang::ParmVarDecl *, 4> synthParams;
     for (unsigned int i = 0; i < ctorParamCount; ++i) {

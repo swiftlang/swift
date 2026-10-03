@@ -7692,9 +7692,9 @@ ClassDecl *ClassDecl::getForeignReferenceSuperclassOrSelf() const {
 }
 
 ReferenceCounting ClassDecl::getObjectModel() const {
-  if (isForeignReferenceType())
-    return hasRefCountingAnnotations() ? ReferenceCounting::Custom
-                                       : ReferenceCounting::None;
+  if (auto frtBase = getForeignReferenceSuperclassOrSelf())
+    return frtBase->hasRefCountingAnnotations() ? ReferenceCounting::Custom
+                                                : ReferenceCounting::None;
 
   if (checkAncestry(AncestryFlags::ObjCObjectModel))
     return ReferenceCounting::ObjC;

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeSubclassing -I %S%{fs-sep}Inputs %s -target %target-swift-5.8-abi-triple
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeSubclassing -I %S%{fs-sep}Inputs %s -target %target-swift-5.8-abi-triple -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inherit-frt-subclassing.h
 
 // REQUIRES: swift_feature_ForeignReferenceTypeSubclassing
 
@@ -125,6 +125,33 @@ final class NoChainableBaseInit: ArgOnlyConstructed { // expected-error {{class 
   let x: Int64 = 42
 }
 
+// A static factory method imported as an initializer allocates a new object, so
+// it cannot construct the base subobject of a subclass.
+final class ChainsToFactory: SharedWithFactory {
+  let x: Int64
+  init(x: Int64) {
+    self.x = x
+    super.init(value: 1) // expected-error {{cannot call 'init(value:)' with 'super.init' because it is a C++ static factory method, not a constructor of 'SharedWithFactory'}}
+  }
+}
+
+final class ChainsToNoArgumentFactory: SharedWithFactoryOnly {
+  init() {
+    super.init() // expected-error {{cannot call 'init()' with 'super.init' because it is a C++ static factory method, not a constructor of 'SharedWithFactoryOnly'}}
+  }
+}
+
+final class OmitsSuperInitToFactory: SharedWithFactoryOnly {
+  let x: Int64
+  init(x: Int64) { // expected-error {{cannot implicitly call 'init()' with 'super.init' because it is a C++ static factory method, not a constructor of 'SharedWithFactoryOnly'}}
+    self.x = x
+  }
+}
+
+final class NoDefaultInitFromFactory: SharedWithFactoryOnly { // expected-error {{class 'NoDefaultInitFromFactory' has no initializers}}
+  let x: Int64 = 42
+}
+
 func constructThem() {
   _ = DefaultInitialized()
   _ = OmitsSuperInit(x: 0)
@@ -134,6 +161,7 @@ func constructThem() {
   _ = OmitsSuperInit() // expected-error {{missing argument for parameter 'x' in call}}
   _ = DefaultInitialized(1) // expected-error {{argument passed to call that takes no arguments}}
   _ = WithConvenienceInit() // expected-error {{missing argument for parameter 'a' in call}}
+  _ = ChainsToFactory(value: 1) // expected-error {{incorrect argument label in call (have 'value:', expected 'x:')}}
 }
 
 enum InitError: Error { case bad }
