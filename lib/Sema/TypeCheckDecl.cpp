@@ -2505,8 +2505,10 @@ static Type validateParameterType(ParamDecl *decl) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
-        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                           diag::called_once_cannot_be_used_with_borrowing);
+        ctx.Diags.diagnose(
+            decl->getTypeRepr()->getLoc(),
+            diag::called_attr_cannot_be_used_with_borrowing,
+            CalledAttr::getSemanticsName(*F->getExecutionSemantics()));
         return ErrorType::get(ctx);
 
       case ParamSpecifier::InOut:
