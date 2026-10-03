@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -loop-rotate -looprotate-single-block-loop=true -looprotate-infinite-budget %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -looprotate-single-block-loop=true -looprotate-infinite-budget %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -16,6 +16,10 @@ sil [ossa] @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @klassIdentity : $@convention(thin) (@owned Klass) -> @owned Klass
 
 sil [ossa] @increment : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+
+sil [ossa] @getBox : $@convention(thin) () -> @owned BoxStruct
+
+sil [ossa] @cond : $@convention(thin) () -> Builtin.Int1
 
 // CHECK-LABEL: sil [ossa] @testLoopSimple : 
 // CHECK: bb0(%0 : $Int32, %1 : @owned $Klass):
@@ -285,3 +289,65 @@ bb3:
   return %25
 }
 
+// rdar://188958548
+// The header consumes %box with a destructure_struct. A debug_value of %box
+// after the consume (an OperandOwnership::DebugUse, which may be outside the
+// value's lifetime) must not make LoopRotate create an owned phi for %box.
+// LoopRotate deletes the debug_value instead.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_after_consume :
+// CHECK-NOT:     @owned $BoxStruct
+// CHECK-NOT:     debug_value
+// CHECK-LABEL: } // end sil function 'debug_use_after_consume'
+sil [ossa] @debug_use_after_consume : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @getBox : $@convention(thin) () -> @owned BoxStruct
+  %box = apply %f() : $@convention(thin) () -> @owned BoxStruct
+  %guts = destructure_struct %box : $BoxStruct
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb2, bb3
+
+bb2:
+  debug_value %box : $BoxStruct, let, name "self"
+  destroy_value %guts : $Klass
+  br bb1
+
+bb3:
+  destroy_value %guts : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// %box is live out of the header, so the debug_value is inside its lifetime.
+// LoopRotate must rewrite it to use the new header phi, not delete it.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_before_consume :
+// CHECK:         // Loop header
+// CHECK-NEXT:    bb{{[0-9]+}}([[PHI:%[0-9]+]] : @owned $BoxStruct):
+// CHECK-NEXT:      debug_value [[PHI]], let, name "self"
+// CHECK-LABEL: } // end sil function 'debug_use_before_consume'
+sil [ossa] @debug_use_before_consume : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @getBox : $@convention(thin) () -> @owned BoxStruct
+  %box = apply %f() : $@convention(thin) () -> @owned BoxStruct
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb2, bb3
+
+bb2:
+  debug_value %box : $BoxStruct, let, name "self"
+  destroy_value %box : $BoxStruct
+  br bb1
+
+bb3:
+  destroy_value %box : $BoxStruct
+  %r = tuple ()
+  return %r : $()
+}
