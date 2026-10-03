@@ -4850,6 +4850,10 @@ ConstraintSystem::matchTypesBindTypeVar(
     return SolutionKind::Solved;
   }
 
+  if (kind == ConstraintKind::Equal && type->isVoid() &&
+      typeVar->getImpl().isClosureToVoid())
+    return SolutionKind::Solved;
+
   // When binding a fixed type to a type variable that cannot contain
   // lvalues or noescape types, any type variables within the fixed
   // type cannot contain lvalues or noescape types either.
@@ -15719,6 +15723,15 @@ void ConstraintSystem::recordImplicitCallAsFunction(ConstraintLocator *locator,
 
   if (solverState)
     recordChange(SolverTrail::Change::RecordedImplicitCallAsFunction(locator));
+}
+
+void ConstraintSystem::recordMergeable(TypeVariableType *key, Type conflict,
+                                       ConstraintLocator *locator) {
+  ConflictedType conflicted(conflict->getCanonicalType(), conflict, locator);
+  mergeableTypes.map[key].insert(conflicted);
+
+  // if (solverState)
+  //   recordChange(SolverTrail::Change::AddedMergeableType(root,merging));
 }
 
 void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,

@@ -709,26 +709,20 @@ func test_55680_Tuple() -> Int {
 }
 
 func test_55680() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callit { // expected-note@:10{{generic parameter 'T' inferred as '()' from closure return expression}}
-    print("hello")
+  callit {
+    print("hello") // expected-error{{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
 
 func test_55680_Args() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
-    print("hello")
+  callitArgs(1) {
+    print("hello") // expected-error{{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
 
 func test_55680_ArgsFn() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
-    { print("hello") }
+  callitArgsFn(1) {
+    { print("hello") } // expected-error{{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
 
@@ -747,10 +741,8 @@ func test_55680_GenericArg() -> Int {
 }
 
 func test_55680_Variadic() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitVariadic({ // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
-    print("hello")
+  callitVariadic({ 
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
   })
 }
 
