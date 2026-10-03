@@ -35,7 +35,7 @@
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSiN;
 // CHECK-NEXT: // type metadata address for UInt.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSuN;
-// CHECK-NEXT: // type metadata address for CChar32.
+// CHECK-NEXT: // type metadata address for Unicode.Scalar.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UnicodeO6ScalarVN;
 // CHECK-NEXT: // type metadata address for Int128.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6Int128VN;
