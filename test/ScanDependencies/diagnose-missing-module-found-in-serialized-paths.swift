@@ -6,7 +6,7 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/deps/B.swiftmodule -module-cache-path %t/module-cache %t/B.swift -module-name B -I %t/moreDeps
 
-// RUN: %target-swift-frontend -scan-dependencies -o %t/deps.json %t/client.swift -I %t/deps -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import &> %t/output.txt
+// RUN: not %target-swift-frontend -scan-dependencies -o %t/deps.json %t/client.swift -I %t/deps -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import &> %t/output.txt
 // RUN: cat %t/output.txt | %FileCheck %s
 
 // CHECK: error: compilation search paths unable to resolve module dependency: 'C'
