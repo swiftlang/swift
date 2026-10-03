@@ -42,6 +42,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/DynamicAllocationArgumentsCXX.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -3067,18 +3068,18 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   if (ctorDeclsForSynth.empty())
     return {};
 
-  clang::FunctionDecl *operatorNew = nullptr;
-  clang::FunctionDecl *operatorDelete = nullptr;
   clang::ImplicitAllocationParameters IAP(clang::AlignedAllocationMode::No);
   clang::Sema::SFINAETrap trap(clangSema);
-  bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
+  auto foundAllocation = clangSema.FindAllocationFunctions(
       cxxRecordDeclLoc, clang::SourceRange(),
       clang::AllocationFunctionScope::Both,
       clang::AllocationFunctionScope::Both, cxxRecordTy, /*IsArray=*/false, IAP,
-      clang::MultiExprArg(), operatorNew, operatorDelete,
-      /*Diagnose=*/false);
-  if (trap.hasErrorOccurred() || findingAllocFuncFailed || !operatorNew ||
-      operatorNew->isDeleted() ||
+      clang::MultiExprArg(), /*Diagnose=*/false);
+  if (trap.hasErrorOccurred() || !foundAllocation)
+    return {};
+
+  clang::FunctionDecl *operatorNew = foundAllocation->OperatorNew;
+  if (!operatorNew || operatorNew->isDeleted() ||
       operatorNew->getAccess() == clang::AS_private ||
       operatorNew->getAccess() == clang::AS_protected)
     return {};

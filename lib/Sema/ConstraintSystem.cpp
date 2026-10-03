@@ -600,15 +600,15 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   // Check whether a locator with this anchor + path already exists.
   llvm::FoldingSetNodeID id;
   ConstraintLocator::Profile(id, anchor, path);
-  void *insertPos = nullptr;
-  auto locator = ConstraintLocators.FindNodeOrInsertPos(id, insertPos);
+  llvm::FoldingSetInsertToken insertToken;
+  auto locator = ConstraintLocators.lookup(id, insertToken);
   if (locator)
     return locator;
 
   // Allocate a new locator and add it to the set.
   locator = ConstraintLocator::create(getAllocator(), anchor, path,
                                       summaryFlags);
-  ConstraintLocators.InsertNode(locator, insertPos);
+  ConstraintLocators.insert(locator, insertToken);
   return locator;
 }
 
