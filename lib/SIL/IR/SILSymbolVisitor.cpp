@@ -629,6 +629,11 @@ public:
         }
         if (VD->isLazilyInitializedGlobal())
           addFunction(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+        // A @_silgen_name variable is not lazily initialized, but SILGen
+        // still emits an addressor for it when it has an initial value.
+        else if (VD->getAttrs().hasAttribute<SILGenNameAttr>() &&
+                 VD->hasInitialValue() && !VD->isTopLevelGlobal())
+          addFunction(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
       }
       // Wrapped non-static member properties may have a backing initializer.
       auto initInfo = VD->getPropertyWrapperInitializerInfo();
@@ -658,9 +663,6 @@ public:
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
     if (canSkipNominal(NTD))
-      return;
-
-    if (NTD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
       return;
 
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();

@@ -1938,7 +1938,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     }
   }
 
-  if (!IRGen.Opts.DisableForceLoadSymbols && linkLib.shouldForceLoad()) {
+  // Embedded Swift does not use force-load symbols.
+  if (!IRGen.Opts.DisableForceLoadSymbols && linkLib.shouldForceLoad() &&
+      !Context.LangOpts.hasFeature(Feature::Embedded)) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk = cast<llvm::Function>(
@@ -2293,7 +2295,9 @@ void IRGenModule::emitAutolinkInfo() {
 
   Autolink.writeEntries(Entries, Metadata, *this);
 
-  if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
+  // Embedded Swift does not use force-load symbols.
+  if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
+      !Context.LangOpts.hasFeature(Feature::Embedded)) {
     (void) createForceImportThunk(*this);
   }
 }

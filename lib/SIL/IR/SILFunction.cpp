@@ -675,6 +675,11 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (getName() == getASTContext().getEntryPointFunctionName())
     return false;
 
+  // Any module that uses a generic function can create the same
+  // specialization of it.
+  if (isSpecialization())
+    return true;
+
   // If this is for a declaration, ask it.
   if (auto declRef = getDeclRef()) {
     return declRef.hasNonUniqueDefinition();
