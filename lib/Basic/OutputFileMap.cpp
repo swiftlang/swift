@@ -68,7 +68,7 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   using TypePathPair = std::pair<file_types::ID, std::string>;
 
   auto printOutputPair = [&os](StringRef InputPath,
-                               const TypePathPair &OutputPair) -> void {
+                               const auto &OutputPair) -> void {
     os << InputPath << " -> " << file_types::getTypeName(OutputPair.first)
        << ": \"" << OutputPair.second << "\"\n";
   };
@@ -98,7 +98,7 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   } else {
     for (auto &InputPair : InputToOutputsMap) {
       const TypeToPathMap &Map = InputPair.second;
-      for (const TypePathPair &OutputPair : Map) {
+      for (const auto &OutputPair : Map) {
         printOutputPair(InputPair.first(), OutputPair);
       }
     }
