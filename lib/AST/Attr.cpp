@@ -378,6 +378,8 @@ const char *CalledAttr::getSemanticsName(ExecutionSemantics semantics) {
   switch (semantics) {
   case ExecutionSemantics::AtMostOnce:
     return "atMostOnce";
+  case ExecutionSemantics::Once:
+    return "exactlyOnce";
   }
   llvm_unreachable("bad kind");
 }
@@ -2256,6 +2258,8 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<CalledAttr>(this)->getSemantics()) {
     case ExecutionSemantics::AtMostOnce:
       return "called(atMostOnce)";
+    case ExecutionSemantics::Once:
+      return "called(exactlyOnce)";
     }
   case DeclAttrKind::Target:
     return "_target";

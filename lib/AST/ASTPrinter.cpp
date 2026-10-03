@@ -7275,9 +7275,14 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
-    if (!Options.excludeAttrKind(TypeAttrKind::Called) &&
-        info.getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
-      Printer.printSimpleAttr("@called(atMostOnce)") << " ";
+    if (!Options.excludeAttrKind(TypeAttrKind::Called)) {
+      if (auto semantics = info.getExecutionSemantics()) {
+        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+        Printer.printAttrName("@called");
+        Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
+        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+        Printer << " ";
+      }
     }
 
     // Print lifetime dependencies using Swift syntax.
@@ -7491,10 +7496,10 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
-    if (info.getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
+    if (auto semantics = info.getExecutionSemantics()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@called");
-      Printer << "(atMostOnce)";
+      Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
       Printer << " ";
     }
