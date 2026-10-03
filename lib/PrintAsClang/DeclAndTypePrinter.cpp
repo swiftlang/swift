@@ -267,10 +267,18 @@ private:
     bool protocolMembersOptional = false;
     for (const Decl *member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
+      if (!VD || isa<TypeDecl>(VD) || isa<AccessorDecl>(VD))
         continue;
-      if (isa<AccessorDecl>(VD))
+      switch (owningPrinter.getDeclInclusion(VD)) {
+      case DeclInclusion::Excluded:
         continue;
+      case DeclInclusion::Unrepresentable:
+        printUnavailableInCxxMemberComment(
+            VD, owningPrinter.getUnsupportedDeclReason(VD));
+        continue;
+      case DeclInclusion::Included:
+        break;
+      }
       if (!AllowDelayed && owningPrinter.objcDelayedMembers.count(VD)) {
         os << "// '" << VD->getName()
            << ((outputLang == OutputLanguageMode::Cxx) ? "' cannot be printed\n"
@@ -284,6 +292,24 @@ private:
       }
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
     }
+  }
+
+  /// Prints a comment in place of a member that is left out of the C++ class
+  /// because it can't be represented in C++.
+  void printUnavailableInCxxMemberComment(const ValueDecl *VD,
+                                          StringRef reason) {
+    assert(outputLang == OutputLanguageMode::Cxx);
+    // Don't mention members that the user didn't write, like the ones
+    // synthesized for protocol conformances, or operators, which aren't
+    // printed as members yet. As with top-level declarations, don't mention
+    // underscored standard library members either.
+    if (VD->isImplicit() || VD->isOperator() ||
+        (VD->getModuleContext()->isStdlibModule() &&
+         !VD->getName().isSpecial() &&
+         VD->getBaseIdentifier().hasUnderscoredNaming()))
+      return;
+    os << "  ";
+    printUnavailableInCxxComment(VD, reason);
   }
 
   void printDocumentationComment(Decl *D) {
@@ -1201,8 +1227,17 @@ private:
                          .printSwiftABIFunctionSignatureAsCxxFunction(
                              AFD, methodTy,
                              /*selfTypeDeclContext=*/typeDeclContext);
-      if (!funcABI)
+      if (!funcABI) {
+        // Mention a property or subscript once, not once per accessor.
+        auto *accessor = dyn_cast<AccessorDecl>(AFD);
+        if (!accessor)
+          printUnavailableInCxxMemberComment(AFD,
+                                             getUnsupportedTypeReason(AFD));
+        else if (accessor->isGetter())
+          printUnavailableInCxxMemberComment(accessor->getStorage(),
+                                             getUnsupportedTypeReason(AFD));
         return;
+      }
       std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo;
       if (!isa<ConstructorDecl>(AFD)) {
         dispatchInfo = owningPrinter.interopContext.getIrABIDetails()
@@ -1228,8 +1263,12 @@ private:
           }
         }
       } else {
-        if (!canPrintOverloadOfFunction(AFD))
+        if (!canPrintOverloadOfFunction(AFD)) {
+          printUnavailableInCxxMemberComment(
+              AFD, owningPrinter.getCxxDeclEmissionScope()
+                       .additionalUnrepresentableDeclarations.lookup(AFD));
           return;
+        }
       }
 
       owningPrinter.prologueOS << cFuncPrologueOS.str();
@@ -1645,12 +1684,19 @@ private:
                  owningPrinter, &mod, ty)
           .isUnsupported();
     };
+    auto describeUnsupported = [&](Type ty) {
+      std::string result =
+          "'" + ty->getString() + "' is not representable in C++";
+      if (auto *unexposedModule = owningPrinter.getUnexposedModule(ty))
+        result += " because module '" + unexposedModule->getNameStr().str() +
+                  "' is not exposed";
+      return result;
+    };
 
     if (auto *funcDecl = dyn_cast<FuncDecl>(FD)) {
       auto resultTy = funcDecl->getResultInterfaceType();
       if (resultTy && !resultTy->isVoid() && isUnsupported(resultTy))
-        return "Return type '" + resultTy->getString() +
-               "' is not representable in C++";
+        return "Return type " + describeUnsupported(resultTy);
     }
 
     for (auto [i, param] : llvm::enumerate(*FD->getParameters())) {
@@ -1658,10 +1704,10 @@ private:
       if (isUnsupported(paramTy)) {
         auto name = param->getNameStr();
         if (name.empty() || name == "_")
-          return "Parameter #" + std::to_string(i) + " of type '" +
-                 paramTy->getString() + "' is not representable in C++";
-        return "Parameter '" + name.str() + "' of type '" +
-               paramTy->getString() + "' is not representable in C++";
+          return "Parameter #" + std::to_string(i) + " of type " +
+                 describeUnsupported(paramTy);
+        return "Parameter '" + name.str() + "' of type " +
+               describeUnsupported(paramTy);
       }
     }
     return "";
@@ -3117,27 +3163,19 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
   return true;
 }
 
-bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
+DeclAndTypePrinter::DeclInclusion
+DeclAndTypePrinter::getDeclInclusion(const ValueDecl *VD) {
   if (VD->isInvalid())
-    return false;
+    return DeclInclusion::Excluded;
 
   if (requiresExposedAttribute && !hasExposeAttr(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
   if (hasExposeNotCxxAttr(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
   if (!isVisible(VD))
-    return false;
-
-  if (outputLang == OutputLanguageMode::Cxx) {
-    if (!isExposedToThisModule(M, VD, exposedModules))
-      return false;
-    if (!cxx_translation::isExposableToCxx(VD, this))
-      return false;
-    if (!isEnumExposableToCxx(VD, *this))
-      return false;
-  }
+    return DeclInclusion::Excluded;
 
   // In C output mode print only the C variant `@c` (no `@_cdecl`),
   // while in other modes print only `@_cdecl`.
@@ -3148,17 +3186,17 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   // A @cxx function implements a C++ declaration that already exists in an
   // imported C++ header; never redeclare it in a generated header.
   if (cdeclKind == ForeignLanguage::Cxx)
-    return false;
+    return DeclInclusion::Excluded;
 
   if (cdeclKind &&
       (*cdeclKind == ForeignLanguage::C) !=
        (outputLang == OutputLanguageMode::C))
-    return false;
+    return DeclInclusion::Excluded;
 
   // C output mode only prints @c functions and enums.
   if (outputLang == OutputLanguageMode::C &&
       !cdeclKind && !isa<EnumDecl>(VD)) {
-    return false;
+    return DeclInclusion::Excluded;
   }
 
   // The C mode prints @c enums and reject other enums,
@@ -3166,19 +3204,62 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (isa<EnumDecl>(VD) &&
       VD->getAttrs().hasAttribute<CDeclAttr>() !=
         (outputLang == OutputLanguageMode::C)) {
-    return false;
+    return DeclInclusion::Excluded;
   }
 
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return false;
+    return DeclInclusion::Excluded;
 
   if (isAsyncAlternativeOfOtherDecl(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
   if (excludeForObjCImplementation(VD))
-    return false;
+    return DeclInclusion::Excluded;
 
-  return true;
+  // Check representability after the exclusions above so intentionally hidden
+  // declarations don't get an unavailable comment.
+  if (outputLang == OutputLanguageMode::Cxx) {
+    if (!isExposedToThisModule(M, VD, exposedModules))
+      return DeclInclusion::Unrepresentable;
+    if (!cxx_translation::isExposableToCxx(VD, this))
+      return DeclInclusion::Unrepresentable;
+    if (!isEnumExposableToCxx(VD, *this))
+      return DeclInclusion::Unrepresentable;
+  }
+
+  return DeclInclusion::Included;
+}
+
+std::string DeclAndTypePrinter::getUnsupportedDeclReason(const ValueDecl *VD) {
+  auto representation =
+      cxx_translation::getDeclRepresentation(VD, /*layoutQueries=*/this);
+  if (!representation.isUnsupported() || !representation.error)
+    return "";
+  auto diag = cxx_translation::diagnoseRepresenationError(
+      *representation.error, const_cast<ValueDecl *>(VD));
+  auto diagString =
+      M.getASTContext().Diags.getFormatStringForDiagnostic(diag.getID());
+  std::string reason;
+  llvm::raw_string_ostream reasonOS(reason);
+  DiagnosticEngine::formatDiagnosticText(reasonOS, diagString, diag.getArgs(),
+                                         DiagnosticFormatOptions());
+  return reason;
+}
+
+const ModuleDecl *DeclAndTypePrinter::getUnexposedModule(Type ty) {
+  auto *nominal = ty->getAnyNominal();
+  if (!nominal)
+    return nullptr;
+  auto *module = nominal->getModuleContext();
+  if (!module->isStdlibModule() &&
+      !isExposedToThisModule(M, nominal, exposedModules) &&
+      getDeclInclusion(nominal) != DeclInclusion::Excluded)
+    return module;
+  if (auto *boundGeneric = ty->getAs<BoundGenericType>())
+    for (auto arg : boundGeneric->getGenericArgs())
+      if (auto *argModule = getUnexposedModule(arg))
+        return argModule;
+  return nullptr;
 }
 
 bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
