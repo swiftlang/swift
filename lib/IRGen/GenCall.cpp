@@ -1571,17 +1571,16 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
   return true;
 }
 
-static std::optional<clang::CallingConv>
-getNonDefaultClangCallingConvention(IRGenModule &IGM,
-                                    CanSILFunctionType fnType) {
+static const clang::FunctionType *
+getClangFunctionType(CanSILFunctionType fnType) {
   auto representation = fnType->getRepresentation();
   if (representation != SILFunctionTypeRepresentation::CFunctionPointer &&
       representation != SILFunctionTypeRepresentation::CXXMethod)
-    return std::nullopt;
+    return nullptr;
 
   auto *clangType = fnType->getClangTypeInfo().getType();
   if (!clangType)
-    return std::nullopt;
+    return nullptr;
 
   const clang::FunctionType *functionType = nullptr;
   if (auto *pointer = clangType->getAs<clang::PointerType>())
@@ -1593,6 +1592,15 @@ getNonDefaultClangCallingConvention(IRGenModule &IGM,
     functionType = clangType->getAs<clang::FunctionType>();
 
   ASSERT(functionType && "unexpected Clang function type");
+  return functionType;
+}
+
+static std::optional<clang::CallingConv>
+getNonDefaultClangCallingConvention(IRGenModule &IGM,
+                                    CanSILFunctionType fnType) {
+  auto *functionType = getClangFunctionType(fnType);
+  if (!functionType)
+    return std::nullopt;
   auto callingConv = functionType->getCallConv();
   // Both representations otherwise use the platform C convention. Compare
   // against the free-function default so that a method's default thiscall
@@ -1624,10 +1632,18 @@ void SignatureExpansion::expandExternalSignatureTypes() {
 
   // Convert the SIL result type to a Clang type. If this is for a c++
   // constructor, use 'void' as the return type to arrange the function type.
-  auto clangResultTy = IGM.getClangType(
-      cxxCtorDecl
-          ? SILType::getPrimitiveObjectType(IGM.Context.TheEmptyTupleType)
-          : SILResultTy);
+  auto *clangFunctionType = getClangFunctionType(FnType);
+  auto stringTy = clangFunctionType ? IGM.Context.getStringType() : Type();
+  clang::CanQualType clangResultTy;
+  if (cxxCtorDecl)
+    clangResultTy = IGM.getClangType(
+        SILType::getPrimitiveObjectType(IGM.Context.TheEmptyTupleType));
+  else if (clangFunctionType && stringTy &&
+           SILResultTy.getASTType()->isEqual(stringTy))
+    clangResultTy = IGM.getClangASTContext().getCanonicalType(
+        clangFunctionType->getReturnType());
+  else
+    clangResultTy = IGM.getClangType(SILResultTy);
 
   // Now convert the parameters to Clang types.
   auto params = FnType->getParameters();
@@ -1699,8 +1715,14 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   size_t clangToSwiftParamOffset = paramTys.size();
 
   // Convert each parameter to a Clang type.
-  for (auto param : params) {
-    auto clangTy = IGM.getClangType(param, FnType);
+  for (auto [index, param] : llvm::enumerate(params)) {
+    auto clangTy =
+        clangFunctionType && stringTy &&
+                param.getInterfaceType()->isEqual(stringTy)
+            ? clangCtx.getCanonicalType(
+                  clangFunctionType->castAs<clang::FunctionProtoType>()
+                      ->getParamType(index))
+            : IGM.getClangType(param, FnType);
     paramTys.push_back(clangTy);
   }
 
@@ -4809,6 +4831,10 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
     case clang::CodeGen::ABIArgInfo::TargetSpecific:
       llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
+      if (silConv.isSILIndirect(paramInfo)) {
+        out.add(in.claimNext());
+        break;
+      }
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
 
       auto temp = ti.allocateStack(IGF, paramType, "indirect-temporary");

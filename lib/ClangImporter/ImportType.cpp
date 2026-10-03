@@ -2437,6 +2437,9 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
           Type t = ClassType::get(cd, Type(), SwiftContext);
           return ImportedType(t, /*implicitlyUnwraps=*/false);
         }
+        if (auto *sd = dyn_cast<StructDecl>(vd))
+          return ImportedType(sd->getDeclaredInterfaceType(),
+                              /*implicitlyUnwraps=*/false);
       }
     }
   }
@@ -2787,10 +2790,10 @@ ClangImporter::Implementation::importParameterType(
               SwiftContext.evaluator,
               CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
 
-        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
-
+        if (auto *cd = dyn_cast<ClassDecl>(vd))
           swiftParamTy = ClassType::get(cd, Type(), SwiftContext);
-        }
+        else if (auto *sd = dyn_cast<StructDecl>(vd))
+          swiftParamTy = sd->getDeclaredInterfaceType();
       }
     }
   }
