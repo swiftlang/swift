@@ -355,10 +355,60 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
 
         // Resolve the conformances of the superclass.
         superclassDecl->prepareConformanceTable();
-        superclassDecl->ConformanceTable->updateLookupTable(
-          superclassDecl,
-          ConformanceStage::Resolved);
-        
+        auto *superclassTable = superclassDecl->ConformanceTable;
+        superclassTable->updateLookupTable(superclassDecl,
+                                           ConformanceStage::Resolved);
+
+        // If this class directly states Sendable (or a protocol that refines
+        // it), demand the superclass's implicit Sendable conformance. An
+        // inherited result from that request is not registered in the
+        // superclass table, so record an equivalent inherited source here
+        // before resolving this table. This runs after resolving the
+        // superclass table so the recorded-source check below is meaningful:
+        // demanding a lookup any earlier forces request evaluation whose
+        // cached side effects can change the outcome of subsequent lookups.
+        if (auto *sendable = nominal->getASTContext().getProtocol(
+                KnownProtocolKind::Sendable)) {
+          bool needsSendable =
+              llvm::any_of(Conformances, [&](const auto &conformances) {
+                auto *protocol = conformances.first;
+                return protocol == sendable || protocol->inheritsFrom(sendable);
+              });
+          if (needsSendable) {
+            // If the superclass table already has a recorded source for
+            // Sendable, normal inherited-conformance expansion below will
+            // pick it up; only demand a lookup when there is nothing
+            // recorded.
+            auto hasRecordedSource = [&] {
+              auto known = superclassTable->Conformances.find(sendable);
+              return known != superclassTable->Conformances.end() &&
+                     !known->second.empty();
+            };
+            // A superclass that is explicitly non-Sendable cannot have an
+            // implicit Sendable conformance worth inheriting. Skip the
+            // demand lookup in that case: besides being pointless, the
+            // lookup populates the superclass table with the error
+            // conformance, which normal inherited-conformance expansion
+            // would then pick up and prefer over this class's own
+            // explicit conformance.
+            if (!hasRecordedSource() &&
+                !superclassDecl->getAttrs().hasAttribute<NonSendableAttr>()) {
+              // Preserve extension-macro expansion and evaluator cycle
+              // guards by going through the normal lookup entry point.
+              auto conformance = swift::lookupConformance(
+                  superclassDecl->getDeclaredInterfaceType(), sendable,
+                  /*allowMissing=*/false);
+              if (conformance.isConcrete() && !hasRecordedSource()) {
+                auto *inherited = cast<InheritedProtocolConformance>(
+                    nominal->getASTContext().getInheritedConformance(
+                        classDecl->getDeclaredInterfaceType(),
+                        conformance.getConcrete()));
+                registerImplicitInheritedConformance(classDecl, inherited);
+              }
+            }
+          }
+        }
+
         // Expand inherited conformances from all superclasses.
         // We may have circular inheritance in ill-formed classes, so keep an
         // eye out for that.
@@ -773,10 +823,20 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     assert(!lhsSF && !rhsSF && "Source files shouldn't conflict");
     return Ordering::Before;
   }
-  auto module = lhs->getDeclContext()->getParentModule();
-  assert(lhs->getDeclContext()->getParentModule()
-           == rhs->getDeclContext()->getParentModule() &&
-         "conformances should be in the same module");
+  auto lhsModule = lhs->getDeclContext()->getParentModule();
+  auto rhsModule = rhs->getDeclContext()->getParentModule();
+  if (lhsModule != rhsModule) {
+    // Two implied conformances from different modules can denote the same
+    // conformance: e.g. an implied entry expanded from an explicit extension
+    // and one expanded from an inherited entry whose nominal was imported
+    // from another module. Either choice forms an equivalent conformance, so
+    // order deterministically by module name. (Same-file-unit conflicts
+    // above already pick arbitrarily for the same reason.)
+    return lhsModule->getNameStr() < rhsModule->getNameStr()
+             ? Ordering::Before
+             : Ordering::After;
+  }
+  auto module = lhsModule;
   for (auto file : module->getFiles()) {
     if (file == lhsFileUnit)
       return Ordering::Before;
@@ -1057,6 +1117,40 @@ void ConformanceLookupTable::addSynthesizedConformance(
               ConformanceSource::forSynthesized(conformanceDC));
 }
 
+void ConformanceLookupTable::registerImplicitInheritedConformance(
+    ClassDecl *classDecl, InheritedProtocolConformance *conformance) {
+  auto *protocol = conformance->getProtocol();
+  auto &classConformances = AllConformances[classDecl];
+
+  // Another subclass may already have forced this implicit conformance. Reuse
+  // the existing inherited source rather than adding duplicate entries.
+  for (auto *entry : classConformances) {
+    if (entry->isSuperseded() || entry->getProtocol() != protocol ||
+        entry->getKind() != ConformanceEntryKind::Inherited)
+      continue;
+
+    assert(!entry->getConformance() || entry->getConformance() == conformance);
+    entry->Conformance = conformance;
+    return;
+  }
+
+  ASTContext &ctx = classDecl->getASTContext();
+  auto *entry =
+      new (ctx) ConformanceEntry(classDecl->getLoc(), protocol,
+                                 ConformanceSource::forInherited(classDecl));
+  entry->Conformance = conformance;
+  Conformances[protocol].push_back(entry);
+  classConformances.push_back(entry);
+
+  // This source can be discovered after an earlier query advanced the table.
+  // Revisit the nominal in the stages that expand and rank its conformances.
+  auto &lastProcessed = LastProcessed[classDecl];
+  lastProcessed[static_cast<unsigned>(ConformanceStage::ExpandedImplied)]
+      .setInt(false);
+  lastProcessed[static_cast<unsigned>(ConformanceStage::Resolved)].setInt(
+      false);
+}
+
 void ConformanceLookupTable::registerProtocolConformance(
        DeclContext *dc, ProtocolConformance *conformance,
        bool synthesized) {
@@ -1112,7 +1206,8 @@ bool ConformanceLookupTable::lookupConformance(
 
   // Look for conformances to this protocol.
   auto known = Conformances.find(protocol);
-  if (known == Conformances.end() || hasUnexpanded(known->second)) {
+  if (known == Conformances.end() || known->second.empty() ||
+      hasUnexpanded(known->second)) {
     // If we didn't find anything, or have unexpanded macro conformances, expand
     // implied conformances. We can run into the latter case when we expand a
     // macro that introduces a conformance that implies another conformance --
@@ -1122,7 +1217,7 @@ bool ConformanceLookupTable::lookupConformance(
     known = Conformances.find(protocol);
 
     // We didn't find anything.
-    if (known == Conformances.end())
+    if (known == Conformances.end() || known->second.empty())
       return false;
   }
 
