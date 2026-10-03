@@ -217,7 +217,15 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   return MadeChange;
 }
 
-bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBlocks *deb) {
+bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I,
+                                        DeadEndBlocks *deb) {
+  auto isInLoop = [&](SILInstruction *inst) { return L->contains(inst); };
+  return canDuplicateRegionInstruction(I, deb, isInLoop);
+}
+
+bool swift::canDuplicateRegionInstruction(
+    SILInstruction *I, DeadEndBlocks *deb,
+    llvm::function_ref<bool(SILInstruction *)> isInRegion) {
   SinkAddressProjections sinkProj;
   for (auto res : I->getResults()) {
     // If a guaranteed value is used in a dead-end exit block and the enclosing value
@@ -227,12 +235,18 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
     if (res->getOwnershipKind() == OwnershipKind::Guaranteed) {
       for (Operand *use : res->getUses()) {
         SILBasicBlock *useBlock = use->getUser()->getParent();
-        if (!L->contains(useBlock) && deb->isDeadEnd(useBlock))
+        if (!isInRegion(use->getUser()) && deb->isDeadEnd(useBlock))
           return false;
       }
     }
 
     if (!res->getType().isAddress()) {
+      continue;
+    }
+    // Uses of an address inside the region are duplicated along with it. Uses
+    // outside the region would need an address phi, unless the address
+    // projections can be sunk to them.
+    if (llvm::all_of(res->getUsers(), isInRegion)) {
       continue;
     }
     auto canSink = sinkProj.analyzeAddressProjections(I);
@@ -241,12 +255,12 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
     }
   }
 
-  // The deallocation of a stack allocation must be in the loop, otherwise the
+  // The deallocation of a stack allocation must be in the region, otherwise the
   // deallocation will be fed by a phi node of two allocations.
   if (auto allocation = I->getStackAllocation()) {
     for (auto *UI : allocation->getValue()->getUses()) {
       if (UI->getUser()->isDeallocatingStack()) {
-        if (!L->contains(UI->getUser()->getParent()))
+        if (!isInRegion(UI->getUser()))
           return false;
       }
     }
@@ -254,7 +268,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
   }
   if (auto deallocation = I->getStackDeallocation()) {
     SILInstruction *alloc = deallocation->getAllocation().getInstruction();
-    return L->contains(alloc);
+    return isInRegion(alloc);
   }
   // In OSSA, partial_apply is not considered stack allocating. Nonetheless,
   // prevent it from being cloned so OSSA lowering can directly convert it to a
@@ -275,7 +289,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
   if (auto *Method = dyn_cast<MethodInst>(I)) {
     if (Method->getMember().isForeign) {
       for (auto *UI : Method->getUses()) {
-        if (!L->contains(UI->getUser()))
+        if (!isInRegion(UI->getUser()))
           return false;
       }
     }
@@ -290,7 +304,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
       isa<OpenExistentialBoxValueInst>(I) || isa<OpenPackElementInst>(I)) {
     SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
     for (auto *UI : OI->getUses())
-      if (!L->contains(UI->getUser()))
+      if (!isInRegion(UI->getUser()))
         return false;
     return true;
   }
@@ -298,16 +312,16 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
   if (isa<ThrowInst>(I) || isa<ThrowAddrInst>(I))
     return false;
 
-  // The entire access must be within the loop.
+  // The entire access must be within the region.
   if (auto BAI = dyn_cast<BeginAccessInst>(I)) {
     for (auto *UI : BAI->getUses()) {
-      if (!L->contains(UI->getUser()))
+      if (!isInRegion(UI->getUser()))
         return false;
     }
     return true;
   }
-  // The entire coroutine execution must be within the loop.
-  // Note that we don't have to worry about the reverse --- a loop which
+  // The entire coroutine execution must be within the region.
+  // Note that we don't have to worry about the reverse --- a region which
   // contains an end_apply or abort_apply of an external begin_apply ---
   // because that wouldn't be structurally valid in the first place.
   if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
@@ -315,7 +329,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
       auto *User = Use->getUser();
       assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User) ||
              isa<EndBorrowInst>(User));
-      if (!L->contains(User))
+      if (!isInRegion(User))
         return false;
     }
     return true;
@@ -351,7 +365,6 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
     "Code here must match isTriviallyDuplicatable in SILInstruction");
   return true;
 }
-
 
 //===----------------------------------------------------------------------===//
 //                                Loop Visitor
