@@ -49,6 +49,9 @@ enum TypeVariableOptions {
 
   /// Whether the type variable can be bound only to a pack expansion type.
   TVO_PackExpansion = 0x40,
+
+  /// Whether the type variable has a fallback toVoid closure type
+  TVO_ClosureToVoid = 0x80,
 };
 
 /// The implementation object for a type variable used within the
@@ -125,6 +128,10 @@ public:
   bool prefersSubtypeBinding() const {
     return getRawOptions() & TVO_PrefersSubtypeBinding;
   }
+
+  /// Whether this type variable is representing a single expr closure that is
+  /// implicitly Void
+  bool isClosureToVoid() const { return getRawOptions() & TVO_ClosureToVoid; }
 
   /// Retrieve the corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
@@ -312,6 +319,12 @@ public:
         recordBinding(*trail);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToPack;
     }
+
+    if (!isClosureToVoid() && otherRep->getImpl().isClosureToVoid()) {
+      if (trail)
+        recordBinding(*trail);
+      getTypeVariable()->Bits.TypeVariableType.Options |= TVO_ClosureToVoid;
+    }
   }
 
   /// Retrieve the fixed type that corresponds to this type variable,
@@ -378,6 +391,11 @@ public:
     impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
   }
 
+  void enableClosureToVoid() {
+    auto &impl = getRepresentative(nullptr)->getImpl();
+    impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_ClosureToVoid;
+  }
+
   void setComponent(TypeVariableType *parent) {
     Component.setPointerAndInt(parent, /*valid=*/false);
   }
@@ -423,6 +441,7 @@ private:
     ENTRY(TVO_PrefersSubtypeBinding, "prefer subtype");
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
+    ENTRY(TVO_ClosureToVoid, "single expression closure");
     }
   #undef ENTRY
   }
