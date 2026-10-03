@@ -137,6 +137,18 @@ class ShellTestCase(unittest.TestCase):
 + popd
 '''.format(tmpdir=self._platform_quote(self.tmpdir)))
 
+    def test_pushd_restores_directory_after_exception(self):
+        shell.dry_run = False
+        basedir = os.getcwd()
+
+        with self.assertRaisesRegex(RuntimeError, "boom"):
+            with shell.pushd(self.tmpdir, echo=False):
+                raise RuntimeError("boom")
+
+        actual_dir = os.getcwd()
+        os.chdir(basedir)
+        self.assertEqual(actual_dir, basedir)
+
     def test_dry_run(self):
         shell.dry_run = True
 
