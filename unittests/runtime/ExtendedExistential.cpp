@@ -532,3 +532,55 @@ TEST(TestExtendedExistential, defaultMetatypeValueWitnesses) {
   EXPECT_EQ(vwtable2->size, sizeof(void*) + 2 * sizeof(void*));
   EXPECT_TRUE(vwtable2->isPOD());
 }
+
+TEST(TestExtendedExistential, containerLayoutWithGeneralizationWitnesses) {
+  auto classShape = buildGlobalShape([] {
+    return shape(
+      special(SpecialKind::Class),
+      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
+      genSig(param(), conforms(typeParam(0, 0), Q())),
+      reqSig(param(), param(),
+             conforms(typeParam(0, 0), Q()),
+             conforms(typeParam(1, 0), P()))
+    );
+  });
+  EXPECT_EQ(classShape->getContainerSignatureLayoutSizeInWords(), 1u);
+
+  auto opaqueShape = buildGlobalShape([] {
+    return shape(
+      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
+      genSig(param(), conforms(typeParam(0, 0), Q())),
+      reqSig(param(), param(),
+             conforms(typeParam(0, 0), Q()),
+             conforms(typeParam(1, 0), P()))
+    );
+  });
+  EXPECT_EQ(opaqueShape->getContainerSignatureLayoutSizeInWords(), 2u);
+}
+
+TEST(TestExtendedExistential, containerLayoutWithRedundantParameters) {
+  auto classShape = buildGlobalShape([] {
+    return shape(
+      special(SpecialKind::Class),
+      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
+      genSig(param(), param()),
+      reqSig(param(), param().withKeyArgument(false), param(),
+             sameType(typeParam(0, 0), typeParam(0, 1)),
+             conforms(typeParam(1, 0), P()),
+             conforms(typeParam(1, 0), Q()))
+    );
+  });
+  EXPECT_EQ(classShape->getContainerSignatureLayoutSizeInWords(), 2u);
+
+  auto opaqueShape = buildGlobalShape([] {
+    return shape(
+      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
+      genSig(param(), param()),
+      reqSig(param(), param().withKeyArgument(false), param(),
+             sameType(typeParam(0, 0), typeParam(0, 1)),
+             conforms(typeParam(1, 0), P()),
+             conforms(typeParam(1, 0), Q()))
+    );
+  });
+  EXPECT_EQ(opaqueShape->getContainerSignatureLayoutSizeInWords(), 3u);
+}

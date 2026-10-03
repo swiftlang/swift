@@ -2316,8 +2316,8 @@ static DynamicCastResult tryCastToExtendedExistential(
 
   auto destExistentialType = cast<ExtendedExistentialTypeMetadata>(destType);
   auto *destExistentialShape = destExistentialType->Shape;
-  const unsigned shapeArgumentCount =
-      destExistentialShape->getGenSigArgumentLayoutSizeInWords();
+  const unsigned numGeneralizationParameters =
+      destExistentialShape->getNumGenSigParams();
   const Metadata *selfType = srcType;
 
   // If we have a type expression to look into, unwrap as much metatype
@@ -2355,7 +2355,7 @@ static DynamicCastResult tryCastToExtendedExistential(
   {
     // Line up the arguments to the requirement signature.
     auto genArgs = destExistentialType->getGeneralizationArguments();
-    allGenericArgsVec.append(genArgs, genArgs + shapeArgumentCount);
+    allGenericArgsVec.append(genArgs, genArgs + numGeneralizationParameters);
     // Tack on the `Self` argument.
     allGenericArgsVec.push_back((const void *)selfType);
 
@@ -2373,7 +2373,9 @@ static DynamicCastResult tryCastToExtendedExistential(
           return substitutions.getMetadata(depth, index).Ptr;
         },
         [&substitutions](unsigned fullOrdinal, unsigned keyOrdinal) {
-          return substitutions.getMetadataKeyArgOrdinal(keyOrdinal).Ptr;
+          // Generalization arguments retain their original positions even
+          // when the requirement signature aliases its parameters.
+          return substitutions.getMetadataKeyArgOrdinal(fullOrdinal).Ptr;
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
@@ -2428,16 +2430,32 @@ static DynamicCastResult tryCastToExtendedExistential(
   }
 
   // Fill in the trailing set of witness tables.
-  const unsigned numWitnessTables = witnessTables.size();
-  assert(numWitnessTables ==
-         llvm::count_if(destExistentialShape->getRequirementSignature().getRequirements(),
-                        [](const auto &req) -> bool {
-                          return req.getKind() ==
-                                 GenericRequirementKind::Protocol;
-                        }));
-  for (unsigned i = 0; i < numWitnessTables; ++i) {
-    destWitnesses[i] = reinterpret_cast<const WitnessTable *>(witnessTables[i]);
+  // Generalization requirements can be interleaved with the requirements
+  // on `Self`; only the latter belong in the existential container.
+  Demangler dem;
+  unsigned witnessIndex = 0;
+  unsigned containerWitnessIndex = 0;
+  for (const auto &req :
+       destExistentialShape->getRequirementSignature().getRequirements()) {
+    if (req.getKind() != GenericRequirementKind::Protocol ||
+        !req.getProtocol().needsWitnessTable())
+      continue;
+
+    auto witness = witnessTables[witnessIndex++];
+    auto *subject = dem.demangleType(req.getParam());
+    if (subject && subject->getKind() == Demangle::Node::Kind::Type)
+      subject = subject->getChild(0);
+    if (req.Flags.hasKeyArgument() && subject &&
+        subject->getKind() == Demangle::Node::Kind::DependentGenericParamType &&
+        subject->getChild(0)->getIndex() ==
+            (numGeneralizationParameters ? 1u : 0u)) {
+      destWitnesses[containerWitnessIndex++] =
+          reinterpret_cast<const WitnessTable *>(witness);
+    }
   }
+  assert(witnessIndex == witnessTables.size());
+  assert(containerWitnessIndex ==
+         destExistentialShape->getNumContainerWitnessTables());
 
   if (takeOnSuccess) {
     srcType->vw_initializeWithTake(destBox, srcValue);

@@ -2312,23 +2312,46 @@ public:
              : nullptr;
   }
 
+  /// The number of witness tables stored in each existential container.
+  unsigned getNumContainerWitnessTables() const {
+    unsigned numWitnessTables = 0;
+    for (const auto &req : getRequirementSignature().getRequirements()) {
+      if (req.Flags.hasKeyArgument() &&
+          req.getKind() == GenericRequirementKind::Protocol)
+        ++numWitnessTables;
+    }
+
+    // Generalization conformances are stored in the type metadata.
+    for (const auto &req : getGeneralizationSignature().getRequirements()) {
+      if (req.Flags.hasKeyArgument() &&
+          req.getKind() == GenericRequirementKind::Protocol)
+        --numWitnessTables;
+    }
+    return numWitnessTables;
+  }
+
   /// Return the amount of space used in the existential container
   /// for storing the existential arguments (including both the
   /// type metadata and the conformances).
   unsigned getContainerSignatureLayoutSizeInWords() const {
-    unsigned rawSize = ReqSigHeader.getArgumentLayoutSizeInWords();
+    // Only parameters introduced by the requirement signature are stored
+    // in the container. Generalization arguments are in the type metadata.
+    unsigned numWitnessTables = getNumContainerWitnessTables();
+    unsigned rawSize = numWitnessTables;
+    for (const auto &param : getRequirementSignature().getParams()
+                                .drop_front(getNumGenSigParams())) {
+      if (param.hasKeyArgument())
+        ++rawSize;
+    }
     switch (Flags.getSpecialKind()) {
-    // The default and explicitly-sized-value-layout cases don't optimize
-    // the storage of the signature.
     case SpecialKind::None:
     case SpecialKind::ExplicitLayout:
       return rawSize;
 
-    // The class and metadata cases don't store type metadata.
+    // The class and metatype cases don't store type metadata.
     case SpecialKind::Class:
     case SpecialKind::Metatype:
-      // Requirement signatures won't have non-key parameters.
-      return rawSize - ReqSigHeader.NumParams;
+      return numWitnessTables;
     }
 
     // Assume any future cases don't optimize metadata storage.
