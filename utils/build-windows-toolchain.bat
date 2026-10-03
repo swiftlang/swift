@@ -82,7 +82,8 @@ if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Package -Stage %PackageRoot%
 :: Build the arguments related to Windows SDK builds
 set "WindowsSDKArgs=-Windows"
 if "%INCLUDE_PACKAGING%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKLinkModes dynamic"
-if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures %WINDOWS_SDKS%"
+:: if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures %WINDOWS_SDKS%"
+set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures X64"
 
 :: Build the -HostArchName argument, if any.
 set "HostArchNameArg="
