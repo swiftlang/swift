@@ -419,54 +419,14 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       throw _Win32Error(functionName: "GetProcAddress", error: GetLastError())
     }
 
-    enum InvalidPEError: Error, CustomStringConvertible {
-      case invalidDosSignature(WORD)
-      case invalidNtSignature(DWORD)
-      case missingTLSDirectoryEntry(numberOfRvaAndSizes: DWORD)
-      case emptyTLSDirectory
-
-      var description: String {
-        switch self {
-        case .invalidDosSignature(let m):
-          return "invalid DOS signature 0x\(String(m, radix: 16)), expected IMAGE_DOS_SIGNATURE (\"MZ\")"
-        case .invalidNtSignature(let s):
-          return "invalid NT signature 0x\(String(s, radix: 16)), expected IMAGE_NT_SIGNATURE (\"PE00\")"
-        case .missingTLSDirectoryEntry(let n):
-          return "PE has no TLS data directory entry (NumberOfRvaAndSizes=\(n) <= 9)"
-        case .emptyTLSDirectory:
-          return "PE TLS data directory entry is empty (VirtualAddress=0)"
-        }
-      }
-    }
-
     func getTlsDirectoryIndex(module: HMODULE) throws -> (index: DWORD, size: SIZE_T) {
       let base = UInt64(UInt(bitPattern: module))
-      let dos = try pointee(base, as: IMAGE_DOS_HEADER.self)
-
-      guard dos.e_magic == IMAGE_DOS_SIGNATURE else {
-        throw InvalidPEError.invalidDosSignature(dos.e_magic)
+      let directory = try dataDirectory(IMAGE_DIRECTORY_ENTRY_TLS, of: module)
+      guard directory.VirtualAddress != 0 else {
+        throw InvalidPEError.emptyDataDirectory(index: Int(IMAGE_DIRECTORY_ENTRY_TLS))
       }
 
-      let nt = try pointee(base + UInt64(dos.e_lfanew), as: IMAGE_NT_HEADERS.self)
-
-      guard nt.Signature == IMAGE_NT_SIGNATURE else {
-        let err = InvalidPEError.invalidNtSignature(nt.Signature)
-        warn("\(err)")
-        throw err
-      }
-
-      // Ensure we have IMAGE_DIRECTORY_ENTRY_TLS == 9 available.
-      guard nt.OptionalHeader.NumberOfRvaAndSizes > 9 else {
-        throw InvalidPEError.missingTLSDirectoryEntry(
-          numberOfRvaAndSizes: nt.OptionalHeader.NumberOfRvaAndSizes)
-      }
-
-      let tlsDirRVA = nt.OptionalHeader.DataDirectory.9.VirtualAddress
-      guard tlsDirRVA != 0 else {
-        throw InvalidPEError.emptyTLSDirectory
-      }
-
-      let tls = try pointee(base + UInt64(tlsDirRVA), as: IMAGE_TLS_DIRECTORY64.self)
+      let tls = try pointee(base + UInt64(directory.VirtualAddress), as: IMAGE_TLS_DIRECTORY64.self)
 
       return try (pointee(tls.AddressOfIndex, as: DWORD.self), tls.EndAddressOfRawData - tls.StartAddressOfRawData)
     }
@@ -489,6 +449,61 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
 
     return tasks
+  }
+
+  private enum InvalidPEError: Error, CustomStringConvertible {
+    case invalidDosSignature(WORD)
+    case invalidNtSignature(DWORD)
+    case missingDataDirectory(index: Int, numberOfRvaAndSizes: DWORD)
+    case emptyDataDirectory(index: Int)
+
+    var description: String {
+      switch self {
+      case .invalidDosSignature(let m):
+        return "invalid DOS signature 0x\(String(m, radix: 16)), expected IMAGE_DOS_SIGNATURE (\"MZ\")"
+      case .invalidNtSignature(let s):
+        return "invalid NT signature 0x\(String(s, radix: 16)), expected IMAGE_NT_SIGNATURE (\"PE00\")"
+      case .missingDataDirectory(let index, let n):
+        return "PE has no data directory entry \(index) (NumberOfRvaAndSizes=\(n))"
+      case .emptyDataDirectory(let index):
+        return "PE data directory entry \(index) is empty (VirtualAddress=0)"
+      }
+    }
+  }
+
+  /// Reads the NT headers of `module`, which is loaded in the remote process.
+  private func ntHeaders(of module: HMODULE) throws -> IMAGE_NT_HEADERS {
+    let base = UInt64(UInt(bitPattern: module))
+    let dos = try pointee(base, as: IMAGE_DOS_HEADER.self)
+
+    guard dos.e_magic == IMAGE_DOS_SIGNATURE else {
+      throw InvalidPEError.invalidDosSignature(dos.e_magic)
+    }
+
+    let nt = try pointee(base + UInt64(dos.e_lfanew), as: IMAGE_NT_HEADERS.self)
+
+    guard nt.Signature == IMAGE_NT_SIGNATURE else {
+      let err = InvalidPEError.invalidNtSignature(nt.Signature)
+      warn("\(err)")
+      throw err
+    }
+
+    return nt
+  }
+
+  /// Reads data directory entry `index` (an `IMAGE_DIRECTORY_ENTRY_*` value)
+  /// of `module`, which is loaded in the remote process.
+  private func dataDirectory<Index: BinaryInteger>(_ index: Index, of module: HMODULE) throws -> IMAGE_DATA_DIRECTORY {
+    let nt = try ntHeaders(of: module)
+    let index = Int(index)
+    guard index < Int(nt.OptionalHeader.NumberOfRvaAndSizes) else {
+      throw InvalidPEError.missingDataDirectory(
+        index: index, numberOfRvaAndSizes: nt.OptionalHeader.NumberOfRvaAndSizes)
+    }
+    return withUnsafeBytes(of: nt.OptionalHeader.DataDirectory) {
+      $0.load(fromByteOffset: index * MemoryLayout<IMAGE_DATA_DIRECTORY>.stride,
+              as: IMAGE_DATA_DIRECTORY.self)
+    }
   }
 
   internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
