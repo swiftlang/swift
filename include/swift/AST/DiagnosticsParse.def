@@ -1872,7 +1872,7 @@ ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
 ERROR(attr_called_expected_rparen,none,
       "expected ')' after execution semantics", ())
 ERROR(attr_called_expected_semantics,none,
-      "expected 'once' as the `@called` execution semantics", ())
+      "expected 'atMostOnce' as the `@called` execution semantics", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,

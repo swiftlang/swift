@@ -481,10 +481,10 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   if (!inst->isOnStack())
     return false;
 
-  // A nonescaping closure borrows its captures (note that `@called(once)`,
-  // is allowed to also consume its captures), but now that we've lowered
-  // those borrows away, we need to make those dependence relationships explicit
-  // so that the optimizer continues respecting them.
+  // A nonescaping closure borrows its captures (note that
+  // `@called(atMostOnce)`, is allowed to also consume its captures), but now
+  // that we've lowered those borrows away, we need to make those dependence
+  // relationships explicit so that the optimizer continues respecting them.
   ApplySite applySite(inst);
   MarkDependenceInst *firstNewMDI = nullptr;
   auto newValue = withBuilder<SILValue>(inst->getNextInstruction(),
@@ -502,8 +502,9 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
         break;
       }
 
-      // In `@called(once)` case, consumed captures don't need the dependence
-      // but the borrowed ones still do i.e. a non-Copyable borrowed value.
+      // In `@called(atMostOnce)` case, consumed captures don't need the
+      // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
+      // value.
       if (inst->isCalledOnce()) {
         auto argConv = applySite.getArgumentConvention(argOp);
         if (!(op->getType().isMoveOnly() &&
@@ -812,7 +813,7 @@ static bool stripOwnership(SILFunction &func) {
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
-      // A `@called(once)` closure's context can be consumed directly by a
+      // A `@called(atMostOnce)` closure's context can be consumed directly by a
       // `try_apply`, which is a terminator, so the `dealloc_stack` has to
       // go at the start of every successor block instead.
       if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {

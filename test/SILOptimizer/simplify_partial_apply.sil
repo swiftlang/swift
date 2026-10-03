@@ -105,7 +105,7 @@ sil @closure_without_args : $@convention(thin) () -> ()
 sil @generic_closure_without_args : $@convention(thin) <T> () -> ()
 sil @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
 sil @use_noescape_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
-sil @use_called_once_closure : $@convention(thin) (@guaranteed @noescape @called(once) @callee_guaranteed () -> ()) -> ()
+sil @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LABEL: sil @test_partial_apply_without_args
 // CHECK:         [[F:%.*]] = function_ref @closure_without_args
@@ -160,18 +160,18 @@ bb0:
   return %r : $()
 }
 
-// thin_to_thick_function can't produce a @called(once) function type.
-// CHECK-LABEL: sil @test_called_once_partial_apply_without_args
+// thin_to_thick_function can't produce a @called(atMostOnce) function type.
+// CHECK-LABEL: sil @test_called_at_most_once_partial_apply_without_args
 // CHECK:         partial_apply [callee_guaranteed] [on_stack] [called_once]
 // CHECK-NOT:     thin_to_thick_function
-// CHECK:       } // end sil function 'test_called_once_partial_apply_without_args'
-sil @test_called_once_partial_apply_without_args : $@convention(thin) () -> () {
+// CHECK:       } // end sil function 'test_called_at_most_once_partial_apply_without_args'
+sil @test_called_at_most_once_partial_apply_without_args : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
   %1 = partial_apply [callee_guaranteed] [on_stack] [called_once] %0() : $@convention(thin) () -> ()
-  %2 = function_ref @use_called_once_closure : $@convention(thin) (@guaranteed @noescape @called(once) @callee_guaranteed () -> ()) -> ()
-  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @called(once) @callee_guaranteed () -> ()) -> ()
-  dealloc_stack %1 : $@noescape @called(once) @callee_guaranteed () -> ()
+  %2 = function_ref @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %1 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
   %r = tuple()
   return %r : $()
 }

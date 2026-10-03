@@ -7596,8 +7596,8 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
   // This instruction makes the context trivial, unless the result is a
-  // `@called(once)` closure, whose context remains a real refcounted object
-  // that must still be retained/released/destroyed correctly.
+  // `@called(atMostOnce)` closure, whose context remains a real refcounted
+  // object that must still be retained/released/destroyed correctly.
   bool contextIsTrivial =
       i->getType().castTo<SILFunctionType>()->isTrivialNoEscape();
   Explosion in = getLoweredExplosion(i->getOperand());

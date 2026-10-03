@@ -3543,7 +3543,7 @@ struct DefaultBlockConventions : Conventions {
   }
 };
 
-/// The default conventions for `@called(once)` closures.
+/// The default conventions for `@called(atMostOnce)` closures.
 ///
 /// Calling such a value is itself the consuming use that enforces
 /// call-at-most-once, so its context must be owned rather than guaranteed.
@@ -3740,7 +3740,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
-  // The thunk itself cannot be `@called(once)` just like a closure cannot
+  // The thunk itself cannot be `@called(atMostOnce)` just like a closure cannot
   // be since the constraint is about the value and is expressed on
   // `partial_apply` instruction that forms the value of the thunk.
   if (extInfoBuilder.isCalledOnce())
@@ -3826,7 +3826,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   // Add the formal parameters of the expected type to the thunk.
   //
-  // A `@called(once)` source function is applied inside the thunk body,
+  // A `@called(atMostOnce)` source function is applied inside the thunk body,
   // which is itself the consuming use that enforces call-at-most-once, so
   // it must be captured as `Direct_Owned`.
   auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()

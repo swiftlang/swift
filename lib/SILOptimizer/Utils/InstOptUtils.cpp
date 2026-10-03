@@ -1158,9 +1158,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     // lifetime is managed outside of the closure and there's nothing to do
     // here.
 
-    // A `@called(once)` on-stack closure can also own (consume) its captures,
-    // and is responsible for releasing them via its destructor. Release such
-    // captures here to make up for that.
+    // A `@called(atMostOnce)` on-stack closure can also own (consume) its
+    // captures, and is responsible for releasing them via its destructor.
+    // Release such captures here to make up for that.
     if (pa->isCalledOnce()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {

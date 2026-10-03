@@ -1444,7 +1444,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool isCalledOnce = false;
 
   if (auto *called = expr->getAttrs().getAttribute<CalledAttr>()) {
-    isCalledOnce = called->isOnce();
+    isCalledOnce = called->isAtMostOnce();
   }
 
   if (throws || async) {
@@ -1781,7 +1781,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     if (ty->hasTypeVariable())
       return std::pair(ty, false);
 
-    // Otherwise we've flattened the dependence, evaluate @called(once).
+    // Otherwise we've flattened the dependence, evaluate @called(atMostOnce).
     return std::make_pair(Type(), ty->isNoncopyable());
   }
 };

@@ -702,8 +702,8 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
       if (declRef.isAsyncLetClosure)
         return true;
 
-      // All of the non-Sendable captures of non-escaping @called(once) closures
-      // that aren't explicitly `sending` can be sent.
+      // All of the non-Sendable captures of non-escaping @called(atMostOnce)
+      // closures that aren't explicitly `sending` can be sent.
       if (auto *closure = declRef.getClosureExpr();
           closure && closure->isCalledOnce()) {
         auto *closureTy = closure->getType()->castTo<FunctionType>();
@@ -2358,7 +2358,7 @@ class PartitionOpTranslator {
     partialApplyReachabilityDataflow.propagateReachability();
   }
 
-  /// The argument is a non-escaping `@called(once)` value,
+  /// The argument is a non-escaping `@called(atMostOnce)` value,
   /// if it's a closure, attempt to undo send of it's implicitly
   /// sending captures if the values weren't actually sent in the
   /// body of the closure.
@@ -2819,7 +2819,7 @@ public:
   void translateSILNoEscapeCalledOncePartialApply(PartialApplyInst *pai) {
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << "Translating non-escaping `@called(once)` Partial Apply!\n");
+        << "Translating non-escaping `@called(atMostOnce)` Partial Apply!\n");
 
     for (auto &op : ApplySite(pai).getArgumentOperands()) {
       // All of the non-Sendable captures are sent by default. This would
@@ -2838,8 +2838,8 @@ public:
 
   void translateSILCalledOncePartialApply(PartialApplyInst *pai) {
     ApplySite applySite(pai);
-    REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                             << "Translating `@called(once)` Partial Apply!\n");
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "Translating `@called(atMostOnce)` Partial Apply!\n");
 
     SmallVector<Operand *> operandsToMerge;
     for (auto &op : applySite.getArgumentOperands()) {
@@ -2940,8 +2940,8 @@ public:
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
-    // `@called(once)` closures are allowed to have `sending` captures which
-    // need special handling.
+    // `@called(atMostOnce)` closures are allowed to have `sending` captures
+    // which need special handling.
     if (pai->isCalledOnce()) {
       // no-escaping closures treat non-Sendable captures that aren't explicitly
       // `sending` as individually sent and undo if the values were never
@@ -2996,7 +2996,7 @@ public:
     // For non-self parameters, gather all of the sending parameters and
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
-    // Non-escaping `@called(once)` closures require a post-call undo
+    // Non-escaping `@called(atMostOnce)` closures require a post-call undo
     // of their un-sent captures.
     SmallVector<Operand *, 2> nonescapingCalledOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
@@ -3020,7 +3020,7 @@ public:
       if (!fas.isSending(op)) {
         auto argumentType = op.get()->getType();
 
-        // Non-escaping @called(once) closures require special
+        // Non-escaping @called(atMostOnce) closures require special
         // handling to undo send of non-Sendable captures that
         // weren't sent in the body.
         if (argumentType.isCalledOnce() &&
@@ -3057,7 +3057,7 @@ public:
       }
 
       // Attempt to undo send of captures that weren't sent in the body of
-      // a non-escaping `@called(once)` closure.
+      // a non-escaping `@called(atMostOnce)` closure.
       for (Operand *op : nonescapingCalledOnceArguments) {
         tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(op);
       }
@@ -4080,8 +4080,8 @@ CONSTANT_TRANSLATION(DereferenceBorrowAddrInst, LookThrough)
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 // `assign` is ordinarily lowered away by DI before this pass but
-// non-escaping `@called(once)` and `async let` bodies require analysis
-// as part of the use (calls for `@called(once)` and `await` for
+// non-escaping `@called(atMostOnce)` and `async let` bodies require analysis
+// as part of the use (calls for `@called(atMostOnce)` and `await` for
 // `async let`) to determine whether sends of captures have to be undone
 // and that can happen before DI run on the closure and so `assign` has
 // to be treated as a `store`.

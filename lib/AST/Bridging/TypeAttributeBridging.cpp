@@ -106,8 +106,8 @@ BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
     SourceLoc semanticsLoc) {
   auto semantics = [=] {
     switch (bridgedSemantics) {
-    case BridgedCalledTypeAttrSemantics_Once:
-      return CalledTypeAttr::Semantics::Once;
+    case BridgedCalledTypeAttrSemantics_AtMostOnce:
+      return CalledTypeAttr::Semantics::AtMostOnce;
     }
     llvm_unreachable("bad kind");
   }();

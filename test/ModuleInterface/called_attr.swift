@@ -7,39 +7,39 @@
 // REQUIRES: swift_feature_CalledAttribute
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public typealias FnType = @called(once) () -> ()
+// CHECK: public typealias FnType = @called(atMostOnce) () -> ()
 // CHECK: #endif
-public typealias FnType = @called(once) () -> ()
+public typealias FnType = @called(atMostOnce) () -> ()
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public func test1(_: consuming @called(once) () -> ())
+// CHECK: public func test1(_: consuming @called(atMostOnce) () -> ())
 // CHECK: #endif
-public func test1(_: @called(once) () -> ()) {}
+public func test1(_: @called(atMostOnce) () -> ()) {}
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public func test2(_: consuming @autoclosure @called(once) () -> ())
+// CHECK: public func test2(_: consuming @autoclosure @called(atMostOnce) () -> ())
 // CHECK: #endif
-public func test2(_: @autoclosure @called(once) () -> ()) {}
+public func test2(_: @autoclosure @called(atMostOnce) () -> ()) {}
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public func test3(_: () -> @called(once) () -> Swift::Void)
+// CHECK: public func test3(_: () -> @called(atMostOnce) () -> Swift::Void)
 // CHECK: #endif
-public func test3(_: () -> @called(once) () -> Void) {}
+public func test3(_: () -> @called(atMostOnce) () -> Void) {}
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public func test4(_: consuming @escaping @called(once) () -> ())
+// CHECK: public func test4(_: consuming @escaping @called(atMostOnce) () -> ())
 // CHECK: #endif
-public func test4(_: @escaping @called(once) () -> ()) {}
+public func test4(_: @escaping @called(atMostOnce) () -> ()) {}
 
 public struct Test: ~Copyable {
   // CHECK: #if compiler(>=5.3) && $CalledAttribute
-  // CHECK: public let prop: (@called(once) () -> Swift::Void)?
+  // CHECK: public let prop: (@called(atMostOnce) () -> Swift::Void)?
   // CHECK: #endif
-  public let prop: (@called(once) () -> Void)? = nil
+  public let prop: (@called(atMostOnce) () -> Void)? = nil
 
   // CHECK: #if compiler(>=5.3) && $CalledAttribute
-  // CHECK: public func f(_: (consuming @called(once) () -> Swift::Void) -> Swift::Void)
+  // CHECK: public func f(_: (consuming @called(atMostOnce) () -> Swift::Void) -> Swift::Void)
   // CHECK: #endif
-  public func f(_: (@called(once) () -> Void) -> Void) {}
+  public func f(_: (@called(atMostOnce) () -> Void) -> Void) {}
 }
 

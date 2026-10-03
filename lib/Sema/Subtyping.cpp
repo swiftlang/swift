@@ -1195,7 +1195,8 @@ extInfoJoinMeetImpl(Operation op,
     }
 
     if (lhsCalledOnceDep && rhsCalledOnceDep) {
-      // Form a tuple; its @called(once) iff both components are @called(once).
+      // Form a tuple; its @called(atMostOnce) iff both components are
+      // @called(atMostOnce).
       SmallVector<TupleTypeElt, 2> elts;
       elts.push_back(lhsCalledOnceDep);
       elts.push_back(rhsCalledOnceDep);
@@ -1251,7 +1252,8 @@ extInfoJoinMeetImpl(Operation op,
     }
 
     if (lhsCalledOnceDep && rhsCalledOnceDep) {
-      // We cannot represent the meet of two @called(once)-dependent types.
+      // We cannot represent the meet of two @called(atMostOnce)-dependent
+      // types.
       return std::nullopt;
     } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
       if (rhsInfo.isCalledOnce()) {
