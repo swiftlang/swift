@@ -10,6 +10,13 @@
 // RUN: cat %t/useclass.h     >> %t/fixed-useclass.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %target-interop-build-clangxx -fsyntax-only %S/Inputs/swift-subclass-generic-members.cpp -I %t -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
+
+// RUN: %target-swift-frontend %s -I %t -module-name UseClass -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/useclass-exposed.h
+// RUN: echo '#include "class.h"' > %t/fixed-useclass-exposed.h
+// RUN: cat %t/useclass-exposed.h >> %t/fixed-useclass-exposed.h
+// RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass-exposed.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %target-interop-build-clangxx -fsyntax-only %S/Inputs/swift-subclass-generic-members.cpp -I %t -DEXPLICIT_EXPOSURE -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
 
 // rdar://105396625
 // UNSUPPORTED: CPU=arm64e
@@ -65,6 +72,19 @@ public class CrossModuleDerivedDerivedClass: CrossModuleDerivedClass {
   override public final func virtualMethod2InDerived() {
     print("CrossModuleDerivedDerivedClass.virtualMethod2InDerived")
   }
+}
+
+@_expose(Cxx)
+public final class GenericMemberDerivedClass: BaseClass {
+  public override init() {}
+  public func getComputedProp() -> ZGeneric<Int> { ZGeneric(9) }
+  public func novel() -> ZGeneric<Int> { ZGeneric(11) }
+}
+
+@_expose(Cxx)
+public struct ZGeneric<T> {
+  public var value: T
+  public init(_ value: T) { self.value = value }
 }
 
 public func createCrossModuleDerivedClass() -> CrossModuleDerivedClass {

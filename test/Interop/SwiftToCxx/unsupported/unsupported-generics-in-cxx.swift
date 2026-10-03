@@ -63,8 +63,12 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 
 // CHECK: supported
 
+// Struct1<UInt32> can't be represented in C++, so index1 is not printed.
 // CHECK: class SWIFT_SYMBOL("s:5Decls6Class1C") Class1 : public swift::_impl::RefCountedClass {
-// CHECK: 'index1' cannot be printed
+// CHECK-NEXT: public:
+// CHECK-NEXT:   using RefCountedClass::RefCountedClass;
+// CHECK-NEXT:   using RefCountedClass::operator=;
+// CHECK-NEXT: protected:
 
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
