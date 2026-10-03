@@ -330,3 +330,219 @@ func testExactlyOnceClosures() {
   // expected-error@-1 {{type '@called(exactlyOnce) () -> ()' cannot conform to 'Copyable'}}
   // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
+
+// MARK: - Conversions
+
+func conversionMatrix(
+  plain: @escaping () -> Void,
+  atMostOnce: @escaping @called(atMostOnce) () -> Void,
+  exactlyOnce: @escaping @called(exactlyOnce) () -> Void
+) {
+  func takesPlain(_: @escaping () -> Void) {}
+  func takesAtMostOnce(_: @escaping @called(atMostOnce) () -> Void) {}
+  func takesExactlyOnce(_: @escaping @called(exactlyOnce) () -> Void) {}
+
+  takesPlain(plain) // Ok
+  takesAtMostOnce(plain) // Ok
+  takesExactlyOnce(plain) // Ok
+
+  takesPlain(atMostOnce)
+  // expected-error@-1 {{invalid conversion from '@called(atMostOnce)' function of type '@called(atMostOnce) () -> Void' to function type '() -> Void'}}
+  takesAtMostOnce(atMostOnce) // Ok
+  takesExactlyOnce(atMostOnce) // Ok
+
+  takesPlain(exactlyOnce)
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '() -> Void'}}
+  takesAtMostOnce(exactlyOnce)
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '@called(atMostOnce) () -> Void'}}
+  takesExactlyOnce(exactlyOnce) // Ok
+
+  let _: @called(exactlyOnce) () -> Void = plain // Ok
+  let _: @called(exactlyOnce) () -> Void = atMostOnce // Ok
+  let _: @called(atMostOnce) () -> Void = exactlyOnce
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '@called(atMostOnce) () -> Void'}}
+}
+
+func conversionVariance() {
+  func takesAtMostOnce(_: @called(atMostOnce) () -> Void) {}
+  func takesExactlyOnce(_: @called(exactlyOnce) () -> Void) {}
+
+  // Parameters are contravariant.
+  let _: (@escaping @called(atMostOnce) () -> Void) -> Void = takesExactlyOnce // Ok
+  let _: (@escaping @called(exactlyOnce) () -> Void) -> Void = takesAtMostOnce
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '@called(atMostOnce) () -> Void'}}
+
+  func makePlain() -> () -> Void { {} }
+  func makeAtMostOnce() -> @called(atMostOnce) () -> Void { {} }
+  func makeExactlyOnce() -> @called(exactlyOnce) () -> Void { {} }
+
+  // Results are covariant.
+  let _: () -> @called(exactlyOnce) () -> Void = makePlain // Ok
+  let _: () -> @called(exactlyOnce) () -> Void = makeAtMostOnce // Ok
+  let _: () -> @called(atMostOnce) () -> Void = makeExactlyOnce
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '@called(atMostOnce) () -> Void'}}
+  let _: () -> () -> Void = makeExactlyOnce
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '() -> Void'}}
+}
+
+func conversionClosures() {
+  func takesExactlyOnce(_: @called(exactlyOnce) () -> Void) {}
+  func takesAtMostOnce(_: @called(atMostOnce) () -> Void) {}
+
+  takesExactlyOnce { @called(atMostOnce) in } // Ok
+  takesAtMostOnce { @called(exactlyOnce) in }
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+}
+
+func conversionJoin(
+  _ flag: Bool,
+  plain: @escaping () -> Void,
+  atMostOnce: @escaping @called(atMostOnce) () -> Void,
+  exactlyOnce: @escaping @called(exactlyOnce) () -> Void
+) {
+  // The join of two function types has the more restrictive semantics.
+  let a = flag ? plain : exactlyOnce
+  let _: () -> Void = a
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '() -> Void'}}
+  let b = flag ? atMostOnce : exactlyOnce
+  let _: @called(atMostOnce) () -> Void = b
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '@called(atMostOnce) () -> Void'}}
+  let c = flag ? plain : atMostOnce
+  let _: () -> Void = c
+  // expected-error@-1 {{invalid conversion from '@called(atMostOnce)' function of type '@called(atMostOnce) () -> Void' to function type '() -> Void'}}
+}
+
+// MARK: - Witness matching
+
+// Parameters
+protocol Completable {
+  func onCompletion(_ body: @called(exactlyOnce) () -> Void)
+  // expected-note@-1 2 {{protocol requires function 'onCompletion' with type '(consuming @called(exactlyOnce) () -> Void) -> ()'}}
+}
+
+struct Request: Completable {
+  func onCompletion(_ body: @called(exactlyOnce) () -> Void) {} // Ok
+}
+
+struct Broadcast: Completable { // expected-error {{type 'Broadcast' does not conform to protocol 'Completable'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func onCompletion(_ body: () -> Void) {}
+  // expected-note@-1 {{candidate has non-matching type '(() -> Void) -> ()'}}
+}
+
+struct Retry: Completable { // expected-error {{type 'Retry' does not conform to protocol 'Completable'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func onCompletion(_ body: @called(atMostOnce) () -> Void) {}
+  // expected-note@-1 {{candidate has non-matching type '(consuming @called(atMostOnce) () -> Void) -> ()'}}
+}
+
+protocol CompletableAtMostOnce {
+  func onCompletion(_ body: @called(atMostOnce) () -> Void)
+}
+
+struct ExactlyOnceRequest: CompletableAtMostOnce {
+  func onCompletion(_ body: @called(exactlyOnce) () -> Void) {} // Ok
+}
+
+protocol CompletablePlain {
+  func onCompletion(_ body: () -> Void)
+}
+
+struct ExactlyOncePlainRequest: CompletablePlain {
+  func onCompletion(_ body: @called(exactlyOnce) () -> Void) {} // Ok
+}
+
+// Results
+protocol SingleResponse {
+  func callback() -> @called(exactlyOnce) () -> Void
+}
+
+struct Success: SingleResponse {
+  func callback() -> () -> Void { {} } // Ok
+}
+
+struct AtMostOnceSuccess: SingleResponse {
+  func callback() -> @called(atMostOnce) () -> Void { {} } // Ok
+}
+
+struct ExactlyOnceSuccess: SingleResponse {
+  func callback() -> @called(exactlyOnce) () -> Void { {} } // Ok
+}
+
+protocol AtMostOnceResponse {
+  func callback() -> @called(atMostOnce) () -> Void
+  // expected-note@-1 {{protocol requires function 'callback()' with type '() -> @called(atMostOnce) () -> Void'}}
+}
+
+struct ExactlyOnceFailure: AtMostOnceResponse { // expected-error {{type 'ExactlyOnceFailure' does not conform to protocol 'AtMostOnceResponse'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func callback() -> @called(exactlyOnce) () -> Void { {} }
+  // expected-note@-1 {{candidate has non-matching type '() -> @called(exactlyOnce) () -> Void'}}
+}
+
+protocol Response {
+  func callback() -> () -> Void
+  // expected-note@-1 {{protocol requires function 'callback()' with type '() -> () -> Void'}}
+}
+
+struct Failure: Response { // expected-error {{type 'Failure' does not conform to protocol 'Response'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func callback() -> @called(exactlyOnce) () -> Void { {} }
+  // expected-note@-1 {{candidate has non-matching type '() -> @called(exactlyOnce) () -> Void'}}
+}
+
+// Overrides must match the `@called` semantics of the overridden method
+// exactly.
+class OverrideBase {
+  func plainParam(_: @escaping () -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'plainParam' here}}
+  func atMostOnceParam(_: @escaping @called(atMostOnce) () -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'atMostOnceParam' here}}
+  func exactlyOnceResult() -> @called(exactlyOnce) () -> Void { {} }
+  // expected-note@-1 {{potential overridden instance method 'exactlyOnceResult()' here}}
+}
+
+class OverrideDerivedBad: OverrideBase {
+  override func plainParam(_: @escaping @called(exactlyOnce) () -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func atMostOnceParam(_: @escaping @called(exactlyOnce) () -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func exactlyOnceResult() -> () -> Void { {} }
+  // expected-error@-1 {{method does not override any method from its superclass}}
+}
+
+class OverrideDerivedGood: OverrideBase {
+  override func plainParam(_: @escaping () -> Void) {}
+  override func atMostOnceParam(_: @escaping @called(atMostOnce) () -> Void) {}
+  override func exactlyOnceResult() -> @called(exactlyOnce) () -> Void { {} }
+}
+
+// MARK: - Overload resolution
+
+func overloadRanking(
+  plain: @escaping () -> Void,
+  atMostOnce: @escaping @called(atMostOnce) () -> Void,
+  exactlyOnce: @escaping @called(exactlyOnce) () -> Void
+) {
+  func overloaded(_: @escaping @called(atMostOnce) () -> Void) -> Int { 0 }
+  func overloaded(_: @escaping @called(exactlyOnce) () -> Void) -> String { "" }
+
+  // The closest execution semantics win.
+  let _: Int = overloaded(plain)
+  let _: Int = overloaded(atMostOnce)
+  let _: String = overloaded(exactlyOnce)
+
+  func plainOverloaded(_: @escaping () -> Void) -> Int { 0 }
+  func plainOverloaded(_: @escaping @called(exactlyOnce) () -> Void) -> String { "" }
+
+  let _: Int = plainOverloaded(plain)
+  let _: String = plainOverloaded(atMostOnce)
+  let _: String = plainOverloaded(exactlyOnce)
+
+  // A closure literal adopts either contextual type, so the less restrictive
+  // overload wins because it's more specialized.
+  let _: Int = overloaded { }
+  let _: Int = plainOverloaded { }
+  let _: Int = overloaded { @called(atMostOnce) in }
+  let _: String = overloaded { @called(exactlyOnce) in }
+}
