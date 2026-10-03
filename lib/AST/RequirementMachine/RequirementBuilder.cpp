@@ -229,6 +229,7 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
       case Symbol::Kind::GenericParam:
       case Symbol::Kind::Shape:
       case Symbol::Kind::PackElement:
+      case Symbol::Kind::Metatype:
         break;
       }
 

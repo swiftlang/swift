@@ -246,8 +246,8 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                                 llvm::Value *metadata) {
   assert(reqts.getRequirements()[reqtIndex].getKind()
            == GenericRequirement::Kind::WitnessTable);
-  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
-                                      IGF.IGM.WitnessTablePtrTy);
+  auto Ty = reqts.getRequirements()[reqtIndex].getType(IGF.IGM);
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex, Ty);
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -357,6 +357,11 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addClassAddressPoint() {
       Layout.MetadataAddressPoint = getNextOffset();
       super::addClassAddressPoint();
+    }
+
+    void addInstanceAddressPoint() {
+      Layout.InstanceAddressPoint = getNextOffset();
+      super::addInstanceAddressPoint();
     }
 
     void addInstanceSize() {
@@ -470,6 +475,11 @@ Size ClassMetadataLayout::getMetadataSizeOffset() const {
 Size ClassMetadataLayout::getMetadataAddressPointOffset() const {
   assert(MetadataAddressPoint.isStatic());
   return MetadataAddressPoint.getStaticOffset();
+}
+
+Size ClassMetadataLayout::getInstanceAddressPointOffset() const {
+  assert(InstanceAddressPoint.isStatic());
+  return InstanceAddressPoint.getStaticOffset();
 }
 
 Size ClassMetadataLayout::getInstanceSizeOffset() const {

@@ -95,13 +95,18 @@ struct SubstitutionMapWithLocalArchetypes {
   ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
                                     Type origType,
                                     ProtocolDecl *proto) {
-    if (origType->is<LocalArchetypeType>())
+    if (origType->hasLocalArchetype())
       return swift::lookupConformance(origType.subst(IFS), proto);
 
     if (SubsMap) {
       if (origType->is<PrimaryArchetypeType>() ||
           origType->is<PackArchetypeType>()) {
         origType = origType->mapTypeOutOfEnvironment();
+      } else if (auto *metatype = origType->getAs<AnyMetatypeType>()) {
+        auto instanceType = metatype->getInstanceType();
+        if (instanceType->is<PrimaryArchetypeType>() ||
+            instanceType->is<PackArchetypeType>())
+          origType = origType->mapTypeOutOfEnvironment();
       }
 
       return SubsMap->lookupConformance(

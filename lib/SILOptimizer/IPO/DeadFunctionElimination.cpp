@@ -219,6 +219,8 @@ class DeadFunctionAndGlobalElimination {
               ensureAlive(F);
             }
           }
+          if (auto *interface = methodWitness.InterfaceEntry)
+            ensureAlive(interface);
         } break;
 
         case SILWitnessTable::AssociatedConformance:
@@ -696,6 +698,8 @@ class DeadFunctionAndGlobalElimination {
       ++WI;
       WT->clearMethods_if([this, &changedTable]
                           (const SILWitnessTable::MethodWitness &MW) -> bool {
+        if (!MW.Witness)
+          return false;
         if (!isAlive(MW.Witness)) {
           auto *fd = cast<AbstractFunctionDecl>(MW.Requirement.getDecl());
           // Distributed method witnesses must never be cleared: the
