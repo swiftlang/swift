@@ -102,6 +102,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "Haiku",
   "WASI",
   "Emscripten",
+  "UEFI",
   "none",
 };
 
@@ -600,6 +601,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::Emscripten:
     addPlatformConditionValue(PlatformConditionKind::OS, "Emscripten");
+    break;
+  case llvm::Triple::UEFI:
+    addPlatformConditionValue(PlatformConditionKind::OS, "UEFI");
     break;
   case llvm::Triple::UnknownOS:
     if (Target.getOSName() == "none") {
