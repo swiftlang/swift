@@ -161,6 +161,10 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
     cPrologueOS << "SWIFT_EXTERN swift_interop_stub_Swift_String "
                 << manglingPrefix << "SS7cStringSSSPys4Int8VG_tcfC("
                    "const char * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;\n";
+    cPrologueOS
+        << "SWIFT_EXTERN swift_interop_stub_Swift_String "
+           "swift_stdlib_StringFromUTF8("
+           "const uint8_t * _Nonnull, size_t) SWIFT_NOEXCEPT SWIFT_CALL;\n";
     if (!embedded) {
       printer.printObjCBlock([&](raw_ostream &os) {
         os << "  ";
