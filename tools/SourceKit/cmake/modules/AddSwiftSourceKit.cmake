@@ -314,6 +314,12 @@ macro(add_sourcekit_library name)
     RUNTIME
       DESTINATION "bin"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
+  if((SOURCEKITLIB_SHARED OR SOURCEKITLIB_MODULE) AND CMAKE_CXX_LINKER_SUPPORTS_PDB)
+    swift_install_in_component(FILES $<TARGET_PDB_FILE:${name}>
+                               DESTINATION bin
+                               COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+                               OPTIONAL)
+  endif()
 
   swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
                              DESTINATION "include/SourceKit"

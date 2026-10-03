@@ -128,7 +128,17 @@ endif()
 
 install(TARGETS swift-inspect
   DESTINATION bin)
+if(CMAKE_Swift_LINKER_SUPPORTS_PDB)
+  install(FILES $<TARGET_PDB_FILE:swift-inspect>
+    DESTINATION bin
+    OPTIONAL)
+endif()
 if(WIN32)
   install(TARGETS SwiftInspectClient
     RUNTIME DESTINATION bin)
+  if(CMAKE_CXX_LINKER_SUPPORTS_PDB)
+    install(FILES $<TARGET_PDB_FILE:SwiftInspectClient>
+      DESTINATION bin
+      OPTIONAL)
+  endif()
 endif()
