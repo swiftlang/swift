@@ -19,7 +19,7 @@ func sendAgain(_ ns: sending NS) {}
 // CHECK:  [[NS_VALUE:%.*]] = load [copy] [[NS_READ]] : $*NS
 // CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s36called_at_most_once_sending_captures18testSendingCaptureyyAA2NSCnFyyXOofU_ : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK:  [[NS_COPY:%.*]] = copy_value {{%.*}} : $NS
-// CHECK:  partial_apply [called_once] [[CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK: } // end sil function '$s36called_at_most_once_sending_captures18testSendingCaptureyyAA2NSCnF'
 
 // The closure's own captured parameter carries `@sil_sending`, exactly as a
@@ -43,7 +43,7 @@ func testSendingCapture(_ ns: sending NS) {
 // CHECK:  [[NS_VALUE:%.*]] = load [copy] [[NS_READ]] : $*NS
 // CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s36called_at_most_once_sending_captures21testSendingVarCaptureyyAA2NSCnFyyXOofU_ : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK:  [[NS_COPY:%.*]] = copy_value {{%.*}} : $NS
-// CHECK:  partial_apply [called_once] [[CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK: } // end sil function '$s36called_at_most_once_sending_captures21testSendingVarCaptureyyAA2NSCnF'
 func testSendingVarCapture(_ ns: sending NS) {
   var ns = ns
@@ -57,7 +57,7 @@ func testSendingVarCapture(_ ns: sending NS) {
 // CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s36called_at_most_once_sending_captures23testConsumingAndSending3boxyAA3BoxVn_tFyyXEfU_ : $@convention(thin) (@sil_sending @owned Box) -> ()
 // CHECK:  [[BOX_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[BOX_PROJ]] : $*Box
 // CHECK:  [[BOX_VALUE:%.*]] = load [take] [[BOX_TAKE_ADDR]] : $*Box
-// CHECK:  partial_apply [called_once] [[CLOSURE_REF]]([[BOX_VALUE]]) : $@convention(thin) (@sil_sending @owned Box) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE_REF]]([[BOX_VALUE]]) : $@convention(thin) (@sil_sending @owned Box) -> ()
 // CHECK: } // end sil function '$s36called_at_most_once_sending_captures23testConsumingAndSending3boxyAA3BoxVn_tF'
 
 // The closure body sees an `@sil_sending @owned` capture, just like a
@@ -91,14 +91,14 @@ func testConsumingAndSending(box: consuming sending Box) {
 // CHECK:  [[NS_VALUE:%.*]] = load [copy] [[NS_READ]] : $*NS
 // CHECK:  [[OUTER_CLOSURE_REF:%.*]] = function_ref @$s36called_at_most_once_sending_captures22testCapturePropagationyyAA2NSCnFyyXOofU_ : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK:  [[NS_COPY:%.*]] = copy_value {{%.*}} : $NS
-// CHECK:  partial_apply [called_once] [[OUTER_CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[OUTER_CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK: } // end sil function '$s36called_at_most_once_sending_captures22testCapturePropagationyyAA2NSCnF'
 
 // CHECK-LABEL: sil private [ossa] @$s36called_at_most_once_sending_captures22testCapturePropagationyyAA2NSCnFyyXOofU_ : $@convention(thin) (@sil_sending @guaranteed NS) -> () {
 // CHECK: bb0([[NS_OUTER_CAPTURE:%.*]] : @closureCapture @guaranteed $NS):
 // CHECK:  [[INNER_CLOSURE_REF:%.*]] = function_ref @$s36called_at_most_once_sending_captures22testCapturePropagationyyAA2NSCnFyyXOofU_yyXEfU_ : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK:  [[NS_COPY:%.*]] = copy_value [[NS_OUTER_CAPTURE]] : $NS
-// CHECK:  partial_apply [called_once] [[INNER_CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[INNER_CLOSURE_REF]]([[NS_COPY]]) : $@convention(thin) (@sil_sending @guaranteed NS) -> ()
 // CHECK: } // end sil function '$s36called_at_most_once_sending_captures22testCapturePropagationyyAA2NSCnFyyXOofU_'
 
 // CHECK-LABEL: sil private [ossa] @$s36called_at_most_once_sending_captures22testCapturePropagationyyAA2NSCnFyyXOofU_yyXEfU_ : $@convention(thin) (@sil_sending @guaranteed NS) -> () {

@@ -1875,8 +1875,8 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      *this << "[called(" << CalledAttr::getSemanticsName(*semantics) << ")] ";
     }
     visitApplyInstBase(CI);
   }

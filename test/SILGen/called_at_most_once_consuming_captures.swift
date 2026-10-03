@@ -183,11 +183,11 @@ func testMixedConsumingAndBorrowingCaptures(_ consumed: consuming Resource, _ bo
 // CHECK:  [[CLOSURE_G:%.*]] = function_ref @$s38called_at_most_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU_
 // CHECK:  [[R1_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R1_PROJ]] : $*Resource
 // CHECK:  [[R1_VALUE:%.*]] = load [take] [[R1_TAKE_ADDR]] : $*Resource
-// CHECK:  partial_apply [called_once] [[CLOSURE_G]]({{.*}}, [[R1_VALUE]]) : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE_G]]({{.*}}, [[R1_VALUE]]) : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> ()
 // CHECK:  [[CLOSURE_H:%.*]] = function_ref @$s38called_at_most_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU0_
 // CHECK:  [[R2_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R2_PROJ]] : $*Resource
 // CHECK:  [[R2_VALUE:%.*]] = load [take] [[R2_TAKE_ADDR]] : $*Resource
-// CHECK:  partial_apply [called_once] [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
 // CHECK: } // end sil function '$s38called_at_most_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntF'
 
 // CHECK-LABEL: sil private [ossa] @$s38called_at_most_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU_ : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> () {
@@ -319,7 +319,7 @@ protocol Usable: ~Copyable {
 // CHECK:  [[T_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T_PROJ]] : $*T
 // CHECK:  [[T_STACK:%.*]] = alloc_stack $T
 // CHECK:  copy_addr [take] [[T_TAKE_ADDR]] to [init] [[T_STACK]] : $*T
-// CHECK:  partial_apply [called_once] {{.*}}<T>([[T_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> ()
+// CHECK:  partial_apply [called(atMostOnce)] {{.*}}<T>([[T_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> ()
 // CHECK: } // end sil function '$s38called_at_most_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlF'
 
 // CHECK-LABEL: sil private [ossa] @$s38called_at_most_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOofU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
@@ -371,7 +371,7 @@ func testIdentityCast(_ x: consuming Resource) -> Resource {
 // CHECK:  [[CLOSURE:%.*]] = function_ref @$s38called_at_most_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0K0_pRi_s_XPyXOofU_
 // CHECK:  [[C_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[C_PROJ]] : $*UsableResource
 // CHECK:  [[C_VALUE:%.*]] = load [take] [[C_TAKE_ADDR]] : $*UsableResource
-// CHECK:  partial_apply [called_once] [[CLOSURE]]([[C_VALUE]]) : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE]]([[C_VALUE]]) : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable
 // CHECK: } // end sil function '$s38called_at_most_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnF'
 
 // CHECK-LABEL: sil private [ossa] @$s38called_at_most_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0K0_pRi_s_XPyXOofU_ : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable {
@@ -400,7 +400,7 @@ func testEraseConsumesCapture(_ c: consuming UsableResource) {
 // CHECK:  [[V_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[V_PROJ]] : $*T
 // CHECK:  [[V_STACK:%.*]] = alloc_stack $T
 // CHECK:  copy_addr [take] [[V_TAKE_ADDR]] to [init] [[V_STACK]] : $*T
-// CHECK:  partial_apply [called_once] [[CLOSURE]]<T>([[V_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> @out any Usable & ~Copyable
+// CHECK:  partial_apply [called(atMostOnce)] [[CLOSURE]]<T>([[V_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> @out any Usable & ~Copyable
 // CHECK: } // end sil function '$s38called_at_most_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlF'
 
 // CHECK-LABEL: sil private [ossa] @$s38called_at_most_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlFAaC_pRi_s_XPyXOofU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> @out any Usable & ~Copyable {
@@ -425,7 +425,7 @@ func calledAtMostOnce(_ fn: @called(atMostOnce) () -> Void) { fn() }
 // CHECK:  [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_COPY]] : $Resource
 // CHECK:  [[CLOSURE:%.*]] = function_ref @$s38called_at_most_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVFyyXEfU_
 // CHECK:  [[R_ARG_COPY:%.*]] = copy_value [[R_MARKED]] : $Resource
-// CHECK:  [[PA:%.*]] = partial_apply [called_once] [[CLOSURE]]([[R_ARG_COPY]]) : $@convention(thin) (@guaranteed Resource) -> ()
+// CHECK:  [[PA:%.*]] = partial_apply [called(atMostOnce)] [[CLOSURE]]([[R_ARG_COPY]]) : $@convention(thin) (@guaranteed Resource) -> ()
 // CHECK:  {{%.*}} = convert_escape_to_noescape [[PA]] : $@called(atMostOnce) @callee_owned () -> () to $@noescape @called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function '$s38called_at_most_once_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVF'
 
@@ -453,7 +453,7 @@ func testBorrowingParameterCaptureIsNotConsumed(_ r: borrowing Resource) {
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s38called_at_most_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyFyyXEfU_
 // CHECK: [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_PROJ]] : $*Resource
 // CHECK: [[R_VALUE:%.*]] = load [copy] [[R_MARKED]] : $*Resource
-// CHECK: [[PA:%.*]] = partial_apply [called_once] [[CLOSURE]]([[R_VALUE]]) : $@convention(thin) (@guaranteed Resource) -> ()
+// CHECK: [[PA:%.*]] = partial_apply [called(atMostOnce)] [[CLOSURE]]([[R_VALUE]]) : $@convention(thin) (@guaranteed Resource) -> ()
 // CHECK: {{%.*}} = convert_escape_to_noescape [[PA]] : $@called(atMostOnce) @callee_owned () -> () to $@noescape @called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function '$s38called_at_most_once_consuming_captures32testLocalLetCaptureIsNotConsumedyyF'
 

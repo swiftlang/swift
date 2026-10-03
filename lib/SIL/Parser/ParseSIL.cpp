@@ -574,9 +574,11 @@ using SILOptionalAttrValue = std::optional<std::variant<uint64_t, StringRef>>;
 /// Returns false if no optional exists. Returns true on both success and
 /// failure. On success, the Result string is nonempty. If the optional is
 /// assigned to an integer value using an equal, \p value contains the parsed
-/// value. Otherwise, value is set to the maximum uint64_t.
+/// value. Otherwise, value is set to the maximum uint64_t. An identifier value
+/// can also follow the name in parentheses.
 ///
 /// Example: [alignment=$NUM]
+/// Example: [called(atMostOnce)]
 static bool parseSILOptional(StringRef &parsedName, SourceLoc &parsedNameLoc,
                              SILOptionalAttrValue &parsedValue,
                              SourceLoc &parsedValueLoc, SILParser &parser) {
@@ -608,6 +610,13 @@ static bool parseSILOptional(StringRef &parsedName, SourceLoc &parsedNameLoc,
       }
       parsedValue = parsedStringId.str();
     }
+  } else if (parser.P.consumeIf(tok::l_paren)) {
+    if (parser.parseSILIdentifier(parsedStringId, parsedValueLoc,
+                                  diag::expected_in_attribute_list) ||
+        parser.P.parseToken(tok::r_paren, diag::expected_in_attribute_list)) {
+      return true;
+    }
+    parsedValue = parsedStringId.str();
   }
 
   if (parser.P.parseToken(tok::r_square, diag::expected_in_attribute_list))
@@ -7366,9 +7375,19 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
-    if (AttrName == "called_once") {
-      assert(!bool(AttrValue));
-      PartialApplySemantics = ExecutionSemantics::AtMostOnce;
+    if (AttrName == "called") {
+      auto *value = AttrValue ? std::get_if<StringRef>(&*AttrValue) : nullptr;
+      if (value && *value == CalledAttr::getSemanticsName(
+                                 ExecutionSemantics::AtMostOnce)) {
+        PartialApplySemantics = ExecutionSemantics::AtMostOnce;
+      } else if (value && *value == CalledAttr::getSemanticsName(
+                                        ExecutionSemantics::Once)) {
+        PartialApplySemantics = ExecutionSemantics::Once;
+      } else {
+        P.diagnose(AttrValueLoc.isValid() ? AttrValueLoc : AttrLoc,
+                   diag::expected_in_attribute_list);
+        return true;
+      }
       continue;
     }
 

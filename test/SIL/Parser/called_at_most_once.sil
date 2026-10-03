@@ -31,16 +31,16 @@ bb0:
 }
 
 // `partial_apply` can directly produce a `@called(atMostOnce)` result via the
-// `[called_once]` attribute, without a separate `convert_function`.
+// `[called(atMostOnce)]` attribute, without a separate `convert_function`.
 // CHECK-LABEL: sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @called(atMostOnce) @callee_guaranteed () -> () {
 // CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
-// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [called_once] [[F]]() : $@convention(thin) () -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [called(atMostOnce)] [[F]]() : $@convention(thin) () -> ()
 // CHECK:   return [[PA]] : $@called(atMostOnce) @callee_guaranteed () -> ()
 // CHECK: } // end sil function 'produce_called_at_most_once_directly'
 sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @called(atMostOnce) @callee_guaranteed () -> () {
 bb0:
   %f = function_ref @thin_callee : $@convention(thin) () -> ()
-  %pa = partial_apply [callee_guaranteed] [called_once] %f() : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] [called(atMostOnce)] %f() : $@convention(thin) () -> ()
   return %pa : $@called(atMostOnce) @callee_guaranteed () -> ()
 }
 
@@ -49,13 +49,13 @@ bb0:
 // CHECK-LABEL: sil [ossa] @produce_called_at_most_once_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(atMostOnce) @callee_owned () -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:   [[F:%.*]] = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-// CHECK:   [[PA:%.*]] = partial_apply [called_once] [[F]]([[ARG]]) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [called(atMostOnce)] [[F]]([[ARG]]) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 // CHECK:   return [[PA]] : $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function 'produce_called_at_most_once_with_capture'
 sil [ossa] @produce_called_at_most_once_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(atMostOnce) @callee_owned () -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %f = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-  %pa = partial_apply [called_once] %f(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %pa = partial_apply [called(atMostOnce)] %f(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   return %pa : $@called(atMostOnce) @callee_owned () -> ()
 }
 

@@ -19,7 +19,7 @@ func acceptGenericCalledAtMostOnce<T>(_ f: @called(atMostOnce) (T) -> Void, _ va
 // CHECK-LABEL: sil hidden [ossa] @$s25called_at_most_once_thunk27genericMakeCalledAtMostOnceyyxXOoyxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T>) -> @owned @called(atMostOnce) @callee_owned @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T> {
 // CHECK:      [[CONVERTED:%.*]] = convert_function {{%.*}} : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T> to $@callee_guaranteed (@in_guaranteed T) -> ()
 // CHECK:      [[THUNK:%.*]] = function_ref @$sxIegn_xIeOoxn_lTR : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> ()) -> ()
-// CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [called_once] [[THUNK]]<T>([[CONVERTED]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> ()) -> ()
+// CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [called(atMostOnce)] [[THUNK]]<T>([[CONVERTED]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> ()) -> ()
 // CHECK:      return {{%.*}} : $@called(atMostOnce) @callee_owned @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T>
 // CHECK: } // end sil function '$s25called_at_most_once_thunk27genericMakeCalledAtMostOnceyyxXOoyxclF'
 //
@@ -35,7 +35,7 @@ func genericMakeCalledAtMostOnce<T>(_ f: @escaping (T) -> Void) -> @called(atMos
 
 // CHECK-LABEL: sil hidden [ossa] @$s25called_at_most_once_thunk28makeCalledAtMostOnceEscapingyyAA3BigVXOoyADcF : $@convention(thin) (@guaranteed @callee_guaranteed (Big) -> ()) -> @owned @called(atMostOnce) @callee_owned (Big) -> () {
 // CHECK: [[LAST_THUNK:%.*]] = function_ref @$s25called_at_most_once_thunk3BigVIegy_ACIeOoxy_TR : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
-// CHECK-NEXT: [[RESULT:%.*]] = partial_apply [called_once] [[LAST_THUNK]]({{%.*}}) : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
+// CHECK-NEXT: [[RESULT:%.*]] = partial_apply [called(atMostOnce)] [[LAST_THUNK]]({{%.*}}) : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
 // CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $@called(atMostOnce) @callee_owned (Big) -> ()
 // CHECK: } // end sil function '$s25called_at_most_once_thunk28makeCalledAtMostOnceEscapingyyAA3BigVXOoyADcF'
@@ -51,7 +51,7 @@ func makeCalledAtMostOnceEscaping(_ f: @escaping (Big) -> Void) -> @called(atMos
 
 // CHECK-LABEL: sil hidden [ossa] @$s25called_at_most_once_thunk34testNoEscapeConversionThroughThunkyyyAA3BigVc_ADtF : $@convention(thin) (@guaranteed @callee_guaranteed (Big) -> (), Big) -> () {
 // CHECK: [[THUNK:%.*]] = function_ref @$s25called_at_most_once_thunk3BigVIegy_ACIeOoxy_TR : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
-// CHECK-NEXT: [[ESCAPING:%.*]] = partial_apply [called_once] [[THUNK]]({{%.*}}) : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
+// CHECK-NEXT: [[ESCAPING:%.*]] = partial_apply [called(atMostOnce)] [[THUNK]]({{%.*}}) : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
 // CHECK-NEXT: [[NOESCAPE:%.*]] = convert_escape_to_noescape [[ESCAPING]] : $@called(atMostOnce) @callee_owned (Big) -> () to $@noescape @called(atMostOnce) @callee_owned (Big) -> ()
 // CHECK: function_ref @$s25called_at_most_once_thunk23consumeCalledAtMostOnceyyyAA3BigVXEn_ADtF
 // CHECK-NEXT: apply {{%.*}}([[NOESCAPE]], {{%.*}}) : $@convention(thin) (@owned @noescape @called(atMostOnce) @callee_owned (Big) -> (), Big) -> ()
@@ -66,7 +66,7 @@ func testNoEscapeConversionThroughThunk(_ f: @escaping (Big) -> Void, _ big: Big
 // CHECK: [[F_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_ACCESS]] : $*@noescape @called(atMostOnce) @callee_owned (Big) -> ()
 // CHECK: [[F_VALUE:%.*]] = load [copy] [[F_ADDR]] : $*@noescape @called(atMostOnce) @callee_owned (Big) -> ()
 // CHECK: [[THUNK:%.*]] = function_ref @$s25called_at_most_once_thunk3BigVIOoxy_ACIeOoxn_TR
-// CHECK: partial_apply [called_once] [[THUNK]]([[F_VALUE]]) : $@convention(thin) (@in_guaranteed Big, @owned @noescape @called(atMostOnce) @callee_owned (Big) -> ()) -> ()
+// CHECK: partial_apply [called(atMostOnce)] [[THUNK]]([[F_VALUE]]) : $@convention(thin) (@in_guaranteed Big, @owned @noescape @called(atMostOnce) @callee_owned (Big) -> ()) -> ()
 // CHECK: function_ref @$s25called_at_most_once_thunk29acceptGenericCalledAtMostOnceyyyxXEn_xtlF
 // CHECK: end_access [[F_ACCESS]] : $*@noescape @called(atMostOnce) @callee_owned (Big) -> ()
 // CHECK: } // end sil function '$s25called_at_most_once_thunk36testGenericCalledAtMostOnceParameteryyyAA3BigVXEn_ADtF'
