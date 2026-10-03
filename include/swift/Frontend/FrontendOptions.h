@@ -152,6 +152,10 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// Emit index data for imported Swift modules that were built from a
+  /// textual interface outside the SDK (e.g. binary frameworks).
+  bool IndexBinaryModules = false;
+
   /// Avoid emitting index data for imported clang modules (pcms).
   bool IndexIgnoreClangModules = false;
 
