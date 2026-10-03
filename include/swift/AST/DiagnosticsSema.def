@@ -2682,12 +2682,12 @@ WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
 
-// @called(atMostOnce)
-ERROR(called_once_cannot_be_used_with_borrowing,none,
-      "'@called(atMostOnce)' cannot be used together with 'borrowing'", ())
-ERROR(called_once_function_type_mismatch,none,
-      "invalid conversion from '@called(atMostOnce)' function of type %0 "
-      "to function type %1", (Type, Type))
+// @called
+ERROR(called_attr_cannot_be_used_with_borrowing,none,
+      "'@called(%0)' cannot be used together with 'borrowing'", (StringRef))
+ERROR(called_attr_function_type_mismatch,none,
+      "invalid conversion from '@called(%0)' function of type %1 "
+      "to function type %2", (StringRef, Type, Type))
 ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
       "'CalledAttribute' is enabled",

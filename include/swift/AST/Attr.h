@@ -3958,6 +3958,14 @@ public:
     return ExecutionSemantics(Bits.CalledAttr.Semantics);
   }
 
+  const char *getSemanticsName() const {
+    return getSemanticsName(getSemantics());
+  }
+
+  /// Returns the source spelling of the argument of `@called` for the given
+  /// execution semantics, such as `atMostOnce`.
+  static const char *getSemanticsName(ExecutionSemantics semantics);
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Called;
   }

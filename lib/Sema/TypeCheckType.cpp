@@ -4279,7 +4279,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
         diagnose(eltTypeRepr->getLoc(),
-                 diag::called_once_cannot_be_used_with_borrowing);
+                 diag::called_attr_cannot_be_used_with_borrowing,
+                 CalledAttr::getSemanticsName(*fnTy->getExecutionSemantics()));
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
 

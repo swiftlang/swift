@@ -374,6 +374,14 @@ CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
   llvm_unreachable("bad kind");
 }
 
+const char *CalledAttr::getSemanticsName(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::AtMostOnce:
+    return "atMostOnce";
+  }
+  llvm_unreachable("bad kind");
+}
+
 void CalledTypeAttr::printImpl(ASTPrinter &printer,
                                const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
