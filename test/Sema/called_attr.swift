@@ -806,3 +806,32 @@ struct WrappedStorage: ~Copyable {
   // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' cannot conform to 'Deinitable'}}
   // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
+
+// MARK: - Conventions
+
+func conventions(
+  _: @convention(c) @called(atMostOnce) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+  _: @convention(thin) @called(atMostOnce) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+  _: @convention(block) @called(atMostOnce) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+  _: @convention(c) @called(exactlyOnce) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+  _: @convention(thin) @called(exactlyOnce) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+  _: @convention(block) @called(exactlyOnce) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+  _: @convention(swift) @called(atMostOnce) () -> Void, // Ok
+  _: @convention(swift) @called(exactlyOnce) () -> Void // Ok
+) {}
+
+// MARK: - copy
+
+func copyOperator(
+  _ exactlyOnce: @called(exactlyOnce) () -> Void,
+  _ atMostOnce: @called(atMostOnce) () -> Void
+) {
+  _ = copy exactlyOnce // expected-error {{'copy' cannot be applied to noncopyable types}}
+  _ = copy atMostOnce // expected-error {{'copy' cannot be applied to noncopyable types}}
+}

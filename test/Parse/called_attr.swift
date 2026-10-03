@@ -40,10 +40,6 @@ struct Test : ~Copyable {
   // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 }
 
-func testWithConvention(_: @convention(block) @called(atMostOnce) () -> Void) {}
-// expected-supported-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
-// expected-forbidden-error@-2 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
-
 typealias ExactlyOnceFnType = @called(exactlyOnce) () -> () // Ok
 // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 
