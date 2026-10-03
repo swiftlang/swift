@@ -1384,6 +1384,9 @@ ClangImporter::computeClangImporterFileSystem(
 
   auto overridenVFS =
       llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  auto overlayVFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+      std::move(baseFS));
+  overlayVFS->pushOverlay(overridenVFS);
   for (const auto &file : recipe.overridenFiles) {
     if (recipe.dumpClangDiagnostics) {
       llvm::errs() << "clang importer overriding file '" << file.path
@@ -1392,9 +1395,6 @@ ClangImporter::computeClangImporterFileSystem(
     }
     overridenVFS->addFileNoOwn(file.path, 0, file.contents);
   }
-  auto overlayVFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
-      std::move(baseFS));
-  overlayVFS->pushOverlay(std::move(overridenVFS));
   return overlayVFS;
 }
 
