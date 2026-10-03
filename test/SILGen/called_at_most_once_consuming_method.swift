@@ -36,7 +36,7 @@ func runAtMostOnce(_ f: @called(atMostOnce) () -> Void) {
 // CHECK-LABEL: sil private [ossa] @$s36called_at_most_once_consuming_method10testSimpleyyAA8ResourceVnFyyXOoADncfu_ : $@convention(thin) (@owned Resource) -> @owned @called(atMostOnce) @callee_owned () -> () {
 // CHECK: [[THUNK:%.*]] = function_ref @$s36called_at_most_once_consuming_method10testSimpleyyAA8ResourceVnFyyXOoADncfu_yyXOofu0_ : $@convention(thin) (@owned Resource) -> ()
 // CHECK: [[VALUE:%.*]] = load [take] {{%.*}} : $*Resource
-// CHECK: [[CLOSURE:%.*]] = partial_apply [called_once] [[THUNK]]([[VALUE]]) : $@convention(thin) (@owned Resource) -> ()
+// CHECK: [[CLOSURE:%.*]] = partial_apply [called_at_most_once] [[THUNK]]([[VALUE]]) : $@convention(thin) (@owned Resource) -> ()
 // CHECK: return [[CLOSURE]] : $@called(atMostOnce) @callee_owned () -> ()
 // CHECK: } // end sil function '$s36called_at_most_once_consuming_method10testSimpleyyAA8ResourceVnFyyXOoADncfu_'
 func testSimple(_ r: consuming Resource) {
@@ -71,7 +71,7 @@ func testCopyableViaGenericParameter(_ b: consuming Box<Int>) {
 
 // CHECK-LABEL: sil private [ossa] @$s36called_at_most_once_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlFxyXOoAFncfu_ : $@convention(thin) <T where T : ~Copyable> (@in Box<T>) -> @owned @called(atMostOnce) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T> {
 // CHECK: [[THUNK:%.*]] = function_ref @$s36called_at_most_once_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlFxyXOoAFncfu_xyXOofu0_ : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Box<τ_0_0>) -> @out τ_0_0
-// CHECK: [[CLOSURE:%.*]] = partial_apply [called_once] [[THUNK]]<T>({{%.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Box<τ_0_0>) -> @out τ_0_0
+// CHECK: [[CLOSURE:%.*]] = partial_apply [called_at_most_once] [[THUNK]]<T>({{%.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Box<τ_0_0>) -> @out τ_0_0
 // CHECK: [[SUBSTITUTED:%.*]] = convert_function [[CLOSURE]] : $@called(atMostOnce) @callee_owned () -> @out T to $@called(atMostOnce) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T>
 // CHECK: return [[SUBSTITUTED]] : $@called(atMostOnce) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T>
 // CHECK: } // end sil function '$s36called_at_most_once_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlFxyXOoAFncfu_'
@@ -125,7 +125,7 @@ func pick(_: String) -> String { "" }
 //
 // CHECK: [[FALSE_BB]]:
 // CHECK: [[FALSE_REF:%.*]] = function_ref @$s36called_at_most_once_consuming_method26testJoinWithDependentTypesyxSbRi_zlFAA3BoxVyxGyXOofU_ : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> () -> @out Box<τ_0_0>
-// CHECK: [[FALSE_CLOSURE:%.*]] = partial_apply [called_once] [[FALSE_REF]]<T>() : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> () -> @out Box<τ_0_0>
+// CHECK: [[FALSE_CLOSURE:%.*]] = partial_apply [called_at_most_once] [[FALSE_REF]]<T>() : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> () -> @out Box<τ_0_0>
 // CHECK: [[FALSE_VALUE:%.*]] = convert_function [[FALSE_CLOSURE]] : $@called(atMostOnce) @callee_owned () -> @out Box<T> to $@called(atMostOnce) @callee_owned @substituted <τ_0_0> () -> @out Box<τ_0_0> for <T>
 // CHECK: br [[JOIN_BB]]([[FALSE_VALUE]] : $@called(atMostOnce) @callee_owned @substituted <τ_0_0> () -> @out Box<τ_0_0> for <T>)
 //
