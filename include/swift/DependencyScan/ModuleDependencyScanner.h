@@ -120,9 +120,40 @@ public:
       std::shared_ptr<llvm::cas::ObjectStore> CAS,
       std::shared_ptr<llvm::cas::ActionCache> ActionCache,
       DependencyScannerDiagnosticReporter &DiagnosticReporter,
-      llvm::PrefixMapper *mapper, bool ShareClangCompilerInstance);
+      llvm::PrefixMapper *mapper);
 
 private:
+  /// Take Clang module names from \p getNextModuleName until they run out,
+  /// query them using a single Clang compiler instance, and record the
+  /// results.
+  ///
+  ///  \param getNextModuleName a callback returning the name of the next module
+  ///  to query, or \c std::nullopt once there are none left
+  ///
+  ///  \param lookupModuleCallback a callback to compute a client-specific
+  ///  module-cache-relative output path for discovered Clang module
+  ///  dependencies.
+  ///
+  ///  \param alreadySeenModules a set of module dependencies previously seen
+  ///  by the scanner, as to avoid processing them all over again
+  ///
+  ///  \param discoveredDependencyInfos records each discovered Clang module
+  ///
+  ///  \param visibleModules records the visible modules of each found module
+  ///
+  ///  \param resultAccessLock guards \p discoveredDependencyInfos and
+  ///  \p visibleModules, which other workers may be updating concurrently
+  ///
+  ///  \returns whether every query succeeded
+  bool drainClangModuleQueries(
+      llvm::function_ref<std::optional<std::string>()> getNextModuleName,
+      LookupModuleOutputCallback lookupModuleCallback,
+      const llvm::DenseSet<clang::dependencies::ModuleID> &alreadySeenModules,
+      llvm::StringMap<clang::dependencies::ModuleDeps>
+          &discoveredDependencyInfos,
+      llvm::StringMap<std::vector<std::string>> &visibleModules,
+      std::mutex &resultAccessLock);
+
   /// Query dependency information for a named Clang module
   ///
   /// \param moduleName moduel identifier for the query
@@ -195,12 +226,6 @@ private:
   std::unique_ptr<InterfaceSubContextDelegateImpl> scanningASTDelegate;
   // The Clang scanner tool used by this worker.
   clang::tooling::DependencyScanningTool clangScanningTool;
-  // A persistent by-name scanning context maintaining a single Clang compiler
-  // instance that is reused across all by-name lookups performed by this worker
-  // when \c ShareClangCompilerInstance is set. Lazily created on the first
-  // by-name query.
-  std::optional<clang::tooling::CompilerInstanceWithContext>
-      clangScanningContext;
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
 
@@ -220,10 +245,6 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
   // Working directory for clang module lookup queries
   std::string clangScanningWorkingDirectoryPath;
-
-  // Flag to use a single clang compiler instance to do all
-  // dependency queries during the life time of this worker.
-  bool ShareClangCompilerInstance = true;
 
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
@@ -375,7 +396,7 @@ private:
 
   /// Perform an operation utilizing one of the Scanning workers
   /// available to this scanner.
-  template <typename Function, typename... Args>
+  template <bool CountLookup = true, typename Function, typename... Args>
   auto withDependencyScanningWorker(Function &&F, Args &&...ArgList);
 
   /// Determine cache-relative output path for a given Clang module
@@ -400,6 +421,21 @@ private:
   void performClangModuleLookup(
       const ImportStatementInfoMap &unresolvedImportsMap,
       const ImportStatementInfoMap &unresolvedOptionalImportsMap,
+      BatchClangModuleLookupResult &result);
+
+  /// Helper method that implements a clang dependency scanning algorithm
+  /// that reuses a clang compiler instance within a worker.
+  void performClangModuleLookupSharingCompilerInstances(
+      ArrayRef<StringRef> moduleNames,
+      const llvm::DenseSet<clang::dependencies::ModuleID> &seenClangModules,
+      BatchClangModuleLookupResult &result);
+
+  /// Helper method that implements a clang dependency scanning algorithm
+  /// that creates a new clang compiler instance for every module name
+  /// it scans.
+  void performClangModuleLookupPerName(
+      ArrayRef<StringRef> moduleNames,
+      const llvm::DenseSet<clang::dependencies::ModuleID> &seenClangModules,
       BatchClangModuleLookupResult &result);
 
   /// Given a result of a batch Clang module dependency lookup,
@@ -464,8 +500,15 @@ private:
   llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.
   std::mutex WorkersLock;
-  /// Count of filesystem queries performed
+  /// Count of lookups the scanner performed on the filesystem rather than
+  /// answering from the dependency cache: one per module name looked up and
+  /// one per header scan. Reported as the NumDepScanFilesystemLookups
+  /// frontend statistic.
   std::atomic<unsigned> NumLookups = 0;
+
+  /// Whether each worker uses a single Clang compiler instance for all of
+  /// the Clang module names it queries, rather than one per name.
+  const bool ShareClangCompilerInstance = true;
 };
 
 /// Check if a module path is under one of the known SDK private framework
