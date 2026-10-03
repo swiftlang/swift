@@ -248,6 +248,25 @@ StringCreateTests.test("Validating.utf16")
   expectEqual(String(validating: AnySequence(i1), as: UTF16.self), s1)
   expectEqual(String(validating: AnySequence(i2), as: UTF16.self), s2)
   expectNil(String(validating: AnyCollection(i3), as: UTF16.self))
+
+  // Cover the contiguous path (the one that goes through String._validate) for
+  // each shape: empty, small enough for a _SmallString, large, all-ASCII, and
+  // surrogate pairs.
+  for simpleString in SimpleString.allCases {
+    let expected = simpleString.rawValue
+    let units = Array(expected.utf16)
+    expectEqual(
+      String(validating: units, as: UTF16.self), expected, "\(simpleString)")
+    expectEqual(
+      units.withUnsafeBufferPointer { String(validating: $0, as: UTF16.self) },
+      expected,
+      "\(simpleString)")
+  }
+
+  // Unpaired surrogates at the end of the buffer, where a truncated pair and a
+  // lone trailing surrogate are easiest to get wrong.
+  expectNil(String(validating: [0x41, 0xd801] as [UInt16], as: UTF16.self))
+  expectNil(String(validating: [0x41, 0xdc01] as [UInt16], as: UTF16.self))
 }
 
 StringCreateTests.test("UTF16.surrogatePairAtBlockBoundary")
