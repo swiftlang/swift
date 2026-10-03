@@ -292,7 +292,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // special-case this instruction.
 OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *i) {
-  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+  return i->getType().castTo<SILFunctionType>()->hasCalledAtMostOnceSemantics()
              ? OperandOwnership::ForwardingConsume
              : OperandOwnership::PointerEscape;
 }
@@ -661,7 +661,7 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
       return OperandOwnership::TrivialUse;
     }
 
-    if (i->isCalledOnce()) {
+    if (i->hasCalledAtMostOnceSemantics()) {
       auto argConv = ApplySite(i).getArgumentConvention(op);
       // Borrowed non-Copyable captures aren't owned by the closure.
       if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())

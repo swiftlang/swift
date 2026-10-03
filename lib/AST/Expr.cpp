@@ -2112,8 +2112,8 @@ bool AbstractClosureExpr::isBodyAsync() const {
   return getOrComputeExtInfo(this).isAsync();
 }
 
-bool AbstractClosureExpr::isCalledOnce() const {
-  return getOrComputeExtInfo(this).isCalledOnce();
+bool AbstractClosureExpr::hasCalledAtMostOnceSemantics() const {
+  return getOrComputeExtInfo(this).hasCalledAtMostOnceSemantics();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {

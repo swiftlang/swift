@@ -761,7 +761,7 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
   std::function<bool(Type)> hasCalled = [](Type T) {
     if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
-      return F->isCalledOnce();
+      return F->hasCalledAtMostOnceSemantics();
     return false;
   };
 

@@ -414,8 +414,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 18 };
-  enum { NumSILExtInfoBits = 16 };
+  enum { NumAFTExtInfoBits = 19 };
+  enum { NumSILExtInfoBits = 17 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -453,7 +453,7 @@ protected:
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
     HasSendableDependence : 1,
-    HasCalledOnceDependence : 1
+    HasExecutionSemanticsDependence : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -3775,8 +3775,8 @@ protected:
           !Info.value().getLifetimeDependencies().empty();
       Bits.AnyFunctionType.HasSendableDependence =
           !Info->getSendableDependentType().isNull();
-      Bits.AnyFunctionType.HasCalledOnceDependence =
-          !Info->getCalledOnceDependentType().isNull();
+      Bits.AnyFunctionType.HasExecutionSemanticsDependence =
+          !Info->getExecutionSemanticsDependentType().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3790,7 +3790,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
       Bits.AnyFunctionType.HasSendableDependence = false;
-      Bits.AnyFunctionType.HasCalledOnceDependence = false;
+      Bits.AnyFunctionType.HasExecutionSemanticsDependence = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3865,8 +3865,8 @@ public:
     return Bits.AnyFunctionType.HasSendableDependence;
   }
 
-  bool hasCalledOnceDependentType() const {
-    return Bits.AnyFunctionType.HasCalledOnceDependence;
+  bool hasExecutionSemanticsDependentType() const {
+    return Bits.AnyFunctionType.HasExecutionSemanticsDependence;
   }
 
   bool hasLifetimeDependencies() const {
@@ -3891,7 +3891,7 @@ public:
   /// A dependent type that determines whether the function is
   /// @called(atMostOnce). This is only used within the constraint system, and
   /// will contain type variables if present.
-  Type getCalledOnceDependentType() const;
+  Type getExecutionSemanticsDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3943,10 +3943,10 @@ public:
 
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
-    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getGlobalActor(), getThrownError(),
-                   getSendableDependentType(), getCalledOnceDependentType(),
-                   getLifetimeDependencies());
+    return ExtInfo(
+        Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(), getGlobalActor(),
+        getThrownError(), getSendableDependentType(),
+        getExecutionSemanticsDependentType(), getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4094,8 +4094,9 @@ public:
   /// Return the function type setting sendable to \p newValue.
   AnyFunctionType *withSendable(bool newValue) const;
 
-  /// Return the function type setting @called(atMostOnce) to \p newValue.
-  AnyFunctionType *withCalledOnce(bool newValue) const;
+  /// Return the function type setting the execution semantics to \p newValue.
+  AnyFunctionType *
+  withExecutionSemantics(std::optional<ExecutionSemantics> newValue) const;
 
   /// Return the function type without yields (and coroutine flag)
   AnyFunctionType *getWithoutYields() const;
@@ -4123,7 +4124,14 @@ public:
     return getExtInfo().getDifferentiabilityKind();
   }
 
-  bool isCalledOnce() const;
+  std::optional<ExecutionSemantics> getExecutionSemantics() const;
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getExecutionSemantics().has_value();
+  }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
@@ -4216,7 +4224,7 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return hasGlobalActor() + hasThrownError() + hasSendableDependentType() +
-           hasCalledOnceDependentType();
+           hasExecutionSemanticsDependentType();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4276,8 +4284,8 @@ public:
   /// A dependent type that determines whether the function is
   /// @called(atMostOnce). This is only used within the constraint system, and
   /// will contain type variables if present.
-  Type getCalledOnceDependentType() const {
-    if (!hasCalledOnceDependentType())
+  Type getExecutionSemanticsDependentType() const {
+    if (!hasExecutionSemanticsDependentType())
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError() +
                                       hasSendableDependentType()];
@@ -5639,7 +5647,16 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
-  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+  std::optional<ExecutionSemantics> getExecutionSemantics() const {
+    return getExtInfo().getExecutionSemantics();
+  }
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getExtInfo().hasCalledAtMostOnceSemantics();
+  }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }
@@ -6282,7 +6299,7 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick &&
-           !isCalledOnce();
+           !hasCalledAtMostOnceSemantics();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }

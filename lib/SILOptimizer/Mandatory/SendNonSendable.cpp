@@ -2723,7 +2723,7 @@ void UseAfterSendDiagnosticInferrer::infer() {
   if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
     // @called(atMostOnce) closures can have both implicit and explicit
     // `sending` captures.
-    if (pai->isCalledOnce()) {
+    if (pai->hasCalledAtMostOnceSemantics()) {
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
         return diagnosticEmitter.emitNamedUseofStronglySentValue(
             baseLoc, rootValueAndName->first);
@@ -3682,7 +3682,7 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
     // Let's use the captured value's tracked isolation (when it is
     // actor-isolated) as the caller isolation.
     if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
-        pai && pai->isCalledOnce()) {
+        pai && pai->hasCalledAtMostOnceSemantics()) {
       std::optional<ActorIsolation> callerIsolation;
       if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
         callerIsolation =

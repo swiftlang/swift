@@ -6795,7 +6795,8 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
-        printFlag(T->isCalledOnce(), "called_once");
+        printFlag(T->getExecutionSemantics() == ExecutionSemantics::AtMostOnce,
+                  "called_once");
         printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {

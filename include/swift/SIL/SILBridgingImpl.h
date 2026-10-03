@@ -1750,8 +1750,12 @@ SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() c
   return swift::ApplySite(unbridged()).getSubstCalleeArgIndexOfFirstAppliedArg();
 }
 
-bool BridgedInstruction::PartialApplyInst_isCalledOnce() const {
-  return getAs<swift::PartialApplyInst>()->isCalledOnce();
+BridgedOptionalExecutionSemantics
+BridgedInstruction::PartialApplyInst_getExecutionSemantics() const {
+  if (auto semantics =
+          getAs<swift::PartialApplyInst>()->getExecutionSemantics())
+    return *semantics;
+  return {};
 }
 
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
@@ -3216,7 +3220,8 @@ BridgedInstruction BridgedBuilder::createPartialApply(
     BridgedValue funcRef, BridgedValueArray bridgedCapturedArgs,
     BridgedArgumentConvention calleeConvention,
     BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
-    bool isOnStack, bool isNested, bool isCalledOnce,
+    bool isOnStack, bool isNested, bool hasExecutionSemantics,
+    swift::ExecutionSemantics executionSemantics,
     OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
   llvm::ArrayRef<swift::SILValue> args =
@@ -3226,7 +3231,7 @@ BridgedInstruction BridgedBuilder::createPartialApply(
       args, getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
-      isCalledOnce,
+      hasExecutionSemantics ? std::optional(executionSemantics) : std::nullopt,
       isOnStack ? swift::PartialApplyInst::OnStack
                 : swift::PartialApplyInst::NotOnStack,
       swift::StackAllocationIsNested_t(isNested),

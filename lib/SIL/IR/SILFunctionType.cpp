@@ -3547,8 +3547,8 @@ struct DefaultBlockConventions : Conventions {
 ///
 /// Calling such a value is itself the consuming use that enforces
 /// call-at-most-once, so its context must be owned rather than guaranteed.
-struct DefaultCalledOnceConventions : DefaultConventions {
-  DefaultCalledOnceConventions()
+struct DefaultCalledAtMostOnceSemanticsConventions : DefaultConventions {
+  DefaultCalledAtMostOnceSemanticsConventions()
       : DefaultConventions(NormalParameterConvention::Guaranteed) {}
 
   ParameterConvention getCallee() const override {
@@ -3616,8 +3616,9 @@ static CanSILFunctionType getNativeSILFunctionType(
         }
       }
 
-      if (substInterfaceType->isCalledOnce())
-        return getSILFunctionTypeForConventions(DefaultCalledOnceConventions());
+      if (substInterfaceType->hasCalledAtMostOnceSemantics())
+        return getSILFunctionTypeForConventions(
+            DefaultCalledAtMostOnceSemanticsConventions());
 
       return getSILFunctionTypeForConventions(
           DefaultConventions(NormalParameterConvention::Guaranteed));
@@ -3743,8 +3744,8 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   // The thunk itself cannot be `@called(atMostOnce)` just like a closure cannot
   // be since the constraint is about the value and is expressed on
   // `partial_apply` instruction that forms the value of the thunk.
-  if (extInfoBuilder.isCalledOnce())
-    extInfoBuilder = extInfoBuilder.withCalledOnce(false);
+  if (extInfoBuilder.hasCalledAtMostOnceSemantics())
+    extInfoBuilder = extInfoBuilder.withExecutionSemantics(std::nullopt);
 
   // Does the thunk type involve a local archetype type?
   SmallVector<GenericEnvironment *, 2> capturedEnvs;
@@ -3831,7 +3832,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   // it must be captured as `Direct_Owned`.
   auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
                                ? ParameterConvention::Direct_Unowned
-                           : sourceType->isCalledOnce()
+                           : sourceType->hasCalledAtMostOnceSemantics()
                                ? ParameterConvention::Direct_Owned
                                : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;

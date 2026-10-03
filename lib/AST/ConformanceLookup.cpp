@@ -316,18 +316,18 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
   }
 }
 
-static bool isCalledOnceFunctionType(EitherFunctionType eitherFnTy) {
+static bool hasCalledAtMostOnceSemantics(EitherFunctionType eitherFnTy) {
   if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>()) {
-    return fnTy->isCalledOnce();
+    return fnTy->hasCalledAtMostOnceSemantics();
   }
 
   auto silFnTy = cast<const SILFunctionType *>(eitherFnTy);
-  return silFnTy->isCalledOnce();
+  return silFnTy->hasCalledAtMostOnceSemantics();
 }
 
 /// Whether the given function type conforms to Copyable.
 static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
-  if (isCalledOnceFunctionType(eitherFnTy))
+  if (hasCalledAtMostOnceSemantics(eitherFnTy))
     return false;
 
   return true;
@@ -349,7 +349,7 @@ static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
-  if (isCalledOnceFunctionType(eitherFnTy))
+  if (hasCalledAtMostOnceSemantics(eitherFnTy))
     return false;
 
   SILFunctionTypeRepresentation representation;

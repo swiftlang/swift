@@ -1581,7 +1581,8 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
       pai->getCalleeConvention(), pai->getResultIsolation(),
-      pai->isCalledOnce(), pai->isOnStack(), pai->isStackAllocationNested(),
+      pai->getExecutionSemantics(), pai->isOnStack(),
+      pai->isStackAllocationNested(),
       /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

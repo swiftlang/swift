@@ -935,9 +935,9 @@ bool SILType::isDifferentiable(SILModule &M) const {
       .has_value();
 }
 
-bool SILType::isCalledOnce() const {
+bool SILType::hasCalledAtMostOnceSemantics() const {
   if (auto F = dyn_cast<SILFunctionType>(getASTType()))
-    return F->isCalledOnce();
+    return F->hasCalledAtMostOnceSemantics();
   return false;
 }
 
@@ -1167,7 +1167,7 @@ bool SILType::isMoveOnly(bool orWrapped) const {
   }
    */
   if (auto F = dyn_cast<SILFunctionType>(ty))
-    return F->isCalledOnce();
+    return F->hasCalledAtMostOnceSemantics();
 
   // Treat all other SIL-specific types as Copyable.
   if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||

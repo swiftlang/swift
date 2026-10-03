@@ -7895,8 +7895,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // '@called(atMostOnce)' bit to the closure without invalidating prior
     // analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.isCalledOnce() && !fromEI.isCalledOnce()) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withCalledOnce());
+    if (toEI.hasCalledAtMostOnceSemantics() &&
+        !fromEI.hasCalledAtMostOnceSemantics()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withExecutionSemantics(toEI.getExecutionSemantics()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 

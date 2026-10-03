@@ -2943,13 +2943,13 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   // First check to see if we have any @called(atMostOnce) dependent function
   // types, if any of them still have unresolved type variables we need to wait
   // until they're fully resolved.
-  auto dep1 = func1->getCalledOnceDependentType();
+  auto dep1 = func1->getExecutionSemanticsDependentType();
   if (dep1) {
     dep1 = simplifyType(dep1);
     if (dep1->hasTypeVariable())
       return formUnsolved();
   }
-  auto dep2 = func2->getCalledOnceDependentType();
+  auto dep2 = func2->getExecutionSemanticsDependentType();
   if (dep2) {
     dep2 = simplifyType(dep2);
     if (dep2->hasTypeVariable())
@@ -2958,11 +2958,13 @@ ConstraintSystem::matchFunctionExecutionSemantics(
 
   // Sendability is given by either the sendability of the dependent type if
   // present, otherwise it's given by the function itself.
-  auto func1CalledOnce = dep1 ? dep1->isNoncopyable() : func1->isCalledOnce();
-  auto func2CalledOnce = dep2 ? dep2->isNoncopyable() : func2->isCalledOnce();
+  auto func1HasCalledAtMostOnceSemantics =
+      dep1 ? dep1->isNoncopyable() : func1->hasCalledAtMostOnceSemantics();
+  auto func2HasCalledAtMostOnceSemantics =
+      dep2 ? dep2->isNoncopyable() : func2->hasCalledAtMostOnceSemantics();
 
-  if (func1CalledOnce != func2CalledOnce) {
-    if (func1CalledOnce || kind < ConstraintKind::Subtype) {
+  if (func1HasCalledAtMostOnceSemantics != func2HasCalledAtMostOnceSemantics) {
+    if (func1HasCalledAtMostOnceSemantics || kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
@@ -12588,11 +12590,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
 
     // Infer `@called(atMostOnce)` from the contextual type.
-    if (!closureExtInfo.isCalledOnce()) {
-      if (auto calledOnceTy = contextualFnType->getCalledOnceDependentType()) {
-        closureExtInfo = closureExtInfo.withCalledOnceDependentType(calledOnceTy);
-      } else if (contextualFnType->isCalledOnce()) {
-        closureExtInfo = closureExtInfo.withCalledOnce();
+    if (!closureExtInfo.hasCalledAtMostOnceSemantics()) {
+      if (auto executionSemanticsTy =
+              contextualFnType->getExecutionSemanticsDependentType()) {
+        closureExtInfo = closureExtInfo.withExecutionSemanticsDependentType(
+            executionSemanticsTy);
+      } else if (auto semantics = contextualFnType->getExecutionSemantics()) {
+        closureExtInfo = closureExtInfo.withExecutionSemantics(semantics);
       }
     }
   }
