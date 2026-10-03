@@ -73,6 +73,23 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 uint32_t _swift_concurrency_debug_internal_layout_version;
 
+#if defined(_WIN32)
+/// On Windows, when the current task is stored in a C++ `thread_local`
+/// (SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_CXX_THREAD_LOCAL), this is the
+/// byte offset of the current-task pointer within swift_Concurrency's
+/// per-thread implicit TLS block. To find a thread's current task:
+///
+///   tlsBlock = ((void **)Teb->ThreadLocalStoragePointer)[_tls_index]
+///   task     = *(AsyncTask **)((char *)tlsBlock + offset)
+///
+/// where `_tls_index` is read from the `AddressOfIndex` field of the image's
+/// IMAGE_TLS_DIRECTORY. The linker resolves this value (a SECREL relocation)
+/// when it links the image. It is defined in Actor.cpp and is not present on
+/// other platforms or storage kinds.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const uint32_t _swift_concurrency_debug_current_task_tls_offset;
+#endif
+
 } // namespace swift
 
 #endif
