@@ -359,6 +359,7 @@ EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
 EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
+EXPERIMENTAL_FEATURE(DeploymentTargetCondition, false)
 
 // Whether to compile scripts lazily in immediate mode
 EXPERIMENTAL_FEATURE(LazyImmediate, false)
