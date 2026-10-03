@@ -10,49 +10,62 @@
 //
 //===----------------------------------------------------------------------===//
 
-// The following modules have to be standalone top-level modules to deal with
-// version 10.0.26100 of the Windows SDK.
-module _complex [system] [no_undeclared_includes] {
+// These internal top-level modules break cycles among the UCRT, Clang builtin,
+// and C++ standard-library headers. Keep the ownership graph independent of the
+// installed Windows SDK version.
+module _complex [system] {
   use corecrt
   use std
   header "complex.h"
   export *
 }
 
-module _fenv [system] [no_undeclared_includes] {
-  use _float
+module _fenv [system] {
+  use _Builtin_float
   use corecrt
   header "fenv.h"
   export *
 }
 
-module _float [system] [no_undeclared_includes] {
+module _float [system] {
   use corecrt
   header "float.h"
   export *
 }
 
-module _malloc [system] [no_undeclared_includes] {
+module _malloc [system] {
   use corecrt
   header "malloc.h"
   export *
 }
 
-module _stdlib [system] [no_undeclared_includes] {
+module _stdlib [system] {
+  use _Builtin_limits
   use corecrt
-  use vcruntime
   header "stdlib.h"
   export *
 }
 
 module ucrt [system] {
+  use _Builtin_stdint
+  use _fenv
+  use _float
+  use _malloc
+  use _stdlib
+  use corecrt
+  use std_config
+  use vcruntime
+
+  header "SwiftUCRT.h"
+  config_macros NDEBUG
+
+  export *
 
   module C {
-    export _complex
-    export _fenv
-    export _float
-    export _malloc
-    export _stdlib
+    module assert {
+      header "assert.h"
+      export *
+    }
 
     module ctype {
       header "ctype.h"
@@ -64,16 +77,6 @@ module ucrt [system] {
       export *
     }
 
-    module fenv {
-      header "fenv.h"
-      export *
-    }
-
-    module float {
-      header "float.h"
-      export *
-    }
-
     module inttypes {
       header "inttypes.h"
       export *
@@ -81,11 +84,6 @@ module ucrt [system] {
 
     module locale {
       header "locale.h"
-      export *
-    }
-
-    module malloc {
-      header "malloc.h"
       export *
     }
 
@@ -121,11 +119,6 @@ module ucrt [system] {
       link "legacy_stdio_definitions"
     }
 
-    module stdlib {
-      header "stdlib.h"
-      export *
-    }
-
     module stdnoreturn {
       textual header "stdnoreturn.h"
       export *
@@ -141,35 +134,62 @@ module ucrt [system] {
       export *
     }
 
-    module POSIX {
-      module fcntl {
-        header "fcntl.h"
+    module tgmath {
+      textual header "tgmath.h"
+      export *
+    }
+
+    module uchar {
+      header "uchar.h"
+      export *
+    }
+
+    module wchar {
+      header "wchar.h"
+      export *
+    }
+
+    module wctype {
+      header "wctype.h"
+      export *
+    }
+  }
+
+  module POSIX {
+    module fcntl {
+      header "fcntl.h"
+      export *
+    }
+
+    module sys {
+      module locking {
+        header "sys/locking.h"
         export *
       }
 
-      module sys {
+      module stat {
+        header "sys/stat.h"
         export *
+      }
 
-        module stat {
-          header "sys/stat.h"
-          header "direct.h"
-          export *
-        }
+      module direct {
+        header "direct.h"
+        export *
+      }
 
-        module timeb {
-          header "sys/timeb.h"
-          export *
-        }
+      module timeb {
+        header "sys/timeb.h"
+        export *
+      }
 
-        module types {
-          header "sys/types.h"
-          export *
-        }
+      module types {
+        header "sys/types.h"
+        export *
+      }
 
-        module utime {
-          header "sys/utime.h"
-          export *
-        }
+      module utime {
+        header "sys/utime.h"
+        export *
       }
     }
   }
@@ -184,13 +204,45 @@ module ucrt [system] {
     export *
   }
 
+  module debug {
+    header "crtdbg.h"
+    export *
+  }
+
+  module fpieee {
+    header "fpieee.h"
+    export *
+  }
+
+  module io {
+    header "io.h"
+    export *
+  }
+
+  module memory {
+    header "memory.h"
+    export *
+  }
+
   module minmax {
     header "minmax.h"
     export *
   }
 
   module multibyte {
-    header "mbstring.h"
+    module ctype {
+      header "mbctype.h"
+      export *
+    }
+
+    module string {
+      header "mbstring.h"
+      export *
+    }
+  }
+
+  module new {
+    header "new.h"
     export *
   }
 
@@ -199,18 +251,51 @@ module ucrt [system] {
     export *
   }
 
-  module wchar {
-    header "wchar.h"
+  explicit module safeint {
+    requires cplusplus
+    header "safeint.h"
+    // This is the private implementation of safeint.h, not an independent
+    // public header surface.
+    private textual header "safeint_internal.h"
+    export *
+  }
+
+  module search {
+    header "search.h"
+    export *
+  }
+
+  module share {
+    header "share.h"
+    export *
+  }
+
+  module startup {
+    header "corecrt_startup.h"
+    export *
+  }
+
+  module tchar {
+    header "tchar.h"
     export *
   }
 }
 
 module corecrt [system] {
+  use _Builtin_stddef
+  use ucrt.C.errno
   use vcruntime
-
-  header "corecrt.h"
-  header "corecrt_stdio_config.h"
   export *
+
+  module base {
+    header "corecrt.h"
+    export *
+  }
+
+  module stdio_config {
+    header "corecrt_stdio_config.h"
+    export *
+  }
 
   module conio {
     header "corecrt_wconio.h"
@@ -224,6 +309,10 @@ module corecrt [system] {
 
   module io {
     header "corecrt_io.h"
+    export *
+  }
+
+  module wio {
     header "corecrt_wio.h"
     export *
   }
@@ -235,6 +324,11 @@ module corecrt [system] {
 
   module math {
     header "corecrt_math.h"
+    export *
+  }
+
+  module math_defines {
+    textual header "corecrt_math_defines.h"
     export *
   }
 
@@ -287,4 +381,11 @@ module corecrt [system] {
     header "corecrt_wtime.h"
     export *
   }
+}
+
+module _corecrt_terminate [system] {
+  requires cplusplus
+  use corecrt
+  header "corecrt_terminate.h"
+  export *
 }

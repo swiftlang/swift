@@ -570,9 +570,13 @@ add_dependencies(sdk-overlay emscriptenlibc_modulemap)
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
       ucrt.modulemap
+      SwiftUCRT.h
+      SwiftWinRT.h
       WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
+      winrt.modulemap
+      winsdk.modulemap
       winsdk_um.modulemap
       winsdk_shared.modulemap
     DESTINATION "share"

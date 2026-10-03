@@ -3,27 +3,45 @@ version: 0
 case-sensitive: false
 use-external-names: false
 roots:
-  - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\um"
+  - name: "@WindowsSdkDir@\\Include\\@WindowsSDKVersion@"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk.modulemap"
+      - name: WinSDK.apinotes
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\WinSDK.apinotes"
+  - name: "@WindowsSdkDir@\\Include\\@WindowsSDKVersion@\\um"
     type: directory
     contents:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_um.modulemap"
-      - name: WinSDK.apinotes
-        type: file
-        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\WinSDK.apinotes"
-  - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\shared"
+  - name: "@WindowsSdkDir@\\Include\\@WindowsSDKVersion@\\shared"
     type: directory
     contents:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_shared.modulemap"
+  - name: "@WindowsSdkDir@\\Include\\@WindowsSDKVersion@\\winrt"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winrt.modulemap"
+      - name: SwiftWinRT.h
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\SwiftWinRT.h"
   - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\ucrt"
     type: directory
     contents:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\ucrt.modulemap"
+      - name: SwiftUCRT.h
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\SwiftUCRT.h"
   - name: "@VCToolsInstallDir@\\include"
     type: directory
     contents:
