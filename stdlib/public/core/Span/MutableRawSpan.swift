@@ -712,6 +712,300 @@ extension MutableRawSpan {
   }
 }
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableRawSpan {
+
+  /// Overwrites every byte of this span with the given value.
+  ///
+  /// - Parameter repeatedByte: The value to set for every byte.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(repeating repeatedByte: UInt8) {
+    guard !isEmpty else { return }
+    unsafe _start().withMemoryRebound(to: UInt8.self, capacity: byteCount) {
+      unsafe $0.update(repeating: repeatedByte, count: byteCount)
+    }
+  }
+
+  /// Overwrites every byte within a range of offsets with the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - repeatedByte: The value to set for every byte in `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Int>,
+    repeating repeatedByte: UInt8,
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(repeating: repeatedByte)
+  }
+
+  /// Overwrites every byte within a range of offsets with the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - repeatedByte: The value to set for every byte in `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>,
+    repeating repeatedByte: UInt8,
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), repeating: repeatedByte)
+  }
+
+  /// Overwrites every byte of this span with the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every offset of this span.
+  ///   - repeatedByte: The value to set for every byte.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange,
+    repeating repeatedByte: UInt8,
+  ) {
+    updateAll(repeating: repeatedByte)
+  }
+
+  /// Overwrites every byte of this span by copying the bytes of the source.
+  ///
+  /// `source` must have exactly as many bytes as this span.
+  ///
+  /// - Parameter source: The bytes to copy into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(copying source: RawSpan) {
+    precondition(source.byteCount == self.byteCount)
+    if self.isEmpty { return }
+    unsafe _start().copyMemory(from: source._start(), byteCount: byteCount)
+  }
+
+  /// Overwrites the bytes within a range of offsets by copying
+  /// the bytes of the source.
+  ///
+  /// `source` must have exactly as many bytes as `subrange`.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to copy into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Int>, copying source: RawSpan
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(copying: source)
+  }
+
+  /// Overwrites the bytes within a range of offsets by copying
+  /// the bytes of the source.
+  ///
+  /// `source` must have exactly as many bytes as `subrange`.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to copy into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>, copying source: RawSpan
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), copying: source)
+  }
+
+  /// Overwrites every byte of this span by copying the bytes of the source.
+  ///
+  /// `source` must have exactly as many bytes as this span.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every offset of this span.
+  ///   - source: The bytes to copy into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, copying source: RawSpan
+  ) {
+    updateAll(copying: source)
+  }
+
+  /// Overwrites every byte of this span by moving the bytes from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameter source: The bytes to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(moving source: inout OutputRawSpan) {
+    precondition(source.byteCount == self.byteCount)
+    if self.isEmpty { return }
+    unsafe _start().copyMemory(from: source._start(), byteCount: byteCount)
+    source.removeAll()
+  }
+
+  /// Overwrites the bytes within a range of offsets by moving
+  /// the bytes from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Int>, moving source: inout OutputRawSpan
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(moving: &source)
+  }
+
+  /// Overwrites the bytes within a range of offsets by moving
+  /// the bytes from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>, moving source: inout OutputRawSpan
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), moving: &source)
+  }
+
+  /// Overwrites every byte of this span by moving the bytes from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every offset of this span.
+  ///   - source: The bytes to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, moving source: inout OutputRawSpan
+  ) {
+    updateAll(moving: &source)
+  }
+
+#if !SPAN_COMPATIBILITY_STUB
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// every byte of the source.
+  ///
+  /// This span must have enough space from `byteOffset` to its end
+  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
+  ///
+  /// If reading from `source` throws an error, the bytes copied before
+  /// the error occurred remain in this span, and `byteOffset` is updated to
+  /// the offset after the last byte updated before the error.
+  ///
+  /// - Parameters:
+  ///   - byteOffset: The offset at which to start copying. It must be a valid
+  ///      offset into this span, or equal to its `byteCount`. On return, it
+  ///      is updated to the offset after the last byte updated.
+  ///   - source: The bytes to copy into this span.
+  /// - Throws: Any error thrown while reading from `source`.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: Iterable & ~Escapable & ~Copyable
+  >(
+    from byteOffset: inout Int, copying source: borrowing I
+  ) throws(I.Failure) where I.Element == UInt8 {
+    var iterator = source.makeBorrowingIterator()
+    try updateElements(from: &byteOffset, copying: &iterator)
+    let next = try iterator.nextSpan()
+    _precondition(next.isEmpty)
+  }
+
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// every byte of the source.
+  ///
+  /// This span must have enough space from `byteOffset` to its end
+  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
+  ///
+  /// - Parameters:
+  ///   - byteOffset: The offset at which to start copying. It must be a valid
+  ///      offset into this span, or equal to its `byteCount`.
+  ///   - source: The bytes to copy into this span.
+  /// - Returns: The offset after the last byte updated.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: Iterable & ~Escapable & ~Copyable
+  >(
+    from byteOffset: Int, copying source: borrowing I
+  ) -> Int where I.Element == UInt8, I.Failure == Never {
+    var byteOffset = byteOffset
+    updateElements(from: &byteOffset, copying: source)
+    return byteOffset
+  }
+
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// bytes from an iterator.
+  ///
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
+  ///
+  /// If reading from `source` throws an error, the bytes copied before
+  /// the error occurred remain in this span, and `byteOffset` is updated to
+  /// the offset after the last byte updated before the error.
+  ///
+  /// - Parameters:
+  ///   - byteOffset: The offset at which to start copying. It must be a valid
+  ///      offset into this span, or equal to its `byteCount`. On return, it
+  ///      is updated to the offset after the last byte updated.
+  ///   - source: An iterator over the bytes to copy into this span. On
+  ///      return, it is positioned after the last byte copied.
+  /// - Throws: Any error thrown while reading from `source`.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
+  >(
+    from byteOffset: inout Int,
+    copying source: inout I
+  ) throws(I.Failure) where I.Element == UInt8 {
+    _precondition(
+      UInt(bitPattern: byteOffset) <= UInt(bitPattern: _count),
+      "Byte offset out of bounds"
+    )
+    while byteOffset < byteCount {
+      let bytes = try source.nextSpan(maxCount: byteCount &- byteOffset)
+      if bytes.isEmpty { break }
+      updateSubrange(
+        byteOffset ..< (byteOffset &+ bytes.count),
+        copying: RawSpan(elements: bytes)
+      )
+      byteOffset &+= bytes.count
+    }
+  }
+#endif // !SPAN_COMPATIBILITY_STUB
+}
+
 // MARK: sub-spans
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
