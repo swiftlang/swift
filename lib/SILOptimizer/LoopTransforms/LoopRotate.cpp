@@ -171,20 +171,18 @@ static void updateSSAForUseOfValue(
   // has to be modified). This would invalidate a plain ValueUseIterator.
   // Instead we collect uses wrapping uses in branches specially so that we
   // can reconstruct the use even after the branch has been modified.
+  //
+  // Debug uses are collected separately and rewritten after all other uses
+  // (see below).
   SmallVector<UseWrapper, 8> storedUses;
-  for (auto *use : Res->getUses())
+  SmallVector<UseWrapper, 8> debugUses;
+  for (auto *use : Res->getUses()) {
+    if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
+      debugUses.push_back(UseWrapper(use));
+      continue;
+    }
     storedUses.push_back(UseWrapper(use));
-
-  // If an owned value is consumed in the header, its only uses outside of the
-  // header are debug uses, which may be outside of the value's lifetime.
-  // Rewriting them would create an owned phi that consumes the value a second
-  // time and is never destroyed. Delete them instead.
-  bool isConsumedInHeader =
-      Res->getOwnershipKind() == OwnershipKind::Owned &&
-      llvm::any_of(Res->getUses(), [&](Operand *use) {
-        return use->isLifetimeEnding() && use->getParentBlock() == Header;
-      });
-  llvm::SmallSetVector<SILInstruction *, 4> deadDebugUsers;
+  }
 
   for (auto useWrapper : storedUses) {
     Operand *use = useWrapper;
@@ -197,17 +195,36 @@ static void updateSSAForUseOfValue(
 
     assert(user->getParent() != EntryCheckBlock &&
            "The entry check block should dominate the header");
-    if (isConsumedInHeader) {
-      assert(use->getOperandOwnership() == OperandOwnership::DebugUse &&
-             "Only debug uses can be outside of the value's lifetime");
-      deadDebugUsers.insert(user);
-      continue;
-    }
     updater.rewriteUse(*use);
   }
 
-  for (auto *user : deadDebugUsers)
-    user->eraseFromParent();
+  // A debug use may be outside of the value's lifetime, e.g. after the value is
+  // consumed or after its borrow scope ends. Rewriting such a use could create
+  // a phi only for the debug use, which consumes an owned value a second time
+  // or extends a borrow past its scope.
+  //
+  // Rewriting the non-debug uses above recorded an available value for every
+  // block the ssa updater visited. Rewrite a debug use only if its block is one
+  // of them; this reuses existing values and phis. Otherwise, replace the debug
+  // use's operand with undef.
+  for (auto debugWrapper : debugUses) {
+    Operand *use = debugWrapper;
+    SILInstruction *user = use->getUser();
+    assert(user && "Missing user");
+
+    // Ignore uses in the same basic block.
+    if (user->getParent() == Header)
+      continue;
+
+    if (!updater.hasValueForBlock(user->getParent())) {
+      use->set(SILUndef::get(use->get()));
+      continue;
+    }
+
+    assert(user->getParent() != EntryCheckBlock &&
+           "The entry check block should dominate the header");
+    updater.rewriteUse(*use);
+  }
 
   replacePhisWithIncomingValues(pm, insertedPhis);
 }

@@ -2,7 +2,8 @@
 
 // rdar://188958548
 // Check that LoopRotate does not create an owned phi for a debug_value that
-// follows the consume of its operand. See looprotate_nontrivial_ossa.sil.
+// follows the consume of its operand. See
+// test/SILOptimizer/looprotate_nontrivial_ossa.sil.
 
 @inline(never) func opaque() -> Bool { true }
 

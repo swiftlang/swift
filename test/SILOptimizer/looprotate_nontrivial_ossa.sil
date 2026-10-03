@@ -293,11 +293,12 @@ bb3:
 // The header consumes %box with a destructure_struct. A debug_value of %box
 // after the consume (an OperandOwnership::DebugUse, which may be outside the
 // value's lifetime) must not make LoopRotate create an owned phi for %box.
-// LoopRotate deletes the debug_value instead.
+// LoopRotate kills the debug_value (its operand becomes undef) instead.
 //
 // CHECK-LABEL: sil [ossa] @debug_use_after_consume :
 // CHECK-NOT:     @owned $BoxStruct
-// CHECK-NOT:     debug_value
+// CHECK:         debug_value undef : $BoxStruct, let, name "self"
+// CHECK-NOT:     @owned $BoxStruct
 // CHECK-LABEL: } // end sil function 'debug_use_after_consume'
 sil [ossa] @debug_use_after_consume : $@convention(thin) () -> () {
 bb0:
@@ -322,13 +323,15 @@ bb3:
   return %r : $()
 }
 
-// %box is live out of the header, so the debug_value is inside its lifetime.
-// LoopRotate must rewrite it to use the new header phi, not delete it.
+// A debug use inside the value's lifetime is rewritten when the ssa updater
+// already has a value for its block from rewriting the non-debug uses. Here the
+// destroy_value in the same block already required the owned phi, so the
+// debug_value reuses it.
 //
 // CHECK-LABEL: sil [ossa] @debug_use_before_consume :
-// CHECK:         // Loop header
-// CHECK-NEXT:    bb{{[0-9]+}}([[PHI:%[0-9]+]] : @owned $BoxStruct):
+// CHECK:         bb{{[0-9]+}}([[PHI:%[0-9]+]] : @owned $BoxStruct):
 // CHECK-NEXT:      debug_value [[PHI]], let, name "self"
+// CHECK-NEXT:      destroy_value [[PHI]]
 // CHECK-LABEL: } // end sil function 'debug_use_before_consume'
 sil [ossa] @debug_use_before_consume : $@convention(thin) () -> () {
 bb0:
@@ -348,6 +351,91 @@ bb2:
 
 bb3:
   destroy_value %box : $BoxStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// The header ends the borrow scope of %borrow. A debug_value of %borrow after
+// the end_borrow must not make LoopRotate create a guaranteed phi for %borrow.
+// LoopRotate kills the debug_value instead.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_after_end_borrow :
+// CHECK-NOT:     @guaranteed $BoxStruct
+// CHECK-NOT:     @reborrow
+// CHECK:         debug_value undef : $BoxStruct, let, name "self"
+// CHECK-NOT:     @guaranteed $BoxStruct
+// CHECK-NOT:     @reborrow
+// CHECK-LABEL: } // end sil function 'debug_use_after_end_borrow'
+sil [ossa] @debug_use_after_end_borrow : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @getBox : $@convention(thin) () -> @owned BoxStruct
+  %box = apply %f() : $@convention(thin) () -> @owned BoxStruct
+  %borrow = begin_borrow %box : $BoxStruct
+  %guts = struct_extract %borrow : $BoxStruct, #BoxStruct.guts
+  %u = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %0 = apply %u(%guts) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %borrow : $BoxStruct
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb2, bb3
+
+bb2:
+  debug_value %borrow : $BoxStruct, let, name "self"
+  destroy_value %box : $BoxStruct
+  br bb1
+
+bb3:
+  destroy_value %box : $BoxStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// %box is not consumed in the header; it is consumed in bb2 (the new header
+// after rotation) and in the exit path bb4. The dangling debug_value in bb3,
+// where both consumed paths merge, would need its own owned phi, which would
+// consume %box a second time. LoopRotate kills the debug_value and only
+// rewrites the consuming uses.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_after_consume_outside_header :
+// CHECK:         // Loop header
+// CHECK-NEXT:    bb{{[0-9]+}}([[PHI:%[0-9]+]] : @owned $BoxStruct):
+// CHECK-NEXT:      destroy_value [[PHI]]
+// CHECK:         debug_value undef : $BoxStruct, let, name "self"
+// CHECK-LABEL: } // end sil function 'debug_use_after_consume_outside_header'
+sil [ossa] @debug_use_after_consume_outside_header : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @getBox : $@convention(thin) () -> @owned BoxStruct
+  %box = apply %f() : $@convention(thin) () -> @owned BoxStruct
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb2, bb4
+
+bb2:
+  destroy_value %box : $BoxStruct
+  br bb7
+
+bb7:
+  %b2 = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b2, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  br bb3
+
+bb4:
+  destroy_value %box : $BoxStruct
+  br bb3
+
+bb3:
+  debug_value %box : $BoxStruct, let, name "self"
   %r = tuple ()
   return %r : $()
 }
