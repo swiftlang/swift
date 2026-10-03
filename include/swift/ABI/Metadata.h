@@ -2312,20 +2312,41 @@ public:
              : nullptr;
   }
 
+  /// The canonical mangled type of the existential's Self parameter.
+  llvm::StringRef getCanonicalSelfTypeMangling() const {
+    // Self is at depth 0, or depth 1 after generalization parameters.
+    llvm::StringRef selfType = getNumGenSigParams() ? "qd__" : "x";
+    if (getReqSigParams()[getNumReqSigParams() - 1].hasKeyArgument())
+      return selfType;
+
+    // Canonicalization can equate Self with a generalization parameter.
+    for (const auto &req : getRequirementSignature().getRequirements()) {
+      if (req.getKind() != GenericRequirementKind::SameType)
+        continue;
+      if (req.getMangledTypeName() == selfType)
+        return req.getParam();
+      if (req.getParam() == selfType)
+        return req.getMangledTypeName();
+    }
+    return selfType;
+  }
+
+  /// Whether a requirement supplies a witness table stored in the container.
+  bool isContainerWitnessTableRequirement(
+      const TargetGenericRequirementDescriptor<Runtime> &req) const {
+    if (!req.Flags.hasKeyArgument() ||
+        req.getKind() != GenericRequirementKind::Protocol)
+      return false;
+
+    return req.getParam() == getCanonicalSelfTypeMangling();
+  }
+
   /// The number of witness tables stored in each existential container.
   unsigned getNumContainerWitnessTables() const {
     unsigned numWitnessTables = 0;
     for (const auto &req : getRequirementSignature().getRequirements()) {
-      if (req.Flags.hasKeyArgument() &&
-          req.getKind() == GenericRequirementKind::Protocol)
+      if (isContainerWitnessTableRequirement(req))
         ++numWitnessTables;
-    }
-
-    // Generalization conformances are stored in the type metadata.
-    for (const auto &req : getGeneralizationSignature().getRequirements()) {
-      if (req.Flags.hasKeyArgument() &&
-          req.getKind() == GenericRequirementKind::Protocol)
-        --numWitnessTables;
     }
     return numWitnessTables;
   }
@@ -2337,12 +2358,10 @@ public:
     // Only parameters introduced by the requirement signature are stored
     // in the container. Generalization arguments are in the type metadata.
     unsigned numWitnessTables = getNumContainerWitnessTables();
-    unsigned rawSize = numWitnessTables;
-    for (const auto &param : getRequirementSignature().getParams()
-                                .drop_front(getNumGenSigParams())) {
-      if (param.hasKeyArgument())
-        ++rawSize;
-    }
+    // Opaque containers retain Self metadata even when Self is not a key
+    // parameter in the requirement signature.
+    unsigned rawSize = numWitnessTables +
+                       getNumReqSigParams() - getNumGenSigParams();
     switch (Flags.getSpecialKind()) {
     case SpecialKind::None:
     case SpecialKind::ExplicitLayout:

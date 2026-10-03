@@ -2432,7 +2432,6 @@ static DynamicCastResult tryCastToExtendedExistential(
   // Fill in the trailing set of witness tables.
   // Generalization requirements can be interleaved with the requirements
   // on `Self`; only the latter belong in the existential container.
-  Demangler dem;
   unsigned witnessIndex = 0;
   unsigned containerWitnessIndex = 0;
   for (const auto &req :
@@ -2442,13 +2441,7 @@ static DynamicCastResult tryCastToExtendedExistential(
       continue;
 
     auto witness = witnessTables[witnessIndex++];
-    auto *subject = dem.demangleType(req.getParam());
-    if (subject && subject->getKind() == Demangle::Node::Kind::Type)
-      subject = subject->getChild(0);
-    if (req.Flags.hasKeyArgument() && subject &&
-        subject->getKind() == Demangle::Node::Kind::DependentGenericParamType &&
-        subject->getChild(0)->getIndex() ==
-            (numGeneralizationParameters ? 1u : 0u)) {
+    if (destExistentialShape->isContainerWitnessTableRequirement(req)) {
       destWitnesses[containerWitnessIndex++] =
           reinterpret_cast<const WitnessTable *>(witness);
     }

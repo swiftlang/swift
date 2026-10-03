@@ -234,4 +234,140 @@ ParameterizedProtocolsTestSuite.test("sharedAssociatedTypeLayoutAndCasting") {
             any HashableSuperclass<Int> & LeftHolder<String> & RightHolder<String>)
 }
 
+protocol FirstValueHolder {
+  associatedtype First
+  var first: First { get }
+}
+
+protocol SecondValueHolder {
+  associatedtype Second
+  var second: Second { get }
+}
+
+protocol EqualValuePair: FirstValueHolder, SecondValueHolder where First == Second {}
+
+class HashablePairSuperclass<T: Hashable, U: Hashable>:
+  FirstValueHolder, SecondValueHolder {
+  let first: T
+  let second: U
+  let lifetime: SuperclassLifetimeCounter?
+
+  init(_ first: T, _ second: U, lifetime: SuperclassLifetimeCounter? = nil) {
+    self.first = first
+    self.second = second
+    self.lifetime = lifetime
+  }
+
+  deinit { lifetime?.destructions += 1 }
+}
+
+final class HashablePairHolder:
+  HashablePairSuperclass<Int, Int>, EqualValuePair, Holder {
+  var value: Bool { true }
+}
+
+ParameterizedProtocolsTestSuite.test("mergedGeneralizationConformances") {
+  typealias Value = HashablePairSuperclass<Int, Int> & EqualValuePair & Holder<Bool>
+  let type: Any.Type = (any Value).self
+  let layout = _openExistential(type, do: genericLayout)
+  expectEqual(MemoryLayout<any Value>.size, layout.0)
+  expectEqual(MemoryLayout<any Value>.stride, layout.1)
+
+  let metatype: Any.Type = (any Value.Type).self
+  let metatypeLayout = _openExistential(metatype, do: genericLayout)
+  expectEqual(MemoryLayout<any Value.Type>.size, metatypeLayout.0)
+
+  let lifetime = SuperclassLifetimeCounter()
+  do {
+    let erased: Any = HashablePairHolder(42, 84, lifetime: lifetime)
+    expectTrue(erased is any Value)
+    let value = erased as? any Value
+    expectEqual(42, value?.first)
+    expectEqual(84, value?.second)
+    expectEqual(true, value?.value)
+    expectNil(erased as?
+              any HashablePairSuperclass<Int, Int> & EqualValuePair & Holder<Int>)
+
+    var copies: [any Value] = [value!, value!]
+    copies.removeFirst()
+    expectEqual(42, copies[0].first)
+    expectEqual(84, copies[0].second)
+    expectTrue(copies[0].value)
+    withExtendedLifetime(copies) {
+      expectEqual(0, lifetime.destructions)
+    }
+  }
+  expectEqual(1, lifetime.destructions)
+
+  let erasedType: Any = HashablePairHolder.self
+  let castType = erasedType as? any Value.Type
+  expectNotNil(castType)
+  expectEqual(ObjectIdentifier(HashablePairHolder.self), ObjectIdentifier(castType!))
+}
+
+protocol SameSelfHolder<Value> where Value == Self {
+  associatedtype Value
+  var number: Int { get }
+}
+
+extension Int: SameSelfHolder {
+  var number: Int { self }
+}
+
+protocol SameObjectHolder<Value>: AnyObject where Value == Self {
+  associatedtype Value
+  var number: Int { get }
+}
+
+final class SameObject: SameObjectHolder {
+  let number: Int
+  init(_ number: Int) { self.number = number }
+}
+
+ParameterizedProtocolsTestSuite.test("selfAliasesGeneralizationParameter") {
+  typealias Value = SameSelfHolder<Int>
+  let type: Any.Type = (any Value).self
+  let layout = _openExistential(type, do: genericLayout)
+  expectEqual(MemoryLayout<any Value>.size, layout.0)
+  expectEqual(MemoryLayout<any Value>.stride, layout.1)
+
+  @inline(never)
+  func checkValueCasts<T>(_ type: T.Type) {
+    let erased: Any = 42
+    let value = erased as? T
+    expectNotNil(value)
+    let other: Any = "42"
+    expectNil(other as? T)
+    var copies: [T] = [value!, value!]
+    copies.removeFirst()
+    let copied: Any = copies[0]
+    expectEqual(42, copied as? Int)
+  }
+  _openExistential(type, do: checkValueCasts)
+
+  let metatype: Any.Type = (any Value.Type).self
+  let metatypeLayout = _openExistential(metatype, do: genericLayout)
+  expectEqual(MemoryLayout<any Value.Type>.size, metatypeLayout.0)
+  @inline(never)
+  func checkMetatypeCast<T>(_ type: T.Type) {
+    let erased: Any = Int.self
+    expectNotNil(erased as? T)
+  }
+  _openExistential(metatype, do: checkMetatypeCast)
+
+  typealias ObjectValue = SameObjectHolder<SameObject>
+  let objectType: Any.Type = (any ObjectValue).self
+  let objectLayout = _openExistential(objectType, do: genericLayout)
+  expectEqual(MemoryLayout<any ObjectValue>.size, objectLayout.0)
+  @inline(never)
+  func checkObjectCast<T>(_ type: T.Type) {
+    let object = SameObject(84)
+    let erased: Any = object
+    let value = erased as? T
+    expectNotNil(value)
+    expectTrue((value! as? SameObject) === object)
+  }
+  _openExistential(objectType, do: checkObjectCast)
+}
+
 runAllTests()
