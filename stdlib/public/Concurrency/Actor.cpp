@@ -1301,6 +1301,8 @@ struct JobQueueTraits {
 #else
 #define ACTIVE_ACTOR_STATUS_SIZE (2 * (sizeof(uintptr_t)))
 #endif
+static_assert(sizeof(swift::atomic<ActiveActorStatus>) == sizeof(ActiveActorStatus),
+              "StatusStorage is sized for ActiveActorStatus but used as its atomic");
 static_assert(sizeof(ActiveActorStatus) == ACTIVE_ACTOR_STATUS_SIZE,
   "ActiveActorStatus is of incorrect size");
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */

@@ -1174,6 +1174,8 @@ struct AsyncTask::PrivateStorage {
 // additional requirement where it is aligned to 4 words.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
+static_assert(sizeof(swift::atomic<ActiveTaskStatus>) == sizeof(ActiveTaskStatus),
+              "StatusStorage is sized for ActiveTaskStatus but used as its atomic");
 static_assert(((offsetof(AsyncTask, Private) + offsetof(AsyncTask::PrivateStorage, StatusStorage)) % ACTIVE_TASK_STATUS_SIZE == 0),
    "StatusStorage is not aligned in the AsyncTask");
 #pragma clang diagnostic pop
