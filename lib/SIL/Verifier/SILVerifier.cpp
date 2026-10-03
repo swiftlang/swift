@@ -2566,6 +2566,14 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+      // Only a `@called(exactlyOnce)` closure can capture a
+      // `@called(exactlyOnce)` value.
+      if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
+        require(!argFnTy->isCalledOnce() ||
+                    PAI->getFunctionType()->isCalledOnce(),
+                "only a @called(exactlyOnce) closure can capture a "
+                "@called(exactlyOnce) value");
+      }
       if (PAI->isOnStack()) {
         // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
@@ -5737,6 +5745,13 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+
+    require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
+                                         resTI->getExecutionSemantics()),
+            "convert_function cannot drop @called execution semantics");
+    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
+            "convert_function cannot form a @called(exactlyOnce) value; a "
+            "thunk must form it");
   }
 
   void checkThunkInst(ThunkInst *ti) {

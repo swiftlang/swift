@@ -5568,6 +5568,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
     return ABIDifference::NeedsThunk;
 
+  // A `@called(exactlyOnce)` value needs a context of its own, so forming one
+  // from any other thick function value needs a thunk. A thin function has no
+  // context, so thin-to-thick can form the value directly. This includes a
+  // `@called(atMostOnce)` source, even though its ABI is the same.
+  if (fnTy2->isCalledOnce() && !fnTy1->isCalledOnce() &&
+      fnTy1->getExtInfo().hasContext())
+    return ABIDifference::NeedsThunk;
+
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
