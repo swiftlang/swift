@@ -484,7 +484,9 @@ $PythonModules = @{
   "psutil" = @{
     Version = "6.1.0";
     SHA256 = @{
-      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      # psutil-6.1.0-cp37-abi3-win_amd64.whl; there is no ARM64 wheel, so
+      # ARM64 builds the sdist.
+      AMD64 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
       ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     };
     Dependencies = @();
