@@ -370,6 +370,28 @@ CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
   switch (semantics) {
   case CalledTypeAttr::Semantics::AtMostOnce:
     return "atMostOnce";
+  case CalledTypeAttr::Semantics::ExactlyOnce:
+    return "exactlyOnce";
+  }
+  llvm_unreachable("bad kind");
+}
+
+ExecutionSemantics CalledTypeAttr::getExecutionSemantics() const {
+  switch (getSemantics()) {
+  case Semantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case Semantics::ExactlyOnce:
+    return ExecutionSemantics::Once;
+  }
+  llvm_unreachable("bad kind");
+}
+
+const char *CalledAttr::getSemanticsName(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::AtMostOnce:
+    return "atMostOnce";
+  case ExecutionSemantics::Once:
+    return "exactlyOnce";
   }
   llvm_unreachable("bad kind");
 }
@@ -2248,6 +2270,8 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<CalledAttr>(this)->getSemantics()) {
     case ExecutionSemantics::AtMostOnce:
       return "called(atMostOnce)";
+    case ExecutionSemantics::Once:
+      return "called(exactlyOnce)";
     }
   case DeclAttrKind::Target:
     return "_target";

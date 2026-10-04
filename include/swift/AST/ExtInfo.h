@@ -714,6 +714,12 @@ public:
     return getExecutionSemantics().has_value();
   }
 
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  constexpr bool isCalledOnce() const {
+    return getExecutionSemantics() == ExecutionSemantics::Once;
+  }
+
   constexpr bool isCoroutine() const { return bits & CoroutineMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
@@ -1077,6 +1083,10 @@ public:
     return builder.hasCalledAtMostOnceSemantics();
   }
 
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
+
   /// Helper method for changing the representation.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withRepresentation for chaining.
@@ -1378,6 +1388,12 @@ public:
     return getExecutionSemantics().has_value();
   }
 
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  constexpr bool isCalledOnce() const {
+    return getExecutionSemantics() == ExecutionSemantics::Once;
+  }
+
   /// Does this function type have nonisolated(nonsending) isolation
   /// (i.e. is it the lowering of an nonisolated(nonsending) function type)?
   constexpr bool hasNonisolatedNonsendingIsolation() const {
@@ -1645,6 +1661,10 @@ public:
   constexpr bool hasCalledAtMostOnceSemantics() const {
     return builder.hasCalledAtMostOnceSemantics();
   }
+
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
 
   constexpr bool hasNonisolatedNonsendingIsolation() const {
     return builder.hasNonisolatedNonsendingIsolation();

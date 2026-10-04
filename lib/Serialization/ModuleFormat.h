@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1033; // @called execution semantics field
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1034; // @called exactly-once semantics
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -286,6 +286,7 @@ using DifferentiabilityKindField = BCFixed<3>;
 enum class FunctionTypeExecutionSemantics : uint8_t {
   None = 0,
   AtMostOnce,
+  Once,
 };
 using FunctionTypeExecutionSemanticsField = BCFixed<2>;
 
