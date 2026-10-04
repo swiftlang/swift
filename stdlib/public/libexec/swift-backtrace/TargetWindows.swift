@@ -257,14 +257,10 @@ class Target {
     }
 
     for thread in threads {
-      guard let hThread = OpenThread(
-              DWORD(THREAD_GET_CONTEXT)
-                  | DWORD(THREAD_QUERY_LIMITED_INFORMATION)
-                  | DWORD(THREAD_SUSPEND_RESUME)
-              ,
-              false,
-              thread
-            ) else {
+      let dwFlags = THREAD_GET_CONTEXT
+                  | THREAD_QUERY_LIMITED_INFORMATION
+                  | THREAD_SUSPEND_RESUME
+      guard let hThread = OpenThread(dwFlags, false, thread) else {
         let error = GetLastError()
         print("swift-backtrace: unable to open thread \(thread): \(hex(error)).",
               to: &standardError)
@@ -486,15 +482,16 @@ class Target {
         startupInfo.lpTitle = UnsafeMutablePointer(mutating: pwszTitle)
 
         return cmdline.withCString(encodedAs: UTF16.self) { pwszCmdline in
+          let dwFlags = NORMAL_PRIORITY_CLASS
+                      | CREATE_NEW_CONSOLE
+                      | CREATE_NEW_PROCESS_GROUP
           return CreateProcessW(nil,
                                 // Not really mutating
                                 UnsafeMutablePointer(mutating: pwszCmdline),
                                 nil,
                                 nil,
                                 false,
-                                DWORD(NORMAL_PRIORITY_CLASS)
-                                      | DWORD(CREATE_NEW_CONSOLE)
-                                      | DWORD(CREATE_NEW_PROCESS_GROUP),
+                                dwFlags,
                                 nil,
                                 nil,
                                 &startupInfo,
