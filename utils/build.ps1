@@ -3687,8 +3687,14 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    # The build tree is already configured with these arguments above.
-    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets @("swift-test-stdlib")
+    # The build tree is already configured with these arguments above. The
+    # LLDB tests' C++ dependencies run no swift-frontend, so they build along
+    # with the stdlib, which mostly waits for single swift-frontend jobs.
+    $StdlibTargets = @("swift-test-stdlib")
+    if ($LLDBTargets) {
+      $StdlibTargets += @("lldb", "liblldb", "lldb-server", "lldb-dap", "lldb-test", "lldb-unit-test-deps")
+    }
+    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BatchTargets -BuildTargets $StdlibTargets
     if ($Targets) {
       Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BatchTargets -BuildTargets $Targets
     }
