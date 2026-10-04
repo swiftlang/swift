@@ -258,11 +258,10 @@ class Target {
 
     for thread in threads {
       guard let hThread = OpenThread(
-              DWORD(
-                THREAD_GET_CONTEXT
-                  | THREAD_QUERY_LIMITED_INFORMATION
-                  | THREAD_SUSPEND_RESUME
-              ),
+              DWORD(THREAD_GET_CONTEXT)
+                  | DWORD(THREAD_QUERY_LIMITED_INFORMATION)
+                  | DWORD(THREAD_SUSPEND_RESUME)
+              ,
               false,
               thread
             ) else {
@@ -493,9 +492,9 @@ class Target {
                                 nil,
                                 nil,
                                 false,
-                                DWORD(NORMAL_PRIORITY_CLASS
-                                      | CREATE_NEW_CONSOLE
-                                      | CREATE_NEW_PROCESS_GROUP),
+                                DWORD(NORMAL_PRIORITY_CLASS)
+                                      | DWORD(CREATE_NEW_CONSOLE)
+                                      | DWORD(CREATE_NEW_PROCESS_GROUP),
                                 nil,
                                 nil,
                                 &startupInfo,
