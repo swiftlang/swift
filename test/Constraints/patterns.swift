@@ -904,3 +904,23 @@ func testNestedMissingMembers() {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/56302
+// Matching an optional against a non-optional 'as'/'is' pattern implicitly
+// unwraps it, so the test is not always true.
+func testAsPatternImplicitOptionalUnwrap(maybeInt: Int?, int: Int, doubleOpt: Int??) {
+  if case let x as Int = maybeInt { _ = x } // no warning
+  if case is Int = maybeInt {} // no warning
+  switch maybeInt {
+  case let x as Int: _ = x // no warning
+  default: break
+  }
+
+  if case let x as Int = int { _ = x } // expected-warning {{'as' test is always true}} expected-warning {{'if' condition is always true}}
+  if case is Int = int {} // expected-warning {{'is' test is always true}} expected-warning {{'if' condition is always true}}
+  if case let x as Int? = maybeInt { _ = x } // expected-warning {{'as' test is always true}} expected-warning {{'if' condition is always true}}
+
+  if case let x as Int? = doubleOpt { _ = x } // no warning
+  if case let x as Int = doubleOpt { _ = x } // no warning
+  if case let x as Int?? = doubleOpt { _ = x } // expected-warning {{'as' test is always true}} expected-warning {{'if' condition is always true}}
+}
