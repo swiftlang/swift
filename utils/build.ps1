@@ -2155,6 +2155,9 @@ function Build-CMakeProject {
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @(),
+    # Build all of BuildTargets in one build tool invocation instead of one at
+    # a time. Only for targets that do not have to be built in order.
+    [switch] $BatchTargets = $false,
     # Reuse the configuration of an existing build tree.
     [switch] $SkipConfigure = $false
   )
@@ -2571,11 +2574,16 @@ function Build-CMakeProject {
     }
 
     # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
+    if ($BatchTargets -and $BuildTargets.Length -gt 0) {
+      $Targets = $BuildTargets | ForEach-Object { if ($_ -eq "default") { "all" } else { $_ } }
+      Invoke-Program $CMakeBin --build $Bin --target @Targets
+    } else {
+      foreach ($Target in $BuildTargets) {
+        if ($Target -eq "default") {
+          Invoke-Program $CMakeBin --build $Bin
+        } else {
+          Invoke-Program $CMakeBin --build $Bin --target $Target
+        }
       }
     }
 
@@ -3382,7 +3390,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
-      $Targets += @("SwiftCompilerPlugin", "check-swift")
+      # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
+      # need it, so it is built before check-swift starts.
+      $Targets += @("SwiftCompilerPlugin")
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
@@ -3447,7 +3457,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Defines       = $TestingDefines
     }
 
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
+    Build-CMakeProject @BuildCMakeArgs -BatchTargets -BuildTargets @(
       "swift-frontend",
       "sourcekitd-test",
       "swift-refactor",
@@ -3517,9 +3527,14 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    $Targets = @("swift-test-stdlib") + $Targets
     # The build tree is already configured with these arguments above.
-    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $Targets
+    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets @("swift-test-stdlib")
+    if ($Targets) {
+      Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BatchTargets -BuildTargets $Targets
+    }
+    if ($TestSwift) {
+      Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets @("check-swift")
+    }
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {
