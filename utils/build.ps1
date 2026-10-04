@@ -6150,7 +6150,9 @@ if ($Windows) {
 
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
-    if ($Build.LinkModes.contains("dynamic")) {
+    # The toolchain build already built the host's dynamic SDK.
+    $BuiltWithToolchain = $Toolchain -and $Build -eq $HostPlatform
+    if ($Build.LinkModes.contains("dynamic") -and -not $BuiltWithToolchain) {
       Invoke-BuildStep Build-SDK $Build -Context @{
         SDKIdentifier        = "Windows";
         Variant              = "Dynamic";
@@ -6199,27 +6201,6 @@ if ($Windows) {
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
   }
 
-  $RebuiltHostDynamicRuntime = @(
-    $WindowsSDKBuilds | Where-Object {
-      $_ -eq $HostPlatform -and $_.LinkModes.Contains("dynamic")
-    }
-  ).Count -gt 0
-  # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
-  # copies after the final runtime image is in place.
-  if ($Toolchain -and $RebuiltHostDynamicRuntime) {
-    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
-      ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
-      RuntimeLocation = $HostRuntimeBin;
-    }
-    if ($IncludeNoAsserts) {
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
-        ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
-        RuntimeLocation = $HostRuntimeBin;
-      }
-    }
-  }
 }
 
 if ($Android) {
