@@ -429,10 +429,19 @@ bool TBDGenVisitor::willVisitDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return false;
 
-  // A @_silgen_name("...") function without a body only exists to
+  // A @_silgen_name("...") or @_extern function without a body only exists to
   // forward-declare a symbol from another library.
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
-    if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>())
+    if (!AFD->hasBody() && (AFD->getAttrs().hasAttribute<SILGenNameAttr>() ||
+                            AFD->getAttrs().hasAttribute<ExternAttr>()))
+      return false;
+
+  // Likewise for a @_silgen_name("...") or @_extern(c) variable without an
+  // initial value.
+  if (auto VD = dyn_cast<VarDecl>(D))
+    if (!VD->hasInitialValue() &&
+        (VD->getAttrs().hasAttribute<SILGenNameAttr>() ||
+         ExternAttr::find(VD->getAttrs(), ExternKind::C)))
       return false;
 
   DeclStack.push_back(D);
@@ -463,6 +472,17 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
+  // A @_silgen_name("...") variable's storage uses that name, as in
+  // SILGenModule::getSILGlobalVariable.
+  auto silgenName = VD->getAttrs().getAttribute<SILGenNameAttr>();
+  if (silgenName && !silgenName->Name.empty()) {
+    std::string name = silgenName->Name.str();
+    if (silgenName->Raw)
+      name = "\1" + name;
+    addSymbol(name, SymbolSource::forGlobal(VD), SymbolFlags::Data);
+    return;
+  }
+
   Mangle::ASTMangler mangler(VD->getASTContext());
   addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
             SymbolFlags::Data);
@@ -514,6 +534,10 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
+  // Embedded Swift does not use force-load symbols.
+  if (SwiftModule->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   if (!Opts.ModuleLinkName.empty()) {
     // FIXME: We ought to have a symbol source for this.
     SmallString<32> buf;
