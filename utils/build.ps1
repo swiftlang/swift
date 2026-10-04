@@ -2794,10 +2794,12 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Assembler $Assemblers.Host `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
+    -BatchTargets `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
       CLANG_ENABLE_LIBXML2 = "NO";
+      CLANG_INCLUDE_TESTS = "NO";
       LLDB_ENABLE_LIBXML2 = "NO";
       LLDB_ENABLE_PYTHON = "NO";
       LLDB_INCLUDE_TESTS = "NO";
@@ -2808,6 +2810,9 @@ function Build-BuildTools([Hashtable] $Platform) {
       LLVM_ENABLE_PROJECTS = "clang;clang-tools-extra;lldb";
       LLVM_EXTERNAL_PROJECTS = "swift";
       LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
+      LLVM_INCLUDE_BENCHMARKS = "NO";
+      LLVM_INCLUDE_EXAMPLES = "NO";
+      LLVM_INCLUDE_TESTS = "NO";
       SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
       SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
       SWIFT_BUILD_HOST_DISPATCH = "NO";
