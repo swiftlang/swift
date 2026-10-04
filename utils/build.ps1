@@ -2154,7 +2154,9 @@ function Build-CMakeProject {
     [switch] $AddAndroidCMakeEnv = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
-    [string[]] $BuildTargets = @()
+    [string[]] $BuildTargets = @(),
+    # Reuse the configuration of an existing build tree.
+    [switch] $SkipConfigure = $false
   )
 
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
@@ -2563,8 +2565,10 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$CMakeBin $cmakeGenerateArgs"
-    Invoke-Program $CMakeBin @cmakeGenerateArgs
+    if (-not $SkipConfigure) {
+      Write-Host "$CMakeBin $cmakeGenerateArgs"
+      Invoke-Program $CMakeBin @cmakeGenerateArgs
+    }
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
@@ -3514,12 +3518,13 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
     $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    # The build tree is already configured with these arguments above.
+    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $Targets
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {
         $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+        Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $LLDBTargets
       }
     }
   }
