@@ -79,6 +79,10 @@ set "TestArg=-Test !TestArg!"
 set "PackagingArg="
 if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Package -Stage %PackageRoot%"
 
+:: The SBoM is only published with the installer.
+set "SBoMArg="
+if not "%INCLUDE_PACKAGING%"=="" set "SBoMArg=-IncludeSBoM"
+
 :: Build the arguments related to Windows SDK builds
 set "WindowsSDKArgs=-Windows"
 if "%INCLUDE_PACKAGING%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKLinkModes dynamic"
@@ -115,7 +119,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %WindowsSDKArgs% ^
   %PackagingArg% ^
   %TestArg% ^
-  -IncludeSBoM ^
+  %SBoMArg% ^
   %DebugInfoArg% ^
   -Summary || (exit /b 1)
 
