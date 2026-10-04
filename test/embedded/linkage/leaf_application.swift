@@ -7,7 +7,9 @@
 // RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -emit-sil -emit-module-path %t/Modules/Library.swiftmodule -o - | %FileCheck -check-prefix LIBRARY-SIL %s
 
 // IR checking to ensure we get the right weak symbols.
-// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -emit-ir -o - | %FileCheck -check-prefix LIBRARY-IR --dump-input-filter all %s
+// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -emit-ir -o %t/Library.ll
+// RUN: %FileCheck -check-prefix LIBRARY-IR --dump-input-filter all %s < %t/Library.ll
+// RUN: %FileCheck -check-prefix LIBRARY-NO-STUB %s < %t/Library.ll
 
 // Application module
 
@@ -88,7 +90,10 @@ public func createsExistential() -> any Reflectable {
 // LIBRARY-IR-NOT: define {{.*}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
 
-// LIBRARY-IR: define linkonce_odr hidden void @_swift_dead_method_stub
+// Functions without a unique definition are emitted into each client that
+// uses them, so dead ones must not leave strong aliases to the dead-method
+// stub behind.
+// LIBRARY-NO-STUB-NOT: = alias {{.*}}@_swift_dead_method_stub
 
 // LIBRARY-SIL: sil [export_implementation] @$e7Library5helloSaySiGyF
 // LIBRARY-SIL: sil [export_implementation] @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
