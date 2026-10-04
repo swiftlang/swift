@@ -574,6 +574,16 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     }
   }
 
+  /// Atomically replaces the contents with `nil` and returns the previous
+  /// contents. At most one caller observes a non-`nil` value.
+  func take<Wrapped>() -> Contents where Contents == Wrapped? {
+    lock()
+    let contents = _value
+    _value = nil
+    unlock()
+    return contents
+  }
+
   static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
     let minimumCapacity = _lockWordCount()
     let storage = unsafe Builtin.allocWithTailElems_1(
