@@ -474,6 +474,14 @@ private:
   /// automatically update when they are out of date.
   unsigned CurrentGeneration = 0;
 
+  /// The number of passes of BindExtensionsRequest that bound extensions to
+  /// their extended nominal types.
+  ///
+  /// Results computed from inheritance clause entries that did not resolve,
+  /// and whose resolution did not run into a cycle, such as conformance lookup
+  /// tables, are updated once this changes.
+  unsigned ExtensionBindingGeneration = 0;
+
   friend class Pattern;
 
   /// Mapping from patterns that store interface types that will be lazily
@@ -1406,6 +1414,15 @@ public:
   ///
   /// \returns the previous generation number.
   unsigned bumpGeneration() { return CurrentGeneration++; }
+
+  /// Returns the number of passes of BindExtensionsRequest that bound
+  /// extensions so far.
+  unsigned getExtensionBindingGeneration() const {
+    return ExtensionBindingGeneration;
+  }
+
+  /// Record that a pass of BindExtensionsRequest bound extensions.
+  void bumpExtensionBindingGeneration() { ++ExtensionBindingGeneration; }
 
   /// Produce a "normal" conformance for a nominal type.
   ///

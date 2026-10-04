@@ -412,6 +412,37 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// Indicates whether we are visiting the superclass.
   bool VisitingSuperclass = false;
 
+  /// A nominal type declaration or extension along with the indices of its
+  /// inheritance clause entries that did not resolve, and whose resolution
+  /// did not run into a cycle.
+  struct UnresolvedInheritedContext {
+    DeclContext *DC;
+    SmallVector<unsigned, 1> Indices;
+  };
+
+  /// The nominal type declaration and extensions with inheritance clause
+  /// entries that did not resolve when their explicit conformances were
+  /// recorded, and whose resolution did not run into a cycle.
+  ///
+  /// Such an entry can name a protocol declared in an extension that is not
+  /// bound yet, so it is resolved again once more extensions are bound.
+  SmallVector<UnresolvedInheritedContext, 2> UnresolvedInheritedContexts;
+
+  /// Whether the table may lack conformances of a superclass, because the
+  /// superclass may gain conformances.
+  bool InheritsFromUnresolvedSuperclass = false;
+
+  /// The extension binding generation at which the table was created or last
+  /// looked for the conformances it may lack.
+  unsigned ExtensionBindingGeneration;
+
+  /// Whether conformances were added since the conformances were last resolved.
+  bool NeedsResolution = false;
+
+  /// Add the conformances the table may lack if more extensions were bound
+  /// since it last looked for them.
+  void addGainedConformances(NominalTypeDecl *nominal);
+
   /// Add a protocol.
   bool addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                    ConformanceSource source);
@@ -487,9 +518,12 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// \param superclassExt If non-null, the superclass extension from
   /// which conformances will be inherited. If null, the conformances
   /// on the superclass declaration itself will be inherited.
-  void inheritConformances(ClassDecl *classDecl, 
-                           ClassDecl *superclassDecl,
-                           ExtensionDecl *superclassExt);
+  ///
+  /// \param skipInherited If true, don't inherit conformances to protocols
+  /// that already have an inherited conformance entry.
+  void inheritConformances(ClassDecl *classDecl, ClassDecl *superclassDecl,
+                           ExtensionDecl *superclassExt,
+                           bool skipInherited = false);
 
   /// Update a lookup table with conformances from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal, ConformanceStage stage);
@@ -505,6 +539,19 @@ public:
 
   /// Destroy the conformance table.
   void destroy();
+
+  /// Whether the table may lack some conformances that it could gain once more
+  /// extensions are bound.
+  bool mayGainConformances() const {
+    return !UnresolvedInheritedContexts.empty() ||
+           InheritsFromUnresolvedSuperclass;
+  }
+
+  /// Call \c addGainedConformances if the table may lack some conformances.
+  void addGainedConformancesIfNeeded(NominalTypeDecl *nominal) {
+    if (mayGainConformances())
+      addGainedConformances(nominal);
+  }
 
   /// Add a synthesized conformance to the lookup table.
   void addSynthesizedConformance(NominalTypeDecl *nominal,

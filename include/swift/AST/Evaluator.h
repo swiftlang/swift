@@ -167,6 +167,9 @@ class Evaluator {
   /// A set of active requests that have been diagnosed for a cycle.
   llvm::DenseSet<ActiveRequest> diagnosedActiveCycles;
 
+  /// The number of cycles diagnosed so far.
+  unsigned numDiagnosedCycles = 0;
+
   /// A cache that stores the results of requests.
   evaluator::RequestCache cache;
 
@@ -312,6 +315,9 @@ public:
   bool hasActiveRequest(const Request &request) const {
     return activeRequests.count(ActiveRequest(request));
   }
+
+  /// Returns the number of cycles diagnosed so far.
+  unsigned getNumDiagnosedCycles() const { return numDiagnosedCycles; }
 
   void dump(llvm::raw_ostream &out) { cache.dump(out); }
 

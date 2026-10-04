@@ -640,11 +640,16 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 /// list of "inherited" types.
 ///
 /// Add anything we find to the \c result vector. If we come across the
-/// AnyObject type, set \c anyObject true.
+/// AnyObject type, set \c anyObject true. If \p unresolved is non-null and
+/// the entry, or some component of it, does not resolve to any nominal type
+/// declaration, inverse or AnyObject, for example because it names a type
+/// declared in an extension that is not bound yet, or a typealias for one,
+/// set \c *unresolved true, unless resolving the entry ran into a cycle.
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    InvertibleProtocolSet &inverses, bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject,
+    bool *unresolved = nullptr);
 
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration, looking through typealiases

@@ -183,6 +183,18 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
 evaluator::SideEffect
 BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   bool excludeMacroExpansions = true;
+  bool boundAny = false;
+
+  // Results computed from inheritance clause entries that did not resolve, and
+  // whose resolution did not run into a cycle, such as conformance lookup
+  // tables, are updated once more extensions are bound. Record that once per
+  // pass rather than for every extension, so that a result used while binding
+  // many extensions isn't updated each time.
+  auto finishPass = [&]() {
+    if (boundAny)
+      M->getASTContext().bumpExtensionBindingGeneration();
+    boundAny = false;
+  };
 
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
@@ -192,6 +204,7 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
     if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
       ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);
+      boundAny = true;
       return true;
     }
 
@@ -221,6 +234,7 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
     for (auto *D : SF->getHoistedDecls())
       visitTopLevelDecl(D);
   }
+  finishPass();
 
   auto tryBindExtensions = [&]() {
     // Phase 2 - repeatedly go through the worklist and attempt to bind each
@@ -231,6 +245,7 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
 
       auto last = std::remove_if(worklist.begin(), worklist.end(),
                                  tryBindExtension);
+      finishPass();
       if (last != worklist.end()) {
         worklist.erase(last, worklist.end());
         changed = true;

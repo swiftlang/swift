@@ -1239,10 +1239,12 @@ void NominalTypeDecl::prepareConformanceTable() const {
   assert(!isa<ProtocolDecl>(this) &&
          "Protocols don't have a conformance table");
 
-  if (ConformanceTable)
-    return;
-
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  if (ConformanceTable) {
+    ConformanceTable->addGainedConformancesIfNeeded(mutableThis);
+    return;
+  }
+
   ASTContext &ctx = getASTContext();
   ConformanceTable = new (ctx) ConformanceLookupTable(ctx);
   ++NumConformanceLookupTables;

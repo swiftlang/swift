@@ -134,7 +134,8 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
   os << ")\n";
 }
 
-ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx) {
+ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx)
+    : ExtensionBindingGeneration(ctx.getExtensionBindingGeneration()) {
   // Register a cleanup with the ASTContext to call the conformance
   // table destructor.
   ctx.addCleanup([this]() {
@@ -163,6 +164,37 @@ namespace {
         : Located(item, loc), inheritedTypeRepr(inheritedTypeRepr),
           attributes(attributes) {}
   };
+}
+
+/// Collect the type declarations named in the inheritance clause entries of
+/// \p decl at \p indices, or in all of its entries if \p indices is null.
+///
+/// \param unresolved If non-null, the indices of the entries that, or some
+/// component of which, do not resolve to any nominal type declaration, inverse
+/// or AnyObject, and whose resolution did not run into a cycle.
+static void collectDirectlyInheritedNominalTypeDecls(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    const SmallVectorImpl<unsigned> *indices,
+    SmallVectorImpl<InheritedNominalEntry> &result,
+    SmallVectorImpl<unsigned> *unresolved) {
+  InvertibleProtocolSet inverses;
+  bool anyObject = false;
+  auto collect = [&](unsigned i) {
+    bool entryUnresolved = false;
+    getDirectlyInheritedNominalTypeDecls(decl, i, result, inverses, anyObject,
+                                         unresolved ? &entryUnresolved
+                                                    : nullptr);
+    if (entryUnresolved)
+      unresolved->push_back(i);
+  };
+  if (indices) {
+    for (unsigned i : *indices)
+      collect(i);
+  } else {
+    auto inheritedTypes = InheritedTypes(decl);
+    for (unsigned i : inheritedTypes.getIndices())
+      collect(i);
+  }
 }
 
 template<typename NominalFunc, typename ExtensionFunc>
@@ -222,10 +254,18 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
-      InvertibleProtocolSet inverses;
-      bool anyObject = false;
-      for (const auto &found :
-               getDirectlyInheritedNominalTypeDecls(next, inverses, anyObject)) {
+      SmallVector<InheritedNominalEntry, 4> inherited;
+      SmallVector<unsigned, 1> unresolved;
+      // Record the entries once, when the explicit conformances are recorded:
+      // the later stages visit the same extensions again, and the stage that
+      // inherits conformances also visits the extensions of superclasses,
+      // whose entries belong to their own tables.
+      bool record = stage == ConformanceStage::RecordedExplicit;
+      collectDirectlyInheritedNominalTypeDecls(next, nullptr, inherited,
+                                               record ? &unresolved : nullptr);
+      if (!unresolved.empty())
+        UnresolvedInheritedContexts.push_back({next, std::move(unresolved)});
+      for (const auto &found : inherited) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
           protocols.push_back(
               {proto, found.Loc, found.inheritedTypeRepr, found.attributes});
@@ -236,9 +276,10 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
   }
 }
 
-void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl, 
+void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
                                                  ClassDecl *superclassDecl,
-                                                 ExtensionDecl *superclassExt) {
+                                                 ExtensionDecl *superclassExt,
+                                                 bool skipInherited) {
   // Local function to return the location of the superclass. This
   // takes a little digging, so compute on first use and cache it.
   SourceLoc superclassLoc;
@@ -276,7 +317,13 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     // anyway.
     if (!protocols.insert(protocol).second)
       return;
-    
+
+    if (skipInherited &&
+        llvm::any_of(Conformances[protocol], [](ConformanceEntry *existing) {
+          return existing->getKind() == ConformanceEntryKind::Inherited;
+        }))
+      return;
+
     // Add the inherited entry.
     (void)addProtocol(protocol, getSuperclassLoc(), 
                       ConformanceSource::forInherited(classDecl));
@@ -301,10 +348,14 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         stage, nominal,
         [&](NominalTypeDecl *nominal) {
           // Get all of the protocols in the inheritance clause.
-          InvertibleProtocolSet inverses;
-          bool anyObject = false;
-          for (const auto &found :
-                  getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject)) {
+          SmallVector<InheritedNominalEntry, 4> inherited;
+          SmallVector<unsigned, 1> unresolved;
+          collectDirectlyInheritedNominalTypeDecls(nominal, nullptr, inherited,
+                                                   &unresolved);
+          if (!unresolved.empty())
+            UnresolvedInheritedContexts.push_back(
+                {nominal, std::move(unresolved)});
+          for (const auto &found : inherited) {
             auto proto = dyn_cast<ProtocolDecl>(found.Item);
             if (!proto)
               continue;
@@ -365,6 +416,9 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         auto circularSuperclass = superclassDecl->getSuperclassDecl();
         
         do {
+          if (superclassDecl->ConformanceTable &&
+              superclassDecl->ConformanceTable->mayGainConformances())
+            InheritsFromUnresolvedSuperclass = true;
           forEachInStage(
               stage, superclassDecl,
               [&](NominalTypeDecl *superclass) {
@@ -407,10 +461,11 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     // Expand inherited conformances so we have the complete set of
     // conformances.
     updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
-    
-    /// Determine whether any extensions were added that might require
-    /// us to compute conformances again.
-    bool anyChanged = false;
+
+    /// Determine whether any extensions or conformances were added that
+    /// might require us to compute conformances again.
+    bool anyChanged = NeedsResolution;
+    NeedsResolution = false;
     forEachInStage(stage, nominal,
                    [&](NominalTypeDecl *nominal) { anyChanged = true; },
                    [&](ExtensionDecl *ext,
@@ -442,6 +497,90 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     }
     break;
   }
+}
+
+void ConformanceLookupTable::addGainedConformances(NominalTypeDecl *nominal) {
+  unsigned generation =
+      nominal->getASTContext().getExtensionBindingGeneration();
+  if (ExtensionBindingGeneration == generation)
+    return;
+
+  // Update the generation first: resolving the entries can look into this
+  // table again.
+  ExtensionBindingGeneration = generation;
+
+  SmallVector<UnresolvedInheritedContext, 2> contexts;
+  std::swap(contexts, UnresolvedInheritedContexts);
+  for (auto &context : contexts) {
+    auto *dc = context.DC;
+    SmallVector<InheritedNominalEntry, 4> inherited;
+    SmallVector<unsigned, 1> unresolved;
+    if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+      collectDirectlyInheritedNominalTypeDecls(ext, &context.Indices, inherited,
+                                               &unresolved);
+    else
+      collectDirectlyInheritedNominalTypeDecls(
+          cast<NominalTypeDecl>(dc), &context.Indices, inherited, &unresolved);
+    if (!unresolved.empty())
+      UnresolvedInheritedContexts.push_back({dc, std::move(unresolved)});
+
+    // Only the entries that did not resolve before are looked at, so the
+    // protocols they name are added just like the entries that resolved
+    // right away, and redundant conformances are diagnosed the same way.
+    bool anyAdded = false;
+    for (const auto &found : inherited) {
+      auto *proto = dyn_cast<ProtocolDecl>(found.Item);
+      if (!proto || found.isSuppressed)
+        continue;
+
+      // A composition can also name protocols that resolved right away.
+      if (found.inheritedTypeRepr &&
+          llvm::any_of(Conformances[proto], [&](ConformanceEntry *existing) {
+            return existing->getDeclContext() == dc &&
+                   existing->Source.getInheritedTypeRepr() ==
+                       found.inheritedTypeRepr;
+          }))
+        continue;
+
+      auto source = ConformanceSource::forExplicit(dc, found.inheritedTypeRepr);
+      addProtocol(proto, found.Loc, source.withAttributes(found.attributes));
+      anyAdded = true;
+    }
+
+    if (anyAdded) {
+      expandImpliedConformances(nominal, dc);
+      NeedsResolution = true;
+    }
+  }
+
+  if (!InheritsFromUnresolvedSuperclass)
+    return;
+
+  // Inherit the conformances the superclasses gained.
+  InheritsFromUnresolvedSuperclass = false;
+  auto *classDecl = cast<ClassDecl>(nominal);
+  unsigned numConformances = AllConformances[classDecl].size();
+  llvm::SmallPtrSet<ClassDecl *, 4> visited;
+  visited.insert(classDecl);
+  for (auto *superclassDecl = classDecl->getSuperclassDecl();
+       superclassDecl && visited.insert(superclassDecl).second;
+       superclassDecl = superclassDecl->getSuperclassDecl()) {
+    superclassDecl->prepareConformanceTable();
+    auto *superclassTable = superclassDecl->ConformanceTable;
+    superclassTable->updateLookupTable(superclassDecl,
+                                       ConformanceStage::Resolved);
+    if (superclassTable->mayGainConformances())
+      InheritsFromUnresolvedSuperclass = true;
+
+    inheritConformances(classDecl, superclassDecl, nullptr,
+                        /*skipInherited=*/true);
+    for (auto *ext : superclassDecl->getExtensions())
+      inheritConformances(classDecl, superclassDecl, ext,
+                          /*skipInherited=*/true);
+  }
+
+  if (AllConformances[classDecl].size() != numConformances)
+    NeedsResolution = true;
 }
 
 void ConformanceLookupTable::registerProtocolConformances(
