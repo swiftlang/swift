@@ -519,6 +519,11 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 #include "clang/Basic/HLSLIntangibleTypes.def"
       return OmissionTypeName();
 
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+      return OmissionTypeName();
+
     // SPIR-V builtin types that don't have Swift equivalents.
 #define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
 #include "clang/Basic/SPIRVTypes.def"

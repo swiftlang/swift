@@ -194,6 +194,11 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
 #include "clang/Basic/HLSLIntangibleTypes.def"
     return std::nullopt;
 
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+    return std::nullopt;
+
     // SPIRV opaque builtin types that don't have Swift equivalents.
 #define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
 #include "clang/Basic/SPIRVTypes.def"

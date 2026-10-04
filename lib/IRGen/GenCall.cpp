@@ -1386,6 +1386,11 @@ namespace {
 #include "clang/Basic/HLSLIntangibleTypes.def"
         llvm_unreachable("HLSL intangible type in ABI lowering");
 
+      // We should never see HLSL packed types at all.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+        llvm_unreachable("HLSL packed type in ABI lowering");
+
       // We should never see SPIRV opaque types at all.
 #define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
 #include "clang/Basic/SPIRVTypes.def"
