@@ -2351,8 +2351,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
-  if (fn->hasCalledAtMostOnceSemantics())
+  if (auto semantics = fn->getExecutionSemantics()) {
     OpArgs.push_back('O');
+    if (*semantics == ExecutionSemantics::AtMostOnce)
+      OpArgs.push_back('o');
+  }
 
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
@@ -3389,7 +3392,9 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
-    } else if (fn->hasCalledAtMostOnceSemantics()) {
+    } else if (auto semantics = fn->getExecutionSemantics()) {
+      if (*semantics == ExecutionSemantics::AtMostOnce)
+        return appendOperator("XOo");
       return appendOperator("XO");
     }
     return appendOperator("c");

@@ -513,6 +513,19 @@ void ASTBuilder::endPackExpansion() {
   ActivePackExpansions.pop_back();
 }
 
+static std::optional<ExecutionSemantics>
+getExecutionSemantics(FunctionMetadataExecutionSemantics semantics) {
+  switch (semantics) {
+  case FunctionMetadataExecutionSemantics::None:
+    return std::nullopt;
+  case FunctionMetadataExecutionSemantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case FunctionMetadataExecutionSemantics::Once:
+    return ExecutionSemantics::Once;
+  }
+  llvm_unreachable("unknown execution semantics");
+}
+
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags, ExtendedFunctionTypeFlags extFlags,
@@ -607,9 +620,7 @@ Type ASTBuilder::createFunctionType(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
                    /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult(),
-                   extFlags.isCalledOnce()
-                       ? std::optional(ExecutionSemantics::AtMostOnce)
-                       : std::nullopt)
+                   getExecutionSemantics(extFlags.getExecutionSemantics()))
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();
@@ -730,6 +741,19 @@ getCoroutineKind(ImplCoroutineKind kind) {
     return SILCoroutineKind::YieldMany;
   }
   llvm_unreachable("unknown coroutine kind");
+}
+
+static std::optional<ExecutionSemantics>
+getExecutionSemantics(ImplFunctionExecutionSemantics semantics) {
+  switch (semantics) {
+  case ImplFunctionExecutionSemantics::None:
+    return std::nullopt;
+  case ImplFunctionExecutionSemantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case ImplFunctionExecutionSemantics::Once:
+    return ExecutionSemantics::Once;
+  }
+  llvm_unreachable("unknown execution semantics");
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -856,8 +880,7 @@ Type ASTBuilder::createImplFunctionType(
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),
           flags.isSendable(), flags.isAsync(), unimplementable,
-          flags.isCalledOnce() ? std::optional(ExecutionSemantics::AtMostOnce)
-                               : std::nullopt,
+          getExecutionSemantics(flags.getExecutionSemantics()),
           isolation, diffKind, clangFnType,
           /*LifetimeDependenceInfo*/ {})
           .build();
