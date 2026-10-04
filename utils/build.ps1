@@ -1614,7 +1614,9 @@ function Get-Dependencies {
 
       $TemporaryDestination = Join-Path -Path $ArtifactCache -ChildPath ".$ExtractPath.$PID.$([Guid]::NewGuid()).tmp"
       try {
-        Expand-Archive -LiteralPath $Source -DestinationPath $TemporaryDestination
+        # Expand-Archive is several times slower on Windows PowerShell 5.1.
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::ExtractToDirectory($Source, $TemporaryDestination)
         $PublishedSource = if ($ArchiveRoot) {
           Join-Path -Path $TemporaryDestination -ChildPath $ArchiveRoot
         } else {
