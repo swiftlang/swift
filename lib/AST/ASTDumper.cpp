@@ -686,6 +686,8 @@ static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
   case ExecutionSemantics::AtMostOnce:
     return "atMostOnce";
+  case ExecutionSemantics::Once:
+    return "once";
   }
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {
@@ -6795,8 +6797,8 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
-        printFlag(T->getExecutionSemantics() == ExecutionSemantics::AtMostOnce,
-                  "called_once");
+        if (auto semantics = T->getExecutionSemantics())
+          printField(*semantics, Label::always("called"));
         printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {

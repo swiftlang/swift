@@ -2400,12 +2400,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
-  // @called(atMostOnce) implies `consumed`.
+  // Every kind of @called implies `consumed`.
   if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-    if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
-      if (cast<CalledTypeAttr>(calledAttr)->isAtMostOnce())
-        return ParamSpecifier::Consuming;
-    }
+    if (attributedTy->has(TypeAttrKind::Called))
+      return ParamSpecifier::Consuming;
   }
 
   return ParamSpecifier::Default;
@@ -2505,8 +2503,10 @@ static Type validateParameterType(ParamDecl *decl) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
-        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                           diag::called_once_cannot_be_used_with_borrowing);
+        ctx.Diags.diagnose(
+            decl->getTypeRepr()->getLoc(),
+            diag::called_attr_cannot_be_used_with_borrowing,
+            CalledAttr::getSemanticsName(*F->getExecutionSemantics()));
         return ErrorType::get(ctx);
 
       case ParamSpecifier::InOut:

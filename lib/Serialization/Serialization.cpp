@@ -3000,6 +3000,8 @@ static uint8_t getRawStableFunctionTypeExecutionSemantics(
   switch (*semantics) {
   case swift::ExecutionSemantics::AtMostOnce:
     return uint8_t(serialization::FunctionTypeExecutionSemantics::AtMostOnce);
+  case swift::ExecutionSemantics::Once:
+    return uint8_t(serialization::FunctionTypeExecutionSemantics::Once);
   }
   llvm_unreachable("bad execution semantics");
 }

@@ -3954,9 +3954,21 @@ public:
     return getSemantics() == ExecutionSemantics::AtMostOnce;
   }
 
+  bool isExactlyOnce() const {
+    return getSemantics() == ExecutionSemantics::Once;
+  }
+
   ExecutionSemantics getSemantics() const {
     return ExecutionSemantics(Bits.CalledAttr.Semantics);
   }
+
+  const char *getSemanticsName() const {
+    return getSemanticsName(getSemantics());
+  }
+
+  /// Returns the source spelling of the argument of `@called` for the given
+  /// execution semantics, such as `atMostOnce`.
+  static const char *getSemanticsName(ExecutionSemantics semantics);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Called;
@@ -4891,7 +4903,7 @@ public:
 
 class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
 public:
-  enum class Semantics : uint8_t { AtMostOnce };
+  enum class Semantics : uint8_t { AtMostOnce, ExactlyOnce };
 
 private:
   SourceLoc SemanticsLoc;
@@ -4904,10 +4916,16 @@ public:
   }
 
   bool isAtMostOnce() const { return getSemantics() == Semantics::AtMostOnce; }
+  bool isExactlyOnce() const {
+    return getSemantics() == Semantics::ExactlyOnce;
+  }
 
   Semantics getSemantics() const {
     return Semantics(Bits.CalledTypeAttr.Semantics);
   }
+
+  /// Returns the execution semantics of function types with this attribute.
+  ExecutionSemantics getExecutionSemantics() const;
   SourceLoc getSemanticsLoc() const { return SemanticsLoc; }
 
   const char *getSemanticsName() const {

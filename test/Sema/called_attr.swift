@@ -250,3 +250,83 @@ do {
     }
   }
 }
+
+// MARK: - @called(exactlyOnce)
+
+do {
+  func fn() {}
+
+  let _: @called(exactlyOnce) () -> Void = fn // Ok
+  let exactlyOnce: @called(exactlyOnce) () -> Void = { } // Ok
+
+  let _: () -> Void = exactlyOnce
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '() -> Void'}}
+}
+
+struct ExactlyOnceStorage {
+  // expected-note@-1 {{consider adding '~Copyable' to struct 'ExactlyOnceStorage'}}
+
+  let exactlyOnce: @called(exactlyOnce) () -> Void
+  // expected-error@-1 {{stored property 'exactlyOnce' of 'Copyable'-conforming struct 'ExactlyOnceStorage' has non-Copyable type '@called(exactlyOnce) () -> Void'}}
+}
+
+func exactlyOnceArgumentConversions(fn: @escaping () -> Void, exactlyOnce: @called(exactlyOnce) () -> Void) {
+  func exactlyOnceFn(_ f: @called(exactlyOnce) () -> Void) {}
+  func plainFn(_ f: () -> Void) {}
+
+  exactlyOnceFn(fn) // Ok
+  exactlyOnceFn({ }) // Ok
+
+  plainFn(exactlyOnce) // expected-error {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> Void' to function type '() -> Void'}}
+}
+
+func exactlyOnceOwnership(
+  _: borrowing @called(exactlyOnce) () -> Void,
+  // expected-error@-1 {{'@called(exactlyOnce)' cannot be used together with 'borrowing'}}
+  _: consuming @called(exactlyOnce) () -> Void, // Ok
+  _: inout @called(exactlyOnce) () -> Void // Ok
+) {}
+
+func exactlyOnceTupleOwnership(
+  _: (borrowing @called(exactlyOnce) () -> Void) -> Void
+  // expected-error@-1 {{'@called(exactlyOnce)' cannot be used together with 'borrowing'}}
+) {}
+
+// `@called(exactlyOnce)` parameters are `consuming` by default.
+protocol P_ExactlyOnce {
+  func run(_: @called(exactlyOnce) () -> Void)
+  // expected-note@-1 {{protocol requires function 'run' with type '(consuming @called(exactlyOnce) () -> Void) -> ()'}}
+  func runNested(_: (@called(exactlyOnce) () -> Void) -> Void)
+}
+
+struct TestExactlyOnceWitnesses: P_ExactlyOnce { // expected-error {{type 'TestExactlyOnceWitnesses' does not conform to protocol 'P_ExactlyOnce'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func run(_: () -> Void) {}
+  // expected-note@-1 {{candidate has non-matching type '(() -> Void) -> ()'}}
+  func runNested(_: (consuming @called(exactlyOnce) () -> Void) -> Void) {} // Ok
+}
+
+func testExactlyOnceClosures() {
+  let _: @called(exactlyOnce) () -> Void = { } // Ok
+
+  let fn = { @called(exactlyOnce) in }
+  let _: () -> Void = fn
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '() -> Void'}}
+
+  func exactlyOnce(_: @called(exactlyOnce) () -> Void) {}
+
+  exactlyOnce { } // Ok
+  exactlyOnce { @called(exactlyOnce) in } // Ok
+
+  func plain(_: () -> Void) {}
+
+  plain { @called(exactlyOnce) in
+    // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '() -> Void'}}
+  }
+
+  func generic<T>(_: T) {} // expected-note {{required by local function 'generic' where 'T' = '@called(exactlyOnce) () -> ()'}}
+
+  generic(fn)
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> ()' cannot conform to 'Copyable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+}
