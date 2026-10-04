@@ -769,6 +769,29 @@ function Flatten-TimingEntry {
   }
 }
 
+# The build time depends mostly on the machine, so record what it is.
+function Write-BuildMachineInfo {
+  $Processor = Get-CimInstance Win32_Processor | Select-Object -First 1
+  $System = Get-CimInstance Win32_ComputerSystem
+  $OperatingSystem = Get-CimInstance Win32_OperatingSystem
+  Write-Host "Build machine: $($Processor.Name.Trim()), $($System.NumberOfLogicalProcessors) logical processors, $([Math]::Round($System.TotalPhysicalMemory / 1GB)) GB, $($OperatingSystem.Caption) $($OperatingSystem.Version)"
+  $Drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot("$BinaryCache"))
+  Write-Host "Build drive: $($Drive.Name) $($Drive.DriveFormat), $([Math]::Round($Drive.AvailableFreeSpace / 1GB)) GB free"
+  try {
+    Get-PhysicalDisk -ErrorAction Stop | ForEach-Object {
+      Write-Host "Disk: $($_.FriendlyName) ($($_.BusType), $($_.MediaType)), $([Math]::Round($_.Size / 1GB)) GB"
+    }
+  } catch {
+    Write-Host "Disk: unknown"
+  }
+  try {
+    $Defender = Get-MpComputerStatus -ErrorAction Stop
+    Write-Host "Microsoft Defender real-time protection: $($Defender.RealTimeProtectionEnabled)"
+  } catch {
+    Write-Host "Microsoft Defender real-time protection: unknown"
+  }
+}
+
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
@@ -5864,6 +5887,10 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
 #-------------------------------------------------------------------
 
 try {
+
+if ($Summary) {
+  Write-BuildMachineInfo
+}
 
 Get-Dependencies
 
