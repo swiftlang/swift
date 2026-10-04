@@ -177,11 +177,14 @@
       "StaticBigInt.swift",
       "UInt128.swift"],
     "Floating": [
+      "Double.swift",
+      "Float.swift",
+      "Float16.swift",
+      "Float80.swift",
       "FloatingPoint.swift",
       "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
       "FloatingPointToString.swift",
-      "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
       "SIMDIntegerConcreteOperations.swift",
