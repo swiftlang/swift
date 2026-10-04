@@ -559,7 +559,8 @@ public:
 
     auto *accessor = dyn_cast<AccessorDecl>(AFD);
     if (accessor &&
-        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+        accessor->getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2) {
       addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
@@ -877,8 +878,11 @@ public:
           if (decl && decl->hasBody()) {
             Visitor.addFunction(declRef);
             auto *accessor = dyn_cast<AccessorDecl>(decl);
-            if (accessor && requiresFeatureCoroutineAccessors(
-                                accessor->getAccessorKind())) {
+            if (accessor &&
+                requiresFeatureCoroutineAccessors(
+                    accessor->getAccessorKind()) &&
+                accessor->getASTContext()
+                    .SILOpts.CoroutineAccessorsUseYieldOnce2) {
               Visitor.addCoroFunctionPointer(SILDeclRef(accessor));
             }
           }

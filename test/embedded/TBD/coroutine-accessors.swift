@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -o /dev/null %s -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface -enable-experimental-feature CoroutineAccessors -validate-tbd-against-ir=all
 // RUN: %target-swift-frontend -emit-ir -o /dev/null %s -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface -enable-experimental-feature CoroutineAccessors -validate-tbd-against-ir=all -O
+// RUN: %target-swift-frontend -emit-ir -o /dev/null %s -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface -enable-experimental-feature CoroutineAccessors -validate-tbd-against-ir=all -disable-callee-allocated-coro-abi
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CoroutineAccessors
