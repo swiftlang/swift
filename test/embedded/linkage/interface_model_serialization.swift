@@ -84,9 +84,9 @@ final class Mine: C { override func m() -> Int { 33 } }
 @main
 struct Main {
   static func main() {
-    print(generic(1))
+    print(generic(Int64(1)))
     print(iface())
-    print(usesInternalClass(1))
+    print(usesInternalClass(Int64(1)))
     print(callP(S()))
     let e: any P = S()
     print(e.p())
