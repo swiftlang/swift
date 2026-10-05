@@ -5132,6 +5132,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ParsedEnum<bool> aborting;
     ParsedEnum<bool> noNestedConflict;
     ParsedEnum<bool> fromBuiltin;
+    ParsedEnum<bool> unresolved;
 
     bool isBeginAccess =
         (Opcode == SILInstructionKind::BeginAccessInst ||
@@ -5168,6 +5169,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         maybeSetEnum(Opcode != SILInstructionKind::EndAccessInst, fromBuiltin,
                      value, attr, identLoc);
       };
+      auto setUnresolved = [&](bool value) {
+        maybeSetEnum(isBeginAccess, unresolved, value, attr, identLoc);
+      };
 
       if (attr == "unknown") {
         setEnforcement(SILAccessEnforcement::Unknown);
@@ -5193,6 +5197,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         setNoNestedConflict(true);
       } else if (attr == "builtin") {
         setFromBuiltin(true);
+      } else if (attr == "unresolved") {
+        setUnresolved(true);
       } else {
         P.diagnose(identLoc, diag::unknown_attr_name, attr);
       }
@@ -5219,6 +5225,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     if (!fromBuiltin.isSet())
       fromBuiltin.Value = false;
+    
+    if (!unresolved.isSet())
+      unresolved.Value = false;
 
     SILValue addrVal;
     SourceLoc addrLoc;
@@ -5242,7 +5251,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     if (Opcode == SILInstructionKind::BeginAccessInst) {
       ResultVal = B.createBeginAccess(InstLoc, addrVal, *kind, *enforcement,
-                                      *noNestedConflict, *fromBuiltin);
+                                      *noNestedConflict, *fromBuiltin,
+                                      *unresolved);
     } else if (Opcode == SILInstructionKind::EndAccessInst) {
       ResultVal = B.createEndAccess(InstLoc, addrVal, *aborting);
     } else if (Opcode == SILInstructionKind::BeginUnpairedAccessInst) {
@@ -7303,6 +7313,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
   std::optional<ExecutionSemantics> PartialApplySemantics;
+  bool IsUnresolved = false;
 
   StringRef AttrName;
   SourceLoc AttrLoc;
@@ -7384,6 +7395,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       if (!isolationCrossing)
         isolationCrossing.emplace();
       isolationCrossing->CallerIsolation = *applyIsolation;
+      continue;
+    }
+    
+    if (AttrName == "unresolved") {
+      IsUnresolved = true;
       continue;
     }
 
@@ -7505,7 +7521,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     ResultVal = B.createBeginApply(InstLoc, FnVal, subs, Args, ApplyOpts,
-                                   nullptr, isolationCrossing);
+                                   nullptr, isolationCrossing, std::nullopt,
+                                   IsUnresolved);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
