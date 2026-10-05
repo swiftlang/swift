@@ -1995,10 +1995,11 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
                                  firstPattern->getCastKind()))
     return false;
 
-  // The test reads the subject through a pointer, so it has to be in memory.
-  // An opaque existential always is.
+  // The test reads the subject through a pointer.
+  // * Without OpaqueValues, return here if it's not an address
+  // * With OpaqueValues, fall through to borrow it into a temporary
   ManagedValue subject = src.getFinalManagedValue();
-  if (!subject.getType().isAddress())
+  if (!subject.getType().isAddress() && SGF.useLoweredAddresses())
     return false;
 
   // We can't yet support binding the payload, so diagnose here.
@@ -2026,6 +2027,23 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
 
   // Sketch the CFG and type test
   SILLocation loc = rows[0].Pattern;
+
+  // Borrow a value subject into a temporary so the cast has an address to read.
+  // Close the borrow at the top of each successor block.
+  SILValue subjectTemp, subjectBorrow;
+  if (!subject.getType().isAddress()) {
+    subjectTemp = SGF.B.createAllocStack(loc, subject.getType());
+    subjectBorrow =
+        SGF.B.createStoreBorrow(loc, subject.getValue(), subjectTemp);
+    subject = ManagedValue::forBorrowedAddressRValue(subjectBorrow);
+  }
+  auto endSubjectBorrow = [&] {
+    if (!subjectTemp)
+      return;
+    SGF.B.createEndBorrow(loc, subjectBorrow);
+    SGF.B.createDeallocStack(loc, subjectTemp);
+  };
+
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
   emitNoncopyableTypeTest(SGF, loc, subject, sourceType, targetType, trueBB,
@@ -2033,10 +2051,12 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
 
   // Chain failure to the next case
   SGF.B.setInsertionPoint(falseBB);
+  endSubjectBorrow();
   failure(loc);
 
   // Set up the success block.  If we diagnosed above, this is unreachable
   SGF.B.setInsertionPoint(trueBB);
+  endSubjectBorrow();
   if (wantsPayload) {
     SGF.B.createUnreachable(loc);
     return true;
