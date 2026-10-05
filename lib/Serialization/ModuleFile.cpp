@@ -27,10 +27,8 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -133,6 +131,13 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(GenericEnvironments, core->GenericEnvironments);
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
+  allocateBuffer(HiddenTypeLayoutInfoDecls, core->HiddenTypeLayoutInfoDecls);
+
+  auto fallbackData = core->HiddenTypeFallbackTableData;
+  for (unsigned index = 0; index + 1 < fallbackData.size(); index += 2) {
+    HiddenTypeFallbackMap[static_cast<uint32_t>(fallbackData[index])] =
+        static_cast<uint32_t>(fallbackData[index + 1]);
+  }
 }
 
 bool ModuleFile::allowCompilerErrors() const {

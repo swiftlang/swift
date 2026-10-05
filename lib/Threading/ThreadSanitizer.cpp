@@ -25,14 +25,15 @@
 
 #include <dlfcn.h>
 
-#include <cstdio>
 
 namespace swift {
 namespace threading_impl {
 
 SWIFT_THREADING_EXPORT bool _swift_tsan_enabled = false;
-SWIFT_THREADING_EXPORT void (*_swift_tsan_acquire)(const void *) = nullptr;
-SWIFT_THREADING_EXPORT void (*_swift_tsan_release)(const void *) = nullptr;
+SWIFT_THREADING_EXPORT void (* __ptrauth_swift_thread_sanitizer_hook
+                             _swift_tsan_acquire)(const void *) = nullptr;
+SWIFT_THREADING_EXPORT void (* __ptrauth_swift_thread_sanitizer_hook
+                             _swift_tsan_release)(const void *) = nullptr;
 
 // The TSan library code will call this function when it starts up
 extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS

@@ -21,16 +21,11 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/LLVMExtras.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -385,45 +380,13 @@ template <>
 struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   using Binding = swift::constraints::inference::PotentialBinding;
 
-  static Binding getEmptyKey() {
-    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
-  }
-
-  static Binding getTombstoneKey() {
-    return placeholderKey(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(const Binding &Val) {
     return DenseMapInfo<swift::Type>::getHashValue(
         Val.BindingType->getCanonicalType());
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
-#if LLVM_VERSION_MAJOR <= 21
-    // If either side is empty or tombstone, let's use pointer equality.
-    {
-      auto lhsTy = LHS.BindingType.getPointer();
-      auto rhsTy = RHS.BindingType.getPointer();
-
-      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
-      auto tombstoneTy =
-          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
-
-      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-
-      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-    }
-#endif
-
     return LHS == RHS;
-  }
-
-private:
-  static Binding placeholderKey(swift::Type type) {
-    return Binding::forPlaceholder(type);
   }
 };
 
@@ -790,6 +753,8 @@ private:
 
   SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
                                       const PotentialBinding &existing);
+
+  void promoteBindings();
 
   void inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
                                          TypeVariableType *keyPathTy);

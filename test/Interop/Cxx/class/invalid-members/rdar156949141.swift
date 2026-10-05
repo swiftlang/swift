@@ -2,11 +2,8 @@
 // RUN: split-file %s %t
 //
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}header.h \
 // RUN:   %t%{fs-sep}test.swift
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module TheHeader {

@@ -64,12 +64,12 @@ public import Foundation // public import to allow `NSObject` in API.
 package class PkgKlass: NSObject {
   /// Serialized since it does _not_ reference a type from module imported as @_implementationOnly.
   // PkgKlass.first.getter
-  // CHECK-UTILS-DAG: sil package [serialized_for_package] [canonical] [ossa]  @$s5Utils8PkgKlassC5firstSSvg : $@convention(method) (@guaranteed PkgKlass) -> @owned String {
+  // CHECK-UTILS-DAG: sil package [serialized_for_package] [canonical] [stage=canonical] [ossa]  @$s5Utils8PkgKlassC5firstSSvg : $@convention(method) (@guaranteed PkgKlass) -> @owned String {
   package var first: String
 
   /// NOT serialized since it does reference a type from module imported as @_implementationOnly.
   // PkgKlass.second.getter
-  // CHECK-UTILS-DAG: sil package_external [canonical] @$s5Utils8PkgKlassC6secondSo8NSObjectCvg : $@convention(method) (@guaranteed PkgKlass) -> @owned NSObject
+  // CHECK-UTILS-DAG: sil package_external [canonical] [stage=canonical] @$s5Utils8PkgKlassC6secondSo8NSObjectCvg : $@convention(method) (@guaranteed PkgKlass) -> @owned NSObject
   @objc package var second: NSObject
 
   init(first: String, second: NSObject) {
@@ -91,13 +91,13 @@ package import CoreA
 @_spiOnly public import CoreB
 
 /// PkgStruct is imported with `package import` and should be serialized.
-// CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s2UI6uiFuncyy5CoreA9PkgStructVF : $@convention(thin) (@in_guaranteed PkgStruct) -> () {
+// CHECK-DAG: sil package [serialized_for_package] [canonical] [stage=canonical] [ossa] @$s2UI6uiFuncyy5CoreA9PkgStructVF : $@convention(thin) (@in_guaranteed PkgStruct) -> () {
 package func uiFunc(_ arg: PkgStruct) {
   print(arg.pkgVar)
 }
 
 /// PubStruct is imported with `@_spiOnly public import` and should be serialized.
-// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s2UI7spiFuncyy5CoreB15PubStructForSPIVF : $@convention(thin) (@in_guaranteed PubStructForSPI) -> () {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [stage=canonical] [ossa] @$s2UI7spiFuncyy5CoreB15PubStructForSPIVF : $@convention(thin) (@in_guaranteed PubStructForSPI) -> () {
 @_spi(GroupB)
 public func spiFunc(_ arg: PubStructForSPI) {
   print(arg.pubVarForSPI)

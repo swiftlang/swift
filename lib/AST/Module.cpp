@@ -24,18 +24,15 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
@@ -48,12 +45,9 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Compiler.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -1277,8 +1271,8 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
 }
 
 void ModuleDecl::getTopLevelDeclsWithAuxiliaryDecls(
-    SmallVectorImpl<Decl *> &Results) const {
-  FORWARD(getTopLevelDeclsWithAuxiliaryDecls, (Results));
+    SmallVectorImpl<Decl *> &Results, bool visitFreestanding) const {
+  FORWARD(getTopLevelDeclsWithAuxiliaryDecls, (Results, visitFreestanding));
 }
 
 void ModuleDecl::dumpDisplayDecls() const {
@@ -1832,8 +1826,8 @@ void SourceFile::getImplicitImportsForModuleInterface(
 
 void SourceFile::dumpSeparatelyImportedOverlays() const {
   for (auto &pair : separatelyImportedOverlays) {
-    auto &underlying = std::get<0>(pair);
-    auto &overlays = std::get<1>(pair);
+    auto &underlying = pair.first;
+    auto &overlays = pair.second;
 
     llvm::errs() << (void*)underlying << " ";
     underlying->dump(llvm::errs());
@@ -2457,7 +2451,7 @@ findDeclaredCrossImportOverlays(Identifier bystanderName,
 void ModuleDecl::getDeclaredCrossImportBystanders(
     SmallVectorImpl<Identifier> &otherModules) {
   for (auto &pair : declaredCrossImports)
-    otherModules.push_back(std::get<0>(pair));
+    otherModules.push_back(pair.first);
 }
 
 void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
@@ -2500,8 +2494,8 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
     }
 
     for (auto &pair: current->declaredCrossImports) {
-      Identifier &bystander = std::get<0>(pair);
-      for (auto *file: std::get<1>(pair)) {
+      Identifier &bystander = pair.first;
+      for (auto *file: pair.second) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
           addOverlay(overlay);
@@ -2520,9 +2514,9 @@ namespace {
                                      CrossImportMap modCrossImports) {
     auto ret = std::find_if(modCrossImports.begin(), modCrossImports.end(),
                             [&](CrossImportMap::iterator::value_type &pair) {
-      for (OverlayFile *file: std::get<1>(pair)) {
+      for (OverlayFile *file: pair.second) {
         ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
-            mod, SourceLoc(), std::get<0>(pair));
+            mod, SourceLoc(), pair.first);
         if (std::find(overlays.begin(), overlays.end(),
                       overlay->getName()) != overlays.end())
           return true;
@@ -3720,7 +3714,12 @@ void *SourceFile::getExportedSourceFile() const {
 
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
-  getTopLevelDecls(Decls);
+  if (walker.shouldWalkTopLevelAuxiliaryDecls()) {
+    // Ignore freestanding expansions since the ASTWalker visits those.
+    getTopLevelDeclsWithAuxiliaryDecls(Decls, /*visitFreestanding*/ false);
+  } else {
+    getTopLevelDecls(Decls);
+  }
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
 
@@ -3769,7 +3768,13 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (auto Item : getTopLevelItems()) {
+  SmallVector<ASTNode, 64> scratch;
+  // Ignore freestanding expansions since the ASTWalker visits those.
+  auto Items = walker.shouldWalkTopLevelAuxiliaryDecls()
+                   ? getTopLevelItemsWithAuxiliaryDecls(scratch,
+                                                        /*freestanding*/ false)
+                   : getTopLevelItems();
+  for (auto Item : Items) {
     if (auto D = Item.dyn_cast<Decl *>()) {
       if (D->walk(walker))
         return true;
@@ -4092,20 +4097,103 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
   Results.erase(newEnd, Results.end());
 }
 
-void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
-    SmallVectorImpl<Decl*> &results) const {
+/// Recursively visit all the auxiliary extensions for any top-level and nested
+/// types.
+static void
+visitAllAuxiliaryExtensions(Decl *D,
+                            llvm::function_ref<void(Decl *)> addResult) {
+  // Only needs to be done for source files and Clang decls.
+  // FIXME: Should Clang be handling this in ClangModuleUnit::getTopLevelDecls?
+  if (!D->getDeclContext()->isInSwiftSourceFile() && !D->hasClangNode())
+    return;
 
-  std::function<void(Decl *)> addResult;
-  addResult = [&](Decl *decl) {
-    results.push_back(decl);
-    decl->visitAuxiliaryDecls(addResult);
+  class Visitor final : public DeclVisitor<Visitor> {
+    llvm::function_ref<void(Decl *)> AddResult;
+
+  public:
+    Visitor(llvm::function_ref<void(Decl *)> addResult)
+        : AddResult(addResult) {}
+
+    void visitDecl(Decl *D) {
+      // Make sure to visit any peer macros. See the comment in
+      // `getTopLevelItemsWithAuxiliaryDecls` for why this is done separately.
+      D->visitAuxiliaryDecls([&](Decl *D) { visit(D); });
+    }
+
+    void visitMembers(IterableDeclContext *IDC) {
+      auto *D = const_cast<Decl *>(IDC->getDecl());
+      visitDecl(D);
+
+      // Make sure to expand any member macros. Note we intentionally don't use
+      // `getABIMembers` here since that unnecessarily synthesizes a bunch of
+      // implicit decls that don't have extension macros, causing unnecessary
+      // work for lazy type-checking.
+      auto &eval = D->getASTContext().evaluator;
+      (void)evaluateOrDefault(eval, ExpandSynthesizedMemberMacroRequest{D}, {});
+      for (auto *member : IDC->getMembers())
+        visit(member);
+    }
+
+    void visitExtensionDecl(ExtensionDecl *ED) { visitMembers(ED); }
+
+    void visitNominalTypeDecl(NominalTypeDecl *NTD) {
+      NTD->visitAuxiliaryExtensions([&](Decl *D) {
+        visit(D);
+        AddResult(D);
+      });
+      visitMembers(NTD);
+    }
   };
+  Visitor visitor(addResult);
+  visitor.visit(D);
+}
 
+ArrayRef<ASTNode>
+FileUnit::getTopLevelItemsWithAuxiliaryDecls(SmallVectorImpl<ASTNode> &scratch,
+                                             bool visitFreestanding) const {
+  std::function<void(Decl *)> addDecl;
+  addDecl = [&](Decl *decl) {
+    scratch.push_back(decl);
+    decl->visitAuxiliaryDecls(addDecl, visitFreestanding);
+  };
+  // Currently only SourceFiles have top-level code items.
+  if (auto *SF = dyn_cast<SourceFile>(this)) {
+    for (auto item : SF->getTopLevelItems()) {
+      if (auto *D = dyn_cast<Decl *>(item)) {
+        addDecl(D);
+        // Note this isn't in `addDecl` since when `visitFreestanding` is
+        // `false` we don't want to collect freestanding expansions for the
+        // result, but we *do* still want to walk them to find auxiliary
+        // extensions.
+        visitAllAuxiliaryExtensions(D, addDecl);
+      } else {
+        scratch.push_back(item);
+      }
+    }
+  } else {
+    SmallVector<Decl *, 32> decls;
+    getTopLevelDeclsWithAuxiliaryDecls(decls, visitFreestanding);
+    for (auto *D : decls)
+      scratch.push_back(D);
+  }
+  return scratch;
+}
+
+void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
+    SmallVectorImpl<Decl *> &results, bool visitFreestanding) const {
+  std::function<void(Decl *)> addDecl;
+  addDecl = [&](Decl *decl) {
+    results.push_back(decl);
+    decl->visitAuxiliaryDecls(addDecl, visitFreestanding);
+  };
   SmallVector<Decl *, 32> nonExpandedDecls;
-  nonExpandedDecls.reserve(results.capacity());
   getTopLevelDecls(nonExpandedDecls);
-  for (auto *decl : nonExpandedDecls) {
-    addResult(decl);
+  for (auto *D : nonExpandedDecls) {
+    addDecl(D);
+    // Note this isn't in `addDecl` since when `visitFreestanding` is `false`
+    // we don't want to collect freestanding expansions for the result, but
+    // we *do* still want to walk them to find auxiliary extensions.
+    visitAllAuxiliaryExtensions(D, addDecl);
   }
 }
 

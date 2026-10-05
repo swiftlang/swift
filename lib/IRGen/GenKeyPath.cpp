@@ -38,22 +38,17 @@
 #include "ProtocolInfo.h"
 #include "StructLayout.h"
 #include "TypeInfo.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/ABI/KeyPath.h"
-#include "swift/ABI/HeapObject.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/IRGen/Linking.h"
 
@@ -2000,8 +1995,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   // built the same way here as it is there.
   if (!swiftImmortalRefCount) {
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-      // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
-      // (all-ones on both 32-bit and 64-bit).
+      // = HeapObject.staticRefCount (all ones)
       swiftImmortalRefCount = llvm::ConstantInt::getAllOnesValue(IntPtrTy);
     } else {
       swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(

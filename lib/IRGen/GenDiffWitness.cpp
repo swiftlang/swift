@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 
 #include "ConstantBuilder.h"

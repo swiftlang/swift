@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -module-name=test -disable-availability-checking -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -module-name=test -target %target-swift-6.2-abi-triple -emit-sil | %FileCheck %s
 
 public struct S {
     var i: Int

@@ -261,7 +261,7 @@ public:
 /// TaskOptionRecord is used to provide the witnesses.
 struct ResultTypeInfo {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const Metadata *metadata = nullptr;
+  const Metadata *__ptrauth_swift_task_result_type_metadata metadata = nullptr;
   bool isNull() {
     return metadata == nullptr;
   }
@@ -566,6 +566,10 @@ private:
   void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
   void destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord);
   uint32_t taskFlagAsRunningWithoutDependency(InvokeFlags invokeFlags);
+
+  /// Remove the enqueued bit in the ActiveTaskStatus atomically. This must be
+  /// done when a Task's intrusive link is dequeued but after reading the local
+  /// stealer exclusion value. This should not be called from any other context.
   void taskRemoveEnqueued();
 
 public:
@@ -582,7 +586,7 @@ public:
   ///
   /// \param ignoreShield if cancellation shield should be ignored. 
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
-  bool isCancelled(bool ignoreShield) const;
+  bool isCancelled(bool ignoreShield = false) const;
 
   // ==== Task Naming ----------------------------------------------------------
 
@@ -883,7 +887,8 @@ public:
     };
 
     /// An item within the wait queue, which includes the status and the
-    /// head of the list of tasks.
+    /// head of the list of tasks. The task pointer is signed with the address
+    /// of the waitQueue field that holds the item.
     struct WaitQueueItem {
       /// Mask used for the low status bits in a wait queue item.
       static const uintptr_t statusMask = 0x03;
@@ -894,13 +899,29 @@ public:
         return static_cast<Status>(storage & statusMask);
       }
 
-      AsyncTask *getTask() const {
-        return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+      AsyncTask *getTask(const void *slot) const {
+        auto task = reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+#if SWIFT_PTRAUTH
+        if (task)
+          task = ptrauth_auth_data(
+              task, ptrauth_key_process_independent_data,
+              ptrauth_blend_discriminator(
+                  slot, SpecialPointerAuthDiscriminators::TaskFutureWaitQueue));
+#endif
+        return task;
       }
 
-      static WaitQueueItem get(Status status, AsyncTask *task) {
-        return WaitQueueItem{
-          reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+      static WaitQueueItem get(Status status, AsyncTask *task,
+                               const void *slot) {
+#if SWIFT_PTRAUTH
+        if (task)
+          task = ptrauth_sign_unauthenticated(
+              task, ptrauth_key_process_independent_data,
+              ptrauth_blend_discriminator(
+                  slot, SpecialPointerAuthDiscriminators::TaskFutureWaitQueue));
+#endif
+        return WaitQueueItem{reinterpret_cast<uintptr_t>(task) |
+                             static_cast<uintptr_t>(status)};
       }
     };
 
@@ -923,8 +944,8 @@ public:
 
   public:
     explicit FutureFragment(ResultTypeInfo resultType)
-      : waitQueue(WaitQueueItem::get(Status::Executing, nullptr)),
-        resultType(resultType) { }
+        : waitQueue(WaitQueueItem::get(Status::Executing, nullptr, &waitQueue)),
+          resultType(resultType) {}
 
     /// Destroy the storage associated with the future.
     void destroy();
@@ -1010,7 +1031,8 @@ private:
   /// Access the next waiting task, which establishes a singly linked
   /// list of tasks that are waiting on a future. This function
   /// assumes that this Task is suspended waiting on a another Task.
-  AsyncTask *&getNextWaitingTask();
+  AsyncTask *getNextWaitingTask();
+  void setNextWaitingTask(AsyncTask *task);
 };
 
 // The compiler will eventually assume these.

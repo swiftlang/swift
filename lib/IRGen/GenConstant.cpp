@@ -30,7 +30,6 @@
 #include "DebugTypeInfo.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
@@ -475,8 +474,7 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   if (IGM.canMakeStaticObjectReadOnly(OI->getType())) {
     if (!IGM.swiftImmortalRefCount) {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-        // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
-        // 0xffff_ffff on 32-bit, 0xffff_ffff_ffff_ffff on 64-bit
+        // = HeapObject.staticRefCount (all ones)
         IGM.swiftImmortalRefCount =
             llvm::ConstantInt::getAllOnesValue(IGM.IntPtrTy);
       } else {

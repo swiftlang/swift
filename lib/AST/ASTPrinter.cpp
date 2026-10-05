@@ -46,18 +46,15 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -75,7 +72,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <queue>
 
 using namespace swift;
 
@@ -456,9 +452,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
-      // The `using` declarations are private to the file at the moment
+      // The `default` declarations are private to the file at the moment
       // and shouldn't appear in swift interfaces.
-      if (isa<UsingDecl>(D))
+      if (isa<FileDefaultDecl>(D))
         return false;
 
       return ShouldPrintChecker::shouldPrint(D, options);
@@ -3487,8 +3483,8 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
-void PrintAST::visitUsingDecl(UsingDecl *decl) {
-  Printer.printIntroducerKeyword("using", Options, " ");
+void PrintAST::visitFileDefaultDecl(FileDefaultDecl *decl) {
+  Printer.printIntroducerKeyword("default", Options, " ");
   for (auto attr : decl->getSpecifiedAttributes()) {
     attr->print(Printer, Options, decl);
   }
@@ -4816,6 +4812,37 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         printGenericDeclGenericParams(decl);
         printFunctionParameters(decl);
       });
+
+    if (decl->isCoroutine()) {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      decl->getYieldInterfaceTypes(yields);
+      auto *bodyYields = decl->getYields();
+
+      Printer.printStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
+      };
+      Printer << " " << tok::kw_yield << " (";
+
+      for (auto [idx, yield] : llvm::enumerate(yields)) {
+        if (idx > 0)
+          Printer << ", ";
+
+        Type interfaceTy = yield.getType();
+        TypeLoc TheTypeLoc;
+        if (bodyYields) {
+          TheTypeLoc = TypeLoc(bodyYields->get(idx).getTypeRepr(), interfaceTy);
+        } else {
+          TheTypeLoc = TypeLoc::withoutLoc(interfaceTy);
+        }
+
+        if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options))
+          printParameterFlags(Printer, Options, nullptr,
+                              yield.getFlags().asParamFlags(), false);
+
+        printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
+      }
+    }
 
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
@@ -6871,7 +6898,21 @@ public:
   }
 
   bool shouldDesugarTypeAliasType(TypeAliasType *T) {
-    return Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType;
+    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType)
+      return true;
+
+    // Implicit typealiases for generic parameters (such as the witness
+    // `typealias Element = Element` inferred for an associated type) are not
+    // printed in module interfaces, so references to them would not resolve.
+    // Print the underlying type instead.
+    if (Options.IsForSwiftInterface) {
+      auto *alias = T->getDecl();
+      if (alias->isImplicit() &&
+          alias->getUnderlyingType()->is<GenericTypeParamType>())
+        return true;
+    }
+
+    return false;
   }
 
   void visitTypeAliasType(TypeAliasType *T,
@@ -7234,10 +7275,16 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
-    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
-      Printer.printSimpleAttr("@called(once)") << " ";
+    if (!Options.excludeAttrKind(TypeAttrKind::Called)) {
+      if (auto semantics = info.getExecutionSemantics()) {
+        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+        Printer.printAttrName("@called");
+        Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
+        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+        Printer << " ";
+      }
     }
-    
+
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -7250,6 +7297,10 @@ public:
           Printer.printLifetimeDependence(lifetimeDependence, params, Options);
         }
       }
+    }
+    
+    if (!Options.excludeAttrKind(TypeAttrKind::YieldOnce) && info.isCoroutine()) {
+      Printer.printSimpleAttr("@yield_once") << " ";
     }
 
     SmallString<64> buf;
@@ -7286,6 +7337,9 @@ public:
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
+        break;
+      case SILFunctionType::Representation::COMMethod:
+        Printer << "com_method";
         break;
       case SILFunctionType::Representation::CXXMethod:
         Printer << "cxx_method";
@@ -7380,6 +7434,9 @@ public:
       case SILFunctionType::Representation::Method:
         Printer << "method";
         break;
+      case SILFunctionType::Representation::COMMethod:
+        Printer << "com_method";
+        break;
       case SILFunctionType::Representation::CXXMethod:
         Printer << "cxx_method";
         break;
@@ -7439,10 +7496,10 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
-    if (info.isCalledOnce()) {
+    if (auto semantics = info.getExecutionSemantics()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@called");
-      Printer << "(once)";
+      Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
       Printer << " ";
     }
@@ -7523,6 +7580,22 @@ public:
     // explicit lifetimes use them to describe their sources and targets.
     return T->hasExplicitLifetimeDependencies();
   }
+  
+  void visitAnyFunctionTypeYields(ArrayRef<AnyFunctionType::Yield> yields) {
+    Printer << "(";
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      if (index)
+        Printer << ", ";
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYield);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYield);
+      };
+      if (yield.isInOut())
+        Printer << "inout ";
+      visit(yield.getType());
+    }
+    Printer << ")";
+  }
 
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
@@ -7555,6 +7628,14 @@ public:
           Printer << ")";
         }
       }
+    }
+
+    if (T->hasExtInfo() && T->isCoroutine()) {
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      Printer << " ";
+      Printer.printKeyword("yields ", Options);
+      visitAnyFunctionTypeYields(T->getYields());
+      Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
     }
 
     Printer << " -> ";
@@ -7622,6 +7703,14 @@ public:
           Printer << ")";
         }
       }
+   }
+
+   if (T->hasExtInfo() && T->isCoroutine()) {
+     Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+     Printer << " ";
+     Printer.printKeyword("yields ", Options);
+     visitAnyFunctionTypeYields(T->getYields());
+     Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
    }
 
     Printer << " -> ";

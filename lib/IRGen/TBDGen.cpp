@@ -17,16 +17,10 @@
 #include "swift/IRGen/TBDGen.h"
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/SourceFile.h"
-#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -36,11 +30,8 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILSymbolVisitor.h"
-#include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessTable.h"
-#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
-#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Mangler.h"
@@ -438,10 +429,19 @@ bool TBDGenVisitor::willVisitDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return false;
 
-  // A @_silgen_name("...") function without a body only exists to
+  // A @_silgen_name("...") or @_extern function without a body only exists to
   // forward-declare a symbol from another library.
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
-    if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>())
+    if (!AFD->hasBody() && (AFD->getAttrs().hasAttribute<SILGenNameAttr>() ||
+                            AFD->getAttrs().hasAttribute<ExternAttr>()))
+      return false;
+
+  // Likewise for a @_silgen_name("...") or @_extern(c) variable without an
+  // initial value.
+  if (auto VD = dyn_cast<VarDecl>(D))
+    if (!VD->hasInitialValue() &&
+        (VD->getAttrs().hasAttribute<SILGenNameAttr>() ||
+         ExternAttr::find(VD->getAttrs(), ExternKind::C)))
       return false;
 
   DeclStack.push_back(D);
@@ -472,6 +472,17 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
+  // A @_silgen_name("...") variable's storage uses that name, as in
+  // SILGenModule::getSILGlobalVariable.
+  auto silgenName = VD->getAttrs().getAttribute<SILGenNameAttr>();
+  if (silgenName && !silgenName->Name.empty()) {
+    std::string name = silgenName->Name.str();
+    if (silgenName->Raw)
+      name = "\1" + name;
+    addSymbol(name, SymbolSource::forGlobal(VD), SymbolFlags::Data);
+    return;
+  }
+
   Mangle::ASTMangler mangler(VD->getASTContext());
   addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
             SymbolFlags::Data);
@@ -523,6 +534,10 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
+  // Embedded Swift does not use force-load symbols.
+  if (SwiftModule->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   if (!Opts.ModuleLinkName.empty()) {
     // FIXME: We ought to have a symbol source for this.
     SmallString<32> buf;
@@ -823,15 +838,16 @@ private:
   apigen::APIAvailability getAvailability(const Decl *decl) {
     std::optional<bool> unavailable, spiAvailable;
     std::string introduced, obsoleted;
-    bool hasFallbackUnavailability = false, hasFallbackSPIAvailability = false;
+    // `@_spi_available` requires a specific platform, so only a platform
+    // attribute can make the symbol SPI and there is no fallback for it.
+    bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
     const Decl *declForAvailability = decl->getInnermostDeclWithAvailability();
     if (!declForAvailability)
       return {};
     for (auto attr : declForAvailability->getSemanticAvailableAttrs()) {
-      if (!attr.isPlatformSpecific()) {
-        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
-        hasFallbackSPIAvailability = attr.isSPI();
+      if (attr.getDomain().isUniversal()) {
+        hasFallbackUnavailability |= attr.isUnconditionallyUnavailable();
         continue;
       }
       if (attr.getPlatform() != platform)
@@ -845,7 +861,7 @@ private:
     }
     return {introduced, obsoleted,
             unavailable.value_or(hasFallbackUnavailability),
-            spiAvailable.value_or(hasFallbackSPIAvailability)};
+            spiAvailable.value_or(false)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {

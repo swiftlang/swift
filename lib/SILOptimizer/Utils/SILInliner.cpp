@@ -14,8 +14,6 @@
 
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -28,7 +26,6 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -427,10 +424,6 @@ protected:
   /// Insert end_borrow for the enclosing values of an inlined return_borrow
   /// at the lifetime boundary of the inlined result.
   void fixupReturnBorrow();
-
-  /// Inlining splices the callee into the caller; the caller's lowered-address
-  /// form is its own and must not be overwritten with the callee's.
-  bool isWholeFunctionClone() const { return false; }
 
   const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
@@ -1089,12 +1082,6 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   return InlinedScope;
 }
 
-template <typename... T, typename... U>
-static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-                     U &&...args) {
-  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
 //===----------------------------------------------------------------------===//
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
@@ -1137,6 +1124,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExtendLifetimeInst:
+  case SILInstructionKind::DiagnoseInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -1315,6 +1303,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CheckedCastAddrBranchInst:
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::CondBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
@@ -1367,6 +1356,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::OpenPackElementInst:
   case SILInstructionKind::PartialApplyInst:

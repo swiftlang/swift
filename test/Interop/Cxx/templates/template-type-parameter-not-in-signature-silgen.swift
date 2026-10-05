@@ -1,16 +1,11 @@
 // RUN: %target-swift-emit-silgen %s -cxx-interoperability-mode=default -I %S/Inputs \
 // RUN: | %FileCheck %s
-//
-// RUN: %target-swift-emit-silgen %s -cxx-interoperability-mode=default -I %S/Inputs \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
-// RUN: | %FileCheck %s
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 import TemplateTypeParameterNotInSignature
 
 _ = templateTypeParamNotUsedInSignature(T: Int.self)
 _ = templateTypeParamNotUsedInSignature(T: Bool.self)
+_ = StructWithAttributes().templateTypeParamNotUsedInSignatureAddress(T: Int.self)
 
 
 // CHECK: sil [transparent] [serialized] [ossa] @$sSC35templateTypeParamNotUsedInSignatureySbSimF : $@convention(thin) (@thin Int.Type) -> Bool {
@@ -22,3 +17,6 @@ _ = templateTypeParamNotUsedInSignature(T: Bool.self)
 // CHECK: bb0(%0 : $@thin Bool.Type):
 // CHECK:   {{.*}} = function_ref @$sSo69__swift_specializedThunk__Z35templateTypeParamNotUsedInSignatureIbEbvSbyFTo : $@convention(c) () -> Bool
 // CHECK: } // end sil function '$sSC35templateTypeParamNotUsedInSignatureyS2bmF'
+
+// The thunk borrows 'self' in place, like the method it calls.
+// CHECK: sil {{.*}}templateTypeParamNotUsedInSignatureAddress{{.*}} : $@convention(method) (@thin Int.Type, @in_guaranteed StructWithAttributes) -> Optional<UnsafePointer<Int32>> {

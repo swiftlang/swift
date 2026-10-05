@@ -43,7 +43,7 @@ enum class ThrownErrorSubtyping {
 
 /// Compare the thrown error types for the purposes of subtyping.
 ThrownErrorSubtyping compareThrownErrorsForSubtyping(
-    Type subThrownError, Type superThrownError, DeclContext *dc);
+    Type subThrownError, Type superThrownError);
 
 /// Determine whether the given function uses typed throws in a manner
 /// that is structurally similar to 'rethrows', e.g.,

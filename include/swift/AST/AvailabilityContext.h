@@ -21,9 +21,9 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityRestriction.h"
-#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -33,6 +33,7 @@ class AvailableAttr;
 class AvailabilityScope;
 class Decl;
 class DeclContext;
+class ProtocolConformanceRef;
 
 /// An `AvailabilityContext` summarizes the availability restrictions for a
 /// specific scope, such as within a declaration or at a particular source
@@ -156,6 +157,27 @@ public:
   DeclAvailabilityRestrictions
   allRestrictionsForDecl(const Decl *decl,
                          AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Enumerates the availability restrictions that must be satisfied to use
+  /// \p conformance from this context, similar to
+  /// `unsatisfiedRestrictionForDecl()`. The enumerated restrictions may apply
+  /// to the protocol, to the conformance declaration itself, to the members of
+  /// a pack conformance, or to an associated conformance. \p callback is
+  /// invoked with each restricted declaration, the protocol of the conformance
+  /// whose use is restricted, and the strongest unsatisfied restriction. To
+  /// stop the enumeration, return `true` from \p callback. Returns `true` if
+  /// the enumeration stopped early.
+  bool enumerateUnsatisfiedRestrictionsForConformance(
+      ProtocolConformanceRef conformance,
+      llvm::function_ref<bool(const Decl *, const ProtocolDecl *,
+                              AvailabilityRestriction)> callback,
+      AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Returns true if any availability restriction must be satisfied to use
+  /// \p conformance from this context.
+  bool hasUnsatisfiedRestrictionsForConformance(
+      ProtocolConformanceRef conformance,
+      AvailabilityRestrictionFlags flags = std::nullopt);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const AvailabilityContext other) const;

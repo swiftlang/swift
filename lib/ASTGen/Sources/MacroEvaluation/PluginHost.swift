@@ -393,7 +393,7 @@ extension String {
 }
 
 extension PluginMessage.Syntax {
-  init?(syntax: Syntax, in sourceFilePtr: UnsafePointer<ExportedSourceFile>, pluginProtocolVersion: Int = PluginMessage.PROTOCOL_VERSION_NUMBER) {
+  init?(syntax: Syntax, in sourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>, pluginProtocolVersion: Int = PluginMessage.PROTOCOL_VERSION_NUMBER) {
     let kind: PluginMessage.Syntax.Kind
     switch true {
     case syntax.is(AccessorDeclSyntax.self): kind = pluginProtocolVersion >= 8 ? .accessor : .declaration

@@ -16,8 +16,6 @@
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
-#include "SILGenTopLevel.h"
-#include "Scope.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -44,7 +42,6 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
@@ -2267,32 +2264,11 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     emitEntryPoint(sf);
   }
 
-  for (auto *D : sf->getTopLevelDecls()) {
-    // Emit auxiliary decls.
-    D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      visit(auxiliaryDecl);
-    });
-
-    visit(D);
-  }
-
-  // Visit extensions recorded in the synthesized file separately. The code
-  // above that visits auxiliary decls of the top-level decls in the source
-  // file does not work for nested types with attached conformance macros:
-  // ```
-  // struct Outer {
-  //   @AddConformance struct Inner {}
-  // }
-  // ```
-  // Because the attached-to decl is not at the top level. Other compiler
-  // features can also add extensions directly to the synthesized file.
-  if (auto *synthesizedFile = sf->getSynthesizedFile()) {
-    for (auto *D : synthesizedFile->getTopLevelDecls()) {
-      if (!isa<ExtensionDecl>(D))
-        continue;
-
+  {
+    SmallVector<Decl *, 64> decls;
+    sf->getTopLevelDeclsWithAuxiliaryDecls(decls);
+    for (auto *D : decls)
       visit(D);
-    }
   }
 
   for (Decl *D : sf->getHoistedDecls()) {
@@ -2384,8 +2360,24 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
       });
   if (shouldDeserialize) {
     auto *primary = desc.context.dyn_cast<FileUnit *>();
-    silMod->getSILLoader()->getAllForModule(silMod->getSwiftModule()->getName(),
-                                            primary);
+    auto recordedFloor = silMod->getSILLoader()->getAllForModule(
+        silMod->getSwiftModule()->getName(), primary);
+
+    // A SIB records the stage floor its producing compilation committed to.
+    // That floor is the module's only when SIBs are all that is being lowered:
+    // SIL generated from source above is raw, and the floor must stay Raw for
+    // the mandatory pipeline to run over it. Among several SIBs the lowest
+    // floor wins, so a raw SIB still gets the mandatory pipeline next to a
+    // canonical one. Either way, each deserialized function keeps the stage
+    // recorded for it.
+    bool generatedFromSource =
+        desc.SourcesToEmit.has_value() ||
+        llvm::any_of(desc.getFilesToEmit(), [](const FileUnit *File) -> bool {
+          return isa<SourceFile>(File);
+        });
+    if (recordedFloor && !generatedFromSource &&
+        *recordedFloor > silMod->getStageFloor())
+      silMod->commitStage(*recordedFloor);
   }
 
   // Emit any delayed definitions that were forced.

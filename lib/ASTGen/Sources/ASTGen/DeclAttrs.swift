@@ -224,6 +224,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Concurrent))
       case .Called:
         return handle(self.generateCalledAttr(attribute: node)?.asDeclAttribute)
+      case .Coroutine:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Coroutine))
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -2817,7 +2819,8 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
-        case "once": return .once
+        case "exactlyOnce": return .once
+        case "atMostOnce": return .atMostOnce
         default: return nil
         }
       }

@@ -87,6 +87,8 @@ set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to c
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
+define_property(TARGET PROPERTY PURE_SWIFT_LIB)
+
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
@@ -251,6 +253,14 @@ option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
+
+option(SWIFT_BUILD_COMPILER_DYLIB
+  "Builds a swift compiler dylib for tools to link against"
+  FALSE)
+
+if (SWIFT_BUILD_COMPILER_DYLIB AND NOT APPLE)
+  message(FATAL_ERROR "SWIFT_BUILD_COMPILER_DYLIB is only supported on Darwin platforms currently.")
+endif()
 
 # The SDK overlay is provided by the SDK itself on Darwin platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -473,6 +483,22 @@ if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
     set(BRIDGING_MODE "INLINE")
   endif()
 endif()
+
+# LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+# need it.
+set(SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR 23)
+if(LLVM_VERSION_MAJOR LESS ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR})
+  message(FATAL_ERROR
+    "LLVM_VERSION_MAJOR is ${LLVM_VERSION_MAJOR}, which is older than "
+    "SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR "
+    "(${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}).")
+endif()
+set(SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS)
+foreach(version RANGE ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}
+                      ${LLVM_VERSION_MAJOR})
+  list(APPEND SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS
+    "LLVM_VERSION_MAJOR_AT_LEAST_${version}")
+endforeach()
 
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)
@@ -882,6 +908,22 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
 
+# Whether the compiler's own Swift sources are built.
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED TRUE)
+else()
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
+endif()
+
+option(SWIFT_BUILD_SARIF
+  "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
+  FALSE)
+# SARIF serialization runs through DiagnosticBridge, so it needs those sources.
+if(SWIFT_BUILD_SARIF AND NOT SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
+  message(WARNING "Force setting SWIFT_BUILD_SARIF=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_SARIF OFF)
+endif()
+
 option(SWIFT_BUILD_IMMEDIATE_MODE
   "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
   TRUE)
@@ -1064,7 +1106,7 @@ if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
   endif()
 endif()
 
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+if(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -1078,6 +1120,10 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
+endif()
+
+if(SWIFT_BUILD_SARIF)
+  add_definitions(-DSWIFT_BUILD_SARIF)
 endif()
 
 if(SWIFT_BUILD_IMMEDIATE_MODE)
@@ -1482,6 +1528,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
+  message(STATUS "  SARIF support:  ${SWIFT_BUILD_SARIF}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")

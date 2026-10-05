@@ -8,12 +8,16 @@
 // RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt %} %else %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: test ! -s %t/extra.txt
 
+// Runtime error reporting still uses the standard library's print.
 // Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
 // XFAIL: swift_embedded_platform
 
 //--- allowed-dependencies_macos.txt
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
+_flockfile
+_funlockfile
 _memmove
 _memset
 _putchar
@@ -21,9 +25,12 @@ _putchar
 //--- allowed-dependencies_linux.txt
 __stack_chk_fail
 __stack_chk_guard
+flockfile
+funlockfile
 memmove
 memset
 putchar
+stdout
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-embedded-link %t/a.o %t/print.o -o %t/a.out

@@ -13,10 +13,12 @@
 #include "SILGenDynamicCast.h"
 
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -26,6 +28,78 @@
 using namespace swift;
 using namespace Lowering;
 
+ManagedValue Lowering::prepareCOMCastSource(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            ManagedValue source) {
+  if (!source.getType().isMoveOnlyWrapped())
+    return source;
+
+  if (source.getType().isAddress()) {
+    auto address =
+        SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, source.getValue());
+    return ManagedValue::forBorrowedAddressRValue(address);
+  }
+
+  if (source.getOwnershipKind() != OwnershipKind::Guaranteed)
+    source = source.borrow(SGF, loc);
+  return SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, source);
+}
+
+CastStrategy Lowering::computeCastStrategy(SILGenFunction &SGF,
+                                           CanType sourceType,
+                                           CanType targetType) {
+  auto targetObjectType = targetType->lookThroughAllOptionalTypes();
+  if (targetObjectType->isCOMExistentialType())
+    return CastStrategy::COM;
+  if (canSILUseScalarCheckedCastInstructions(
+          SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType))
+    return CastStrategy::Scalar;
+  return CastStrategy::Address;
+}
+
+/// Whether a cast to \p targetType may use isolated conformances.
+///
+/// This is a property of the target type alone, so every way of emitting a
+/// checked cast has to reach the same answer -- including the type-test form,
+/// which does not go through CheckedCastEmitter.
+static CastingIsolatedConformances
+computeIsolatedConformances(CanType targetType) {
+  // Non-existential types don't carry conformances, so we always allow
+  // isolated conformances.
+  if (!targetType->isAnyExistentialType())
+    return CastingIsolatedConformances::Allow;
+
+  // If there is a conformance to SendableMetatype, then this existential
+  // can leave the current isolation domain.
+  ASTContext &ctx = targetType->getASTContext();
+  Type checkType;
+  if (auto existentialMetatype = targetType->getAs<ExistentialMetatypeType>())
+    checkType = existentialMetatype->getInstanceType();
+  else
+    checkType = targetType;
+
+  // If there are no non-marker protocols in the existential, there's no
+  // need to prohibit isolated conformances.
+  auto layout = checkType->getExistentialLayout();
+  if (!layout.containsNonMarkerProtocols())
+    return CastingIsolatedConformances::Allow;
+
+  // If the type conforms to SendableMetatype, prohibit isolated
+  // conformances.
+  auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
+    return CastingIsolatedConformances::Prohibit;
+
+  return CastingIsolatedConformances::Allow;
+}
+
+/// The CheckedCastInstOptions for a cast to \p targetType.
+static CheckedCastInstOptions
+computeCheckedCastOptions(CanType targetType) {
+  return CheckedCastInstOptions()
+      .withIsolatedConformances(computeIsolatedConformances(targetType));
+}
+
 namespace {
   class CheckedCastEmitter {
     SILGenFunction &SGF;
@@ -33,42 +107,51 @@ namespace {
     CanType SourceType;
     CanType TargetType;
 
-    enum class CastStrategy : uint8_t {
-      Address,
-      Scalar,
-    };
     CastStrategy Strategy;
     CheckedCastInstOptions Options;
 
   public:
-    CheckedCastEmitter(SILGenFunction &SGF, SILLocation loc,
-                       Type sourceType, Type targetType)
-      : SGF(SGF), Loc(loc), SourceType(sourceType->getCanonicalType()),
-        TargetType(targetType->getCanonicalType()),
-        Strategy(computeStrategy()),
-        Options(computedOptions()) {
-    }
+    CheckedCastEmitter(SILGenFunction &SGF, SILLocation loc, Type sourceType,
+                       Type targetType)
+        : SGF(SGF), Loc(loc), SourceType(sourceType->getCanonicalType()),
+          TargetType(targetType->getCanonicalType()),
+          Strategy(computeCastStrategy(SGF, SourceType, TargetType)),
+          Options(computedOptions()) {}
 
-    bool isOperandIndirect() const {
-      return Strategy == CastStrategy::Address;
+    CastStrategy getStrategy() const { return Strategy; }
+
+    CastConsumptionKind getDefaultConsumption() const {
+      switch (Strategy) {
+      case CastStrategy::Address:
+      case CastStrategy::Scalar:
+        return CastConsumptionKind::TakeAlways;
+      case CastStrategy::COM:
+        return CastConsumptionKind::CopyOnSuccess;
+      }
+      llvm_unreachable("invalid cast strategy");
     }
 
     ManagedValue emitOperand(Expr *operand) {
       AbstractionPattern mostGeneral = SGF.SGM.Types.getMostGeneralAbstraction();
       auto &origSourceTL = SGF.getTypeLowering(mostGeneral, SourceType);
 
-      SGFContext ctx;
+      switch (Strategy) {
+      case CastStrategy::COM: {
+        auto result = SGF.emitRValueAsOrig(operand, mostGeneral, origSourceTL,
+                                           SGFContext::AllowGuaranteedPlusZero);
+        result = prepareCOMCastSource(SGF, Loc, result);
+        if (result.getType().isAddress())
+          return result;
 
-      TemporaryInitializationPtr temporary;
-      if (isOperandIndirect()) {
-        temporary = SGF.emitTemporary(Loc, origSourceTL);
-        ctx = SGFContext(temporary.get());
+        auto temporary =
+            SGF.emitTemporaryAllocation(Loc, origSourceTL.getLoweredType());
+        return SGF.B.createStoreBorrowOrTrivial(Loc, result.borrow(SGF, Loc),
+                                                temporary);
       }
-
-      auto result = SGF.emitRValueAsOrig(operand, mostGeneral,
-                                         origSourceTL, ctx);
-
-      if (isOperandIndirect()) {
+      case CastStrategy::Address: {
+        auto temporary = SGF.emitTemporary(Loc, origSourceTL);
+        auto result = SGF.emitRValueAsOrig(operand, mostGeneral, origSourceTL,
+                                           SGFContext(temporary.get()));
         // Force the result into the temporary if it's not already there.
         if (!result.isInContext()) {
           result.forwardInto(SGF, Loc, temporary->getAddress());
@@ -76,8 +159,11 @@ namespace {
         }
         return temporary->getManagedAddress();
       }
-
-      return result;
+      case CastStrategy::Scalar:
+        return SGF.emitRValueAsOrig(operand, mostGeneral, origSourceTL,
+                                    SGFContext());
+      }
+      llvm_unreachable("invalid cast strategy");
     }
 
     RValue emitUnconditionalCast(ManagedValue operand, SGFContext ctx) {
@@ -89,28 +175,39 @@ namespace {
       bool hasAbstraction =
         (origTargetTL.getLoweredType() != substTargetTL.getLoweredType());
 
-      // If we're using checked_cast_addr, take the operand (which
-      // should be an address) and build into the destination buffer.
-      if (Strategy == CastStrategy::Address) {
+      switch (Strategy) {
+      case CastStrategy::Address: {
+        // Take the operand and build into the destination buffer.
         SILValue resultBuffer =
-          createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createUnconditionalCheckedCastAddr(Loc, Options,
-                                             operand.forward(SGF), SourceType,
-                                             resultBuffer, TargetType);
+            createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
+        SGF.B.createUnconditionalCheckedCastAddr(
+            Loc, Options, operand.forward(SGF), SourceType, resultBuffer,
+            TargetType);
         return RValue(SGF, Loc, TargetType,
                       finishFromResultBuffer(hasAbstraction, resultBuffer,
                                              abstraction, origTargetTL, ctx));
       }
+      case CastStrategy::COM: {
+        SILValue resultBuffer =
+            createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
 
-      ManagedValue result =
-        SGF.B.createUnconditionalCheckedCast(Loc, Options,
-                                             operand,
-                                             origTargetTL.getLoweredType(),
-                                             TargetType);
-      return RValue(SGF, Loc, TargetType,
-                    finishFromResultScalar(hasAbstraction, result,
-                                           CastConsumptionKind::TakeAlways,
-                                           abstraction, origTargetTL, ctx));
+        SGF.B.createUnconditionalCheckedCastAddr(
+            Loc, Options, operand.getValue(), SourceType, resultBuffer,
+            TargetType, /*isCopy=*/true);
+        return RValue(SGF, Loc, TargetType,
+                      finishFromResultBuffer(hasAbstraction, resultBuffer,
+                                             abstraction, origTargetTL, ctx));
+      }
+      case CastStrategy::Scalar: {
+        ManagedValue result = SGF.B.createUnconditionalCheckedCast(
+            Loc, Options, operand, origTargetTL.getLoweredType(), TargetType);
+        return RValue(SGF, Loc, TargetType,
+                      finishFromResultScalar(hasAbstraction, result,
+                                             CastConsumptionKind::TakeAlways,
+                                             abstraction, origTargetTL, ctx));
+      }
+      }
+      llvm_unreachable("invalid cast strategy");
     }
 
     /// Emit a conditional cast.
@@ -136,15 +233,21 @@ namespace {
       // Emit the branch.
       ManagedValue operandValue;
       SILValue resultBuffer;
-      if (Strategy == CastStrategy::Address) {
+      switch (Strategy) {
+      case CastStrategy::Address:
+      case CastStrategy::COM: {
         assert(operand.getType().isAddress());
         resultBuffer =
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
+        SILValue source = consumption == CastConsumptionKind::CopyOnSuccess
+                              ? operand.getValue()
+                              : operand.forward(SGF);
         SGF.B.createCheckedCastAddrBranch(
-            Loc, Options, consumption, operand.forward(SGF),
-            SourceType, resultBuffer, TargetType, trueBB, falseBB,
-            TrueCount, FalseCount);
-      } else {
+            Loc, Options, consumption, source, SourceType, resultBuffer,
+            TargetType, trueBB, falseBB, TrueCount, FalseCount);
+        break;
+      }
+      case CastStrategy::Scalar: {
         // Tolerate being passed an address here.  It comes up during switch
         // emission.
         operandValue = std::move(operand);
@@ -162,6 +265,8 @@ namespace {
                                       SourceType, origTargetTL.getLoweredType(),
                                       TargetType, trueBB, falseBB, TrueCount,
                                       FalseCount);
+        break;
+      }
       }
 
       // Emit the success block.
@@ -170,10 +275,13 @@ namespace {
         FullExpr scope(SGF.Cleanups, CleanupLocation(Loc));
 
         ManagedValue result;
-        if (Strategy == CastStrategy::Address) {
+        switch (Strategy) {
+        case CastStrategy::Address:
+        case CastStrategy::COM:
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
-        } else {
+          break;
+        case CastStrategy::Scalar: {
           // If we had copy_on_success, then we need to use a guaranteed
           // argument.
           assert(!shouldTakeOnSuccess(consumption)
@@ -185,6 +293,8 @@ namespace {
           result =
               finishFromResultScalar(hasAbstraction, termResult, consumption,
                                      abstraction, origTargetTL, ctx);
+          break;
+        }
         }
 
         handleTrue(result);
@@ -198,11 +308,15 @@ namespace {
 
         // If we have an address only type, do not handle the consumption
         // rules. These are handled for us by the user.
-        if (Strategy == CastStrategy::Address) {
+        switch (Strategy) {
+        case CastStrategy::Address:
+        case CastStrategy::COM:
           handleFalse(std::nullopt);
           assert(!SGF.B.hasValidInsertionPoint() &&
                  "handler did not end block");
           return;
+        case CastStrategy::Scalar:
+          break;
         }
 
         // Otherwise, we use the following strategy:
@@ -235,6 +349,9 @@ namespace {
         case CastConsumptionKind::TakeOnSuccess:
           handleFalse(result);
           break;
+        case CastConsumptionKind::TestOnly:
+          llvm_unreachable(
+              "test_only is emitted directly, not via CheckedCastEmitter");
         }
 
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
@@ -296,46 +413,8 @@ namespace {
     }
 
   private:
-    CastStrategy computeStrategy() const {
-      if (canSILUseScalarCheckedCastInstructions(
-              SGF.SGM.M, SGF.F.hasLoweredAddresses(), SourceType, TargetType))
-        return CastStrategy::Scalar;
-      return CastStrategy::Address;
-    }
-
     CheckedCastInstOptions computedOptions() const {
-      return CheckedCastInstOptions()
-        .withIsolatedConformances(computedIsolatedConformances());
-    }
-    
-    CastingIsolatedConformances computedIsolatedConformances() const {
-      // Non-existential types don't carry conformances, so we always allow
-      // isolated conformances.
-      if (!TargetType->isAnyExistentialType())
-        return CastingIsolatedConformances::Allow;
-
-      // If there is a conformance to SendableMetatype, then this existential
-      // can leave the current isolation domain.
-      ASTContext &ctx = TargetType->getASTContext();
-      Type checkType;
-      if (auto existentialMetatype = TargetType->getAs<ExistentialMetatypeType>())
-        checkType = existentialMetatype->getInstanceType();
-      else
-        checkType = TargetType;
-
-      // If there are no non-marker protocols in the existential, there's no
-      // need to prohibit isolated conformances.
-      auto layout = checkType->getExistentialLayout();
-      if (!layout.containsNonMarkerProtocols())
-        return CastingIsolatedConformances::Allow;
-
-      // If the type conforms to SendableMetatype, prohibit isolated
-      // conformances.
-      auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-      if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
-        return CastingIsolatedConformances::Prohibit;
-
-      return CastingIsolatedConformances::Allow;
+      return computeCheckedCastOptions(TargetType);
     }
   };
 } // end anonymous namespace
@@ -347,7 +426,7 @@ void SILGenFunction::emitCheckedCastBranch(
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
-  emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
+  emitter.emitConditional(operand, emitter.getDefaultConsumption(), ctx,
                           handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
@@ -399,48 +478,50 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
 
 static ManagedValue
 adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
-                                       CanType sourceType, CanType targetType,
-                                       SILGenFunction &SGF) {
+                                       CanType sourceType, SILGenFunction &SGF,
+                                       CastStrategy strategy) {
   // Reabstract to the most general abstraction, and put it into a
   // temporary if necessary.
-  
-  // Figure out if we need the value to be in a temporary.
-  bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(
-        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
-  
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
-  
   bool hasAbstraction = (src.getType() != srcAbstractTL.getLoweredType());
-  
-  // Fast path: no re-abstraction required.
-  if (!hasAbstraction && (!requiresAddress || src.getType().isAddress()))
-    return src;
-  
-  TemporaryInitializationPtr init;
-  if (requiresAddress) {
-    init = SGF.emitTemporary(loc, srcAbstractTL);
 
+  switch (strategy) {
+  case CastStrategy::COM: {
+    src = prepareCOMCastSource(SGF, loc, src);
+    if (src.getType().isObject()) {
+      // A COM cast only needs the source value's address. Do not reabstract a
+      // one-word COM existential to the opaque existential representation.
+      auto temporary = SGF.emitTemporaryAllocation(loc, src.getType());
+      return SGF.B.createStoreBorrowOrTrivial(loc, src.borrow(SGF, loc),
+                                              temporary);
+    }
+    hasAbstraction = (src.getType() != srcAbstractTL.getLoweredType());
+    [[fallthrough]];
+  }
+  case CastStrategy::Address: {
+    if (!hasAbstraction && src.getType().isAddress())
+      return src;
+
+    auto init = SGF.emitTemporary(loc, srcAbstractTL);
     if (hasAbstraction)
       src = SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
 
-    // Okay, if all we need to do is drop the value in an address,
-    // this is easy.
     SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
                                   StoreOwnershipQualifier::Init);
     init->finishInitialization(SGF);
     return init->getManagedAddress();
   }
-  
-  assert(hasAbstraction);
-  assert(src.getType().isObject() &&
-         "address-only type with abstraction difference?");
-  
-  // Produce the value at +1.
-  return SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
+  case CastStrategy::Scalar:
+    if (!hasAbstraction)
+      return src;
+    assert(src.getType().isObject() &&
+           "address-only type with abstraction difference?");
+    // Produce the value at +1.
+    return SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
+  }
+  llvm_unreachable("invalid cast strategy");
 }
-
 
 RValue Lowering::emitUnconditionalCheckedCast(SILGenFunction &SGF,
                                               SILLocation loc,
@@ -484,9 +565,10 @@ RValue Lowering::emitConditionalCheckedCast(
                                       /*conditional=*/true);
   }
 
-  operand = adjustForConditionalCheckedCastOperand(loc, operand,
-                                               operandType->getCanonicalType(),
-                                                   resultObjectType, SGF);
+  CanType sourceType = operandType->getCanonicalType();
+  CheckedCastEmitter emitter(SGF, loc, sourceType, resultObjectType);
+  operand = adjustForConditionalCheckedCastOperand(loc, operand, sourceType,
+                                                   SGF, emitter.getStrategy());
 
   auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
   auto &resultTL = SGF.getTypeLowering(optTargetType);
@@ -511,11 +593,8 @@ RValue Lowering::emitConditionalCheckedCast(
   // Prepare a jump destination here.
   ExitableFullExpr scope(SGF, CleanupLocation(loc));
 
-  auto operandCMV = ConsumableManagedValue::forOwned(operand);
-  assert(operandCMV.getFinalConsumption() == CastConsumptionKind::TakeAlways);
-
-  SGF.emitCheckedCastBranch(
-      loc, operandCMV, operandType, resultObjectType, resultObjectCtx,
+  emitter.emitConditional(
+      operand, emitter.getDefaultConsumption(), resultObjectCtx,
       // The success path.
       [&](ManagedValue objectValue) {
         // If we're not emitting into a temporary, just wrap up the result
@@ -536,10 +615,8 @@ RValue Lowering::emitConditionalCheckedCast(
       },
       // The failure path.
       [&](std::optional<ManagedValue> Value) {
-        // We always are performing a take here, so Value should be std::nullopt
-        // since the object should have been destroyed immediately in the fail
-        // block.
-        assert(!Value.has_value() && "Expected a take_always consumption kind");
+        assert(!Value.has_value() &&
+               "cast must not propagate the source on failure");
         auto noneDecl = SGF.getASTContext().getOptionalNoneDecl();
 
         // If we're not emitting into a temporary, just wrap up the result
@@ -572,9 +649,114 @@ RValue Lowering::emitConditionalCheckedCast(
   return RValue(SGF, loc, optTargetType->getCanonicalType(), result);
 }
 
+/// True if a cast from \p sourceType to \p targetType can be answered by a
+/// non-consuming type test rather than going through the full dynamic
+/// cast machinery used by `as?`
+/// Note: This is deliberately limited to a subset of `is` cast operations.
+///       This will be expanded later to cover most `is` operations.
+///
+/// The test reads the source through swift_dynamicCastTest, which needs the
+/// source in memory and needs the cast to be the plain value cast -- collection
+/// downcasts carry element-wise conversions that no type test can stand in for.
+bool Lowering::canUseNoncopyableTypeTest(CanType sourceType,
+                                         CanType targetType,
+                                         CheckedCastKind castKind) {
+  if (castKind != CheckedCastKind::ValueCast)
+    return false;
+
+  // Only *necessary* for values that cannot be copied.
+  return sourceType->isNoncopyable() && sourceType->isExistentialType();
+}
+
+void Lowering::emitNoncopyableTypeTest(SILGenFunction &SGF, SILLocation loc,
+                                       ManagedValue existentialAddr,
+                                       CanType sourceType, CanType targetType,
+                                       SILBasicBlock *trueBB,
+                                       SILBasicBlock *falseBB,
+                                       ProfileCounter trueCount,
+                                       ProfileCounter falseCount) {
+  assert(existentialAddr.getType().isAddress() &&
+         "type test needs the existential in memory");
+
+  // Emit `checked_cast_addr_br test_only` with no destination
+  SGF.B.createCheckedCastAddrBranch(
+      loc, computeCheckedCastOptions(targetType),
+      CastConsumptionKind::TestOnly,
+      existentialAddr.getValue(), sourceType, SILValue(), targetType, trueBB,
+      falseBB, trueCount, falseCount);
+}
+
+/// Borrow the storage \p operand names so a type test can read it without
+/// copying or consuming it.
+///
+/// Anything that names storage -- a local, a global, a stored property, a
+/// parameter, mutable or not -- is borrowed in place. Only an operand that
+/// produces a temporary of its own falls through to ordinary rvalue emission,
+/// and that temporary is ours to read anyway.
+///
+/// The caller must have established a FormalEvaluationScope covering the use of
+/// the returned value.
+ManagedValue Lowering::emitTypeTestOperand(SILGenFunction &SGF,
+                                           Expr *operand) {
+  if (Expr *storage = SGF.findStorageReferenceExprForMoveOnly(
+          operand, StorageReferenceOperationKind::Borrow)) {
+    LValue lv = SGF.emitLValue(storage, SGFAccessKind::BorrowedAddressRead);
+    return SGF.emitBorrowedLValue(operand, std::move(lv));
+  }
+
+  // If the operand is an address, we can use it directly
+  ManagedValue value =
+      SGF.emitRValueAsSingleValue(operand, SGFContext::AllowImmediatePlusZero);
+  if (value.getType().isAddress())
+    return value;
+
+  // If it's not an address, borrow the value into a temporary
+  // allocation for the casting runtime.
+  SILValue temp = SGF.emitTemporaryAllocation(operand, value.getType());
+  ManagedValue borrowed =
+      SGF.emitFormalEvaluationManagedBeginBorrow(operand, value.getValue());
+  return SGF.emitFormalEvaluationManagedStoreBorrow(operand,
+                                                    borrowed.getValue(), temp);
+}
+
 SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
                            Expr *operand, Type targetType,
                            CheckedCastKind castKind) {
+  // A noncopyable existential can answer this without giving up its payload.
+  // Do that before anything below materializes the operand: the ordinary path
+  // extracts the payload only to destroy it, which for a noncopyable source
+  // means the query consumes what it was asked about.
+  {
+    auto sourceType =
+        operand->getType()->getWithoutSpecifierType()->getCanonicalType();
+    auto targetCanType = targetType->getCanonicalType();
+    if (canUseNoncopyableTypeTest(sourceType, targetCanType, castKind)) {
+      auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+
+      // The borrow of the subject has to outlive the terminator, so this scope
+      // is closed in the continuation block, after both edges have merged.
+      FormalEvaluationScope borrowScope(SGF);
+      ManagedValue addr = emitTypeTestOperand(SGF, operand);
+
+      ExitableFullExpr scope(SGF, CleanupLocation(loc));
+      SILBasicBlock *trueBB = SGF.createBasicBlock();
+      SILBasicBlock *falseBB = SGF.createBasicBlock();
+      emitNoncopyableTypeTest(SGF, loc, addr, sourceType, targetCanType, trueBB,
+                              falseBB);
+
+      SGF.B.emitBlock(trueBB);
+      SILValue yes = SGF.B.createIntegerLiteral(loc, i1Ty, 1);
+      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, yes);
+
+      SGF.B.emitBlock(falseBB);
+      SILValue no = SGF.B.createIntegerLiteral(loc, i1Ty, 0);
+      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, no);
+
+      SILBasicBlock *contBB = scope.exit();
+      return contBB->createPhiArgument(i1Ty, OwnershipKind::None);
+    }
+  }
+
   // Handle collection downcasts separately.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 // REQUIRES: asserts
 
 struct NE : ~Escapable { // expected-error{{an implicit initializer cannot return a ~Escapable result}}

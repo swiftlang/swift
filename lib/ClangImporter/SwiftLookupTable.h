@@ -28,11 +28,9 @@
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/Compiler.h"
-#include <functional>
 #include <optional>
 #include <utility>
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace llvm {
 class BitstreamWriter;
@@ -119,12 +117,6 @@ using swift::SerializedSwiftName;
 // Inherit the DenseMapInfo from StringRef but add a few special cases for
 // special names
 template<> struct DenseMapInfo<SerializedSwiftName> {
-  static SerializedSwiftName getEmptyKey() {
-    return SerializedSwiftName(DenseMapInfo<StringRef>::getEmptyKey());
-  }
-  static SerializedSwiftName getTombstoneKey() {
-    return SerializedSwiftName(DenseMapInfo<StringRef>::getTombstoneKey());
-  }
   static unsigned getHashValue(SerializedSwiftName Val) {
     if (Val.Kind == swift::DeclBaseName::Kind::Normal) {
       return DenseMapInfo<StringRef>::getHashValue(Val.Name);

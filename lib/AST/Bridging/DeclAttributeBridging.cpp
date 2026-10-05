@@ -17,7 +17,6 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -142,6 +141,10 @@ BridgedAvailableAttr BridgedAvailableAttr_createUnavailableInEmbedded(
 
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupMember();
+}
+void BridgedAvailableAttr_setMacroLoc(BridgedAvailableAttr cAttr,
+                                      SourceLoc loc) {
+  cAttr.unbridged()->setMacroLoc(loc);
 }
 void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupedWithWildcard();

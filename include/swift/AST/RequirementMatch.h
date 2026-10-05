@@ -56,6 +56,10 @@ enum class MatchKind : uint8_t {
   /// The types conflict.
   TypeConflict,
 
+  /// The types would match, but one of them is an implicitly unwrapped
+  /// optional and the other is a regular optional.
+  ImplicitlyUnwrappedOptionalConflict,
+
   /// The witness would match if an additional requirement were met.
   MissingRequirement,
 
@@ -371,6 +375,11 @@ struct RequirementMatch {
   /// Requirement not met.
   std::optional<Requirement> MissingRequirement;
 
+  /// For \c MatchKind::ImplicitlyUnwrappedOptionalConflict, the index of the
+  /// parameter whose implicit unwrapping differs. If this is \c std::nullopt,
+  /// the difference is in the value type or the result type instead.
+  std::optional<unsigned> IUOConflictParamIndex;
+
   /// Unmet attribute from the requirement.
   const DeclAttribute *UnmetAttribute = nullptr;
 
@@ -402,6 +411,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
+    case MatchKind::ImplicitlyUnwrappedOptionalConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::CompileTimeLiteralConflict:
@@ -441,6 +451,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
+    case MatchKind::ImplicitlyUnwrappedOptionalConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::CompileTimeLiteralConflict:
@@ -473,6 +484,7 @@ struct RequirementMatch {
     case MatchKind::RequiresNonSendable:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
+    case MatchKind::ImplicitlyUnwrappedOptionalConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::OptionalityConflict:
       return true;

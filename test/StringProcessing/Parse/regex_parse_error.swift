@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -target %target-swift-5.7-abi-triple
 // REQUIRES: swift_swift_parser
 
 _ = /(/ // expected-error@:7 {{expected ')'}}

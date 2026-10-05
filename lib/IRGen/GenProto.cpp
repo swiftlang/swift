@@ -31,14 +31,12 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -60,7 +58,6 @@
 #include "ConstantBuilder.h"
 #include "ComputedWitnessIndex.h"
 #include "EntryPointArgumentEmission.h"
-#include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "Fulfillment.h"
@@ -1014,9 +1011,13 @@ bool IRGenModule::isResilientConformance(
   //
   // This is an optimization -- a conformance of a non-generic type cannot
   // resiliently become dependent.
-  if (!conformance->getDeclContext()->isGenericContext() &&
+  // Also check the @_originallyDefinedIn attribute to make sure the conforming
+  // type wasn't moved into the protocol's module. In that case, we need to keep
+  // the conformance resilient.
+  if (!disableOptimizations &&
+      !conformance->getDeclContext()->isGenericContext() &&
       conformanceModule == conformance->getProtocol()->getParentModule() &&
-      !disableOptimizations)
+      conformance->isOriginallyInSameModuleAsProtocol())
     return false;
 
   // We have a resilient conformance.
@@ -1210,6 +1211,13 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
+  // A dependent conformance requires its witness table to be instantiated at runtime.
+  // This is not possible in Embedded Swift, which has no such runtime. It's also not
+  // needed: the mandatory pipeline specializes all witness tables, so that every
+  // conformance which is used at runtime is fully concrete.
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(
       *this, conformance,
@@ -1714,7 +1722,7 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
         // It should be never called. We add a pointer to an error function.
         if (isAsyncRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (isCalleeAllocatedCoroutineRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
@@ -1772,8 +1780,12 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
 
       if (IGM.isEmbeddedWithExistentials()) {
         // In Embedded Swift associated type witness point to the metadata.
-        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(
-          typeWitness->getCanonicalType());
+        // The type witness can be an opaque result type, which has no metadata of its
+        // own. Its underlying type is always known in Embedded Swift.
+        CanType canTypeWitness = typeWitness->getCanonicalType();
+        if (canTypeWitness->hasOpaqueArchetype())
+          canTypeWitness = IGM.substOpaqueTypesWithUnderlyingTypes(canTypeWitness);
+        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(canTypeWitness);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, assocType);
@@ -1843,7 +1855,15 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         // In Embedded Swift associated-conformance entries simply point to the witness table
         // of the associated conformance.
-        ProtocolConformance *assocConf = associatedWitness.Witness.getConcrete();
+        ProtocolConformanceRef assocConfRef = associatedWitness.Witness;
+        // An associated type which is an opaque result type has an abstract conformance.
+        // In Embedded Swift the underlying type of an opaque type is always known, so
+        // replace the opaque type to get the concrete conformance.
+        if (assocConfRef.isAbstract() &&
+            assocConfRef.getType()->hasOpaqueArchetype()) {
+          assocConfRef = IGM.substOpaqueTypesWithUnderlyingTypes(assocConfRef);
+        }
+        ProtocolConformance *assocConf = assocConfRef.getConcrete();
         llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;
@@ -2645,10 +2665,21 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
 
+  // Whether `wt` is the specialized witness table of `conf`. Specialized
+  // witness tables are shared by conformances which only differ in type sugar.
+  auto isSpecializedTableOf = [](SILWitnessTable *wt,
+                                 const ProtocolConformance *conf) {
+    auto canonical = [](const ProtocolConformance *c) {
+      return const_cast<ProtocolConformance *>(c)->getCanonicalConformance();
+    };
+    return wt && wt->isSpecialized() &&
+           canonical(wt->getConformance()) == canonical(conf);
+  };
+
   auto *specConf = conformance;
   if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(inheritedC);
-    if (wt && wt->getConformance() == inheritedC) {
+    if (isSpecializedTableOf(wt, inheritedC)) {
       info = new SpecializedConformanceInfo(inheritedC);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -2660,7 +2691,7 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // directly use it.
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(specConf)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(specConf);
-    if (wt && wt->getConformance() == sc) {
+    if (isSpecializedTableOf(wt, sc)) {
       info = new SpecializedConformanceInfo(sc);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -2928,6 +2959,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     // May be polymorphic at the SIL level, but no type metadata is actually
     // passed.
@@ -3904,6 +3936,25 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    if (proto->isCOMInterface()) {
+      auto archetype = cast<ArchetypeType>(srcType);
+      for (auto *required : archetype->getConformsTo()) {
+        if (!required->isCOMInterface())
+          continue;
+        auto *hierarchy = required->getCOMInterfaceHierarchy();
+        assert(hierarchy && !hierarchy->isInvalid());
+        if (!llvm::is_contained(hierarchy->getABIChain(), proto))
+          continue;
+        auto *adjustment =
+            emitArchetypeWitnessTableRef(IGF, archetype, required);
+        // Pack elements use pointer-sized slots shared with native witnesses.
+        if (adjustment->getType()->isPointerTy())
+          adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
+        return adjustment;
+      }
+      llvm_unreachable("COM archetype is missing an interface adjustment");
+    }
+
     auto archetype = cast<ArchetypeType>(srcType);
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
@@ -4314,6 +4365,12 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   }
 }
 
+llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {
+  if (isCOMInterfaceAdjustment())
+    return IGM.IntPtrTy;
+  return typeForKind(IGM, getKind());
+}
+
 void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
@@ -4336,6 +4393,10 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
   }
 
+  // A conformance loaded from a pack uses a pointer-sized storage slot. Restore
+  // the integer representation used for individual COM requirements.
+  if (requirement.isCOMInterfaceAdjustment() && value->getType()->isPointerTy())
+    value = IGF.Builder.CreatePtrToInt(value, IGF.IGM.IntPtrTy);
   assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {

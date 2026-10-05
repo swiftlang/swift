@@ -434,7 +434,11 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     //   %3 = partial_apply %2(%1)      // re-abstraction
     //   apply %f(%3)
     // ```
-    if partialApply.isPartialApplyOfThunk {
+    // The thunk's partial_apply is cloned into the specialized function. 
+    // It may have substitutions that reference archetypes of the caller, bailout.
+    if partialApply.isPartialApplyOfThunk,
+       !partialApply.substitutionMap.replacementTypes.contains(where: { $0.hasArchetype })
+    {
       // Keep the recorded dependencies only if the thunk's argument provides the root closure;
       // otherwise the thunk's partial_apply itself is tried as the root, below.
       var argumentDependencies = [CapturedDependency]()
@@ -466,7 +470,7 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
           (partialApply.isOnStack || callee.effectAllowsSpecialization),
 
           // TODO: handle other kind of indirect arguments
-          partialApply.hasOnlyInoutIndirectArguments,
+          partialApply.hasOnlySupportedIndirectArguments,
 
           (partialApply.isOnStack || partialApply.allArgumentsCanBeCopied)
     else {
@@ -608,8 +612,9 @@ private struct SpecializationInfo {
       let closureConvention = partialApply.functionConvention
       let unappliedArgumentCount = partialApply.unappliedArgumentCount - closureConvention.indirectSILResultCount
 
-      for paramInfo in closureConvention.parameters[unappliedArgumentCount...] {
-        let newParamInfo = paramInfo.withSpecializedConvention(for: partialApply, in: callee)
+      for (argOp, paramInfo) in zip(partialApply.argumentOperands,
+                                     closureConvention.parameters[unappliedArgumentCount...]) {
+        let newParamInfo = paramInfo.withSpecializedConvention(for: argOp, in: partialApply, callee: callee)
         specializedParamInfoList.append(newParamInfo)
       }
     }
@@ -680,7 +685,16 @@ private struct SpecializationInfo {
 
     for rootClosure in rootClosures {
       let clonedRootClosure = cloner.getClonedValue(of: rootClosure) as! PartialApplyInst
-      let _ = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
+      let argsAreKeptAlive = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
+      // Unlike a regular closure (which only ever borrows, or independently copies, its captures),
+      // a `@called(atMostOnce)` closure can have consuming captures. When the fold above transfers a
+      // non-Copyable capture to the new direct call, it can't copy it, so it leaves `Undef` in
+      // `clonedRootClosure`'s own operand instead. Leaving such a closure's `partial_apply` behind
+      // would still run its destructor at runtime, which would release whatever garbage is left
+      // in that now-`Undef`'d capture slot.
+      if clonedRootClosure.hasCalledAtMostOnceSemantics {
+        _ = cloner.context.tryDeleteDeadClosure(closure: clonedRootClosure, needKeepArgsAlive: !argsAreKeptAlive)
+      }
     }
   }
 
@@ -743,17 +757,37 @@ private struct SpecializationInfo {
 
   private func getNewApplyArguments(_ context: FunctionPassContext) -> [Value] {
     let newCapturedArguments = rootClosures.flatMap { partialApply in
-      partialApply.arguments.map { capturedArg in
+      partialApply.argumentOperands.map { argOp -> Value in
+        let capturedArg = argOp.value
+        if partialApply.hasCalledAtMostOnceSemantics {
+          // A `@called(atMostOnce)` closure can consume its captures and always gets a destructor even
+          // if it's stack-promoted. So all of the arguments that are consumed have to be passed
+          // the same way to the specialized version.
+          if capturedArg.ownership != .none &&
+              (argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume) {
+            if capturedArg.type.isMoveOnly {
+              // A move-only value cannot be copied. Transfer it directly to the specialized
+              // call instead, and clear the original `partial_apply`'s operand (it isn't being
+              // deleted here, only folded into a direct call) so that a later cleanup pass
+              // doesn't also try to destroy the same value when it deletes the now-dead
+              // `partial_apply`.
+              argOp.set(to: Undef.get(type: capturedArg.type, context), context)
+              return capturedArg
+            }
+            return capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
+          }
+          return capturedArg
+        }
         if partialApply.isOnStack || capturedArg.ownership == .none {
           // Non-escaping closures don't consume their captures. Therefore we pass them also as "guaranteed"
           // arguments to the specialized function.
           // Note that because the non-escaping closure was passed to the original function, this guarantees
           // that the lifetime of the captured arguments also extend to at least the apply of the function.
-          capturedArg
+          return capturedArg
         } else {
           // Escaping closures consume their captures. Therefore we pass them as "owned" arguments to the
           // specialized function.
-          capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
+          return capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
         }
       }
     }
@@ -942,10 +976,18 @@ private func findValuesWhichNeedDestroyRecursively(value: Value, needDestroy: in
 }
 
 private extension ParameterInfo {
-  func withSpecializedConvention(for partialApply: PartialApplyInst, in callee: Function) -> Self {
+  func withSpecializedConvention(for argOp: Operand, in partialApply: PartialApplyInst, callee: Function) -> Self {
     let argType = type.loweredType(in: partialApply.parentFunction)
     let specializedParamConvention = if self.convention.isIndirect {
       self.convention
+    } else if partialApply.hasCalledAtMostOnceSemantics {
+      if argType.isTrivial(in: callee) {
+        ArgumentConvention.directUnowned
+      } else if argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume {
+        ArgumentConvention.directOwned
+      } else {
+        ArgumentConvention.directGuaranteed
+      }
     } else {
       if argType.isTrivial(in: callee) {
         ArgumentConvention.directUnowned
@@ -985,10 +1027,13 @@ private extension PartialApplyInst {
     return false
   }
 
-  var hasOnlyInoutIndirectArguments: Bool {
+  var hasOnlySupportedIndirectArguments: Bool {
     self.argumentOperands
       .filter { !$0.value.type.isObject }
-      .allSatisfy { self.convention(of: $0)!.isInout }
+      .allSatisfy {
+        let conv = self.convention(of: $0)!
+        return conv.isInout || (self.isOnStack && conv == .indirectInGuaranteed)
+      }
   }
 
   var allArgumentsCanBeCopied: Bool {
@@ -1284,7 +1329,7 @@ private extension Instruction {
     // TODO: figure out what to do with non-inout indirect arguments
     // https://forums.swift.org/t/non-inout-indirect-types-not-supported-in-closure-specialization-optimization/70826
     case let pai as PartialApplyInst
-    where pai.callee is FunctionRefInst && pai.hasOnlyInoutIndirectArguments:
+    where pai.callee is FunctionRefInst && pai.hasOnlySupportedIndirectArguments:
       return pai
     default:
       return nil

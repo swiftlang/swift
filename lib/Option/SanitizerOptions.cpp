@@ -17,11 +17,9 @@
 
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Platform.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/TargetParser/Triple.h"

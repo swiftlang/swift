@@ -4,8 +4,9 @@
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
-// RUN:   -strict-memory-safety
+// RUN:   -target %target-swift-5.8-abi-triple \
+// RUN:   -strict-memory-safety \
+// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}escapable.h
 
 // UNSUPPORTED: OS=windows-msvc
 
@@ -47,6 +48,7 @@ struct SWIFT_IMMORTAL_REFERENCE Immortal {
 
 // Same shape, but not a reference type: escapability stays unknown, so this one
 // is still unsafe. Keeps the test honest about -strict-memory-safety being on.
+// expected-note@+1 2 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct Polymorphic {
   virtual ~Polymorphic() {}
   Polymorphic(const Polymorphic &) = delete;

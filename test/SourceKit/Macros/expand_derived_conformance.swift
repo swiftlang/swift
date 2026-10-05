@@ -27,10 +27,17 @@ struct ViaTypealias: EquatableAndHashable {
   var x: Int = 0
 }
 // VIA_TYPEALIAS: source.edit.kind.active:
-// VIA_TYPEALIAS-NEXT: {{^}}{{ +}}[[@LINE-4]]:44-[[@LINE-4]]:44 ({{.*}}_deriveEquatablefMf_.swift) "
+// VIA_TYPEALIAS-NEXT: {{^}}{{ +}}[[@LINE-4]]:44-[[@LINE-4]]:44 ({{.*}}_deriveHashablefMf_.swift) "
+// VIA_TYPEALIAS-NEXT: var hashValue: Swift::Int {
+// VIA_TYPEALIAS: source.edit.kind.active:
+// VIA_TYPEALIAS-NEXT: {{^}}{{ +}}[[@LINE-7]]:44-[[@LINE-7]]:44 ({{.*}}_deriveHashablefMf0_.swift) "
+// VIA_TYPEALIAS-NEXT: func hash(into hasher: inout Swift::Hasher) {
+// VIA_TYPEALIAS-NEXT: hasher.combine(self.x)
+// VIA_TYPEALIAS: source.edit.kind.active:
+// VIA_TYPEALIAS-NEXT: {{^}}{{ +}}[[@LINE-11]]:44-[[@LINE-11]]:44 ({{.*}}_deriveEquatablefMf_.swift) "
 // VIA_TYPEALIAS-NEXT: @_implements(Swift::Equatable, ==(_:_:))
 // VIA_TYPEALIAS-NEXT: static func __derived_struct_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
-// VIA_TYPEALIAS-NOT: [[@LINE-7]]:44-[[@LINE-7]]:44
+// VIA_TYPEALIAS-NOT: source.edit.kind.active
 
 // RUN: %sourcekitd-test -req=refactoring.expand.derived_conformance -pos=%(line+1):12 %s -- -enable-experimental-feature DeriveConformancesViaMacros -module-name DerivedConformanceUser %s | %FileCheck -check-prefix=ENUM %s
 enum Enum: Hashable {
@@ -38,10 +45,23 @@ enum Enum: Hashable {
   case b(Int)
 }
 // ENUM: source.edit.kind.active:
-// ENUM-NEXT: {{^}}{{ +}}[[@LINE-5]]:22-[[@LINE-5]]:22 ({{.*}}_deriveEquatablefMf_.swift) "
+// ENUM-NEXT: {{^}}{{ +}}[[@LINE-5]]:22-[[@LINE-5]]:22 ({{.*}}_deriveHashablefMf_.swift) "
+// ENUM-NEXT: var hashValue: Swift::Int {
+// ENUM: source.edit.kind.active:
+// ENUM-NEXT: {{^}}{{ +}}[[@LINE-8]]:22-[[@LINE-8]]:22 ({{.*}}_deriveHashablefMf0_.swift) "
+// ENUM-NEXT: func hash(into hasher: inout Swift::Hasher) {
+// ENUM-NEXT: switch self {
+// ENUM-NEXT: case .a:
+// ENUM-NEXT: hasher.combine(0)
+// ENUM-NEXT: case .b(let a0):
+// ENUM-NEXT: hasher.combine(1)
+// ENUM-NEXT: hasher.combine(a0)
+// ENUM: source.edit.kind.active:
+// ENUM-NEXT: {{^}}{{ +}}[[@LINE-17]]:22-[[@LINE-17]]:22 ({{.*}}_deriveEquatablefMf_.swift) "
 // ENUM-NEXT: @_semantics("derived_enum_equals")
 // ENUM-NEXT: @_implements(Swift::Equatable, ==(_:_:))
 // ENUM-NEXT: static func __derived_enum_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
+// ENUM-NOT: source.edit.kind.active
 
 // RUN: %sourcekitd-test -req=refactoring.expand.derived_conformance -pos=%(line+2):16 %s -- -enable-experimental-feature DeriveConformancesViaMacros -module-name DerivedConformanceUser %s | %FileCheck --allow-empty -check-prefix=NO_EXPANSION %s
 class Base {}

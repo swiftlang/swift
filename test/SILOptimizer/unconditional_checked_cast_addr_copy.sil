@@ -1,0 +1,120 @@
+// RUN: %target-sil-opt -sil-print-types -sil-combine -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -generic-specializer -enable-sil-verify-all %s | %FileCheck %s --check-prefix=SPECIALIZE
+
+// RUN: %target-sil-opt -sil-print-types -simplification -simplify-instruction=alloc_stack -enable-sil-verify-all %s | %FileCheck %s --check-prefix=SIMPLIFY
+
+sil_stage canonical
+import Swift
+
+public protocol P {}
+public protocol ClassP: AnyObject {}
+public class C: ClassP {}
+sil_witness_table C: ClassP module unconditional_checked_cast_addr_copy {}
+public struct S: P { var value: AnyObject }
+sil_witness_table S: P module unconditional_checked_cast_addr_copy {}
+
+// An identity cast copies the value instead of taking it from a borrowed address.
+// CHECK-LABEL: sil [ossa] @identity
+// CHECK: copy_addr %1 to [init] %0 : $*T
+// CHECK-NEXT: fix_lifetime %1 : $*T
+// CHECK-NOT: destroy_addr %1
+// CHECK: return
+sil [ossa] @identity : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  unconditional_checked_cast_addr [copy] T in %1 : $*T to T in %0 : $*T
+  fix_lifetime %1 : $*T
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Eliminating an unused result must not destroy the source.
+// CHECK-LABEL: sil [ossa] @unused_result
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: destroy_addr
+// CHECK: fix_lifetime %0 : $*T
+// CHECK: return
+sil [ossa] @unused_result : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  unconditional_checked_cast_addr [copy] T in %0 : $*T to T in %1 : $*T
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  fix_lifetime %0 : $*T
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// A known conformance initializes an existential with a copy of the source.
+// CHECK-LABEL: sil [ossa] @known_conformance
+// CHECK: [[PAYLOAD:%.*]] = init_existential_addr %0 : $*any P, $S
+// CHECK: copy_addr %1 to [init] [[PAYLOAD]] : $*S
+// CHECK-NOT: destroy_addr %1
+// CHECK: fix_lifetime %1 : $*S
+// CHECK: return
+sil [ossa] @known_conformance : $@convention(thin) (@in_guaranteed S) -> @out any P {
+bb0(%0 : $*any P, %1 : $*S):
+  unconditional_checked_cast_addr [copy] S in %1 : $*S to any P in %0 : $*any P
+  fix_lifetime %1 : $*S
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// A class existential owns a copy, leaving the borrowed reference initialized.
+// CHECK-LABEL: sil [ossa] @known_class_conformance
+// CHECK: [[VALUE:%.*]] = load [copy] %1 : $*C
+// CHECK: [[EXISTENTIAL:%.*]] = init_existential_ref [[VALUE]] : $C : $C, $any ClassP
+// CHECK: store [[EXISTENTIAL]] to [init] %0 : $*any ClassP
+// CHECK-NOT: destroy_addr %1
+// CHECK: fix_lifetime %1 : $*C
+// CHECK: return
+sil [ossa] @known_class_conformance : $@convention(thin) (@in_guaranteed C) -> @out any ClassP {
+bb0(%0 : $*any ClassP, %1 : $*C):
+  unconditional_checked_cast_addr [copy] C in %1 : $*C to any ClassP in %0 : $*any ClassP
+  fix_lifetime %1 : $*C
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// The consuming identity form still takes the source.
+// CHECK-LABEL: sil [ossa] @taking_identity
+// CHECK: copy_addr [take] %1 to [init] %0 : $*T
+// CHECK: return
+sil [ossa] @taking_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  unconditional_checked_cast_addr T in %1 : $*T to T in %0 : $*T
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// SPECIALIZE-LABEL: // specialized generic_copy
+// SPECIALIZE: unconditional_checked_cast_addr [copy] S in
+sil hidden [noinline] [ossa] @generic_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out Any {
+bb0(%0 : $*Any, %1 : $*T):
+  unconditional_checked_cast_addr [copy] T in %1 : $*T to Any in %0 : $*Any
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [ossa] @call_generic : $@convention(thin) (@in_guaranteed S) -> @out Any {
+bb0(%0 : $*Any, %1 : $*S):
+  %2 = function_ref @generic_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out Any
+  %3 = apply %2<S>(%0, %1) : $@convention(thin) <T> (@in_guaranteed T) -> @out Any
+  return %3 : $()
+}
+
+// Rebuilding the cast after simplifying its storage preserves consumption.
+// SIMPLIFY-LABEL: sil [ossa] @concrete_storage
+// SIMPLIFY: [[SOURCE:%.*]] = alloc_stack $S
+// SIMPLIFY: unconditional_checked_cast_addr [copy] S in [[SOURCE]] : $*S to U in %0 : $*U
+// SIMPLIFY: destroy_addr [[SOURCE]] : $*S
+sil [ossa] @concrete_storage : $@convention(thin) <U> (@in_guaranteed S) -> @out U {
+bb0(%0 : $*U, %1 : $*S):
+  %2 = alloc_stack $any P
+  %3 = init_existential_addr %2 : $*any P, $S
+  copy_addr %1 to [init] %3 : $*S
+  unconditional_checked_cast_addr [copy] any P in %2 : $*any P to U in %0 : $*U
+  destroy_addr %2 : $*any P
+  dealloc_stack %2 : $*any P
+  %4 = tuple ()
+  return %4 : $()
+}

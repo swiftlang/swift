@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
-// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
 // REQUIRES: PTRSIZE=64
 

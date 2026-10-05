@@ -111,6 +111,11 @@ function(add_swift_compiler_modules_library name)
     endif()
   endforeach()
 
+  # FIXME: forward the C++ targets' other MSVC definitions here too, not just this one.
+  if(MSVC AND NOT LLVM_ENABLE_EH)
+    list(APPEND swift_compile_options "-Xcc" "-D_HAS_EXCEPTIONS=0")
+  endif()
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
       list(APPEND swift_compile_options
@@ -149,6 +154,12 @@ function(add_swift_compiler_modules_library name)
   if("${BRIDGING_MODE}" STREQUAL "PURE")
     list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
+
+  # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+  # need it.
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS})
+    list(APPEND swift_compile_options "-D${condition}")
+  endforeach()
 
   if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")

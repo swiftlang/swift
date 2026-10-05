@@ -196,6 +196,17 @@ struct TaskGroupTaskStatusRecord : TaskStatusRecord<Runtime> {
   typename Runtime::StoredPointer FirstChild;
 };
 
+/// Mirror of `TaskDependencyStatusRecord` in include/swift/ABI/TaskStatus.h.
+template <typename Runtime>
+struct TaskDependencyStatusRecord : TaskStatusRecord<Runtime> {
+  // A union whose largest member is a SerialExecutorRef.
+  typename Runtime::StoredPointer DependentOn[2];
+  uint32_t DependencyKind;
+  typename Runtime::StoredPointer NextWaitingTask;
+
+  static const uint32_t WaitingOnTask = 1;
+};
+
 template <typename Runtime>
 struct ChildFragment {
   typename Runtime::StoredPointer Parent;

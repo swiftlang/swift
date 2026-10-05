@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TargetAttribute -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TargetAttribute
 
 // REQUIRES: swift_feature_TargetAttribute
 

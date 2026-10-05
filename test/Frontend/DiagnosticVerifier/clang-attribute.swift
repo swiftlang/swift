@@ -29,7 +29,7 @@ module TestClang {
 // CHECK: TEST_H:1:6: note: in expansion 0 from here
 // CHECK: TEST_H:1:6: note: file 'TEST_H' is not parsed for 'expected' statements. Use '-verify-additional-file TEST_H' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file 
 
-// CHECK: @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:2:1: error: unexpected remark produced: macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foo(_ p: UnsafeMutableBufferPointer<CInt>) {|
+// CHECK: @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:2:1: error: unexpected remark produced: macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func foo(_ p: UnsafeMutableBufferPointer<CInt>) {|
 // CHECK: TEST_H:1:25: note: in expansion 0 from here
 // CHECK: TEST_H:1:25: note: file 'TEST_H' is not parsed for 'expected' statements. Use '-verify-additional-file TEST_H' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file
 // CHECK: <empty-filename>:1:1: error: unexpected note produced: in expansion of macro '_SwiftifyImport' on global function 'foo' here

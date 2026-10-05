@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -I %S/Inputs/has_symbol/
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/has_symbol/
 
 // UNSUPPORTED: OS=windows-msvc
 

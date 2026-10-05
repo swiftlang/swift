@@ -391,6 +391,7 @@ $sxq_Irgnr_D ---> @differentiable(reverse) @callee_guaranteed (@in_guaranteed A)
 $sxq_Idgnr_D ---> @differentiable @callee_guaranteed (@in_guaranteed A) -> (@out B)
 $sxq_Ilgnr_D ---> @differentiable(_linear) @callee_guaranteed (@in_guaranteed A) -> (@out B)
 $sS3fIedgyywd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float)
+$sBpIetVy_D ---> @escaping @convention(thin) @convention(com_method) (@unowned Builtin.RawPointer) -> ()
 $sS5fIertyyywddw_D ---> @escaping @differentiable(reverse) @convention(thin) (@unowned Swift.Float, @unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float, @unowned @noDerivative Swift.Float)
 $syQo ---> $syQo
 $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee ---> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
@@ -522,7 +523,17 @@ $sBAD ---> Builtin.ImplicitActor
 $sIeg_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed () -> () to @escaping @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> ()
 $sSiBW ---> Builtin.Borrow<Swift.Int>
 $sBAIeNghHgIL_BAytIeNghHgILr_TR ---> {T:} reabstraction thunk helper from @escaping @caller_isolated @callee_guaranteed @Sendable @async (@guaranteed Builtin.ImplicitActor) -> () to @escaping @caller_isolated @callee_guaranteed @Sendable @async (@guaranteed Builtin.ImplicitActor) -> (@out ())
-$s4main12testCallOnceyyyyXOnF ---> main.testCallOnce(__owned @called(once) () -> ()) -> ()
+$s4main18testCallAtMostOnceyyyyXOonF ---> main.testCallAtMostOnce(__owned @called(atMostOnce) () -> ()) -> ()
+$s4main19testCallExactlyOnceyyyyXOnF ---> main.testCallExactlyOnce(__owned @called(exactlyOnce) () -> ()) -> ()
+$s4main9testThunkyS2iyXOn_SiyXOontF ---> main.testThunk(__owned @called(exactlyOnce) () -> Swift.Int, __owned @called(atMostOnce) () -> Swift.Int) -> Swift.Int
+$s4main15makeExactlyOnceyyXOyFyyXOfU_ ---> closure #1 @called(exactlyOnce) () -> () in main.makeExactlyOnce() -> @called(exactlyOnce) () -> ()
+$s4main14makeAtMostOnceyyXOoyFyyXOofU_ ---> closure #1 @called(atMostOnce) () -> () in main.makeAtMostOnce() -> @called(atMostOnce) () -> ()
+$syyXO ---> @called(exactlyOnce) () -> ()
+$syyXOo ---> @called(atMostOnce) () -> ()
+$syyXOD ---> @called(exactlyOnce) () -> ()
+$syyXOoD ---> @called(atMostOnce) () -> ()
+$sSiIeOxd_SiIeOxr_TR ---> {T:} reabstraction thunk helper from @escaping @called(exactlyOnce) @callee_owned () -> (@unowned Swift.Int) to @escaping @called(exactlyOnce) @callee_owned () -> (@out Swift.Int)
+$sSiIeOoxd_SiIeOoxr_TR ---> {T:} reabstraction thunk helper from @escaping @called(atMostOnce) @callee_owned () -> (@unowned Swift.Int) to @escaping @called(atMostOnce) @callee_owned () -> (@out Swift.Int)
 async_Main ---> async main entry point
 async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
 async_MainTQ0_ ---> (1) await resume partial function for async main entry point

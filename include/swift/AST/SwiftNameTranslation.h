@@ -101,17 +101,42 @@ struct DeclRepresentation {
   bool isUnsupported() const { return kind == Unsupported; }
 };
 
+/// Answers layout questions that only the C++ printer can, but that decide
+/// whether a declaration is representable in C++.
+class NominalTypeLayoutQueries {
+public:
+  virtual bool isZeroSized(const NominalTypeDecl *decl) = 0;
+  /// Whether the size and alignment are not statically known, so that C++ has
+  /// to box the value instead of storing it inline.
+  virtual bool isOpaqueLayout(const NominalTypeDecl *decl) = 0;
+
+protected:
+  ~NominalTypeLayoutQueries() = default;
+};
+
 /// Returns the C++ representation info for the given declaration.
-DeclRepresentation getDeclRepresentation(
-    const ValueDecl *VD,
-    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized);
+///
+/// With a null \p layoutQueries the layout-dependent checks are skipped and the
+/// declaration is reported as representable; the printer drops it later.
+DeclRepresentation
+getDeclRepresentation(const ValueDecl *VD,
+                      NominalTypeLayoutQueries *layoutQueries);
 
 /// Returns true if the given value decl is exposable to C++.
-inline bool isExposableToCxx(
-    const ValueDecl *VD,
-    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
-  return !getDeclRepresentation(VD, isZeroSized).isUnsupported();
+inline bool isExposableToCxx(const ValueDecl *VD,
+                             NominalTypeLayoutQueries *layoutQueries) {
+  return !getDeclRepresentation(VD, layoutQueries).isUnsupported();
 }
+
+/// Whether the given noncopyable Swift value type is exposed to C++ as a
+/// move-only C++ class.
+///
+/// This covers the part of "has a fixed layout" that the AST can answer on its
+/// own; see \c NominalTypeLayoutQueries::isOpaqueLayout for the rest.
+bool isNoncopyableValueTypeExposableToCxx(const NominalTypeDecl *typeDecl);
+
+/// \overload
+bool isNoncopyableValueTypeExposableToCxx(Type type);
 
 bool isObjCxxOnly(const ValueDecl *VD);
 bool isObjCxxOnly(const clang::Decl *D, const ASTContext &ctx);

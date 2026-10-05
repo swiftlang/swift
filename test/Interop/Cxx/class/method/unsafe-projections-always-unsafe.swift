@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe \
+// RUN:   -verify-additional-prefix default- \
+// RUN:   -verify-additional-file %S/Inputs%{fs-sep}unsafe-projections.h \
+// RUN:   -verify-additional-file %S/Inputs%{fs-sep}always-unsafe-projections.h
 
 // REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
@@ -51,10 +54,10 @@ func useInherited(_ d: InheritedDerived) {
   // expected-note@-1 {{reference to unsafe instance method 'view()'}}
 }
 
-// 'value', 'insert' and 'append' are carved out only for the C++ standard
-// library, whose overlay provides same-named safe wrappers. A user type gets the
-// original name plus a stub like any other projection, rather than being left
-// renamed with no un-renamed spelling to migrate to.
+// 'value', 'insert' and 'append' used to be carved out of the rename for the
+// C++ standard library, whose overlay provides same-named safe wrappers; the
+// unsafe import is '@_disfavoredOverload' instead. A user type gets the original
+// name plus a stub like any other projection.
 func useNotStd(_ n: inout NotStd) {
   _ = unsafe n.value()
   _ = unsafe n.insert(1)
@@ -67,4 +70,39 @@ func useNotStd(_ n: inout NotStd) {
   _ = unsafe n.__insertUnsafe(1)
   // expected-warning@-1 {{'__insertUnsafe' is deprecated: renamed to 'insert(_:)'}}
   // expected-note@-2 {{use 'insert(_:)' instead}}
+}
+
+func useTemplates(_ t: inout TemplateProjections) {
+  // The original names are '@unsafe(always)', like those of other methods.
+  _ = t.projection(CInt(0)) // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'projection'}}
+  _ = t.metatype(T: CInt.self) // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'metatype(T:)'}}
+
+  // The migration stubs, which share their specialization, are only '@unsafe'.
+  _ = t.__projectionUnsafe(CInt(0)) // expected-warning {{'__projectionUnsafe' is deprecated: renamed to 'projection(_:)'}}
+  // expected-note@-1 {{use 'projection(_:)' instead}}
+  _ = t.__metatypeUnsafe(T: CInt.self) // expected-warning {{'__metatypeUnsafe(T:)' is deprecated: renamed to 'metatype(T:)'}}
+  // expected-note@-1 {{use 'metatype(T:)' instead}}
+}
+
+func useTemplateAndSafe(_ o: TemplateAndSafeOwner,
+                        _ p: UnsafeMutablePointer<CInt>) {
+  // Instantiating with a pointer doesn't make this a projection.
+  _ = o.identity(p)
+
+  _ = o.vouchedProjection()
+
+  // 'safe' doesn't exempt begin and end, which keep their stubs.
+  _ = o.begin() // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+  _ = unsafe o.begin()
+  _ = unsafe o.__beginUnsafe()
+  _ = unsafe o.__endUnsafe()
+}
+
+func useCustomNamed(_ c: inout CustomNamed) {
+  // Kept its name because of a custom Swift name, not because the feature let
+  // it; like without the feature, it is only '@unsafe'.
+  _ = c.get()
 }

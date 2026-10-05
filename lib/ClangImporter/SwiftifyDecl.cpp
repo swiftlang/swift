@@ -34,7 +34,6 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -488,7 +487,9 @@ struct UnaliasedInstantiationVisitor
     : clang::RecursiveASTVisitor<UnaliasedInstantiationVisitor> {
   bool hasUnaliasedInstantiation = false;
 
-  bool TraverseTypedefType(const clang::TypedefType *) { return true; }
+  bool TraverseTypedefType(const clang::TypedefType *, bool TraverseQualifier) {
+    return true;
+  }
 
   bool
   VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
@@ -888,11 +889,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       attachMacro = true;
     }
 
-    if (!attachMacro && CAT == nullptr)
-      // The return type is not imported eagerly (unlike parameter types). Exit
-      // early to avoid unnecessarily importing types we might not need.
-      return false;
-
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
       swiftReturnTy = funcDecl->getResultInterfaceType();
@@ -1041,8 +1037,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     return;
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
-  if (clang::RawComment *raw =
-          getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+  if (const clang::RawComment *raw =
+          getClangASTContext().getRawCommentForAnyRedecl(ClangDecl)) {
     // swift::RawDocCommentAttr doesn't contain its text directly, but instead
     // references the source range of the parsed comment. Instead of creating
     // a new source file just to parse the doc comment, we can add the

@@ -352,6 +352,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::EscapingObjCBlock:
   case Node::Kind::NoEscapeFunctionType:
   case Node::Kind::CalledOnceFunctionType:
+  case Node::Kind::CalledAtMostOnceFunctionType:
   case Node::Kind::ExplicitClosure:
   case Node::Kind::Extension:
   case Node::Kind::ExtensionAttachedMacroExpansion:
@@ -391,6 +392,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplErasedIsolation:
   case Node::Kind::ImplNonisolatedNonsendingIsolation:
   case Node::Kind::ImplCalledOnceFunction:
+  case Node::Kind::ImplCalledAtMostOnceFunction:
   case Node::Kind::ImplSendingResult:
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
@@ -630,6 +632,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::DefaultOverride:
     case Node::Kind::BorrowAccessor:
     case Node::Kind::MutateAccessor:
+    case Node::Kind::YieldTypes:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -762,7 +765,8 @@ NodePointer NodePrinter::getChildIf(NodePointer Node, Node::Kind Kind) {
 void NodePrinter::printFunctionParameters(NodePointer LabelList,
                                           NodePointer ParameterType,
                                           unsigned depth, bool showTypes) {
-  if (ParameterType->getKind() != Node::Kind::ArgumentTuple) {
+  if (ParameterType->getKind() != Node::Kind::ArgumentTuple &&
+      ParameterType->getKind() != Node::Kind::YieldTypes) {
     setInvalid();
     return;
   }
@@ -844,7 +848,10 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
   case Node::Kind::NoEscapeFunctionType:
     break;
   case Node::Kind::CalledOnceFunctionType:
-    Printer << "@called(once) ";
+    Printer << "@called(exactlyOnce) ";
+    break;
+  case Node::Kind::CalledAtMostOnceFunctionType:
+    Printer << "@called(atMostOnce) ";
     break;
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
@@ -1399,6 +1406,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::CalledOnceFunctionType:
+    case Node::Kind::CalledAtMostOnceFunctionType:
     case Node::Kind::DependentGenericType:
       return false;
     default:
@@ -1739,6 +1747,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::UncurriedFunctionType:
   case Node::Kind::NoEscapeFunctionType:
   case Node::Kind::CalledOnceFunctionType:
+  case Node::Kind::CalledAtMostOnceFunctionType:
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
   case Node::Kind::ThinFunctionType:
@@ -1751,6 +1760,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << Node->getText();
     return nullptr;
   case Node::Kind::ArgumentTuple:
+  case Node::Kind::YieldTypes:
     printFunctionParameters(nullptr, Node, depth,
                             Options.ShowFunctionArgumentTypes);
     return nullptr;
@@ -2918,7 +2928,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@isolated(any)";
     return nullptr;
   case Node::Kind::ImplCalledOnceFunction:
-    Printer << "@called(once)";
+    Printer << "@called(exactlyOnce)";
+    return nullptr;
+  case Node::Kind::ImplCalledAtMostOnceFunction:
+    Printer << "@called(atMostOnce)";
     return nullptr;
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.
@@ -3653,7 +3666,8 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
           t->getKind() != Node::Kind::UncurriedFunctionType &&
           t->getKind() != Node::Kind::CFunctionPointer &&
           t->getKind() != Node::Kind::ThinFunctionType &&
-          t->getKind() != Node::Kind::CalledOnceFunctionType) {
+          t->getKind() != Node::Kind::CalledOnceFunctionType &&
+          t->getKind() != Node::Kind::CalledAtMostOnceFunctionType) {
         TypePr = TypePrinting::WithColon;
       }
     }
@@ -3790,6 +3804,8 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
     NodePointer firstChild = root->getChild(0);
     if (firstChild->getKind() == Node::Kind::KeyPathGetterThunkHelper) {
       NodePointer child = firstChild->getChild(0);
+      if (child == nullptr)
+        return invalid;
       switch (child->getKind()) {
       case Node::Kind::Subscript: {
         std::string subscriptText = "subscript(";
@@ -3800,6 +3816,9 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           return std::string("<unknown>");
         };
         auto getArgumentNodeName = [](NodePointer node) {
+          if (node == nullptr) {
+            return std::string("<unknown>");
+          }
           if (node->getKind() == Node::Kind::Identifier) {
             return std::string(node->getText());
           }
@@ -3833,8 +3852,15 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
             NodePointer argumentType = argList->getChild(idx);
             idx += 1;
             if (argumentType->getKind() == Node::Kind::TupleElement) {
-              argumentType =
-                  argumentType->getChild(0)->getChild(0)->getChild(1);
+              // A tuple element has the type as its last child, but is not
+              // required to have the shape TupleElement -> Type -> <nominal> ->
+              // [Module, Identifier]. For example, an empty-tuple element has a
+              // childless Tuple as the grandchild, so every step here can produce
+              // null.
+              NodePointer typeNode = argumentType->getLastChild();
+              NodePointer nominal =
+                  typeNode ? typeNode->getChild(0) : nullptr;
+              argumentType = nominal ? nominal->getChild(1) : nullptr;
               argumentTypeNames.push_back(getArgumentNodeName(argumentType));
               continue;
             }
@@ -3850,8 +3876,9 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
                          std::make_pair(Node::Kind::Type, 0),
                      });
           if (argList != nullptr) {
+            NodePointer argType = argList->getChild(0);
             argumentTypeNames.push_back(
-                getArgumentNodeName(argList->getChild(0)->getChild(1)));
+                getArgumentNodeName(argType ? argType->getChild(1) : nullptr));
           }
         }
         child = child->getChild(1);

@@ -50,6 +50,12 @@ public:
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowByPointer);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   static bool classof(const BorrowByPointerTypeInfo *) { return true; }
   // NB: this classof implementation assumes that it is already known that
   // the `TypeInfo` being cast is converted from a `Builtin.Borrow`. Other
@@ -119,6 +125,12 @@ public:
       ReferentTI(referentTI)
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowInline);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
   unsigned getExplosionSize() const override {
@@ -262,6 +274,12 @@ public:
                            IsABIAccessible)
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowNonFixed);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,

@@ -7633,8 +7633,22 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
 
 bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     diagnoseAsError() {
-  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
-                 getToType());
+  auto getSemantics = [](Type type) -> std::optional<ExecutionSemantics> {
+    if (auto *fnType = type->getAs<FunctionType>())
+      return fnType->getExecutionSemantics();
+    return std::nullopt;
+  };
+
+  // The source has the execution semantics, unless the constraint required
+  // the two types to be equal.
+  auto semantics = getSemantics(getFromType());
+  if (!semantics)
+    semantics = getSemantics(getToType());
+
+  emitDiagnostic(diag::called_attr_function_type_mismatch,
+                 CalledAttr::getSemanticsName(
+                     semantics.value_or(ExecutionSemantics::AtMostOnce)),
+                 getFromType(), getToType());
   return true;
 }
 
@@ -7805,6 +7819,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return true;
 
   if (diagnoseKeyPathAsFunctionResultMismatch())
+    return true;
+
+  if (diagnoseInOutToPointerInSubscript())
     return true;
 
   auto argType = getFromType();
@@ -8144,6 +8161,33 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   // Suggest importing RegexBuilder.
   auto diag = emitDiagnostic(diag::must_import_regex_builder_module);
   fixItImport(diag, ctx.Id_RegexBuilder, getDC());
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseInOutToPointerInSubscript() const {
+  if (!getASTContext().LangOpts.hasFeature(
+          Feature::SubscriptParametersWithOwnership))
+    return false;
+
+  // Only for `&x` passed where a pointer is expected.
+  auto *argExpr = getAsExpr(getAnchor());
+  if (!argExpr || !argExpr->isSemanticallyInOutExpr())
+    return false;
+
+  PointerTypeKind pointerKind;
+  if (!getToType()->lookThroughAllOptionalTypes()->getAnyPointerElementType(
+          pointerKind))
+    return false;
+
+  // The implicit inout-to-pointer conversion deliberately does not apply to
+  // subscript arguments; `inout` there means the index takes the exclusive
+  // access itself. See `matchTypes` in CSSimplify.cpp.
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!overload || !overload->choice.isDecl() ||
+      !isa<SubscriptDecl>(overload->choice.getDecl()))
+    return false;
+
+  emitDiagnostic(diag::cannot_pass_inout_arg_to_subscript);
   return true;
 }
 
@@ -8875,8 +8919,8 @@ bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
 
 bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
   // Diagnose use a keypath where a function with multiple arguments is expected
-  emitDiagnostic(diag::expr_keypath_multiparam_func_conversion,
-                 resolveType(functionType));
+  emitDiagnostic(diag::expr_keypath_wrong_param_func_conversion,
+                 resolveType(functionType), resolveType(expectedType));
   return true;
 }
 

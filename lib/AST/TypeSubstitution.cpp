@@ -64,7 +64,8 @@ GenericFunctionType::substGenericArgs(SubstitutionMap subs,
   // FIXME: Before dropping the signature, we should assert that
   // subs.getGenericSignature() is equal to this function type's
   // generic signature.
-  Type fnType = FunctionType::get(getParams(), getResult(), getExtInfo());
+  Type fnType =
+      FunctionType::get(getParams(), getYields(), getResult(), getExtInfo());
   return fnType.subst(subs, options)->castTo<FunctionType>();
 }
 

@@ -16,26 +16,18 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Concurrency.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
-#include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/NodeDatastructures.h"
-#include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Test.h"
@@ -44,7 +36,6 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -435,26 +426,6 @@ findClosureUse(Operand *initialOperand) {
   }
 
   return {};
-}
-
-//===----------------------------------------------------------------------===//
-//                             MARK: Diagnostics
-//===----------------------------------------------------------------------===//
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(const PartitionOp &op, Diag<T...> diag,
-                                        U &&...args) {
-  return siloptimizer::diagnoseError(
-      op.getSourceInst()->getFunction()->getASTContext(),
-      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
-                                       U &&...args) {
-  return siloptimizer::diagnoseNote(
-      op.getSourceInst()->getFunction()->getASTContext(),
-      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2395,12 +2366,6 @@ private:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
@@ -2756,9 +2721,9 @@ void UseAfterSendDiagnosticInferrer::infer() {
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
-    if (pai->isCalledOnce() && ApplySite(pai)
-                                   .getParamInfoForOperand(*sendingOp)
-                                   .hasOption(SILParameterInfo::Sending)) {
+    // @called(atMostOnce) closures can have both implicit and explicit
+    // `sending` captures.
+    if (pai->hasCalledAtMostOnceSemantics()) {
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
         return diagnosticEmitter.emitNamedUseofStronglySentValue(
             baseLoc, rootValueAndName->first);
@@ -3303,12 +3268,6 @@ private:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
     return diagnoseError(op->getUser()->getLoc(), diag,
                          std::forward<U>(args)...);
@@ -3323,12 +3282,6 @@ private:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
   template <typename... T, typename... U>
@@ -3721,24 +3674,21 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
       }
     }
 
-    // A `sending` capture of an non-isolated `@called(once)` closure is
-    // translated by `translateSILCalledOncePartialApply` as a send of
-    // that specific operand -- so reaching this operand here means the
-    // capture itself crossed isolation, independent of whether the closure
-    // as a whole is isolated. Let's use the captured value's tracked
-    // isolation (when it is actor-isolated) as the caller isolation.
+    // Reaching this operand here means it was individually sent as a capture
+    // of a non-isolated `@called(atMostOnce)` closure -- either because it was
+    // explicitly `sending`, or because it's an ordinary capture of a
+    // non-escaping closure (every non-Sendable capture of those is sent
+    // individually, independent of whether the closure as a whole is isolated.
+    // Let's use the captured value's tracked isolation (when it is
+    // actor-isolated) as the caller isolation.
     if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
-        pai && pai->isCalledOnce()) {
-      ApplySite apply(pai);
-      if (apply.getParamInfoForOperand(*op).hasOption(
-              SILParameterInfo::Sending)) {
-        std::optional<ActorIsolation> callerIsolation;
-        if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
-          callerIsolation =
-              diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
-        if (initForIsolatedPartialApply(op, ace, callerIsolation))
-          return true;
-      }
+        pai && pai->hasCalledAtMostOnceSemantics()) {
+      std::optional<ActorIsolation> callerIsolation;
+      if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
+        callerIsolation =
+            diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
+      if (initForIsolatedPartialApply(op, ace, callerIsolation))
+        return true;
     }
   }
 
@@ -4065,12 +4015,6 @@ public:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
@@ -4079,12 +4023,6 @@ public:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 };
 
@@ -4808,12 +4746,6 @@ public:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
     return diagnoseError(op->getUser()->getLoc(), diag,
                          std::forward<U>(args)...);
@@ -4828,12 +4760,6 @@ public:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
   template <typename... T, typename... U>

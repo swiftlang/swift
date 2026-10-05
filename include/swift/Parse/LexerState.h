@@ -18,7 +18,6 @@
 #define SWIFT_LEXERSTATE_H
 
 #include "swift/Basic/SourceLoc.h"
-#include <optional>
 
 namespace swift {
 class Lexer;

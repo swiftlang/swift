@@ -247,7 +247,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  
+
   /// True if values of this type can be passed by value when borrowed.
   /// If this bit is true, then borrows of the value are independent of the
   /// value's address, so a value can be passed in registers or memcpy'd
@@ -268,7 +268,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
                                    (isBB ? 0 : IsNonBitwiseBorrowable));
   }
-  
+
   /// True if values of this type can be copied.
   /// NOTE: This is NOT accurate for types that are conditionally Copyable.
   /// You may need to use `checkInvertibleRequirements`.
@@ -277,7 +277,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
                                    (isCopyable ? 0 : IsNonCopyable));
   }
-  
+
   /// True if values of this type are addressable-for-dependencies, meaning
   /// that values of this type should be passed indirectly to functions that
   /// produce lifetime-dependent values that could possibly contain pointers
@@ -835,7 +835,7 @@ public:
                                  ? IsConformanceOfProtocolMask
                                  : 0));
   }
-  
+
   ConformanceFlags withHasGlobalActorIsolation(
                                            bool hasGlobalActorIsolation) const {
     return ConformanceFlags((Value & ~HasGlobalActorIsolation)
@@ -1159,6 +1159,14 @@ struct TargetFunctionMetadataDifferentiabilityKind {
 using FunctionMetadataDifferentiabilityKind =
     TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
+/// Execution semantics for function type metadata.
+/// Duplicates `ExecutionSemantics` in AST/AttrKind.h, plus `None`.
+enum class FunctionMetadataExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce = 1,
+  Once = 2,
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -1308,7 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    IsCalledOnce = 0x00000020U,
+    // Values for the enumerated execution semantics. Reserved; the compiler
+    // doesn't emit them yet.
+    ExecutionSemanticsMask = 0x00000060U, // two bits
+    ExecutionSemanticsShift = 5,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1351,9 +1362,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withCalledOnce(bool newValue = true) const {
+  withExecutionSemantics(FunctionMetadataExecutionSemantics semantics) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~IsCalledOnce) | (newValue ? IsCalledOnce : 0));
+        (Data & ~ExecutionSemanticsMask) |
+        (int_type(semantics) << ExecutionSemanticsShift));
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1362,7 +1374,7 @@ public:
         (Data & ~InvertedProtocolMask) |
         (inverted.rawBits() << InvertedProtocolshift));
   }
-  
+
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1377,8 +1389,9 @@ public:
     return bool(Data & HasSendingResult);
   }
 
-  bool isCalledOnce() const {
-    return bool(Data & IsCalledOnce);
+  FunctionMetadataExecutionSemantics getExecutionSemantics() const {
+    return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
+                                              ExecutionSemanticsShift);
   }
 
   int_type getIntValue() const {
@@ -1662,7 +1675,7 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
-  
+
   /// Whether this raw layout type is bitwise borrowable.
   ///
   /// No raw layout types are yet, but should we change our mind about that in the future,
@@ -1712,6 +1725,34 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
 
   const uint16_t ProtocolDescriptor = 0xe909; // = 59657
+
+  /// Protocol witness table pointers in the runtime's conformance cache.
+  ///
+  /// Computed with ptrauth_string_discriminator("protocol_witness_table").
+  const uint16_t ProtocolWitnessTable = 0x22d0; // = 8912
+
+  /// The combined pointer/tag words stored in the two swift::SignedPointerUnion
+  /// fields of the runtime conformance cache's entries. Each field has its own
+  /// discriminator so a signed word from one cannot be substituted into the
+  /// other.
+  ///
+  /// Computed with
+  /// ptrauth_string_discriminator("conformance_cache_type_or_descriptor") and
+  /// ptrauth_string_discriminator("conformance_cache_proto_or_storage").
+  const uint16_t ConformanceCacheTypeOrDescriptor = 0xbe9b; // = 48795
+  const uint16_t ConformanceCacheProtoOrStorage = 0x06a2; // = 1698
+
+  /// The individual pointer fields of a conformance cache entry's extended
+  /// storage (used for global-actor-isolated conformances). Each field is
+  /// signed with its own discriminator.
+  ///
+  /// Computed with
+  /// ptrauth_string_discriminator("conformance_cache_storage_protocol"),
+  /// ptrauth_string_discriminator("conformance_cache_storage_global_actor_type")
+  /// and ptrauth_string_discriminator("conformance_cache_storage_next").
+  const uint16_t ConformanceCacheStorageProtocol = 0x2465; // = 9317
+  const uint16_t ConformanceCacheStorageGlobalActorType = 0x31dc; // = 12764
+  const uint16_t ConformanceCacheStorageNext = 0x5664; // = 22116
 
   // Type descriptors as arguments.
   const uint16_t OpaqueTypeDescriptor = 0xbdd1; // = 48593
@@ -1794,8 +1835,19 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
+  /// Task pointers in a future's wait queue: the queue head in the future
+  /// fragment, and the link to the next waiter in a task dependency record.
+  const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
+  const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
+
+  /// Result type metadata stored in a future task or task group.
+  const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
+
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
+
+  /// AsyncTask pointer in the AsyncLetImpl record.
+  const uint16_t AsyncLetTaskPointer = 0x6451; // = 25681
 
   // C type TaskContinuationFunction* descriminator.
   const uint16_t ClangTypeTaskContinuationFunction = 0x2abe; // = 10942
@@ -1828,11 +1880,20 @@ namespace SpecialPointerAuthDiscriminators {
   /// discriminator covers all of them.
   const uint16_t ConcurrencyHook = 0xc0a1; // = 49313
 
+  /// ThreadSanitizer interop hook variables (_swift_tsan_acquire,
+  /// _swift_tsan_release). Address-diversified, so one discriminator
+  /// covers both.
+  const uint16_t ThreadSanitizerHook = 0x8f52; // = 36690
+
   /// Function pointers stored in the coro allocator struct.
   const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
   const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
   const uint16_t CoroFrameAllocationFunction = 0xd251;   // = 53841
   const uint16_t CoroFrameDeallocationFunction = 0x5ba8; // = 23464
+
+  /// The compatibility-override cache in each hooked runtime entry point.
+  /// The slot is address-diversified, so one discriminator covers all of them.
+  const uint16_t CompatibilityOverride = 0xf50b; // = 62731
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1995,7 +2056,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
-    /// WARNING: 5 is the last bit!
+    /// Set if a class descriptor is followed by a versioned instance-prefix
+    /// descriptor. The template is copied immediately before the
+    /// native heap-object address point.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasInstancePrefix = 5,
 
     // Type-specific flags:
 
@@ -2109,6 +2175,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
                                 class_hasDefaultOverrideTable,
                                 class_setHasDefaultOverrideTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasInstancePrefix,
+                                class_hasInstancePrefix,
+                                class_setHasInstancePrefix)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -2116,6 +2185,9 @@ public:
                                  class_getResilientSuperclassReferenceKind,
                                  class_setResilientSuperclassReferenceKind)
 };
+
+/// Version of the optional trailing class instance-prefix descriptor.
+static constexpr uint16_t ClassInstancePrefixDescriptorVersion = 0;
 
 /// Extra flags for resilient classes, since we need more than 16 bits of
 /// flags there.

@@ -32,6 +32,8 @@ class Stmt;
 class Pattern;
 class TypeRepr;
 class ParameterList;
+class YieldList;
+class Yield;
 enum class AccessKind: unsigned char;
 
 enum class SemaReferenceKind : uint8_t {
@@ -610,6 +612,15 @@ public:
     return false;
   }
 
+  /// Whether the walker should walk into the expression of a
+  /// \c GenericArgumentExprTypeRepr.
+  virtual bool shouldWalkIntoGenericArgumentExprTypeRepr() const {
+    // That expression is type-checked separately by
+    // `resolveGenericArgumentExprTypeRepr`, so it is hidden by default. Opt in
+    // to reach the TypeReprs the parser built inside it.
+    return false;
+  }
+
   virtual bool shouldWalkIntoForEachDesugaredStmt() { return true; }
 
   /// This method configures how the walker should walk the initializers of
@@ -673,6 +684,16 @@ public:
   /// Whether to walk into the definition of a \c MacroDecl if it hasn't been
   /// type-checked yet.
   virtual bool shouldWalkIntoUncheckedMacroDefinitions() { return false; }
+
+  /// Whether to walk the top-level auxiliary decls for a SourceFile, including
+  /// peer and extension macro expansions. Note this does not control the
+  /// walking of expansions for freestanding macros.
+  ///
+  /// FIXME: This ought to just be controlled by
+  /// `shouldWalkMacroArgumentsAndExpansion`, but we currently have a bunch of
+  /// misconfigured walkers that are currently relying on phase ordering to not
+  /// expand macros too early.
+  virtual bool shouldWalkTopLevelAuxiliaryDecls() const { return false; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.
@@ -740,6 +761,51 @@ public:
   ///
   /// The default implementation returns \c Action::Continue().
   virtual PostWalkAction walkToArgumentPost(const Argument &Arg) {
+    return Action::Continue();
+  }
+
+  /// walkToYieldListPre - This method is called when first visiting a
+  /// YieldList, before walking into yield types.
+  ///
+  /// \param YL The yield list to walk.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToYieldListPre(YieldList *PL) {
+    return Action::Continue();
+  }
+
+  /// walkToYieldListPost - This method is called after visiting the
+  /// children of a yield list.
+  ///
+  /// \param YL The yield list that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToYieldListPost(YieldList *PL) {
+    return Action::Continue();
+  }
+
+  /// This method is called when first visiting a yield before walking into
+  /// its children.
+  ///
+  /// \param Y The yield to check.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToYieldPre(Yield *Y) { return Action::Continue(); }
+
+  /// This method is called after visiting yield.
+  ///
+  /// \param Y The yield that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToYieldPost(Yield *Y) {
     return Action::Continue();
   }
 

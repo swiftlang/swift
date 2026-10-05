@@ -14,7 +14,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_PARTITIONUTILS_H
 
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
@@ -28,7 +27,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 
-#include <algorithm>
 #include <variant>
 
 namespace swift {
@@ -67,13 +65,6 @@ template <>
 struct DenseMapInfo<swift::PartitionPrimitives::Element> {
   using Element = swift::PartitionPrimitives::Element;
 
-  static Element getEmptyKey() {
-    return Element(DenseMapInfo<unsigned>::getEmptyKey());
-  }
-  static Element getTombstoneKey() {
-    return Element(DenseMapInfo<unsigned>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(Element element) {
     return DenseMapInfo<unsigned>::getHashValue(element);
   }
@@ -83,13 +74,6 @@ struct DenseMapInfo<swift::PartitionPrimitives::Element> {
 template <>
 struct DenseMapInfo<swift::PartitionPrimitives::Region> {
   using Region = swift::PartitionPrimitives::Region;
-
-  static Region getEmptyKey() {
-    return Region(DenseMapInfo<unsigned>::getEmptyKey());
-  }
-  static Region getTombstoneKey() {
-    return Region(DenseMapInfo<unsigned>::getTombstoneKey());
-  }
 
   static unsigned getHashValue(Region region) {
     return DenseMapInfo<unsigned>::getHashValue(region);
@@ -2857,13 +2841,6 @@ struct DenseMapInfo<swift::RepresentativeValue> {
   using RepresentativeValue = swift::RepresentativeValue;
   using InnerType = RepresentativeValue::InnerType;
   using InnerDenseMapInfo = DenseMapInfo<InnerType>;
-
-  static RepresentativeValue getEmptyKey() {
-    return RepresentativeValue(InnerDenseMapInfo::getEmptyKey());
-  }
-  static RepresentativeValue getTombstoneKey() {
-    return RepresentativeValue(InnerDenseMapInfo::getTombstoneKey());
-  }
 
   static unsigned getHashValue(RepresentativeValue value) {
     return InnerDenseMapInfo::getHashValue(value.value);

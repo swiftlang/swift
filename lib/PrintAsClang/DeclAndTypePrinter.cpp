@@ -52,7 +52,6 @@
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -570,6 +569,9 @@ private:
           associatedValueList->size() > 1) {
         return;
       }
+      // Projecting the payload out of a borrowed enum needs a copy of it.
+      if (cxx_translation::isNoncopyableValueTypeExposableToCxx(ED))
+        return;
       auto paramType = associatedValueList->front()->getInterfaceType();
 
       std::string declName, defName, name;
@@ -1055,9 +1057,6 @@ private:
 
   /// Returns true if \p clangTy is the typedef for NSUInteger.
   bool isNSUInteger(clang::QualType clangTy) {
-    if (const auto* elaboratedTy = dyn_cast<clang::ElaboratedType>(clangTy)) {
-      clangTy = elaboratedTy->desugar();
-    }
     const auto *typedefTy = dyn_cast<clang::TypedefType>(clangTy);
     if (!typedefTy)
       return false;
@@ -2047,26 +2046,6 @@ private:
     return true;
   }
 
-  /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
-  /// thereof.
-  bool isCFTypeRef(Type ty) {
-    if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
-      ty = existential->getConstraintType();
-
-    const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
-      TAD = aliasTy->getDecl();
-      ty = aliasTy->getSinglyDesugaredType();
-    }
-
-    if (!TAD || !TAD->hasClangNode())
-      return false;
-
-    if (owningPrinter.ID_CFTypeRef.empty())
-      owningPrinter.ID_CFTypeRef = getASTContext().getIdentifier("CFTypeRef");
-    return TAD->getName() == owningPrinter.ID_CFTypeRef;
-  }
-
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
@@ -2083,7 +2062,7 @@ private:
       }
     }
 
-    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !ty->isCFTypeRef())
       return true;
 
     return false;
@@ -3085,7 +3064,8 @@ bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeNotCxxAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+    if (const auto *NTD = ED->getExtendedNominal())
+      return hasExposeNotCxxAttr(NTD);
   return false;
 }
 
@@ -3121,6 +3101,10 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
       if (auto *params = elementDecl->getParameterList()) {
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
+          // A noncopyable payload would have to be moved into the case
+          // constructor and consumed back out of the enum.
+          if (!paramType->hasTypeParameter() && paramType->isNoncopyable())
+            return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
                   printer, enumDecl->getModuleContext(), paramType)
@@ -3149,9 +3133,7 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (outputLang == OutputLanguageMode::Cxx) {
     if (!isExposedToThisModule(M, VD, exposedModules))
       return false;
-    if (!cxx_translation::isExposableToCxx(
-            VD,
-            [this](const NominalTypeDecl *decl) { return isZeroSized(decl); }))
+    if (!cxx_translation::isExposableToCxx(VD, this))
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
@@ -3207,6 +3189,13 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
   if (sizeAndAlignment)
     return sizeAndAlignment->size == 0;
   return false;
+}
+
+bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
+  if (decl->isResilient() || decl->hasGenericParamList())
+    return true;
+  // The size and alignment are also unknown when a field is resilient.
+  return !interopContext.getIrABIDetails().getTypeSizeAlignment(decl);
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {

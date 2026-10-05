@@ -1031,14 +1031,6 @@ namespace llvm {
 using swift::ProjectionPath;
 /// Allow ProjectionPath to be used in DenseMap.
 template <> struct DenseMapInfo<ProjectionPath> {
-  static inline ProjectionPath getEmptyKey() {
-    return ProjectionPath(DenseMapInfo<swift::SILType>::getEmptyKey(),
-                          DenseMapInfo<swift::SILType>::getEmptyKey());
-  }
-  static inline ProjectionPath getTombstoneKey() {
-    return ProjectionPath(DenseMapInfo<swift::SILType>::getTombstoneKey(),
-                          DenseMapInfo<swift::SILType>::getTombstoneKey());
-  }
   static inline unsigned getHashValue(const ProjectionPath &Val) {
     return hash_value(Val);
   }

@@ -21,7 +21,6 @@
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "AST"
 

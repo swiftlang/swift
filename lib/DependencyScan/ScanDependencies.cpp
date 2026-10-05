@@ -1394,6 +1394,11 @@ performModuleScanImpl(
     SwiftDependencyScanningService &service, CompilerInstance *instance,
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
+  // Configure the scanning service before creating the scanner, and therefore
+  // before any Clang scanning worker builds its file system.
+  if (service.setupDependencyScanningService(*instance))
+    return std::make_error_code(std::errc::invalid_argument);
+
   const ASTContext &ctx = instance->getASTContext();
   const FrontendOptions &opts = instance->getInvocation().getFrontendOptions();
   // Load the dependency cache if -reuse-dependency-scan-cache
@@ -1481,6 +1486,11 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     SwiftDependencyScanningService &service, CompilerInstance *instance,
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
+  // Configure the scanning service before creating the scanner, and therefore
+  // before any Clang scanning worker builds its file system.
+  if (service.setupDependencyScanningService(*instance))
+    return std::make_error_code(std::errc::invalid_argument);
+
   // Setup the scanner
   auto expectedScannerPtr =
       ModuleDependencyScanner::create(service, instance, cache);
@@ -1529,8 +1539,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
       ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(CI.getMainModule()->getNameStr().str(),
                                 CI.getInvocation().getModuleScanningHash());
-  if (service->setupCachingDependencyScanningService(CI))
-    return true;
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
@@ -1544,12 +1552,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
                         dependencies))
     return true;
 
-  // This process succeeds regardless of whether any errors occurred.
-  // FIXME: We shouldn't need this, but it's masking bugs in our scanning
-  // logic where we don't create a fresh context when scanning Swift interfaces
-  // that includes their own command-line flags.
-  ctx.Diags.resetHadAnyError();
-  return false;
+  return ctx.hadError();
 }
 
 bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {

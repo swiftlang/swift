@@ -15,6 +15,11 @@
 
 namespace swift {
 
+enum IsLexical_t : bool {
+  IsNotLexical = false,
+  IsLexical = true,
+};
+
 /// Is a lowered SIL type trivial?  That is, are copies ultimately just
 /// bit-copies, and it takes no work to destroy a value?
 enum IsTrivial_t : bool {
@@ -162,9 +167,9 @@ class SILTypeProperties {
   };
   // clang-format on
 
+public:
   uint16_t Flags;
 
-public:
   /// Construct a default SILTypeProperties, which corresponds to
   /// a trivial, loadable, fixed-layout type.
   constexpr SILTypeProperties() : Flags(0) {}

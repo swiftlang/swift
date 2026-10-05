@@ -19,7 +19,6 @@
 
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -55,7 +54,7 @@ ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return *this;
 
   if (getType().isObject()) {

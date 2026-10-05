@@ -1,0 +1,100 @@
+// RUN: %target-sil-opt -trivial-ownership-elimination %s | %FileCheck %s
+
+import Swift
+
+// CHECK-LABEL: sil [ossa] @eliminate_copies_and_destroys :
+sil [ownership_for_trivial] [ossa] @eliminate_copies_and_destroys : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+entry(%0 : @owned $Int):
+  // CHECK-NEXT: [[ALLOC_STACK:%.*]] = alloc_stack $Int
+  %2 = alloc_stack $Int
+  %3 = copy_value %0
+  // CHECK-NEXT: store [[ARG]] to [trivial] [[ALLOC_STACK]]
+  store %3 to [init] %2
+  destroy_addr %2
+  destroy_value %0
+  // CHECK-NEXT: dealloc_stack [[ALLOC_STACK]]
+  dealloc_stack %2
+  // CHECK-NEXT: return
+  return undef : $()
+}
+
+sil @butt : $@convention(thin) (Int) -> ()
+sil @butt_indirect : $@convention(thin) (@in_guaranteed Int) -> ()
+
+// CHECK-LABEL: sil [ossa] @eliminate_borrows :
+sil [ownership_for_trivial] [ossa] @eliminate_borrows : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+entry(%0 : @owned $Int):
+  %1 = begin_borrow %0
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[BUTT:%.*]] = function_ref @butt
+  %butt = function_ref @butt : $@convention(thin) (Int) -> ()
+  // CHECK-NEXT: apply [[BUTT]]([[ARG]])
+  %2 = apply %butt(%1) : $@convention(thin) (Int) -> ()
+  end_borrow %1
+  destroy_value %0
+  // CHECK-NEXT: return
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @disqualify_load_stores :
+sil [ownership_for_trivial] [ossa] @disqualify_load_stores : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+entry(%0 : @owned $Int):
+  // CHECK-NEXT: [[ALLOC_STACK_1:%.*]] = alloc_stack $Int
+  %1 = alloc_stack $Int
+  // CHECK-NEXT: store [[ARG]] to [trivial] [[ALLOC_STACK]]
+  store %0 to [init] %1
+  
+  // CHECK-NEXT: [[ALLOC_STACK_3:%.*]] = alloc_stack $Int
+  %3 = alloc_stack $Int
+  // CHECK-NEXT: [[LOAD_4:%.*]] = load [trivial] [[ALLOC_STACK_1]]
+  %4 = load [copy] %1
+  // CHECK-NEXT: store [[LOAD_4]] to [trivial] [[ALLOC_STACK_3]]
+  store %4 to [init] %3
+  
+  // CHECK-NEXT: [[LOAD_6:%.*]] = load [trivial] [[ALLOC_STACK_3]]
+  %6 = load_borrow %3
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[BUTT:%.*]] = function_ref @butt
+  %butt = function_ref @butt : $@convention(thin) (Int) -> ()
+  // CHECK-NEXT: apply [[BUTT]]([[LOAD_6]])
+  %7 = apply %butt(%6) : $@convention(thin) (Int) -> ()
+  end_borrow %6
+  
+  // CHECK-NEXT: [[ALLOC_STACK_9:%.*]] = alloc_stack $Int
+  %9 = alloc_stack $Int
+  // CHECK-NEXT: [[LOAD_10:%.*]] = load [trivial] [[ALLOC_STACK_3]]
+  %10 = load_borrow %3
+  // CHECK-NEXT: store [[LOAD_10]] to [trivial] [[ALLOC_STACK_9]]
+  %11 = store_borrow %10 to %9
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[BUTT_INDIRECT:%.*]] = function_ref @butt_indirect
+  %butt_indirect = function_ref @butt_indirect : $@convention(thin) (@in_guaranteed Int) -> ()
+  // CHECK-NEXT: apply [[BUTT_INDIRECT]]([[ALLOC_STACK_9]])
+  %a = apply %butt_indirect(%11) : $@convention(thin) (@in_guaranteed Int) -> ()
+  end_borrow %11
+  end_borrow %10
+  // CHECK-NEXT: dealloc_stack [[ALLOC_STACK_9]]
+  dealloc_stack %9
+  
+  // CHECK-NEXT: [[ALLOC_STACK_15:%.*]] = alloc_stack $Int
+  %15 = alloc_stack $Int
+  // CHECK-NEXT: copy_addr [[ALLOC_STACK_3]] to [[ALLOC_STACK_15]]
+  copy_addr %3 to [init] %15
+  destroy_addr %15
+  // CHECK-NEXT: dealloc_stack [[ALLOC_STACK_15]]
+  dealloc_stack %15
+  
+  destroy_addr %3
+  // CHECK-NEXT: dealloc_stack [[ALLOC_STACK_3]]
+  dealloc_stack %3
+  
+  destroy_addr %1
+  // CHECK-NEXT: dealloc_stack [[ALLOC_STACK_1]]
+  dealloc_stack %1
+  
+  // CHECK-NEXT: return
+  return undef : $()
+}

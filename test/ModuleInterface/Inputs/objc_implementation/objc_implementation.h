@@ -1,6 +1,12 @@
 #import <Foundation/Foundation.h>
 
-@interface ImplClass: NSObject
+@interface ImplBaseClass: NSObject
+
+- (void)baseMethod:(int)param;
+
+@end
+
+@interface ImplClass: ImplBaseClass
 
 - (nonnull instancetype)init;
 

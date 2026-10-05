@@ -32,9 +32,7 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/HeapObject.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -54,8 +52,6 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
@@ -477,7 +473,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
   PrettySourceFileEmission StackEntry(SF);
 
-  // Emit types and other global decls.
+  // Emit types and other global decls. `emitGlobalDecl` handles auxiliary.
   for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
   for (auto *decl : SF.getHoistedDecls())
@@ -1158,9 +1154,10 @@ void IRGenModule::emitGlobalLists() {
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   // Embedded Swift only emits specialized function (except when they are
   // protocol witness methods). So don't emit generic functions, even if they're
-  // externally visible.
+  // externally visible. A function whose type is only generic because of
+  // substitutions, e.g., one with an opaque result type, is not generic.
   if (f.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
-      f.getLoweredFunctionType()->getSubstGenericSignature()) {
+      f.getLoweredFunctionType()->getInvocationGenericSignature()) {
     return true;
   }
 
@@ -1217,6 +1214,21 @@ void IRGenerator::emitGlobalTopLevel(
   for (auto &ot : PrimaryIGM->getSILModule().getDefaultOverrideTableList()) {
     ensureRelativeSymbolCollocation(ot);
   }
+
+  // Under multi-threaded WMO the dynamic-replacements table is emitted into the
+  // primary IGM and references each replacement function with a *direct*
+  // relative reference (newFunction = replacement - tableAnchor). Force those
+  // replacement functions to be emitted into the primary IGM as well, so the
+  // reference does not cross an object-file boundary. A cross-object direct
+  // relative reference is unrepresentable on x86_64 Mach-O (an undefined
+  // minuend in an X86_64_RELOC_SUBTRACTOR). See rdar://187511655.
+  if (GenModules.size() > 1) {
+    for (SILFunction &f : PrimaryIGM->getSILModule()) {
+      if (f.isDefinition() && f.getDynamicallyReplacedFunction())
+        DefaultIGMForFunction[&f] = getPrimaryIGM();
+    }
+  }
+
   for (auto &directive: linkerDirectives) {
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
@@ -1806,10 +1818,54 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
 
   bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
   entry.IsDescriptorUsed = true;
-  
+
   if (isNovelUseOfDescriptor) {
+    assert(!FinishedEmittingLazyDefinitions);
     LazyOpaqueTypeDescriptors.push_back(opaque);
   }
+}
+
+/// Whether the result type of \p fn contains an opaque archetype.
+static bool hasOpaqueResultType(SILFunction *fn) {
+  return fn->getLoweredFunctionType()
+      ->getAllResultsSubstType(fn->getModule(), TypeExpansionContext::minimal())
+      .getASTType()
+      ->hasOpaqueArchetype();
+}
+
+/// Collect the opaque archetypes appearing in the result type of \p fn,
+/// skipping the ones already present in \p seen.
+static void collectOpaqueResultTypes(
+    SILFunction *fn,
+    llvm::SmallVectorImpl<OpaqueTypeArchetypeType *> &opaqueTypes,
+    llvm::SmallSet<OpaqueTypeArchetypeType *, 8> &seen) {
+  auto resultTy = fn->getLoweredFunctionType()
+                      ->getAllResultsSubstType(fn->getModule(),
+                                               TypeExpansionContext::minimal())
+                      .getASTType();
+  resultTy.visit([&](CanType ty) {
+    if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
+      if (seen.insert(opaque).second)
+        opaqueTypes.push_back(opaque);
+  });
+}
+
+void IRGenerator::addDynamicReplacement(SILFunction *f) {
+  if (!DynamicReplacements.insert(f))
+    return;
+
+  if (!hasOpaqueResultType(f))
+    return;
+
+  // emitDynamicReplacements() references the opaque type descriptor and the
+  // descriptor accessor of the replacement's result type. It runs after
+  // emitLazyDefinitions() has drained the lazy worklists, so note the use of
+  // those descriptors now, while they can still be emitted.
+  SmallVector<OpaqueTypeArchetypeType *, 8> opaqueTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> seen;
+  collectOpaqueResultTypes(f, opaqueTypes, seen);
+  for (auto *opaque : opaqueTypes)
+    noteUseOfOpaqueTypeDescriptor(opaque->getDecl());
 }
 
 void IRGenerator::noteUseOfExtensionDescriptor(ExtensionDecl *ext) {
@@ -1944,29 +2000,14 @@ void IRGenerator::emitDynamicReplacements() {
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> newUniqueOpaqueTypes;
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> origUniqueOpaqueTypes;
   for (auto *newFunc : DynamicReplacements) {
-    auto newResultTy = newFunc->getLoweredFunctionType()
-             ->getAllResultsSubstType(newFunc->getModule(),
-                                      TypeExpansionContext::minimal())
-             .getASTType();
-    if (!newResultTy->hasOpaqueArchetype())
+    if (!hasOpaqueResultType(newFunc))
       continue;
-    newResultTy.visit([&](CanType ty) {
-      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
-        if (newUniqueOpaqueTypes.insert(opaque).second)
-          newFuncTypes.push_back(opaque);
-    });
+    collectOpaqueResultTypes(newFunc, newFuncTypes, newUniqueOpaqueTypes);
+
     auto *origFunc = newFunc->getDynamicallyReplacedFunction();
     assert(origFunc);
-    auto origResultTy = origFunc->getLoweredFunctionType()
-                  ->getAllResultsSubstType(origFunc->getModule(),
-                                           TypeExpansionContext::minimal())
-                  .getASTType();
-    assert(origResultTy->hasOpaqueArchetype());
-    origResultTy.visit([&](CanType ty) {
-      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
-        if (origUniqueOpaqueTypes.insert(opaque).second)
-          origFuncTypes.push_back(opaque);
-    });
+    assert(hasOpaqueResultType(origFunc));
+    collectOpaqueResultTypes(origFunc, origFuncTypes, origUniqueOpaqueTypes);
 
     assert(origFuncTypes.size() == newFuncTypes.size());
   }
@@ -2214,6 +2255,12 @@ void IRGenModule::emitVTableStubs() {
            I != getSILModule().zombies_end(); ++I) {
     const SILFunction &F = *I;
     if (! F.isExternallyUsedSymbol())
+      continue;
+
+    // In Embedded Swift, a function without a unique definition (e.g., an
+    // unspecialized generic) is emitted on demand into each module that uses
+    // it, so nothing can refer to this module's symbol for it.
+    if (F.hasNonUniqueDefinition())
       continue;
 
     if (!stub) {
@@ -2489,8 +2536,26 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
+  SILLinkage linkage = entity.getLinkage(isDefinition);
+
+  // getIRLinkage() lowers SILLinkage::Private to the `internal`
+  // linkage, which is invalid (and the LLVM verifier rejects) for a
+  // body-less declaration meant to be resolved by the linker against
+  // a definition in a different .o file. For example, when WMO is
+  // off, a ~Copyable deinit needing another file's private type's
+  // metadata as a generic argument. For those type metadata cases,
+  // use SILLinkage::Hidden instead, which is lowered to `external
+  // hidden` and is valid. Note `external hidden` means visible across
+  // object files but excluded from the final binary's exported
+  // symbols.
+  if (linkage == SILLinkage::Private && linkInfo.isWholeModule() == false &&
+      (entity.isTypeMetadataAddressPoint() ||
+       entity.isTypeMetadataAccessFunction() ||
+       entity.isNominalTypeDescriptor()))
+    linkage = SILLinkage::Hidden;
+
   result.IRL = getIRLinkage(
-      result.Name, linkInfo, entity.getLinkage(isDefinition), isDefinition,
+      result.Name, linkInfo, linkage, isDefinition,
       weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
       entity.privateMeansPrivate());
   result.ForDefinition = isDefinition;
@@ -2656,9 +2721,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return;
 
-  D->visitAuxiliaryDecls([&](Decl *decl) {
-    emitGlobalDecl(decl);
-  });
+  D->visitAuxiliaryDecls([&](Decl *decl) { emitGlobalDecl(decl); },
+                         /*visitFreestanding*/ true, /*visitExtensions*/ true);
 
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -2746,7 +2810,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     // Expansion already visited as auxiliary decls.
     return;
 
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
     return;
 
   case DeclKind::HiddenTypeLayoutInfo:
@@ -2921,7 +2985,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (castStorageToType)
     storageType = cast<ClassTypeInfo>(ti).getClassLayoutType();
 
-  return Address(addr, storageType, Alignment(gvar->getAlignment()));
+  return Address(addr, storageType, Alignment(gvar->getAlign().valueOrOne().value()));
 }
 
 llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
@@ -3575,7 +3639,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     // for the C++ struct that does not zero out trivial fields of a struct.
     auto cxxRecord = ctor->getParent();
     clang::ASTContext &ctx = cxxRecord->getASTContext();
-    auto typeSize = ctx.getTypeSizeInChars(ctx.getRecordType(cxxRecord));
+    auto typeSize = ctx.getTypeSizeInChars(ctx.getCanonicalTagType(cxxRecord));
     subIGF.Builder.CreateMemSet(Args[0],
                                 llvm::ConstantInt::get(subIGF.IGM.Int8Ty, 0),
                                 typeSize.getQuantity(), llvm::MaybeAlign());
@@ -4834,6 +4898,11 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
 
 void IRGenModule::emitAccessibleFunction(StringRef sectionName,
                                          const AccessibleFunction &func) {
+  // In Embedded Distributed swift does not use accessible functions for executing targets,
+  // if we were about to emit a distributed function accessor, that's a bug.
+  assert(!(func.isDistributed() && Context.LangOpts.hasFeature(Feature::Embedded)) &&
+         "should not emit a distributed accessible function record in Embedded Swift");
+
   auto var = new llvm::GlobalVariable(
       Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
@@ -5929,7 +5998,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   llvm::Constant *&entry = cache[entity];
   if (entry) {
     auto existing = cast<llvm::GlobalVariable>(entry);
-    assert(alignment == Alignment(existing->getAlignment()));
+    assert(alignment == Alignment(existing->getAlign().valueOrOne().value()));
     if (forDefinition) updateLinkageForDefinition(IGM, existing, entity);
     return Address(entry, type, alignment);
   }
@@ -5975,9 +6044,17 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     if (!member->isAvailableDuringLowering())
       continue;
 
-    member->visitAuxiliaryDecls([&](Decl *decl) {
-      emitNestedTypeDecls({decl, nullptr});
-    });
+    member->visitAuxiliaryDecls(
+        [&](Decl *decl) {
+          // Nested types can have extension macros, these need to be emitted
+          // as top-level.
+          if (auto *ED = dyn_cast<ExtensionDecl>(decl)) {
+            emitGlobalDecl(ED);
+          } else {
+            emitNestedTypeDecls({decl, nullptr});
+          }
+        },
+        /*visitFreestanding*/ true, /*visitExtensions*/ true);
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -5988,7 +6065,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Param:
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
       llvm_unreachable("decl not allowed in type context");
 
     case DeclKind::BuiltinTuple:
@@ -6422,7 +6499,10 @@ IRGenModule::getAddrOfWitnessTable(const ProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 
-  auto entity = LinkEntity::forProtocolWitnessTable(conf);
+  // Conformances which only differ in type sugar have the same witness table
+  // symbol.
+  auto entity = LinkEntity::forProtocolWitnessTable(
+      const_cast<ProtocolConformance *>(conf)->getCanonicalConformance());
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 

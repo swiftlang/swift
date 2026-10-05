@@ -25,9 +25,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
@@ -50,11 +48,12 @@ NominalTypeDecl *SILWitnessTable::getConformingNominal() const {
 
 void SILWitnessTable::addWitnessTable() {
   if (isSpecialized()) {
+    auto *key = SILModule::getSpecializedWitnessTableKey(Conformance);
     // Make sure we have not seen this witness table yet.
-    assert(Mod.specializedWitnessTableMap.find(Conformance) ==
+    assert(Mod.specializedWitnessTableMap.find(key) ==
            Mod.specializedWitnessTableMap.end() && "Attempting to create duplicate "
            "witness table.");
-    Mod.specializedWitnessTableMap[Conformance] = this;
+    Mod.specializedWitnessTableMap[key] = this;
   } else {
     // Make sure we have not seen this witness table yet.
     assert(Mod.WitnessTableMap.find(cast<RootProtocolConformance>(Conformance)) ==

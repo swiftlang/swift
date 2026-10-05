@@ -25,11 +25,13 @@ protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Co
 
 // CHECK: extension Base where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func base() -> Int {
-// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
-// CHECK:       Distributed._distributedStubFatalError()
-// CHECK:     } else {
-// CHECK:       fatalError()
-// CHECK:     }
+// CHECK:     #if !$Embedded
+// CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+// CHECK-NEXT:       Distributed._distributedStubFatalError()
+// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-EMPTY:
+// CHECK-NEXT:     fatalError()
 // CHECK:   }
 // CHECK: }
 
@@ -49,18 +51,22 @@ protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedA
 
 // CHECK: extension G3 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func get() -> String {
-// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
-// CHECK:       Distributed._distributedStubFatalError()
-// CHECK:     } else {
-// CHECK:       fatalError()
-// CHECK:     }
+// CHECK:     #if !$Embedded
+// CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+// CHECK-NEXT:       Distributed._distributedStubFatalError()
+// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-EMPTY:
+// CHECK-NEXT:     fatalError()
 // CHECK:   }
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
-// CHECK:       Distributed._distributedStubFatalError()
-// CHECK:     } else {
-// CHECK:       fatalError()
-// CHECK:     }
+// CHECK:     #if !$Embedded
+// CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+// CHECK-NEXT:       Distributed._distributedStubFatalError()
+// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-EMPTY:
+// CHECK-NEXT:     fatalError()
 // CHECK:   }
 // CHECK: }
 

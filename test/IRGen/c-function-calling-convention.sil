@@ -1,0 +1,22 @@
+// RUN: %target-swift-frontend -parse-stdlib -use-clang-function-types -target i686-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -enable-experimental-com-interop -com-interop-model=microsoft -target i686-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=X86
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: define{{.*}} x86_stdcallcc i32 @stdcall_function(i32 {{%.*}})
+sil @stdcall_function : $@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32 {
+bb0(%value : $Builtin.Int32):
+  return %value : $Builtin.Int32
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc i32 @call_stdcall_function
+// CHECK: call x86_stdcallcc i32 %{{.*}}(i32 {{%.*}})
+sil @call_stdcall_function : $@convention(thin) (@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%function : $@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, %value : $Builtin.Int32):
+  %result = apply %function(%value) : $@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32
+  return %result : $Builtin.Int32
+}

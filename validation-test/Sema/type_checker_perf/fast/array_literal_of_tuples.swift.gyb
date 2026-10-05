@@ -1,5 +1,5 @@
 // RUN: %scale-test --begin 1 --end 10 --step 1 --select NumConstraintScopes -Xfrontend=-solver-enable-type-var-joins %s
-// RUN: %scale-test --invert --begin 1 --end 10 --step 1 --select NumConstraintScopes %s
+// RUN: %scale-test --invert --begin 1 --end 10 --step 1 --select NumConstraintScopes -Xfrontend=-solver-disable-type-var-joins %s
 
 // This is now fast with type variable joins enabled.
 

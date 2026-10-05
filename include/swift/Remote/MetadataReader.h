@@ -543,8 +543,9 @@ public:
         // without symbolic references.
 
         auto addr = resolved.getResolvedAddress() + sizeof(int32_t);
-        int32_t offset;
-        Reader->readInteger(addr, &offset);
+        int32_t offset = 0;
+        if (!Reader->readInteger(addr, &offset))
+          return nullptr;
         auto addrOfTypeRef = addr + offset;
         resolved = Reader->getSymbol(addrOfTypeRef);
 
@@ -3471,8 +3472,9 @@ private:
       auto it =
           TypeCache.find({getAddress(metadata), skipArtificialSubclasses});
       if (it != TypeCache.end()) {
+        BuiltType cached = it->second;
         TypeCache.erase({getAddress(origMetadata), skipArtificialSubclasses});
-        return it->second;
+        return cached;
       }
     }
 

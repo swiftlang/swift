@@ -7,14 +7,14 @@
 
 // RUN: %target-swift-frontend %t/library.swift                                \
 // RUN:     -enable-library-evolution                                          \
-// RUN:     -disable-availability-checking                                     \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
 // RUN:     -emit-ir -o %t/test.ll -emit-tbd                                   \
 // RUN:     -validate-tbd-against-ir=all                                       \
 // RUN:     -emit-tbd-path %t/library.tbd -I %t -tbd-install_name protocol
 
 // RUN: %target-swift-frontend %t/library.swift                                \
 // RUN:     -enable-library-evolution                                          \
-// RUN:     -disable-availability-checking                                     \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
 // RUN:     -emit-module                                                       \
 // RUN:     -package-name Package                                              \
 // RUN:     -module-name Library                                               \
@@ -22,14 +22,14 @@
 // RUN:     -validate-tbd-against-ir=all                                       \
 // RUN:     -emit-module-interface-path %t/Library.swiftinterface
 
-// RUN: %target-swift-frontend %t/actor.swift -enable-library-evolution     \
-// RUN:     -enable-library-evolution                                       \
-// RUN:     -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd \
+// RUN: %target-swift-frontend %t/actor.swift -enable-library-evolution           \
+// RUN:     -enable-library-evolution                                             \
+// RUN:     -target %target-swift-5.7-abi-triple -emit-ir -o %t/test.ll -emit-tbd \
 // RUN:     -emit-tbd-path %t/actor.tbd -I %t -tbd-install_name actor
 
 // RUN: %target-swift-frontend %t/actor.swift                              \
 // RUN:     -I %t                                                          \
-// RUN:     -disable-availability-checking                                 \
+// RUN:     -target %target-swift-5.7-abi-triple                           \
 // RUN:     -emit-module                                                   \
 // RUN:     -package-name Package                                          \
 // RUN:     -enable-library-evolution                                      \

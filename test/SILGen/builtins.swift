@@ -289,8 +289,7 @@ func obj_to_raw_pointer(_ c: Builtin.NativeObject) -> Builtin.RawPointer {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins22class_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func class_from_raw_pointer(_ p: Builtin.RawPointer) -> C {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $C
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
+  // CHECK: return [[C]]
   return Builtin.bridgeFromRawPointer(p)
 }
 
@@ -301,16 +300,14 @@ func class_archetype_from_raw_pointer<T : C>(_ p: Builtin.RawPointer) -> T {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20obj_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.NativeObject
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
+  // CHECK: return [[C]]
   return Builtin.bridgeFromRawPointer(p)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins28existential_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func existential_from_raw_pointer(_ p: Builtin.RawPointer) -> AnyObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $AnyObject
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
+  // CHECK: return [[C]]
   return Builtin.bridgeFromRawPointer(p)
 }
 
@@ -1139,4 +1136,14 @@ func markDependenceGuaranteed(_ p: AnyObject, _ o: AnyObject) -> AnyObject {
 // CHECK: } // end sil function '$s8builtins20test_dereferenceableyBpBp_BwtF'
 func test_dereferenceable(_ ptr: Builtin.RawPointer, _ size: Builtin.Word) -> Builtin.RawPointer {
   return Builtin.dereferenceable(ptr, size)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins23cowBufferForReadingTestyAA1CCADF : $@convention(thin) (@guaranteed C) -> @owned C {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+// CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[RESULT:%.*]] = builtin "COWBufferForReading"<C>([[COPY]] : $C) : $C
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '$s8builtins23cowBufferForReadingTestyAA1CCADF'
+func cowBufferForReadingTest(_ c: C) -> C {
+  return Builtin.COWBufferForReading(c)
 }

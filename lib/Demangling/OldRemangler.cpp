@@ -21,7 +21,6 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
@@ -1367,6 +1366,11 @@ ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, EntityContext 
   return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
 }
 
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  Buffer << "<yields>";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleNamedAndTypedEntity(node, 'F', "U", ctx,
@@ -1829,7 +1833,13 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
                                                       unsigned depth) {
-  // The old mangler does not encode @called(once).
+  // The old mangler does not encode @called(exactlyOnce).
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplCalledAtMostOnceFunction(Node *node,
+                                                            unsigned depth) {
+  // The old mangler does not encode @called(atMostOnce).
   return ManglingError::Success;
 }
 
@@ -3203,5 +3213,10 @@ ManglingError Remangler::mangleMutateAccessor(Node *node, EntityContext &ctx,
 
 ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
                                                       unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleCalledAtMostOnceFunctionType(Node *node,
+                                                            unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

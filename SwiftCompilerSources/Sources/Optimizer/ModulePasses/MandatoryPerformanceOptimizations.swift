@@ -50,6 +50,16 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // existentials -- are handled in `optimize` when their instructions are
     // visited.
     specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
+
+    // Likewise, IRGen emits the witness tables of `@export(interface)`
+    // conformances eagerly. Their base-protocol and associated conformance
+    // entries point directly to the witness tables of the nested
+    // conformances, which must be specialized if they are generic (e.g. the
+    // `SubSequence: Collection` conformance `Slice<Self>: Collection`).
+    for conformance in moduleContext.conformancesWithEagerlyEmittedWitnessTables {
+      specializeWitnessTable(for: conformance, moduleContext)
+      worklist.addWitnessMethods(of: conformance, moduleContext)
+    }
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
@@ -150,8 +160,12 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
   }
 
   func specializeVTable(for type: Type, instruction: Instruction) {
+    // A class type containing archetypes can appear in the unspecialized code
+    // of a class-bound generic function (e.g. a witness thunk). There is
+    // nothing to specialize the vtable with, so don't.
     if context.options.enableEmbeddedSwift,
-       type.isClass
+       type.isClass,
+       !type.hasArchetype
     {
       Optimizer.specializeVTable(forClassType: type, errorLocation: instruction.location, moduleContext) {
         worklist.pushIfNotVisited($0)
@@ -426,15 +440,16 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return true
   }
 
+  if callee.mayBindDynamicSelf {
+    // We don't support inlining a function that binds dynamic self, e.g. into a
+    // global-init function, because the caller cannot provide the self metadata
+    // for the cloner to rewrite the callee's references to.
+    return false
+  }
+
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true
-  }
-
-  if callee.mayBindDynamicSelf {
-    // We don't support inlining a function that binds dynamic self into a global-init function
-    // because the global-init function cannot provide the self metadata.
-    return false
   }
 
   if apply.parentFunction.isGlobalInitOnceFunction && (
@@ -648,6 +663,11 @@ extension FunctionWorklist {
         if let callee = apply.referencedFunction {
           pushIfNotVisited(callee)
         }
+      case let thinToThick as ThinToThickFunctionInst:
+        // A closure without a context.
+        if let fri = thinToThick.operand.value as? FunctionRefInst {
+          pushIfNotVisited(fri.referencedFunction)
+        }
       case let kpi as KeyPathInst:
         // A key path pattern's accessor thunks are referenced by the pattern
         // rather than by a `function_ref`, so they are invisible to the cases
@@ -706,6 +726,10 @@ extension FunctionWorklist {
                                                      visited: inout Set<Conformance>,
                                                      _ context: ModulePassContext)
   {
+    // If an associated type is an opaque result type the conformance is abstract. The witness
+    // methods of the underlying type's conformance still need to be optimized, because IRGen
+    // looks through the opaque type when it emits the witness table entry.
+    let conformance = conformance.lookingThroughOpaqueTypes(context)
     guard conformance.isConcrete,
           visited.insert(conformance).inserted
     else {
@@ -725,8 +749,8 @@ extension FunctionWorklist {
         break
       case .method(_, let witness):
         if let method = witness,
-           // A new witness table can still contain a generic function if the method couldn't be specialized for
-           // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+           // A witness table can still contain a generic function, even though it's not actually
+           // callable through the witness table.
            !method.isGeneric
         {
           pushIfNotVisited(method)

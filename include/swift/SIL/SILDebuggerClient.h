@@ -18,7 +18,6 @@
 #define SWIFT_SILDEBUGGERCLIENT_H
 
 #include "swift/AST/DebuggerClient.h"
-#include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {

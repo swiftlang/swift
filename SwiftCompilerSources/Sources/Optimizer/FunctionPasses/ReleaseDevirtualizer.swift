@@ -13,6 +13,8 @@
 import AST
 import SIL
 
+// TODO: remove the ReleaseDevirtualizer once the ClassDestroyDevirtualizer runs on OSSA
+
 /// Devirtualizes release instructions which are known to destruct the object.
 ///
 /// This means, it replaces a sequence of

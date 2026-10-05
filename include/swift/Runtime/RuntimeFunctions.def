@@ -615,7 +615,7 @@ FUNCTION(ErrorStrongRelease, Swift, swift_errorRelease,
            RETURNS(UnknownPrefix##RefCountedPtrTy), \
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind, WillReturn), \
-           EFFECT(RuntimeEffect::NoEffect), \
+           EFFECT(RuntimeEffect::RefCounting), \
            UNKNOWN_MEMEFFECTS) \
   /* void *swift_##SymName##Take(Name##Reference *object); */ \
   FUNCTION(Nativeness##Name##TakeStrong, Swift, swift_##SymName##TakeStrong, \
@@ -623,7 +623,7 @@ FUNCTION(ErrorStrongRelease, Swift, swift_errorRelease,
            RETURNS(UnknownPrefix##RefCountedPtrTy), \
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind, WillReturn), \
-           EFFECT(RuntimeEffect::NoEffect), \
+           EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating), \
            UNKNOWN_MEMEFFECTS) \
   /* Name##Reference *swift_##SymName##CopyInit(Name##Reference *dest, Name##Reference *src); */ \
   FUNCTION(Nativeness##Name##CopyInit, Swift, swift_##SymName##CopyInit, \
@@ -1790,6 +1790,14 @@ FUNCTION(GetDynamicType, Swift, swift_getDynamicType, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::MetaData),
          MEMEFFECTS(ReadOnly))
 
+// Metadata *swift_getCOMDynamicType(void *interface, Metadata *staticType);
+FUNCTION(GetCOMDynamicType, Swift, swift_getCOMDynamicType, C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Casting),
+         UNKNOWN_MEMEFFECTS)
+
 // void *swift_dynamicCastClass(void*, void*);
 FUNCTION(DynamicCastClass, Swift, swift_dynamicCastClass, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
@@ -1887,6 +1895,17 @@ FUNCTION(DynamicCast, Swift, swift_dynamicCast, C_CC, AlwaysAvailable,
          RETURNS(Int1Ty),
          ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               SizeTy),
+         ATTRS(ZExt, NoUnwind),
+         EFFECT(RuntimeEffect::Casting),
+         UNKNOWN_MEMEFFECTS)
+
+// bool swift_dynamicCastTest(OpaqueValue *src,
+//                            const Metadata *srcType,
+//                            const Metadata *targetType,
+//                            DynamicCastFlags flags);
+FUNCTION(DynamicCastTest, Swift, swift_dynamicCastTest, C_CC, AlwaysAvailable,
+         RETURNS(Int1Ty),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(ZExt, NoUnwind),
          EFFECT(RuntimeEffect::Casting),
          UNKNOWN_MEMEFFECTS)
@@ -2445,6 +2464,10 @@ FUNCTION(TaskAlloc,
          MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_dealloc(void *ptr);
+//
+// The argument memory has to be part of the memory effects: deallocation
+// invalidates the pointed-to storage, and LLVM will otherwise happily move
+// accesses to it across the call (this is also how LLVM models `free`).
 FUNCTION(TaskDealloc,
          _Concurrency, swift_task_dealloc, SwiftCC,
          ConcurrencyAvailability,
@@ -2452,7 +2475,7 @@ FUNCTION(TaskDealloc,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(InaccessibleMemOnly))
+         MEMEFFECTS(InaccessibleOrArgMemOnly))
 
 // void swift_task_dealloc_through(void *ptr);
 FUNCTION(TaskDeallocThrough,
@@ -2462,7 +2485,7 @@ FUNCTION(TaskDeallocThrough,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(InaccessibleMemOnly))
+         MEMEFFECTS(InaccessibleOrArgMemOnly))
 
 // void swift_task_cancel(AsyncTask *task);
 FUNCTION(TaskCancel,
@@ -2680,6 +2703,18 @@ FUNCTION(DistributedActorInitializeRemote,
          ConcurrencyAvailability, // TODO(distributed): Introduce DistributedAvailability once shipping somewhere
          RETURNS(OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// OpaqueValue* swift_distributedActor_remote_initialize_embedded(
+//    const Metadata *actorType, size_t allocSize, size_t alignMask
+// );
+FUNCTION(DistributedActorInitializeRemoteEmbedded,
+         _Concurrency, swift_distributedActor_remote_initialize_embedded, SwiftCC,
+         EmbeddedDistributedSwiftAvailability,
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
@@ -3337,7 +3372,7 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
 //                                              Metadata *referent);
 FUNCTION(GetBorrowTypeMetadata,
          Swift, swift_getBorrowTypeMetadata,
-         SwiftCC, AlwaysAvailable,
+         SwiftCC, BorrowingAvailability,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
@@ -3348,7 +3383,7 @@ FUNCTION(GetBorrowTypeMetadata,
 //                       OpaqueValue *srcReferent);
 FUNCTION(InitBorrow,
          Swift, swift_initBorrow,
-         C_CC, AlwaysAvailable,
+         C_CC, BorrowingAvailability,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, OpaquePtrTy, OpaquePtrTy),
          ATTRS(NoUnwind),
@@ -3359,7 +3394,7 @@ FUNCTION(InitBorrow,
 //                                            const OpaqueValue *borrow);
 FUNCTION(DereferenceBorrow,
          Swift, swift_dereferenceBorrow,
-         C_CC, AlwaysAvailable,
+         C_CC, BorrowingAvailability,
          RETURNS(OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, OpaquePtrTy),
          ATTRS(NoUnwind, WillReturn),

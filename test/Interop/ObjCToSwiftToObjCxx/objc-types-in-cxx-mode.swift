@@ -20,13 +20,13 @@ public struct HasObjCMethod {
   public func takesObjCKlass(_ o: ObjCKlass) {}
 }
 
-// CHECK:      SWIFT_INLINE_THUNK HasObjCInit HasObjCInit::init(ObjCKlass *_Nonnull o) {
+// CHECK:      SWIFT_INLINE_THUNK HasObjCInit HasObjCInit::init(ObjCKlass *_Nonnull o) noexcept {
 // CHECK:        return {{.*}} {
 // CHECK:        }
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif // defined(__OBJC__)
 
-// CHECK:      SWIFT_INLINE_THUNK void HasObjCMethod::takesObjCKlass(ObjCKlass *_Nonnull o) const {
+// CHECK:      SWIFT_INLINE_THUNK void HasObjCMethod::takesObjCKlass(ObjCKlass *_Nonnull o) const noexcept {
 // CHECK-NEXT:   ObjCInCXX::{{.*}}
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif // defined(__OBJC__)

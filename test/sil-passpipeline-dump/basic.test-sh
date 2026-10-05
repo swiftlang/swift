@@ -10,8 +10,8 @@
 // CHECK: ---
 // CHECK: name:            Serialization
 // CHECK: passes:          [ "serialize-sil", "sil-moved-async-var-dbginfo-propagator",
-// CHECK-NEXT:               "mandatory-temp-rvalue-elimination", "kill-invalid-debug-values",
-// CHECK-NEXT:               "ownership-model-eliminator" ]
+// CHECK-NEXT:               "mandatory-temp-rvalue-elimination", "mandatory-temp-lvalue-elimination",
+// CHECK-NEXT:               "kill-invalid-debug-values", "ownership-model-eliminator" ]
 // CHECK: ---
 // CHECK: name:            Rest of Onone
 // CHECK: passes:          [ "use-prespecialized", "function-stack-protection", "late-onone-simplification",

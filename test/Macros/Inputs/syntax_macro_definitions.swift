@@ -1849,6 +1849,35 @@ public struct ConformanceViaExtensionMacro: ExtensionMacro {
   }
 }
 
+/// Adds an extension that both conforms the type to `MyProtocol` and declares a
+/// nested `Cases` enum conforming to `Hashable`. Mirrors the shape of AppIntents'
+/// `@UnionValue`, which synthesizes a nested `<Enum>Cases` type. Used to test
+/// that the nested type's context descriptor is emitted into the same output
+/// module as its conformance records under multi-threaded WMO (rdar://185645710).
+public struct NestedCasesViaExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): MyProtocol {
+        public enum Cases: Swift.Hashable {
+          case a
+          case b
+        }
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct HashableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -3365,5 +3394,98 @@ public struct MemberAttributeThatAddsPeerMacro: MemberAttributeMacro {
   ) throws -> [AttributeSyntax] {
     guard member.is(FunctionDeclSyntax.self) else { return [] }
     return ["@PeerThatEmitsCode(\(literal: try verbatimCode(node)))"]
+  }
+}
+
+/// Extension macro that declares a nested type with an extension macro
+/// conformance on it.
+public struct NestedConformingExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = """
+      extension \(type.trimmed) {
+        @AddMyProtocol public struct Nested {}
+      }
+      """
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
+// Extension macro conformance on a member macro.
+public struct ConformingMemberStructMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["@AddMyProtocol public struct Generated {}"]
+  }
+}
+
+/// Peer macro with nested type.
+public struct PeerStructMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["""
+      public struct MacroPeer {
+        public struct Nested {}
+      }
+      """]
+  }
+}
+
+// Peer macro with conformance on extension macro.
+public struct ConformingPeerStructMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["@AddMyProtocol public struct ConformingPeer {}"]
+  }
+}
+
+/// Extension macro that itself has a peer.
+public struct PeeredExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = """
+      @AddPeerStruct extension \(type.trimmed) {
+        public func extMember() {}
+      }
+      """
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
+/// Extension macro that has a conformance and regular members.
+public struct ExtensionWithMembersMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = """
+      extension \(type.trimmed): MyProtocol {
+        public func macroAddedFunc() {}
+        public struct MacroAddedNested {}
+      }
+      """
+    return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }

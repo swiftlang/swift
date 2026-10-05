@@ -134,6 +134,7 @@
 
 #define DEBUG_TYPE "address-lowering"
 
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "PhiStorageOptimizer.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Assertions.h"
@@ -162,10 +163,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#include <complex>
 
 using namespace swift;
 using llvm::SmallSetVector;
@@ -937,11 +936,12 @@ void OpaqueValueVisitor::canonicalizeReturnValues() {
       continue;
 
     assert(oldResult->getType().is<TupleType>());
-    if (oldResult->hasOneUse()) {
-      assert(isPseudoReturnValue(oldResult));
+    if (isPseudoReturnValue(oldResult)) {
       continue;
     }
-    // There is another nonconsuming use of the returned tuple.
+    // The returned tuple is not already the canonical pseudo-return value.
+    // Destructure it and rebuild a pseudo-return tuple of the individual
+    // results.
     SILBuilderWithScope returnBuilder(returnInst);
     auto loc = pass.genLoc();
     auto *destructure = returnBuilder.createDestructureTuple(loc, oldResult);
@@ -1171,7 +1171,7 @@ static bool doesNotNeedStackAllocation(SILValue value) {
   // It is, however, valid in OSSA to have uses of an owned value produced by a
   // begin_apply outside of the coroutine range.  So in that case, it is
   // necessary to introduce new storage and move to it.
-  if (isa<LoadBorrowInst>(defInst) ||
+  if (isa<LoadBorrowInst>(defInst) || isa<DereferenceBorrowInst>(defInst) ||
       (isa<BeginApplyInst>(defInst) &&
        value->getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
@@ -3261,8 +3261,8 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
       uncondCheckedCast->getLoc(), uncondCheckedCast->getCheckedCastOptions(),
-      srcAddr, srcAddr->getType().getASTType(),
-      destAddr, destAddr->getType().getASTType());
+      srcAddr, uncondCheckedCast->getSourceFormalType(), destAddr,
+      uncondCheckedCast->getTargetFormalType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
   if (srcAddrOnly) {
@@ -3358,6 +3358,24 @@ void ReturnRewriter::rewriteThrow(ThrowInst *throwInst) {
   pass.deleter.forceDelete(throwInst);
 }
 
+// Find the address that a @guaranteed_address result's returned value was
+// borrowed from. If the value is opaque, it has an entry in the value-storage
+// map recording the address it was rewritten to. Otherwise (e.g. the loadable
+// referent of an @_addressableForDependencies `Builtin.Borrow`, or a trivial
+// referent), it was never entered into that map, so its address is simply the
+// operand it was loaded from.
+static SILValue getGuaranteedAddressResultAddress(SILValue oldResult,
+                                                  AddressLoweringState &pass) {
+  if (pass.valueStorageMap.contains(oldResult)) {
+    ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
+    assert(storage.isRewritten);
+    return storage.storageAddress;
+  }
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(oldResult))
+    return lbi->getOperand();
+  return cast<LoadInst>(oldResult)->getOperand();
+}
+
 void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
@@ -3390,10 +3408,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
                // A @guaranteed_address's lowering directly returns an address.
                if (pass.loweredFnConv.isAddressResult(resultInfo) &&
                    oldResult->getType().isObject()) {
-                 ValueStorage &storage =
-                     pass.valueStorageMap.getStorage(oldResult);
-                 assert(storage.isRewritten);
-                 newDirectResults.push_back(storage.storageAddress);
+                 newDirectResults.push_back(
+                     getGuaranteedAddressResultAddress(oldResult, pass));
                  return;
                }
                newDirectResults.push_back(oldResult);
@@ -3443,11 +3459,10 @@ void ReturnRewriter::rewriteReturnBorrow(ReturnBorrowInst *returnBorrowInst) {
   assert(pass.loweredFnConv.hasGuaranteedAddressResult() &&
          "return_borrow requires a @guaranteed_address result");
   SILValue oldResult = returnBorrowInst->getReturnValue();
-  ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
-  assert(storage.isRewritten);
+  SILValue resultAddr = getGuaranteedAddressResultAddress(oldResult, pass);
 
   auto returnBuilder = pass.getBuilder(returnBorrowInst->getIterator());
-  returnBuilder.createReturn(returnBorrowInst->getLoc(), storage.storageAddress);
+  returnBuilder.createReturn(returnBorrowInst->getLoc(), resultAddr);
   pass.deleter.forceDelete(returnBorrowInst);
 }
 
@@ -3699,6 +3714,14 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    // Polymorphic builtins (e.g. "generic_add") only ever borrow their
+    // operands (see the InstantaneousUse classification in
+    // OperandOwnershipBuiltinClassifier), so every operand is handled the
+    // same way: materialize its address in place.
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+    case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
@@ -3745,6 +3768,13 @@ protected:
     SILValue address = pass.valueStorageMap.getStorage(value).storageAddress;
     builder.createFixLifetime(fli->getLoc(), address);
     pass.deleter.forceDelete(fli);
+  }
+
+  void visitMakeBorrowInst(MakeBorrowInst *mbi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    auto* makeAddrBorrow = builder.createMakeAddrBorrow(mbi->getLoc(), addr);
+    mbi->replaceAllUsesWith(makeAddrBorrow);
+    pass.deleter.forceDelete(mbi);
   }
 
   void visitMarkDependenceInst(MarkDependenceInst *mdi) {
@@ -4232,7 +4262,6 @@ emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
 
 // Extract from an opaque struct or tuple.
 void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
-  auto source = extractInst->getOperand(0);
   AddressMaterialization addrMat(pass, extractInst, builder);
   SILValue extractAddr = addrMat.materializeDefProjection(extractInst);
 
@@ -4264,7 +4293,8 @@ void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
   SILValue loadElement =
       builder.emitLoadBorrowOperation(extractInst->getLoc(), extractAddr);
   replaceUsesWithLoad(extractInst, loadElement);
-  emitEndBorrowsAtEnclosingGuaranteedBoundary(loadElement, source, pass);
+  // End the borrow at the load_borrow's liveness boundary.
+  emitEndBorrows(loadElement, pass);
 }
 
 void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
@@ -4499,10 +4529,45 @@ protected:
       storage.markRewritten();
       break;
     }
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+    case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
+    {
+      // Rewrite the value-form (with already address-converted operands,
+      // see UseRewriter::visitBuiltinInst above):
+      //   %result = builtin "generic_add"<T>(%0 : $*T, %1 : $*T) : $T
+      // into the address-form that non-opaque-values SILGen already emits:
+      //   builtin "generic_add"<T>(%dest : $*T, %0 : $*T, %1 : $*T) : $()
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      SmallVector<SILValue, 4> newArgs;
+      newArgs.push_back(destAddr);
+      for (SILValue arg : bi->getArguments()) {
+        // A polymorphic builtin is typed <T> (T, T) -> T, so an opaque result
+        // means opaque operands, which the UseRewriter has already given
+        // addresses. However, nothing enforces that on parsed SIL, and mixing
+        // a value operand into the address form below would go unnoticed.
+        assert(arg->getType().isAddress() &&
+               "polymorphic builtin operand should already be rewritten");
+        newArgs.push_back(arg);
+      }
+      auto &astCtx = pass.getModule()->getASTContext();
+      builder.createBuiltin(bi->getLoc(), bi->getName(),
+                            SILType::getEmptyTupleType(astCtx),
+                            bi->getSubstitutions(), newArgs);
+      storage.markRewritten();
+      break;
+    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
     }
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *dbi) {
+    auto *addr = builder.createDereferenceAddrBorrow(dbi->getLoc(), dbi->getOperand());
+    pass.valueStorageMap.setStorageAddress(dbi, addr);
   }
 
   // Rewrite the apply for an indirect result.
@@ -4870,22 +4935,17 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
   pass.deleter.cleanupDeadInstructions();
 }
 
-//===----------------------------------------------------------------------===//
-//                     AddressLowering: Function Pass
-//===----------------------------------------------------------------------===//
-
-namespace {
-class AddressLowering : public SILFunctionTransform {
-  /// The entry point to this function transformation.
-  void run() override;
-
-  void runOnFunction(SILFunction *F);
-};
-} // end anonymous namespace
-
-void AddressLowering::runOnFunction(SILFunction *function) {
-  if (!function->isDefinition())
+void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
+  // Skip functions already in lowered-address form: default (non-opaque-values)
+  // mode, a function this pass already lowered (pipeline restarts can re-run a
+  // function pass), or one deserialized as canonical.
+  if (function->hasLoweredAddresses())
     return;
+
+  if (!function->isDefinition()) {
+    function->setHasLoweredAddresses(true);
+    return;
+  }
 
   assert(function->hasOwnership() && "SIL opaque values requires OSSA");
 
@@ -4897,8 +4957,8 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   // Ensure that blocks can be processed in RPO order.
   removeUnreachableBlocks(*function);
 
-  auto *dominance = PM->getAnalysis<DominanceAnalysis>();
-  auto *SLA = PM->getAnalysis<SILLoopAnalysis>();
+  auto *dominance = pm->getAnalysis<DominanceAnalysis>();
+  auto *SLA = pm->getAnalysis<SILLoopAnalysis>();
 
   AddressLoweringState pass(function, dominance->get(function), SLA);
 
@@ -4938,23 +4998,27 @@ void AddressLowering::runOnFunction(SILFunction *function) {
 
   // The CFG may change because of criticalEdge splitting during
   // createStackAllocation or StackNesting.
-  invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-}
-
-/// The entry point to this function transformation.
-void AddressLowering::run() {
-  // Skip functions already in lowered-address form: default (non-opaque-values)
-  // mode, a function this pass already lowered (pipeline restarts can re-run a
-  // function pass), or one deserialized as canonical.
-  if (getFunction()->hasLoweredAddresses())
-    return;
-
-  runOnFunction(getFunction());
+  pm->invalidateAnalysis(
+      function, SILAnalysis::InvalidationKind::BranchesAndInstructions);
 
   // Mark the function lowered now, so its conventions and verification see
   // address form immediately (the module stage only reaches Canonical after all
   // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
-  getFunction()->setHasLoweredAddresses(true);
+  function->setHasLoweredAddresses(true);
 }
+
+//===----------------------------------------------------------------------===//
+//                     AddressLowering: Function Pass
+//===----------------------------------------------------------------------===//
+
+namespace {
+class AddressLowering : public SILFunctionTransform {
+  /// The entry point to this function transformation.
+  void run() override;
+};
+} // end anonymous namespace
+
+/// The entry point to this function transformation.
+void AddressLowering::run() { lowerAddress(PM, getFunction()); }
 
 SILTransform *swift::createAddressLowering() { return new AddressLowering(); }

@@ -16,16 +16,12 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/CommandLine.h"
@@ -50,18 +46,23 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
 }
 
 SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
-  while (true) {
-    switch (value->getKind()) {
-    default:
-      return value;
-    case ValueKind::MoveValueInst:
-    case ValueKind::CopyValueInst:
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::MarkUnresolvedNonCopyableValueInst:
-    case ValueKind::CopyableToMoveOnlyWrapperValueInst:
-      value = cast<SingleValueInstruction>(value)->getOperand(0);
-    }
+  auto *bbi = dyn_cast<BeginBorrowInst>(value);
+  if (!bbi) {
+    return value;
   }
+  auto *muncvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
+  if (!muncvi) {
+    return value;
+  }
+  auto *cvi = dyn_cast<CopyValueInst>(muncvi->getOperand());
+  if (!cvi) {
+    return value;
+  }
+  auto result = cvi->getOperand();
+  if (auto *cmwi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(result)) {
+    return cmwi->getOperand();
+  }
+  return result;
 }
 
 bool swift::visitNonOwnershipUses(SILValue value,
@@ -520,6 +521,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
@@ -611,6 +613,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExtendLifetimeInst:
+  case SILInstructionKind::DiagnoseInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::CondFailInst:
@@ -772,6 +775,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
   }
 
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Existential;
+  }
+
   case SILInstructionKind::UnconditionalCheckedCastInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
@@ -911,7 +919,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = opType;
     switch (opType.getPreferredExistentialRepresentation()) {
     case ExistentialRepresentation::COM:
-      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+      return RuntimeEffect::Casting | RuntimeEffect::Releasing;
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::Boxed:
     case ExistentialRepresentation::Opaque:
@@ -1046,6 +1054,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:

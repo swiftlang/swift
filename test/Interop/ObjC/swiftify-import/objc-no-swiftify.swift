@@ -6,7 +6,7 @@
 
 import NoSwiftifyClang
 
-// CHECK-NOT: @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NOT: @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 
 public func callAutoreleaseParam(_ p: UnsafeMutableBufferPointer<SomeClass>) {
     // expected-error@+2{{missing argument for parameter #2 in call}}

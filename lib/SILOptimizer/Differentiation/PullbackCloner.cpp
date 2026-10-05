@@ -39,8 +39,8 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1102,8 +1102,11 @@ public:
         continue;
 
       adjArgs.push_back(origArg);
-      afterTryApplyPbBB->createPhiArgument(origArg->getType(),
-                                           OwnershipKind::Owned);
+      auto bbArg = afterTryApplyPbBB->createPhiArgument(
+          getRemappedTangentType(origArg->getType()), OwnershipKind::Owned);
+
+      activeValuePullbackBBArgumentMap[{originalBB, origArg}] = bbArg;
+      recordTemporary(bbArg);
     }
 
     {
@@ -1112,7 +1115,10 @@ public:
       SmallVector<SILValue> outAdjArgs;
       for (auto arg : adjArgs) {
         auto argAdj = getAdjointValue(originalBB, arg);
-        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
+        auto adjVal = materializeAdjointDirect(argAdj, loc);
+        auto adjValCopy = builder.emitCopyValueOperation(loc, adjVal);
+
+        outAdjArgs.push_back(adjValCopy);
       }
 
       cleanUpTemporariesForBlock(errorPbBB, loc);
@@ -1126,7 +1132,9 @@ public:
       SmallVector<SILValue> outAdjArgs;
       for (auto arg : adjArgs) {
         auto argAdj = getAdjointValue(originalBB, arg);
-        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
+        auto adjVal = materializeAdjointDirect(argAdj, loc);
+        auto adjValCopy = builder.emitCopyValueOperation(loc, adjVal);
+        outAdjArgs.push_back(adjValCopy);
       }
 
       cleanUpTemporariesForBlock(normalPbBB, loc);
@@ -2857,6 +2865,7 @@ bool PullbackCloner::Implementation::run() {
     auto *pm = &getContext().getPassManager();
     pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&pullback);
     completeAllLifetimes(pm, &pullback);
+    lowerAddress(pm, &pullback);
     pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 

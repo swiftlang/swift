@@ -147,10 +147,10 @@ extension ASTGenDiagnostic {
     )
   }
 
-  static func invalidDefaultSpecifier(_ specifier: some SyntaxProtocol) -> Self {
+  static func invalidFileDefaultSpecifier(_ specifier: some SyntaxProtocol) -> Self {
     Self(
       node: specifier,
-      message: "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'"
+      message: "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'"
     )
   }
 }
@@ -169,6 +169,13 @@ extension ASTGenDiagnostic {
     Self(
       node: extra,
       message: "unexpected arguments in '\(attribute.attributeName.trimmedDescription)' attribute"
+    )
+  }
+
+  static func invalidArgumentInAttribute(_ attribute: AttributeSyntax, _ argument: some SyntaxProtocol) -> Self {
+    Self(
+      node: argument,
+      message: "invalid argument in '\(attribute.attributeName.trimmedDescription)' attribute"
     )
   }
 

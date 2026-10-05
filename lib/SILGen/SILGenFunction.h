@@ -23,13 +23,11 @@
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/NoDiscard.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
@@ -1074,9 +1072,12 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param field The stored property that has to be initialized.
   /// \param substitutions The substitutions to apply to initializer and setter.
-  void emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
-                             PatternBindingDecl *field,
-                             SubstitutionMap substitutions);
+  /// \param initAccessorSubsumedStorage Stored properties set up through an init
+  /// accessor on another property; their own initializer is skipped.
+  void emitMemberInitializer(
+      DeclContext *dc, VarDecl *selfDecl, PatternBindingDecl *field,
+      SubstitutionMap substitutions,
+      const llvm::SmallPtrSetImpl<VarDecl *> &initAccessorSubsumedStorage);
 
   void emitMemberInitializationViaInitAccessor(DeclContext *dc,
                                                VarDecl *selfDecl,
@@ -2324,8 +2325,9 @@ public:
                        SILValue selfValue,
                        SILDeclRef methodConstant,
                        SubstitutionMap subMap);
-  
-  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
+
+  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                               CanType resultType = CanType());
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
@@ -3424,6 +3426,10 @@ public:
   /// marker for lifetime resolution so that it can reason about the formal
   /// scopes of variables.
   void enterLetBindingFormalScopeCleanup(VarDecl *vd);
+
+  /// Are we using the SILMoveOnlyWrappedType to check bindings that are
+  /// @noImplicitCopy?
+  bool usingWrapperTypeImplicitCopyEnforcement();
 };
 
 

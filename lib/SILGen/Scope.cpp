@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "Scope.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;

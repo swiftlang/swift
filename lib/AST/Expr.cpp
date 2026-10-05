@@ -24,7 +24,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
@@ -34,7 +33,6 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -1629,6 +1627,9 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
                             skipFunctionConversions);
   }
 
+  if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return getCalledValue(DSBI->getRHS(), skipFunctionConversions);
+
   Expr *E2 = E->getValueProvidingExpr();
 
   if (auto *L = dyn_cast<LoadExpr>(E2))
@@ -2111,8 +2112,8 @@ bool AbstractClosureExpr::isBodyAsync() const {
   return getOrComputeExtInfo(this).isAsync();
 }
 
-bool AbstractClosureExpr::isCalledOnce() const {
-  return getOrComputeExtInfo(this).isCalledOnce();
+bool AbstractClosureExpr::hasCalledAtMostOnceSemantics() const {
+  return getOrComputeExtInfo(this).hasCalledAtMostOnceSemantics();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {

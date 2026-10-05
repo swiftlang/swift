@@ -23,9 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 
 #define DEBUG_TYPE "Protocol conformance checking"

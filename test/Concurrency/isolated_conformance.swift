@@ -342,6 +342,85 @@ class WrappedWitness: Distinguishable {
   @Wrapped var id: String = "wrapped" // expected-note{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
 }
 
+protocol HasStaticValue {
+  associatedtype Value
+  static var value: Value { get }
+}
+
+// expected-warning@+4:33{{conformance of 'StaticSendableLetWitness' to protocol 'HasStaticValue' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:33{{isolate this conformance to the main actor with '@MainActor'}}{{33-33=@MainActor }}
+// expected-note@+2:33{{turn data races into runtime errors with '@preconcurrency'}}{{33-33=@preconcurrency }}
+@MainActor
+class StaticSendableLetWitness: HasStaticValue {
+  static let value = 0 // expected-note@:14{{main actor-isolated static property 'value' cannot satisfy nonisolated requirement}}
+  // expected-note@-1:14{{mark static property 'value' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
+class NonSendableValue {}
+
+// 'nonisolated' can't be applied to a non-Sendable 'let', so don't suggest it.
+// expected-warning@+4:36{{conformance of 'StaticNonSendableLetWitness' to protocol 'HasStaticValue' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:36{{isolate this conformance to the main actor with '@MainActor'}}{{36-36=@MainActor }}
+// expected-note@+2:36{{turn data races into runtime errors with '@preconcurrency'}}{{36-36=@preconcurrency }}
+@MainActor
+class StaticNonSendableLetWitness: HasStaticValue {
+  static let value = NonSendableValue() // expected-note@:14{{main actor-isolated static property 'value' cannot satisfy nonisolated requirement}}
+}
+
+// A fix-it would also apply to 'other', so don't suggest one.
+// expected-warning@+4:32{{conformance of 'SharedBindingLetWitness' to protocol 'HasStaticValue' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:32{{isolate this conformance to the main actor with '@MainActor'}}{{32-32=@MainActor }}
+// expected-note@+2:32{{turn data races into runtime errors with '@preconcurrency'}}{{32-32=@preconcurrency }}
+@MainActor
+class SharedBindingLetWitness: HasStaticValue {
+  static let value = 0, other = 1 // expected-note@:14{{main actor-isolated static property 'value' cannot satisfy nonisolated requirement}}
+}
+
+// expected-warning@+4:32{{conformance of 'SharedBindingVarWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:32{{isolate this conformance to the main actor with '@MainActor'}}{{32-32=@MainActor }}
+// expected-note@+2:32{{turn data races into runtime errors with '@preconcurrency'}}{{32-32=@preconcurrency }}
+@MainActor
+class SharedBindingVarWitness: Distinguishable {
+  var id = "", other = 0 // expected-note@:7{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
+}
+
+protocol HasBackingStorage {
+  var _value: Wrapped<Int> { get }
+}
+
+// expected-warning@+4:38{{conformance of 'BackingStorageImplicitWitness' to protocol 'HasBackingStorage' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:38{{isolate this conformance to the main actor with '@MainActor'}}{{38-38=@MainActor }}
+// expected-note@+2:38{{turn data races into runtime errors with '@preconcurrency'}}{{38-38=@preconcurrency }}
+@MainActor
+class BackingStorageImplicitWitness: HasBackingStorage {
+  @Wrapped var value = 0
+  // expected-note@-1:16{{main actor-isolated property '_value' cannot satisfy nonisolated requirement}}
+  // expected-error@-2:16{{property '_value' must be declared internal because it matches a requirement in internal protocol 'HasBackingStorage'}}
+  // expected-note@-3:16{{mark the property as 'internal' to satisfy the requirement}}
+}
+
+// 'nonisolated' can't be applied to a 'lazy' property, so don't suggest it.
+// expected-warning@+4:20{{conformance of 'LazyWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:20{{isolate this conformance to the main actor with '@MainActor'}}{{20-20=@MainActor }}
+// expected-note@+2:20{{turn data races into runtime errors with '@preconcurrency'}}{{20-20=@preconcurrency }}
+@MainActor
+class LazyWitness: Distinguishable {
+  lazy var id = "" // expected-note@:12{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
+}
+
+@MainActor
+class ObservedBase {
+  var id = ""
+}
+
+// https://github.com/swiftlang/swift/issues/92716
+// expected-warning@+3:53{{conformance of 'ObservingOverrideWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+2:53{{isolate this conformance to the main actor with '@MainActor'}}{{53-53=@MainActor }}
+// expected-note@+1:53{{turn data races into runtime errors with '@preconcurrency'}}{{53-53=@preconcurrency }}
+final class ObservingOverrideWitness: ObservedBase, Distinguishable {
+  override var id: String { didSet {} } // expected-note@:16{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
+}
+
 // expected-warning@+4{{conformance of 'ComputedGetSetWitness' to protocol 'HasMutableVar' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}

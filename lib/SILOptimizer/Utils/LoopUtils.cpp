@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-utils"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -21,7 +20,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/StackAllocation.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
@@ -287,9 +285,9 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
   // We can't have a phi of two open existential instructions from different
   // environments.
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
-      isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I) ||
-      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
-      isa<OpenPackElementInst>(I)) {
+      isa<OpenCOMExistentialInst>(I) || isa<OpenExistentialMetatypeInst>(I) ||
+      isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
+      isa<OpenExistentialBoxValueInst>(I) || isa<OpenPackElementInst>(I)) {
     SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
     for (auto *UI : OI->getUses())
       if (!L->contains(UI->getUser()))

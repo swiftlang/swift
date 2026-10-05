@@ -17,6 +17,9 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 
@@ -524,6 +527,68 @@ AvailabilityContext::restrictionForDeclInDomain(
   }
 
   return std::nullopt;
+}
+
+bool AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(const Decl *, const ProtocolDecl *,
+                            AvailabilityRestriction)>
+        callback,
+    AvailabilityRestrictionFlags flags) {
+  if (conformance.isInvalid() || conformance.isAbstract())
+    return false;
+
+  if (conformance.isPack()) {
+    for (auto patternConf : conformance.getPack()->getPatternConformances()) {
+      if (enumerateUnsatisfiedRestrictionsForConformance(patternConf, callback,
+                                                         flags))
+        return true;
+    }
+    return false;
+  }
+
+  const ProtocolConformance *concreteConf = conformance.getConcrete();
+  const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+
+  // Conformance to Copyable and Escapable doesn't have availability that is
+  // independent of the type.
+  if (rootConf->getProtocol()->getInvertibleProtocolKind())
+    return false;
+
+  // Conformance declarations can be more available than the protocols they
+  // involve due to source compatibility exceptions. Thus, it is important to
+  // check both the availability of the protocol and of the conformance
+  // declaration.
+  auto *proto = conformance.getProtocol();
+  if (auto restriction = unsatisfiedRestrictionForDecl(proto, flags)) {
+    if (callback(proto, proto, *restriction))
+      return true;
+  }
+
+  auto *conformanceDecl = rootConf->getDeclContext()->getAsDecl();
+  if (auto restriction =
+          unsatisfiedRestrictionForDecl(conformanceDecl, flags)) {
+    if (callback(conformanceDecl, proto, *restriction))
+      return true;
+  }
+
+  // Now, check associated conformances.
+  for (auto assocConf : concreteConf->getSubstitutionMap().getConformances()) {
+    if (enumerateUnsatisfiedRestrictionsForConformance(assocConf, callback,
+                                                       flags))
+      return true;
+  }
+
+  return false;
+}
+
+bool AvailabilityContext::hasUnsatisfiedRestrictionsForConformance(
+    ProtocolConformanceRef conformance, AvailabilityRestrictionFlags flags) {
+  return enumerateUnsatisfiedRestrictionsForConformance(
+      conformance,
+      [](const Decl *decl, const ProtocolDecl *proto,
+         AvailabilityRestriction restriction) { return true; },
+      flags);
 }
 
 static bool restrictionIsStronger(const AvailabilityRestriction &lhs,

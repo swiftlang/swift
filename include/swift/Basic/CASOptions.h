@@ -60,13 +60,19 @@ public:
   /// Has immutable file system input.
   bool HasImmutableFileSystem = false;
 
+  /// Read the input files from disk and overlay them on top of the CAS file
+  /// system, instead of expecting the CAS to provide them. This makes the
+  /// input files editable, and is incompatible with caching since their
+  /// content no longer contributes to the cache key.
+  bool CASFSInputOverlay = false;
+
   /// Get the CAS configuration flags.
   void enumerateCASConfigurationFlags(
       llvm::function_ref<void(llvm::StringRef)> Callback) const;
 
   /// Check to see if a CASFileSystem is required.
   bool requireCASFS() const {
-    return EnableCaching &&
+    return (EnableCaching || CASFSInputOverlay) &&
            (!ClangIncludeTree.empty() || !ClangIncludeTreeFileList.empty() ||
             !InputFileKey.empty() || !BridgingHeaderPCHCacheKey.empty());
   }

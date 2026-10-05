@@ -38,6 +38,7 @@ class ActorIsolation;
 enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
+enum class SILStage;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
@@ -367,6 +368,22 @@ private:
   /// block indices.
   unsigned BlockListChangeIdx = 0;
 
+  /// An upper bound (exclusive) on the block numbers currently handed out via
+  /// SILBasicBlock::getNumber(). This is reset to size() by renumberBlocks()
+  /// and bumped by assignFreshBlockNumber() so that blocks created after a
+  /// renumbering (e.g. by critical-edge splitting) can be numbered uniquely
+  /// without invalidating an already-computed dominator tree or loop info.
+  unsigned NextBlockNumber = 0;
+
+  /// The block-numbering epoch (see getBlockNumberEpoch()). Bumped only when
+  /// existing block numbers are reassigned by renumberBlocks(). Assigning a
+  /// fresh number to a brand-new block does not change it, so generic graph
+  /// algorithms indexed by block number (dominator trees, loop info) stay valid
+  /// across block insertions. This is distinct from BlockListChangeIdx, which
+  /// tracks BasicBlockData validity and changes when the Data-vector indices
+  /// are reassigned.
+  unsigned BlockNumberEpoch = 0;
+
   /// The isolation of this function.
   ActorIsolation actorIsolation;
 
@@ -497,6 +514,13 @@ private:
   /// Set when this function's arguments and instructions have been lowered to
   /// address form by the AddressLowering function pass.
   unsigned HasLoweredAddresses : 1;
+  
+  /// Set when this function gives trivial values explicit ownership.
+  unsigned HasOwnershipForTrivialValues : 1;
+
+  /// This function's pipeline stage. Seeded at creation to the module's stage
+  /// floor, so it is never below the floor. It may be ahead of the floor.
+  unsigned FunctionStage : 2;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -783,6 +807,25 @@ public:
   bool hasLoweredAddresses() const;
 
   void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
+  
+  bool hasOwnershipForTrivialValues() const {
+    return HasOwnershipForTrivialValues; 
+  }
+  void setOwnershipForTrivialValues(bool val = true) {
+    HasOwnershipForTrivialValues = val; 
+  }
+
+  /// This function's SIL stage. Read this for a per-function legality query,
+  /// such as whether an instruction is still legal here. It is never below the
+  /// module's stage floor, and may be ahead of it.
+  SILStage getFunctionStage() const;
+
+  /// Advance this function's stage. A stage only ever moves forward.
+  void setFunctionStage(SILStage stage);
+
+  /// Take the facts a whole-function clone inherits from the function it was
+  /// derived from: the address-lowering form and the SIL stage.
+  void inheritDerivedFrom(const SILFunction *from);
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
@@ -1311,6 +1354,13 @@ public:
   }
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
+
+  /// True if the side effects of this function have been computed by the
+  /// ComputeSideEffects pass (as opposed to only having defined effects, like
+  /// escape effects, which can be copied from a generic function when
+  /// specializing it).
+  bool hasComputedSideEffects() const;
+
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
   MemoryBehavior getMemoryBehavior(bool observeRetains);
 
@@ -1585,6 +1635,52 @@ public:
   const_iterator begin() const { return BlockList.begin(); }
   const_iterator end() const { return BlockList.end(); }
   unsigned size() const { return BlockList.size(); }
+
+  /// Compacts block numbers so that every block is numbered in the range
+  /// [0, size()), matching the block's position in the block list. This is the
+  /// numbering exposed via SILBasicBlock::getNumber() and consumed by generic
+  /// graph algorithms such as llvm::LoopInfoBase.
+  ///
+  /// Blocks are numbered automatically when added to a function, so this is
+  /// only needed to compact the numbering (e.g. to bound the size of a vector
+  /// indexed by block number). It bumps the numbering epoch (see
+  /// getBlockNumberEpoch()) if any number actually changed, which invalidates
+  /// any dominator tree / loop info computed against the old numbering.
+  void renumberBlocks() {
+    bool numbersChanged = false;
+    unsigned idx = 0;
+    for (SILBasicBlock &block : *this) {
+      if (block.blockNumber != (int)idx) {
+        numbersChanged = true;
+        block.blockNumber = idx;
+      }
+      ++idx;
+    }
+    NextBlockNumber = idx;
+    if (numbersChanged)
+      ++BlockNumberEpoch;
+  }
+
+  /// Assigns \p block a fresh, unique block number without renumbering the
+  /// other blocks or bumping the numbering epoch (see getBlockNumberEpoch()).
+  ///
+  /// This is called automatically when a block is added to a function, so that
+  /// SILBasicBlock::getNumber() is always valid and generic graph algorithms
+  /// that are updated incrementally (e.g. a dominator tree during
+  /// critical-edge splitting) can incorporate the new block without a full
+  /// renumbering, which would invalidate them.
+  void assignFreshBlockNumber(SILBasicBlock &block) {
+    block.blockNumber = NextBlockNumber++;
+  }
+
+  /// Returns an upper bound (exclusive) on the numbers returned by
+  /// SILBasicBlock::getNumber(), suitable for sizing a vector indexed by block
+  /// number.
+  unsigned getMaxBlockNumber() const { return NextBlockNumber; }
+
+  /// Returns the current block-numbering epoch. This changes whenever block
+  /// numbers are reassigned, allowing consumers to detect stale numbers.
+  unsigned getBlockNumberEpoch() const { return BlockNumberEpoch; }
 
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }

@@ -1,0 +1,163 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/native.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=NATIVE
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/class-member.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CLASS-MEMBER
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/convention.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CONVENTION
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/context.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CONTEXT
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/not-function.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=NOT-FUNCTION
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/unrelated-interface.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=UNRELATED-INTERFACE
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/existential.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=EXISTENTIAL
+
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/extension.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=EXTENSION
+
+// REQUIRES: asserts
+
+// NATIVE: com_method must reference a COM interface requirement
+
+//--- native.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: Native> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #Native.method, $@convention(com_method) (@in_guaranteed T) -> Int32
+  unreachable
+}
+
+// CLASS-MEMBER: com_method must reference a COM interface requirement
+
+//--- class-member.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: IInterface> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #Concrete.method, $@convention(com_method) (@in_guaranteed T) -> Int32
+  unreachable
+}
+
+// CONVENTION: wrong function type representation
+
+//--- convention.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: IInterface> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #IInterface.method, $@convention(thin) (@in_guaranteed T) -> Int32
+  unreachable
+}
+
+// CONTEXT: result method must be of a context-free function type
+
+//--- context.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: IInterface> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #IInterface.method, $@callee_guaranteed (@in_guaranteed T) -> Int32
+  unreachable
+}
+
+// NOT-FUNCTION: result of com_method
+
+//--- not-function.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: IInterface> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #IInterface.method, $Builtin.Int32
+  unreachable
+}
+
+// UNRELATED-INTERFACE: com_method operand must be an archetype constrained to the declaring COM interface
+
+//--- unrelated-interface.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: IOther> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #IInterface.method, $@convention(com_method) (@in_guaranteed T) -> Int32
+  unreachable
+}
+
+// EXISTENTIAL: com_method operand must be an archetype constrained to the declaring COM interface
+
+//--- existential.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface { func method() -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+protocol Native { func method() -> Int32 }
+class Concrete { func method() -> Int32 }
+
+sil @invalid : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : $IInterface):
+  %method = com_method %value : $IInterface, #IInterface.method, $@convention(com_method) (@guaranteed IInterface) -> Int32
+  unreachable
+}
+
+// EXTENSION: com_method must reference a COM interface requirement
+
+//--- extension.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+extension IInterface { func helper() -> Int32 }
+
+sil @invalid : $@convention(thin) <T: IInterface> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %method = com_method %value : $*T, #IInterface.helper, $@convention(com_method) (@in_guaranteed T) -> Int32
+  unreachable
+}

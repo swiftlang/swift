@@ -50,7 +50,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -2097,9 +2096,8 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
   // common, because most of the recursion involves the requirements
   // of the generic type.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    type = FunctionType::get(genericFn->getParams(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
+    type = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
   }
 
   if (!witness->getDeclContext()->getExtendedProtocolDecl()) {
@@ -2283,8 +2281,8 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
       return funcType->isNoEscape();
     case TypeAdjustment::NonsendableToSendable:
       return !funcType->isSendable();
-    case TypeAdjustment::CalledOnceToPlain:
-      return funcType->isCalledOnce();
+    case TypeAdjustment::ExecutionSemanticsToPlain:
+      return funcType->hasCalledAtMostOnceSemantics();
     }
   };
   auto adjust = [=](const ASTExtInfo &info) -> ASTExtInfo {
@@ -2293,8 +2291,8 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
       return info.withNoEscape(false);
     case TypeAdjustment::NonsendableToSendable:
       return info.withSendable(true);
-    case TypeAdjustment::CalledOnceToPlain:
-      return info.withCalledOnce(false);
+    case TypeAdjustment::ExecutionSemanticsToPlain:
+      return info.withExecutionSemantics(std::nullopt);
     }
   };
 
@@ -2302,7 +2300,8 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
   if (auto funcType = type->getAs<FunctionType>()) {
     performed = needsAdjustment(funcType);
     if (performed)
-      return FunctionType::get(funcType->getParams(), funcType->getResult(),
+      return FunctionType::get(funcType->getParams(), funcType->getYields(),
+                               funcType->getResult(),
                                adjust(funcType->getExtInfo()));
   }
   return type;
@@ -2458,10 +2457,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       Type inferredType =
         adjustInferredAssociatedType(TypeAdjustment::NoescapeToEscaping,
                                      secondType, noescapeToEscaping);
-      bool calledOnceToPlain = false;
-      inferredType =
-        adjustInferredAssociatedType(TypeAdjustment::CalledOnceToPlain,
-                                     inferredType, calledOnceToPlain);
+      bool executionSemanticsToPlain = false;
+      inferredType = adjustInferredAssociatedType(
+          TypeAdjustment::ExecutionSemanticsToPlain, inferredType,
+          executionSemanticsToPlain);
       if (!inferredType->isMaterializable())
         return false;
 

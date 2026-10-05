@@ -34,7 +34,9 @@ std::optional<SILValue> emitDistributedActorSystemWitnessCall(
   auto &M = B.getModule();
   auto &C = F.getASTContext();
 
-  // Dig out the conformance to DistributedActorSystem.
+  // Dig out the conformance to DistributedActorSystem. There is a single
+  // protocol family; the embedded shape is selected by `Feature::Embedded`,
+  // and its `remoteCall` etc. are ordinary requirements on the same protocol.
   ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
   assert(DAS);
   auto systemASTType = base->getType().getASTType();
@@ -64,27 +66,28 @@ std::optional<SILValue> emitDistributedActorSystemWitnessCall(
       loc, systemASTType, systemConfRef, methodRef, methodSILTy);
 
   // prepare conformance substitutions
+  //
+  // Build only the replacement types (Self := the actor system, and, for the
+  // requirements that have it, Act := the concrete actor type) and let the
+  // signature's own conformance requirements decide which conformances are
+  // needed. We must NOT hand-assemble a fixed conformance array here: the
+  // embedded `DistributedActorSystem` requirements are constrained with
+  // `Act.ActorSystem == Self`, from which the requirement machine derives (and
+  // therefore drops as redundant) the `Self: DistributedActorSystem`
+  // conformance, so the minimized signature has one fewer conformance
+  // requirement than the non-embedded `Act.ID == ActorID` shape. Looking the
+  // conformances up from the signature keeps this correct for both shapes.
   SubstitutionMap subs;
   {
     auto genericSig = method->getGenericSignature();
     SmallVector<Type, 2> subTypes;
-    SmallVector<ProtocolConformanceRef, 2> subConformances;
     subTypes.push_back(systemASTType);
-    subConformances.push_back(systemConfRef);
     if (actorType) {
-      ProtocolDecl *actorProto = C.getProtocol(
-          KnownProtocolKind::DistributedActor);
-      assert(actorProto);
-
-      auto distributedActorConfRef = lookupConformance(
-          actorType.getASTType(), actorProto);
-      assert(!distributedActorConfRef.isInvalid() &&
-             "Missing conformance to `DistributedActor`");
       subTypes.push_back(actorType.getASTType());
-      subConformances.push_back(distributedActorConfRef);
     }
 
-    subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
+    subs = SubstitutionMap::get(genericSig, subTypes,
+                                LookUpConformanceInModule());
   }
 
   auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();

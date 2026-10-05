@@ -17,8 +17,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Unicode.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
@@ -34,7 +32,6 @@
 #include "swift/SIL/StackAllocation.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace Lowering;
@@ -806,7 +803,7 @@ namespace {
     }
 
     bool visitRawPointerToRefInst(RawPointerToRefInst *RHS) {
-      return true;
+      return cast<RawPointerToRefInst>(LHS)->isImmortal() == RHS->isImmortal();
     }
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
@@ -902,6 +899,13 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitCOMMethodInst(COMMethodInst *RHS) {
+      auto *X = cast<COMMethodInst>(LHS);
+      return X->getMember() == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType() == RHS->getType();
+    }
+
     bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
       auto *X = cast<ObjCSuperMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
@@ -929,6 +933,10 @@ namespace {
     }
 
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
+      return true;
+    }
+
+    bool visitOpenCOMExistentialInst(const OpenCOMExistentialInst *RHS) {
       return true;
     }
 
@@ -1059,6 +1067,10 @@ unsigned Operand::getOperandNumber() const {
 }
 
 MemoryBehavior SILInstruction::getMemoryBehavior() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return MemoryBehavior::MayHaveSideEffects;
+  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
@@ -1092,6 +1104,11 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
+  }
+
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastInst>(this)) {
+    if (!cast->preservesOwnership())
+      return MemoryBehavior::MayHaveSideEffects;
   }
 
   // Handle full apply sites that have a resolvable callee function with an
@@ -1185,6 +1202,10 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 bool SILInstruction::mayRelease() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return true;
+  }
   // Overrule a "DoesNotRelease" of dynamic casts. If a dynamic cast is not
   // RC identity preserving it can release it's source (in some cases - we are
   // conservative here).
@@ -1635,6 +1656,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
+      isa<OpenCOMExistentialInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) ||
       isa<OpenExistentialBoxInst>(this) ||
@@ -1931,6 +1953,7 @@ void SILInstruction::forEachDefinedLocalEnvironment(
   }
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenCOMExistentialInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
@@ -2099,6 +2122,15 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
+
+      // A `@called(atMostOnce)` closure's context is consumed directly by the
+      // `apply`/`try_apply` its passed to.
+      if (hasCalledAtMostOnceSemantics() &&
+          isa<ApplyInst, TryApplyInst>(use->getUser())) {
+        liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
+        continue;
+      }
+
       auto forward = ForwardingOperand(use);
       if (!forward) {
         // There shouldn't be any non-forwarding consumptions of a nonescaping
@@ -2137,11 +2169,25 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   liveness.computeBoundary(boundary);
 
   for (auto *inst : boundary.lastUsers) {
-    // Only destroy_values were added to liveness, so only destroy_values can be
-    // the last users.
-    auto *dvi = cast<DestroyValueInst>(inst);
-    auto keepGoing = func(&dvi->getOperandRef());
-    if (!keepGoing) {
+    Operand *consumingOperand = nullptr;
+    // Non-`@called(atMostOnce)` values end their lifetime only at
+    // `destroy_value`.
+    if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
+      consumingOperand = &dvi->getOperandRef();
+    } else if (hasCalledAtMostOnceSemantics()) {
+      // `@called(atMostOnce)` is consumed by an apply, look up the operand
+      // where it appears.
+      for (auto &operand : inst->getAllOperands()) {
+        if (operand.isConsuming() && lookThroughOwnershipAndForwardingInsts(
+                                         operand.get()) == SILValue(this)) {
+          consumingOperand = &operand;
+          break;
+        }
+      }
+    }
+
+    ASSERT(consumingOperand && "found no consuming operand?!");
+    if (!func(consumingOperand)) {
       return false;
     }
   }
@@ -2403,3 +2449,12 @@ ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
 #include "swift/SIL/SILNodes.def"
 
 #endif
+
+namespace swift::test {
+static FunctionTest InstructionsIdentical(
+    "instructions-identical", [](auto &function, auto &arguments, auto &test) {
+      auto *lhs = arguments.takeInstruction();
+      auto *rhs = arguments.takeInstruction();
+      llvm::outs() << (lhs->isIdenticalTo(rhs) ? "true" : "false") << '\n';
+    });
+} // namespace swift::test

@@ -1,7 +1,7 @@
 // REQUIRES: swift_feature_LiteralExpressions
 
 // Generic arguments that reach the expression path but have to resolve as types.
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions
+// RUN: %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple -enable-experimental-feature LiteralExpressions
 
 struct G<T> {}
 protocol P {}

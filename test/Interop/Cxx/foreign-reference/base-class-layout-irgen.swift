@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -module-name=test -disable-availability-checking  | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -module-name=test -target %target-swift-5.8-abi-triple  | %FileCheck %s
 
 import MemberLayout
 

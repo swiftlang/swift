@@ -517,14 +517,14 @@ bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 2
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
 
-  %3b = raw_pointer_to_ref %2 : $Builtin.RawPointer to $NonSendableKlass
+  %3b = raw_pointer_to_ref [immortal] %2 : $Builtin.RawPointer to $NonSendableKlass
   %3a = ref_to_raw_pointer %3b : $NonSendableKlass to $Builtin.RawPointer
-  %3 = raw_pointer_to_ref %3a : $Builtin.RawPointer to $NonSendableKlass
+  %3 = raw_pointer_to_ref [immortal] %3a : $Builtin.RawPointer to $NonSendableKlass
   %4 = copy_value %3 : $NonSendableKlass
 
-  %5b = raw_pointer_to_ref %0 : $Builtin.RawPointer to $NonSendableKlass
+  %5b = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $NonSendableKlass
   %5a = ref_to_raw_pointer %5b : $NonSendableKlass to $Builtin.RawPointer
-  %5 = raw_pointer_to_ref %5a : $Builtin.RawPointer to $NonSendableKlass
+  %5 = raw_pointer_to_ref [immortal] %5a : $Builtin.RawPointer to $NonSendableKlass
   %6 = copy_value %5 : $NonSendableKlass
 
   // Should error on both since the raw pointer is from an argument.
@@ -548,14 +548,14 @@ bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 2
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
 
-  %3b = raw_pointer_to_ref %2 : $Builtin.RawPointer to $SendableKlass
+  %3b = raw_pointer_to_ref [immortal] %2 : $Builtin.RawPointer to $SendableKlass
   %3a = ref_to_raw_pointer %3b : $SendableKlass to $Builtin.RawPointer
-  %3 = raw_pointer_to_ref %3a : $Builtin.RawPointer to $SendableKlass
+  %3 = raw_pointer_to_ref [immortal] %3a : $Builtin.RawPointer to $SendableKlass
   %4 = copy_value %3 : $SendableKlass
 
-  %5b = raw_pointer_to_ref %0 : $Builtin.RawPointer to $SendableKlass
+  %5b = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $SendableKlass
   %5a = ref_to_raw_pointer %5b : $SendableKlass to $Builtin.RawPointer
-  %5 = raw_pointer_to_ref %5a : $Builtin.RawPointer to $SendableKlass
+  %5 = raw_pointer_to_ref [immortal] %5a : $Builtin.RawPointer to $SendableKlass
   %6 = copy_value %5 : $SendableKlass
 
   // No self error since we are passing in sendable.
@@ -606,7 +606,7 @@ bb0:
   // expected-note @-2 {{}}
 
   // Test that this is viewed as a use of %construct
-  %3 = raw_pointer_to_ref %3a : $Builtin.RawPointer to $SendableKlass
+  %3 = raw_pointer_to_ref [immortal] %3a : $Builtin.RawPointer to $SendableKlass
   // expected-note @-1 {{access can happen concurrently}}
 
   destroy_value %value : $NonSendableKlass

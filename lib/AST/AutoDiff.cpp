@@ -17,7 +17,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

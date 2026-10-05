@@ -102,8 +102,10 @@ class SubSub: Sub {}
 // CHECK:   %3 = function_ref @$s6vtable5SuperC6methodyS2f_SftF : $@convention(method) (Float, Float, @guaranteed Super) -> Float
 // CHECK:   %4 = differentiable_function [parameters 0] [results 0] %3 : $@convention(method) (Float, Float, @guaranteed Super) -> Float
 // CHECK:   %5 = differentiable_function_extract [jvp] %4 : $@differentiable(reverse) @convention(method) (Float, @noDerivative Float, @noDerivative @guaranteed Super) -> Float
-// CHECK:   %6 = apply %5(%0, %1, %2) : $@convention(method) (Float, Float, @guaranteed Super) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   return %6 : $(Float, @callee_guaranteed (Float) -> Float)
+// CHECK:   %[[INNER:.*]] = apply %5(%0, %1, %2) : $@convention(method) (Float, Float, @guaranteed Super) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   (%[[ELT1:.*]], %[[ELT2:.*]]) = destructure_tuple %[[INNER]] : $(Float, @callee_guaranteed (Float) -> Float)
+// CHECK:   %[[RESULT:.*]] = tuple (%[[ELT1]] : $Float, %[[ELT2]] : $@callee_guaranteed (Float) -> Float)
+// CHECK:   return %[[RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK: }
 
 // Check vtable entries: new vs `[override]` vs `[inherited]` entries.

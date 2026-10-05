@@ -14,15 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/LLVM.h"
-#include "clang/Basic/CharInfo.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <vector>
 
 #define TOSTR2(X) #X
 #define TOSTR(X) TOSTR2(X)

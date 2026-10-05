@@ -1,0 +1,32 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-stdlib -target aarch64-unknown-windows-msvc -module-name Swift -emit-module-path %t/Swift.swiftmodule %S/Inputs/com-lifetime-calling-convention/Swift.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -parse-stdlib -target aarch64-unknown-windows-msvc -module-name COM -I %t -emit-ir %s | %FileCheck %s --check-prefix=C
+// REQUIRES: CODEGENERATOR=AArch64
+
+sil_stage canonical
+import Builtin
+import Swift
+
+// Supply the initializer used by the synthesized IID getter.
+public struct IID {
+  public init(data1: Int, data2: Int, data3: Int,
+              data4: (Int, Int, Int, Int, Int, Int, Int, Int))
+}
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IInterface {}
+sil [ossa] @copy_interface : $@convention(thin) (@guaranteed IInterface) -> @owned IInterface {
+bb0(%value : @guaranteed $IInterface):
+  %copy = copy_value %value : $IInterface
+  return %copy : $IInterface
+}
+sil [ossa] @destroy_interface : $@convention(thin) (@owned IInterface) -> () {
+bb0(%value : @owned $IInterface):
+  destroy_value %value : $IInterface
+  %result = tuple ()
+  return %result : $()
+}
+
+// C-LABEL: define{{.*}} @copy_interface(
+// C: call i32 {{%.*}}(ptr {{%.*}})
+// C-LABEL: define{{.*}} @destroy_interface(
+// C: call i32 {{%.*}}(ptr {{%.*}})

@@ -65,8 +65,7 @@ func testPublicClassAsync(_ c: PublicBase) async {
     }
 
     tests.test("Call class async") {
-      // TODO: it should crash with the error message and not with sigsegv
-      expectCrashLater()
+      expectCrashLater(withMessage: "Fatal error: Call of deleted method")
       await callClassAsync()
     }
 
@@ -76,8 +75,7 @@ func testPublicClassAsync(_ c: PublicBase) async {
     }
 
     tests.test("Call proto async") {
-      // TODO: it should crash with the error message and not with sigsegv
-      expectCrashLater(withMessage: "")
+      expectCrashLater(withMessage: "Fatal error: Call of deleted method")
       await callProtoAsync()
     }
 

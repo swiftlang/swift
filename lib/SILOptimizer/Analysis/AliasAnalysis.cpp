@@ -12,10 +12,8 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "llvm/Support/Debug.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 
 using namespace swift;

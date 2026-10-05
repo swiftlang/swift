@@ -83,6 +83,10 @@ void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
   spec.unbridged()->setMacroLoc(loc);
 }
 
+SourceLoc BridgedAvailabilitySpec_getMacroLoc(BridgedAvailabilitySpec spec) {
+  return spec.unbridged()->getMacroLoc();
+}
+
 BridgedAvailabilityDomainOrIdentifier
 BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getDomainOrIdentifier();

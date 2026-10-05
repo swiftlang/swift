@@ -26,11 +26,13 @@ package protocol Greeter: DistributedActor where ActorSystem: DistributedActorSy
 
 // CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK:   package distributed func greet(name: String) -> String {
+// CHECK-NEXT:     #if !$Embedded
 // CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK-NEXT:       Distributed._distributedStubFatalError()
-// CHECK-NEXT:     } else {
-// CHECK-NEXT:       fatalError()
 // CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-EMPTY:
+// CHECK-NEXT:     fatalError()
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 

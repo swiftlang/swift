@@ -174,9 +174,12 @@ public:
   
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
+  SWIFT_DEPRECATED_IN_SILGEN_MSG("should check whether function being emitted has ownership for trivial values enabled")
   bool isTrivial() const {
     return Properties.isTrivial();
   }
+  
+  bool isTrivial(SILFunction *inFunction) const;
   
   bool isOrContainsRawPointer() const {
     return Properties.isOrContainsRawPointer();
@@ -515,9 +518,9 @@ enum class CaptureKind {
   /// A let constant captured as a pointer to storage
   Immutable,
   /// A local value captured directly, moved (not boxed or copied) into the
-  /// closure's context. This is only used for `@called(once)` closures that
-  /// capture `@called(once)` values at the moment because such closures
-  /// cannot be copied or called multiple times.
+  /// closure's context. This is only used for `@called(atMostOnce)` closures
+  /// that capture `@called(atMostOnce)` values at the moment because such
+  /// closures cannot be copied or called multiple times.
   Consuming,
 };
 
@@ -696,6 +699,9 @@ class TypeConverter {
   /// Second element is a ResilienceExpansion.
   llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
 
+  /// Cache for TypeSubElementCount.
+  llvm::DenseMap<std::pair<SILType, TypeExpansionContext>, unsigned> TypeSubElementCache;
+
   llvm::DenseMap<AbstractClosureExpr *, FunctionTypeInfo> ClosureInfos;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
     CaptureTypeExpansionContexts;
@@ -827,8 +833,13 @@ public:
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
-  /// Count the total number of fields inside the given SIL Type
+  /// Count the total number of fields inside the given SILType.
   unsigned countNumberOfFields(SILType Ty, TypeExpansionContext expansion);
+
+  /// Count number of sub-elements inside the given SILType.
+  ///
+  /// FIXME: This is going away soon.
+  uint32_t getTypeSubElementCount(SILType type, TypeExpansionContext context);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
@@ -1299,15 +1310,6 @@ namespace llvm {
 
     using CanTypeInfo = DenseMapInfo<swift::CanType>;
 
-    // Use the second field because the first field can validly be null.
-    static CachingTypeKey getEmptyKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
-    static CachingTypeKey getTombstoneKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
         DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
@@ -1330,12 +1332,6 @@ namespace llvm {
 
     using SILDeclRefInfo = DenseMapInfo<swift::SILDeclRef>;
 
-    static OverrideKey getEmptyKey() {
-      return {SILDeclRefInfo::getEmptyKey(), SILDeclRefInfo::getEmptyKey()};
-    }
-    static OverrideKey getTombstoneKey() {
-      return {SILDeclRefInfo::getTombstoneKey(), SILDeclRefInfo::getTombstoneKey()};
-    }
     static unsigned getHashValue(OverrideKey val) {
       return hash_combine(SILDeclRefInfo::getHashValue(val.base),
                           SILDeclRefInfo::getHashValue(val.derived));

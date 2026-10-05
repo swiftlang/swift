@@ -12,6 +12,7 @@ import Swift
 import Builtin
 
 sil_scope 1 { parent @test_alloc_box_undef : $@convention(thin) @async (Builtin.Int64) -> () }
+sil_scope 2 { parent @test_alloc_box_undef_addr_only : $@convention(thin) @async (@in Any) -> () }
 
 // CHECK-LABEL: sil @test_alloc_box_undef : $@convention(thin) @async (Builtin.Int64) -> () {
 // CHECK: bb0(
@@ -60,4 +61,53 @@ bb3:
   strong_release %1 : ${ var Builtin.Int64 }, scope 1
   %r = tuple (), scope 1
   return %r : $(), scope 1
+}
+
+// If the vartype is address-only (Any), the undef must keep the address type
+// and an op_deref, since an object-category undef of an address-only type is invalid.
+
+// CHECK-LABEL: sil @test_alloc_box_undef_addr_only : $@convention(thin) @async (@in Any) -> () {
+// CHECK: bb0(
+// CHECK:   [[BOX:%[0-9]+]] = alloc_box
+// CHECK:   hop_to_executor
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] [[BOX]] : ${ var Any }, var, name "k", type $Any
+// CHECK:   cond_br undef, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+//
+// CHECK: [[BB1]]:
+// CHECK:   debug_value [moveable_value_debuginfo] %0 : $*Any, var, name "k", expr op_deref
+// CHECK:   hop_to_executor
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] %0 : $*Any, var, name "k", expr op_deref
+//
+// CHECK: [[BB2]]:
+// CHECK:   hop_to_executor
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] [[BOX]] : ${ var Any }, var, name "k", type $Any
+//
+// CHECK: [[MERGE:bb[0-9]+]]:
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] undef : $*Any, var, name "k", expr op_deref
+// CHECK: } // end sil function 'test_alloc_box_undef_addr_only'
+sil @test_alloc_box_undef_addr_only : $@convention(thin) @async (@in Any) -> () {
+bb0(%0 : $*Any):
+  %1 = alloc_box [moveable_value_debuginfo] ${ var Any }, var, name "k", loc "test.swift":2:3, scope 2
+  %2 = project_box %1 : ${ var Any }, 0, scope 2
+  copy_addr %0 to %2 : $*Any, scope 2
+
+  %ex = enum $Optional<Builtin.Executor>, #Optional.none!enumelt, scope 2
+  hop_to_executor %ex : $Optional<Builtin.Executor>, scope 2
+
+  cond_br undef, bb1, bb2, scope 2
+
+bb1:
+  // Override variable "k" with a different operand so the merge disagrees.
+  debug_value [moveable_value_debuginfo] %0 : $*Any, var, name "k", expr op_deref, loc "test.swift":2:3, scope 2
+  hop_to_executor %ex : $Optional<Builtin.Executor>, scope 2
+  br bb3, scope 2
+
+bb2:
+  hop_to_executor %ex : $Optional<Builtin.Executor>, scope 2
+  br bb3, scope 2
+
+bb3:
+  strong_release %1 : ${ var Any }, scope 2
+  %r = tuple (), scope 2
+  return %r : $(), scope 2
 }

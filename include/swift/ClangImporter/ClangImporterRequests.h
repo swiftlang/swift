@@ -27,6 +27,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"

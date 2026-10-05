@@ -10,11 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/Compiler.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ConvertUTF.h"
 
 using namespace swift;

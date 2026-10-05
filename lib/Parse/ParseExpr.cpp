@@ -26,7 +26,6 @@
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -503,6 +502,19 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   // 'any' followed by another identifier is an existential type.
   if (Tok.isContextualKeyword("any") &&
+      (peekToken().is(tok::identifier) ||
+       peekToken().isContextualPunctuator("~")) &&
+      !peekToken().isAtStartOfLine()) {
+    ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
+    auto *typeExpr = new (Context) TypeExpr(ty.get());
+    return makeParserResult(typeExpr);
+  }
+
+  // 'some' followed by another identifier is an opaque type.
+  if (Tok.isContextualKeyword("some") &&
       (peekToken().is(tok::identifier) ||
        peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {

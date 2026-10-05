@@ -12,37 +12,24 @@
 
 #include "swift/Option/Options.h"
 
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
-
-#define OPTTABLE_STR_TABLE_CODE
-#include "swift/Option/Options.inc"
-#undef OPTTABLE_STR_TABLE_CODE
-
-#define OPTTABLE_PREFIXES_TABLE_CODE
-#include "swift/Option/Options.inc"
-#undef OPTTABLE_PREFIXES_TABLE_CODE
 
 using namespace swift::options;
 using namespace llvm::opt;
 
-static const llvm::opt::GenericOptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
+#define OPTTABLE_CODE
 #include "swift/Option/Options.inc"
-#undef OPTION
-};
 
 namespace {
 
-class SwiftOptTable : public llvm::opt::GenericOptTable {
+class SwiftOptTable : public llvm::opt::OptTable {
 public:
-  SwiftOptTable()
-      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
+  SwiftOptTable() : OptTable(optionTables()) {}
 };
 
 } // end anonymous namespace
 
 std::unique_ptr<OptTable> swift::createSwiftOptTable() {
-  return std::unique_ptr<GenericOptTable>(new SwiftOptTable());
+  return std::unique_ptr<OptTable>(new SwiftOptTable());
 }

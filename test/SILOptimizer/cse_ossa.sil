@@ -603,8 +603,8 @@ bb0(%0 : $*Builtin.Int8):
 // CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
 sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned (C, C) {
 bb0(%0 : $Builtin.RawPointer):
-  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
+  %1 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $C
+  %2 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $C
   %6 = tuple(%1: $C, %2: $C)
   %7 = copy_value %6
   return %7
@@ -1416,7 +1416,7 @@ bb0(%0 : $Pair<x, y>):
 // CHECK-LABEL: } // end sil function 'dead_end_block'
 sil [ossa] @dead_end_block : $@convention(thin) (Builtin.RawPointer) -> @owned B {
 bb0(%0 : $Builtin.RawPointer):
-  %4 = raw_pointer_to_ref %0 to $E
+  %4 = raw_pointer_to_ref [immortal] %0 to $E
   %5 = copy_value %4
   %6 = upcast %5 to $B
   fix_lifetime %6
@@ -1427,7 +1427,7 @@ bb1:
   unreachable
 
 bb2:
-  %14 = raw_pointer_to_ref %0 to $E
+  %14 = raw_pointer_to_ref [immortal] %0 to $E
   %15 = copy_value %14
   %16 = upcast %15 to $B
   return %16

@@ -845,6 +845,34 @@ case TypeKind::Id:
         }
       }
 
+      // Transform function yield types.
+      SmallVector<AnyFunctionType::Yield, 8> substYields;
+      for (auto yield : function->getYields()) {
+        auto type = yield.getType();
+        auto flags = yield.getFlags();
+
+        Type substType = doIt(type, pos);
+        if (!substType)
+          return Type();
+
+        if (type.getPointer() != substType.getPointer())
+          isUnchanged = false;
+
+        // TODO: Verify logic here
+        if (substType->is<InOutType>()) {
+          substType = substType->getInOutObjectType();
+          flags = flags.withInOut(true);
+        }
+
+        if (auto substPack = getTransformedPack(substType)) {
+          for (auto substEltType : substPack->getElementTypes()) {
+            substYields.emplace_back(substEltType, flags);
+          }
+        } else {
+          substYields.emplace_back(substType, flags);
+        }
+      }
+
       // Transform result type.
       Type resultTy = doIt(function->getResult(), pos);
       if (!resultTy)
@@ -910,6 +938,26 @@ case TypeKind::Id:
             isUnchanged = false;
           }
         }
+
+        // Transform the @called(atMostOnce) dependent type if present.
+        if (auto executionSemanticsDep =
+                origExtInfo.getExecutionSemanticsDependentType()) {
+          auto [newExecutionSemanticsDep, executionSemantics] =
+              asDerived().transformExecutionSemanticsDependentType(
+                  executionSemanticsDep);
+          if (!newExecutionSemanticsDep) {
+            // If we're no longer @called(atMostOnce) dependent, update the
+            // execution semantics.
+            extInfo = extInfo->withExecutionSemanticsDependentType(Type());
+            extInfo = extInfo->withExecutionSemantics(executionSemantics);
+            isUnchanged = false;
+          } else if (newExecutionSemanticsDep.getPointer() !=
+                     executionSemanticsDep.getPointer()) {
+            extInfo = extInfo->withExecutionSemanticsDependentType(
+                newExecutionSemanticsDep);
+            isUnchanged = false;
+          }
+        }
       }
 
       if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
@@ -925,8 +973,8 @@ case TypeKind::Id:
         if (isUnchanged) return t;
 
         auto genericSig = genericFnType->getGenericSignature();
-        return GenericFunctionType::get(
-            genericSig, substParams, resultTy, extInfo);
+        return GenericFunctionType::get(genericSig, substParams, substYields,
+                                        resultTy, extInfo);
       }
       
       if (isUnchanged) {
@@ -969,7 +1017,7 @@ case TypeKind::Id:
         }
       }
 
-      return FunctionType::get(substParams, resultTy, extInfo);
+      return FunctionType::get(substParams, substYields, resultTy, extInfo);
     }
 
     case TypeKind::ArraySlice: {
@@ -1168,6 +1216,11 @@ case TypeKind::Id:
 
   std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
     return std::make_pair(ty, false);
+  }
+
+  std::pair<Type, std::optional<ExecutionSemantics>>
+  transformExecutionSemanticsDependentType(Type ty) {
+    return std::make_pair(ty, std::nullopt);
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

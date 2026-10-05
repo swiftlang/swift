@@ -1,0 +1,29 @@
+// RUN: %empty-directory(%t)
+//
+// Serialize a module whose SIL is still Raw, then read it back and verify it.
+//
+// RUN: %target-sil-opt %s -serialize -o %t/raw_module.swiftmodule -module-name raw_module
+// RUN: %target-sil-opt %t/raw_module.swiftmodule -module-name raw_module -sil-verify-all | %FileCheck %s
+
+// The deserializer used to infer a stage of Canonical from the container kind,
+// because a `.swiftmodule` is normally written after the mandatory pipeline.
+// Nothing enforced that. A module serialized while its floor was still Raw came
+// back stamped Canonical, and the raw-only verifier checks then rejected its own
+// input: `assign` here aborted with "assign instruction can only exist in raw
+// SIL". The stage is now recorded in the module, so the body comes back Raw.
+//
+// CHECK: sil_stage raw
+// CHECK-LABEL: sil [serialized] [canonical] [ossa] @raw_body_survives_serialization
+// CHECK-NOT:   [stage=
+// CHECK:       assign
+
+sil_stage raw
+
+import Builtin
+
+sil [serialized] [ossa] @raw_body_survives_serialization : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  assign %1 to [reassign] %0 : $*Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}

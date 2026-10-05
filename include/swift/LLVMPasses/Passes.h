@@ -99,7 +99,7 @@ namespace swift {
     SwiftARCOpt();
   };
 
-  struct SwiftARCOptPass : public llvm::PassInfoMixin<SwiftARCOptPass> {
+  struct SwiftARCOptPass : public llvm::OptionalPassInfoMixin<SwiftARCOptPass> {
     SwiftRCIdentity RC;
 
     llvm::PreservedAnalyses run(llvm::Function &F,
@@ -117,7 +117,7 @@ namespace swift {
   };
 
   struct SwiftARCContractPass
-      : public llvm::PassInfoMixin<SwiftARCContractPass> {
+      : public llvm::OptionalPassInfoMixin<SwiftARCContractPass> {
     SwiftRCIdentity RC;
 
     llvm::PreservedAnalyses run(llvm::Function &F,
@@ -133,7 +133,7 @@ namespace swift {
   };
 
   class SwiftMergeFunctionsPass
-      : public llvm::PassInfoMixin<SwiftMergeFunctionsPass> {
+      : public llvm::OptionalPassInfoMixin<SwiftMergeFunctionsPass> {
     bool ptrAuthEnabled = false;
     unsigned ptrAuthKey = 0;
 
@@ -145,13 +145,13 @@ namespace swift {
   };
 
   struct InlineTreePrinterPass
-      : public llvm::PassInfoMixin<InlineTreePrinterPass> {
+      : public llvm::OptionalPassInfoMixin<InlineTreePrinterPass> {
     llvm::PreservedAnalyses run(llvm::Module &M,
                                 llvm::ModuleAnalysisManager &AM);
   };
 
   struct AsyncEntryReturnMetadataPass
-      : public llvm::PassInfoMixin<AsyncEntryReturnMetadataPass> {
+      : public llvm::OptionalPassInfoMixin<AsyncEntryReturnMetadataPass> {
     llvm::PreservedAnalyses run(llvm::Module &M,
                                 llvm::ModuleAnalysisManager &AM);
   };

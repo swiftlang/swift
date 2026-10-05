@@ -39,7 +39,7 @@ public struct CustomArray<Element> where Element : ~Copyable {
 }
 
 // CHECK: #if __cplusplus >= 202302L
-// CHECK-NEXT: SWIFT_INLINE_THUNK int operator [](int x, int _2) const SWIFT_SYMBOL("s:9Operators6IntBoxVys5Int32VAE_AEtcig");
+// CHECK-NEXT: SWIFT_INLINE_THUNK int operator [](int x, int _2) const noexcept SWIFT_SYMBOL("s:9Operators6IntBoxVys5Int32VAE_AEtcig");
 // CHECK-NEXT: #endif // #if __cplusplus >= 202302L
 
 public func -(lhs: IntBox, rhs: IntBox) -> CInt {

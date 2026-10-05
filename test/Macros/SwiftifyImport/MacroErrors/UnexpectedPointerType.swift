@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -verify
+// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name main -typecheck -plugin-path %swift-plugin-dir -verify
 
 // expected-error@+2{{expected Unsafe[Mutable][Raw]Pointer type for type CInt - first type token is 'CInt'}}
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"))

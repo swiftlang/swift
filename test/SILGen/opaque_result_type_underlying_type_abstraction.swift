@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
 // CHECK-LABEL: sil {{.*}}9withTuple
 // CHECK: bb0(%0 : $*(Int, String)):

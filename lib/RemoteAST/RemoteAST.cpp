@@ -16,7 +16,6 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
@@ -28,11 +27,8 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
-#include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
 #include "swift/AST/IRGenOptions.h"

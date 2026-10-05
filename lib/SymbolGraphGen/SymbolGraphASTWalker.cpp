@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
@@ -342,6 +345,15 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
   if (!BaseDecl && !SG->canIncludeDeclAsNode(VD)) {
     return false;
+  }
+
+  // An implicit Objective-C protocol requirement that is inherited onto a
+  // conforming type keeps the protocol requirement's own USR, regardless of
+  // the type it appears on. That requirement is already explicitly documented
+  // under the protocol itself. Skip the inherited copies.
+  if (VD->isImplicit() && VD->getClangDecl() &&
+      isa<clang::ObjCProtocolDecl>(VD->getClangDecl()->getDeclContext())) {
+    return true;
   }
 
   // If this symbol extends a type from another module, record it in that

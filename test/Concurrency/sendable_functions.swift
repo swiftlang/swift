@@ -43,3 +43,13 @@ extension S: Sendable where T: Sendable {
 
 @available(SwiftStdlib 5.1, *)
 @MainActor @Sendable func globalActorFuncAsync() async { }
+
+func testConversionToThin(s: S<Int>) {
+  @Sendable func localFn() {}
+
+  let _: @convention(thin) () -> Void = globalFunc // Ok
+  let _: @convention(thin) () -> Void = localFn // Ok
+
+  let _: @Sendable @convention(thin) () -> Void = globalFunc // Ok
+  let _: @Sendable @convention(thin) () -> Void = localFn
+}

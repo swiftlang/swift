@@ -264,6 +264,7 @@ public:
   bool isCalleeThin() const {
     switch (getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
@@ -1106,14 +1107,6 @@ struct simplify_type<const ::swift::FullApplySite>
     : public simplify_type<const ::swift::ApplySite> {};
 
 template <> struct DenseMapInfo<::swift::ApplySite> {
-  static ::swift::ApplySite getEmptyKey() {
-    return ::swift::ApplySite::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getEmptyKey());
-  }
-  static ::swift::ApplySite getTombstoneKey() {
-    return ::swift::ApplySite::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getTombstoneKey());
-  }
   static unsigned getHashValue(::swift::ApplySite AS) {
     auto *I = AS.getInstruction();
     return DenseMapInfo<::swift::SILInstruction *>::getHashValue(I);
@@ -1124,14 +1117,6 @@ template <> struct DenseMapInfo<::swift::ApplySite> {
 };
 
 template <> struct DenseMapInfo<::swift::FullApplySite> {
-  static ::swift::FullApplySite getEmptyKey() {
-    return ::swift::FullApplySite::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getEmptyKey());
-  }
-  static ::swift::FullApplySite getTombstoneKey() {
-    return ::swift::FullApplySite::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getTombstoneKey());
-  }
   static unsigned getHashValue(::swift::FullApplySite AS) {
     auto *I = AS.getInstruction();
     return DenseMapInfo<::swift::SILInstruction *>::getHashValue(I);

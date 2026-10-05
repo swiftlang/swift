@@ -1705,6 +1705,31 @@ bb0(%0 : $Int):
   return %7
 }
 
+sil @write_through_stored_raw_pointer : $@convention(thin) (@inout Builtin.RawPointer) -> () {
+[%0: noescape **, read v**]
+[global: read,write]
+}
+
+// CHECK-LABEL: sil [ossa] @address_stored_as_pointer :
+// CHECK:         apply
+// CHECK:         [[LD:%.*]] = load [trivial] %1
+// CHECK:         return [[LD]]
+// CHECK-LABEL: } // end sil function 'address_stored_as_pointer'
+sil [ossa] @address_stored_as_pointer : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  %3 = alloc_stack $Builtin.RawPointer
+  %4 = address_to_pointer %1 to $Builtin.RawPointer
+  store %4 to [trivial] %3
+  %6 = function_ref @write_through_stored_raw_pointer : $@convention(thin) (@inout Builtin.RawPointer) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@inout Builtin.RawPointer) -> ()
+  %8 = load [trivial] %1
+  dealloc_stack %3
+  dealloc_stack %1
+  return %8
+}
+
 // CHECK-LABEL: sil [ossa] @complete_lifetime1 :
 // This is not optimized, yet
 // CHECK:         load [copy]

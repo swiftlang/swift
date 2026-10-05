@@ -127,14 +127,12 @@
 #define SWIFT_SILOPTIMIZER_UTILS_PRUNEDLIVENESS_H
 
 #include "swift/AST/TypeExpansionContext.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 

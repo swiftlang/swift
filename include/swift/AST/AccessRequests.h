@@ -16,12 +16,10 @@
 #ifndef SWIFT_ACCESS_REQUESTS_H
 #define SWIFT_ACCESS_REQUESTS_H
 
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
-#include "llvm/ADT/Hashing.h"
 
 namespace swift {
 

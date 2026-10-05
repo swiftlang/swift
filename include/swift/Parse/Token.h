@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -196,7 +195,6 @@ public:
 #include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
         .Case("macro", true)
-        .Case("using", true)
         .Default(false);
   }
 

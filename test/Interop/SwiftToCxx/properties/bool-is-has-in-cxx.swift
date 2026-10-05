@@ -23,36 +23,36 @@ public struct IsHasProperties {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) IsHasProperties
 
-// CHECK: SWIFT_INLINE_THUNK bool isEmpty() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool hasFlavor() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool isSolid() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK void setIsSolid(bool value) SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool getFlag() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK void setFlag(bool value) SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool getHas() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getIsOption() const SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK bool isEmpty() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool hasFlavor() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool isSolid() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK void setIsSolid(bool value) noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool getFlag() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK void setFlag(bool value) noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool getHas() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getIsOption() const noexcept SWIFT_SYMBOL({{.*}});
 
-// CHECK: SWIFT_INLINE_THUNK bool IsHasProperties::isEmpty() const {
+// CHECK: SWIFT_INLINE_THUNK bool IsHasProperties::isEmpty() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V7isEmptySbvg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::hasFlavor() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::hasFlavor() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V9hasFlavorSbvg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::isSolid() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::isSolid() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V7isSolidSbvg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK void IsHasProperties::setIsSolid(bool value) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void IsHasProperties::setIsSolid(bool value) noexcept {
 // CHECK-NEXT: Properties::_impl::$s10Properties05IsHasA0V7isSolidSbvs(value, _getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::getFlag() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::getFlag() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V4flagSbvg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK void IsHasProperties::setFlag(bool value) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void IsHasProperties::setFlag(bool value) noexcept {
 // CHECK-NEXT: Properties::_impl::$s10Properties05IsHasA0V4flagSbvs(value, _getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::getHas() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK bool IsHasProperties::getHas() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V3hasSbvg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int IsHasProperties::getIsOption() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int IsHasProperties::getIsOption() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V8isOptionSivg(_getOpaquePointer());
 // CHECK-NEXT: }

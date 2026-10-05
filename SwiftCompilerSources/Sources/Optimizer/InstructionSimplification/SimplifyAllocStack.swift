@@ -424,7 +424,8 @@ private extension AllocStackInst {
         builder.createUnconditionalCheckedCastAddr(
           options: ucca.checkedCastOptions,
           source: newAlloc, sourceFormalType: concreteFormalType,
-          destination: ucca.destination, targetFormalType: ucca.targetFormalType)
+          destination: ucca.destination, targetFormalType: ucca.targetFormalType,
+          isCopy: ucca.isCopy)
         context.erase(instruction: ucca)
       case let dv as DebugValueInst:
         if dv.location.isInlined || dv.debugReconstructionBlock != nil {

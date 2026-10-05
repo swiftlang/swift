@@ -371,7 +371,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK T_0_1 GenericPair<T_0_0, T_0_1>::getY() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK T_0_1 GenericPair<T_0_0, T_0_1>::getY() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -398,7 +398,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::setY(const T_0_1& value) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::setY(const T_0_1& value) noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -412,7 +412,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK GenericPair<T_0_0, T_0_1> GenericPair<T_0_0, T_0_1>::init(const T_0_0& x, swift::Int i, const T_0_1& y) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK GenericPair<T_0_0, T_0_1> GenericPair<T_0_0, T_0_1>::init(const T_0_0& x, swift::Int i, const T_0_1& y) noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -431,7 +431,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::method() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::method() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -442,7 +442,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::mutatingMethod(const GenericPair<T_0_1, T_0_0>& other) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::mutatingMethod(const GenericPair<T_0_1, T_0_0>& other) noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -457,7 +457,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -487,7 +487,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int GenericPair<T_0_0, T_0_1>::getComputedProp() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int GenericPair<T_0_0, T_0_1>::getComputedProp() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -497,7 +497,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 
 // CHECK: SWIFT_INLINE_THUNK T_0_0 GenericPair<T_0_0, T_0_1>::getComputedVar()
 // CHECK: _impl::$s8Generics11GenericPairV11computedVarxvg(reinterpret_cast<void *>(&returnValue), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
-// CHECK: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::setComputedVar(const T_0_0& newValue) {
+// CHECK: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::setComputedVar(const T_0_0& newValue) noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");

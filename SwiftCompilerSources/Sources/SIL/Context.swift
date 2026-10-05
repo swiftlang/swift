@@ -25,8 +25,10 @@ public protocol MutatingContext : Context {
 
 /// Common funcationality of all Contexts.
 extension Context {
-  public var silStage: SILStage {
-    switch _bridged.getSILStage() {
+  /// A lower bound on the stage of every function. This is a module-wide
+  /// commitment, not a per-function stage.
+  public var stageFloor: SILStage {
+    switch _bridged.getStageFloor() {
       case .Raw:       return .raw
       case .Canonical: return .canonical
       case .Lowered:   return .lowered
@@ -104,6 +106,15 @@ extension Context {
 
   public func lookupWitnessTable(for conformance: Conformance) -> WitnessTable? {
     return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
+  }
+
+  /// Replaces opaque result types in `conformance` with their underlying types.
+  ///
+  /// If an associated type is an opaque result type, the associated conformance is abstract.
+  /// This returns the concrete conformance of the opaque type's underlying type - if it is
+  /// known in the current type expansion context.
+  public func substituteOpaqueTypes(in conformance: Conformance) -> Conformance {
+    return _bridged.substOpaqueTypesWithUnderlyingTypes(conformance.bridged).conformance
   }
 
   public func lookupVTable(for classDecl: NominalTypeDecl) -> VTable? {

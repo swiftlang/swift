@@ -17,7 +17,6 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "gtest/gtest.h"
 

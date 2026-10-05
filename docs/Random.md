@@ -14,3 +14,9 @@ following implementation details:
 otherwise, they read from `/dev/urandom`.
 - Fuchsia platforms use `getentropy(3)`.
 - Windows platforms use `BCryptGenRandom`.
+
+Embedded Swift does not link the runtime above; the embedded standard library
+carries its own implementation. On Linux it calls `arc4random_buf(3)` when the C
+library provides it (glibc 2.36 and later) and `getrandom(2)` otherwise. When
+the Embedded Swift platform abstraction layer is in use, the platform supplies
+the generator instead, through `_swift_generateRandom`.

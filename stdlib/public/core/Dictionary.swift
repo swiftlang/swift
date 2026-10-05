@@ -983,7 +983,7 @@ extension Dictionary {
   ///   this dictionary.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func mapKeyedValues<T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> Dictionary<Key, T> {
@@ -1059,7 +1059,7 @@ extension Dictionary {
   ///
   /// - Complexity: O(*m* + *n*), where *n* is the length of the original
   ///   dictionary and *m* is the length of the resulting dictionary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func compactMapKeyedValues<T, E>(
     _ transform: (Key, Value) throws(E) -> T?
   ) throws(E) -> Dictionary<Key, T> {

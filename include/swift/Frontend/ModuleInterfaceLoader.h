@@ -115,7 +115,6 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/Support/YAMLTraits.h"
 
 namespace llvm {
 namespace cas {

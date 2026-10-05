@@ -41,6 +41,31 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/macro.swift @%t/MyApp.cmd
 
+/// The plugin is an input to the compilation, so it has to appear in the
+/// make-style dependencies, both when produced and when replayed from the CAS.
+// RUN: %target-swift-frontend-plain \
+// RUN:   -typecheck -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
+// RUN:   -swift-version 5 -module-name MyApp \
+// RUN:   -emit-dependencies -emit-dependencies-path %t/deps.d \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/macro.swift @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix=MISS
+// MISS: remark: cache miss
+
+// RUN: %FileCheck %s --check-prefix=DEPS --input-file=%t/deps.d -DLIB=%target-library-name(MacroDefinition)
+
+// RUN: rm %t/deps.d
+// RUN: %target-swift-frontend-plain \
+// RUN:   -typecheck -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
+// RUN:   -swift-version 5 -module-name MyApp \
+// RUN:   -emit-dependencies -emit-dependencies-path %t/deps.d \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/macro.swift @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix=REPLAY
+// REPLAY: remark: replay output file '{{.*}}deps.d'
+
+// RUN: %FileCheck %s --check-prefix=DEPS --input-file=%t/deps.d -DLIB=%target-library-name(MacroDefinition)
+
+// DEPS: plugins{{/|\\}}[[LIB]]
+
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/macro.swift -o %t/deps2.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t/plugins#%swift-plugin-server \
@@ -70,6 +95,35 @@
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=REMARK
 // REMAKR: remark: cache miss
 // REMARK: remark: loaded macro implementation module 'MacroDefinition' from compiler plugin server
+
+/// The plugin is tracked using the prefix mapped path passed to the frontend,
+/// so the dependency file maps it back to the local path.
+// RUN: %target-swift-frontend-plain \
+// RUN:   -emit-module -o %t/Macro2.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 -O -module-name MyApp -Rcache-compile-job \
+// RUN:   -emit-dependencies -emit-dependencies-path %t/deps2.d \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=MISS-REMAP
+// MISS-REMAP: remark: cache miss
+
+// RUN: %FileCheck %s --check-prefix=DEPS-LOCAL --input-file=%t/deps2.d -DLIB=%target-library-name(MacroDefinition) -DTMP=%t
+// DEPS-LOCAL-DAG: [[TMP]]{{/|\\}}macro.swift
+// DEPS-LOCAL-DAG: [[TMP]]{{/|\\}}plugins{{/|\\}}[[LIB]]
+
+/// Replaying the same key with a different prefix map moves the plugin to the
+/// new location along with the source file.
+// RUN: rm %t/deps2.d
+// RUN: %target-swift-frontend-plain \
+// RUN:   -emit-module -o %t/Macro2.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 -O -module-name MyApp -Rcache-compile-job \
+// RUN:   -emit-dependencies -emit-dependencies-path %t/deps2.d \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test /^relocated -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=REPLAY-REMAP
+// REPLAY-REMAP: remark: replay output file '{{.*}}deps2.d'
+
+// RUN: %FileCheck %s --check-prefix=DEPS-REMAP --input-file=%t/deps2.d -DLIB=%target-library-name(MacroDefinition)
+// DEPS-REMAP-DAG: /^relocated{{/|\\}}macro.swift
+// DEPS-REMAP-DAG: /^relocated{{/|\\}}plugins{{/|\\}}[[LIB]]
 
 /// Encoded PLUGIN_SEARCH_OPTION is remapped.
 // RUN: %llvm-bcanalyzer -dump %t/Macro.swiftmodule | %FileCheck %s --check-prefix=MOD -DLIB=%target-library-name(MacroDefinition)

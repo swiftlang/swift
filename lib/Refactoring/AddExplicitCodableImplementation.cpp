@@ -11,9 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RefactoringActions.h"
-#include "Utils.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift::refactoring;
 

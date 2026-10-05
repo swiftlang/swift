@@ -26,7 +26,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_ANALYSISINVALIDATIONTRANSFORM_H
 #define SWIFT_SILOPTIMIZER_UTILS_ANALYSISINVALIDATIONTRANSFORM_H
 
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 namespace swift {

@@ -49,6 +49,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var shouldOptimize: Bool { bridged.shouldOptimize() }
 
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+  
+  public var hasOwnershipForTrivialValues: Bool {
+    bridged.hasOwnership()
+  }
+  public func set(hasOwnershipForTrivialValues: Bool, _ context: some MutatingContext) {
+    bridged.setOwnershipForTrivialValues(hasOwnershipForTrivialValues)
+  }
 
   /// The module which defines this function, or nil if it's not known.
   ///
@@ -62,6 +69,15 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// standard library - and for specializations of such functions.
   public func isInCurrentModule(_ context: some Context) -> Bool {
     parentModule == context.currentModuleContext
+  }
+
+  /// This function's SIL stage. Prefer this over `Context.stageFloor` for a
+  /// per-function query.
+  public var silStage: SILStage {
+    guard let stage = SILStage(rawValue: bridged.getStage()) else {
+      fatalError("unhandled SILStage")
+    }
+    return stage
   }
 
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
@@ -185,6 +201,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isDestructor: Bool { bridged.isDestructor() }
 
   public var isGeneric: Bool { bridged.isGeneric() }
+
+  /// SIL-level counterpart of
+  /// `AbstractFunctionDecl.isDistributedWitnessWithAdHocSerializationRequirement`.
+  public var isDistributedAdHocSerializationRequirementWitness: Bool {
+    bridged.isDistributedAdHocSerializationRequirementWitness()
+  }
 
   public var linkage: Linkage { bridged.getLinkage().linkage }
 
@@ -697,6 +719,10 @@ extension Function {
       { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
+      },
+      // hasComputedSideEffects  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction) -> Bool in
+        return f.function.effects.sideEffects != nil
       },
       // argumentMayRead  (used by the MemoryLifetimeVerifier)
       { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in

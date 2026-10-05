@@ -2,6 +2,7 @@
 
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -wmo %s -c -o %t/main.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-multi-threaded-darwin-shim %target-embedded-synchronization -o %t/a.out -dead_strip
+// RUN: %llvm-nm --defined-only --format=just-symbols %t/a.out | %FileCheck %s --check-prefix=DEBUG-SYMBOL
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -12,6 +13,8 @@
 // REQUIRES: swift_embedded_platform
 
 import Synchronization
+
+// DEBUG-SYMBOL: _swift_concurrency_debug_current_task_storage_kind
 
 @main
 struct Main {

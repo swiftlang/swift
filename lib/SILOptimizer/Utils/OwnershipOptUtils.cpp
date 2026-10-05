@@ -22,7 +22,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
@@ -441,7 +440,11 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
 
   // If we are in Raw SIL, just bail at this point. We do not support
   // ownership fixups.
-  if (m->getStage() == SILStage::Raw)
+  //
+  // This asks whether the raw mandatory pipeline is still running, not what
+  // stage oldValue's function is at. Ownership fixups are an optimizer
+  // facility, so read the floor.
+  if (m->getStageFloor() == SILStage::Raw)
     return false;
 
   // OSSA rauw can create copies. Bail out if we have move only values.

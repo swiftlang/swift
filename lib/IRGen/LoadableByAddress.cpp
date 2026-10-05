@@ -21,8 +21,6 @@
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "loadable-address"
 #include "Explosion.h"
-#include "FixedTypeInfo.h"
-#include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "NativeConventionSchema.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -34,19 +32,14 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
-#include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -721,6 +714,7 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::ClassMethodInst:
       case SILInstructionKind::SuperMethodInst:
       case SILInstructionKind::ObjCMethodInst:
+      case SILInstructionKind::COMMethodInst:
       case SILInstructionKind::ObjCSuperMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?
@@ -2980,8 +2974,9 @@ void LoadableByAddress::recreateSingleApply(
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
-        castedApply->isOnStack(), castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation,
+        castedApply->getExecutionSemantics(), castedApply->isOnStack(),
+        castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -3387,7 +3382,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
 void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
   // verification.
-  getModule()->setStage(SILStage::Lowered);
+  getModule()->commitStage(SILStage::Lowered);
 
   for (auto &F : *getModule())
     runOnFunction(&F);

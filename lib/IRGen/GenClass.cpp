@@ -21,6 +21,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
@@ -28,15 +29,12 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILVTableVisitor.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
@@ -46,6 +44,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <limits>
 
 #include "Callee.h"
 #include "ClassLayout.h"
@@ -59,7 +59,6 @@
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -502,6 +501,14 @@ ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
   }
 
   builder.setAsBodyOfStruct(classTy);
+
+  // The class instance size is recorded in a 32-bit metadata field, so a class
+  // whose instance size does not fit in 32 bits cannot be represented. Reject
+  // it instead of silently truncating the recorded size.
+  if (builder.getSize().getValue() > std::numeric_limits<uint32_t>::max()) {
+    IGM.Context.Diags.diagnose(SourceLoc(), diag::fixed_type_too_large,
+                               classType.getASTType());
+  }
 
   return builder.getClassLayout(classTy);
 }

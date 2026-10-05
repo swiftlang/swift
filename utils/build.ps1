@@ -92,7 +92,7 @@ Build Android SDKs. Requires Android NDK to be available.
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
 Format: r{number}[{letter}][-revision-suffix] (e.g., r28c or r30-beta2)
-Default: "r28c"
+Default: "r30"
 
 .PARAMETER AndroidAPILevel
 The API Level to target when building the Android SDKs. Must be between 21 and 36.
@@ -201,7 +201,7 @@ param
   # Android SDK Options
   [switch] $Android = $false,
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?(-beta[1-9])?$")]
-  [string] $AndroidNDKVersion = "r28c",
+  [string] $AndroidNDKVersion = "r30",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
@@ -463,39 +463,70 @@ $KnownPythons = @{
 }
 
 $PythonModules = @{
+  # One SHA256 per architecture. Most modules are pinned to an architecture
+  # independent source distribution and have the same hashes.
   "packaging" = @{
     Version = "24.1";
-    SHA256 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+    SHA256 = @{
+      AMD64 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+      ARM64 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+    };
     Dependencies = @();
   };
   "setuptools" = @{
     Version = "75.1.0";
-    SHA256 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+    SHA256 = @{
+      AMD64 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+      ARM64 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+    };
     Dependencies = @();
   };
   "psutil" = @{
     Version = "6.1.0";
-    SHA256 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+    SHA256 = @{
+      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+    };
+    Dependencies = @();
+  };
+  "cryptography" = @{
+    Version = "46.0.3";
+    SHA256 = @{
+      AMD64 = "416260257577718c05135c55958b674000baef9a1c7d9e8f306ec60d71db850f";
+      ARM64 = "d89c3468de4cdc4f08a57e214384d0471911a3830fcdaf7a8cc587e42a866372";
+    };
     Dependencies = @();
   };
   "argparse" = @{
     Version = "1.4.0";
-    SHA256 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+    SHA256 = @{
+      AMD64 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+      ARM64 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+    };
     Dependencies = @();
   };
   "six" = @{
     Version = "1.17.0";
-    SHA256 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+    SHA256 = @{
+      AMD64 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+      ARM64 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+    };
     Dependencies = @();
   };
   "traceback2" = @{
     Version = "1.4.0";
-    SHA256 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+    SHA256 = @{
+      AMD64 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+      ARM64 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+    };
     Dependencies = @();
   };
   "linecache2" = @{
     Version = "1.0.0";
-    SHA256 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+    SHA256 = @{
+      AMD64 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+      ARM64 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+    };
     Dependencies = @();
   };
 }
@@ -511,9 +542,9 @@ $KnownNDKs = @{
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
   }
-  "r30-beta2" = @{
-    URL = "https://dl.google.com/android/repository/android-ndk-r30-beta2-windows.zip"
-    SHA256 = "e2c01b70794365a95ad84b5a68b7a52df11b7672097fc3f487cdfd205483d6b5"
+  r30 = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r30-windows.zip"
+    SHA256 = "b830098aaf18b67a42eb831c404e15e5f2990a474f054ac145b0bc957ac6d729"
     ClangVersion = 21
   }
 }
@@ -553,7 +584,7 @@ $KnownCMakes = @{
   "4.4.1" = @{
     AMD64 = @{
       Artifact = "cmake-4.4.1-windows-amd64"
-      URL = "https://cmake.org/files/v4.4/cmake-4.4.1-windows-x86_64.zip"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.4.1/cmake-4.4.1-windows-x86_64.zip"
       SHA256 = "091919E1CDE162B69D2D5E0F3B1F5670C973E72133F78126FBB18042947D6F19"
       FileName = "cmake-4.4.1-windows-x86_64.zip"
       CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-amd64", "cmake-4.4.1-windows-x86_64", "share", "cmake-4.4")
@@ -561,7 +592,7 @@ $KnownCMakes = @{
     };
     ARM64 = @{
       Artifact = "cmake-4.4.1-windows-arm64"
-      URL = "https://cmake.org/files/v4.4/cmake-4.4.1-windows-arm64.zip"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.4.1/cmake-4.4.1-windows-arm64.zip"
       SHA256 = "DC59D9F377F891B8DA42EDE22F53717034A9D093092FCEAF6297FEEEC6AFBA29"
       FileName = "cmake-4.4.1-windows-arm64.zip"
       CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-arm64", "cmake-4.4.1-windows-arm64", "share", "cmake-4.4")
@@ -1725,15 +1756,18 @@ function Get-Dependencies {
       }
 
       $TempRequirementsTxt = New-TemporaryFile
+      $ArchName = $BuildPlatform.Architecture.CMakeName
 
       $Module = $PythonModules[$ModuleName]
-      "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
+      "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256[$ArchName])`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
       foreach ($Dependency in $Module.Dependencies) {
-        $Module = $PythonModules[$Dependency]
-        "$Dependency==$($Dependency.Version) --hash=`"sha256:$($Module.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
+        $DependencyModule = $PythonModules[$Dependency]
+        "$Dependency==$($DependencyModule.Version) --hash=`"sha256:$($DependencyModule.SHA256[$ArchName])`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
       }
 
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
+      # Dependencies are pinned above; --require-hashes rejects anything else
+      # pip would resolve on its own.
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-deps --disable-pip-version-check
 
       Write-Success "$ModuleName"
     }
@@ -1743,7 +1777,8 @@ function Get-Dependencies {
       Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
       if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
-        Install-PythonModule "psutil"   # Required for testing LLDB
+        Install-PythonModule "psutil"       # Required for testing LLDB
+        Install-PythonModule "cryptography" # Required for testing LLDB
       }
     }
 
@@ -1772,10 +1807,6 @@ function Get-Dependencies {
       Write-Success "WiX $($WiX.Version)"
     }
 
-    if (-not $Toolchain) { return }
-
-    DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
-
     if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
       # The make tool isn't part of MSYS
       $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
@@ -1784,6 +1815,10 @@ function Get-Dependencies {
       Expand-ArtifactZip GnuWin32Make-4.4.1.zip GnuWin32Make-4.4.1
       Write-Success "GNUWin32 make 4.4.1"
     }
+
+    if (-not $Toolchain) { return }
+
+    DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
 
     $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
     Invoke-WithArtifactLock "SwiftToolchainExtraction" {
@@ -2055,10 +2090,29 @@ $Compilers.Host = @{
 }
 
 $Assemblers = @{
+  MSVC = @{
+    Executable        = { param([Hashtable] $Platform)
+      if ($Platform.Architecture.VSName -eq "x86") { "ml.exe" } else { "ml64.exe" }
+    }
+    Dialect           = "ASM_MASM"
+    Flags             = { param([Hashtable] $Platform)
+      @("/nologo", "/quiet")
+    }
+    DebugFlags        = { param([string] $Format)
+      @()
+    }
+    AssumeFunctional  = $true
+  }
+
   Pinned = @{
-    Executable        = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
+    Executable        = { param([Hashtable] $Platform)
+      Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
+    }
+    Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
@@ -2066,15 +2120,22 @@ $Assemblers = @{
   }
 
   Stage1 = @{
-    Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+    Executable        = { param([Hashtable] $Platform)
+      [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+    }
+    Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
     AssumeFunctional  = $true
   }
 }
+
+$Assemblers.Host = if ($UseHostToolchain) { $Assemblers.MSVC } else { $Assemblers.Pinned }
 
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
@@ -2090,7 +2151,6 @@ function Build-CMakeProject {
     [Hashtable] $CCompiler = $null,
     [Hashtable] $CXXCompiler = $null,
     [Hashtable] $SwiftCompiler = $null,
-    [switch] $UseASMMASM = $false,
     [switch] $AddAndroidCMakeEnv = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
@@ -2114,7 +2174,6 @@ function Build-CMakeProject {
     }
 
     $UseASM = $Assembler -ne $null
-    $UseASM_MASM = [bool]$UseASMMASM
     $UseC = $CCompiler -ne $null
     $UseCXX = $CXXCompiler -ne $null
     $UseSwift = $SwiftCompiler -ne $null
@@ -2162,29 +2221,33 @@ function Build-CMakeProject {
     switch ($Platform.OS) {
       Windows {
         if ($UseASM) {
-          Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILER $Assembler.Executable
-          Add-KeyValueIfNew $Defines CMAKE_ASM_FLAGS @("--target=$($Platform.Triple)")
-          Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+          $ASMDialect = $Assembler.Dialect
 
-          if ($DebugInfo) {
-            # CMake's MSVC_DEBUG_INFORMATION_FORMAT support also applies to ASM
-            # targets, but clang-cl-as-ASM does not get a built-in mapping for
-            # the Embedded format. Provide the mapping before setting the global
-            # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below.
-            Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
-              $(& $Assembler.DebugFlags $PlatformDebugFormat)
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_COMPILER" (& $Assembler.Executable $Platform)
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_FLAGS" (& $Assembler.Flags $Platform)
+
+          # CMake's assembler detection computes the MSVC-like frontend
+          # correctly but does not cache CMAKE_<ASMDialect>_SIMULATE_ID and
+          # CMAKE_<ASMDialect>_COMPILER_FRONTEND_VARIANT. On every re-configure,
+          # the assembler is reloaded from the saved compiler file with both
+          # fields empty, the Ninja generator then misidentifies it as GCC on
+          # Windows and rewrites the include path with forward slashes,
+          # resulting in a full rebuild.
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_SIMULATE_ID" MSVC
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_COMPILER_FRONTEND_VARIANT" MSVC
+
+          if ($ASMDialect -eq "ASM") {
+            Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+
+            if ($DebugInfo) {
+              # CMake's MSVC_DEBUG_INFORMATION_FORMAT support also applies to ASM
+              # targets, but clang-cl-as-ASM does not get a built-in mapping for
+              # the Embedded format. Provide the mapping before setting the global
+              # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below. MASM has no equivalent.
+              Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
+                $(& $Assembler.DebugFlags $PlatformDebugFormat)
+            }
           }
-        }
-
-        if ($UseASM_MASM) {
-          $ASM_MASM = if ($Platform.Architecture.VSName -eq "x86") {
-            "ml.exe"
-          } else {
-            "ml64.exe"
-          }
-
-          Add-KeyValueIfNew $Defines CMAKE_ASM_MASM_COMPILER $ASM_MASM
-          Add-KeyValueIfNew $Defines CMAKE_ASM_MASM_FLAGS @("/nologo" ,"/quiet")
         }
 
         if ($UseC) {
@@ -2337,7 +2400,7 @@ function Build-CMakeProject {
           } elseif ($UseCXX) {
             $CXXCompiler.Executable
           } elseif ($UseASM) {
-            $Assembler.Executable
+            (& $Assembler.Executable $Platform)
           }
           $ld = Join-Path -Path (Split-Path $Executable) -ChildPath "ld.lld"
           if ($UseSwift) {
@@ -2716,8 +2779,7 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-ProjectBinaryCache $Platform BuildTools) `
     -Platform $Platform `
-    -Assembler $(if ($UseHostToolchain) { $null } else { $Assemblers.Pinned }) `
-    -UseASMMASM:$UseHostToolchain `
+    -Assembler $Assemblers.Host `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
@@ -2950,6 +3012,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
 function Build-Compilers([Hashtable] $Platform,
                          [string]    $Variant,
                          [Project]   $Project          = [Project]::Compilers,
+                         [Hashtable] $Assembler        = $Assemblers.Host,
                          [Hashtable] $CCompiler        = $Compilers.Host.C,
                          [Hashtable] $CXXCompiler      = $Compilers.Host.CXX,
                          [Hashtable] $SwiftCompiler    = $Compilers.Pinned.Swift,
@@ -2965,6 +3028,7 @@ function Build-Compilers([Hashtable] $Platform,
     -Bin (Get-ProjectBinaryCache $Platform $Project) `
     -InstallTo "$ToolchainRoot\usr" `
     -Platform $Platform `
+    -Assembler $Assembler `
     -CCompiler $CCompiler `
     -CXXCompiler $CXXCompiler `
     -SwiftCompiler $SwiftCompiler `
@@ -3318,7 +3382,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
-    if ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
+    elseif ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
@@ -3409,6 +3473,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     Invoke-IsolatingEnvVars {
       # Test-time tools execute on the build host.
+      # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
+      # the test reconfigure here makes lldb compile expressions against the in-
+      # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
+      # uses the shipped runtime instead.
+      # See https://github.com/swiftlang/swift/issues/91537 for details.
       Invoke-VsDevShell $BuildPlatform
       Set-WindowsSxSToolchainRuntime `
         -BinaryDir              $Stage2BinDir `
@@ -3426,8 +3495,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
                                    "swiftc-legacy-driver.exe",
-                                   "lldb.exe",
-                                   "repl_swift.exe"
+                                   "lldb.exe"
                                  )
       # SxS only probes the EXE's own directory for the named assembly.
       if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
@@ -3667,6 +3735,7 @@ function Build-XML2([Hashtable] $Platform,
     -CXXCompiler $CXXCompiler `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_C_FLAGS = @("-w");
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       LIBXML2_WITH_C14N = "NO";
       LIBXML2_WITH_CATALOG = "NO";
@@ -4119,13 +4188,10 @@ function Write-PlatformInfoPlist($PlatformOrOS) {
 }
 
 function Get-SelectedSDKBuilds() {
-  return $KnownPlatforms.Values | Where-Object {
-    switch ($_.OS) {
-      Windows { $Windows }
-      Android { $Android }
-      default { $false }
-    }
-  }
+  $Builds = @()
+  if ($Windows) { $Builds += $WindowsSDKBuilds }
+  if ($Android) { $Builds += $AndroidSDKBuilds }
+  return $Builds
 }
 
 # Promotes C module header directories that libdispatch and Foundation install
@@ -4879,7 +4945,7 @@ function Build-LLBuild([Hashtable] $Platform,
     }
 }
 
-function Test-LLBuild {
+function Test-LLBuild([Hashtable] $Platform) {
   # Build additional llvm executables needed by tests
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $BuildPlatform
@@ -4896,12 +4962,15 @@ function Test-LLBuild {
       -Src $SourceCache\llbuild `
       -Bin (Get-ProjectBinaryCache $BuildPlatform LLBuild) `
       -Platform $Platform `
-      -CXXCompiler $Compilers.Host.CXX `
+      -CXXCompiler $Compilers.Stage1.CXX `
       -SwiftCompiler $Compilers.Stage1.Swift `
       -SwiftSDK (Get-SwiftSDK -OS $BuildPlatform.OS) `
       -BuildTargets default,test-llbuild `
       -Defines @{
         BUILD_SHARED_LIBS = "YES";
+        # Build-LLBuild configures this same directory with BUILD_TESTING=NO,
+        # which drops the tests subdirectory and the test-llbuild target.
+        BUILD_TESTING = "YES";
         FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin", "FileCheck.exe"));
         LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
@@ -5462,13 +5531,45 @@ function Build-Inspect([Hashtable] $Platform,
     -Defines $Defines
 }
 
-function Build-DocC() {
-  Build-SPMProject `
-    -Action Build `
+function Build-SymbolKit([Hashtable] $Platform,
+                         [Hashtable] $Compilers,
+                         [string]    $SwiftSDK) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-docc-symbolkit `
+    -bin (Get-ProjectBinaryCache $Platform SymbolKit) `
+    -Platform $Platform `
+    -CCompiler $Compilers.C `
+    -SwiftCompiler $Compilers.Swift `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    }
+}
+
+function Build-DocC([Hashtable] $Platform,
+                    [Hashtable] $Compilers,
+                    [string]    $SwiftSDK) {
+  Build-CMakeProject `
     -Src $SourceCache\swift-docc `
-    -Bin $(Get-ProjectBinaryCache $BuildPlatform DocC) `
-    -Platform $BuildPlatform `
-    --product docc
+    -Bin (Get-ProjectBinaryCache $Platform DocC) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -CCompiler $Compilers.C `
+    -SwiftCompiler $Compilers.Swift `
+    -SwiftSDK $SwiftSDK `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
+      SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
+      SwiftMarkdown_DIR = (Get-ProjectCMakeModules $Platform Markdown);
+      LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
+      SymbolKit_DIR = (Get-ProjectCMakeModules $Platform SymbolKit);
+      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
+    }
 }
 
 function Test-PackageManager() {
@@ -5815,6 +5916,7 @@ if ($Toolchain) {
   Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
   Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
+    Assembler       = $Assemblers.Host;
     CCompiler       = $Compilers.Host.C;
     CXXCompiler     = $Compilers.Host.CXX;
     SwiftCompiler   = $Compilers.Pinned.Swift;
@@ -5848,6 +5950,7 @@ if ($Toolchain) {
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+    Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
     CXXCompiler     = $Compilers.Stage1.CXX;
     SwiftCompiler   = $Compilers.Stage1.Swift;
@@ -5948,6 +6051,14 @@ if ($Toolchain) {
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
+  Invoke-BuildStep Build-SymbolKit $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+  }
+  Invoke-BuildStep Build-DocC $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
+  }
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
@@ -5960,14 +6071,10 @@ if ($Toolchain) {
 
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
 
-  # FIXME(compnerd) this requires the CMake build to be enabled.
-  if ($false -and -not $IsCrossCompiling) {
-    Invoke-BuildStep Build-DocC $HostPlatform
-  }
-
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
     Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
+      Assembler       = $Assemblers.Stage1;
       CCompiler       = $Compilers.Stage1.C;
       CXXCompiler     = $Compilers.Stage1.CXX;
       SwiftCompiler   = $Compilers.Stage1.Swift;

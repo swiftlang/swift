@@ -79,35 +79,6 @@ void writeJSONValue(llvm::raw_ostream &out, uint32_t value, unsigned indentLevel
   out.write_escaped(std::to_string(value));
 }
 
-/// Write a JSON array.
-template <typename T>
-void writeJSONValue(llvm::raw_ostream &out, ArrayRef<T> values,
-                    unsigned indentLevel) {
-  out << "[\n";
-
-  for (const auto &value : values) {
-
-    out.indent((indentLevel + 1) * 2);
-
-    writeJSONValue(out, value, indentLevel + 1);
-
-    if (&value != &values.back()) {
-      out << ",";
-    }
-    out << "\n";
-  }
-
-  out.indent(indentLevel * 2);
-  out << "]";
-}
-
-/// Write a JSON array.
-template <typename T>
-void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
-                    unsigned indentLevel) {
-  writeJSONValue(out, llvm::ArrayRef(values), indentLevel);
-}
-
 /// Write a single JSON field.
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,

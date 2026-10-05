@@ -20,6 +20,7 @@
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
+#include <climits>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1220,15 +1221,14 @@ recur:
 int Demangler::demangleNatural() {
   if (!isDigit(peekChar()))
     return -1000;
-  int num = 0;
+  uint64_t num = 0;
   while (true) {
     char c = peekChar();
     if (!isDigit(c))
-      return num;
-    int newNum = (10 * num) + (c - '0');
-    if (newNum < num)
+      return (int)num;
+    num = (10 * num) + (c - '0');
+    if (num > INT_MAX)
       return -1000;
-    num = newNum;
     nextChar();
   }
 }
@@ -1237,7 +1237,7 @@ int Demangler::demangleIndex() {
   if (nextIf('_'))
     return 0;
   int num = demangleNatural();
-  if (num >= 0 && nextIf('_'))
+  if (num >= 0 && num < INT_MAX && nextIf('_'))
     return num + 1;
   return -1000;
 }
@@ -1793,6 +1793,9 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   // params-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
 
+  // yields?
+  addChild(FuncType, popNode(Node::Kind::YieldTypes));
+
   // result-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
 
@@ -1822,7 +1825,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
 
   if (FuncType->getKind() != Node::Kind::FunctionType &&
       FuncType->getKind() != Node::Kind::NoEscapeFunctionType &&
-      FuncType->getKind() != Node::Kind::CalledOnceFunctionType)
+      FuncType->getKind() != Node::Kind::CalledOnceFunctionType &&
+      FuncType->getKind() != Node::Kind::CalledAtMostOnceFunctionType)
     return nullptr;
 
   unsigned FirstChildIdx = 0;
@@ -2505,8 +2509,13 @@ NodePointer Demangler::demangleImplFunctionType() {
     type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
                    *this);
 
-  if (nextIf('O'))
-    type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
+  if (nextIf('O')) {
+    if (nextIf('o'))
+      type->addChild(createNode(Node::Kind::ImplCalledAtMostOnceFunction),
+                     *this);
+    else
+      type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
+  }
 
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
@@ -2549,6 +2558,9 @@ NodePointer Demangler::demangleImplFunctionType() {
   case 'O': FConv = "objc_method"; break;
   case 'K': FConv = "closure"; break;
   case 'W': FConv = "witness_method"; break;
+  case 'V':
+    FConv = "com_method";
+    break;
   default: pushBack(); break;
   }
   if (FConv) {
@@ -4027,12 +4039,23 @@ NodePointer Demangler::demangleSpecialType() {
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
     case 'O':
+      if (nextIf('o'))
+        return popFunctionType(Node::Kind::CalledAtMostOnceFunctionType);
       return popFunctionType(Node::Kind::CalledOnceFunctionType);
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);
     case 'j':
       return demangleSymbolicExtendedExistentialType();
+    case 'y': {
+      NodePointer YieldsType = nullptr;
+      if (popNode(Node::Kind::EmptyList)) {
+        YieldsType = createType(createNode(Node::Kind::Tuple));
+      } else {
+        YieldsType = popNode(Node::Kind::Type);
+      }
+      return createWithChild(Node::Kind::YieldTypes, YieldsType);
+    }
     case 'z':
       switch (nextChar()) {
       case 'B':

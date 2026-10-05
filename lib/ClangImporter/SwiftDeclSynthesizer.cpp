@@ -42,11 +42,23 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/DynamicAllocationArgumentsCXX.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Twine.h"
 
 using namespace swift;
 using namespace importer;
+
+ParamDecl *importer::createNewValueParam(ASTContext &ctx, Type type,
+                                         DeclContext *dc) {
+  auto *param =
+      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                          ctx.getIdentifier("newValue"), dc);
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(type);
+  return param;
+}
 
 /// Build forwarding argument expressions for a set of clang parameters.
 /// Parameters with rvalue reference types or move-only value types are wrapped
@@ -305,6 +317,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
   case clang::APValue::Struct:
   case clang::APValue::Union:
   case clang::APValue::Vector:
+  case clang::APValue::Matrix:
     llvm_unreachable("Unhandled APValue kind");
 
   case clang::APValue::Float:
@@ -552,7 +565,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo info;
-  zeroInitializerRef->setType(FunctionType::get({}, selfType, info));
+  zeroInitializerRef->setType(FunctionType::get({}, {}, selfType, info));
 
   auto call = CallExpr::createImplicitEmpty(ctx, zeroInitializerRef);
   call->setType(selfType);
@@ -993,7 +1006,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   addressofFnRefExpr->setType(FunctionType::get(
       AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(), Identifier(),
                              ParameterTypeFlags().withInOut(true)),
-      ctx.TheRawPointerType, addressOfInfo));
+      /* yields */ {}, ctx.TheRawPointerType, addressOfInfo));
 
   auto *selfPtrArgs = ArgumentList::createImplicit(
       ctx, {Argument::implicitInOut(ctx, inoutSelfRef)});
@@ -1015,7 +1028,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   initializeFnRefExpr->setType(FunctionType::get(
       {AnyFunctionType::Param(newValueDecl->getInterfaceType()),
        AnyFunctionType::Param(ctx.TheRawPointerType)},
-      TupleType::getEmpty(ctx), initializeInfo));
+      /* yields */ {}, TupleType::getEmpty(ctx), initializeInfo));
 
   auto *initArgs =
       ArgumentList::forImplicitUnlabeled(ctx, {newValueRef, selfPointer});
@@ -1069,14 +1082,14 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
-  auto recordType = Ctx.getRecordType(structDecl);
+  auto recordType = Ctx.getCanonicalTagType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
   auto cGetterType =
-      Ctx.getFunctionType(fieldDecl->getType(), recordType,
+      Ctx.getFunctionType(fieldDecl->getType(), {recordType},
                           clang::FunctionProtoType::ExtProtoInfo());
   auto cGetterDecl = createClangFunctionDecl(Ctx, structDecl->getDeclContext(),
                                          cGetterName, cGetterType);
@@ -1613,6 +1626,23 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
   return thunk;
 }
 
+ParamDecl *SwiftDeclSynthesizer::cloneParamForForwarding(
+    ASTContext &ctx, ParamDecl *param, const Twine &nameIfUnnamed) {
+  auto *clonedParam = ParamDecl::clone(ctx, param);
+  // Cloning drops the default argument the importer type-checked up front.
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::Normal &&
+      param->hasDefaultExpr()) {
+    clonedParam->setTypeCheckedDefaultExpr(param->getTypeCheckedDefaultExpr());
+    SmallString<0> scratch;
+    clonedParam->setDefaultValueStringRepresentation(
+        param->getDefaultValueStringRepresentation(scratch));
+    assert(scratch.empty() && "imported default arguments store their text");
+  }
+  if (clonedParam->getName().empty())
+    clonedParam->setName(ctx.getIdentifier(nameIfUnnamed.str()));
+  return clonedParam;
+}
+
 // MARK: C++ subscripts
 
 Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
@@ -1630,8 +1660,8 @@ Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo info;
-  reinterpretCastRef->setType(
-      FunctionType::get({FunctionType::Param(givenType)}, exprType, info));
+  reinterpretCastRef->setType(FunctionType::get(
+      {FunctionType::Param(givenType)}, /* yields */ {}, exprType, info));
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
   auto reinterpreted =
@@ -1790,14 +1820,9 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   auto &ctx = ImporterImpl.SwiftContext;
 
   SmallVector<ParamDecl *> paramVec;
-  for (auto [i, param] : llvm::enumerate(*getterImpl->getParameters())) {
-    auto clonedParam = ParamDecl::clone(ctx, param);
-    // If the subscript parameter is unnamed, give it a name to make sure SILGen
-    // creates a variable for it.
-    if (clonedParam->getName().empty())
-      clonedParam->setName(ctx.getIdentifier("__index" + std::to_string(i)));
-    paramVec.push_back(clonedParam);
-  }
+  for (auto [i, param] : llvm::enumerate(*getterImpl->getParameters()))
+    paramVec.push_back(
+        cloneParamForForwarding(ctx, param, "__index" + Twine(i)));
   auto bodyParams = ParameterList::create(ctx, paramVec);
   DeclName name(ctx, DeclBaseName::createSubscript(), bodyParams);
   auto dc = getterImpl->getDeclContext();
@@ -1820,10 +1845,13 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   bool elementIsNoncopyable = false;
   if (auto *nominal = elementTy->getAnyNominal()) {
     if (auto *clangDecl =
-            dyn_cast_or_null<clang::RecordDecl>(nominal->getClangDecl()))
+            dyn_cast_or_null<clang::RecordDecl>(nominal->getClangDecl())) {
+      auto declTy =
+          ImporterImpl.getClangASTContext().getCanonicalTagType(clangDecl);
       elementIsNoncopyable =
-          getCxxValueSemanticsKind(clangDecl->getTypeForDecl(), ImporterImpl) ==
+          getCxxValueSemanticsKind(declTy.getTypePtr(), ImporterImpl) ==
           CxxValueSemanticsKind::MoveOnly;
+    }
   }
 
   bool useAddress =
@@ -1853,6 +1881,10 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                                      ? synthesizeUnwrappingAddressGetterBody
                                      : synthesizeUnwrappingGetterBody,
                                  getterImpl);
+  // Only the getter is recorded: a synthesized setter takes 'newValue' ahead of
+  // the source's parameters, and inference already gives it a dependency at
+  // least as wide as the source's.
+  ImporterImpl.recordForwardingSource(getterDecl, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1861,11 +1893,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
   AccessorDecl *setterDecl = nullptr;
   if (setterImpl) {
-    auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(elementTy);
+    auto paramVarDecl = createNewValueParam(ctx, elementTy, dc);
 
     SmallVector<ParamDecl *> setterParams;
     if (!useAddress)
@@ -1969,6 +1997,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                                      ? synthesizeUnwrappingAddressGetterBody
                                      : synthesizeUnwrappingGetterBody,
                                  getterImpl);
+  ImporterImpl.recordForwardingSource(getterDecl, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1980,11 +2009,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
 
   AccessorDecl *setterDecl = nullptr;
   if (setterImpl) {
-    auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(elementTy);
+    auto paramVarDecl = createNewValueParam(ctx, elementTy, dc);
 
     auto setterParamList = useAddress
                                ? ParameterList::create(ctx, {})
@@ -2253,8 +2278,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       os << "_";
       std::unique_ptr<clang::ItaniumMangleContext> mangler{
           clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
-      auto derivedType = clangCtx.getTypeDeclType(baseClass)
-        .getCanonicalType();
+      auto derivedType = clangCtx.getCanonicalTagType(baseClass);
       mangler->mangleCanonicalTypeName(derivedType, os);
     }
 
@@ -2328,11 +2352,26 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (auto *param : method->parameters()) {
-    params.push_back(clang::ParmVarDecl::Create(
+    auto *newParam = clang::ParmVarDecl::Create(
         clangCtx, newMethod, param->getSourceRange().getBegin(),
         param->getLocation(), param->getIdentifier(), param->getType(),
         param->getTypeSourceInfo(), param->getStorageClass(),
-        /*DefExpr=*/nullptr));
+        /*DefExpr=*/nullptr);
+    // The forwarding method is imported in its own right, so carry over the
+    // annotations that tell Swift what a parameter's lifetime means, alongside
+    // the method-level ones copied above. Without them the importer infers a
+    // dependency for the forwarding method instead of using the one written in
+    // C++, which need not be the same. Annotations on the implicit object
+    // parameter need no copying: they are part of 'methodType'.
+    if (auto *attr = param->getAttr<clang::LifetimeBoundAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::NoEscapeAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    params.push_back(newParam);
   }
   newMethod->setParams(params);
 
@@ -2350,7 +2389,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       /*IsImplicit=*/false);
   if (castThisToNonConstThis) {
     auto baseClassPtr =
-        clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
+        clangCtx.getPointerType(clangCtx.getCanonicalTagType(derivedClass));
     clang::CastKind Kind;
     clang::CXXCastPath Path;
     clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
@@ -2429,13 +2468,8 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   SmallVector<ParamDecl *, 4> newParams;
   newParams.push_back(lhsParam);
 
-  for (auto param : *paramList) {
-    auto clonedParam = ParamDecl::clone(ctx, param);
-    if (clonedParam->getParameterName().empty()) {
-      clonedParam->setName(ctx.getIdentifier("other"));
-    }
-    newParams.push_back(clonedParam);
-  }
+  for (auto param : *paramList)
+    newParams.push_back(cloneParamForForwarding(ctx, param, "other"));
 
   auto oldArgNames = operatorMethod->getName().getArgumentNames();
   SmallVector<Identifier, 4> newArgNames;
@@ -2457,6 +2491,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   topLevelStaticFuncDecl->setStatic();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody,
                                              operatorMethod);
+  ImporterImpl.recordForwardingSource(topLevelStaticFuncDecl, operatorMethod);
 
   // If this is a unary prefix operator (e.g. `!`), add a `prefix` attribute.
   size_t numParams = operatorMethod->getParameters()->size();
@@ -2600,6 +2635,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
   getterDecl->setBodySynthesizer(synthesizeComputedGetterFromCXXMethod, getter);
+  ImporterImpl.recordForwardingSource(getterDecl, getter);
   if (getter->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
     result->setIsGetterMutating(true);
@@ -2608,10 +2644,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   AccessorDecl *setterDecl = nullptr;
   if (setter) {
     auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(getter->getResultInterfaceType());
+        createNewValueParam(ctx, getter->getResultInterfaceType(), dc);
 
     auto setterParamList = ParameterList::create(ctx, {paramVarDecl});
 
@@ -2847,7 +2880,8 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   auto wrapperClangDecl =
       cast<clang::CXXRecordDecl>(wrapperInstDecl->getClangDecl());
-  auto wrapperClangType = clangCtx.getRecordType(wrapperClangDecl).withConst();
+  auto wrapperClangType =
+      clangCtx.getCanonicalTagType(wrapperClangDecl).withConst();
 
   // Create a fake variable with the __SwiftFunctionWrapper<...> type.
   auto fakeWrapperVarDecl = clang::VarDecl::Create(
@@ -2858,7 +2892,8 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto fakeWrapperRefExpr = createClangDeclRefExpr(
       clangCtx, fakeWrapperVarDecl, wrapperClangType, clang::VK_LValue);
 
-  auto functionTypeClangType = clangCtx.getRecordType(functionTypeClangDecl);
+  auto functionTypeClangType =
+      clangCtx.getCanonicalTagType(functionTypeClangDecl);
   auto functionTypeClangInfo =
       clangCtx.getTrivialTypeSourceInfo(functionTypeClangType);
   SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperRefExpr};
@@ -3018,7 +3053,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
           const_cast<clang::CXXRecordDecl *>(cxxRecordDecl)))
     return {};
 
-  clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
+  clang::QualType cxxRecordTy = clangCtx.getCanonicalTagType(cxxRecordDecl);
   clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
 
   llvm::SmallVector<clang::CXXConstructorDecl *, 4> ctorDeclsForSynth;
@@ -3027,31 +3062,24 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         ctorDecl->getAccess() == clang::AS_protected ||
         ctorDecl->isCopyOrMoveConstructor() || ctorDecl->isVariadic())
       continue;
-
-    bool hasDefaultArg = !ctorDecl->parameters().empty() &&
-                         ctorDecl->parameters().back()->hasDefaultArg();
-    // TODO: Add support for default args in ctors for C++ foreign reference
-    // types.
-    if (hasDefaultArg)
-      continue;
     ctorDeclsForSynth.push_back(ctorDecl);
   }
 
   if (ctorDeclsForSynth.empty())
     return {};
 
-  clang::FunctionDecl *operatorNew = nullptr;
-  clang::FunctionDecl *operatorDelete = nullptr;
   clang::ImplicitAllocationParameters IAP(clang::AlignedAllocationMode::No);
   clang::Sema::SFINAETrap trap(clangSema);
-  bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
+  auto foundAllocation = clangSema.FindAllocationFunctions(
       cxxRecordDeclLoc, clang::SourceRange(),
       clang::AllocationFunctionScope::Both,
       clang::AllocationFunctionScope::Both, cxxRecordTy, /*IsArray=*/false, IAP,
-      clang::MultiExprArg(), operatorNew, operatorDelete,
-      /*Diagnose=*/false);
-  if (trap.hasErrorOccurred() || findingAllocFuncFailed || !operatorNew ||
-      operatorNew->isDeleted() ||
+      clang::MultiExprArg(), /*Diagnose=*/false);
+  if (trap.hasErrorOccurred() || !foundAllocation)
+    return {};
+
+  clang::FunctionDecl *operatorNew = foundAllocation->OperatorNew;
+  if (!operatorNew || operatorNew->isDeleted() ||
       operatorNew->getAccess() == clang::AS_private ||
       operatorNew->getAccess() == clang::AS_protected)
     return {};
@@ -3121,11 +3149,19 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
       if (paramBeginLoc.isInvalid() || paramEndLoc.isInvalid())
         paramBeginLoc = paramEndLoc = cxxRecordDeclLoc;
 
+      clang::Expr *defaultArg = nullptr;
+      if (origParam->hasDefaultArg() &&
+          ImporterImpl.isDefaultArgSafeToImport(origParam))
+        defaultArg = origParam->getDefaultArg();
+
       auto *param = clang::ParmVarDecl::Create(
           clangCtx, synthCxxMethodDecl, paramBeginLoc, paramEndLoc, paramIdent,
           origParam->getType(),
           clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
-          clang::SC_None, /*DefArg=*/nullptr);
+          clang::SC_None, defaultArg);
+      param->setScopeInfo(/*scopeDepth=*/0, /*parameterIndex=*/i);
+      if (hasUnsafeAPIAttr(origParam))
+        param->addAttr(clang::SwiftAttrAttr::Create(clangCtx, "import_unsafe"));
       param->setIsUsed();
       synthParams.push_back(param);
     }
@@ -3233,8 +3269,8 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
   clang::Sema::SFINAETrap trap(clangSema);
 
   // Build `Derived * _Nonnull` and `Base * _Nonnull`, and the function type.
-  clang::QualType derivedTy = clangCtx.getRecordType(derivedClass),
-                  baseTy = clangCtx.getRecordType(baseClass);
+  clang::QualType derivedTy = clangCtx.getCanonicalTagType(derivedClass),
+                  baseTy = clangCtx.getCanonicalTagType(baseClass);
 
   clang::QualType derivedPtrTy = clangCtx.getPointerType(derivedTy),
                   basePtrTy = clangCtx.getPointerType(baseTy);
@@ -3399,33 +3435,23 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
        !decl->getDestructor()->isDefaulted()))
     return false;
 
-  auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
-            hasUnsafeAPIAttr(cxxRecord))
-          return true;
+  // Whether a base or field of this type makes the record non-trivial.
+  auto isNonTrivial = [](clang::QualType t) {
+    // N.B. Use Type::getAsCXXRecordDecl() rather than reaching for
+    // RecordType::getDecl(): the latter can be any declaration of the record,
+    // and Swift attributes are not propagated across redeclarations.
+    if (auto *cxxRecord = t->getAsCXXRecordDecl()) {
+      if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+          hasUnsafeAPIAttr(cxxRecord))
+        return false;
 
-        if (!isSufficientlyTrivial(cxxRecord))
-          return false;
-      }
+      return !isSufficientlyTrivial(cxxRecord);
     }
 
-    return true;
+    return false;
   };
 
-  for (auto field : decl->fields()) {
-    if (!checkType(field->getType()))
-      return false;
-  }
-
-  for (auto base : decl->bases()) {
-    if (!checkType(base.getType()))
-      return false;
-  }
-
-  return true;
+  return !anySubobjectTypeSatisfies(decl, isNonTrivial);
 }
 
 /// Find an explicitly-provided "destroy" operation specified for the
@@ -3499,8 +3525,14 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   // If this type isn't imported as noncopyable, we can't respect the request
   // for a destroy operation.
   ASTContext &ctx = ImporterImpl.SwiftContext;
-  auto valueSemanticsKind =
-      getCxxValueSemanticsKind(clangType->getTypeForDecl(), ImporterImpl);
+  CxxValueSemanticsKind valueSemanticsKind;
+  {
+    auto *clangDeclType = ImporterImpl.getClangASTContext()
+                              .getCanonicalTagType(clangType)
+                              .getTypePtr();
+
+    valueSemanticsKind = getCxxValueSemanticsKind(clangDeclType, ImporterImpl);
+  }
 
   if (valueSemanticsKind == CxxValueSemanticsKind::Unknown)
     return nullptr;

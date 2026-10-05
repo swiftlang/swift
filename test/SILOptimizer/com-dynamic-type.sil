@@ -1,0 +1,22 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all -common-subexpression-elimination -dce %S/../Inputs/COMDynamicType.sil | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -compute-side-effects %S/../Inputs/COMDynamicType.sil | %FileCheck %s --check-prefix=EFFECTS
+
+// CHECK-LABEL: sil {{.*}}@com_dynamic_type
+// CHECK: existential_metatype
+// CHECK: existential_metatype
+// CHECK: return
+// CHECK-LABEL: sil {{.*}}@com_unused_dynamic_type
+// CHECK: existential_metatype
+// CHECK: return
+// Ordinary class-bound existential metadata queries can still be combined.
+// CHECK-LABEL: sil {{.*}}@native_dynamic_type
+// CHECK: existential_metatype
+// CHECK-NOT: existential_metatype
+// CHECK: return
+
+// EFFECTS-LABEL: sil {{.*}}@com_dynamic_type
+// EFFECTS: [global: read,write,copy,destroy,allocate,deinit_barrier]
+// EFFECTS-LABEL: sil {{.*}}@com_unused_dynamic_type
+// EFFECTS: [global: read,write,copy,destroy,allocate,deinit_barrier]

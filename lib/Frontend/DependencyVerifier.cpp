@@ -16,19 +16,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Parse/Lexer.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/Support/FormatVariadic.h"
 
 using namespace swift;
 
@@ -179,14 +175,6 @@ struct Obligation {
 
   public:
     struct Info {
-      static inline Obligation::Key getEmptyKey() {
-        return Obligation::Key{llvm::DenseMapInfo<StringRef>::getEmptyKey(),
-                               static_cast<Expectation::Kind>(~0)};
-      }
-      static inline Obligation::Key getTombstoneKey() {
-        return Obligation::Key{llvm::DenseMapInfo<StringRef>::getTombstoneKey(),
-                               static_cast<Expectation::Kind>(~0U - 1)};
-      }
       static unsigned getHashValue(const Obligation::Key &Val) {
         return llvm::hash_combine(Val.Name, Val.Kind);
       }

@@ -240,9 +240,6 @@ class Remangler : public RemanglerBase {
     Words.push_back(word, Factory);
   }
 
-  template <typename Mangler>
-  friend void mangleIdentifier(Mangler &M, StringRef ident);
-
   class EntityContext {
     bool AsContext = false;
   public:
@@ -855,6 +852,14 @@ ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
   RETURN_IF_ERROR(
       mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XO";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleCalledAtMostOnceFunctionType(Node *node,
+                                                            unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
+  Buffer << "XOo";
   return ManglingError::Success;
 }
 
@@ -1995,6 +2000,12 @@ ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplCalledAtMostOnceFunction(Node *node,
+                                                            unsigned depth) {
+  Buffer << "Oo";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
   Buffer << 'T';
   return ManglingError::Success;
@@ -2084,6 +2095,7 @@ ManglingError Remangler::mangleImplFunctionConvention(Node *node,
                       .Case("objc_method", 'O')
                       .Case("closure", 'K')
                       .Case("witness_method", 'W')
+                      .Case("com_method", 'V')
                       .Default(0);
   DEMANGLER_ASSERT(FuncAttr && "invalid impl function convention", node);
   if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
@@ -2204,6 +2216,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplCalledOnceFunction:
         Buffer << 'O';
+        break;
+      case Node::Kind::ImplCalledAtMostOnceFunction:
+        Buffer << "Oo";
         break;
       case Node::Kind::ImplSendingResult:
         Buffer << 'T';
@@ -2521,6 +2536,12 @@ ManglingError Remangler::mangleMetaclass(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
+}
+
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleArgumentTuple(node, depth + 1));
+  Buffer << "Xy";
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, unsigned depth) {

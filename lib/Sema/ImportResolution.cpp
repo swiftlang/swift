@@ -22,9 +22,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -33,14 +31,11 @@
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/TargetParser/Host.h"
 #include <algorithm>
-#include <system_error>
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -223,11 +218,6 @@ private:
 
   // Ignore other decls.
   void visitDecl(Decl *D) {}
-
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
-  }
 
   /// Calls \c bindImport() on unbound imports until \c boundImports is drained.
   void bindPendingImports();

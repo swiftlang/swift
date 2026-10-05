@@ -51,3 +51,25 @@ extension Int {
 }
 
 let _ = .optional?^.foo()
+
+// Disjunction pruning needed a carveout for the 'any Sendable' bind 'Any' hack.
+do {
+  func testInOut(_ arr: inout [Any]) {}
+  func testInOut(_ dict: inout [String: Any]) {}
+
+  @preconcurrency var dict: [String : any Sendable] = ["a": 42]
+  @preconcurrency var arr: [any Sendable] = [42]
+
+  testInOut(&arr)
+  testInOut(&dict)
+}
+
+do {
+  enum E {
+    case c
+  }
+
+  func f(d: [E: any Sendable]) {
+    let _: Any? = d[.c]
+  }
+}

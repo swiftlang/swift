@@ -21,6 +21,8 @@
 #define SWIFT_THREADING_THREAD_SANITIZER_H
 
 #include "swift/shims/Visibility.h"
+#include "swift/ABI/MetadataValues.h"
+#include "swift/Runtime/Config.h"
 
 namespace swift {
 
@@ -55,8 +57,10 @@ template <typename T> T *release(T *ptr) { return ptr; }
 namespace threading_impl {
 
 SWIFT_THREADING_EXPORT bool _swift_tsan_enabled;
-SWIFT_THREADING_EXPORT void (*_swift_tsan_acquire)(const void *ptr);
-SWIFT_THREADING_EXPORT void (*_swift_tsan_release)(const void *ptr);
+SWIFT_THREADING_EXPORT void (* __ptrauth_swift_thread_sanitizer_hook
+                             _swift_tsan_acquire)(const void *ptr);
+SWIFT_THREADING_EXPORT void (* __ptrauth_swift_thread_sanitizer_hook
+                             _swift_tsan_release)(const void *ptr);
 
 } // namespace threading_impl
 

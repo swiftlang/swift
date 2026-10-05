@@ -18,7 +18,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/Module.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/Path.h"

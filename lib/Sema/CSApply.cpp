@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CSDiagnostics.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
@@ -38,12 +37,10 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
@@ -56,7 +53,6 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -841,7 +837,8 @@ namespace {
     /// metatype).
     Expr *openExistentialReference(Expr *base,
                                    ExistentialArchetypeType *archetype,
-                                   ValueDecl *member, SourceLoc memberLoc) {
+                                   ValueDecl *member, SourceLoc memberLoc,
+                                   bool isArgument = false) {
       assert(archetype && "archetype not already opened?");
 
       // Dig out the base type.
@@ -872,9 +869,12 @@ namespace {
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
 
       // Embedded Swift has limitations on the use of generic members of
-      // existentials. Diagnose them here.
-      diagnoseGenericMemberOfExistentialInEmbedded(
-          dc, memberLoc, baseTy, member);
+      // existentials. Diagnose them here. Opening an argument is diagnosed by
+      // the caller, which has the argument expression a fix-it can attach to.
+      if (!isArgument) {
+        diagnoseGenericMemberOfExistentialInEmbedded(
+            dc, memberLoc, baseTy, member);
+      }
 
       // If the base was an lvalue but it will only be treated as an
       // rvalue, turn the base into an rvalue now. This results in
@@ -1213,14 +1213,15 @@ namespace {
       // callee params, hand it over to the conditional 'self' call, and use it
       // to update the type of the called expression with respect to whether
       // it's 'self'-curried.
-      auto *const newCalleeFnTy = FunctionType::get(
-          newCalleeParams, calleeFnTy->getResult(), calleeFnTy->getExtInfo());
+      auto *const newCalleeFnTy =
+          FunctionType::get(newCalleeParams, /* yields */ {},
+                            calleeFnTy->getResult(), calleeFnTy->getExtInfo());
 
       // If given, apply the base expression to the curried 'self'
       // parameter first.
       if (baseExpr) {
-        fnExpr->setType(FunctionType::get(fnTy->getParams(), newCalleeFnTy,
-                                          fnTy->getExtInfo()));
+        fnExpr->setType(FunctionType::get(fnTy->getParams(), fnTy->getYields(),
+                                          newCalleeFnTy, fnTy->getExtInfo()));
         cs.cacheType(fnExpr);
 
         fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(),
@@ -2584,9 +2585,8 @@ namespace {
           flags = flags.withInOut(true);
 
         auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-        return FunctionType::get({selfParam},
-                                 resultTy->getResult(),
-                                 resultTy->getExtInfo());
+        return FunctionType::get({selfParam}, /* yields */ {},
+                                 resultTy->getResult(), resultTy->getExtInfo());
       };
 
       auto *resultTySelf = getOpenedInitializerType(
@@ -4209,6 +4209,24 @@ namespace {
           expr->getElseExpr(), resultTy,
           cs.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(false))));
 
+      // If both branches inject their result into an optional, rewrite the
+      // ternary in terms of the injected values and then inject the result
+      // of the ternary. This is an opportunistic hack to help diagnostics
+      // which simplistically pattern match on the outermost expression
+      // being an InjectIntoOptionalExpr.
+      if (isa<InjectIntoOptionalExpr>(expr->getThenExpr()) &&
+          isa<InjectIntoOptionalExpr>(expr->getElseExpr())) {
+        auto objectTy = resultTy->getOptionalObjectType();
+        cs.setType(expr, objectTy);
+
+        auto *thenExpr = cast<InjectIntoOptionalExpr>(expr->getThenExpr());
+        auto *elseExpr = cast<InjectIntoOptionalExpr>(expr->getElseExpr());
+        expr->setThenExpr(thenExpr->getSubExpr());
+        expr->setElseExpr(elseExpr->getSubExpr());
+
+        return cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, resultTy));
+      }
+
       return expr;
     }
     
@@ -5340,8 +5358,8 @@ namespace {
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
-          FunctionType::get({FunctionType::Param(baseTy)}, kpResultTy,
-                            closureInfo);
+          FunctionType::get({FunctionType::Param(baseTy)},
+                            /* yields */ {}, kpResultTy, closureInfo);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, kpResultTy, dc);
 
@@ -6535,9 +6553,16 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       auto knownOpened = solution.OpenedExistentialTypes.find(
           cs.getConstraintLocator(argLoc));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        // Embedded Swift cannot specialize the callee for the opened
+        // archetype, so diagnose the opening before performing it.
+        diagnoseOpenedExistentialArgumentInEmbedded(
+            dc, argExpr, argType->getWithoutSpecifierType(),
+            callee.getDecl(), paramIdx);
+
         argExpr = openExistentialReference(
             argExpr, knownOpened->second, callee.getDecl(),
-            apply ? apply->getLoc() : argExpr->getLoc());
+            apply ? apply->getLoc() : argExpr->getLoc(),
+            /*isArgument=*/true);
         argType = cs.getType(argExpr);
       }
     }
@@ -7735,7 +7760,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             param.withFlags(param.getParameterFlags().withNoDerivative(true));
         }
 
-        fromFunc = FunctionType::get(params, fromFunc->getResult(), newEI);
+        fromFunc = FunctionType::get(params, fromFunc->getYields(),
+                                     fromFunc->getResult(), newEI);
         switch (toEI.getDifferentiabilityKind()) {
         // TODO: Ban `Normal` and `Forward` cases.
         case DifferentiabilityKind::Normal:
@@ -7866,14 +7892,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate the
-    // '@called(once)' bit to the closure without invalidating prior analysis.
+    // '@called(atMostOnce)' bit to the closure without invalidating prior
+    // analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.isCalledOnce() && !fromEI.isCalledOnce()) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withCalledOnce());
+    if (toEI.hasCalledAtMostOnceSemantics() &&
+        !fromEI.hasCalledAtMostOnceSemantics()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withExecutionSemantics(toEI.getExecutionSemantics()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
-        // Propagating '@called(once)' might have satisfied the entire
+        // Propagating '@called(atMostOnce)' might have satisfied the entire
         // conversion. If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;
@@ -7920,9 +7949,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         };
 
         if (requiresRuntimeCheck()) {
-          auto isolatedToType =
-              FunctionType::get(toFunc->getParams(), toFunc->getResult(),
-                                toEI.withGlobalActor(fromEI.getGlobalActor()));
+          auto isolatedToType = FunctionType::get(
+              toFunc->getParams(), toFunc->getYields(), toFunc->getResult(),
+              toEI.withGlobalActor(fromEI.getGlobalActor()));
 
           // Global actor might not be the only difference, let's introduce
           // a function conversion first but with matching isolation.
@@ -8353,12 +8382,14 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
                                DeclNameLoc(), loc, loc,
                                /*implicit=*/true, AccessSemantics::Ordinary);
 
+  auto argsRange = args->getSourceRange();
+
   // Construct argument to the method (either an array or dictionary
   // expression).
   Expr *argExpr = nullptr;
   if (!useKwargsMethod) {
-    argExpr = ArrayExpr::create(ctx, SourceLoc(), args->getArgExprs(), {},
-                                SourceLoc());
+    argExpr = ArrayExpr::create(ctx, argsRange.Start, args->getArgExprs(), {},
+                                argsRange.End);
     cs.setType(argExpr, argumentType);
     finishArrayExpr(cast<ArrayExpr>(argExpr));
   } else {
@@ -8370,9 +8401,15 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (auto arg : *args) {
+      // An unlabeled argument contributes an empty key, so fall back to the
+      // start of the argument for the same reason as above.
+      auto labelLoc = arg.getLabelLoc();
+      if (labelLoc.isInvalid())
+        labelLoc = arg.getStartLoc();
+
       Expr *labelExpr =
-        new (ctx) StringLiteralExpr(arg.getLabel().get(), arg.getLabelLoc(),
-                                    /*Implicit*/ true);
+          new (ctx) StringLiteralExpr(arg.getLabel().get(), labelLoc,
+                                      /*Implicit*/ true);
       cs.setType(labelExpr, keyType);
       handleStringLiteralExpr(cast<LiteralExpr>(labelExpr));
 
@@ -8383,8 +8420,8 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
       cs.setType(pair, TupleType::get(eltTypes, ctx));
       dictElements.push_back(pair);
     }
-    argExpr = DictionaryExpr::create(ctx, SourceLoc(), dictElements, {},
-                                     SourceLoc());
+    argExpr = DictionaryExpr::create(ctx, argsRange.Start, dictElements, {},
+                                     argsRange.End);
     cs.setType(argExpr, argumentType);
     finishDictionaryExpr(cast<DictionaryExpr>(argExpr));
   }
@@ -8446,9 +8483,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         bodyArgFnTy = cast<FunctionType>(
           bodyArgFnTy->withExtInfo(bodyArgFnTy->getExtInfo().withNoEscape(false)));
         bodyFnTy = cast<FunctionType>(
-          FunctionType::get(bodyFnTy->getParams()[0].withType(bodyArgFnTy),
-                            bodyFnTy->getResult())
-            ->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+            FunctionType::get(bodyFnTy->getParams()[0].withType(bodyArgFnTy),
+                              /* yields */ {}, bodyFnTy->getResult())
+                ->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
         body = coerceToType(body, bodyFnTy, locator);
         assert(body && "can't make nonescaping?!");
 
@@ -9254,7 +9291,7 @@ static Expr *wrapAsyncLetInitializer(
 
   // Form the autoclosure expression. The actual closure here encapsulates the
   // child task.
-  auto closureType = FunctionType::get({ }, initializerType, extInfo);
+  auto closureType = FunctionType::get({}, {}, initializerType, extInfo);
   Expr *autoclosureExpr = cs.buildAutoClosureExpr(
       initializer, closureType, dc, /*isDefaultWrappedValue=*/false,
       /*isAsyncLetWrapper=*/true);

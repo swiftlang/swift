@@ -18,7 +18,6 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEmbedded.h"
-#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTPrinter.h"
@@ -36,6 +35,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -48,13 +48,11 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "Sema"
@@ -1595,9 +1593,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 DeferredDiags swift::findSyntacticErrorForConsume(
     ModuleDecl *module, SourceLoc loc, Expr *subExpr,
     llvm::function_ref<Type(Expr *)> getType) {
+  DeferredDiags result;
+
+  // LifetimeResolution can handle all kinds of consumes, such as those on
+  // copyable types and results of functions, without restrictions.
+  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
+    return result;
+
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 
-  DeferredDiags result;
   const bool noncopyable =
       getType(subExpr)->isNoncopyable();
 
@@ -2324,10 +2328,10 @@ public:
       return false;
     }
 
-    // Escaping `@called(once)` closures are allowed to implicitly capture
+    // Escaping `@called(atMostOnce)` closures are allowed to implicitly capture
     // `self` because the call (which is a consuming operation) would break
     // the cycle.
-    if (isCalledOnce(CE)) {
+    if (hasCalledAtMostOnceSemantics(CE)) {
       return false;
     }
 
@@ -2354,9 +2358,9 @@ public:
     return false;
   }
 
-  static bool isCalledOnce(const AbstractClosureExpr *ACE) {
+  static bool hasCalledAtMostOnceSemantics(const AbstractClosureExpr *ACE) {
     if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-      return funcTy->isCalledOnce();
+      return funcTy->hasCalledAtMostOnceSemantics();
     }
 
     return false;
@@ -2956,7 +2960,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 }
 
 /// Diagnose cases where a `sending` capture is associated with a
-/// non-`@called(once)` closure.
+/// non-`@called(atMostOnce)` closure.
 static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
                                                       const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -2982,7 +2986,7 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
             return Action::Stop();
           }
 
-          if (!captureList->getClosureBody()->isCalledOnce()) {
+          if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
             Ctx.Diags.diagnose(V->getLoc(),
                                diag::sending_capture_decl_requires_called_once);
             V->setInvalid();

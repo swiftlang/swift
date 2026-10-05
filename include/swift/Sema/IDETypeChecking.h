@@ -24,7 +24,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include <memory>
 #include <tuple>
 
 namespace swift {

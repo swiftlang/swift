@@ -18,7 +18,6 @@
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -26,7 +25,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -37,8 +35,6 @@
 #include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
-#include "clang/AST/DeclarationName.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
@@ -564,11 +560,8 @@ public:
 
     // If our instance type is not already @moveOnly wrapped, and it's a
     // no-implicit-copy parameter, wrap it.
-    //
-    // Unless the function is using ManualOwnership, which checks for
-    // no-implicit-copies using a different mechanism.
     if (!isNoImplicitCopy && instanceType->isCopyable() &&
-        !SGF.B.hasManualOwnershipAttr()) {
+        SGF.usingWrapperTypeImplicitCopyEnforcement()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -1327,7 +1320,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         if (mv.getType().isAddress()) {
           // If the enum is address-only, take from the enum we have and load it
           // if the element value is loadable.
-          assert((eltTL.isTrivial() || mv.hasCleanup()) &&
+          assert((eltTL.isTrivial(&SGF.F) || mv.hasCleanup()) &&
                  "must be able to consume value");
           mv = SGF.B.createUncheckedEnumDataAddrForTake(loc, mv, eltDecl, eltTy);
           // Load a loadable data value.
@@ -1568,8 +1561,10 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
   if (!targetTL.isLoadableOrOpaque(SGF.F)) {
     payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
   } else {
+    // A copyable payload in a non-Copyable existential can be trivial
     payload = SGF.emitManagedRValueWithCleanup(
-        SGF.B.createLoad(loc, destAddr, LoadOwnershipQualifier::Take), targetTL);
+        SGF.B.createTrivialLoadOr(loc, destAddr, LoadOwnershipQualifier::Take),
+        targetTL);
   }
   subInitialization->copyOrInitValueInto(SGF, loc, payload, /*isInit=*/true);
   // Note: our own finishInitialization() forwards to subInitialization, so
@@ -2373,7 +2368,7 @@ SILGenFunction::useBufferAsTemporary(SILValue addr,
 CleanupHandle
 SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
                                              const TypeLowering &tempTL) {
-  if (tempTL.isTrivial())
+  if (tempTL.isTrivial(&F))
     return CleanupHandle::invalid();
 
   Cleanups.pushCleanupInState<ReleaseValueCleanup>(CleanupState::Dormant, addr);
@@ -2428,7 +2423,7 @@ SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(addr->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forTrivialAddressRValue(addr);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2443,7 +2438,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(value->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(value);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2456,7 +2451,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
 CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
     SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
-  if (tempTL.isTrivial())
+  if (tempTL.isTrivial(&F))
     return CleanupHandle::invalid();
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();

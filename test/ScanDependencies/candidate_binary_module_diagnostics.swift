@@ -5,7 +5,7 @@
 // RUN: split-file %s %t
 
 // RUN: echo "Not Really a module" >> %t/moduleInputs/FooBar.swiftmodule
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/main.swift -o %t/deps.json -I %t/moduleInputs -diagnostic-style llvm -scanner-module-validation 2>&1 | %FileCheck %s -check-prefix=ERROR
+// RUN: not %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/main.swift -o %t/deps.json -I %t/moduleInputs -diagnostic-style llvm -scanner-module-validation 2>&1 | %FileCheck %s -check-prefix=ERROR
 
 // ERROR: error: unable to resolve Swift module dependency to a compatible module: 'FooBar'
 // ERROR: note: found incompatible module '{{.*}}{{/|\\}}moduleInputs{{/|\\}}FooBar.swiftmodule': malformed

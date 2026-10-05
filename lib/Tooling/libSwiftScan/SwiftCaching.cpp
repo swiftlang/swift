@@ -42,7 +42,6 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PrefixMapper.h"

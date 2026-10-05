@@ -12,7 +12,6 @@
 
 #include "swift/Basic/PointerIntEnum.h"
 #include "swift/Basic/type_traits.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

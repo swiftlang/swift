@@ -17,13 +17,10 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -193,6 +190,30 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
       AllowMarkerProtocols, false);
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty, Sig);
+  });
+}
+
+/// Mangle a protocol name for reflection records built with
+/// addNominalRef(), the protocol's own field descriptor, and the
+/// protocol of an associated type
+/// descriptor. EmptyStructMetadataBuilder also uses addNominalRef(),
+/// but only for structs and enums, never protocols.
+SymbolicMangling
+IRGenMangler::mangleBareProtocol(IRGenModule &IGM,
+                                 const ProtocolDecl *Decl) {
+  // Keep @objc protocols textual: references to them match this name
+  // or skip it.
+  if (Decl->isObjC()) {
+    beginMangling();
+    appendAnyGenericType(Decl);
+    return {finalize(), {}};
+  }
+
+  // Refer to Swift protocols symbolically. The textual name of a private
+  // protocol contains a private discriminator, which reflection cannot
+  // recover from the protocol descriptor, so the names would never match.
+  return withSymbolicReferences(IGM, [&]{
+    appendAnyGenericType(Decl);
   });
 }
 

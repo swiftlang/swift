@@ -16,7 +16,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <vector>
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -96,8 +95,8 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
   for (auto symbol : mutableTerm)
     id.AddPointer(symbol.getOpaquePointer());
 
-  void *insertPos = nullptr;
-  if (auto *term = ctx.Terms.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *term = ctx.Terms.lookup(id, insertToken))
     return term;
 
   void *mem = ctx.Allocator.Allocate(
@@ -107,7 +106,7 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
   for (unsigned i = 0; i < size; ++i)
     term->getElements()[i] = mutableTerm[i];
 
-  ctx.Terms.InsertNode(term, insertPos);
+  ctx.Terms.insert(term, insertToken);
   ctx.TermHistogram.add(size);
 
   return term;

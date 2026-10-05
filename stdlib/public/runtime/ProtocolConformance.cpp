@@ -25,6 +25,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/SignedPointerUnion.h"
 #include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -568,43 +569,77 @@ namespace {
     }
   };
 
+  // Relative witness tables use signed pointers. When we're storing those
+  // signed pointers in a signed field, we need to authenticate first to avoid
+  // mixing the two signatures together.
+  static const WitnessTable *
+  authRelativeWitnessTableForCache(const WitnessTable *witness) {
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+    if (witness && !(reinterpret_cast<uintptr_t>(witness) & 0x1))
+      witness = swift_auth_data_non_address(
+          witness,
+          SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#endif
+    return witness;
+  }
+
+  static const WitnessTable *
+  resignRelativeWitnessTableFromCache(const WitnessTable *witness) {
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+    if (witness && !(reinterpret_cast<uintptr_t>(witness) & 0x1))
+      witness = swift_sign_data_non_address(
+          witness,
+          SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#endif
+    return witness;
+  }
+
   struct ConformanceCacheEntry {
   public:
     /// Storage used when we have global actor isolation on the conformance.
     struct ExtendedStorage {
       /// The protocol to which the type conforms.
-      const ProtocolDescriptor *Proto;
+      const ProtocolDescriptor * __ptrauth_swift_conformance_cache_storage_protocol
+          Proto;
 
       /// The global actor to which this conformance is isolated, or NULL for
       /// a nonisolated conformances.
-      const Metadata *globalActorIsolationType = nullptr;
+      const Metadata * __ptrauth_swift_conformance_cache_storage_global_actor_type
+          globalActorIsolationType = nullptr;
 
       /// When the conformance is global-actor-isolated, this is the conformance
       /// of globalActorIsolationType to GlobalActor.
-      const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+      const WitnessTable * __ptrauth_swift_protocol_witness_table_pointer
+          globalActorIsolationWitnessTable = nullptr;
 
       /// The next pointer in the list of extended storage allocations.
-      ExtendedStorage *next = nullptr;
+      ExtendedStorage * __ptrauth_swift_conformance_cache_storage_next
+          next = nullptr;
     };
 
-    llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *>
+    SignedPointerUnion<const Metadata *, const TypeContextDescriptor *,
+                       SpecialPointerAuthDiscriminators::
+                           ConformanceCacheTypeOrDescriptor>
         TypeOrDescriptor;
-    llvm::PointerUnion<const ProtocolDescriptor *, ExtendedStorage *>
+    SignedPointerUnion<const ProtocolDescriptor *, ExtendedStorage *,
+                       SpecialPointerAuthDiscriminators::
+                           ConformanceCacheProtoOrStorage>
         ProtoOrStorage;
 
     union {
       /// The witness table. Used for type cache records.
-      const WitnessTable *Witness;
+      const WitnessTable * __ptrauth_swift_protocol_witness_table_pointer Witness;
 
       /// The conformance. Used for type descriptor cache records.
-      const ProtocolConformanceDescriptor *Conformance;
+      const ProtocolConformanceDescriptor * __ptrauth_swift_protocol_conformance_descriptor Conformance;
     };
 
   public:
     ConformanceCacheEntry(const Metadata *type, const ProtocolDescriptor *proto,
                           ConformanceLookupResult result,
                           std::atomic<ExtendedStorage *> &storageHead)
-        : TypeOrDescriptor(type), Witness(result.witnessTable) {
+        : TypeOrDescriptor(type),
+          Witness(authRelativeWitnessTableForCache(result.witnessTable)) {
       if (!result.globalActorIsolationType) {
         ProtoOrStorage = proto;
         return;
@@ -612,10 +647,10 @@ namespace {
 
       // Allocate extended storage.
       void *memory = malloc(sizeof(ExtendedStorage));
-      auto storage = new (memory) ExtendedStorage{
-        proto, result.globalActorIsolationType,
-        result.globalActorIsolationWitnessTable
-      };
+      auto storage = new (memory)
+          ExtendedStorage{proto, result.globalActorIsolationType,
+                          authRelativeWitnessTableForCache(
+                              result.globalActorIsolationWitnessTable)};
 
       ProtoOrStorage = storage;
 
@@ -640,12 +675,28 @@ namespace {
       assert(ProtoOrStorage);
     }
 
+    ConformanceCacheEntry(const ConformanceCacheEntry &other)
+        : TypeOrDescriptor(other.TypeOrDescriptor), ProtoOrStorage(other.ProtoOrStorage) {
+      if (TypeOrDescriptor.is<const Metadata *>())
+        Witness = other.Witness;
+      else
+        Conformance = other.Conformance;
+    }
+
     bool matchesKey(const ConformanceCacheKey &key) const {
-      return TypeOrDescriptor == key.TypeOrDescriptor && getProtocol() == key.Proto;
+      return getTypeOrDescriptorUnion() == key.TypeOrDescriptor &&
+             getProtocol() == key.Proto;
     }
 
     friend llvm::hash_code hash_value(const ConformanceCacheEntry &entry) {
       return hash_value(entry.getKey());
+    }
+
+    llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *>
+    getTypeOrDescriptorUnion() const {
+      if (TypeOrDescriptor.is<const Metadata *>())
+        return TypeOrDescriptor.get<const Metadata *>();
+      return TypeOrDescriptor.get<const TypeContextDescriptor *>();
     }
 
     /// Get the protocol.
@@ -661,22 +712,26 @@ namespace {
 
     /// Get the conformance cache key.
     ConformanceCacheKey getKey() const {
-      return ConformanceCacheKey(TypeOrDescriptor, getProtocol());
+      return ConformanceCacheKey(getTypeOrDescriptorUnion(), getProtocol());
     }
 
     /// Get the cached witness table, or null if we cached failure.
     const WitnessTable *getWitnessTable() const {
-      return Witness;
+      return resignRelativeWitnessTableFromCache(Witness);
     }
 
     ConformanceLookupResult getResult() const {
-      if (ProtoOrStorage.is<const ProtocolDescriptor *>())
-        return ConformanceLookupResult { Witness, nullptr, nullptr };
+      if (ProtoOrStorage.is<const ProtocolDescriptor *>()) {
+        return ConformanceLookupResult{
+            resignRelativeWitnessTableFromCache(Witness), nullptr, nullptr};
+      }
 
       if (auto storage = ProtoOrStorage.dyn_cast<ExtendedStorage *>()) {
         return ConformanceLookupResult(
-            Witness, storage->globalActorIsolationType,
-            storage->globalActorIsolationWitnessTable);
+            resignRelativeWitnessTableFromCache(Witness),
+            storage->globalActorIsolationType,
+            resignRelativeWitnessTableFromCache(
+                storage->globalActorIsolationWitnessTable));
       }
 
       return nullptr;

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -Xllvm -sil-disable-pass=onone-simplification -emit-sil \
 // RUN: -enable-experimental-feature Lifetimes \
-// RUN: -disable-availability-checking \
+// RUN: -target %target-swift-6.2-abi-triple \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes

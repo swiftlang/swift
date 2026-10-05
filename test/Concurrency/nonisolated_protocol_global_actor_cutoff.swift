@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library %s -emit-sil -o /dev/null -verify -language-mode 6
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library %s -emit-sil -o /dev/null -verify -language-mode 6 -enable-experimental-feature NoExplicitNonIsolated
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature NoExplicitNonIsolated
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_NoExplicitNonIsolated
@@ -9,6 +9,18 @@ func onMain() {}
 
 @MainActor
 protocol IsolatedBase {}
+
+@MainActor
+// expected-note@+1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+class Req {}
+
+protocol IsolatedRequirements: IsolatedBase {
+  var req: Req { get }
+}
+
+nonisolated protocol NonisolatedRequirements: IsolatedBase {
+  var req: Req { get }
+}
 
 nonisolated protocol NonisolatedRefinement: IsolatedBase {}
 
@@ -41,4 +53,13 @@ struct E: IsolatedRefinement {
 
 struct F: NonisolatedRefinement, IsolatedBase {
   func k() { onMain() }
+}
+
+struct S: IsolatedRequirements {
+  var req = Req()
+}
+
+struct S2: NonisolatedRequirements {
+  // expected-error@+1{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
+  var req = Req()
 }

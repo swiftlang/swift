@@ -18,7 +18,6 @@
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include <string>
 
 namespace swift {
@@ -135,9 +134,12 @@ public:
   StringRef getFineModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FineModuleTracePath;
   }
-  StringRef getSerializedDiagnosticsPath() const {
+  StringRef getLLVMBitcodeDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs
-        .SerializedDiagnosticsPath;
+        .LLVMBitcodeDiagnosticsPath;
+  }
+  StringRef getSARIFDiagnosticsPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.SARIFDiagnosticsPath;
   }
   StringRef getFixItsOutputPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;

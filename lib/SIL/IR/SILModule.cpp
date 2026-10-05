@@ -27,15 +27,12 @@
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/YAMLTraits.h"
 #include <functional>
 using namespace swift;
 using namespace Lowering;
@@ -106,10 +103,30 @@ class SILModule::SerializationCallback final
   }
 };
 
+StringRef swift::getSILStageName(SILStage stage) {
+  switch (stage) {
+  case SILStage::Raw:
+    return "raw";
+  case SILStage::Canonical:
+    return "canonical";
+  case SILStage::Lowered:
+    return "lowered";
+  }
+  llvm_unreachable("covered switch");
+}
+
+std::optional<SILStage> swift::getSILStageByName(StringRef name) {
+  return llvm::StringSwitch<std::optional<SILStage>>(name)
+      .Case("raw", SILStage::Raw)
+      .Case("canonical", SILStage::Canonical)
+      .Case("lowered", SILStage::Lowered)
+      .Default(std::nullopt);
+}
+
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options,
                      const IRGenOptions *irgenOptions)
-    : Stage(SILStage::Raw),
+    : StageFloor(SILStage::Raw),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
@@ -258,7 +275,8 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C, bool isSpecialized) 
 
   if (isSpecialized) {
     // First try to lookup a specialized witness table for that conformance.
-    auto foundSpec = specializedWitnessTableMap.find(C);
+    auto foundSpec =
+        specializedWitnessTableMap.find(getSpecializedWitnessTableKey(C));
     if (foundSpec != specializedWitnessTableMap.end())
       return foundSpec->second;
   } else if (auto *rootConf = dyn_cast<RootProtocolConformance>(C)) {
@@ -306,7 +324,7 @@ void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   auto Conf = Wt->getConformance();
   assert(lookUpWitnessTable(Conf) == Wt);
   getSILLoader()->invalidateWitnessTable(Wt);
-  specializedWitnessTableMap.erase(Conf);
+  specializedWitnessTableMap.erase(getSpecializedWitnessTableKey(Conf));
   if (auto *rootConf = dyn_cast<RootProtocolConformance>(Conf))
     WitnessTableMap.erase(rootConf);
   witnessTables.erase(Wt);
@@ -438,8 +456,11 @@ bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, Mode).processFunction(F);
 }
 
-bool SILModule::linkWitnessTable(ProtocolConformance *PC, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, Mode).processConformance(ProtocolConformanceRef(PC));
+bool SILModule::linkWitnessTable(ProtocolConformance *PC,
+                                 SILModule::LinkingMode Mode,
+                                 bool referencedFromInitExistential) {
+  return SILLinkerVisitor(*this, Mode).processConformance(
+      ProtocolConformanceRef(PC), referencedFromInitExistential);
 }
 
 bool SILModule::hasFunction(StringRef Name) {
@@ -664,7 +685,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!C.isConcrete())
     return {nullptr, nullptr};
 
-  if (getStage() != SILStage::Lowered) {
+  if (!haveFunctionTypesBeenRewritten()) {
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }

@@ -49,7 +49,7 @@ public func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>
 @__swiftmacro_4test10constParam15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func constParam(_ ptr: UnsafeRawBufferPointer) {
     let size = CInt(exactly: ptr.count)!
     return unsafe constParam(ptr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
@@ -58,7 +58,7 @@ public func constParam(_ ptr: UnsafeRawBufferPointer) {
 @__swiftmacro_4test8mutParam15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
     let size = CInt(exactly: ptr.count)!
     return unsafe mutParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
@@ -67,10 +67,16 @@ public func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
 @__swiftmacro_4test9exprParam15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ count: CInt) {
     if ptr.count != size * count {
-      fatalError("bounds check failure in exprParam: expected \(size * count) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("exprParam", expected, actual)
+      }
+      _boundsCheckFailure(size * count, ptr.count)
     }
     return unsafe exprParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, count)
 }
@@ -78,7 +84,7 @@ public func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ coun
 @__swiftmacro_4test11constReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func constReturn(_ size: CInt) -> UnsafeRawBufferPointer {
     return unsafe UnsafeRawBufferPointer(start: unsafe constReturn(size), count: Int(size))
 }
@@ -86,7 +92,7 @@ public func constReturn(_ size: CInt) -> UnsafeRawBufferPointer {
 @__swiftmacro_4test9mutReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func mutReturn(_ size: CInt) -> UnsafeMutableRawBufferPointer {
     return unsafe UnsafeMutableRawBufferPointer(start: unsafe mutReturn(size), count: Int(size))
 }
@@ -94,7 +100,7 @@ public func mutReturn(_ size: CInt) -> UnsafeMutableRawBufferPointer {
 @__swiftmacro_4test10exprReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutableRawBufferPointer {
     return unsafe UnsafeMutableRawBufferPointer(start: unsafe exprReturn(size, count), count: Int(size * count))
 }
@@ -102,7 +108,7 @@ public func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutableRawBufferPoi
 @__swiftmacro_4test18constParamNoreturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func constParamNoreturn(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeBytes {
@@ -117,7 +123,7 @@ public func constParamNoreturn(_ ptr: RawSpan) {
 @__swiftmacro_4test16mutParamNoreturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeMutableBytes {
@@ -132,7 +138,7 @@ public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
 @__swiftmacro_4test21constReturnDependence15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_disfavoredOverload
 public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeBytes {
@@ -147,7 +153,7 @@ public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
 @__swiftmacro_4test19mutReturnDependence15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeMutableBytes {

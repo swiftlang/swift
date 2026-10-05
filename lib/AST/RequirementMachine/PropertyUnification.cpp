@@ -26,7 +26,6 @@
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include <algorithm>
 #include <vector>
 #include "PropertyMap.h"
 

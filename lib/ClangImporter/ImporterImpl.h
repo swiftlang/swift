@@ -19,6 +19,7 @@
 
 #include "ClangAdapter.h"
 #include "ClangSourceBufferImporter.h"
+#include "CxxUnsafetyReason.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -32,7 +33,6 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -495,6 +495,12 @@ public:
   llvm::DenseSet<std::pair<const clang::FunctionDecl *, DiagID>>
       DiagnosedTemplateDiagnostics;
 
+  // Tracks already-emitted diagnostics associated with template arguments
+  // (e.g., from a malformed SWIFT_ESCAPABLE_IF) to avoid duplicate diagnostics.
+  llvm::DenseSet<
+      std::pair<const clang::ClassTemplateSpecializationDecl *, unsigned>>
+      DiagnosedConditionalAttrParams;
+
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
@@ -653,6 +659,16 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  /// Why a declaration was given an implicit '@unsafe' by the lifetime
+  /// inference in VisitFunctionDecl, for diagnostics.
+  ///
+  /// Recorded where the attribute is added rather than recomputed later: the
+  /// conditions depend on local state of the import (which annotations were
+  /// skipped, which parameters were annotated) that cannot be re-derived from
+  /// the Clang declaration alone. Recording keeps the reason and the verdict on
+  /// the same code path, as elsewhere.
+  llvm::DenseMap<const Decl *, Diagnostic> LifetimeUnsafetyReasons;
+
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
   llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;
@@ -723,6 +739,10 @@ public:
   /// For virtual methods of foreign reference types, whenever a virtual thunk
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
+
+  /// Accessors and operator functions synthesized around an imported function,
+  /// mapped back to it.
+  llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
 
 private:
   // Keep track of the decls that were already cloned for this specific class.
@@ -822,12 +842,27 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
 
+  void recordForwardingSource(const ValueDecl *decl, ValueDecl *source) {
+    forwardingSources[decl] = source;
+  }
+  /// The declaration \p decl was synthesized around, whether it is a clone of
+  /// a base class member or an accessor or operator built on an imported
+  /// function.
+  ValueDecl *getForwardingSource(const ValueDecl *decl) {
+    if (auto *source = forwardingSources.lookup(decl))
+      return source;
+    return getOriginalForClonedMember(decl);
+  }
+
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   // Cache for already-specialized function templates and any thunks they may
-  // have.
-  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+  // have, per Swift declaration of the template: e.g. a member template and its
+  // '__<name>Unsafe' migration stub share a C++ specialization, but resolve to
+  // different Swift declarations.
+  llvm::DenseMap<std::pair<clang::FunctionDecl *, const ValueDecl *>,
+                 ValueDecl *>
       specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
@@ -2206,7 +2241,7 @@ void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+T *dynCastIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2219,7 +2254,7 @@ static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *castIgnoringCompatibilityAlias(Decl *D) {
+T *castIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2237,19 +2272,15 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail,
-                           ClangImporter::Implementation *importerImpl)
+                           const PlatformAvailability &avail)
       : // Update in response to D97702 landing.
         clang::ModuleFileExtension(), pchLookupTable(pchLookupTable),
         lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        importerImpl(importerImpl) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   void hashExtension(ExtensionHashBuilder &HBuilder) const override;
@@ -2283,8 +2314,8 @@ static inline Type applyToFunctionType(
   if (auto funcType = type->getAs<FunctionType>()) {
     auto newExtInfo = transform(funcType->getExtInfo());
     if (!newExtInfo.isEqualTo(funcType->getExtInfo(), /*useClangTypes=*/true))
-      return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                               newExtInfo);
+      return FunctionType::get(funcType->getParams(), /* yields */ {},
+                               funcType->getResult(), newExtInfo);
   }
 
   return type;
@@ -2369,6 +2400,19 @@ CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
                          ClangImporter::Implementation &Impl);
 
+/// Create the implicit 'newValue' parameter of a synthesized setter.
+ParamDecl *createNewValueParam(ASTContext &ctx, Type type, DeclContext *dc);
+
+/// Print the name of \p decl for a request's \c simple_display, falling back
+/// to a placeholder for an anonymous or otherwise unnamed record.
+void printRecordName(llvm::raw_ostream &out, const clang::RecordDecl *decl);
+
+/// Whether the type of any base class or field of \p decl satisfies \p pred.
+/// Bases are visited before fields; a non-C++ record has no bases.
+bool anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred);
+
 bool isViewType(const clang::CXXRecordDecl *decl);
 
 /// Determine whether \p type is a "direct view": a pointer or reference to a
@@ -2390,32 +2434,44 @@ bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
 /// derived from \c swift::RefCountedClass).
 bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 
+/// Why \p recordDecl's escapability is unknown, or nothing when it is known --
+/// or when no reason could be attributed, since a note that cannot be justified
+/// is worse than none.
+///
+/// Shares the ClangTypeEscapability computation rather than repeating it.
+std::optional<CxxUnknownEscapability>
+explainUnknownEscapability(const clang::RecordDecl *recordDecl,
+                           ASTContext &ctx);
+
+/// Which part of \p recordDecl made it unsafe, or nothing when it is not.
+///
+/// Shares the ClangDeclExplicitSafety walk rather than repeating it, so the
+/// reason cannot contradict the verdict. \p isClass must match how the record is
+/// imported: a type imported as a class inherits unsafety from its bases and
+/// from nothing else, so asking under the wrong rules can answer that a record
+/// is safe when the compiler treats it as unsafe.
+std::optional<CxxUnsafetyExplanation>
+explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx,
+                      bool isClass);
+
 /// Whether the C++ method \p method can be safely used in Swift, i.e. it is not
 /// a projection that could yield a dangling pointer/reference/iterator. Methods
 /// that are not safe are imported under a \c __<name>Unsafe name and/or marked
 /// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
-bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
-
-/// Whether \p method keeps its original Swift name, and is imported
-/// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .
 ///
-/// False unless \c ImportUnsafeCxxMethodsAsAlwaysUnsafe is enabled. Also false
-/// for the handful of C++ standard library methods that the overlay in
-/// stdlib/public/Cxx wraps in a safe Swift API of the same name, since the
-/// original-named import would shadow or ambiguate the wrapper.
-bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
+/// Returns which rule decided that, so a diagnostic can explain it, or nothing
+/// when the method needs no rename.
+std::optional<CxxUnsafetyReason>
+shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                              ASTContext &ctx);
 
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar().getTypePtr();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 
 inline clang::QualType desugarIfElaborated(clang::QualType type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 
@@ -2467,6 +2523,16 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   }
   return nullptr;
 }
+
+/// Compute the foreign reference type info for \p decl without consulting or
+/// populating the \c ForeignReferenceTypeInfoRequest cache.
+///
+/// Prefer \c ForeignReferenceTypeInfoRequest in almost all cases. This function
+/// should only be used when the result must not be cached, with a Clang decl
+/// that belongs to a short-lived clang::ASTContext (caching that pointer can
+/// lead to spurious false cache hits).
+ForeignReferenceTypeInfo
+getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl);
 
 /// Emit diagnostics related to foreign reference types for \a decl.
 bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,

@@ -1,9 +1,15 @@
 // RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-BOTH
 // RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Onone -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK-ONONE --check-prefix=CHECK-BOTH
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -disable-availability-checking -module-name=test -enable-sil-opaque-values -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-BOTH
 
 // Also do an end-to-end test to check all components, including IRGen.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library -O -Xfrontend -disable-availability-checking -module-name=test %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -parse-as-library -O -Xfrontend -disable-availability-checking -Xfrontend -enable-sil-opaque-values -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 

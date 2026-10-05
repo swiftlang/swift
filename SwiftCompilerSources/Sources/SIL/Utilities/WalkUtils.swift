@@ -360,6 +360,12 @@ extension ValueDefUseWalker {
       } else {
         return unmatchedPath(value: operand, path: path)
       }
+    case let oce as OpenCOMExistentialInst:
+      if let path = path.popIfMatches(.existential, index: 0) {
+        return walkDownUses(ofValue: oce, path: path)
+      } else {
+        return unmatchedPath(value: operand, path: path)
+      }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
@@ -733,6 +739,8 @@ extension ValueUseDefWalker {
       }
     case let oer as OpenExistentialRefInst:
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
+    case let oce as OpenCOMExistentialInst:
+      return walkUp(value: oce.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
          is BeginDeallocRefInst, is MarkDependenceInst, is UncheckedOwnershipConversionInst,

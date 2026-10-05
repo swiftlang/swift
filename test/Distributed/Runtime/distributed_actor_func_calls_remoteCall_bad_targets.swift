@@ -26,6 +26,22 @@ distributed actor Greeter {
   }
 }
 
+// Build a well-formed distributed-thunk mangled name whose single parameter is Swift.Int
+// wrapped `depth` times in Array/Optional layers selected by the bits of `pattern`.
+//
+// Each pattern would demangle into a distinct nested-generic parameter type.
+func syntheticTargetName(pattern: Int, depth: Int) -> String {
+  var inner = "Si" // Swift.Int
+  for j in 0..<depth {
+    if (pattern >> j) & 1 == 1 {
+      inner = "Say" + inner + "G" // Array<inner>
+    } else {
+      inner = inner + "Sg" // Optional<inner>
+    }
+  }
+  return "$s4main7GreeterC1f1vy" + inner + "_tYaKFTE"
+}
+
 func test() async throws {
   let system = DefaultDistributedActorSystem()
   let local = Greeter(actorSystem: system)
@@ -58,8 +74,8 @@ func test() async throws {
       returning: String.self
     )
   } catch {
-    // CHECK: << onThrow: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.targetAccessorNotFound, message: "Failed to locate distributed function accessor")
-    // CHECK: << remoteCall throw: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.targetAccessorNotFound, message: "Failed to locate distributed function accessor")
+    // An unknown target is now rejected before dispatch,
+    // so the error doesn't end up in onThrow in this specific implementation
     print("caught error: \(error)")
     print("call target was: \(badTarget.identifier)")
     // CHECK: caught error: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.targetAccessorNotFound, message: "Failed to locate distributed function accessor")
@@ -67,8 +83,52 @@ func test() async throws {
   }
 }
 
+func testRejectUnknownTargets() async throws {
+  let system = DefaultDistributedActorSystem()
+  let greeter = Greeter(actorSystem: system)
+  let handler = FakeRoundtripResultHandler({ _ in }, onError: { _ in })
+
+  // 256 distinct well-formed nested-generic identifiers, none of which name a
+  // real accessor, plus a handful of malformed identifiers.
+  var names = [String]()
+  for i in 0..<256 {
+    names.append(syntheticTargetName(pattern: i, depth: 8))
+  }
+  names += [
+    "",
+    "not a mangled name",
+    "$s4main7GreeterC7missingyyYaKFTE",
+    "$s99999",
+  ]
+
+  var rejected = 0
+  var unexpected = 0
+  for name in names {
+    var decoder = FakeInvocationDecoder(args: [], substitutions: [])
+    do {
+      try await system.executeDistributedTarget(
+        on: greeter,
+        target: RemoteCallTarget(name),
+        invocationDecoder: &decoder,
+        handler: handler)
+      unexpected += 1
+      print("UNEXPECTED: returned for \(name)")
+    } catch let e as ExecuteDistributedTargetError
+              where e.errorCode == .targetAccessorNotFound {
+      rejected += 1
+    } catch {
+      unexpected += 1
+      print("UNEXPECTED error for \(name): \(error)")
+    }
+  }
+
+  print("rejected=\(rejected) unexpected=\(unexpected)")
+  // CHECK: rejected=260 unexpected=0
+}
+
 @main struct Main {
   static func main() async {
     try! await test()
+    try! await testRejectUnknownTargets()
   }
 }

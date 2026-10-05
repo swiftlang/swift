@@ -1011,11 +1011,11 @@ public:
 };
 
 /// Diagnose failures related to conversion between two types with different
-/// execution semantics i.e. '@called(once)' function and regular one:
+/// execution semantics i.e. '@called(atMostOnce)' function and regular one:
 ///
 /// ```swift
 /// func test(_: () -> Void) {}
-/// let fn: @called(once) () -> Void = {}
+/// let fn: @called(atMostOnce) () -> Void = {}
 /// test(fn) // error due to widening
 /// ```
 class ConversionBetweenFunctionsWithDifferentExecutionSemantics final
@@ -2324,6 +2324,10 @@ public:
   /// result value.
   bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
+  /// Tailored diagnostic for `&x` passed to a subscript parameter of pointer
+  /// type, where the implicit inout-to-pointer conversion does not apply.
+  bool diagnoseInOutToPointerInSubscript() const;
+
   /// Situations like this:
   ///
   /// func foo(_: Int, _: String) {}
@@ -2633,11 +2637,12 @@ public:
 /// ```
 class MultiArgFuncKeyPathFailure final : public FailureDiagnostic {
   Type functionType;
+  Type expectedType;
 public:
   MultiArgFuncKeyPathFailure(const Solution &solution, Type functionType,
-                             ConstraintLocator *locator)
+                             Type expectedType, ConstraintLocator *locator)
   : FailureDiagnostic(solution, locator),
-  functionType(functionType) {}
+  functionType(functionType), expectedType(expectedType) {}
 
   bool diagnoseAsError() override;
 };

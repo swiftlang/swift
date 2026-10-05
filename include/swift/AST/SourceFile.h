@@ -32,15 +32,15 @@ class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
 class Token;
-class UsingDecl;
+class FileDefaultDecl;
 class AvailableAttr;
 enum class DefaultIsolation : uint8_t;
 
-/// The set of `using ...` defaults declared at the top of a source file.
+/// The set of defaults declared by top-level `default ...` in a source file.
 struct FileDefaults {
   struct Isolation {
     DefaultIsolation kind;
-    UsingDecl *source;
+    FileDefaultDecl *source;
   };
   /// `std::nullopt` when there is no file-level default isolation.
   std::optional<Isolation> isolation;
@@ -526,7 +526,7 @@ public:
     auto i = separatelyImportedOverlays.find(declaring);
     if (i == separatelyImportedOverlays.end()) return;
 
-    auto &value = std::get<1>(*i);
+    auto &value = i->second;
     overlays.append(value.begin(), value.end());
   }
 
@@ -723,7 +723,7 @@ public:
     DelayedParserState = std::move(state);
   }
 
-  /// Retrieve the file-level defaults declared via top-level `using ...`
+  /// Retrieve the file-level defaults declared via top-level `default ...`
   /// declarations, including default actor isolation and any default
   /// `@available` attributes.
   FileDefaults getFileDefaults() const;

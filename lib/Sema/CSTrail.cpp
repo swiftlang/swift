@@ -371,11 +371,13 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
 
 SolverTrail::Change
 SolverTrail::Change::PrunedDisjunction(Constraint *disjunction,
-                                       FunctionType *argFuncType) {
+                                       FunctionType *argFuncType,
+                                       unsigned resultGenerationNumber) {
   Change result;
   result.Kind = ChangeKind::PrunedDisjunction;
   result.Disjunction.Disjunction = disjunction;
   result.Disjunction.ArgFuncType = argFuncType;
+  result.Disjunction.ResultGenerationNumber = resultGenerationNumber;
 
   return result;
 }
@@ -696,7 +698,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::PrunedDisjunction: {
     cs.getRemainingDisjunction(Disjunction.Disjunction)
-        .undoArgFuncTypeChange(Disjunction.ArgFuncType);
+        .undoArgFuncTypeChange(Disjunction.ArgFuncType, Disjunction.ResultGenerationNumber);
     break;
   }
 }
@@ -949,7 +951,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Disjunction.Disjunction->print(out, &cs.getASTContext().SourceMgr, indent + 2);
     out << " with type ";
     Disjunction.ArgFuncType->print(out, PO);
-    out << ")\n";
+    out << " and result generation number " << Disjunction.ResultGenerationNumber << ")\n";
     break;
   }
 }

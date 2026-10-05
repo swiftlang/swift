@@ -31,7 +31,6 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Strings.h"
@@ -1154,9 +1153,7 @@ public:
           continue;
         }
         auto representation = cxx_translation::getDeclRepresentation(
-            vd, [this](const NominalTypeDecl *decl) {
-              return printer.isZeroSized(decl);
-            });
+            vd, /*layoutQueries=*/&printer);
         if (nmtd->hasGenericParamList()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
@@ -1194,9 +1191,7 @@ public:
         emitStubComment(reasonIt->second);
       } else {
         auto representation = cxx_translation::getDeclRepresentation(
-            vd, [this](const NominalTypeDecl *decl) {
-              return printer.isZeroSized(decl);
-            });
+            vd, /*layoutQueries=*/&printer);
         std::string reasonStr;
         if (representation.isUnsupported() &&
             representation.error.has_value()) {
