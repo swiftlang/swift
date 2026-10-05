@@ -180,6 +180,7 @@ class DCE {
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
+  void markReborrowBlocksLive(SILValue v);
   void propagateLiveBlockArgument(SILArgument *Arg);
   void propagateLiveness(SILInstruction *I);
   void collectControllingBlocksInTree(ControllingInfo &QueryInfo,
@@ -492,6 +493,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   for (auto *depInst : ReverseDependencies.lookup(Arg)) {
     markInstructionLive(depInst);
   }
+  markReborrowBlocksLive(Arg);
 
   if (auto *phi = dyn_cast<SILPhiArgument>(Arg)) {
     for (auto depVal : guaranteedPhiDependencies.lookup(phi)) {
@@ -529,6 +531,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
       for (auto *depInst : ReverseDependencies.lookup(res)) {
         markInstructionLive(depInst);
       }
+      markReborrowBlocksLive(res);
     }
     return;
   }
@@ -944,6 +947,19 @@ void DCE::markControllingTerminatorsLive(SILBasicBlock *Block) {
 
   for (auto BB : ControllingBlocks)
     markInstructionLive(BB->getTerminator());
+}
+
+// If a live guaranteed value is reborrowed by a phi, which turns out to be
+// dead, an end_borrow is inserted at the branch in the predecessor block.
+// Therefore the predecessor block must stay reachable, i.e. its controlling
+// terminators must be live, too.
+void DCE::markReborrowBlocksLive(SILValue v) {
+  if (v->getOwnershipKind() != OwnershipKind::Guaranteed)
+    return;
+  for (Operand *use : v->getUses()) {
+    if (isa<BranchInst>(use->getUser()) && use->isLifetimeEnding())
+      markControllingTerminatorsLive(use->getUser()->getParent());
+  }
 }
 
 class DCEPass : public SILFunctionTransform {
