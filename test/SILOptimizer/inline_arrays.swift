@@ -255,6 +255,37 @@ public func a_globalVar(_ i: Int, _ j: Int) -> UInt8 { gVar.span[i].v[j] }
 // CHECK-LABEL: } // end sil function '$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF'
 public func a_classProperty(_ h: borrowing Holder, _ i: Int, _ j: Int) -> UInt8 { h.p.span[i].v[j] }
 
+// rdar://187155913: Indexing a global InlineArray copies the entire array.
+public final class Box { var x: Int = 0 }
+
+let gString: InlineArray<2, String> = ["aaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbb"]
+let gClass: InlineArray<2, Box> = [Box(), Box()]
+let gOptClass: InlineArray<2, Box?> = [nil, nil]
+
+// CHECK-LABEL: sil {{.*}} @$s4test8g_stringySSSiF : $@convention(thin) (Int) -> @owned String {
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     _borrow
+// CHECK-LABEL: } // end sil function '$s4test8g_stringySSSiF'
+public func g_string(_ i: Int) -> String {
+  gString[i]
+}
+
+// CHECK-LABEL: sil {{.*}} @$s4test7g_classyAA3BoxCSiF : $@convention(thin) (Int) -> @owned Box {
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     _borrow
+// CHECK-LABEL: } // end sil function '$s4test7g_classyAA3BoxCSiF'
+public func g_class(_ i: Int) -> Box {
+  gClass[i]
+}
+
+// CHECK-LABEL: sil {{.*}} @$s4test10g_optclassyAA3BoxCSgSiF : $@convention(thin) (Int) -> @owned Optional<Box> {
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     _borrow
+// CHECK-LABEL: } // end sil function '$s4test10g_optclassyAA3BoxCSgSiF'
+public func g_optclass(_ i: Int) -> Box? {
+  gOptClass[i]
+}
+
 // specialized a_consumingParam that does not consume the array, called from original a_consumingParam.
 // CHECK-LABEL: sil shared @$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itFTf4gnn_n
 // CHECK-NOT:     alloc_stack
