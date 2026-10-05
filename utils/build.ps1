@@ -5184,8 +5184,12 @@ function Build-Driver([Hashtable] $Platform,
                       [string]    $SwiftSDK,
                       [string]    $LLVM_DIR,
                       [string]    $Clang_DIR,
-                      [string]    $Swift_DIR) {
-  Build-CMakeProject `
+                      [string]    $Swift_DIR,
+                      # Build the driver without makeOptions, which needs the
+                      # Stage2 compilers, and do not install it.
+                      [switch]    $BuildOnly) {
+  $BuildArgs = if ($BuildOnly) { @{ BuildTargets = @("default") } } else { @{} }
+  Build-CMakeProject @BuildArgs `
     -Src $SourceCache\swift-driver `
     -Bin (Get-ProjectBinaryCache $Platform Driver) `
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
@@ -5206,7 +5210,7 @@ function Build-Driver([Hashtable] $Platform,
       } else {
         "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
       };
-      SWIFT_DRIVER_BUILD_TOOLS = "YES";
+      SWIFT_DRIVER_BUILD_TOOLS = if ($BuildOnly) { "NO" } else { "YES" };
       LLVM_DIR = $LLVM_DIR;
       Clang_DIR = $Clang_DIR;
       Swift_DIR = $Swift_DIR;
@@ -6147,6 +6151,87 @@ if ($Toolchain) {
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
+
+  # ── Stage2 Toolchain ──────────────────────────────────────────────────────
+  # The tools are built by the Stage1 compilers. The ones that do not need
+  # swift-syntax from Stage2 build in parallel with it. Their builds mostly
+  # compile one Swift module at a time, so they barely slow Stage2 down.
+  Start-BuildLane "toolchain-tools" {
+    Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
+    Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-LLBuild $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    # Stage2 installs swift-driver.exe too, so the driver is installed after
+    # Stage2, below.
+    Invoke-BuildStep Build-Driver $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    } -BuildOnly
+    Invoke-BuildStep Build-ASN1 $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Crypto $HostPlatform @{
+      Assembler = $Assemblers.Stage1;
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Collections $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Certificates $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-System $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Subprocess $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Build $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Markdown $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
+    Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-SymbolKit $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-DocC $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Inspect $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+  }
+
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
     Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
@@ -6175,20 +6260,8 @@ if ($Toolchain) {
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
 
-  # ── Stage2 Toolchain ──────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
-  Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-LLBuild $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
+  # ── Stage2 Toolchain, continued ───────────────────────────────────────────
+  Wait-BuildLane "toolchain-tools"
   Invoke-BuildStep Build-Driver $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
@@ -6197,76 +6270,21 @@ if ($Toolchain) {
     Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
     Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
   }
-  Invoke-BuildStep Build-ASN1 $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Crypto $HostPlatform @{
-    Assembler = $Assemblers.Stage1;
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Collections $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Certificates $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-System $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Subprocess $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Build $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
   Invoke-BuildStep Build-PackageManager $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-Markdown $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
   Invoke-BuildStep Build-Format $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
-  Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-SymbolKit $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-DocC $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-Inspect $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
 
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
