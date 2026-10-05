@@ -9,7 +9,7 @@
 // RUN:     -serialize-diagnostics-path %t/helper.sarif \
 // RUN:   %S/Inputs/sarif-diagnostics-batch-mode-other.swift
 
-// RUN: %normalize_sarif %t/main.sarif | %diff -U1 -b %S/Inputs/expected-sarif/sarif-diagnostics-batch-mode.sarif -
+// RUN: %sarif-diff %S/Inputs/expected-sarif/sarif-diagnostics-batch-mode.sarif < %t/main.sarif
 
 // Same shape, so check only what distinguishes the helper's log.
 // RUN: %FileCheck --input-file=%t/helper.sarif %s -check-prefix=HELPER

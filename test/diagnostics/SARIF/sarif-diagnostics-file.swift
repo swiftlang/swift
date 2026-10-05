@@ -8,7 +8,7 @@
 // RUN: test ! -f %t/derived.dia
 
 // No diagnostics still means a log, with no results and no artifacts.
-// RUN: %normalize_sarif %t/derived.sarif | %diff -U1 -b %S/Inputs/expected-sarif/sarif-diagnostics-empty.sarif -
+// RUN: %sarif-diff %S/Inputs/expected-sarif/sarif-diagnostics-empty.sarif < %t/derived.sarif
 
 // A log that cannot be written is reported.
 // RUN: not %target-swift-frontend -typecheck -serialize-diagnostics=sarif -serialize-diagnostics-path %t/nonexistent/some.sarif %s 2>%t.err.txt

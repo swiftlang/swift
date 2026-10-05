@@ -8,7 +8,7 @@
           "informationUri" : "https://swift.org",
           "name" : "Swift Compiler",
           "organization" : "Swift Project",
-          "version" : "Swift version SWIFT_VERSION"
+          "version" : "SWIFT_VERSION"
         }
       }
     }

@@ -5,7 +5,7 @@
       "artifacts" : [
         {
           "location" : {
-            "uri" : "file://SOURCE_DIR/test/diagnostics/SARIF/sarif-diagnostics-columns.swift"
+            "uri" : "file://SOURCE_DIR/test/diagnostics/SARIF/Inputs/sarif-diagnostics-bridging-header.h"
           },
           "roles" : [
 
@@ -23,21 +23,22 @@
                   "index" : 0
                 },
                 "region" : {
-                  "endColumn" : 38,
-                  "endLine" : 10,
-                  "startColumn" : 37,
-                  "startLine" : 10
+                  "endColumn" : 3,
+                  "endLine" : 1,
+                  "startColumn" : 2,
+                  "startLine" : 1
                 }
               }
             }
           ],
           "message" : {
-            "text" : "initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it"
+            "text" : "\"here is some warning about something\""
           },
-          "ruleId" : "pbd_never_used",
+          "ruleId" : "warning_from_clang",
           "ruleIndex" : 0
         },
         {
+          "level" : "error",
           "locations" : [
             {
               "physicalLocation" : {
@@ -45,19 +46,27 @@
                   "index" : 0
                 },
                 "region" : {
-                  "endColumn" : 33,
-                  "endLine" : 11,
-                  "startColumn" : 32,
-                  "startLine" : 11
+                  "endColumn" : 3,
+                  "endLine" : 2,
+                  "startColumn" : 2,
+                  "startLine" : 2
                 }
               }
             }
           ],
           "message" : {
-            "text" : "initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it"
+            "text" : "\"but this one is an error\""
           },
-          "ruleId" : "pbd_never_used",
-          "ruleIndex" : 0
+          "ruleId" : "error_from_clang",
+          "ruleIndex" : 1
+        },
+        {
+          "level" : "error",
+          "message" : {
+            "text" : "failed to import bridging header 'SOURCE_DIR/test/diagnostics/SARIF/Inputs/sarif-diagnostics-bridging-header.h'"
+          },
+          "ruleId" : "bridging_header_error",
+          "ruleIndex" : 2
         }
       ],
       "tool" : {
@@ -67,7 +76,13 @@
           "organization" : "Swift Project",
           "rules" : [
             {
-              "id" : "pbd_never_used"
+              "id" : "warning_from_clang"
+            },
+            {
+              "id" : "error_from_clang"
+            },
+            {
+              "id" : "bridging_header_error"
             }
           ],
           "version" : "SWIFT_VERSION"

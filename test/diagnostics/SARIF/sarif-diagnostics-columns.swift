@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck -serialize-diagnostics=sarif -serialize-diagnostics-path %t/diags.sarif %s
-// RUN: %normalize_sarif %t/diags.sarif | %diff -U1 -b %S/Inputs/expected-sarif/sarif-diagnostics-columns.sarif -
+// RUN: %sarif-diff %S/Inputs/expected-sarif/sarif-diagnostics-columns.sarif < %t/diags.sarif
 
 // REQUIRES: swift_sarif
 

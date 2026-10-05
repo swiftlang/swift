@@ -5,7 +5,7 @@
       "artifacts" : [
         {
           "location" : {
-            "uri" : "file:///TEST_DIR/sarif-diagnostics-batch-mode.swift"
+            "uri" : "file://SOURCE_DIR/test/diagnostics/SARIF/sarif-diagnostics-batch-mode.swift"
           },
           "roles" : [
 
@@ -24,9 +24,9 @@
                 },
                 "region" : {
                   "endColumn" : 8,
-                  "endLine" : 32,
+                  "endLine" : 33,
                   "startColumn" : 7,
-                  "startLine" : 32
+                  "startLine" : 33
                 }
               }
             }
@@ -48,7 +48,7 @@
               "id" : "pbd_never_used"
             }
           ],
-          "version" : "Swift version SWIFT_VERSION"
+          "version" : "SWIFT_VERSION"
         }
       }
     }
