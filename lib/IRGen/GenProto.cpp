@@ -3936,6 +3936,25 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    if (proto->isCOMInterface()) {
+      auto archetype = cast<ArchetypeType>(srcType);
+      for (auto *required : archetype->getConformsTo()) {
+        if (!required->isCOMInterface())
+          continue;
+        auto *hierarchy = required->getCOMInterfaceHierarchy();
+        assert(hierarchy && !hierarchy->isInvalid());
+        if (!llvm::is_contained(hierarchy->getABIChain(), proto))
+          continue;
+        auto *adjustment =
+            emitArchetypeWitnessTableRef(IGF, archetype, required);
+        // Pack elements use pointer-sized slots shared with native witnesses.
+        if (adjustment->getType()->isPointerTy())
+          adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
+        return adjustment;
+      }
+      llvm_unreachable("COM archetype is missing an interface adjustment");
+    }
+
     auto archetype = cast<ArchetypeType>(srcType);
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
@@ -4346,6 +4365,12 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   }
 }
 
+llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {
+  if (isCOMInterfaceAdjustment())
+    return IGM.IntPtrTy;
+  return typeForKind(IGM, getKind());
+}
+
 void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
@@ -4368,6 +4393,10 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
   }
 
+  // A conformance loaded from a pack uses a pointer-sized storage slot. Restore
+  // the integer representation used for individual COM requirements.
+  if (requirement.isCOMInterfaceAdjustment() && value->getType()->isPointerTy())
+    value = IGF.Builder.CreatePtrToInt(value, IGF.IGM.IntPtrTy);
   assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {
