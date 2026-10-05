@@ -263,6 +263,26 @@ bool AbstractionPattern::isConcreteType() const {
           GenericSig->isConcreteType(getType()));
 }
 
+// COM-constrained parameters need their value witnesses even with an AnyObject
+// constraint. A concrete superclass establishes the reference representation;
+// an opened existential already has its interface pointer representation.
+static bool hasOpaqueCOMRepresentation(CanType type,
+                                       CanGenericSignature signature) {
+  if (auto element = dyn_cast<PackElementType>(type))
+    type = element.getPackType();
+  if (auto archetype = dyn_cast<ArchetypeType>(type))
+    return !isa<ExistentialArchetypeType>(archetype) &&
+           !archetype->getSuperclass() &&
+           llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
+             return protocol->isCOMInterface();
+           });
+  return type->isTypeParameter() && signature &&
+         !signature->getSuperclassBound(type) &&
+         llvm::any_of(
+             signature->getRequiredProtocols(type),
+             [](ProtocolDecl *protocol) { return protocol->isCOMInterface(); });
+}
+
 bool AbstractionPattern::requiresClass() const {
   switch (getKind()) {
   case Kind::Opaque:
@@ -271,6 +291,8 @@ bool AbstractionPattern::requiresClass() const {
   case Kind::Discard:
   case Kind::ClangType: {
     auto type = getType();
+    if (hasOpaqueCOMRepresentation(type, getGenericSignatureOrNull()))
+      return false;
     if (auto element = dyn_cast<PackElementType>(type))
       type = element.getPackType();
     if (auto archetype = dyn_cast<ArchetypeType>(type))
@@ -287,7 +309,7 @@ bool AbstractionPattern::requiresClass() const {
     }
     return false;
   }
-    
+
   default:
     return false;
   }
@@ -301,6 +323,8 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   case Kind::Discard:
   case Kind::ClangType: {
     auto type = getType();
+    if (hasOpaqueCOMRepresentation(type, getGenericSignatureOrNull()))
+      return LayoutConstraint();
     if (auto archetype = dyn_cast<ArchetypeType>(type)) {
       return archetype->getLayoutConstraint();
     } else if (isa<DependentMemberType>(type) ||
