@@ -697,7 +697,7 @@ LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
 
 /// Enable distributed actors in Embedded Swift.
-EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
+EXPERIMENTAL_FEATURE(EmbeddedDistributed, true)
 
 /// Enable type-based scope restrictions on ~Escapable types.
 EXPERIMENTAL_FEATURE(ScopeRestrictions, false)
