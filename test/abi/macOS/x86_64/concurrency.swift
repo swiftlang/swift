@@ -417,6 +417,9 @@ Added: _swift_task_isCancelledWithFlags
 Added: _$sSct5_taskBovg
 Added: _$sSct5_taskBovpMV
 
+// Swift.UnsafeCurrentTask.init(Builtin.NativeObject) -> Swift.UnsafeCurrentTask
+Added: _$sSctySctBocfC
+
 // Swift.UnsafeCurrentTask.init(_AsyncTask) -> Swift.UnsafeCurrentTask
 Added: _$sSctyScts10_AsyncTaskVcfC
 // Swift.withUnsafeCurrentTaskNonsending<A>(body: nonisolated(nonsending) (Swift.UnsafeCurrentTask?) async throws -> A) async throws -> A
@@ -547,3 +550,12 @@ Added: _swift_taskGroup_cancelAllWithFlags
 
 // Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
 Added: _swift_task_addCancellationHandlerWithReason
+
+// ExecutorJob.context became usable from inline, for the
+// @export(implementation) unsafeCurrentTask accessor (SE-0469)
+Added: _$ss11ExecutorJobV7contextBjvM
+Added: _$ss11ExecutorJobV7contextBjvg
+Added: _$ss11ExecutorJobV7contextBjvs
+
+// property descriptor for Swift.UnownedJob.unsafeCurrentTask : Swift.UnsafeCurrentTask?
+Added: _$sScJ17unsafeCurrentTaskSctSgvpMV

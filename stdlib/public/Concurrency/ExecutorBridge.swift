@@ -97,6 +97,27 @@ internal func _jobSetPriority(_ job: Builtin.Job, _ priority: UInt8)
 @_silgen_name("swift_job_getKind")
 internal func _jobGetKind(_ job: Builtin.Job) -> UInt8
 
+/// Returns the job's flags; works for any job, not only tasks
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_silgen_name("swift_task_getJobFlags")
+internal func _jobGetFlags(_ job: Builtin.Job) -> Int
+
+/// Returns the task the job represents, or `nil` if the job is not a task
+@available(SwiftStdlib 6.4, *)
+@export(implementation)
+internal func _jobGetUnsafeCurrentTask(_ job: Builtin.Job) -> UnsafeCurrentTask? {
+  // The low 8 bits of the flags are the JobKind, and JobKind::Task is 0
+  guard _jobGetFlags(job) & 0xFF == 0 else {
+    return nil
+  }
+  // An AsyncTask is a Job, so the job pointer is also the task pointer,
+  // use the Builtin.NativeObject initializer, as it is available since 6.4
+  let rawTask: Builtin.RawPointer = Builtin.reinterpretCast(job)
+  let task: Builtin.NativeObject = Builtin.bridgeFromRawPointer(rawTask)
+  return unsafe UnsafeCurrentTask(task)
+}
+
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_job_getExecutorPrivateData")
 internal func _jobGetExecutorPrivateData(

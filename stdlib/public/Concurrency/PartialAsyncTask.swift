@@ -281,6 +281,7 @@ extension Job {
 @available(StdlibDeploymentTarget 5.9, *)
 @frozen
 public struct ExecutorJob: Sendable, ~Copyable {
+  @usableFromInline
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -568,6 +569,46 @@ extension ExecutorJob {
 
 }
 
+
+@available(SwiftStdlib 6.4, *)
+extension ExecutorJob {
+  /// The task this job represents, or `nil` if this job is not a task
+  ///
+  /// This allows an executor to inspect the task it is about to run,
+  /// for example to log its ``UnsafeCurrentTask/name``
+  ///
+  /// The returned ``UnsafeCurrentTask`` does not retain the task, and must
+  /// not be used after the job has been run (e.g. using
+  /// ``runSynchronously(on:)``), as the task may have completed and been
+  /// destroyed by then
+  @export(implementation)
+  public var unsafeCurrentTask: UnsafeCurrentTask? {
+    @export(implementation)
+    get {
+      unsafe _jobGetUnsafeCurrentTask(context)
+    }
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension UnownedJob {
+  /// The task this job represents, or `nil` if this job is not a task
+  ///
+  /// This allows an executor to inspect the task it is about to run,
+  /// for example to log its ``UnsafeCurrentTask/name``
+  ///
+  /// The returned ``UnsafeCurrentTask`` does not retain the task, and must
+  /// not be used after the job has been run (e.g. using
+  /// ``runSynchronously(on:)``), as the task may have completed and been
+  /// destroyed by then
+  @export(implementation)
+  public var unsafeCurrentTask: UnsafeCurrentTask? {
+    @export(implementation)
+    get {
+      unsafe ExecutorJob(self).unsafeCurrentTask
+    }
+  }
+}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
