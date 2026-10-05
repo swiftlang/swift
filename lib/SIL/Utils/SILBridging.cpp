@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -468,6 +469,11 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
 bool BridgedGlobalVar::mustBeInitializedStatically() const {
   SILGlobalVariable *global = getGlobal();
   return global->mustBeInitializedStatically();
+}
+
+bool BridgedGlobalVar::isNeverEmittedIntoClient() const {
+  auto model = getGlobal()->codeGenerationModel();
+  return model && *model == swift::CodeGenerationModel::Interface;
 }
 
 bool BridgedGlobalVar::isConstValue() const {

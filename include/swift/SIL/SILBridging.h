@@ -720,6 +720,7 @@ struct BridgedGlobalVar {
   bool canBeInitializedStatically() const;
   bool mustBeInitializedStatically() const;
   bool isConstValue() const;
+  bool isNeverEmittedIntoClient() const;
 };
 
 struct OptionalBridgedGlobalVar {
