@@ -416,10 +416,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // An opened COM existential contains its interface pointer directly.
   // Ordinary generic parameters constrained to a COM interface remain opaque
   // and continue through the normal generic ABI below.
-  bool isCOM =
-      llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
-        return protocol->isCOMInterface();
-      });
+  bool isCOM = archetype->hasCOMInterfaceConstraint();
   if (isCOM && isa<ExistentialArchetypeType>(archetype))
     return createCOMInterfaceTypeInfo(IGM);
 
