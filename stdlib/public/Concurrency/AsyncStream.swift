@@ -358,8 +358,12 @@ public struct AsyncStream<Element> {
         }
         return result
       } onCancel: {
-        storage.value = nil
-        onCancel?()
+        // This handler also runs immediately for every next() on an
+        // already-cancelled task; call `onCancel` at most once, and not at all
+        // if the stream already finished.
+        if storage.take() != nil {
+          onCancel?()
+        }
       }
     }
   }
