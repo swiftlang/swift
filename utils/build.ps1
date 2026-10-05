@@ -137,6 +137,14 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
+.PARAMETER SerialBuild
+Run every build step one after the other, instead of running independent steps
+in parallel. Helpful when debugging the build.
+
+.PARAMETER BuildLane
+For internal use: run the build steps of a parallel build lane, written to this
+file by Start-BuildLane, and exit.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -231,8 +239,23 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [switch] $SerialBuild,
+  [string] $BuildLane = ""
 )
+
+# The parameters that a parallel build lane re-runs this script with.
+$BuildScript = $PSCommandPath
+$BuildLaneParameters = @{}
+foreach ($Parameter in $PSBoundParameters.GetEnumerator()) {
+  $Value = $Parameter.Value
+  if ($Value -is [IO.FileSystemInfo]) {
+    $Value = $Value.ToString()
+  } elseif ($Value -is [Management.Automation.SwitchParameter]) {
+    $Value = $Value.IsPresent
+  }
+  $BuildLaneParameters[$Parameter.Key] = $Value
+}
 
 ## Prepare the build environment.
 
@@ -688,6 +711,7 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
+$BuildStopwatch = $null
 
 function Add-TimingData {
   param
@@ -776,7 +800,8 @@ function Write-Summary {
 
   $TotalTime = [TimeSpan]::Zero
   foreach ($Entry in $TimingData) {
-    if (-not $Entry.Parent) {
+    # Steps that ran in parallel overlap the others.
+    if (-not $Entry.Parent -and -not $Entry.PSObject.Properties["InParallel"]) {
       $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
     }
   }
@@ -796,6 +821,130 @@ function Write-Summary {
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
+  if ($BuildStopwatch) {
+    Write-Host ("Wall clock time: {0:hh\:mm\:ss\.ff}" -f $BuildStopwatch.Elapsed)
+  }
+}
+
+function ConvertTo-TimingRecord([PSCustomObject] $Entry) {
+  [PSCustomObject]@{
+    Arch = $Entry.Arch
+    Platform = $Entry.Platform
+    BuildStep = $Entry."Build Step"
+    Seconds = $Entry."Elapsed Time".TotalSeconds
+    Children = @($Entry.Children | ForEach-Object { ConvertTo-TimingRecord $_ })
+  }
+}
+
+function Import-TimingRecord([PSCustomObject] $Record, [PSCustomObject] $Parent) {
+  $Entry = [PSCustomObject]@{
+    Arch = $Record.Arch
+    Platform = $Record.Platform
+    "Build Step" = $Record.BuildStep
+    "Elapsed Time" = [TimeSpan]::FromSeconds($Record.Seconds)
+    Parent = $Parent
+    Children = @()
+  }
+  if ($Parent) {
+    $Parent.Children += $Entry
+  }
+  $TimingData.Add($Entry)
+  foreach ($Child in $Record.Children) {
+    Import-TimingRecord $Child $Entry | Out-Null
+  }
+  return $Entry
+}
+
+$BuildLanes = @{}
+
+# Runs the build steps in $Body in another instance of this script, in parallel
+# with the steps that follow, until Wait-BuildLane. $Body runs in a fresh
+# script scope: it can use what this script computes from its parameters, but
+# not the caller's local variables. Its output is printed when it is waited on.
+function Start-BuildLane([string] $Name, [ScriptBlock] $Body) {
+  if ($SerialBuild) {
+    & $Body
+    return
+  }
+
+  $Directory = Join-Path $BinaryCache "lanes"
+  New-Item -ItemType Directory -Force $Directory | Out-Null
+  $Lane = @{
+    Name = $Name;
+    Script = Join-Path $Directory "$Name.ps1";
+    Log = Join-Path $Directory "$Name.log";
+    ErrorLog = Join-Path $Directory "$Name.err.log";
+    Timing = Join-Path $Directory "$Name.timing.json";
+  }
+  Remove-Item -Force -ErrorAction Ignore $Lane.Log, $Lane.ErrorLog, $Lane.Timing
+  Set-Content -Path $Lane.Script -Value $Body.ToString()
+
+  $Parameters = $BuildLaneParameters.Clone()
+  $Parameters.BuildLane = $Lane.Script
+  $ParametersFile = Join-Path $Directory "$Name.parameters.xml"
+  $Parameters | Export-Clixml -Path $ParametersFile
+  $Runner = Join-Path $Directory "$Name.run.ps1"
+  Set-Content -Path $Runner -Value @"
+`$Parameters = Import-Clixml -Path '$ParametersFile'
+& '$BuildScript' @Parameters
+exit `$LASTEXITCODE
+"@
+
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Starting build lane '$Name' ..."
+  $Lane.Process = Start-Process -PassThru -NoNewWindow `
+    -FilePath (Get-Process -Id $PID).Path `
+    -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$Runner`"" `
+    -RedirectStandardOutput $Lane.Log -RedirectStandardError $Lane.ErrorLog
+  # Windows PowerShell only reports the exit code of a process whose handle
+  # was opened before it exited.
+  $null = $Lane.Process.Handle
+  $script:BuildLanes[$Name] = $Lane
+}
+
+function Wait-BuildLane([string] $Name) {
+  if (-not $BuildLanes.ContainsKey($Name)) { return }
+
+  $Lane = $BuildLanes[$Name]
+  $Lane.Process.WaitForExit()
+  $Elapsed = $Lane.Process.ExitTime - $Lane.Process.StartTime
+  $script:BuildLanes.Remove($Name)
+
+  # CI only keeps the console output.
+  Write-Host -ForegroundColor Cyan "----- Output of build lane '$Name' -----"
+  Get-Content -Path $Lane.Log, $Lane.ErrorLog -ErrorAction Ignore | ForEach-Object { Write-Host $_ }
+  Write-Host -ForegroundColor Cyan "----- End of build lane '$Name' ($Elapsed) -----"
+
+  if ($Summary -and (Test-Path $Lane.Timing)) {
+    $Entry = [PSCustomObject]@{
+      Arch = $HostPlatform.Architecture.LLVMName
+      Platform = $HostPlatform.OS.ToString()
+      "Build Step" = "Build lane '$Name' (in parallel)"
+      "Elapsed Time" = $Elapsed
+      Parent = $null
+      Children = @()
+      InParallel = $true
+    }
+    $TimingData.Add($Entry)
+    # Windows PowerShell's ConvertFrom-Json does not enumerate arrays.
+    foreach ($Record in (Get-Content -Raw $Lane.Timing | ConvertFrom-Json)) {
+      Import-TimingRecord $Record $Entry | Out-Null
+    }
+  }
+
+  if ($Lane.Process.ExitCode -ne 0) {
+    throw "Build lane '$Name' failed with exit code $($Lane.Process.ExitCode)."
+  }
+}
+
+function Stop-BuildLanes {
+  foreach ($Lane in @($BuildLanes.Values)) {
+    if (-not $Lane.Process.HasExited) {
+      & taskkill /T /F /PID $Lane.Process.Id 2>&1 | Out-Null
+    }
+    Write-Host -ForegroundColor Red "----- Output of stopped build lane '$($Lane.Name)' -----"
+    Get-Content -Path $Lane.Log, $Lane.ErrorLog -ErrorAction Ignore | ForEach-Object { Write-Host $_ }
+  }
+  $script:BuildLanes.Clear()
 }
 
 function Get-AndroidNDK {
@@ -5896,6 +6045,19 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
 
 try {
 
+$BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
+
+if ($BuildLane) {
+  . $BuildLane
+  if ($Summary) {
+    @($TimingData | Where-Object { -not $_.Parent } | ForEach-Object { ConvertTo-TimingRecord $_ }) |
+      ConvertTo-Json -Depth 32 | Set-Content -Path ([IO.Path]::ChangeExtension($BuildLane, ".timing.json"))
+    # The main build prints the summary.
+    $Summary = $false
+  }
+  exit 0
+}
+
 Get-Dependencies
 
 if ($Clean) {
@@ -5935,16 +6097,21 @@ if ($Toolchain) {
     }
   }
 
-  # ── Build Tools ───────────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $BuildPlatform
-  Invoke-BuildStep Build-BuildTools $BuildPlatform
 
   # ── Early Swift Driver ────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
-  Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
+  # The build tools do not need it, so it builds in parallel with them.
+  Start-BuildLane "early-swift-driver" {
+    Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
+    Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
+  }
+
+  # ── Build Tools ───────────────────────────────────────────────────────────
+  Invoke-BuildStep Build-BuildTools $BuildPlatform
 
   # ── Stage1 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
+  Wait-BuildLane "early-swift-driver"
   Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
     Assembler       = $Assemblers.Host;
@@ -6357,6 +6524,8 @@ if ($IncludeSBoM) {
 
 # Custom exception printing for more detailed exception information
 } catch {
+  Stop-BuildLanes
+
   function Write-ErrorLines($Text, $Indent = 0) {
     $IndentString = " " * $Indent
     $Text.Replace("`r", "") -split "`n" | ForEach-Object {
