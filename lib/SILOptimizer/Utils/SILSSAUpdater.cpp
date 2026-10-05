@@ -113,7 +113,30 @@ areIdentical(llvm::DenseMap<SILBasicBlock *, SILValue> &availableValues) {
 }
 
 /// This should be called in top-down order of each def that needs its uses
-/// rewritten. The order that we visit uses for a given def is irrelevant.
+/// rewritten.
+void SILSSAUpdater::rewriteUses(ArrayRef<UseWrapper> uses) {
+  // Creating new phi arguments while rewriting certain debug uses could
+  // introduce ownership errors, so they must be dropped or killed if the
+  // existing phis are not sufficient (see rewriteDebugUse).
+  //
+  // Rewrite non-debug uses first. This allows debug uses to be rewritten using
+  // any phi arguments that were created for the non-debug uses, minimising
+  // debug info loss.
+  SmallVector<UseWrapper, 4> debugUses;
+  for (UseWrapper useWrapper : uses) {
+    Operand *use = useWrapper;
+    if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
+      debugUses.push_back(useWrapper);
+      continue;
+    }
+    rewriteUse(*use);
+  }
+  for (UseWrapper &useWrapper : debugUses) {
+    Operand *use = useWrapper;
+    rewriteDebugUse(*use);
+  }
+}
+
 void SILSSAUpdater::rewriteUse(Operand &use) {
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.
@@ -153,6 +176,63 @@ void SILSSAUpdater::rewriteUse(Operand &use) {
   SILValue newVal = getValueInMiddleOfBlock(user->getParent());
   assert(newVal && "Need a valid value");
   static_cast<Operand *>(useWrapper)->set(newVal);
+}
+
+void SILSSAUpdater::rewriteDebugUse(Operand &use) {
+  auto *user = cast<DebugValueInst>(use.getUser());
+
+  // A debug use may be outside the value's lifetime, e.g. after an owned value
+  // is consumed or after a guaranteed value's borrow scope ends. A phi created
+  // only for such a use would consume the owned value a second time, or extend
+  // the borrow past its scope. Only rewrite the debug use if the reaching value
+  // is available without new phis, and kill it otherwise.
+  if ((ownershipKind == OwnershipKind::Owned ||
+       ownershipKind == OwnershipKind::Guaranteed) &&
+      use.getOperandOwnership() == OperandOwnership::DebugUse) {
+    if (SILValue newVal = getValueForDebugUser(user)) {
+      use.set(newVal);
+    } else {
+      user->killOperand(use.getOperandNumber());
+    }
+    return;
+  }
+
+  rewriteUse(use);
+}
+
+SILValue SILSSAUpdater::getValueForDebugUser(DebugValueInst *user) {
+  SILBasicBlock *block = user->getParent();
+
+  // A value available in the user's block reaches the user unless it is
+  // defined in that block after the user.
+  auto it = blockToAvailableValueMap->find(block);
+  if (it != blockToAvailableValueMap->end()) {
+    SILValue value = it->second;
+    auto *defInst = value->getDefiningInstruction();
+    if (!defInst || defInst->getParent() != block ||
+        defInst->strictlyDominatesInBlock(user))
+      return value;
+  }
+
+  // Walk backward through the chain of single predecessors starting at the
+  // user's block. We can use the first available value we encounter, even if
+  // the user is outside that value's lifetime, since it is a debug_value.
+  //
+  // If we reach a block with multiple predecessors, either we can use the
+  // available value in that block (which may be a phi introduced while
+  // rewriting a non-debug user), or we have to bail out, since we cannot insert
+  // new phis.
+  BasicBlockSet visited(block->getFunction());
+  visited.insert(block);
+  while (SILBasicBlock *pred = block->getSinglePredecessorBlock()) {
+    if (!visited.insert(pred))
+      // Break out of a loop of single predecessors.
+      return SILValue();
+    if (auto value = tryGetAvailableValueAtEndOfBlock(pred))
+      return value;
+    block = pred;
+  }
+  return SILValue();
 }
 
 /// Get the edge values from the terminator to the destination basic block.
@@ -394,13 +474,23 @@ public:
 } // namespace llvm
 
 /// Check to see if AvailableVals has an entry for the specified BB and if so,
+/// return it. If not, return a null value.
+SILValue
+SILSSAUpdater::tryGetAvailableValueAtEndOfBlock(SILBasicBlock *block) const {
+  auto iter = blockToAvailableValueMap->find(block);
+  if (iter != blockToAvailableValueMap->end())
+    return iter->second;
+  return SILValue();
+}
+
+/// Check to see if AvailableVals has an entry for the specified BB and if so,
 /// return it.  If not, construct SSA form by first calculating the required
 /// placement of PHIs and then inserting new PHIs where needed.
 SILValue SILSSAUpdater::getValueAtEndOfBlockInternal(SILBasicBlock *block) {
+  if (auto value = tryGetAvailableValueAtEndOfBlock(block))
+    return value;
+
   AvailableValsTy &availableValues = *blockToAvailableValueMap;
-  auto iter = availableValues.find(block);
-  if (iter != availableValues.end())
-    return iter->second;
 
   llvm::SSAUpdaterImpl<SILSSAUpdater> impl(this, &availableValues,
                                            insertedPhis);

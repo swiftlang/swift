@@ -436,10 +436,7 @@ updateSSA(SILFunction *Fn, SILLoop *Loop,
     SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SSAUp.rewriteUse(*Use);
-    }
+    SSAUp.rewriteUses(UseList);
   }
 }
 
