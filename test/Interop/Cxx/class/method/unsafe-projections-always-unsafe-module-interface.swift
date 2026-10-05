@@ -1,10 +1,9 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=UnsafeProjections -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=UnsafeProjections -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
-// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, an unsafe projection keeps its
-// original name. The '__<name>Unsafe' spelling is still imported, as a
-// deprecated migration stub that renames to the original.
+// An unsafe projection keeps its original name. The '__<name>Unsafe' spelling
+// is still imported, as a deprecated migration stub that renames to the
+// original.
 
 // 'View' is not self-contained, so its projections were never unsafe and are
 // untouched by the feature.
