@@ -1879,8 +1879,10 @@ function Get-Dependencies {
 
 function Get-PinnedToolchainToolsDir() {
   $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+  # The pinned toolchain only bootstraps the build, so use its faster
+  # no-asserts compilers.
   return [IO.Path]::Combine("$ArtifactCache\toolchains", $ToolchainArtifact,
-    "LocalApp", "Programs", "Swift", "Toolchains", "$PinnedVersion+Asserts",
+    "LocalApp", "Programs", "Swift", "Toolchains", "$PinnedVersion+NoAsserts",
     "usr", "bin")
 }
 
