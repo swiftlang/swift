@@ -529,6 +529,10 @@ void ConformanceLookupTable::addGainedConformances(NominalTypeDecl *nominal) {
     // right away, and redundant conformances are diagnosed the same way.
     bool anyAdded = false;
     for (const auto &found : inherited) {
+      // The entry names the superclass, so inherit its conformances below.
+      if (isa<ClassDecl>(found.Item) && isa<ClassDecl>(dc))
+        InheritsFromUnresolvedSuperclass = true;
+
       auto *proto = dyn_cast<ProtocolDecl>(found.Item);
       if (!proto || found.isSuppressed)
         continue;

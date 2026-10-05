@@ -185,11 +185,10 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   bool excludeMacroExpansions = true;
   bool boundAny = false;
 
-  // Results computed from inheritance clause entries that did not resolve, and
-  // whose resolution did not run into a cycle, such as conformance lookup
-  // tables, are updated once more extensions are bound. Record that once per
-  // pass rather than for every extension, so that a result used while binding
-  // many extensions isn't updated each time.
+  // Results that depend on unresolved inheritance clause entries or 'Self'
+  // constraints can change once more extensions are bound.
+  // Record that once per pass rather than for every extension, so that a
+  // result used while binding many extensions isn't updated each time.
   auto finishPass = [&]() {
     if (boundAny)
       M->getASTContext().bumpExtensionBindingGeneration();

@@ -37,6 +37,7 @@ class Type;
 class TypeDecl;
 class ValueDecl;
 struct SelfBounds;
+class RecomputableDecls;
 class NominalTypeDecl;
 namespace ast_scope {
 class ASTSourceFileScope;
@@ -644,12 +645,17 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 /// the entry, or some component of it, does not resolve to any nominal type
 /// declaration, inverse or AnyObject, for example because it names a type
 /// declared in an extension that is not bound yet, or a typealias for one,
-/// set \c *unresolved true, unless resolving the entry ran into a cycle.
+/// set \c *unresolved true.
+/// When \p recomputable is null, an entry whose resolution ran into a cycle
+/// does not count as unresolved.
+/// If \p recomputable is non-null, split compositions and look through
+/// typealiases, reusing direct references from lookups that diagnose a cycle.
+/// Other components can still count as unresolved and be resolved again.
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
     InvertibleProtocolSet &inverses, bool &anyObject,
-    bool *unresolved = nullptr);
+    bool *unresolved = nullptr, RecomputableDecls *recomputable = nullptr);
 
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration, looking through typealiases
@@ -663,8 +669,12 @@ SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
 /// given protocol or protocol extension.
+/// If \p recomputable is non-null, split compositions and look through
+/// typealiases, reusing direct references from lookups that diagnose a cycle.
+/// Other components can still count as unresolved and be resolved again.
 SelfBounds getSelfBoundsFromWhereClause(
-    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    RecomputableDecls *recomputable = nullptr);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the generic signature of the

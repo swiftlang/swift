@@ -59,16 +59,42 @@ void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
+/// The bits of the superclass decl cache.
+enum : unsigned {
+  /// The superclass was computed.
+  SuperclassComputed = 1,
+
+  /// No superclass was found, but a component of an inheritance clause entry
+  /// or 'Self' constraint remains unresolved and its lookup did not diagnose
+  /// a cycle, so the superclass could be computed again.
+  SuperclassUnresolved = 2,
+};
+
+template <typename Info>
+static std::optional<ClassDecl *>
+getCachedSuperclassDecl(NominalTypeDecl *nominalDecl, const Info &info) {
+  auto cached = info.SuperclassDecl;
+  if (!(cached.getInt() & SuperclassComputed))
+    return std::nullopt;
+
+  // An inheritance clause entry or a 'Self' constraint that did not resolve
+  // can name a class declared in an extension that is bound later.
+  if ((cached.getInt() & SuperclassUnresolved) &&
+      nominalDecl->getASTContext().UnresolvedSuperclassDecls.shouldRecompute(
+          nominalDecl))
+    return std::nullopt;
+
+  return cached.getPointer();
+}
+
 std::optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->LazySemanticInfo.SuperclassDecl.getInt())
-      return classDecl->LazySemanticInfo.SuperclassDecl.getPointer();
+    return getCachedSuperclassDecl(nominalDecl, classDecl->LazySemanticInfo);
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    if (protocolDecl->LazySemanticInfo.SuperclassDecl.getInt())
-      return protocolDecl->LazySemanticInfo.SuperclassDecl.getPointer();
+    return getCachedSuperclassDecl(nominalDecl, protocolDecl->LazySemanticInfo);
 
   return std::nullopt;
 }
@@ -76,11 +102,17 @@ std::optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
 void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
   auto nominalDecl = std::get<0>(getStorage());
 
+  unsigned bits = SuperclassComputed;
+  auto &ctx = nominalDecl->getASTContext();
+  ctx.UnresolvedSuperclassDecls.finishRecomputing(nominalDecl);
+  if (!value && ctx.UnresolvedSuperclassDecls.contains(nominalDecl))
+    bits |= SuperclassUnresolved;
+
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    classDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+    classDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, bits);
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    protocolDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+    protocolDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, bits);
 }
 
 //----------------------------------------------------------------------------//

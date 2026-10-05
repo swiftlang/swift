@@ -5422,9 +5422,10 @@ class ClassDecl final : public NominalTypeDecl {
   SourceLoc ClassLoc;
 
   struct {
-    /// The superclass decl and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+    /// The superclass decl and bits to indicate whether the superclass was
+    /// computed yet or not, and whether it could be computed again (see
+    /// \c SuperclassDeclRequest).
+    llvm::PointerIntPair<ClassDecl *, 2, unsigned> SuperclassDecl;
 
     /// The superclass type and a bit to indicate whether the
     /// superclass was computed yet or not.
@@ -5821,9 +5822,10 @@ class ProtocolDecl final : public NominalTypeDecl {
   ArrayRef<ValueDecl *> ProtocolRequirements;
 
   struct {
-    /// The superclass decl and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+    /// The superclass decl and bits to indicate whether the superclass was
+    /// computed yet or not, and whether it could be computed again (see
+    /// \c SuperclassDeclRequest).
+    llvm::PointerIntPair<ClassDecl *, 2, unsigned> SuperclassDecl;
   } LazySemanticInfo;
 
   /// The generic signature representing exactly the new requirements introduced

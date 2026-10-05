@@ -314,18 +314,28 @@ public:
                            NominalTypeDecl *result) const;
 };
 
+void simple_display(llvm::raw_ostream &out, const RecomputableDecls *value);
+
 struct SelfBounds {
   llvm::TinyPtrVector<NominalTypeDecl *> decls;
   InvertibleProtocolSet inverses;
   bool anyObject = false;
+
+  /// Whether a component of the right-hand side of a 'Self' constraint does
+  /// not resolve to any nominal type declaration, inverse or AnyObject, and
+  /// its lookup did not diagnose a cycle. Without component caching, a
+  /// constraint whose resolution diagnosed a cycle does not count.
+  /// Only set by \c SelfBoundsFromWhereClauseRequest.
+  bool anyUnresolved = false;
 };
 
 /// Request the nominal types that occur as the right-hand side of "Self: Foo"
 /// constraints in the "where" clause of a protocol extension.
 class SelfBoundsFromWhereClauseRequest
     : public SimpleRequest<SelfBoundsFromWhereClauseRequest,
-                           SelfBounds(llvm::PointerUnion<
-                                      const TypeDecl *, const ExtensionDecl *>),
+                           SelfBounds(llvm::PointerUnion<const TypeDecl *,
+                                                         const ExtensionDecl *>,
+                                      RecomputableDecls *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -336,7 +346,8 @@ private:
   // Evaluation.
   SelfBounds
   evaluate(Evaluator &evaluator,
-           llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>) const;
+           llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+           RecomputableDecls *) const;
 };
 
 /// Request the nominal types that occur as the right-hand side of "Self: Foo"

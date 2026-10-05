@@ -279,6 +279,92 @@ enum class BuiltinDerivedConformanceMacroKind : uint8_t {
   NumKinds,
 };
 
+/// Declarations whose cached result depends on unresolved components of
+/// inheritance clause entries or 'Self' constraints. Components whose lookup
+/// diagnosed a cycle do not count. The result could change once more
+/// extensions are bound.
+class RecomputableDecls {
+  /// The current extension binding generation of the ASTContext.
+  const unsigned &Generation;
+
+  /// The extension binding generation at which each result was computed.
+  llvm::DenseMap<const Decl *, unsigned> Generations;
+
+  using TypeReferences =
+      std::pair<llvm::TinyPtrVector<TypeDecl *>, InvertibleProtocolSet>;
+
+  /// Direct references from lookups that diagnosed a cycle, keyed by the
+  /// declaration being resolved and the component's type representation.
+  /// Compositions are split before caching, including inside typealiases.
+  llvm::DenseMap<std::pair<const Decl *, const TypeRepr *>, TypeReferences>
+      CyclicTypeReferences;
+
+  /// Marks a result that is being computed again.
+  static constexpr unsigned Recomputing = ~0u;
+
+public:
+  explicit RecomputableDecls(const unsigned &generation)
+      : Generation(generation) {}
+
+  std::optional<TypeReferences>
+  getCyclicTypeReferences(const Decl *decl, const TypeRepr *typeRepr) const {
+    if (CyclicTypeReferences.empty())
+      return std::nullopt;
+    auto found = CyclicTypeReferences.find({decl, typeRepr});
+    if (found == CyclicTypeReferences.end())
+      return std::nullopt;
+    return found->second;
+  }
+
+  void recordCyclicTypeReferences(const Decl *decl, const TypeRepr *typeRepr,
+                                  const TypeReferences &result) {
+    CyclicTypeReferences.insert({{decl, typeRepr}, result});
+  }
+
+  /// Record that the result for \p decl depends on unresolved components
+  /// whose lookups did not diagnose a cycle.
+  void record(const Decl *decl) { Generations[decl] = Generation; }
+
+  /// Whether \c record was called for \p decl since \c finishRecomputing
+  /// last forgot it.
+  bool contains(const Decl *decl) const {
+    return !Generations.empty() && Generations.count(decl);
+  }
+
+  /// Whether the cached result for \p decl should not be used, because more
+  /// extensions were bound since it was recorded or because it is being
+  /// computed again. If so, the result is marked as being computed again until
+  /// \c record or \c finishRecomputing is called for \p decl, so that the
+  /// evaluator sees a request for \p decl made while computing it again as a
+  /// cycle, as it does the first time.
+  bool shouldRecompute(const Decl *decl) {
+    if (Generations.empty())
+      return false;
+    auto found = Generations.find(decl);
+    if (found == Generations.end() || found->second == Generation)
+      return false;
+    found->second = Recomputing;
+    return true;
+  }
+
+  /// Whether the result for \p decl is marked as being computed again by
+  /// \c shouldRecompute.
+  bool isRecomputing(const Decl *decl) const {
+    if (Generations.empty())
+      return false;
+    auto found = Generations.find(decl);
+    return found != Generations.end() && found->second == Recomputing;
+  }
+
+  /// When a result for \p decl is cached, forget \p decl if it is still marked
+  /// as being computed again, that is, if \c record was not called for it
+  /// since \c shouldRecompute marked it.
+  void finishRecomputing(const Decl *decl) {
+    if (isRecomputing(decl))
+      Generations.erase(decl);
+  }
+};
+
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
 /// It is the closest thing to thread-local or compile-local storage in this
@@ -477,9 +563,10 @@ private:
   /// The number of passes of BindExtensionsRequest that bound extensions to
   /// their extended nominal types.
   ///
-  /// Results computed from inheritance clause entries that did not resolve,
-  /// and whose resolution did not run into a cycle, such as conformance lookup
-  /// tables, are updated once this changes.
+  /// Results that depend on unresolved inheritance clause entries or 'Self'
+  /// constraints are updated once this changes. Conformance lookup tables
+  /// do not record entries for retry if their resolution diagnosed a cycle.
+  /// The superclass cache tracks unresolved components separately.
   unsigned ExtensionBindingGeneration = 0;
 
   friend class Pattern;
@@ -1423,6 +1510,11 @@ public:
 
   /// Record that a pass of BindExtensionsRequest bound extensions.
   void bumpExtensionBindingGeneration() { ++ExtensionBindingGeneration; }
+
+  /// Classes or protocols with unresolved components of inheritance clause
+  /// entries or 'Self' constraints whose lookups did not diagnose a cycle
+  /// (see \c SuperclassDeclRequest).
+  RecomputableDecls UnresolvedSuperclassDecls{ExtensionBindingGeneration};
 
   /// Produce a "normal" conformance for a nominal type.
   ///

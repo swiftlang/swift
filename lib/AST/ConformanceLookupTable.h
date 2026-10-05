@@ -424,12 +424,14 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// entries that did not resolve when their explicit conformances were
   /// recorded, and whose resolution did not run into a cycle.
   ///
-  /// Such an entry can name a protocol declared in an extension that is not
-  /// bound yet, so it is resolved again once more extensions are bound.
+  /// Such an entry can name a protocol or a class declared in an extension
+  /// that is not bound yet, so it is resolved again once more extensions are
+  /// bound.
   SmallVector<UnresolvedInheritedContext, 2> UnresolvedInheritedContexts;
 
   /// Whether the table may lack conformances of a superclass, because the
-  /// superclass may gain conformances.
+  /// superclass may gain conformances or was found by resolving an entry
+  /// again.
   bool InheritsFromUnresolvedSuperclass = false;
 
   /// The extension binding generation at which the table was created or last
