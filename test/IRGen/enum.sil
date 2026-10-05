@@ -223,16 +223,13 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK-32: entry:
 entry(%u : $Singleton):
 // CHECK-32:  call ptr @"$s4enum9SingletonOWOb"
-// CHECK-64:   br label %[[PREDEST:[0-9]+]]
-// CHECK-32:   br label %[[PREDEST:[0-9]+]]
+// CHECK-64:   br label %[[DEST:[0-9]+]]
+// CHECK-32:   br label %[[DEST:[0-9]+]]
   switch_enum %u : $Singleton, case #Singleton.value!enumelt: dest
 
-// CHECK-64: [[PREDEST]]:
-// CHECK-64:   br label %[[DEST:[0-9]+]]
 // CHECK-64: [[DEST]]:
 dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
-// CHECK-64:   {{%.*}} = phi i64 [ %0, %[[PREDEST]] ]
-// CHECK-64:   {{%.*}} = phi i64 [ %1, %[[PREDEST]] ]
+// CHECK-64-NOT: phi
 // CHECK-64:   ret void
   %x = tuple ()
   return %x : $()
@@ -565,7 +562,7 @@ sil @single_payload_no_xi_switch_arg : $@convention(thin) (SinglePayloadNoXI2) -
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
 // CHECK:   %2 = icmp eq i8 %1, 1
-// CHECK:   br i1 %2, label %[[TAGS:[0-9]+]], label %[[X_PREDEST:[0-9]+]]
+// CHECK:   br i1 %2, label %[[TAGS:[0-9]+]], label %[[X_DEST:[0-9]+]]
 // CHECK: [[TAGS]]:
 // CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
 // CHECK:     [[WORD]] 0, label %[[Y_DEST:[0-9]+]]
@@ -578,13 +575,11 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   unreachable
   switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest, default default_dest
 
-// CHECK: [[X_PREDEST]]:
-// CHECK:   br label %[[X_DEST:[0-9]+]]
 // CHECK: [[X_DEST]]:
-// CHECK:   {{%.*}} = phi [[WORD]] [ %0, %[[X_PREDEST]] ]
 x_dest(%u2 : $Builtin.Word):
+// CHECK-NOT: phi
 // CHECK:   call swiftcc void @a()
-// CHECK:   br label %[[END]]
+// CHECK:   br label %[[END:[0-9]+]]
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
@@ -697,10 +692,9 @@ sil @aggregate_single_payload_unpack : $@convention(thin) (AggregateSinglePayloa
 entry(%u : $AggregateSinglePayload):
   switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt: x_dest, default default_dest
 
-  // CHECK: [[FIRST:%.*]] = phi [[WORD]] [ %0
-  // CHECK: [[SECOND:%.*]] = phi [[WORD]] [ %1
-  // CHECK: call swiftcc void @int64_sink([[WORD]] [[FIRST]])
-  // CHECK: call swiftcc void @int64_sink([[WORD]] [[SECOND]])
+  // CHECK-NOT: phi
+  // CHECK: call swiftcc void @int64_sink([[WORD]] %0)
+  // CHECK: call swiftcc void @int64_sink([[WORD]] %1)
 x_dest(%v : $(Builtin.Word, Builtin.Word)):
   %f = function_ref @int64_sink : $@convention(thin) (Builtin.Word) -> ()
   %a = tuple_extract %v : $(Builtin.Word, Builtin.Word), 0
@@ -758,10 +752,8 @@ entry(%u : $AggregateSinglePayload2):
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt: x_dest, default default_dest
 
 // CHECK-64:   [[TRUNC:%.*]] = trunc [[WORD]] %0 to i21
-// CHECK-64:   phi i21 [ [[TRUNC]]
-// CHECK-64:   phi [[WORD]] [ %1
-// CHECK-64:   phi [[WORD]] [ %2
-// CHECK-64:   phi [[WORD]] [ %3
+// CHECK-64-NOT: phi
+// CHECK-64:   ret void
 x_dest(%v : $(CharLike, IntLike, RangeLike)):
   br end
 
@@ -811,11 +803,10 @@ entry(%u : $AggregateSinglePayload3):
   switch_enum %u : $AggregateSinglePayload3, case #AggregateSinglePayload3.x!enumelt: x_dest, default default_dest
 
   // CHECK: [[TRUNC:%.*]] = trunc [[WORD]] %0 to i21
-  // CHECK: [[FIRST:%.*]] = phi i21 [ [[TRUNC]]
-  // CHECK: [[SECOND:%.*]] = phi [[WORD]] [ %1
-  // CHECK: [[ZEXT:%.*]] = zext i21 [[FIRST]] to i32
+  // CHECK-NOT: phi
+  // CHECK: [[ZEXT:%.*]] = zext i21 [[TRUNC]] to i32
   // CHECK: call swiftcc void @int21_sink(i32 [[ZEXT]])
-  // CHECK: call swiftcc void @int64_sink([[WORD]] [[SECOND]])
+  // CHECK: call swiftcc void @int64_sink([[WORD]] %1)
 x_dest(%v : $(Builtin.Int21, Builtin.Word)):
   %f = function_ref @int21_sink : $@convention(thin) (Builtin.Int21) -> ()
   %g = function_ref @int64_sink : $@convention(thin) (Builtin.Word) -> ()
@@ -913,7 +904,7 @@ end:
 sil @single_payload_spare_bit_switch_arg : $@convention(thin) (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
-// CHECK-64:  switch i64 %0, label %[[X_PREDEST:[0-9]+]] [
+// CHECK-64:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
 // --           0x8000_0000_0000_0000
 // CHECK-64:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
 // --           0x8000_0000_0000_0001
@@ -921,11 +912,9 @@ entry(%u : $SinglePayloadSpareBit):
 // CHECK-64:  ]
   switch_enum %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
-// CHECK-64: [[X_PREDEST]]:
-// CHECK-64:   [[TRUNC_PAYLOAD:%.*]] = trunc i64 %0 to i63
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
 // CHECK-64: [[X_DEST]]:
-// CHECK-64:   {{%.*}} = phi i63 [ [[TRUNC_PAYLOAD]], %[[X_PREDEST]] ]
+// CHECK-64:   [[TRUNC_PAYLOAD:%.*]] = trunc i64 %0 to i63
+// CHECK-64-NOT: phi
 x_dest(%u2 : $Builtin.Int63):
 // CHECK-64:   call swiftcc void @a()
   %a = function_ref @a : $@convention(thin) () -> ()
@@ -1132,7 +1121,8 @@ enum SinglePayloadClass {
 // CHECK-native-64: i64 2, label {{%.*}}
 // CHECK-64:   ]
 // CHECK-64: [[DFLT]]:
-// CHECK-64:   phi ptr [ %0,
+// CHECK-64-NOT: phi
+// CHECK-64:   br label
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_switch(i32 %0) {{.*}} {
 // CHECK-32: entry:
@@ -1376,9 +1366,9 @@ enum MultiPayloadNoSpareBits {
 sil @multi_payload_no_spare_bits_switch : $(MultiPayloadNoSpareBits) -> () {
 entry(%u : $MultiPayloadNoSpareBits):
 // CHECK-64:   switch i8 %1, label %[[UNREACHABLE:[0-9]+]] [
-// CHECK-64:     i8 0, label %[[X_PREDEST:[0-9]+]]
-// CHECK-64:     i8 1, label %[[Y_PREDEST:[0-9]+]]
-// CHECK-64:     i8 2, label %[[Z_PREDEST:[0-9]+]]
+// CHECK-64:     i8 0, label %[[X_DEST:[0-9]+]]
+// CHECK-64:     i8 1, label %[[Y_DEST:[0-9]+]]
+// CHECK-64:     i8 2, label %[[Z_DEST:[0-9]+]]
 // CHECK-64:     i8 3, label %[[EMPTY:[0-9]+]]
 // CHECK-64:   ]
 // CHECK-64: [[EMPTY]]:
@@ -1391,31 +1381,25 @@ entry(%u : $MultiPayloadNoSpareBits):
 // CHECK-64:   unreachable
   switch_enum %u : $MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!enumelt: x_dest, case #MultiPayloadNoSpareBits.y!enumelt: y_dest, case #MultiPayloadNoSpareBits.z!enumelt: z_dest, case #MultiPayloadNoSpareBits.a!enumelt: a_dest, case #MultiPayloadNoSpareBits.b!enumelt: b_dest, case #MultiPayloadNoSpareBits.c!enumelt: c_dest
 
-// CHECK-64: [[X_PREDEST]]:
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
-// CHECK-64: [[Y_PREDEST]]:
-// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 %0 to i32
-// CHECK-64:   br label %[[Y_DEST:[0-9]+]]
-// CHECK-64: [[Z_PREDEST]]:
-// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 %0 to i63
-// CHECK-64:   br label %[[Z_DEST:[0-9]+]]
-
 // CHECK-64: [[X_DEST]]:
-// CHECK-64:   phi i64 [ %0, %[[X_PREDEST]] ]
+// CHECK-64-NOT: phi
+// CHECK-64:   call swiftcc void @a()
 x_dest(%x : $Builtin.Int64):
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK-64: [[Y_DEST]]:
-// CHECK-64:   phi i32 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 %0 to i32
+// CHECK-64:   call swiftcc void @b()
 y_dest(%y : $Builtin.Int32):
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK-64: [[Z_DEST]]:
-// CHECK-64:   phi i63 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 %0 to i63
+// CHECK-64:   call swiftcc void @c()
 z_dest(%z : $Builtin.Int63):
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()
@@ -1603,9 +1587,9 @@ entry(%u : $MultiPayloadOneSpareBit):
 // CHECK-64:   [[EXTRA_TAG:%.*]] = shl i8 %1, 1
 // CHECK-64:   [[TAG:%.*]] = or i8 [[SPARE_TAG]], [[EXTRA_TAG]]
 // CHECK-64:   switch i8 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
-// CHECK-64:     i8 0, label %[[X_PREDEST:[0-9]+]]
-// CHECK-64:     i8 1, label %[[Y_PREDEST:[0-9]+]]
-// CHECK-64:     i8 2, label %[[Z_PREDEST:[0-9]+]]
+// CHECK-64:     i8 0, label %[[X_DEST:[0-9]+]]
+// CHECK-64:     i8 1, label %[[Y_DEST:[0-9]+]]
+// CHECK-64:     i8 2, label %[[Z_DEST:[0-9]+]]
 // CHECK-64:     i8 3, label %[[EMPTY_DEST:[0-9]+]]
 // CHECK-64:   ]
 
@@ -1623,34 +1607,24 @@ entry(%u : $MultiPayloadOneSpareBit):
 // CHECK-64:   unreachable
   switch_enum %u : $MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!enumelt: x_dest, case #MultiPayloadOneSpareBit.y!enumelt: y_dest, case #MultiPayloadOneSpareBit.z!enumelt: z_dest, case #MultiPayloadOneSpareBit.a!enumelt: a_dest, case #MultiPayloadOneSpareBit.b!enumelt: b_dest, case #MultiPayloadOneSpareBit.c!enumelt: c_dest
 
-// CHECK-64: [[X_PREDEST]]:
-// CHECK-64:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
-// CHECK-64: [[Y_PREDEST]]:
-// --                                    0x7FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 9223372036854775807
-// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i63
-// CHECK-64:   br label %[[Y_DEST:[0-9]+]]
-// CHECK-64: [[Z_PREDEST]]:
-// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 %0 to i61
-// CHECK-64:   br label %[[Z_DEST:[0-9]+]]
-
 // CHECK-64: [[X_DEST]]:
-// CHECK-64:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
+// CHECK-64:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
 x_dest(%x : $Builtin.Int62):
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK-64: [[Y_DEST]]:
-// CHECK-64:   phi i63 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+// --                                    0x7FFF_FFFF_FFFF_FFFF
+// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 9223372036854775807
+// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i63
 y_dest(%y : $Builtin.Int63):
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK-64: [[Z_DEST]]:
-// CHECK-64:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 %0 to i61
 z_dest(%z : $Builtin.Int61):
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()
@@ -1882,9 +1856,9 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK-64:   [[TAG_BYTE:%.*]] = trunc i64 [[TAG_LSHR]] to i8
 // CHECK-64:   [[TAG:%.*]] = and i8 [[TAG_BYTE]], 3
 // CHECK-64:   switch i8 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
-// CHECK-64:     i8 0, label %[[X_PREDEST:[0-9]+]]
-// CHECK-64:     i8 1, label %[[Y_PREDEST:[0-9]+]]
-// CHECK-64:     i8 2, label %[[Z_PREDEST:[0-9]+]]
+// CHECK-64:     i8 0, label %[[X_DEST:[0-9]+]]
+// CHECK-64:     i8 1, label %[[Y_DEST:[0-9]+]]
+// CHECK-64:     i8 2, label %[[Z_DEST:[0-9]+]]
 // CHECK-64:     i8 3, label %[[EMPTY_DEST:[0-9]+]]
 // CHECK-64:   ]
 // CHECK-64: [[EMPTY_DEST]]:
@@ -1900,38 +1874,26 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK-64:   unreachable
   switch_enum %u : $MultiPayloadTwoSpareBits, case #MultiPayloadTwoSpareBits.x!enumelt: x_dest, case #MultiPayloadTwoSpareBits.y!enumelt: y_dest, case #MultiPayloadTwoSpareBits.z!enumelt: z_dest, case #MultiPayloadTwoSpareBits.a!enumelt: a_dest, case #MultiPayloadTwoSpareBits.b!enumelt: b_dest, case #MultiPayloadTwoSpareBits.c!enumelt: c_dest
 
-// CHECK-64: [[X_PREDEST]]:
-// CHECK-64:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
-
-// CHECK-64: [[Y_PREDEST]]:
-// --                                    0x3FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i60
-// CHECK-64:   br label %[[Y_DEST:[0-9]+]]
-
-// CHECK-64: [[Z_PREDEST]]:
-// --                                    0x3FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[Z_MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 [[Z_MASKED]] to i61
-// CHECK-64:   br label %[[Z_DEST:[0-9]+]]
-
 // CHECK-64: [[X_DEST]]:
-// CHECK-64:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
+// CHECK-64:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
 x_dest(%x : $Builtin.Int62):
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK-64: [[Y_DEST]]:
-// CHECK-64:   phi i60 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+// --                                    0x3FFF_FFFF_FFFF_FFFF
+// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i60
 y_dest(%y : $Builtin.Int60):
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK-64: [[Z_DEST]]:
-// CHECK-64:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+// --                                    0x3FFF_FFFF_FFFF_FFFF
+// CHECK-64:   [[Z_MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 [[Z_MASKED]] to i61
 z_dest(%z : $Builtin.Int61):
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()

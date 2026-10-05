@@ -19,10 +19,12 @@ public var e: (any TaskExecutor)? = nil
 // CHECK: [[CONFORMANCE_ADDR:%.*]] = getelementptr {{.*}}[[EXISTENTIAL_ADDR]]{{, i[0-9]+ 0, i[0-9]+ 1}}
 // CHECK: [[CONFORMANCE:%.*]] = load ptr, ptr [[CONFORMANCE_ADDR]]
 // CHECK: icmp eq ptr [[INSTANCE]], null
-// CHECK: [[INSTANCE_PHI:%.*]] = phi ptr
-// CHECK: [[CONFORMANCE_PHI:%.*]] = phi ptr
-// CHECK: [[INSTANCE_ISA:%.*]] = load ptr, ptr [[INSTANCE_PHI]]
-// CHECK: call {{.*}}@"$es19UnownedTaskExecutorVyABxhcSchRzlufC"(ptr [[INSTANCE_PHI]], ptr [[INSTANCE_ISA]], ptr [[CONFORMANCE_PHI]])
+// CHECK: [[INSTANCE_INT:%.*]] = ptrtoint ptr [[INSTANCE]] to i{{32|64}}
+// CHECK: [[INSTANCE_PAYLOAD:%.*]] = inttoptr i{{32|64}} [[INSTANCE_INT]] to ptr
+// CHECK: [[CONFORMANCE_INT:%.*]] = ptrtoint ptr [[CONFORMANCE]] to i{{32|64}}
+// CHECK: [[CONFORMANCE_PAYLOAD:%.*]] = inttoptr i{{32|64}} [[CONFORMANCE_INT]] to ptr
+// CHECK: [[INSTANCE_ISA:%.*]] = load ptr, ptr [[INSTANCE_PAYLOAD]]
+// CHECK: call {{.*}}@"$es19UnownedTaskExecutorVyABxhcSchRzlufC"(ptr [[INSTANCE_PAYLOAD]], ptr [[INSTANCE_ISA]], ptr [[CONFORMANCE_PAYLOAD]])
 // CHECK-LABEL: {{^}}}
 public func testit() -> UnownedTaskExecutor {
   return unsafe UnownedTaskExecutor(e!)
