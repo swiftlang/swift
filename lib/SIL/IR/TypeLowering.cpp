@@ -812,9 +812,7 @@ namespace {
       // stored in that existential. This is distinct from an ordinary
       // generic parameter constrained to a COM interface, which keeps its
       // opaque Swift generic representation.
-      if (llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
-            return protocol->isCOMInterface();
-          })) {
+      if (type->hasCOMInterfaceConstraint()) {
         if (type->is<ExistentialArchetypeType>())
           return asImpl().handleNonTrivialAggregate(
               type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,

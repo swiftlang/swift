@@ -4116,6 +4116,12 @@ bool ArchetypeType::mayHaveIsolatedConformance() const {
   return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
 }
 
+bool ArchetypeType::hasCOMInterfaceConstraint() const {
+  return llvm::any_of(getConformsTo(), [](ProtocolDecl *protocol) {
+    return protocol->isCOMInterface();
+  });
+}
+
 bool ArchetypeType::requiresClass() const {
   if (auto layout = getLayoutConstraint())
     return layout->isClass();
