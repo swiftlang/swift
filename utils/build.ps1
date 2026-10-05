@@ -495,6 +495,31 @@ $PythonModules = @{
       AMD64 = "416260257577718c05135c55958b674000baef9a1c7d9e8f306ec60d71db850f";
       ARM64 = "d89c3468de4cdc4f08a57e214384d0471911a3830fcdaf7a8cc587e42a866372";
     };
+    Dependencies = @("cffi", "pycparser", "typing_extensions");
+  };
+  "cffi" = @{
+    Version = "2.0.0";
+    # There is no cp310 win_arm64 wheel; ARM64 builds from the sdist.
+    SHA256 = @{
+      AMD64 = "b18a3ed7d5b3bd8d9ef7a8cb226502c6bf8308df1525e1cc676c3680e7176739";
+      ARM64 = "44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529";
+    };
+    Dependencies = @();
+  };
+  "pycparser" = @{
+    Version = "2.23";
+    SHA256 = @{
+      AMD64 = "e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934";
+      ARM64 = "e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934";
+    };
+    Dependencies = @();
+  };
+  "typing_extensions" = @{
+    Version = "4.15.0";
+    SHA256 = @{
+      AMD64 = "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548";
+      ARM64 = "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548";
+    };
     Dependencies = @();
   };
   "argparse" = @{
@@ -1741,8 +1766,11 @@ function Get-Dependencies {
     }
 
     function Test-PythonModuleInstalled([string] $ModuleName) {
+      # Also check the dependencies so that caches populated before one was
+      # pinned get repaired.
+      $Modules = @($ModuleName) + $PythonModules[$ModuleName].Dependencies
       try {
-        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$ModuleName') else 1)"
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import importlib.util, sys; sys.exit(0 if all(importlib.util.find_spec(m) for m in sys.argv[1:]) else 1)" @Modules
         return $true
       } catch {
         return $false
@@ -1767,7 +1795,7 @@ function Get-Dependencies {
 
       # Dependencies are pinned above; --require-hashes rejects anything else
       # pip would resolve on its own.
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-deps --disable-pip-version-check
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --disable-pip-version-check
 
       Write-Success "$ModuleName"
     }
