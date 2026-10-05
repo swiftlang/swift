@@ -566,7 +566,8 @@ private:
   /// Results that depend on unresolved inheritance clause entries or 'Self'
   /// constraints are updated once this changes. Conformance lookup tables
   /// do not record entries for retry if their resolution diagnosed a cycle.
-  /// The superclass cache tracks unresolved components separately.
+  /// Superclass and inherited protocol caches track unresolved components
+  /// separately.
   unsigned ExtensionBindingGeneration = 0;
 
   friend class Pattern;
@@ -1515,6 +1516,15 @@ public:
   /// entries or 'Self' constraints whose lookups did not diagnose a cycle
   /// (see \c SuperclassDeclRequest).
   RecomputableDecls UnresolvedSuperclassDecls{ExtensionBindingGeneration};
+
+  /// Protocols with unresolved components of inheritance clause entries or
+  /// 'Self' constraints whose lookups did not diagnose a cycle (see
+  /// \c InheritedProtocolsRequest).
+  RecomputableDecls UnresolvedInheritedProtocols{ExtensionBindingGeneration};
+
+  /// Protocols that are in \c UnresolvedInheritedProtocols or inherit from
+  /// protocols in it (see \c AllInheritedProtocolsRequest).
+  RecomputableDecls UnresolvedAllInheritedProtocols{ExtensionBindingGeneration};
 
   /// Produce a "normal" conformance for a nominal type.
   ///

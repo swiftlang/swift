@@ -3959,12 +3959,19 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
 
   InvertibleProtocolSet inverses;
   bool anyObject = false;
-  for (const auto &found :
-       getDirectlyInheritedNominalTypeDecls(PD, inverses, anyObject)) {
+  bool anyUnresolved = false;
+  for (const auto &found : getDirectlyInheritedNominalTypeDecls(
+           PD, inverses, anyObject, &anyUnresolved,
+           &ctx.UnresolvedInheritedProtocols)) {
     auto proto = dyn_cast<ProtocolDecl>(found.Item);
     if (proto && proto != PD)
       inherited.insert(proto);
   }
+
+  // An inheritance clause entry or a 'Self' constraint that did not resolve can
+  // name a protocol declared in an extension that is bound later.
+  if (anyUnresolved)
+    ctx.UnresolvedInheritedProtocols.record(PD);
 
   // Apply inverses.
   bool skipInverses = false;
@@ -3999,6 +4006,7 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
 ArrayRef<ProtocolDecl *>
 AllInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD) const {
+  auto &ctx = PD->getASTContext();
   llvm::SmallSetVector<ProtocolDecl *, 2> result;
 
   PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
@@ -4007,7 +4015,14 @@ AllInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
     return TypeWalker::Action::Continue;
   });
 
-  return PD->getASTContext().AllocateCopy(result.getArrayRef());
+  // The inherited protocols of every protocol visited above are computed now.
+  if (PD->mayRecomputeInheritedProtocols() ||
+      llvm::any_of(result, [](ProtocolDecl *inherited) {
+        return inherited->mayRecomputeInheritedProtocols();
+      }))
+    ctx.UnresolvedAllInheritedProtocols.record(PD);
+
+  return ctx.AllocateCopy(result.getArrayRef());
 }
 
 static void diagnoseDuplicateReparenting(
@@ -4665,12 +4680,14 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    InvertibleProtocolSet &inverses, bool &anyObject) {
+    InvertibleProtocolSet &inverses, bool &anyObject, bool *anyUnresolved,
+    RecomputableDecls *recomputable) {
   SmallVector<InheritedNominalEntry, 4> result;
 
   auto inheritedTypes = InheritedTypes(decl);
   for (unsigned i : inheritedTypes.getIndices()) {
-    getDirectlyInheritedNominalTypeDecls(decl, i, result, inverses, anyObject);
+    getDirectlyInheritedNominalTypeDecls(decl, i, result, inverses, anyObject,
+                                         anyUnresolved, recomputable);
   }
 
   auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
@@ -4694,9 +4711,11 @@ swift::getDirectlyInheritedNominalTypeDecls(
   }
 
   // Else we have access to this information on the where clause.
-  auto selfBounds = getSelfBoundsFromWhereClause(decl);
+  auto selfBounds = getSelfBoundsFromWhereClause(decl, recomputable);
   inverses.insertAll(selfBounds.inverses);
   anyObject |= selfBounds.anyObject;
+  if (anyUnresolved && selfBounds.anyUnresolved)
+    *anyUnresolved = true;
 
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.

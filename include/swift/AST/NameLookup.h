@@ -661,10 +661,20 @@ void getDirectlyInheritedNominalTypeDecls(
 /// "inherited" by the given declaration, looking through typealiases
 /// and splitting out the components of compositions.
 ///
-/// If we come across the AnyObject type, set \c anyObject true.
+/// If we come across the AnyObject type, set \c anyObject true. If
+/// \p anyUnresolved is non-null and some entry, or the right-hand side of some
+/// 'Self' constraint of a protocol, or some component of them, does not
+/// resolve to any nominal type declaration, inverse or AnyObject, set
+/// \c *anyUnresolved true.
+/// When \p recomputable is null, an entry or 'Self' constraint whose
+/// resolution ran into a cycle does not count as unresolved.
+/// If \p recomputable is non-null, split compositions and look through
+/// typealiases, reusing direct references from lookups that diagnose a cycle.
+/// Other components can still count as unresolved and be resolved again.
 SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    InvertibleProtocolSet &inverses, bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject,
+    bool *anyUnresolved = nullptr, RecomputableDecls *recomputable = nullptr);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the

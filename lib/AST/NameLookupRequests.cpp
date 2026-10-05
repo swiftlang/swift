@@ -125,13 +125,22 @@ InheritedProtocolsRequest::getCachedResult() const {
   if (!proto->areInheritedProtocolsValid())
     return std::nullopt;
 
+  // An inheritance clause entry or a 'Self' constraint that did not resolve
+  // can name a protocol declared in an extension that is bound later.
+  if (proto->mayRecomputeInheritedProtocols() &&
+      proto->getASTContext().UnresolvedInheritedProtocols.shouldRecompute(
+          proto))
+    return std::nullopt;
+
   return proto->InheritedProtocols;
 }
 
 void InheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
   auto proto = std::get<0>(getStorage());
   proto->InheritedProtocols = PDs;
-  proto->setInheritedProtocolsValid();
+  auto &unresolved = proto->getASTContext().UnresolvedInheritedProtocols;
+  unresolved.finishRecomputing(proto);
+  proto->setInheritedProtocolsValid(unresolved.contains(proto));
 }
 
 void InheritedProtocolsRequest::writeDependencySink(
@@ -152,13 +161,21 @@ AllInheritedProtocolsRequest::getCachedResult() const {
   if (!proto->areAllInheritedProtocolsValid())
     return std::nullopt;
 
+  // Some of the inherited protocols could be computed again.
+  if (proto->mayRecomputeAllInheritedProtocols() &&
+      proto->getASTContext().UnresolvedAllInheritedProtocols.shouldRecompute(
+          proto))
+    return std::nullopt;
+
   return proto->AllInheritedProtocols;
 }
 
 void AllInheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
   auto proto = std::get<0>(getStorage());
   proto->AllInheritedProtocols = PDs;
-  proto->setAllInheritedProtocolsValid();
+  auto &unresolved = proto->getASTContext().UnresolvedAllInheritedProtocols;
+  unresolved.finishRecomputing(proto);
+  proto->setAllInheritedProtocolsValid(unresolved.contains(proto));
 }
 
 //----------------------------------------------------------------------------//

@@ -75,7 +75,7 @@ class N6: A.N7InnerAlias { typealias T = Int } // expected-error {{'N6' inherits
 class N7: N6 { class Inner {} } // expected-note {{through class 'N7' declared here}}
 extension N6.T {}
 
-protocol N8 where Self: A.N8OwnAlias { typealias T = Int; typealias Own = Base } // expected-error {{'N8' inherits from itself}}
+protocol N8 where Self: A.N8OwnAlias { typealias T = Int; typealias Own = Base } // expected-error {{'N8' inherits from itself}} expected-note {{through reference here}}
 extension N8.T {}
 
 // A cycle through a subclass whose superclass is computed first.
@@ -86,7 +86,7 @@ extension N9.T {}
 
 // Recomputing an unresolved entry must not diagnose an earlier cycle again.
 extension A { typealias N11OwnAlias = N11.Own } // expected-error {{circular reference}} expected-note {{through reference here}}
-protocol N11: A.N11OwnAlias, A.OtherAlias { typealias T = Int; typealias Own = Base } // expected-error {{'N11' inherits from itself}} expected-note {{through reference here}} expected-warning {{protocol 'N11' should be declared to refine 'Other' due to a same-type constraint on 'Self'}}
+protocol N11: A.N11OwnAlias, A.OtherAlias { typealias T = Int; typealias Own = Base } // expected-error {{'N11' inherits from itself}} expected-note {{through reference here}}
 extension N11.T {}
 
 enum A {} // expected-note {{'A' declared here}}
@@ -98,7 +98,7 @@ extension A {
   typealias FinalAlias = Final
   typealias N5InnerAlias = N5.Inner // expected-note {{through reference here}}
   typealias N7InnerAlias = N7.Inner // expected-note {{through reference here}}
-  typealias N8OwnAlias = N8.Own // expected-note {{through reference here}}
+  typealias N8OwnAlias = N8.Own // expected-error {{circular reference}} expected-note {{through reference here}}
   typealias N10Alias = N10
   class NestedBase {}
 }

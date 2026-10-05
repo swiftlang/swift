@@ -434,6 +434,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// again.
   bool InheritsFromUnresolvedSuperclass = false;
 
+  /// Whether conformances were implied by a protocol whose inherited
+  /// protocols could be computed again (see \c InheritedProtocolsRequest).
+  bool ImpliedByUnresolvedProtocol = false;
+
   /// The extension binding generation at which the table was created or last
   /// looked for the conformances it may lack.
   unsigned ExtensionBindingGeneration;
@@ -546,7 +550,7 @@ public:
   /// extensions are bound.
   bool mayGainConformances() const {
     return !UnresolvedInheritedContexts.empty() ||
-           InheritsFromUnresolvedSuperclass;
+           InheritsFromUnresolvedSuperclass || ImpliedByUnresolvedProtocol;
   }
 
   /// Call \c addGainedConformances if the table may lack some conformances.

@@ -676,7 +676,7 @@ protected:
     HasDestructor : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -705,6 +705,16 @@ protected:
 
     /// Whether we've computed the AllInheritedProtocolsRequest.
     AllInheritedProtocolsValid : 1,
+
+    /// Whether the InheritedProtocolsRequest could be computed again because
+    /// a component of an inheritance clause entry or 'Self' constraint remains
+    /// unresolved and its lookup did not diagnose a cycle.
+    InheritedProtocolsUnresolved : 1,
+
+    /// Whether the AllInheritedProtocolsRequest could be computed again
+    /// because the inherited protocols of this protocol or of some protocols
+    /// it inherits from could be computed again.
+    AllInheritedProtocolsUnresolved : 1,
 
     /// Whether we have computed a requirement signature.
     HasRequirementSignature : 1,
@@ -5912,6 +5922,14 @@ public:
   /// Retrieve the set of protocols inherited from this protocol.
   ArrayRef<ProtocolDecl *> getInheritedProtocols() const;
 
+  /// Whether the inherited protocols could be computed again because a
+  /// component of an inheritance clause entry or 'Self' constraint remains
+  /// unresolved and its lookup did not diagnose a cycle (see
+  /// \c InheritedProtocolsRequest).
+  bool mayRecomputeInheritedProtocols() const {
+    return Bits.ProtocolDecl.InheritedProtocolsUnresolved;
+  }
+
   /// Retrieve the transitive closure of the inherited protocols, not including
   /// this protocol itself.
   ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
@@ -6058,15 +6076,20 @@ private:
   bool areInheritedProtocolsValid() const {
     return Bits.ProtocolDecl.InheritedProtocolsValid;
   }
-  void setInheritedProtocolsValid() {
+  void setInheritedProtocolsValid(bool unresolved) {
     Bits.ProtocolDecl.InheritedProtocolsValid = true;
+    Bits.ProtocolDecl.InheritedProtocolsUnresolved = unresolved;
   }
 
   bool areAllInheritedProtocolsValid() const {
     return Bits.ProtocolDecl.AllInheritedProtocolsValid;
   }
-  void setAllInheritedProtocolsValid() {
+  void setAllInheritedProtocolsValid(bool unresolved) {
     Bits.ProtocolDecl.AllInheritedProtocolsValid = true;
+    Bits.ProtocolDecl.AllInheritedProtocolsUnresolved = unresolved;
+  }
+  bool mayRecomputeAllInheritedProtocols() const {
+    return Bits.ProtocolDecl.AllInheritedProtocolsUnresolved;
   }
 
   bool areProtocolRequirementsValid() const {

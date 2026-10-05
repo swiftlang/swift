@@ -509,6 +509,26 @@ void ConformanceLookupTable::addGainedConformances(NominalTypeDecl *nominal) {
   // table again.
   ExtensionBindingGeneration = generation;
 
+  // Expand the implied conformances again, since the protocols that imply
+  // them could inherit from more protocols now.
+  if (ImpliedByUnresolvedProtocol) {
+    ImpliedByUnresolvedProtocol = false;
+    auto countConformances = [&] {
+      unsigned count = 0;
+      for (auto &entry : AllConformances)
+        count += entry.second.size();
+      return count;
+    };
+    unsigned numConformances = countConformances();
+    SmallVector<DeclContext *, 4> dcs;
+    for (auto &entry : AllConformances)
+      dcs.push_back(entry.first);
+    for (auto *dc : dcs)
+      expandImpliedConformances(nominal, dc);
+    if (countConformances() != numConformances)
+      NeedsResolution = true;
+  }
+
   SmallVector<UnresolvedInheritedContext, 2> contexts;
   std::swap(contexts, UnresolvedInheritedContexts);
   for (auto &context : contexts) {
@@ -703,7 +723,11 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     }
 
     auto source = ConformanceSource::forImplied(conformanceEntry);
-    for (auto *inherited : conformingProtocol->getInheritedProtocols()) {
+    // Computing the inherited protocols can set or clear the bit checked below.
+    auto inheritedProtocols = conformingProtocol->getInheritedProtocols();
+    if (conformingProtocol->mayRecomputeInheritedProtocols())
+      ImpliedByUnresolvedProtocol = true;
+    for (auto *inherited : inheritedProtocols) {
       // Conforming a ~Copyable nominal to a protocol that inherits Copyable
       // should not imply a Copyable conformance on the nominal.
       if (inherited->getInvertibleProtocolKind())
