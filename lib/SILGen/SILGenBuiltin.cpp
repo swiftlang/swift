@@ -478,7 +478,8 @@ static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
       (!type.getASTType().isCOMExistentialType() &&
        !type.isBridgeableObjectType() && !type.is<BuiltinNativeObjectType>())) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                     "takeFromRawPointer result must be a single reference");
+                     "takeFromRawPointer result must have an object or interface "
+                     "pointer representation");
     return SGF.emitUndef(type);
   }
 

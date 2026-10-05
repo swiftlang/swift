@@ -9,11 +9,11 @@ protocol IItem {}
 
 func optional(_ pointer: Builtin.RawPointer) -> (any IItem)? {
   Builtin.takeFromRawPointer(pointer)
-  // expected-error@-1 {{invalid use of builtin: takeFromRawPointer result must be a single reference}}
+  // expected-error@-1 {{invalid use of builtin: takeFromRawPointer result must have an object or interface pointer representation}}
 }
 
 // A conforming generic value does not have the existential's representation.
 func generic<T: IItem>(_ pointer: Builtin.RawPointer) -> T {
   Builtin.takeFromRawPointer(pointer)
-  // expected-error@-1 {{invalid use of builtin: takeFromRawPointer result must be a single reference}}
+  // expected-error@-1 {{invalid use of builtin: takeFromRawPointer result must have an object or interface pointer representation}}
 }
