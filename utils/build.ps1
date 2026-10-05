@@ -6244,8 +6244,11 @@ if ($Toolchain) {
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
 
   # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
-  Get-SelectedSDKBuilds | ForEach-Object {
-    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+  # These are mostly CMake configure time, which runs on one core.
+  Start-BuildLane "compiler-rt" {
+    Get-SelectedSDKBuilds | ForEach-Object {
+      Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+    }
   }
 
   # ── Stage2 Compiler Macros ────────────────────────────────────────────────
@@ -6285,6 +6288,8 @@ if ($Toolchain) {
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
+  Wait-BuildLane "compiler-rt"
+
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
 
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
