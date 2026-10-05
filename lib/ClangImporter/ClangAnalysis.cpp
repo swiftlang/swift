@@ -1234,11 +1234,9 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
       method->getNameAsString() == "end")
     return unsafe(CxxUnsafetyReason::IteratorFromBeginEnd);
 
-  // The user vouched for this method's safety. Without the feature, such a
-  // method is still renamed, for source compatibility. This doesn't apply to
-  // begin and end, whose renamed spellings the conformance to RAC relies on.
-  if (ctx.LangOpts.hasFeature(Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
-      hasSwiftAttribute(method, {"safe"}))
+  // The user vouched for this method's safety. This doesn't apply to begin and
+  // end, whose renamed spellings the conformance to RAC relies on.
+  if (hasSwiftAttribute(method, {"safe"}))
     return safe();
 
   // A method template returning one of its own template parameters returns
