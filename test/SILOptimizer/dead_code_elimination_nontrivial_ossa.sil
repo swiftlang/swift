@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -dce %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits -dce %s | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 
 sil_stage canonical
@@ -1565,6 +1567,64 @@ bb6(%8 : @reborrow $Klass):
 
 bb7:
   destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+enum MoveOnlyNoPayloadEnum : ~Copyable {
+  case a
+  case b
+}
+
+enum MoveOnlyNoPayloadEnumWithDeinit : ~Copyable {
+  case a
+  case b
+  deinit
+}
+
+sil @getMoveOnlyNoPayloadEnum : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnum
+sil @getMoveOnlyNoPayloadEnumWithDeinit : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnumWithDeinit
+
+// CHECK-LABEL: sil [ossa] @dce_dead_switch_enum_of_owned_moveonly :
+// CHECK:         [[E:%.*]] = apply
+// CHECK-NEXT:    destroy_value [[E]]
+// CHECK-NEXT:    br bb1
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'dce_dead_switch_enum_of_owned_moveonly'
+sil [ossa] @dce_dead_switch_enum_of_owned_moveonly : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getMoveOnlyNoPayloadEnum : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnum
+  %1 = apply %0() : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnum
+  switch_enum %1, case #MoveOnlyNoPayloadEnum.a!enumelt: bb1, case #MoveOnlyNoPayloadEnum.b!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dce_dont_delete_dead_switch_enum_of_owned_moveonly_with_deinit :
+// CHECK:         switch_enum
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dce_dont_delete_dead_switch_enum_of_owned_moveonly_with_deinit'
+sil [ossa] @dce_dont_delete_dead_switch_enum_of_owned_moveonly_with_deinit : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getMoveOnlyNoPayloadEnumWithDeinit : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnumWithDeinit
+  %1 = apply %0() : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnumWithDeinit
+  switch_enum %1, case #MoveOnlyNoPayloadEnumWithDeinit.a!enumelt: bb1, case #MoveOnlyNoPayloadEnumWithDeinit.b!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
   %r = tuple ()
   return %r
 }
