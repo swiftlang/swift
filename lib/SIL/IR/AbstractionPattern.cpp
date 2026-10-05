@@ -273,9 +273,7 @@ static bool hasOpaqueCOMRepresentation(CanType type,
   if (auto archetype = dyn_cast<ArchetypeType>(type))
     return !isa<ExistentialArchetypeType>(archetype) &&
            !archetype->getSuperclass() &&
-           llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
-             return protocol->isCOMInterface();
-           });
+           archetype->hasCOMInterfaceConstraint();
   return type->isTypeParameter() && signature &&
          !signature->getSuperclassBound(type) &&
          llvm::any_of(

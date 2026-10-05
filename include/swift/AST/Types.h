@@ -7362,7 +7362,11 @@ public:
     return { getSubclassTrailingObjects<ProtocolDecl *>(),
              static_cast<size_t>(Bits.ArchetypeType.NumProtocols) };
   }
-  
+
+  /// Whether at least one of the archetype's protocol constraints is a COM
+  /// interface. This does not imply a COM existential representation.
+  bool hasCOMInterfaceConstraint() const;
+
   /// requiresClass - True if the type can only be substituted with class types.
   /// This is true if the type conforms to one or more class protocols or has
   /// a superclass constraint.
