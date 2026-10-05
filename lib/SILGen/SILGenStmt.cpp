@@ -1817,6 +1817,37 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
         exn = emitLoad(loc, exn, exnTL, SGFContext(), IsTake).forward(*this);
       }
       exn = B.createUpcast(loc, exn, destErrorType);
+    } else if (exnType == SILType::getExceptionType(getASTContext())) {
+      // A `rethrows` function that can throw because of an AsyncSequence or
+      // AsyncIteratorProtocol conformance is type-checked as throwing that
+      // conformance's `Failure` (SE-0421), but its ABI still throws
+      // `any Error`. Recover the typed error with a forced cast, as the
+      // standard library does by hand with `throw error as! Failure`.
+      if (!useLoweredAddresses()) {
+        if (exn->getType().isAddress())
+          exn = emitLoad(loc, exn, exnTL, SGFContext(), IsTake).forward(*this);
+        exn = B.createUnconditionalCheckedCast(loc, CheckedCastInstOptions(),
+                                               exn, destErrorType, destASTType);
+      } else {
+        SILValue src = exn;
+        if (!src->getType().isAddress()) {
+          src = emitTemporaryAllocation(loc, exnType);
+          B.emitStoreValueOperation(loc, exn, src,
+                                    StoreOwnershipQualifier::Init);
+        }
+        SILValue dest = emitTemporaryAllocation(loc, destErrorType);
+        B.createUnconditionalCheckedCastAddr(loc, CheckedCastInstOptions(),
+                                             src, exnType.getASTType(), dest,
+                                             destASTType);
+        exn = dest;
+        // A loadable error goes to the throw destination by value; load it
+        // here, since the code below would load using the lowering of the
+        // original `any Error`.
+        if (!indirectErrorAddr)
+          exn = emitLoad(loc, dest, getTypeLowering(destErrorType),
+                         SGFContext(), IsTake)
+                    .forward(*this);
+      }
     } else {
       // We don't have a SILGen lowering for this conversion shape today.
       // Diagnose and substitute an undef of the destination type so the
