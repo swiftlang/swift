@@ -55,7 +55,7 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result))
+    if (vfs->exists(result) && !vfs->makeAbsolute(result))
       return result;
   }
 
@@ -72,7 +72,7 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result))
+    if (vfs->exists(result) && !vfs->makeAbsolute(result))
       return result;
   }
 
@@ -171,6 +171,8 @@ static std::optional<Path> findFirstIncludeDir(
     }
 
     if (allExpectedExist) {
+      if (vfs->makeAbsolute(dir))
+        continue;
       // VFS does not allow mapping paths that contain `../` or `./`.
       llvm::sys::path::remove_dots(dir, /*remove_dot_dot=*/true);
       return dir;
