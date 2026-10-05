@@ -3529,7 +3529,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [ScriptBlock] $BeforeLLDBTests = $null) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
@@ -3697,6 +3697,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     }
 
     if ($LLDBTargets) {
+      if ($BeforeLLDBTests) { & $BeforeLLDBTests }
       Invoke-IsolatingEnvVars {
         $env:SDKROOT = $SwiftSDK
         Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $LLDBTargets
@@ -6494,13 +6495,24 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+    # The dispatch and Foundation tests do not use the Stage2 build tree, so
+    # they run in parallel with the compiler tests, but finish before the LLDB
+    # tests, which are sensitive to load.
+    # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
+    # functions hardcode their platform needs.
+    Start-BuildLane "package-tests" {
+      if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
+      if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
+    }
+    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests @{
+      BeforeLLDBTests = { Wait-BuildLane "package-tests" };
+    }
+    Wait-BuildLane "package-tests"
+  } else {
+    if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
+    if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
   }
 
-  # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
-  # functions hardcode their platform needs.
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
   if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
   if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
   if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
