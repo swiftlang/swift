@@ -19,7 +19,13 @@ public let benchmarks = [
   BenchmarkInfo(name: "ReversedBidirectional", runFunction: run_ReversedBidirectional, tags: [.validation, .api, .cpubench]),
   BenchmarkInfo(name: "ReversedDictionary2", runFunction: run_ReversedDictionary, tags: [.validation, .api, .Dictionary],
       setUpFunction: { blackHole(dictionaryInput) },
-      tearDownFunction: { dictionaryInput = nil })
+      tearDownFunction: { dictionaryInput = nil }),
+  BenchmarkInfo(name: "ReversedSequenceToArray", runFunction: run_ReversedSequenceToArray, tags: [.validation, .api, .Array],
+      setUpFunction: { blackHole(sequenceInput) },
+      tearDownFunction: { sequenceInput = nil }),
+  BenchmarkInfo(name: "ReversedShortSequenceToArray", runFunction: run_ReversedShortSequenceToArray, tags: [.validation, .api, .Array],
+      setUpFunction: { blackHole(shortSequenceInput) },
+      tearDownFunction: { shortSequenceInput = nil })
 ]
 
 // These benchmarks compare the performance of iteration through several
@@ -73,5 +79,44 @@ public func run_ReversedDictionary(_ n: Int) {
       blackHole(key)
       blackHole(value)
     }
+  }
+}
+
+// These benchmarks measure building the reversed `Array` of a sequence that is
+// not a `BidirectionalCollection`, which is what dispatches to
+// `Sequence.reversed() -> [Element]`.
+
+struct OnePassSequence: Sequence {
+  var elements: [Int]
+
+  func makeIterator() -> Array<Int>.Iterator {
+    return elements.makeIterator()
+  }
+}
+
+let sequenceLength = 10_000
+
+var sequenceInput: OnePassSequence! = OnePassSequence(
+  elements: Array(0..<sequenceLength))
+
+var shortSequenceInput: OnePassSequence! = OnePassSequence(elements: [0])
+
+@inline(never)
+public func run_ReversedSequenceToArray(_ n: Int) {
+  let sequence = sequenceInput!
+
+  for _ in 1...n {
+    blackHole(sequence.reversed())
+  }
+}
+
+// A single element sequence has nothing to reverse, so this only measures the
+// fixed overhead of the algorithm.
+@inline(never)
+public func run_ReversedShortSequenceToArray(_ n: Int) {
+  let sequence = shortSequenceInput!
+
+  for _ in 1...n*1_000 {
+    blackHole(sequence.reversed())
   }
 }
