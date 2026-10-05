@@ -2984,6 +2984,12 @@ sil-instruction ::= 'existential_metatype' sil-type ',' sil-operand
 Obtains the metatype of the concrete value referenced by the existential
 container referenced by `%0`.
 
+For a COM existential, the result type must be `Any.Type`. The operation
+queries `ISwiftObject` for native class metadata, falling back to the static
+COM existential metadata when no valid Swift identity is available. It borrows
+its operand but may execute foreign code, retain, and release references; it
+must not be treated as a read-only metadata projection.
+
 ### objc_protocol
 
 ```
