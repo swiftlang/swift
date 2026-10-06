@@ -4961,20 +4961,20 @@ ReferenceCounting TypeBase::getReferenceCounting() {
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
-  ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
-
-  // In the absence of Objective-C interoperability, almost everything uses
-  // native reference counting or is the builtin BridgeObject.
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    defaultRefCounting = ReferenceCounting::Native;
-
-    // It is still possible for an FRT to be involved in an archetype or
-    // protocol type, so only short-circuit for cases other than those
-    if (!isa<ArchetypeType>(type) && !isa<ProtocolType>(type) &&
-        !isa<ProtocolCompositionType>(type))
-      return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
-                                                : ReferenceCounting::Native;
-  }
+  // In the absence of Objective-C interoperability, a class reference uses
+  // native reference counting unless something more specific applies.
+  bool EnableObjCInterop = ctx.LangOpts.EnableObjCInterop;
+  ReferenceCounting defaultRefCounting = EnableObjCInterop
+                                             ? ReferenceCounting::Unknown
+                                             : ReferenceCounting::Native;
+  auto objectModel = [&](const ClassDecl *classDecl) -> ReferenceCounting {
+    auto refCounting = classDecl->getObjectModel();
+    // When ObjC interop is disabled, CF types are managed as Swift heap objects
+    // (corelibs CFRetain calls swift_retain).
+    if (refCounting == ReferenceCounting::ObjC && !EnableObjCInterop)
+      return ReferenceCounting::Native;
+    return refCounting;
+  };
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4991,12 +4991,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return ReferenceCounting::Bridge;
 
   case TypeKind::Class:
-    return cast<ClassType>(type)->getDecl()->getObjectModel();
+    return objectModel(cast<ClassType>(type)->getDecl());
   case TypeKind::BoundGenericClass:
-    return cast<BoundGenericClassType>(type)->getDecl()->getObjectModel();
+    return objectModel(cast<BoundGenericClassType>(type)->getDecl());
   case TypeKind::UnboundGeneric:
-    return cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl())
-        ->getObjectModel();
+    return objectModel(
+        cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()));
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
@@ -5026,7 +5026,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   }
 
   case TypeKind::ParameterizedProtocol: {
-    return cast<ParameterizedProtocolType>(this)
+    return cast<ParameterizedProtocolType>(type)
       ->getBaseType()
       ->getReferenceCounting();
   }
