@@ -72,14 +72,12 @@ class SwiftTesting(product.Product):
         return product
 
     def _cmake_products(self, host_target):
-        if host_target.startswith('wasi'):
-            return [self._cmake_product(host_target, build_shared_libs=False)]
-        if self.is_darwin_host(host_target):
-            return [self._cmake_product(host_target, build_shared_libs=True)]
-        return [
-            self._cmake_product(host_target, build_shared_libs=True),
-            self._cmake_product(host_target, build_shared_libs=False),
-        ]
+        products = [self._cmake_product(
+            host_target, build_shared_libs=not host_target.startswith('wasi'))]
+        # Ship both variants on Linux, alongside the corresponding corelibs.
+        if host_target.startswith('linux-') and self.args.build_swift_static_stdlib:
+            products.append(self._cmake_product(host_target, build_shared_libs=False))
+        return products
 
     def _for_each_host_target(self, base_target, body):
         body(base_target)
@@ -141,8 +139,7 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
         # FIXME: If we build macros for the builder, specify the path.
         self.cmake_options.define('SwiftTesting_MACRO', 'NO')
 
-        if not self.is_darwin_host(host_target) and \
-                not host_target.startswith('wasi'):
+        if host_target.startswith('linux-'):
             build_root = os.path.dirname(self.build_dir)
 
             # Use a compiler from the build tree rather than the toolchain being

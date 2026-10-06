@@ -1329,7 +1329,9 @@ SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 [[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
 [[ "${SKIP_BUILD_LLBUILD}" ]] || PRODUCTS+=(llbuild)
 [[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest)
-[[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest_static)
+if [[ -z "${SKIP_BUILD_XCTEST}" && $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]]; then
+  PRODUCTS+=(xctest_static)
+fi
 
 # get_host_specific_variable(host, name)
 #
@@ -2363,7 +2365,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 ;;
             xctest|xctest_static)
-                if [[ "${product}" == "xctest_static" && "${host}" == macosx-* ]]; then
+                if [[ "${product}" == "xctest_static" && "${host}" != linux-* ]]; then
                   continue
                 fi
 
@@ -2391,7 +2393,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 macosx-*)
                   # Staging: require opt-in for building with dispatch
                   if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                      LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch${XCTEST_DEPENDENCY_SUFFIX})"
+                      LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                       LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                   fi
 
@@ -2426,7 +2428,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -DBUILD_SHARED_LIBS=${XCTEST_BUILD_SHARED_LIBS}
                     -Ddispatch_DIR=$(build_directory ${host} libdispatch${XCTEST_DEPENDENCY_SUFFIX})/cmake/modules
-                    -DFoundation_DIR=$(build_directory ${host} foundation${XCTEST_DEPENDENCY_SUFFIX})/cmake/modules
+                    -DFoundation_DIR=${FOUNDATION_BUILD_DIR}/cmake/modules
                     -DSwiftTesting_DIR=$(build_directory ${host} swifttesting${XCTEST_DEPENDENCY_SUFFIX})/cmake/modules
                     -DSwiftTestingMacros_DIR=$(build_directory ${host} swifttestingmacros)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
@@ -2806,7 +2808,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${product}" == "xctest_static" && "${host}" == macosx-* ]]; then
+                if [[ "${product}" == "xctest_static" && "${host}" != linux-* ]]; then
                   continue
                 fi
 
@@ -3014,6 +3016,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 INSTALL_TARGETS="install-distribution"
                 ;;
             xctest|xctest_static)
+                if [[ "${product}" == "xctest_static" && "${host}" != linux-* ]]; then
+                    continue
+                fi
+
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
                     continue
                 fi
