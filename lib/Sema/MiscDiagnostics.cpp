@@ -6069,6 +6069,10 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     void diagnoseIfUnintendedInterpolation(CallExpr *segment,
                                            UnintendedInterpolationKind kind) {
+      if (kind == UnintendedInterpolationKind::Optional &&
+          baseInterpolationTypeName(segment) != "DefaultStringInterpolation")
+        return;
+
       if (interpolationWouldBeUnintended(
               segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
