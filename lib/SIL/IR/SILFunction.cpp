@@ -680,6 +680,13 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (isSpecialization())
     return true;
 
+  // A protocol witness thunk is serialized along with the witness table that
+  // refers to it, and clients that devirtualize calls through that table emit
+  // their own copy.
+  if (isThunk() && getLoweredFunctionType()->getRepresentation() ==
+                       SILFunctionTypeRepresentation::WitnessMethod)
+    return true;
+
   // If this is for a declaration, ask it.
   if (auto declRef = getDeclRef()) {
     return declRef.hasNonUniqueDefinition();
