@@ -52,6 +52,24 @@ void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
   ClangSyntaxPrinter(type->getASTContext(), os).printBaseName(type);
 }
 
+static bool shouldCacheTypeMetadata(const TypeDecl *typeDecl) {
+  return (isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl)) &&
+         !typeDecl->hasClangNode() &&
+         cast<NominalTypeDecl>(typeDecl)->hasGenericParamList();
+}
+
+static void printCachedTypeMetadataAccess(
+    raw_ostream &os, const NominalTypeDecl *typeDecl,
+    llvm::function_ref<void()> printAccessor) {
+  ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
+  printer.printSwiftImplQualifier();
+  os << "TypeMetadataCache<::";
+  printer.printNominalTypeReference(typeDecl, /*moduleContext=*/nullptr);
+  os << ">::get([] { return ";
+  printAccessor();
+  os << "._0; })";
+}
+
 void ClangValueTypePrinter::printMetadataAccessAsVariable(
     ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
@@ -246,8 +264,23 @@ void ClangValueTypePrinter::printValueTypeDecl(
               const_cast<NominalTypeDecl *>(typeDecl));
   // Takes the stream explicitly, as the nested namespace printers shadow 'os'.
   auto printVWTable = [&](raw_ostream &os) {
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-        Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+    if (shouldCacheTypeMetadata(typeDecl)) {
+      ClangSyntaxPrinter printer(Context, os);
+      os << "    auto metadata = ";
+      printer.printSwiftImplQualifier();
+      os << "MetadataResponseTy{";
+      printCachedTypeMetadataAccess(os, typeDecl, [&] {
+        os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+        printer.printSwiftTypeMetadataAccessFunctionCall(
+            typeMetadataFuncName, typeMetadataFuncGenericParams);
+      });
+      os << ", 0};\n";
+      printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata",
+                                                                 "vwTable", 4);
+    } else {
+      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+          Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+    }
   };
   std::string baseName;
   {
@@ -744,17 +777,25 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
-  if (typeDecl->hasClangNode())
-    printer.printBaseName(moduleContext);
-  else
-    printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  if (!printer.printNestedTypeNamespaceQualifiers(typeDecl))
+  auto printAccessor = [&] {
+    if (typeDecl->hasClangNode())
+      printer.printBaseName(moduleContext);
+    else
+      printer.printBaseName(typeDecl->getModuleContext());
     os << "::";
-  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printSwiftTypeMetadataAccessFunctionCall(
-      typeMetadataFuncName, typeMetadataFuncRequirements);
-  os << "._0;\n";
+    if (!printer.printNestedTypeNamespaceQualifiers(typeDecl))
+      os << "::";
+    os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+    printer.printSwiftTypeMetadataAccessFunctionCall(
+        typeMetadataFuncName, typeMetadataFuncRequirements);
+  };
+  if (shouldCacheTypeMetadata(typeDecl)) {
+    printCachedTypeMetadataAccess(os, NTD, printAccessor);
+  } else {
+    printAccessor();
+    os << "._0";
+  }
+  os << ";\n";
   os << "  }\n};\n";
 
   os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
