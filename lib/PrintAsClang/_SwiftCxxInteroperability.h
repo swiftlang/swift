@@ -280,6 +280,23 @@ template <class T> struct TypeMetadataTrait {
 
 namespace _impl {
 
+/// Caches complete metadata for a Swift generic value type specialization.
+/// The accessor must make a blocking request for complete metadata.
+template <class T> struct TypeMetadataCache {
+  static SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  get(void *_Nonnull (*_Nonnull accessor)()) {
+    // Constant initialization avoids a C++ initialization guard. Let the Swift
+    // runtime coordinate concurrent and recursive metadata requests.
+    static void *cachedMetadata = nullptr;
+    auto metadata = __atomic_load_n(&cachedMetadata, __ATOMIC_ACQUIRE);
+    if (!metadata) {
+      metadata = accessor();
+      __atomic_store_n(&cachedMetadata, metadata, __ATOMIC_RELEASE);
+    }
+    return metadata;
+  }
+};
+
 /// Type trait that returns the `_impl::_impl_<T>` class type for the given
 /// class T.
 template <class T> struct implClassFor {

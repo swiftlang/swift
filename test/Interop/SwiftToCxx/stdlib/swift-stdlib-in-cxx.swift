@@ -37,9 +37,9 @@
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~Array() noexcept {
-// CHECK: }
+// CHECK: {{^ *}$}}
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) noexcept {
-// CHECK: }
+// CHECK: {{^ *}$}}
 // CHECK: static SWIFT_INLINE_THUNK Array<T_0_0> init() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK void append(const T_0_0& newElement) noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK T_0_0 removeAt(swift::Int index) noexcept SWIFT_SYMBOL({{.*}});
@@ -64,9 +64,9 @@
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~Optional() noexcept {
-// CHECK: }
+// CHECK: {{^ *}$}}
 // CHECK-NEXT: SWIFT_INLINE_THUNK Optional(const Optional &other) noexcept {
-// CHECK: }
+// CHECK: {{^ *}$}}
 // CHECK:   enum class cases {
 // CHECK-NEXT: some SWIFT_SYMBOL({{.*}}),
 // CHECK-NEXT: none
