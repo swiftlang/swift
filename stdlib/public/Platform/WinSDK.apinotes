@@ -1,6 +1,42 @@
 ---
 Name: WinSDK
 Globals:
+- Name: BI_RGB
+  Type: DWORD
+- Name: BM_GETCHECK
+  Type: UINT
+- Name: BM_SETCHECK
+  Type: UINT
+- Name: BS_AUTOCHECKBOX
+  Type: DWORD
+- Name: BS_MULTILINE
+  Type: DWORD
+- Name: BS_NOTIFY
+  Type: DWORD
+- Name: BS_PUSHBUTTON
+  Type: DWORD
+- Name: CBS_DROPDOWNLIST
+  Type: DWORD
+- Name: CBS_OWNERDRAWFIXED
+  Type: DWORD
+- Name: CB_GETCOMBOBOXINFO
+  Type: UINT
+- Name: CB_GETCURSEL
+  Type: UINT
+- Name: CB_GETITEMDATA
+  Type: UINT
+- Name: CB_INITSTORAGE
+  Type: UINT
+- Name: CB_INSERTSTRING
+  Type: UINT
+- Name: CB_RESETCONTENT
+  Type: UINT
+- Name: CB_SETCURSEL
+  Type: UINT
+- Name: CB_SETITEMHEIGHT
+  Type: UINT
+- Name: CLIP_DEFAULT_PRECIS
+  Type: DWORD
 - Name: CREATE_ALWAYS
   Type: DWORD
 - Name: CREATE_NEW
@@ -21,7 +57,39 @@ Globals:
   Type: DWORD
 - Name: DACL_SECURITY_INFORMATION
   Type: DWORD
+- Name: DCX_CACHE
+  Type: DWORD
+- Name: DCX_CLIPCHILDREN
+  Type: DWORD
+- Name: DCX_CLIPSIBLINGS
+  Type: DWORD
+- Name: DCX_INTERSECTUPDATE
+  Type: DWORD
+- Name: DEFAULT_CHARSET
+  Type: DWORD
+- Name: DEFAULT_PITCH
+  Type: DWORD
+- Name: DEFAULT_QUALITY
+  Type: DWORD
 - Name: DETACHED_PROCESS
+  Type: DWORD
+- Name: DEVICE_NOTIFY_WINDOW_HANDLE
+  Type: DWORD
+- Name: DIB_RGB_COLORS
+  Type: UINT
+- Name: DMDO_180
+  Type: DWORD
+- Name: DMDO_270
+  Type: DWORD
+- Name: DMDO_90
+  Type: DWORD
+- Name: DMDO_DEFAULT
+  Type: DWORD
+- Name: DM_DISPLAYORIENTATION
+  Type: DWORD
+- Name: DM_PELSHEIGHT
+  Type: DWORD
+- Name: DM_PELSWIDTH
   Type: DWORD
 - Name: DOMAIN_ALIAS_RID_ADMINS
   Type: DWORD
@@ -35,11 +103,41 @@ Globals:
   Type: DPI_AWARENESS_CONTEXT
 - Name: DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED
   Type: DPI_AWARENESS_CONTEXT
+- Name: DT_EDITCONTROL
+  Type: UINT
+- Name: DT_NOCLIP
+  Type: UINT
+- Name: DT_NOPREFIX
+  Type: UINT
+- Name: DT_SINGLELINE
+  Type: UINT
+- Name: DT_VCENTER
+  Type: UINT
 - Name: DUPLICATE_SAME_ACCESS
   Type: DWORD
+- Name: EM_EXLIMITTEXT
+  Type: UINT
+- Name: EM_GETPARAFORMAT
+  Type: UINT
+- Name: EM_GETPASSWORDCHAR
+  Type: UINT
+- Name: EM_SCROLLCARET
+  Type: UINT
+- Name: EM_SETPARAFORMAT
+  Type: UINT
+- Name: EM_SETPASSWORDCHAR
+  Type: UINT
+- Name: EM_SETREADONLY
+  Type: UINT
+- Name: EM_SETSEL
+  Type: UINT
+- Name: EM_SETTYPOGRAPHYOPTIONS
+  Type: UINT
 - Name: ENABLE_VIRTUAL_TERMINAL_PROCESSING
   Type: DWORD
 - Name: ERROR_ACCESS_DENIED
+  Type: DWORD
+- Name: ERROR_ACCESS_DISABLED_BY_POLICY
   Type: DWORD
 - Name: ERROR_ALREADY_EXISTS
   Type: DWORD
@@ -58,6 +156,8 @@ Globals:
 - Name: ERROR_BAD_PATHNAME
   Type: DWORD
 - Name: ERROR_BROKEN_PIPE
+  Type: DWORD
+- Name: ERROR_CANCELLED
   Type: DWORD
 - Name: ERROR_CANNOT_MAKE
   Type: DWORD
@@ -167,7 +267,13 @@ Globals:
   Type: DWORD
 - Name: ERROR_WRITE_PROTECT
   Type: DWORD
+- Name: ES_AUTOHSCROLL
+  Type: DWORD
+- Name: ES_MULTILINE
+  Type: DWORD
 - Name: EXTENDED_STARTUPINFO_PRESENT
+  Type: DWORD
+- Name: FF_DONTCARE
   Type: DWORD
 - Name: FILE_APPEND_DATA
   Type: DWORD
@@ -293,6 +399,20 @@ Globals:
   Type: HKEY
 - Name: HKEY_USERS
   Type: HKEY
+- Name: ICC_BAR_CLASSES
+  Type: DWORD
+- Name: ICC_DATE_CLASSES
+  Type: DWORD
+- Name: ICC_LISTVIEW_CLASSES
+  Type: DWORD
+- Name: ICC_NATIVEFNTCTL_CLASS
+  Type: DWORD
+- Name: ICC_PROGRESS_CLASS
+  Type: DWORD
+- Name: ICC_STANDARD_CLASSES
+  Type: DWORD
+- Name: ICC_TAB_CLASSES
+  Type: DWORD
 - Name: IMAGE_BITMAP
   Type: UINT
 - Name: INFINITE
@@ -309,6 +429,12 @@ Globals:
   Type: DWORD
 - Name: LANG_NEUTRAL
   Type: WORD
+- Name: LB_INSERTSTRING
+  Type: UINT
+- Name: LB_RESETCONTENT
+  Type: UINT
+- Name: LB_SETCURSEL
+  Type: UINT
 - Name: LOCKFILE_EXCLUSIVE_LOCK
   Type: DWORD
 - Name: LOCKFILE_FAIL_IMMEDIATELY
@@ -323,6 +449,12 @@ Globals:
   Type: DWORD
 - Name: MEM_RELEASE
   Type: DWORD
+- Name: MONITORINFOF_PRIMARY
+  Type: DWORD
+- Name: MONITOR_DEFAULTTONULL
+  Type: DWORD
+- Name: MONITOR_DEFAULTTOPRIMARY
+  Type: DWORD
 - Name: MOVEFILE_COPY_ALLOWED
   Type: DWORD
 - Name: MOVEFILE_REPLACE_EXISTING
@@ -335,15 +467,27 @@ Globals:
   Type: DWORD
 - Name: NO_INHERITANCE
   Type: DWORD
+- Name: ODA_DRAWENTIRE
+  Type: UINT
+- Name: ODA_FOCUS
+  Type: UINT
+- Name: ODA_SELECT
+  Type: UINT
+- Name: ODS_SELECTED
+  Type: UINT
 - Name: OPEN_ALWAYS
   Type: DWORD
 - Name: OPEN_EXISTING
+  Type: DWORD
+- Name: OUT_DEFAULT_PRECIS
   Type: DWORD
 - Name: OWNER_SECURITY_INFORMATION
   Type: DWORD
 - Name: PAGE_READONLY
   Type: DWORD
 - Name: PAGE_READWRITE
+  Type: DWORD
+- Name: PFM_ALIGNMENT
   Type: DWORD
 - Name: PIPE_ACCESS_INBOUND
   Type: DWORD
@@ -357,6 +501,8 @@ Globals:
   Type: DWORD
 - Name: PIPE_WAIT
   Type: DWORD
+- Name: PM_REMOVE
+  Type: UINT
 - Name: PROCESS_QUERY_INFORMATION
   Type: DWORD
 - Name: PROCESS_QUERY_LIMITED_INFORMATION
@@ -377,10 +523,38 @@ Globals:
   Type: UINT
 - Name: QS_ALLINPUT
   Type: UINT
+- Name: QS_HOTKEY
+  Type: UINT
 - Name: QS_INPUT
+  Type: UINT
+- Name: QS_KEY
   Type: UINT
 - Name: QS_MOUSE
   Type: UINT
+- Name: QS_MOUSEBUTTON
+  Type: UINT
+- Name: QS_MOUSEMOVE
+  Type: UINT
+- Name: QS_PAINT
+  Type: UINT
+- Name: QS_POINTER
+  Type: UINT
+- Name: QS_POSTMESSAGE
+  Type: UINT
+- Name: QS_RAWINPUT
+  Type: UINT
+- Name: QS_SENDMESSAGE
+  Type: UINT
+- Name: QS_TIMER
+  Type: UINT
+- Name: QS_TOUCH
+  Type: UINT
+- Name: RRF_RT_REG_DWORD
+  Type: DWORD
+- Name: RRF_RT_REG_SZ
+  Type: DWORD
+- Name: RRF_ZEROONFAILURE
+  Type: DWORD
 - Name: SECURITY_BUILTIN_DOMAIN_RID
   Type: DWORD
 - Name: SECURITY_DESCRIPTOR_REVISION
@@ -391,6 +565,12 @@ Globals:
   Type: UINT
 - Name: SE_DACL_PROTECTED
   Type: SECURITY_DESCRIPTOR_CONTROL
+- Name: SPI_GETHIGHCONTRAST
+  Type: UINT
+- Name: SRCCOPY
+  Type: DWORD
+- Name: SS_BITMAP
+  Type: DWORD
 - Name: STANDARD_RIGHTS_EXECUTE
   Type: DWORD
 - Name: STANDARD_RIGHTS_READ
@@ -407,8 +587,24 @@ Globals:
   Type: DWORD
 - Name: STD_OUTPUT_HANDLE
   Type: DWORD
+- Name: STM_SETIMAGE
+  Type: UINT
 - Name: SUBLANG_DEFAULT
   Type: WORD
+- Name: SWP_DRAWFRAME
+  Type: UINT
+- Name: SWP_FRAMECHANGED
+  Type: UINT
+- Name: SWP_NOACTIVATE
+  Type: UINT
+- Name: SWP_NOCOPYBITS
+  Type: UINT
+- Name: SWP_NOMOVE
+  Type: UINT
+- Name: SWP_NOSIZE
+  Type: UINT
+- Name: SWP_NOZORDER
+  Type: UINT
 - Name: SW_HIDE
   Type: WORD
 - Name: SW_SHOWMAXIMIZED
@@ -420,6 +616,28 @@ Globals:
 - Name: SYMOPT_UNDNAME
   Type: DWORD
 - Name: SYNCHRONIZE
+  Type: DWORD
+- Name: TBM_GETPOS
+  Type: UINT
+- Name: TBM_GETRANGEMAX
+  Type: UINT
+- Name: TBM_GETRANGEMIN
+  Type: UINT
+- Name: TBM_SETLINESIZE
+  Type: UINT
+- Name: TBM_SETPOS
+  Type: UINT
+- Name: TBM_SETRANGEMAX
+  Type: UINT
+- Name: TBM_SETRANGEMIN
+  Type: UINT
+- Name: TBS_HORZ
+  Type: DWORD
+- Name: TBS_TRANSPARENTBKGND
+  Type: DWORD
+- Name: TCS_FIXEDWIDTH
+  Type: DWORD
+- Name: TCS_FLATBUTTONS
   Type: DWORD
 - Name: TH32CS_SNAPMODULE
   Type: DWORD
@@ -433,8 +651,22 @@ Globals:
   Type: DWORD
 - Name: THREAD_SUSPEND_RESUME
   Type: DWORD
+- Name: TPM_RIGHTBUTTON
+  Type: UINT
 - Name: TRUNCATE_EXISTING
   Type: DWORD
+- Name: UDM_GETACCEL
+  Type: UINT
+- Name: UDM_GETPOS32
+  Type: UINT
+- Name: UDM_GETRANGE32
+  Type: UINT
+- Name: UDM_SETACCEL
+  Type: UINT
+- Name: UDM_SETPOS32
+  Type: UINT
+- Name: UDM_SETRANGE32
+  Type: UINT
 - Name: UF_DONT_EXPIRE_PASSWD
   Type: DWORD
 - Name: UF_SCRIPT
@@ -449,13 +681,71 @@ Globals:
   Type: DWORD
 - Name: WAIT_TIMEOUT
   Type: DWORD
+- Name: WA_ACTIVE
+  Type: WORD
+- Name: WA_CLICKACTIVE
+  Type: WORD
+- Name: WA_INACTIVE
+  Type: WORD
 - Name: WER_FAULT_REPORTING_NO_UI
   Type: DWORD
+- Name: WM_ACTIVATE
+  Type: UINT
+- Name: WM_ACTIVATEAPP
+  Type: UINT
+- Name: WM_COMMAND
+  Type: UINT
+- Name: WM_CONTEXTMENU
+  Type: UINT
+- Name: WM_DELETEITEM
+  Type: UINT
+- Name: WM_DESTROY
+  Type: UINT
+- Name: WM_DPICHANGED
+  Type: UINT
+- Name: WM_DRAWITEM
+  Type: UINT
+- Name: WM_ERASEBKGND
+  Type: UINT
+- Name: WM_GETMINMAXINFO
+  Type: UINT
+- Name: WM_HSCROLL
+  Type: UINT
+- Name: WM_LBUTTONUP
+  Type: UINT
+- Name: WM_MEASUREITEM
+  Type: UINT
+- Name: WM_PAINT
+  Type: UINT
+- Name: WM_POWERBROADCAST
+  Type: UINT
+- Name: WM_QUIT
+  Type: UINT
+- Name: WM_SETFONT
+  Type: UINT
+- Name: WM_SETREDRAW
+  Type: UINT
 - Name: WSA_FLAG_OVERLAPPED
+  Type: DWORD
+- Name: WS_BORDER
+  Type: DWORD
+- Name: WS_CAPTION
+  Type: DWORD
+- Name: WS_CHILD
+  Type: DWORD
+- Name: WS_CLIPSIBLINGS
+  Type: DWORD
+- Name: WS_HSCROLL
   Type: DWORD
 - Name: WS_OVERLAPPEDWINDOW
   Type: DWORD
 - Name: WS_POPUPWINDOW
+  Type: DWORD
+- Name: WS_TABSTOP
+  Type: DWORD
+- Name: WS_VISIBLE
+  Type: DWORD
+- Name: WS_VSCROLL
   Type: DWORD
 - Name: WT_EXECUTELONGFUNCTION
   Type: ULONG
