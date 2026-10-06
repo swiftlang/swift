@@ -221,7 +221,9 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
   if (isa<ClassDecl>(nominalDecl))
     return;
 
-  bool canAddInverse = !hasExplicitInverse && !hasUnconditionalConformance;
+  // Nothing can suppress Deinitable yet.
+  bool canAddInverse = !hasExplicitInverse && !hasUnconditionalConformance &&
+                       ip != InvertibleProtocolKind::Deinitable;
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (ip == InvertibleProtocolKind::Copyable) {
@@ -263,6 +265,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
         if (type->isEscapable())
           return false;
         break;
+      case InvertibleProtocolKind::Deinitable:
+        if (type->isDeinitable())
+          return false;
+        break;
       }
 
       storage->diagnose(diag::inverse_type_member_in_conforming_type,
@@ -295,6 +301,12 @@ void swift::checkEscapableConformance(DeclContext *dc,
                                       ProtocolConformanceRef conformance) {
   checkInvertibleConformanceCommon(dc, conformance,
                                    InvertibleProtocolKind::Escapable);
+}
+
+void swift::checkDeinitableConformance(DeclContext *dc,
+                                       ProtocolConformanceRef conformance) {
+  checkInvertibleConformanceCommon(dc, conformance,
+                                   InvertibleProtocolKind::Deinitable);
 }
 
 void swift::checkCopyableConformance(DeclContext *dc,

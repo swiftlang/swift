@@ -1927,6 +1927,10 @@ static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
       case InvertibleProtocolKind::Escapable:
         if (!arg->isEscapable())
           return ip;
+        break;
+      case InvertibleProtocolKind::Deinitable:
+        // Nothing can suppress Deinitable, so no generic argument lacks it.
+        break;
       }
     }
   }
@@ -1948,6 +1952,10 @@ checkExistentialForInvertibleReqs(CanType type) {
     case InvertibleProtocolKind::Escapable:
       if (!type->isEscapable())
         return ip;
+      break;
+    case InvertibleProtocolKind::Deinitable:
+      // Nothing can suppress Deinitable, so no existential lacks it.
+      break;
     }
   }
   return std::nullopt;
@@ -1992,6 +2000,8 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
           ? diag::availability_escapable_existential_casting_only_version_newer
           : diag::availability_escapable_generics_casting_only_version_newer;
       break;
+    case InvertibleProtocolKind::Deinitable:
+      llvm_unreachable("nothing can suppress Deinitable");
     }
 
     // Enforce the availability restriction.

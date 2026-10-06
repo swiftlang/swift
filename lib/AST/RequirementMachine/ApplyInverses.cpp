@@ -227,7 +227,12 @@ void swift::rewriting::applyInverses(
   }
 
   // Scan the structural requirements and cancel out any inferred requirements
-  // based on the inverses we saw.
+  // based on the inverses we saw. A subject that suppresses Copyable still
+  // needs the Deinitable default, which Copyable would otherwise imply.
+  SmallVector<StructuralRequirement, 2> deinitableDefaults;
+  auto *deinitableProto = InverseRequirement::copyableImpliesDeinitable(ctx)
+                              ? ctx.getProtocol(KnownProtocolKind::Deinitable)
+                              : nullptr;
   result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {
     auto req = structReq.req;
 
@@ -260,6 +265,18 @@ void swift::rewriting::applyInverses(
       return false;
     }
     auto recordedInverses = foundInverses->getSecond();
-    return recordedInverses.contains(*proto);
+    if (!recordedInverses.contains(*proto))
+      return false;
+
+    if (*proto == InvertibleProtocolKind::Copyable && deinitableProto &&
+        !recordedInverses.contains(InvertibleProtocolKind::Deinitable)) {
+      deinitableDefaults.push_back(
+          {{RequirementKind::Conformance, req.getFirstType(),
+            deinitableProto->getDeclaredInterfaceType()},
+           structReq.loc});
+    }
+    return true;
   }), result.end());
+
+  result.append(deinitableDefaults);
 }

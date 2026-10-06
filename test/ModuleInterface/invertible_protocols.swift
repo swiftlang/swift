@@ -7,13 +7,14 @@
 
 // RUN: %FileCheck %s < %t/Swift.swiftinterface
 
-// CHECK-DAG: @_marker public protocol Copyable {
+// CHECK-DAG: @_marker public protocol Copyable : Swift::Deinitable {
 // CHECK-DAG: @_marker public protocol Escapable {
+// CHECK-DAG: @_marker public protocol Deinitable {
 
 // This test verifies that:
 //   1. When omitted, the an invertible protocol decl gets automatically
 //      synthesized into a module named Swift
 //   2. These protocol decls do not specify inverses in their inheritance clause
-//      when emitted into the interface file.
+//      when emitted into the interface file. Copyable inherits Deinitable.
 
 @_marker public protocol Escapable { }

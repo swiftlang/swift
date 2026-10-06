@@ -713,6 +713,10 @@ public:
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
+  /// Returns true if this contextual type satisfies a conformance to
+  /// Deinitable, which means that its values can be destroyed implicitly.
+  bool isDeinitable();
+
   /// Returns true if this type satisfies a conformance to Escapable in the
   /// given generic signature.
   bool isEscapable(GenericSignature sig);

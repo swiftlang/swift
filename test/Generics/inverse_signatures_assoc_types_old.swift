@@ -10,23 +10,23 @@
 protocol P2 { associatedtype A }
 
 // CHECK-LABEL: .P2_IC@
-// CHECK: <Self where Self : Escapable, Self.[P2_IC]A : Copyable, Self.[P2_IC]A : Escapable>
+// CHECK: <Self where Self : Deinitable, Self : Escapable, Self.[P2_IC]A : Copyable, Self.[P2_IC]A : Escapable>
 protocol P2_IC: ~Copyable { associatedtype A }
 
 // CHECK-LABEL: .P2_CI@
-// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[P2_CI]A : Escapable>
+// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[P2_CI]A : Deinitable, Self.[P2_CI]A : Escapable>
 protocol P2_CI { associatedtype A: ~Copyable } // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 
 // CHECK-LABEL: .P2_II@
-// CHECK: Requirement signature: <Self where Self : Escapable, Self.[P2_II]A : Escapable>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self : Escapable, Self.[P2_II]A : Deinitable, Self.[P2_II]A : Escapable>
 protocol P2_II: ~Copyable { associatedtype A: ~Copyable } // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 
 // CHECK-LABEL: .P3@
-// CHECK: Requirement signature: <Self where Self.[P3]B : Copyable>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self.[P3]B : Copyable>
 protocol P3 where Self: (~Copyable & ~Escapable) { associatedtype B: ~Escapable }  // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 
 // CHECK-LABEL: .P4@
-// CHECK: Requirement signature: <Self where Self : Copyable, Self.[P4]B : Copyable, Self.[P4]C : Escapable>
+// CHECK: Requirement signature: <Self where Self : Copyable, Self.[P4]B : Copyable, Self.[P4]C : Deinitable, Self.[P4]C : Escapable, Self.[P4]D : Deinitable>
 protocol P4<B, D>: ~Escapable {
   associatedtype B: ~Escapable  // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
   associatedtype C: ~Copyable   // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}

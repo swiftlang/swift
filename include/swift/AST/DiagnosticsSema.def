@@ -3074,6 +3074,8 @@ ERROR(inferred_opaque_type,none,
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
+ERROR(deinitable_reserved,none,
+      "'Deinitable' is reserved for use by the compiler", ())
 
 // Extensions
 GROUPED_ERROR(non_nominal_extension,NominalTypes,none,

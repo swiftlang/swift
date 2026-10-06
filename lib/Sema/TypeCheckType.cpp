@@ -5583,6 +5583,17 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                      TypeResolutionOptions options) {
   Type result = resolveDeclRefTypeReprRec(repr, options);
 
+  // The compiler reserves Deinitable for its own use.
+  if (auto *protoTy = result->getAs<ProtocolType>()) {
+    if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Deinitable) &&
+        !getDeclContext()->getParentModule()->isStdlibModule()) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::deinitable_reserved);
+      repr->setInvalid();
+      return ErrorType::get(getASTContext());
+    }
+  }
+
   // Diagnose an error if generic arguments are missing.
   if (result->is<UnboundGenericType>() && !repr->hasGenericArgList() &&
       !resolution.getUnboundTypeOpener() &&

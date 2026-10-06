@@ -484,7 +484,7 @@ $s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncR
 $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> sending (@out null.NonSendableKlass, @error @owned Swift.Error)
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
-$sSRyxG15Synchronization19AtomicRepresentableABRi1_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.<bit 2>> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+$sSRyxG15Synchronization19AtomicRepresentableABRi1_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Deinitable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 
 $s5assoc9ncElementyyxAA1PRz0C0Rj_zlF ---> assoc.ncElement<A where A: assoc.P, A.Element: ~Swift.Copyable>(A) -> ()
 $s5assoc6ncIteryyxAA1PRzlF ---> assoc.ncIter<A where A: assoc.P>(A) -> ()

@@ -7131,6 +7131,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         checkEscapableConformance(dc, ProtocolConformanceRef(conformance));
         break;
       }
+      case KnownProtocolKind::Deinitable: {
+        checkDeinitableConformance(dc, ProtocolConformanceRef(conformance));
+        break;
+      }
       case KnownProtocolKind::BitwiseCopyable: {
         checkBitwiseCopyableConformance(
             conformance, /*isImplicit=*/conformance->getSourceKind() ==

@@ -6479,6 +6479,8 @@ public:
       case InvertibleProtocolKind::Escapable:
         inverseEscapable = true;
         break;
+      case InvertibleProtocolKind::Deinitable:
+        llvm_unreachable("nothing can suppress Deinitable");
       };
     }
 

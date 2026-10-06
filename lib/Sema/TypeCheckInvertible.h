@@ -35,6 +35,10 @@ public:
 void checkCopyableConformance(DeclContext *dc,
                               ProtocolConformanceRef conformance);
 
+/// Checks that all stored properties or associated values are Deinitable.
+void checkDeinitableConformance(DeclContext *dc,
+                                ProtocolConformanceRef conformance);
+
 /// Checks that all stored properties or associated values are Escapable.
 void checkEscapableConformance(DeclContext *dc,
                                ProtocolConformanceRef conformance);
