@@ -105,6 +105,8 @@ private final class SARIFLogBuilder {
     }
 
     let artifact = run.addArtifact()
+    // FIXME: For diagnostics emitted from macro-expanded code this produces a
+    // URI to a file that does not exist.
     artifact.location = ArtifactLocation(
       uri: URL(fileURLWithPath: sourceFiles[index].fileName), uriBaseId: nil)
     artifact.sourceLanguage = "swift"
