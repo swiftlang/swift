@@ -3200,6 +3200,8 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinIsolationMacro,
 };
 
+struct BridgedConformanceArray;
+
 struct BridgedASTType {
   enum class TraitResult {
     IsNot,
@@ -3326,6 +3328,8 @@ public:
   BRIDGED_INLINE bool hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanGenericSignature
   SILFunctionType_getSubstGenericSignature() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray collectExistentialConformances(
+      BridgedCanType existential) const;
 };
 
 struct BridgedASTTypeArray {
