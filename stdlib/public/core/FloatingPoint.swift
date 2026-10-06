@@ -1232,6 +1232,18 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   var isCanonical: Bool { get }
+  
+  /// Adds `rhs` to `lhs` with "relaxed" floating-point semantics.
+  @available(StdlibDeploymentTarget 6.5, *)
+  static func &+=(lhs: inout Self, rhs: Self)
+  
+  /// Subtracts `rhs` from `lhs` with "relaxed" floating-point semantics.
+  @available(StdlibDeploymentTarget 6.5, *)
+  static func &-=(lhs: inout Self, rhs: Self)
+  
+  /// Multiplies `lhs` by `rhs` with "relaxed" floating-point semantics.
+  @available(StdlibDeploymentTarget 6.5, *)
+  static func &*=(lhs: inout Self, rhs: Self)
 }
 
 /// The sign of a floating-point value.
@@ -1473,6 +1485,39 @@ extension FloatingPoint {
   @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLessThanOrEqualTo(lhs)
+  }
+  
+  // Default implementations of relaxed operators simply delegate to
+  // the strict operators. Individual types override to implement relaxed
+  // arithmetic.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation) @_transparent
+  public static func &+=(lhs: inout Self, rhs: Self) { lhs += rhs }
+  
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation) @_transparent
+  public static func &-=(lhs: inout Self, rhs: Self) { lhs -= rhs }
+  
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation) @_transparent
+  public static func &*=(lhs: inout Self, rhs: Self) { lhs *= rhs }
+  
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation) @_transparent
+  public static func &+(lhs: Self, rhs: Self) -> Self {
+    var result = lhs; result &+= rhs; return result
+  }
+  
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation) @_transparent
+  public static func &-(lhs: Self, rhs: Self) -> Self {
+    var result = lhs; result &-= rhs; return result
+  }
+  
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation) @_transparent
+  public static func &*(lhs: Self, rhs: Self) -> Self {
+    var result = lhs; result &*= rhs; return result
   }
 }
 
