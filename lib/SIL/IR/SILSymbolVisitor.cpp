@@ -299,7 +299,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         if (!EmbeddedSerializedWitnesses.insert(witnessRef).second)
           return;
 
-        addFunction(witnessRef, /*ignoreLinkage=*/true);
+        Visitor.addEmbeddedSerializedWitness(witnessRef);
       };
 
       rootConformance->forEachValueWitness(

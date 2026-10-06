@@ -104,6 +104,10 @@ public:
   virtual void addDispatchThunk(SILDeclRef declRef) {}
   virtual void addDynamicFunction(AbstractFunctionDecl *AFD,
                                   DynamicKind dynKind) {}
+  /// In Embedded Swift, a witness that cross-module optimization makes public
+  /// because a serialized witness thunk refers to it, whatever its access
+  /// level.
+  virtual void addEmbeddedSerializedWitness(SILDeclRef declRef) {}
   virtual void addEnumCase(EnumElementDecl *EED) {}
   virtual void addFieldOffset(VarDecl *VD) {}
   virtual void addFunction(SILDeclRef declRef) {}
