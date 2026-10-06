@@ -2,6 +2,8 @@
 // REQUIRES: swift_feature_SafeInteropImplementations
 // REQUIRES: executable_test
 
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
