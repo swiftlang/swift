@@ -5272,10 +5272,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // An implicit 'self' reference base expression means we should
     // prepend with qualification.
     if (baseExpr && !baseExpr->isImplicit()) {
-      Diag->fixItReplace(baseExpr->getSourceRange(),
-                         diag::replace_with_type, baseTy);
+      if (baseTy->hasOpaqueArchetype() || baseTy->isExistentialType()) {
+        Diag->fixItInsert(baseExpr->getSourceRange().Start, "type(of: ");
+        Diag->fixItInsertAfter(baseExpr->getSourceRange().End, ")");
+      } else {
+        Diag->fixItReplace(baseExpr->getSourceRange(),
+                           diag::replace_with_type, baseTy);
+      }
     } else {
-      Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
+      if (baseTy->hasOpaqueArchetype() || baseTy->isExistentialType()) {
+        Diag->fixItInsert(loc, "type(of: self).");
+      } else {
+        Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
+      }
     }
 
     return true;
