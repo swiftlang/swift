@@ -2942,6 +2942,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     CMAKE_Swift_FLAGS = if ($LTO -ne "none") { @("-use-ld=lld") } else { @() };
+    CMAKE_DISABLE_PRECOMPILE_HEADERS = "YES";
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
@@ -5411,6 +5412,14 @@ function Test-SourceKitLSP {
     # The Windows build doesn't build the SourceKit plugins into the SwiftPM build directory (it builds them using CMake).
     # Tell the tests where to find the just-built plugins.
     $env:SOURCEKIT_LSP_TEST_PLUGIN_PATHS="$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+
+    # Add Python to PATH for external build server tests.
+    # Create python3.exe alias if it doesn't exist (Windows installs python.exe, not python3.exe).
+    $PythonToolsDir = [IO.Path]::GetDirectoryName((Get-PythonExecutable))
+    if (-not (Test-Path "$PythonToolsDir\python3.exe")) {
+      Copy-Item "$PythonToolsDir\python.exe" "$PythonToolsDir\python3.exe"
+    }
+    $env:Path = "$PythonToolsDir;$env:Path"
 
     Build-SPMProject `
       -Action TestParallel `
