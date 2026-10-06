@@ -6778,6 +6778,12 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     auto selfParamIndex = origFnTy->getNumParameters() - 1;
     if (!config.parameterIndices->contains(selfParamIndex))
       return false;
+    // A mutating self tangent is not returned from the reverse-mode pullback
+    // but passed as inout, so there is no self result to reorder.
+    // Forward-mode differentials still need this self-reordering.
+    if (kind == AutoDiffDerivativeFunctionKind::VJP &&
+        origFnTy->getSelfParameter().isIndirectMutating())
+      return false;
     return config.parameterIndices->getNumIndices() > 1;
   };
   bool reorderSelf = shouldReorderSelf();
