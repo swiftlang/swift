@@ -279,7 +279,7 @@ func caller() {
 
 To understand the constraints that Swift puts on `inout` parameters, let's take
 a look at the mental model for introduced in the [Ownership
-manifesto](OwnershipManifesto.md) and in [SE-0176 Enforce Exclusive Access to
+manifesto](../OwnershipManifesto.md) and in [SE-0176 Enforce Exclusive Access to
 Memory](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md).
 When the caller binds a storage reference to an `inout` parameter, it starts a
 non-instantaneous access to the whole value that occupies the storage. This
@@ -1179,7 +1179,7 @@ that return inner pointers on temporaries.
 ### Differences in move semantics between C++ and Swift
 
 Swift's "move" operation will leave the source value uninitialized (see
-[ownership manifesto](OwnershipManifesto.md)); this operation is called a
+[ownership manifesto](../OwnershipManifesto.md)); this operation is called a
 "destructive move". C++ has "non-destructive moves" that leave the source value
 initialized, but in an indeterminate state.
 
@@ -1194,7 +1194,7 @@ but don't have a public copy constructor and a public copy assignment operator
 
 Swift does not have move-only types at the time this document was written
 (January 2020). There is a desire to add them, and a lot of design work has been
-done (see the [Ownership Manifesto](OwnershipManifesto.md)), however, this
+done (see the [Ownership Manifesto](../OwnershipManifesto.md)), however, this
 design has not been proposed yet.
 
 Therefore, we will first discuss mapping move-only C++ classes to Swift before
@@ -1329,7 +1329,7 @@ struct TwoFiles {
 ### Move-only C++ classes: mapping to move-only Swift types (in future Swift versions)
 
 This section is based on the design for move-only Swift types that has not been
-officially proposed yet. See [ownership manifesto](OwnershipManifesto.md) for
+officially proposed yet. See [ownership manifesto](../OwnershipManifesto.md) for
 the design for ownership and move only types that we assume in this section.
 
 Move-only C++ classes correspond to `moveonly` structs in Swift. Semantic
