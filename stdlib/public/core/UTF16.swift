@@ -451,6 +451,14 @@ private enum ScalarFallbackResult: UInt8 {
 @_transparent private var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
 @_transparent private var utf16AstralPlaneMin: UInt32 { 0x10000 }
 
+// Fixed high bits of a 2-byte sequence's lead byte: 0b110xxxxx.
+@_transparent private var utf8TwoByteLeadPrefix: UInt16 { 0b1100_0000 }
+// Fixed high bits of any continuation byte: 0b10xxxxxx.
+@_transparent private var utf8ContinuationPrefix: UInt16 { 0b1000_0000 }
+// The six payload bits carried by a continuation byte.
+@_transparent private var utf8ContinuationPayloadMask: UInt16 { 0b0011_1111 }
+@_transparent private var utf8ContinuationPayloadBits: UInt16 { 6 }
+
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 @_transparent private var blockSize:Int { 8 }
 private typealias CodeUnitBlock = SIMD8<UInt16>
@@ -489,10 +497,35 @@ private func _anySurrogate(_ block: CodeUnitBlock) -> Bool {
 }
 
 @_transparent
-private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> ByteHalfBlock? {
-  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
-  if block.max() <= utf8OneByteMax {
-    return unsafe unsafeBitCast(block, to: ByteBlock.self).evenHalf
+private func tryEncodeASCIIOrTwoByteBlock(
+  from input: UnsafePointer<UInt16>,
+  into output: UnsafeMutablePointer<UInt8>
+) -> Int? {
+  let block = unsafe UnsafeRawPointer(input).loadUnaligned(as: CodeUnitBlock.self)
+  let maxCodeUnit = block.max()
+  if maxCodeUnit <= utf8OneByteMax {
+    // All ASCII
+    let bytes = unsafe unsafeBitCast(block, to: ByteBlock.self).evenHalf
+    for i in 0 ..< blockSize {
+      unsafe (output + i).initialize(to: bytes[i])
+    }
+    return blockSize
+  }
+  
+  // All two-byte, checking the value we already calculated first
+  if maxCodeUnit <= utf8TwoByteMax, block.min() > utf8OneByteMax {
+    /*
+     Encode each lane to its two UTF-8 bytes, packed little-endian: lead byte
+     (0b110xxxxx) in the low byte, continuation (0b10xxxxxx) in the high byte,
+     so a single store emits the pairs in encoded order.
+     */
+    let lead = utf8TwoByteLeadPrefix | (block &>> utf8ContinuationPayloadBits)
+    let continuation =
+      utf8ContinuationPrefix | (block & utf8ContinuationPayloadMask)
+    let encoded = lead | (continuation &<< 8)
+    unsafe UnsafeMutableRawPointer(output).storeBytes(
+      of: encoded, as: CodeUnitBlock.self)
+    return 2 * blockSize
   }
   return nil
 }
@@ -514,19 +547,23 @@ private func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16?
 }
 
 @_transparent
-private func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CodeUnitBlock? {
+private func hasSurrogates(inBlockAt pointer: UnsafePointer<UInt16>) -> Bool {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
-  return _anySurrogate(block) ? nil : block
+  return _anySurrogate(block)
 }
 
 #else
 @_transparent private var blockSize:Int { 1 }
 
 @_transparent
-private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
-  let value = unsafe pointer.pointee
+private func tryEncodeASCIIOrTwoByteBlock(
+  from input: UnsafePointer<UInt16>,
+  into output: UnsafeMutablePointer<UInt8>
+) -> Int? {
+  let value = unsafe input.pointee
   if value <= utf8OneByteMax {
-    return CollectionOfOne(UInt8(truncatingIfNeeded: value))
+    unsafe output.pointee = UInt8(truncatingIfNeeded: value)
+    return 1
   }
   return nil
 }
@@ -542,10 +579,9 @@ private func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16?
 }
 
 @_transparent
-private func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt16>? {
+private func hasSurrogates(inBlockAt pointer: UnsafePointer<UInt16>) -> Bool {
   let value = unsafe pointer.pointee
-  return value < utf16LeadSurrogateMin || value > utf16SurrogateMax ?
-    CollectionOfOne(value) : nil
+  return value >= utf16LeadSurrogateMin && value <= utf16SurrogateMax
 }
 #endif
 
@@ -715,17 +751,22 @@ internal func transcodeUTF16ToUTF8(
   var repairsMade = false
   
   while unsafe (inputEnd - input) >= blockSize {
-    if let asciiBlock = unsafe allASCIIBlock(at: input) {
+    if let bytesWritten = unsafe tryEncodeASCIIOrTwoByteBlock(
+      from: input,
+      into: output
+    ) {
       _onFastPath()
-      // All ASCII: transcode directly
-      for i in 0 ..< blockSize {
-        unsafe (output + i).initialize(to: asciiBlock[i])
-      }
       unsafe input += blockSize
-      unsafe output += blockSize
-    } else if let block = unsafe nonSurrogateBlock(at: input) {
+      unsafe output += bytesWritten
+      continue
+    }
+    if unsafe !hasSurrogates(inBlockAt: input) {
       for i in 0 ..< blockSize {
-        unsafe encodeScalarAsUTF8(UInt32(block[i]), output: &output)
+        /*
+         Oddly enough it's cheaper here to read from `input` than having the
+         surrogate check above return the block it loaded
+         */
+        unsafe encodeScalarAsUTF8(UInt32(input[i]), output: &output)
       }
       unsafe input += blockSize
     } else {
