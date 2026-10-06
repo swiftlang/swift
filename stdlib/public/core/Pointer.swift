@@ -378,11 +378,7 @@ extension Int {
   @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
-    if let pointer = pointer {
-      self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
+    self = unsafe unsafeBitCast(pointer, to: Self.self)
   }
 }
 
@@ -397,11 +393,7 @@ extension UInt {
   @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
-    if let pointer = pointer {
-      self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
+    self = unsafe unsafeBitCast(pointer, to: Self.self)
   }
 }
 
