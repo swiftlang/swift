@@ -358,6 +358,22 @@ The boxing implies that the following operations will allocate and store a new v
 
 **NOTE**: A fixed-layout structure that contains a resilient structure as a stored property is also boxed on the C++ side.
 
+### Moving Swift Values
+
+The generated C++ wrappers for copyable Swift structures and enumerations support move construction and move assignment. A move transfers the Swift value and leaves the source wrapper empty. Moving a wrapper with opaque storage also transfers its allocation without allocating a new buffer.
+
+```c++
+auto source = Celsius::init(25);
+auto destination = std::move(source);
+source = destination; // Copy a Swift value back into the empty wrapper.
+```
+
+An empty wrapper can be destroyed, copied, moved, or assigned another wrapper. Copying or moving an empty wrapper produces another empty wrapper. Assigning an empty wrapper destroys the destination's previous value and leaves it empty. Self-assignment preserves the wrapper's state.
+
+An empty wrapper does not contain a Swift value. Calling its Swift methods, accessing its properties or enum cases, or passing it to Swift aborts. Assign a value to the wrapper before using it in those ways. Copying a live wrapper, including constructing from a const rvalue, preserves the source value.
+
+Inline wrappers store a flag after their Swift payload to track this state. Their C++ size can therefore differ from the Swift type's size. Regenerate the headers and rebuild C++ clients together when adopting this wrapper layout.
+
 ## Calling Swift Methods
 
 Swift’s structures, enumerations and classes can define instance methods. An instance method that’s declared in a Swift type gets its own C++ member function declaration in the C++ class that corresponds to the underlying Swift type in the generated C++ interface for a Swift module.

@@ -58,7 +58,9 @@ public struct SmallStruct {
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
 // CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
-// CHECK: }
+// CHECK: vwTable->assignWithCopy
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() const noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void double_() noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV6doubleyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK LargeStruct scale(swift::Int x, swift::Int y) noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV5scaleyACSi_SitF");
@@ -66,7 +68,9 @@ public struct SmallStruct {
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11SmallStructV") SmallStruct final {
 // CHECK: SWIFT_INLINE_THUNK SmallStruct &operator =(const SmallStruct &other) noexcept {
-// CHECK: }
+// CHECK: vwTable->assignWithCopy
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() const noexcept SWIFT_SYMBOL("s:7Methods11SmallStructV4dumpyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK SmallStruct scale(float y) noexcept SWIFT_SYMBOL("s:7Methods11SmallStructV5scaleyACSfF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void invert() noexcept SWIFT_SYMBOL("s:7Methods11SmallStructV6invertyyF");

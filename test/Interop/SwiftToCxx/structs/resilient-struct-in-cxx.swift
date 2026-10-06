@@ -35,6 +35,9 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK FirstSmallStruct(const FirstSmallStruct &other) noexcept {
+// CHECK-NEXT: if (!other._storage.isAllocated()) {
+// CHECK-NEXT: return;
+// CHECK-NEXT: }
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -46,8 +49,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
-// CHECK-NEXT:  SWIFT_INLINE_THUNK FirstSmallStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) noexcept : _storage(vwTable->size, vwTable->getAlignment()) {}
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK FirstSmallStruct _make() noexcept {
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct() noexcept {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -55,7 +57,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #else
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
-// CHECK-NEXT:    return FirstSmallStruct(vwTable);
+// CHECK-NEXT: _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage.getOpaquePointer(); }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { return _storage.getOpaquePointer(); }
@@ -107,6 +109,7 @@ public struct FirstSmallStruct {
 }
 // CHECK: class SWIFT_SYMBOL("s:7Structs12FrozenStructV") FrozenStruct final {
 // CHECK:        alignas(4) char _storage[4];
+// CHECK-NEXT: bool _isMovedFrom = false;
 // CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
@@ -134,6 +137,9 @@ public struct LargeStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs11LargeStructV") LargeStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK LargeStruct(const LargeStruct &other) noexcept {
+// CHECK-NEXT: if (!other._storage.isAllocated()) {
+// CHECK-NEXT: return;
+// CHECK-NEXT: }
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs11LargeStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -145,8 +151,7 @@ public struct LargeStruct {
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
-// CHECK-NEXT:  SWIFT_INLINE_THUNK LargeStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) noexcept : _storage(vwTable->size, vwTable->getAlignment()) {}
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct _make() noexcept {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct() noexcept {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs11LargeStructVMa(0);
 // CHECK-NEXT:    auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -154,7 +159,7 @@ public struct LargeStruct {
 // CHECK-NEXT: #else
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
-// CHECK-NEXT:    return LargeStruct(vwTable);
+// CHECK-NEXT: _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage.getOpaquePointer(); }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { return _storage.getOpaquePointer(); }
@@ -195,7 +200,7 @@ public struct StructWithRefCountStoredProp {
     }
 }
 
-// CHECK: SWIFT_INLINE_THUNK StructWithRefCountStoredProp(swift::_impl::ValueWitnessTable * _Nonnull vwTable) noexcept : _storage(vwTable->size, vwTable->getAlignment()) {}
+// CHECK: SWIFT_INLINE_THUNK StructWithRefCountStoredProp() noexcept {
 
 public func createLargeStruct(_ x: Int) -> LargeStruct {
     return LargeStruct(x1: x, x2: -x, x3: x * 2, x4: x - 4, x5: 0, x6: 21)

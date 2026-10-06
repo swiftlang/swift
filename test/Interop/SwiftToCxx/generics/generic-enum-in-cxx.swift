@@ -138,6 +138,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~GenericOpt() noexcept {
+// CHECK-NEXT: if (!_storage.isAllocated()) return;
 // CHECK-NEXT:   auto metadata = _impl::$s8Generics10GenericOptOMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -237,7 +238,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT:   SWIFT_INLINE_THUNK GenericOpt<T_0_0> GenericOpt<T_0_0>::_impl_some::operator()(const T_0_0& val) const {
-// CHECK-NEXT:     auto result = GenericOpt<T_0_0>::_make();
+// CHECK-NEXT:     GenericOpt<T_0_0> result;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
@@ -294,7 +295,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT:   SWIFT_INLINE_THUNK GenericOpt<T_0_0> GenericOpt<T_0_0>::_impl_none::operator()() const {
-// CHECK-NEXT:     auto result = GenericOpt<T_0_0>::_make();
+// CHECK-NEXT:     GenericOpt<T_0_0> result;
 // CHECK-NEXT:     result._destructiveInjectEnumTag(1);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }

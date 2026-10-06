@@ -16,10 +16,10 @@
 int main() {
   using namespace Structs;
 
-  static_assert(sizeof(StructOneI64) == 8, "");
-  static_assert(sizeof(StructTwoI32) == 8, "");
-  static_assert(sizeof(StructOneI16AndOneStruct) == 12, "");
-  static_assert(sizeof(StructU16AndPointer) == (sizeof(void *) * 2), "");
+  static_assert(sizeof(StructOneI64) == 8 + alignof(StructOneI64), "");
+  static_assert(sizeof(StructTwoI32) == 12, "");
+  static_assert(sizeof(StructOneI16AndOneStruct) == 16, "");
+  static_assert(sizeof(StructU16AndPointer) == (sizeof(void *) * 3), "");
   static_assert(sizeof(StructDoubleAndFloat) == 16, "");
 
   StructOneI64 structOneI64 = returnNewStructOneI64();

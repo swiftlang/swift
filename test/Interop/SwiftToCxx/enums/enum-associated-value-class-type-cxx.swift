@@ -37,7 +37,7 @@ public enum G<T> {
 }
 
 // CHECK:      SWIFT_INLINE_THUNK E E::_impl_c::operator()(const C& val) const {
-// CHECK-NEXT:   auto result = E::_make();
+// CHECK-NEXT:   E result;
 // CHECK-NEXT:   auto op = swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
 // CHECK-NEXT:   memcpy(result._getOpaquePointer(), &op, sizeof(op));
 // CHECK-NEXT:   result._destructiveInjectEnumTag(0);
