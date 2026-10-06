@@ -182,6 +182,17 @@ public:
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
 
+  /// The @section name prefix that, on WebAssembly, requests emission into a
+  /// custom section rather than an ordinary data segment.
+  static StringRef getWasmCustomSectionPrefix() { return ".custom_section."; }
+
+  /// Whether \p section (a @section name) requests a WebAssembly custom section,
+  /// i.e. it has the `.custom_section.` prefix. Combine with a Wasm-target check
+  /// at the use site (see \c isWasmCustomSection).
+  static bool isWasmCustomSectionName(StringRef section) {
+    return section.starts_with(getWasmCustomSectionPrefix());
+  }
+
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.

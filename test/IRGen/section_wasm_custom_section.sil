@@ -1,0 +1,44 @@
+// RUN: %swift_frontend_plain -parse-stdlib -target wasm32-unknown-wasi -module-name main -emit-ir %s -o - | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=WebAssembly
+
+// On WebAssembly, a `.custom_section.`-prefixed @section name is emitted as a
+// real Wasm custom section via `wasm.custom_sections` module metadata (with the
+// prefix stripped and the constant's bytes as contents). Because a custom
+// section is metadata rather than an addressable global, no LLVM global variable
+// is emitted for it. A plain section name is unchanged (an ordinary data segment).
+
+sil_stage canonical
+
+import Builtin
+
+struct T {
+  @_hasStorage var a: Builtin.Int32 { get set }
+}
+
+// A `.custom_section.`-prefixed global does not emit an addressable global at all;
+// its bytes only appear in the `wasm.custom_sections` metadata below.
+// CHECK-NOT: @g0 =
+// CHECK-NOT: @g1 =
+sil_global hidden [used] [section ".custom_section.mysection"] @g0 : $T = {
+  %0 = integer_literal $Builtin.Int32, 42
+  %initval = struct $T (%0 : $Builtin.Int32)
+}
+
+sil_global hidden [used] [section ".custom_section.other"] @g1 : $T = {
+  %0 = integer_literal $Builtin.Int32, 1
+  %initval = struct $T (%0 : $Builtin.Int32)
+}
+
+// A plain (non-prefixed) @section name is still lowered to an ordinary data segment.
+// CHECK: @g2 = hidden global %T4main1TV <{ i32 7 }>, section "regular_data"
+sil_global hidden [used] [section "regular_data"] @g2 : $T = {
+  %0 = integer_literal $Builtin.Int32, 7
+  %initval = struct $T (%0 : $Builtin.Int32)
+}
+
+// The custom section bytes are carried as metadata: name (prefix stripped) plus
+// the constant's little-endian bytes (42 = 0x2a = '*', and 1).
+// CHECK: !wasm.custom_sections = !{![[M:[0-9]+]], ![[O:[0-9]+]]}
+// CHECK-DAG: ![[M]] = !{!"mysection", !"*\00\00\00"}
+// CHECK-DAG: ![[O]] = !{!"other", !"\01\00\00\00"}
