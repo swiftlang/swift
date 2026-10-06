@@ -2525,7 +2525,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   if (!fileSystem)
     return Receiver(RequestResult<CursorInfoData>::fromError(error));
 
-  if (auto IFaceGenRef = IFaceGenContexts.get(PrimaryFilePath)) {
+  if (IFaceGenContexts.get(PrimaryFilePath)) {
     LOG_WARN_FUNC("Info from usr for generated interface not implemented yet.");
     CursorInfoData Info;
     Info.InternalDiagnostic = "Info for generated interfaces not implemented.";
