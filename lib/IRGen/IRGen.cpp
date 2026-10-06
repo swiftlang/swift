@@ -19,8 +19,8 @@
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
@@ -91,9 +91,7 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
-#if LLVM_VERSION_MAJOR >= 23
 #include "llvm/Transforms/Utils/AssignGUID.h"
-#endif
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
 #include "llvm/IR/DiagnosticInfo.h"
@@ -620,12 +618,10 @@ void swift::performLLVMOptimizations(
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-#if LLVM_VERSION_MAJOR >= 23
       // ThinLTOBitcodeWriterPass requests ModuleSummaryIndexAnalysis, which
       // requires a GUID to be assigned to every GlobalValue. The LTO prelink
       // pipelines do that via AssignGUIDPass, but the O0 pipeline does not.
       MPM.addPass(AssignGUIDPass());
-#endif
       MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
@@ -635,12 +631,11 @@ void swift::performLLVMOptimizations(
         // lto summary.)
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
-#if LLVM_VERSION_MAJOR >= 23
+
         // BitcodeWriterPass with EmitSummaryIndex requests
         // ModuleSummaryIndexAnalysis, which requires a GUID to be assigned to
         // every GlobalValue; the per-module/O0 pipelines do not do that.
         MPM.addPass(AssignGUIDPass());
-#endif
       }
       MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
