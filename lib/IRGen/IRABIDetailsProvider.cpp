@@ -102,6 +102,19 @@ public:
         fixedTI->getFixedAlignment().getValue()};
   }
 
+  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+    auto type = TD->getDeclaredTypeInContext();
+    // The header is also used outside this module's resilience domain. The
+    // locally lowered TypeInfo alone may expose a resilient field's layout.
+    if (!typeConverter.getTypeProperties(type, TypeExpansionContext::minimal())
+             .isFixedABI())
+      return false;
+    const auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
+    return typeInfo.isFixedSize(ResilienceExpansion::Minimal) &&
+           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal) &&
+           typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
+  }
+
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
     auto &typeInfo =
         IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
@@ -487,6 +500,11 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
+    const NominalTypeDecl *TD) {
+  return impl->isSingleSwiftRetainablePointer(TD);
 }
 
 AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(

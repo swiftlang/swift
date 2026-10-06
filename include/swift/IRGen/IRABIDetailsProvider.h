@@ -215,6 +215,10 @@ public:
   std::optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
 
+  /// Whether the type has the representation and ownership operations of a
+  /// single native Swift reference, even outside its resilience domain.
+  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD);
+
   /// Returns the abstract layout for a hidden nominal type.
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD);
 
