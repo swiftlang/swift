@@ -327,7 +327,8 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
       return GenericParameterReferenceInfo();
     }
 
-    if (auto reducedTy = genericSig.getReducedType(type)) {
+    auto reducedTy = genericSig.getReducedType(type);
+    if (reducedTy && !reducedTy->is<ErrorType>()) {
       if (!reducedTy->isEqual(type)) {
         // Note: origParam becomes openedParam for the recursive call,
         // because concreteTy is written in terms of genericSig and not
