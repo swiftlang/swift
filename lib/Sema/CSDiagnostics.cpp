@@ -6729,16 +6729,6 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
   return true;
 }
 
-bool InvalidProtocolMetatypeStaticMemberRefInKeyPath::diagnoseAsError() {
-  auto baseType = BaseType;
-  if (auto *metatype = baseType->getAs<AnyMetatypeType>())
-    baseType = metatype->getInstanceType();
-
-  emitDiagnostic(diag::expr_keypath_protocol_metatype_static_member,
-                 DeclNameRef(getMember()->getName()), baseType);
-  return true;
-}
-
 bool UnsupportedStaticMemberRefInKeyPath::diagnoseAsError() {
   auto *member = getMember();
   auto *module = member->getDeclContext()->getParentModule();
