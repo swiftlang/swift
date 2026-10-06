@@ -745,10 +745,17 @@ namespace {
 
   public:
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1,
-                           bool areParameterPacks = false)
+                           bool wantsAdditionalAnyObjectRequirement = false,
+                           bool areParametersPacks = false)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
-                                             areParameterPacks);
+                                             areParametersPacks);
+      if (wantsAdditionalAnyObjectRequirement) {
+        Requirement req(RequirementKind::Conformance,
+                        TheGenericParamList->getParams()[0]->getInterfaceType(),
+                        ctx.getAnyObjectConstraint());
+        addedRequirements.push_back(req);
+      }
       for (auto gp : TheGenericParamList->getParams()) {
         genericParamTypes.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
@@ -785,18 +792,10 @@ namespace {
 
     template <class G>
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
-      ASSERT(proto && "missing protocol");
+      assert(proto && "missing protocol");
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
                       proto->getDeclaredInterfaceType());
-      addedRequirements.push_back(req);
-    }
-
-    template <class G>
-    void addAnyObjectRequirement(const G &generator) {
-      Requirement req(RequirementKind::Conformance,
-                      generator.build(*this),
-                      Context.getAnyObjectConstraint());
       addedRequirements.push_back(req);
     }
 
@@ -1363,14 +1362,12 @@ static ValueDecl *getValueToBridgeObject(ASTContext &ctx, Identifier id) {
                             _bridgeObject);
 }
 
-// FIXME: This builtin actually appears to be unused.
 static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   // <T : AnyObject> T -> T
   //
-  BuiltinFunctionBuilder builder(C, 1);
+  BuiltinFunctionBuilder builder(C, 1, true);
   auto T = makeGenericParam();
   builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
-  builder.addAnyObjectRequirement(T);
   builder.addParameter(T, ParamSpecifier::LegacyOwned);
   builder.setResult(T);
   return builder.build(Id);
@@ -2349,7 +2346,8 @@ static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) 
 
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
-                                 /* areParameterPacks */ true);
+                                 /* anyObject */ false,
+                                 /* areParametersPack */ true);
 
   auto paramTy = makeMetatype(makeTuple(makePackExpansion(makeGenericParam())));
   builder.addParameter(paramTy);
