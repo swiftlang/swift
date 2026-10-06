@@ -565,6 +565,15 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         case ExportedLevel::None:
           break;
         };
+
+        // In Embedded Swift, clients emit their own copies of a global or
+        // static variable's initializer unless it has a unique definition.
+        if (init->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+            (varDecl->getDeclContext()->isModuleScopeContext() ||
+             varDecl->isStatic()) &&
+            varDecl->getEffectiveCodeGenerationModel() !=
+                CodeGenerationModel::Interface)
+          return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
       }
 
       return {FragileFunctionKind::None};

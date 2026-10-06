@@ -16,8 +16,8 @@
 // REQUIRES: VENDOR=apple
 
 func internalHelper() -> Int { 1 }
-// expected-tbd-note@-1 5{{global function 'internalHelper()' is not '@usableFromInline' or public}}
-// expected-warn-note@-2 5{{global function 'internalHelper()' is not '@usableFromInline' or public}}
+// expected-tbd-note@-1 7{{global function 'internalHelper()' is not '@usableFromInline' or public}}
+// expected-warn-note@-2 7{{global function 'internalHelper()' is not '@usableFromInline' or public}}
 
 @usableFromInline func usableFromInlineHelper() -> Int { 2 }
 
@@ -99,3 +99,21 @@ extension P {
     // expected-warn-warning@-2 {{global function 'internalHelper()' is internal and cannot be referenced from instance method 'protocolExtensionMethod()'}}
   }
 }
+
+// Clients emit the initializers of global and static variables that don't
+// have a unique definition.
+@export(implementation)
+public var implementationGlobal: Int = internalHelper()
+// expected-tbd-error@-1 {{global function 'internalHelper()' is internal and cannot be referenced from var 'implementationGlobal'}}
+// expected-warn-warning@-2 {{global function 'internalHelper()' is internal and cannot be referenced from var 'implementationGlobal'}}
+
+public struct HasStatic {
+  @export(implementation)
+  public static var implementationStatic: Int = internalHelper()
+  // expected-tbd-error@-1 {{global function 'internalHelper()' is internal and cannot be referenced from static property 'implementationStatic'}}
+  // expected-warn-warning@-2 {{global function 'internalHelper()' is internal and cannot be referenced from static property 'implementationStatic'}}
+
+  public static var interfaceStatic: Int = internalHelper()
+}
+
+public var interfaceGlobal: Int = internalHelper() + privateHelper()
