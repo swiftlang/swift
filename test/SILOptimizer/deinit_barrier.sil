@@ -314,3 +314,27 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %4 = tuple ()
   return %4 : $()
 }
+
+sil [_semantics "realloc_array_buffer"] @realloc_array_buffer : $@convention(method) (@owned C) -> @owned C
+sil @unknown_realloc_array_buffer : $@convention(method) (@owned C) -> @owned C
+
+// Re-allocating an array buffer only moves or copies the elements to a new buffer.
+// It cannot run user code and therefore cannot observe a de-initializer running earlier.
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_realloc_array_buffer: is_deinit_barrier
+// CHECK:       apply %{{[0-9]+}}(%0)
+// CHECK:       false
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_realloc_array_buffer: is_deinit_barrier
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on test_realloc_array_buffer: is_deinit_barrier
+// CHECK:       apply %{{[0-9]+}}(%2)
+// CHECK:       true
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on test_realloc_array_buffer: is_deinit_barrier
+sil [ossa] @test_realloc_array_buffer : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = function_ref @realloc_array_buffer : $@convention(method) (@owned C) -> @owned C
+  specify_test "is_deinit_barrier @instruction"
+  %2 = apply %1(%0) : $@convention(method) (@owned C) -> @owned C
+  %3 = function_ref @unknown_realloc_array_buffer : $@convention(method) (@owned C) -> @owned C
+  specify_test "is_deinit_barrier @instruction"
+  %4 = apply %3(%2) : $@convention(method) (@owned C) -> @owned C
+  return %4 : $C
+}
