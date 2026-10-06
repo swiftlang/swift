@@ -547,3 +547,8 @@ Added: _swift_taskGroup_cancelAllWithFlags
 
 // Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
 Added: _swift_task_addCancellationHandlerWithReason
+
+// Typed throws AsyncThrowingStream
+Added: _$sScs10makeStream2of8throwing15bufferingPolicyScsyxq_G6stream_Scs12ContinuationVyxq__G12continuationtxm_q_mAH09BufferingF0Oyxq___GtFZ
+Added: _$sScs9unfoldingScsyxq_GxSgyYaq_YKc_tcfC
+Added: _$sScs_15bufferingPolicy_Scsyxq_Gxm_Scs12ContinuationV09BufferingB0Oyxq___GyADyxq__GXEtcfC
