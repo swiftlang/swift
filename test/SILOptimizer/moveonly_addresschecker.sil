@@ -607,7 +607,9 @@ struct M2: ~Copyable {
   let s2: M
 }
 
+sil @get_M : $@convention(thin) () -> @owned M
 sil @get_M2 : $@convention(thin) () -> @owned M2
+sil @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
 sil @end_addr_see_addr : $@convention(thin) (@in M, @in_guaranteed M) -> ()
 
 /// A single instruction, apply @end_addr_see_addr, consumes one field and
@@ -1094,3 +1096,342 @@ bb0:
   %36 = tuple ()
   return %36 : $()
 } // end sil function 'reinitMutableSpanThroughModifyAccess'
+
+// rdar://161636828
+//
+// A move-only inout parameter's deinitialiser should not be called, even in
+// dead-end blocks.
+
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_positive1 : $@convention(method) (@inout M) -> () {
+// CHECK:       bb0(%0 : $*M):
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_positive1'
+sil [ossa] @dead_block_deferred_deinit_positive1 : $@convention(method) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_positive2 : $@convention(method) (@inout M) -> () {
+// CHECK:       bb0(%0 : $*M):
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_positive2'
+sil [ossa] @dead_block_deferred_deinit_positive2 : $@convention(method) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [no_consume_or_assign] %addr
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_positive3 : $@convention(thin) (@inout M) -> () {
+// CHECK:       bb0(%0 : $*M):
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_positive3'
+sil [ossa] @dead_block_deferred_deinit_positive3 : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  unreachable
+}
+
+// @in parameters are expected to be consumed by the method.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_negative1 : $@convention(thin) (@in M) -> () {
+// CHECK:       bb0(%0 : $*M):
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_negative1'
+sil [ossa] @dead_block_deferred_deinit_negative1 : $@convention(thin) (@in M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  unreachable
+}
+
+// Skip destroying local variables in the same situations as inout arguments.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_alloc_stack : $@convention(thin) () -> () {
+// CHECK:         store {{.*}} to [init]
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_alloc_stack'
+sil [ossa] @dead_block_deferred_deinit_alloc_stack : $@convention(thin) () -> () {
+bb0:
+  %stack = alloc_stack $M
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [init] %mark : $*M
+  unreachable
+}
+
+// Insertion point is itself a reinit (store [assign]).
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_neg_isReinit : $@convention(thin) (@inout M) -> () {
+// CHECK:         destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_neg_isReinit'
+sil [ossa] @dead_block_deferred_deinit_neg_isReinit : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [assign] %mark : $*M
+  unreachable
+}
+
+// Insertion point precedes a reinit later in the same block.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_neg_precedesReinit : $@convention(thin) (@inout M) -> () {
+// CHECK:         destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_neg_precedesReinit'
+sil [ossa] @dead_block_deferred_deinit_neg_precedesReinit : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_ = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [assign] %mark : $*M
+  unreachable
+}
+
+// Insert block has successors but none where the address is live.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_pos_succNotEmpty_nothingDominated : $@convention(thin) (@inout M) -> () {
+// CHECK-NOT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_pos_succNotEmpty_nothingDominated'
+sil [ossa] @dead_block_deferred_deinit_pos_succNotEmpty_nothingDominated : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  cond_br undef, bb1, bb2
+bb1:
+  unreachable
+bb2:
+  unreachable
+}
+
+// Downstream reinitialisation + use in another block reachable from the insert
+// block. The destroy must be emitted.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_neg_reachesLive : $@convention(thin) (@inout M) -> () {
+// CHECK:         destroy_addr
+// CHECK:         store {{.*}} to [init] %0
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_neg_reachesLive'
+sil [ossa] @dead_block_deferred_deinit_neg_reachesLive : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_ = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  br bb1
+bb1:
+  br bb2
+bb2:
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [assign] %mark : $*M
+  %_2 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+}
+
+// Downstream reinitialisation in a block with multiple paths to it.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_multiplePaths : $@convention(thin) (@inout M) -> () {
+// CHECK:       bb0(%0 : $*M):
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb1:
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb2:
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb3:
+// CHECK          destroy_addr
+// CHECK:         store {{.*}} to [init] %0
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_multiplePaths'
+sil [ossa] @dead_block_deferred_deinit_multiplePaths : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_ = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [init] %mark : $*M
+  %_2 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+}
+
+// Downstream reinitialisation in one but not all paths to function exit.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_conditionalReinit : $@convention(thin) (@inout M) -> () {
+// CHECK:       bb0(%0 : $*M):
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb1:
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK:       bb2:
+// CHECK-NOT:     destroy_addr
+// CHECK:         br bb3
+// CHECK:       bb3:
+// CHECK-NOT:     destroy_addr
+// CHECK:         cond_br undef, bb4, bb5
+// CHECK:       bb4:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb5:
+// CHECK:         destroy_addr
+// CHECK:         store {{.*}} to [init] %0
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_conditionalReinit'
+sil [ossa] @dead_block_deferred_deinit_conditionalReinit : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_ = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  %_1 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+bb2:
+  br bb3
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  unreachable
+bb5:
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [init] %mark : $*M
+  %_2 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+}
+
+// Downstream reinitialisation in one but not all paths to function exit.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_conditionalReinitLocalVar : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb1:
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK:       bb2:
+// CHECK-NOT:     destroy_addr
+// CHECK:         br bb3
+// CHECK:       bb3:
+// CHECK-NOT:     destroy_addr
+// CHECK:         cond_br undef, bb4, bb5
+// CHECK:       bb4:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb5:
+// CHECK:         destroy_addr
+// CHECK:         store {{.*}} to [init] %0
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_conditionalReinitLocalVar'
+sil [ossa] @dead_block_deferred_deinit_conditionalReinitLocalVar : $@convention(thin) () -> () {
+bb0:
+  %stack = alloc_stack $M
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [init] %mark : $*M
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_1 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+bb2:
+  br bb3
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  unreachable
+bb5:
+  %v2 = apply %f() : $@convention(thin) () -> @owned M
+  store %v2 to [init] %mark : $*M
+  %borrow2 = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_2 = apply %borrow2(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+}
+
+// Return on one but not all paths to function exit.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_conditionalReturn : $@convention(thin) (@inout M) -> () {
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_conditionalReturn'
+sil [ossa] @dead_block_deferred_deinit_conditionalReturn : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_ = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  %_1 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+bb2:
+  br bb3
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  unreachable
+bb5:
+  %result = tuple ()
+  return %result
+}
+
+// The liveness boundary for this local variable occurs in a non-dead-end block
+// (bb2), so the address is destroyed there. As a result it is not initialised
+// at the dead end in bb4.
+// TODO: Fix this, possibly once we have OSSA lifetime completion for addresses.
+// 
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_conditionalReturnLocalVar : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb1:
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK:       bb2:
+// CHECK:         destroy_addr
+// CHECK:         br bb3
+// CHECK:       bb3:
+// CHECK-NOT:     destroy_addr
+// CHECK:         cond_br undef, bb4, bb5
+// CHECK:       bb4:
+// CHECK-NOT:     destroy_addr
+// CHECK:         unreachable
+// CHECK:       bb5:
+// CHECK-NOT:     destroy_addr
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_conditionalReturnLocalVar'
+sil [ossa] @dead_block_deferred_deinit_conditionalReturnLocalVar : $@convention(thin) () -> () {
+bb0:
+  %stack = alloc_stack $M
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack
+  %f = function_ref @get_M : $@convention(thin) () -> @owned M
+  %v = apply %f() : $@convention(thin) () -> @owned M
+  store %v to [init] %mark : $*M
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow = function_ref @borrow_M : $@convention(thin) (@in_guaranteed M) -> ()
+  %_1 = apply %borrow(%mark) : $@convention(thin) (@in_guaranteed M) -> ()
+  unreachable
+bb2:
+  br bb3
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  unreachable
+bb5:
+  dealloc_stack %stack
+  %result = tuple ()
+  return %result
+}
+
+// Debug-info variant of the skip case: confirms debug info is also omitted when
+// the destroy is skipped.
+// CHECK-LABEL: sil [ossa] @dead_block_deferred_deinit_pos_unreachable_debug : $@convention(thin) (@inout M) -> () {
+// CHECK-NOT:    destroy_addr
+// CHECK-NOT:    debug_value undef
+// CHECK-LABEL: } // end sil function 'dead_block_deferred_deinit_pos_unreachable_debug'
+sil [ossa] @dead_block_deferred_deinit_pos_unreachable_debug : $@convention(thin) (@inout M) -> () {
+bb0(%addr : $*M):
+  debug_value %addr : $*M, var, name "x", argno 1, expr op_deref
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %addr
+  unreachable
+}
