@@ -567,9 +567,31 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
     std::move(switchBuilder).emit();
   }
 
+  // Remote distributed actor proxies have no storage for user-declared stored
+  // properties. Let them use the normal release path, which properly handles
+  // deinit of remote proxies.
+  if (cd->isDistributedActor()) {
+    SILBasicBlock *localBB = createBasicBlock("localDeinitBB");
+    SILBasicBlock *remoteBB = createBasicBlock("remoteDeinitBB");
+    B.emitBlock(someBB);
+    SILValue iterBorrow = B.createLoadBorrow(cleanupLoc, iterAddr);
+    auto *node = B.createUncheckedEnumData(
+        cleanupLoc, iterBorrow, getASTContext().getOptionalSomeDecl(),
+        selfTyLowered);
+    SILValue isRemote = emitDistributedActorIsRemote(cleanupLoc, node, selfTy);
+    B.createEndBorrow(cleanupLoc, iterBorrow);
+    B.createCondBranch(cleanupLoc, isRemote, remoteBB, localBB);
+
+    B.emitBlock(remoteBB);
+    B.createBranch(cleanupLoc, cleanBB);
+
+    B.emitBlock(localBB);
+  } else {
+    B.emitBlock(someBB);
+  }
+
   // if isKnownUniquelyReferenced(&iter) {
   {
-    B.emitBlock(someBB);
     auto isUnique = B.createIsUnique(cleanupLoc, iterAddr);
     B.createCondBranch(cleanupLoc, isUnique, uniqueBB, notUniqueBB);
   }
