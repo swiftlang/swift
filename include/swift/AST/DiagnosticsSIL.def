@@ -1374,6 +1374,10 @@ NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRe
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
+ERROR(noncopyable_cast_pattern_binding_unimplemented, none,
+      "binding the payload of a non-'Copyable' value with a cast pattern is not "
+      "implemented; use 'case is' to test the type without binding", ())
+
 
 /// Borrow and mutate accessors
 ERROR(invalid_borrow_accessor_return, none,
