@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/copyable-value-moves.swift -module-name Moves -enable-library-evolution -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves.h
 
-// Without copy elision, C++14 moves the objects that the factories create
-// before Swift has initialized their values.
+// Without copy elision, factory results must still be initialized before
+// their first move.
 // RUN: %target-interop-build-clangxx -std=c++14 -fno-elide-constructors -c %s -I %t -o %t/moves.o
 // RUN: %target-interop-build-swift %S/copyable-value-moves.swift -module-name Moves -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain -Xlinker %t/moves.o -o %t/moves
 // RUN: %target-codesign %t/moves
@@ -49,7 +49,7 @@ using namespace Moves;
 
 static_assert(std::is_nothrow_move_constructible<Value>::value, "");
 static_assert(std::is_nothrow_move_assignable<Value>::value, "");
-static_assert(sizeof(Value) == sizeof(void *), "no state besides the box");
+static_assert(sizeof(Value) == 4 * sizeof(void *), "pointer and inline buffer");
 
 extern "C" size_t swift_retainCount(void *_Nonnull);
 static size_t retainCount(const Ref &ref) {
@@ -145,9 +145,18 @@ int main(int argc, char **argv) {
   {
     auto value = Value::init(ref, 42);
     assert(value.check());
+    assert(allocations == 0); // The three-word Value fits inline.
     assert(retainCount(ref) == 2);
     checkMoves(std::move(value), ref);
     assert(retainCount(ref) == 1);
+
+    {
+      auto before = allocations;
+      auto large = LargeValue::init(ref, 42);
+      assert(allocations == before + 1);
+      checkMoves(std::move(large), ref);
+      assert(retainCount(ref) == 1);
+    }
 
     {
       auto source = Value::init(ref, 1);

@@ -238,7 +238,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT:   SWIFT_INLINE_THUNK GenericOpt<T_0_0> GenericOpt<T_0_0>::_impl_some::operator()(const T_0_0& val) const {
-// CHECK-NEXT:     auto result = GenericOpt<T_0_0>::_make();
+// CHECK-NEXT:     GenericOpt<T_0_0> result;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
@@ -295,7 +295,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT:   SWIFT_INLINE_THUNK GenericOpt<T_0_0> GenericOpt<T_0_0>::_impl_none::operator()() const {
-// CHECK-NEXT:     auto result = GenericOpt<T_0_0>::_make();
+// CHECK-NEXT:     GenericOpt<T_0_0> result;
 // CHECK-NEXT:     result._destructiveInjectEnumTag(1);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }

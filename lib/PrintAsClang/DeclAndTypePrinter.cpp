@@ -782,10 +782,17 @@ private:
             [&](auto &types) {
               auto *ED = elementDecl->getParentEnum();
               // Printing function body
-              outOfLineOS << "    auto result = ";
-              outOfLineSyntaxPrinter.printNominalTypeQualifier(
-                  ED, ED->getModuleContext());
-              outOfLineOS << "_make();\n";
+              if (owningPrinter.isOpaqueLayout(ED)) {
+                outOfLineOS << "    ";
+                outOfLineSyntaxPrinter.printNominalTypeReference(
+                    ED, ED->getModuleContext());
+                outOfLineOS << " result;\n";
+              } else {
+                outOfLineOS << "    auto result = ";
+                outOfLineSyntaxPrinter.printNominalTypeQualifier(
+                    ED, ED->getModuleContext());
+                outOfLineOS << "_make();\n";
+              }
               if (paramType) {
                 if (paramType->getAs<GenericTypeParamType>()) {
                   auto type = types[paramType];
