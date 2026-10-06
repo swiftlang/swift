@@ -362,11 +362,11 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // This function should directly gather the field sizes and invoke the metadata update.
 // CHECK:         %classFields = alloca [4 x ptr]
 // CHECK:         [[FIELDS_ARRAY:%[0-9]+]] = getelementptr inbounds{{.*}} [4 x ptr], ptr %classFields, i32 0, i32 0
-// CHECK:         store ptr getelementptr inbounds (ptr, ptr @"$sBi32_WV", i32 8), ptr {{%[0-9]+}}
+// CHECK:         store ptr getelementptr inbounds (i8, ptr @"$sBi32_WV", i64 64), ptr {{%[0-9]+}}
 // CHECK:         {{%[0-9]+}} = call swiftcc %swift.metadata_response @"$ss6MirrorVSgMa"(i64 63)
 // CHECK:         store ptr {{%[0-9]+}}, ptr {{%[0-9]+}}
-// CHECK:         store ptr getelementptr inbounds (ptr, ptr @"$sBi32_WV", i32 8), ptr {{%[0-9]+}}
-// CHECK:         store ptr getelementptr inbounds (ptr, ptr @"$sBi32_WV", i32 8), ptr {{%[0-9]+}}
+// CHECK:         store ptr getelementptr inbounds (i8, ptr @"$sBi32_WV", i64 64), ptr {{%[0-9]+}}
+// CHECK:         store ptr getelementptr inbounds (i8, ptr @"$sBi32_WV", i64 64), ptr {{%[0-9]+}}
 // CHECK:         {{%[0-9]+}} = call swiftcc ptr @swift_updatePureObjCClassMetadata(ptr @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty", i64 256, i64 4, ptr [[FIELDS_ARRAY]])
 //
 // This function should not invoke the metadata accessor.

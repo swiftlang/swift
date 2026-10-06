@@ -61,7 +61,7 @@ public struct SharedFRT_OpaqueLayout {
 }
 
 // CHECK: define{{.*}} @"$s4test24ImmortalFRT_OpaqueLayoutVMr"
-// CHECK: store ptr getelementptr inbounds (ptr, ptr @"$sBpWV", i32
+// CHECK: store ptr getelementptr inbounds (i8, ptr @"$sBpWV", i{{32|64}}
 
 // CHECK: define{{.*}} @"$s4test22SharedFRT_OpaqueLayoutVMr"
-// CHECK: store ptr getelementptr inbounds (ptr, ptr @"$sBpWV", i32
+// CHECK: store ptr getelementptr inbounds (i8, ptr @"$sBpWV", i{{32|64}}
