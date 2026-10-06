@@ -256,6 +256,33 @@ func global_task_local() async {
   }
 }
 
+// A noncopyable result produced by the operation closure
+struct NC: ~Copyable {
+  let value: Int
+}
+
+@available(SwiftStdlib 5.1, *)
+func noncopyable_return() async {
+  // synchronous withValue returning a ~Copyable value
+  let s = TL.$number.withValue(42) { () -> NC in NC(value: TL.number) }
+  print("noncopyable sync: \(s.value)") // CHECK: noncopyable sync: 42
+
+  // async withValue returning a ~Copyable value
+  let a = await TL.$number.withValue(77) { () async -> NC in NC(value: TL.number) }
+  print("noncopyable async: \(a.value)") // CHECK: noncopyable async: 77
+
+  // throwing async withValue returning a ~Copyable value
+  do {
+    let t = try await TL.$number.withValue(11) { () async throws -> NC in
+      if TL.number == 11 { throw Boom(value: "boom") }
+      return NC(value: TL.number)
+    }
+    print("unexpected: \(t.value)")
+  } catch {
+    print("noncopyable throw: \(error)") // CHECK: noncopyable throw: Boom(value: "boom")
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
@@ -269,5 +296,6 @@ func global_task_local() async {
     await nested_3_onlyTopContributesMixed()
     await inside_actor()
     await global_task_local()
+    await noncopyable_return()
   }
 }
