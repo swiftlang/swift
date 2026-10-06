@@ -47,13 +47,12 @@
 // CHECK: SWIFT_INLINE_THUNK swift::Int getCount() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK swift::Int getCapacity() const noexcept SWIFT_SYMBOL({{.*}});
 
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
-
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
+// CHECK: class _impl_Array {
+// CHECK: struct TypeMetadataTrait<swift::Array<T_0_0>> {
+// CHECK: inline const constexpr bool isValueType<swift::Array<T_0_0>> = true;
+// CHECK: struct implClassFor<swift::Array<T_0_0>> { using type = swift::_impl::_impl_Array<T_0_0>; };
+// CHECK-NOT: isOpaqueLayout<swift::Array<T_0_0>>
+// CHECK: class _impl_Optional;
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
