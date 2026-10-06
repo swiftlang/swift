@@ -18,16 +18,17 @@ enum NodeBuilder {
 struct Item {
   var `self`: String
   var subtitle: String?
+  var id: Int
 }
 
-struct Loop<Element, ID, Value, OptValue>: Node {
-  init(_ data: [Element], id: KeyPath<Element, ID>, content: KeyPath<Element, Value>, subtitle: KeyPath<Element, OptValue>) {}
+struct Loop<Element, ID, Value, OptValue, SelfIDValue, OptChainValue>: Node {
+  init(_ data: [Element], id: KeyPath<Element, ID>, content: KeyPath<Element, Value>, subtitle: KeyPath<Element, OptValue>, selfID: KeyPath<Element, SelfIDValue>, optChain: KeyPath<Element, OptChainValue>) {}
 }
 
 struct Crash: MyProto, Node {
   @NodeBuilder
   var body: some Node {
-    Loop([Item(self: "One", subtitle: nil)], id: \.self, content: \.`self`, subtitle: \.subtitle)
+    Loop([Item(self: "One", subtitle: nil, id: 1)], id: \.self, content: \.`self`, subtitle: \.subtitle, selfID: \.self.id, optChain: \.subtitle?.count)
   }
 }
 
@@ -63,7 +64,7 @@ struct Crash: MyProto, Node {
 // CHECK-NEXT:               "element": {
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
-// CHECK-NEXT:                   "type": "ExtractResultBuilderKeyPathArg.Loop<ExtractResultBuilderKeyPathArg.Item, ExtractResultBuilderKeyPathArg.Item, Swift.String, Swift.Optional<Swift.String>>",
+// CHECK-NEXT:                   "type": "ExtractResultBuilderKeyPathArg.Loop<ExtractResultBuilderKeyPathArg.Item, ExtractResultBuilderKeyPathArg.Item, Swift.String, Swift.Optional<Swift.String>, Swift.Int, Swift.Optional<Swift.Int>>",
 // CHECK-NEXT:                   "arguments": [
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "",
@@ -85,6 +86,12 @@ struct Crash: MyProto, Node {
 // CHECK-NEXT:                                 "label": "subtitle",
 // CHECK-NEXT:                                 "type": "Swift.Optional<Swift.String>",
 // CHECK-NEXT:                                 "valueKind": "NilLiteral"
+// CHECK-NEXT:                               },
+// CHECK-NEXT:                               {
+// CHECK-NEXT:                                 "label": "id",
+// CHECK-NEXT:                                 "type": "Swift.Int",
+// CHECK-NEXT:                                 "valueKind": "RawLiteral",
+// CHECK-NEXT:                                 "value": "1"
 // CHECK-NEXT:                               }
 // CHECK-NEXT:                             ]
 // CHECK-NEXT:                           }
@@ -122,6 +129,40 @@ struct Crash: MyProto, Node {
 // CHECK-NEXT:                           {
 // CHECK-NEXT:                             "label": "subtitle",
 // CHECK-NEXT:                             "type": "Swift.Optional<Swift.String>"
+// CHECK-NEXT:                           }
+// CHECK-NEXT:                         ]
+// CHECK-NEXT:                       }
+// CHECK-NEXT:                     },
+// CHECK-NEXT:                     {
+// CHECK-NEXT:                       "label": "selfID",
+// CHECK-NEXT:                       "type": "Swift.KeyPath<ExtractResultBuilderKeyPathArg.Item, Swift.Int>",
+// CHECK-NEXT:                       "valueKind": "KeyPath",
+// CHECK-NEXT:                       "value": {
+// CHECK-NEXT:                         "path": "id",
+// CHECK-NEXT:                         "rootType": "ExtractResultBuilderKeyPathArg.Item",
+// CHECK-NEXT:                         "components": [
+// CHECK-NEXT:                           {
+// CHECK-NEXT:                             "label": "id",
+// CHECK-NEXT:                             "type": "Swift.Int"
+// CHECK-NEXT:                           }
+// CHECK-NEXT:                         ]
+// CHECK-NEXT:                       }
+// CHECK-NEXT:                     },
+// CHECK-NEXT:                     {
+// CHECK-NEXT:                       "label": "optChain",
+// CHECK-NEXT:                       "type": "Swift.KeyPath<ExtractResultBuilderKeyPathArg.Item, Swift.Optional<Swift.Int>>",
+// CHECK-NEXT:                       "valueKind": "KeyPath",
+// CHECK-NEXT:                       "value": {
+// CHECK-NEXT:                         "path": "subtitle.count",
+// CHECK-NEXT:                         "rootType": "ExtractResultBuilderKeyPathArg.Item",
+// CHECK-NEXT:                         "components": [
+// CHECK-NEXT:                           {
+// CHECK-NEXT:                             "label": "subtitle",
+// CHECK-NEXT:                             "type": "Swift.Optional<Swift.String>"
+// CHECK-NEXT:                           },
+// CHECK-NEXT:                           {
+// CHECK-NEXT:                             "label": "count",
+// CHECK-NEXT:                             "type": "Swift.Int"
 // CHECK-NEXT:                           }
 // CHECK-NEXT:                         ]
 // CHECK-NEXT:                       }
