@@ -11,7 +11,6 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL({{.*}}) FirstSmallStruct final {
 // CHECK: public:
 // CHECK:   SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
-// CHECK: return *this;
 // CHECK: vwTable->assignWithCopy
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
@@ -41,7 +40,6 @@ public struct LargeStruct {
 // CHECK: class SWIFT_SYMBOL({{.*}}) LargeStruct final {
 // CHECK: public:
 // CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
-// CHECK: return *this;
 // CHECK: vwTable->assignWithCopy
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
@@ -101,7 +99,6 @@ public struct SmallStructWithGetters {
 // CHECK: class SWIFT_SYMBOL({{.*}}) SmallStructWithGetters final {
 // CHECK: public:
 // CHECK: SWIFT_INLINE_THUNK SmallStructWithGetters &operator =(const SmallStructWithGetters &other) noexcept {
-// CHECK: return *this;
 // CHECK: vwTable->assignWithCopy
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }

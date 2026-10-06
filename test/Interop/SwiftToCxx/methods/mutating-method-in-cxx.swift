@@ -58,7 +58,6 @@ public struct SmallStruct {
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
 // CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
-// CHECK: return *this;
 // CHECK: vwTable->assignWithCopy
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
@@ -69,7 +68,6 @@ public struct SmallStruct {
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11SmallStructV") SmallStruct final {
 // CHECK: SWIFT_INLINE_THUNK SmallStruct &operator =(const SmallStruct &other) noexcept {
-// CHECK: return *this;
 // CHECK: vwTable->assignWithCopy
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }

@@ -401,7 +401,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
          << " &other) noexcept {\n";
       os << "    if (this == &other) return *this;\n";
       // Copying an empty wrapper propagates its state. Reinitializing an empty
-      // destinations use initializeWithCopy through the copy constructor.
+      // destination uses initializeWithCopy through the copy constructor.
       os << "    if (" << isMovedFrom << " || " << otherIsMovedFrom << ") {\n";
       os << "      *this = " << baseName << "(other);\n";
       os << "      return *this;\n";

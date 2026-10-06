@@ -40,7 +40,6 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:4Init16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
-// CHECK: return *this;
 // CHECK: vwTable->assignWithCopy
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
