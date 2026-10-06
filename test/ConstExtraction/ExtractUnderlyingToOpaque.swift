@@ -29,6 +29,8 @@ public struct Warbler : Bird {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "",
 // CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractUnderlyingToOpaque.swift",
+// CHECK-NEXT:              "line": 14,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "blue"
 // CHECK-NEXT:            }

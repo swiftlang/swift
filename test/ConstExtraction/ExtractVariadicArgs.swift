@@ -35,25 +35,37 @@ public struct Driver: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "args",
 // CHECK-NEXT:              "type": "Swift.Int...",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractVariadicArgs.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "Array",
 // CHECK-NEXT:              "value": [
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractVariadicArgs.swift",
+// CHECK-NEXT:                  "line": 16,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "1"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractVariadicArgs.swift",
+// CHECK-NEXT:                  "line": 16,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "2"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractVariadicArgs.swift",
+// CHECK-NEXT:                  "line": 16,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "3"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractVariadicArgs.swift",
+// CHECK-NEXT:                  "line": 16,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "4"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractVariadicArgs.swift",
+// CHECK-NEXT:                  "line": 16,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "5"
 // CHECK-NEXT:                }
