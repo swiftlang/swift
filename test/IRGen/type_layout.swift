@@ -44,10 +44,10 @@ struct TypeLayoutTest<T> {
   // CHECK:       store ptr [[T_LAYOUT]]
   var z: T
   // -- native class, use standard NativeObject value witness
-  // CHECK:       store ptr getelementptr inbounds (ptr, ptr @"$sBoWV", i32 8)
+  // CHECK:       store ptr getelementptr inbounds (i8, ptr @"$sBoWV", [[INT]] {{32|64}})
   var a: C
   // -- Single-element struct, shares layout of its field (Builtin.Int64)
-  // CHECK:       store ptr getelementptr inbounds (ptr, ptr @"$sBi64_WV", i32 8)
+  // CHECK:       store ptr getelementptr inbounds (i8, ptr @"$sBi64_WV", [[INT]] {{32|64}})
   var c: SSing
   // -- Multi-element structs use open-coded layouts
   // CHECK:    store ptr @type_layout_16_8_0_pod
@@ -59,7 +59,7 @@ struct TypeLayoutTest<T> {
   // CHECK-32:    store ptr @type_layout_8_4_[[REF_XI]]_bt
   var f: SMult3
   // -- Single-case enum, shares layout of its field (Builtin.Int64)
-  // CHECK:       store ptr getelementptr inbounds (ptr, ptr @"$sBi64_WV", i32 8)
+  // CHECK:       store ptr getelementptr inbounds (i8, ptr @"$sBi64_WV", [[INT]] {{32|64}})
   var g: ESing
   // -- Multi-case enum, open-coded layout
   // CHECK:    store ptr @type_layout_9_8_fe_pod
