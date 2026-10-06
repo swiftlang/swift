@@ -11,7 +11,7 @@
 // RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -I %S/Inputs/CHeaders -I %S/Inputs/Swift -enable-testing
 
 // Step 2: scan dependencies
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -sdk %t -prebuilt-module-cache-path %t/clang-module-cache -I %S/Inputs/CHeaders -I %S/Inputs/Swift
+// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -sdk %t -prebuilt-module-cache-path %t/clang-module-cache -I %S/Inputs/CHeaders -I %S/Inputs/Swift -disable-implicit-string-processing-module-import
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // The dependency of `Foo` on `A` will not be visible if the scanner simply scans the textual interface
