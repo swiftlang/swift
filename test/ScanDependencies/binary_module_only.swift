@@ -21,9 +21,9 @@ import Foo
 // RUN: %target-swift-frontend -compile-module-from-interface -o %t/binaryModuleOnly/Foo.swiftmodule -module-name Foo -disable-interface-lock %t/Foo.swiftmodule/%target-swiftinterface-name
 
 // Step 3: scan dependencies, pointed only at the binary module file should detect it as a swiftBinaryModule kind of dependency
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t/binaryModuleOnly -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
+// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t/binaryModuleOnly -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules -disable-implicit-string-processing-module-import
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=BINARY_MODULE_ONLY
 
 // Step 4: Ensure that round-trip serialization does not affect result
-// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization %s -o %t/deps.json -I %t/binaryModuleOnly -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
+// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization %s -o %t/deps.json -I %t/binaryModuleOnly -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules -disable-implicit-string-processing-module-import
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=BINARY_MODULE_ONLY
