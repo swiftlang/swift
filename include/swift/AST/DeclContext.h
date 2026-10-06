@@ -640,6 +640,11 @@ public:
   CodeGenerationModel
   getCodeGenerationModelOfCode(const ValueDecl **decl = nullptr) const;
 
+  /// Determine whether the code in this context has no unique definition, so
+  /// that every module that uses it emits its own copy, as for a closure in a
+  /// generic function in Embedded Swift.
+  bool hasNonUniqueCode() const;
+
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;

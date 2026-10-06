@@ -1245,6 +1245,10 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
   if (auto decl = getDecl())
     return declHasNonUniqueDefinition(decl);
 
+  // A closure is emitted wherever the code that contains it is.
+  if (auto *closure = getAbstractClosureExpr())
+    return closure->hasNonUniqueCode();
+
   return false;
 }
 

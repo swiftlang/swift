@@ -2654,15 +2654,17 @@ std::optional<StringRef> Decl::getSection() const {
                            SectionForDeclRequest{this}, std::nullopt);
 }
 
-bool ValueDecl::hasNonUniqueDefinition() const {
+/// Determine whether code with the given code generation model, from the
+/// given module, has no unique definition, so that every module that uses it
+/// emits its own copy.
+static bool hasNonUniqueDefinition(CodeGenerationModel model,
+                                   const ModuleDecl *module) {
   // This only forces the issue in embedded Swift.
-  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  auto &ctx = module->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  auto *module = getModuleContext();
-  auto &ctx = module->getASTContext();
-
-  switch (getEffectiveCodeGenerationModel()) {
+  switch (model) {
   case CodeGenerationModel::Implementation:
     // When deferring all code generation, declarations are emitted as late
     // as possible, so they must have non-unique definitions.
@@ -2677,6 +2679,16 @@ bool ValueDecl::hasNonUniqueDefinition() const {
     return false;
   }
   llvm_unreachable("covered switch");
+}
+
+bool ValueDecl::hasNonUniqueDefinition() const {
+  return ::hasNonUniqueDefinition(getEffectiveCodeGenerationModel(),
+                                  getModuleContext());
+}
+
+bool DeclContext::hasNonUniqueCode() const {
+  return ::hasNonUniqueDefinition(getCodeGenerationModelOfCode(),
+                                  getParentModule());
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
