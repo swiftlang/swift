@@ -226,28 +226,19 @@ private func _isMallocTypeOSVersionAtLeast() -> Bool {
 
 @export(interface)
 @implementation @c
-public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAllocateFlags, _ typeId: UInt64) -> UnsafeMutableRawPointer? {
+public func _swift_typedAllocate(_ size: Int, _ alignment: Int, _ flags: SwiftAllocateFlags, _ typeId: UInt64) -> UnsafeMutableRawPointer? {
   if (size == 0) {
-    return unsafe _swift_typedAllocate(1, alignMask, flags, typeId)
+    return unsafe _swift_typedAllocate(1, alignment, flags, typeId)
   }
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if _isMallocTypeOSVersionAtLeast() {
-    // This check also forces "default" alignment (alignMask == -1) to use
-    // malloc_type_posix_memalign(). Note we need to check the signedness of
-    // alignMask because it's signed unlike in swift_slowAllocTyped.
-    let MALLOC_ALIGN_MASK = 15
-    if (alignMask >= 0 && alignMask <= MALLOC_ALIGN_MASK) {
+    // malloc() is always 16-byte aligned on Apple platforms. This also covers
+    // the default alignment, 0.
+    let MALLOC_ALIGNMENT = 16
+    if alignment <= MALLOC_ALIGNMENT {
       return unsafe malloc_type_malloc(size, typeId);
     } else {
-      var alignment: Int
-      if alignMask == -1 {
-        let _swift_MinAllocationAlignment = 16
-        alignment = _swift_MinAllocationAlignment
-      } else {
-        alignment = alignMask + 1
-      }
-
       // Do not use malloc_type_aligned_alloc() here, because we want this
       // to work if `size` is not an integer multiple of `alignment`, which
       // was a requirement of the latter in C11 (but not C17 and later).
@@ -259,17 +250,17 @@ public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAl
     }
   }
 #endif
-  return unsafe swift_slowAlloc(size, alignMask)
+  return unsafe swift_slowAlloc(size, alignment &- 1)
 }
 
 @export(interface)
 @implementation @c
-public func _swift_typedDeallocate(_ pointer: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ flags: SwiftDeallocFlags, _ typeId: UInt64) {
+public func _swift_typedDeallocate(_ pointer: UnsafeMutableRawPointer, _ size: Int, _ alignment: Int, _ flags: SwiftDeallocFlags, _ typeId: UInt64) {
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if _isMallocTypeOSVersionAtLeast() {
     unsafe malloc_type_free(pointer, typeId);
     return
   }
 #endif
-  swift_slowDealloc(pointer, size, alignMask);
+  swift_slowDealloc(pointer, size, alignment &- 1);
 }
