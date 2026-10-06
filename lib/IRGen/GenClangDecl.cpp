@@ -15,6 +15,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Stmt.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -25,8 +26,10 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/Basic/Module.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/IR/Module.h"
 
 using namespace swift;
 using namespace irgen;
@@ -363,6 +366,43 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
   return ClangCodeGen->GetAddrOfGlobal(global, (bool) forDefinition);
 }
 
+/// Clang declares the symbols referenced by the bodies of inline functions
+/// from headers itself, so IRGen never gets to give them weak linkage. Weakly
+/// link any of those that are declared in a module imported @_weakLinked.
+static void weakLinkClangDeclsFromWeakLinkedModules(IRGenModule &IGM) {
+  // Clang submodules are represented by their top-level module.
+  llvm::SmallPtrSet<const clang::Module *, 4> weakLinkedModules;
+  auto &ctx = IGM.Context;
+  for (auto *module : ctx.getImportCache().getWeakImports(IGM.getSwiftModule()))
+    if (auto *clangModule = module->findUnderlyingClangModule())
+      weakLinkedModules.insert(clangModule);
+
+  if (weakLinkedModules.empty())
+    return;
+
+  for (llvm::GlobalValue &global : IGM.Module.global_values()) {
+    // Only strong references to symbols defined elsewhere can become weak.
+    if (!global.isDeclaration() || !global.hasExternalLinkage())
+      continue;
+
+    // Null for symbols that were not emitted for a Clang declaration.
+    auto *decl = IGM.ClangCodeGen->GetDeclForMangledName(global.getName());
+    if (!decl)
+      continue;
+
+    // Check every redeclaration so that the result doesn't depend on which
+    // one Clang deserialized first.
+    // Weak is safe when also declared by a strong module; it binds if present.
+    if (llvm::any_of(decl->redecls(), [&](const clang::Decl *redecl) {
+          auto *module =
+              ctx.getClangModuleLoader()->getClangOwningModule(redecl);
+          return module &&
+                 weakLinkedModules.contains(module->getTopLevelModule());
+        }))
+      global.setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+  }
+}
+
 void IRGenModule::finalizeClangCodeGen() {
   // FIXME: We try to avoid looking for PragmaCommentDecls unless we need to,
   // since clang::DeclContext::decls_begin() can trigger expensive
@@ -383,6 +423,9 @@ void IRGenModule::finalizeClangCodeGen() {
 
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
+
+  if (ClangCodeGen->GetModule())
+    weakLinkClangDeclsFromWeakLinkedModules(*this);
 }
 
 void IRGenModule::ensureImplicitCXXDestructorBodyIsDefined(
