@@ -275,7 +275,6 @@ split_embedded_sources(
   EMBEDDED UnsafeRawPointer.swift
   EMBEDDED ValidUTF8Buffer.swift
   EMBEDDED VarArgs.swift
-  EMBEDDED Volatile.swift
   EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED Zip.swift
   EMBEDDED _InlineArray.swift

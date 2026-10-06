@@ -54,6 +54,7 @@ add_library(swiftCore
   CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
+  ConstCell.swift
   Sendable.swift
   ContiguousArray.swift
   ContiguouslyStored.swift

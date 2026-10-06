@@ -285,8 +285,7 @@
     "MutableRef.swift",
     "UniqueBox.swift",
     "Cell.swift",
-    "ConstCell.swift",
-    "Volatile.swift"
+    "ConstCell.swift"
   ],
   "Result": [
     "Result.swift"
