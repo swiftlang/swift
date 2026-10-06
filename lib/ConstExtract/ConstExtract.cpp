@@ -442,12 +442,16 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         std::vector<KeyPathValue::Component> components;
 
         for (auto component: keyPathExpr->getComponents()) {
-            if (component.isResolved()) {
-                auto declRef = component.getDeclRef();
-                auto identifier = declRef.getDecl()->getBaseIdentifier().str();
-                auto type = component.getComponentType()->getRValueType();
-                components.push_back({identifier.str(), type});
-            }
+          if (component.getKind() == KeyPathExpr::Component::Kind::Member) {
+              auto declRef = component.getDeclRef();
+              auto identifier = declRef.getDecl()->getBaseIdentifier().str();
+              auto type = component.getComponentType()->getRValueType();
+              components.push_back({identifier.str(), type});
+          }
+        }
+
+        if (components.empty()) {
+            return std::make_shared<RuntimeValue>();
         }
 
         std::string path = "";
