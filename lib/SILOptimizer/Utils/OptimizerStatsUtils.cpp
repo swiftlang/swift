@@ -73,6 +73,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -1263,12 +1264,45 @@ void swift::updateSILModuleStatsBeforeSubpass(SILFunction *F, StringRef Label,
 // This is just a hook for possible extensions in the future.
 // It could be used e.g. to detect sequences of consecutive executions
 // of the same transform.
+static std::string CurrentTransformID;
+static std::string CurrentStageName;
+static int CurrentPassNumber = 0;
+
 void swift::updateSILModuleStatsBeforeTransform(SILModule &M,
                                                 SILTransform *Transform,
                                                 SILPassManager &PM,
                                                 int PassNumber) {
+  if (SILStatsLostVariables) {
+    CurrentTransformID = Transform->getID();
+    CurrentStageName = PM.getStageName();
+    CurrentPassNumber = PassNumber;
+  }
   if (!SILStatsModules && !SILStatsFunctions)
     return;
+}
+
+void swift::recordMissingSalvage(SILInstruction *I) {
+  if (!SILStatsLostVariables)
+    return;
+
+  unsigned debugUseCount = 0;
+  for (SILValue result : I->getResults()) {
+    auto uses = getDebugUses(result);
+    debugUseCount += std::distance(uses.begin(), uses.end());
+  }
+
+  if (debugUseCount == 0)
+    return;
+
+  stats_os() << "function, missing_salvage, "
+             << CurrentStageName << ", "
+             << CurrentTransformID << ", "
+             << CurrentPassNumber << ", "
+             << debugUseCount << ", 0, "
+             << getSILInstructionName(I->getKind());
+  if (auto *BI = dyn_cast<BuiltinInst>(I))
+    stats_os() << " " << BI->getName();
+  stats_os() << "\n";
 }
 
 SILAnalysis *swift::createOptimizerStatsAnalysis(SILModule *M) {

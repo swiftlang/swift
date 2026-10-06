@@ -88,8 +88,9 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @dead_load_borrow :
 // CHECK-NOT:     load_borrow
-// CHECK:         %1 = tuple ()
-// CHECK:         return %1
+// CHECK:         debug_value undef : $B, var, name "x"
+// CHECK:         %2 = tuple ()
+// CHECK:         return %2
 // CHECK:       } // end sil function 'dead_load_borrow'
 sil [ossa] @dead_load_borrow : $@convention(thin) (@inout B) -> () {
 bb0(%0 : $*B):
