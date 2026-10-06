@@ -5,6 +5,7 @@ import Foundation
 var x = 1
 
 _ = [x] as [NSNumber]
+_ = [x] as [NSNumber?]
 
 _ = ["x":["y":"z","a":1]] as [String : [String : AnyObject]]
 _ = ["x":["z",1]] as [String : [AnyObject]]
