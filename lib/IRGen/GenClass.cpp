@@ -132,6 +132,10 @@ namespace {
 
     Size HeaderSize;
 
+    /// Whether a stored property was laid out as empty because the instance
+    /// would otherwise not fit in 32 bits.
+    bool IsTooLarge = false;
+
   public:
     ClassLayoutBuilder(
         IRGenModule &IGM, SILType classType, ReferenceCounting refcounting,
@@ -187,6 +191,8 @@ namespace {
     ArrayRef<ElementLayout> getElements() const {
       return Elements;
     }
+
+    bool isTooLarge() const { return IsTooLarge; }
 
     ClassLayout getClassLayout(llvm::Type *classTy) const {
       assert(!TailTypes);
@@ -365,6 +371,19 @@ namespace {
             Options |= ClassMetadataFlags::ClassHasResilientMembers;
         }
 
+        // Instance sizes and field offsets must fit in 32 bits. Lay out a
+        // field that would extend past that limit as empty, so that no
+        // offset or size in the layout is truncated; the caller diagnoses
+        // the class and no object file is emitted.
+        if (auto *fixedTI = dyn_cast<FixedTypeInfo>(eltType)) {
+          Size end = CurSize.roundUpToAlignment(fixedTI->getFixedAlignment()) +
+                     fixedTI->getFixedSize();
+          if (end.getValue() > std::numeric_limits<uint32_t>::max()) {
+            IsTooLarge = true;
+            eltType = &IGM.getTypeInfo(SILType::getEmptyTupleType(IGM.Context));
+          }
+        }
+
         auto element = ElementLayout::getIncomplete(*eltType);
         bool isKnownEmpty = !addField(element, LayoutStrategy::Universal);
 
@@ -503,9 +522,9 @@ ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
   builder.setAsBodyOfStruct(classTy);
 
   // The class instance size is recorded in a 32-bit metadata field, so a class
-  // whose instance size does not fit in 32 bits cannot be represented. Reject
-  // it instead of silently truncating the recorded size.
-  if (builder.getSize().getValue() > std::numeric_limits<uint32_t>::max()) {
+  // whose instance size does not fit in 32 bits cannot be represented. The
+  // builder lays out the overflowing fields as empty; reject the class here.
+  if (builder.isTooLarge()) {
     IGM.Context.Diags.diagnose(SourceLoc(), diag::fixed_type_too_large,
                                classType.getASTType());
   }
