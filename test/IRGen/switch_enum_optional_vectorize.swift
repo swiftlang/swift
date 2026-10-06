@@ -1,11 +1,12 @@
-// RUN: %target-swift-frontend -O -emit-ir -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir -parse-as-library -Xllvm -force-vector-width=4 %s | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 // REQUIRES: CPU=arm64
 
 // Optional<Int> (switch_enum) vs. a hand-rolled {Int, Bool} (cond_br).
-// IRGen must not emit extra blocks for the switch_enum payload case, 
-// ensure both loops get vectorized.
+// IRGen must not emit extra blocks for the switch_enum payload case,
+// ensure both loops get vectorized. Force the vector width so the result
+// depends only on vectorization legality, not the target cost model.
 
 public struct ManualOpt {
   public var value: Int
