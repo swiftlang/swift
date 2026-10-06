@@ -665,6 +665,30 @@ static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDeinitableProtocol(Decl *decl) {
+  auto *proto = dyn_cast<ProtocolDecl>(decl);
+  if (!proto)
+    return false;
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+    return true;
+
+  // Copyable inherits Deinitable, and a protocol may suppress it.
+  InheritedTypes inherited(proto);
+  return llvm::any_of(inherited.getIndices(), [&](unsigned i) {
+    auto type = inherited.getResolvedType(i);
+    if (!type)
+      return false;
+    if (auto *inheritedProto = type->getAs<ProtocolType>())
+      if (inheritedProto->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::Deinitable))
+        return true;
+    if (auto *pct = type->getCanonicalType()->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(InvertibleProtocolKind::Deinitable);
+    return false;
+  });
+}
+
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
 UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
 
@@ -874,6 +898,13 @@ static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused"
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  // Compilers without the Deinitable protocol must not see it at all.
+  if (featureName == "DeinitableProtocol") {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+      if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+        return true;
+  }
+
   return hasFeatureSuppressionAttribute(decl, featureName, true);
 }
 

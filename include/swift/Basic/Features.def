@@ -622,6 +622,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 /// Allow use of the @unsafe(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
 
+/// The Deinitable invertible protocol, which Copyable inherits
+SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 

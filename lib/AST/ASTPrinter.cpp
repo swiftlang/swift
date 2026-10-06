@@ -2375,6 +2375,19 @@ void PrintAST::printRequirementSignature(ProtocolDecl *owner,
                         sig.getRequirements().end());
   }
 
+  // Compilers without the Deinitable protocol can't parse requirements that
+  // mention it.
+  if (Options.SuppressDeinitableProtocol) {
+    llvm::erase_if(requirements, [](Requirement req) {
+      return req.getKind() == RequirementKind::Conformance &&
+             req.getProtocolDecl()->isSpecificProtocol(
+                 KnownProtocolKind::Deinitable);
+    });
+    llvm::erase_if(inverses, [](InverseRequirement inverse) {
+      return inverse.getKind() == InvertibleProtocolKind::Deinitable;
+    });
+  }
+
   if (attachingTo) {
     llvm::erase_if(requirements,
                    [&](Requirement req) {
@@ -3663,6 +3676,13 @@ suppressingFeatureLifetimes(PrintOptions &options,
 static void suppressingFeatureTildeSendable(PrintOptions &options,
                                             llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressTildeSendable, true);
+  action();
+}
+
+static void
+suppressingFeatureDeinitableProtocol(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressDeinitableProtocol, true);
   action();
 }
 

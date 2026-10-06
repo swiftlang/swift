@@ -7,9 +7,22 @@
 
 // RUN: %FileCheck %s < %t/Swift.swiftinterface
 
-// CHECK-DAG: @_marker public protocol Copyable : Swift::Deinitable {
-// CHECK-DAG: @_marker public protocol Escapable {
-// CHECK-DAG: @_marker public protocol Deinitable {
+// CHECK:      @_marker public protocol Escapable {
+// CHECK-NEXT: }
+
+// Compilers without the Deinitable protocol see neither it nor Copyable's
+// inheritance from it.
+// CHECK-NEXT: #if compiler(>=5.3) && $DeinitableProtocol
+// CHECK-NEXT: @_marker public protocol Deinitable {
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #if compiler(>=5.3) && $DeinitableProtocol
+// CHECK-NEXT: @_marker public protocol Copyable : Swift::Deinitable {
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @_marker public protocol Copyable {
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
 
 // This test verifies that:
 //   1. When omitted, the an invertible protocol decl gets automatically
