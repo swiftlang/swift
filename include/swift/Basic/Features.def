@@ -702,6 +702,9 @@ EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 /// Enable type-based scope restrictions on ~Escapable types.
 EXPERIMENTAL_FEATURE(ScopeRestrictions, false)
 
+/// Builtins for relaxed floating-point operations.
+LANGUAGE_FEATURE(BuiltinRelaxedFP, 0, "Support for Builtin.F[Add,Sub,Mul]Relaxed")
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -158,6 +158,23 @@ BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SMulOver,
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UMulOver,
                                        "umul_with_overflow", Mul, "n", Integer)
 
+/// These builtins are identical to their un-suffixed cousins FAdd, FSub, FMul,
+/// except that they have the no-signed-zeros, contract, and reassociate fast-
+/// math flags attached, which generally licenses them to participate in
+/// algebraic transformations that allow vectorization and ILP extraction much
+/// more freely at the cost of not necessarily producing bit-identical results
+/// across compilation targets (or across backend versions on a single target).
+#ifndef BUILTIN_BINARY_OPERATION_RELAXED
+#define BUILTIN_BINARY_OPERATION_RELAXED(Id, Name, StrictID, Attrs, Overload) \
+          BUILTIN(Id, Name, Attrs)
+#endif
+BUILTIN_BINARY_OPERATION_RELAXED(FAddRelaxed,
+                                 "fadd_relaxed", FAdd, "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_RELAXED(FSubRelaxed,
+                                 "fsub_relaxed", FSub, "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_RELAXED(FMulRelaxed,
+                                 "fmul_relaxed", FMul, "n", FloatOrVector)
+
 /// Unary operations have type (T) -> T.
 #ifndef BUILTIN_UNARY_OPERATION
 #define BUILTIN_UNARY_OPERATION(Id, Name, Attrs, Overload) \
@@ -1372,6 +1389,7 @@ BUILTIN_MISC_OPERATION(TaskCancellationShieldPop, "taskCancellationShieldPop", "
 #undef BUILTIN_SANITIZER_OPERATION
 #undef BUILTIN_TYPE_CHECKER_OPERATION
 #undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
+#undef BUILTIN_BINARY_OPERATION_RELAXED
 #undef BUILTIN_BINARY_OPERATION_ALL
 #undef BUILTIN_BINARY_OPERATION_POLYMORPHIC
 #undef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
