@@ -208,6 +208,9 @@ private:
       const LoweredFunctionSignature &signature,
       llvm::SmallPtrSetImpl<const ParamDecl *> &consumed);
 
+  /// Whether a consumed parameter owns its argument in the C++ thunk.
+  bool shouldPassConsumedParameterByValue(const ParamDecl &param);
+
   raw_ostream &os;
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;

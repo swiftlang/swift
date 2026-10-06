@@ -133,6 +133,36 @@ void testSwap() {
 }
 ```
 
+### Consuming Parameters
+
+The experimental feature `GenerateConsumingValueParametersInCXX` exposes consumed
+copyable Swift value parameters as C++ parameters passed by value. An lvalue is
+copied at the call boundary; a temporary or a non-const rvalue transfers ownership
+through the wrapper's move constructor. A const rvalue is copied.
+
+For example, a Swift function can initialize storage with a consumed generic value:
+
+```swift
+public func initializeSwiftValue<T>(_ destination: UnsafeMutableRawPointer,
+                                   _ value: consuming T) {
+  destination.assumingMemoryBound(to: T.self).initialize(to: consume value)
+}
+```
+
+With the feature enabled when generating the C++ header, the caller can transfer
+the value with `initializeSwiftValue(destination, std::move(value))`. The
+destination must be suitably aligned, uninitialized storage for the Swift value.
+The source wrapper then follows its moved-from contract.
+
+Borrowing and `inout` parameters retain their reference bindings. Consuming
+methods still copy their receiver, and concrete Swift class parameters retain
+their existing bindings. Generic arguments use the move or copy operation of
+their substituted C++ type.
+
+This changes the C++ function type from one taking `const T &` to one taking `T`,
+including function pointers and explicit template specializations. Use the same
+feature setting for generated headers used together. The Swift ABI is unchanged.
+
 ### Function Overloading
 
 Swift allows you to specify which overload of the function you would like to call using argument labels. For example, the following snippet is explicitly calling the second definition of `greet` because of the call using `greet(person:,from:)` argument labels:
