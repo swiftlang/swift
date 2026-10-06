@@ -25,6 +25,16 @@ struct Pair {
   int adjust(int x, int y);
 };
 
+// Overloads without a const/non-const twin, so the parameter types alone
+// select the overload
+
+struct Gauge {
+  int value;
+
+  int scale(int x) const;
+  int scale(double x) const;
+};
+
 // A struct too large to be returned in registers is returned indirectly
 
 struct Triple {

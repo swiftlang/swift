@@ -7287,37 +7287,10 @@ static bool haveSameParameterTypes(const ValueDecl *a, const ValueDecl *b) {
   return true;
 }
 
-/// Select, among the imported \p candidates sharing \p func's foreign name,
-/// the one(s) \p func implements. Parameter types pick the overload, except
-/// for a const/non-const pair, which shares them and imports as non-mutating
-/// and `mutating`; remaining ambiguity is left to the attribute checker.
-static TinyPtrVector<Decl *>
-selectImplementedOverloads(const AbstractFunctionDecl *func,
-                           const TinyPtrVector<Decl *> &candidates) {
-  if (candidates.size() <= 1)
-    return candidates;
-
-  TinyPtrVector<Decl *> selected;
-  for (Decl *candidate : candidates)
-    if (haveSameParameterTypes(func, cast<ValueDecl>(candidate)))
-      selected.push_back(candidate);
-
-  if (selected.size() > 1) {
-    auto isMutating = [](const Decl *decl) {
-      if (const auto *fd = dyn_cast<FuncDecl>(decl))
-        return fd->isMutating();
-      return false;
-    };
-    bool isFuncMutating = isMutating(func);
-    TinyPtrVector<Decl *> sameMutating;
-    for (Decl *candidate : selected)
-      if (isMutating(candidate) == isFuncMutating)
-        sameMutating.push_back(candidate);
-    if (!sameMutating.empty())
-      selected = sameMutating;
-  }
-
-  return selected;
+static bool isMutatingFunc(const Decl *decl) {
+  if (const auto *fd = dyn_cast<FuncDecl>(decl))
+    return fd->isMutating();
+  return false;
 }
 
 static ObjCInterfaceAndImplementation
@@ -7338,67 +7311,103 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (clangName.empty())
     return {};
 
-  llvm::SmallSetVector<ValueDecl *, 4> results;
-  lookupRelatedFuncs(func, results);
+  auto *clangLoader = func->getASTContext().getClangModuleLoader();
 
-  // Classify the `results` as either interface candidates (imported
-  // declarations) or implementations. (Multiple implementations are invalid
-  // but utterable.)
-  TinyPtrVector<Decl *> candidates;
-  TinyPtrVector<Decl *> impls;
+  llvm::SmallSetVector<ValueDecl *, 4> relatedFuncSet;
+  lookupRelatedFuncs(func, relatedFuncSet);
+  SmallVector<ValueDecl *, 4> relatedFuncs(relatedFuncSet.takeVector());
 
-  auto asFunc = [&](Decl *result) -> AbstractFunctionDecl * {
+  auto asFunc = [&](const Decl *decl) -> const AbstractFunctionDecl * {
     if (accessorKind) {
-      if (auto resultStorage = dyn_cast<AbstractStorageDecl>(result))
+      if (auto resultStorage = dyn_cast<AbstractStorageDecl>(decl))
         return resultStorage->getAccessor(*accessorKind);
       return nullptr;
     }
-    return dyn_cast<AbstractFunctionDecl>(result);
+    return dyn_cast<AbstractFunctionDecl>(decl);
   };
 
-  auto *clangLoader = func->getASTContext().getClangModuleLoader();
-  for (ValueDecl *result : results) {
-    AbstractFunctionDecl *resultFunc = asFunc(result);
-    if (!resultFunc)
-      continue;
-
+  auto hasSameOriginalName = [&](const ValueDecl *decl) -> bool {
     // A virtual method of a foreign reference type is imported as a
     // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
     // known by the name of the virtual method it forwards to.
-    const ValueDecl *named = resultFunc;
-    if (auto *thunk = dyn_cast<FuncDecl>(resultFunc))
-      if (auto *original = clangLoader->getOriginalForVirtualThunk(thunk))
+    const ValueDecl *named = decl;
+    if (const auto *thunk = dyn_cast<FuncDecl>(decl))
+      if (const auto *original = clangLoader->getOriginalForVirtualThunk(thunk))
         named = original;
-    if (named->getCDeclName() != clangName)
-      continue;
+    return named->getCDeclName() == clangName;
+  };
 
-    if (resultFunc->hasClangNode())
-      candidates.push_back(result);
-    else if (resultFunc->isObjCImplementation())
-      impls.push_back(result);
+  auto interfaceCandidatesEnd = std::partition(
+      relatedFuncs.begin(), relatedFuncs.end(), [&](ValueDecl *decl) -> bool {
+        const auto *fn = asFunc(decl);
+        return fn && fn->hasClangNode() && hasSameOriginalName(fn);
+      });
+  MutableArrayRef<ValueDecl *> interfaceCandidates(relatedFuncs.begin(),
+                                                   interfaceCandidatesEnd);
+  ArrayRef<ValueDecl *> otherCandidates(interfaceCandidatesEnd,
+                                        relatedFuncs.end());
+
+  // Pick the interfaces. Filter out interfaces with different types or
+  // mutability, but only when they can cause ambiguity. We want to keep an
+  // unambiguous interface even when it has wrong param types or mutability for
+  // more precise diagnostic instead of 'function not found'.
+  bool narrowedByMutating = false;
+  MutableArrayRef<ValueDecl *> interfaces = interfaceCandidates;
+  if (interfaces.size() > 1) {
+    auto end = std::partition(interfaces.begin(), interfaces.end(),
+                              [&](const ValueDecl *candidate) -> bool {
+                                return haveSameParameterTypes(func, candidate);
+                              });
+    interfaces = MutableArrayRef<ValueDecl *>(interfaces.begin(), end);
   }
-
-  // Pick the interface.
-  TinyPtrVector<Decl *> interfaces =
-      selectImplementedOverloads(func, candidates);
+  if (interfaces.size() > 1) {
+    bool isMutable = isMutatingFunc(func);
+    auto end = std::partition(interfaces.begin(), interfaces.end(),
+                              [&](const ValueDecl *candidate) -> bool {
+                                return isMutatingFunc(candidate) == isMutable;
+                              });
+    MutableArrayRef<ValueDecl *> interfacesWithSameMut(interfaces.begin(), end);
+    if (!interfacesWithSameMut.empty() &&
+        interfacesWithSameMut.size() != interfaces.size()) {
+      interfaces = interfacesWithSameMut;
+      narrowedByMutating = true;
+    }
+  }
   if (interfaces.empty())
     return {};
 
-  // Implementations of other overloads are unrelated to this one; drop them so
-  // they are not reported as duplicate implementations.
-  llvm::erase_if(impls, [&](Decl *impl) {
-    return !llvm::equal(selectImplementedOverloads(asFunc(impl), candidates),
-                        interfaces);
-  });
+  // Sort interfaces into source order so diagnostics and front() for the result
+  // are deterministic.
+  if (interfaces.size() > 1)
+    llvm::sort(interfaces, OrderDecls());
+
+  // Pick the implementations, dropping those of other overloads so they are
+  // not diagnosed as duplicates.
+  TinyPtrVector<Decl *> impls;
+  for (ValueDecl *decl : otherCandidates) {
+    auto *fn = asFunc(decl);
+    if (!fn || !fn->isObjCImplementation() || !hasSameOriginalName(fn))
+      continue;
+    if (interfaceCandidates.size() > 1) {
+      if (!haveSameParameterTypes(func, fn))
+        continue;
+      if (narrowedByMutating && isMutatingFunc(fn) != isMutatingFunc(func))
+        continue;
+    }
+    impls.push_back(decl);
+  }
 
   // If we found enough decls to construct a result, `func` should be among them
   // somewhere.
-  assert(interfaces.empty() || impls.empty() ||
-         llvm::is_contained(interfaces, func) ||
+  assert(impls.empty() || llvm::is_contained(interfaces, func) ||
          llvm::is_contained(impls, func));
 
-  return constructResult(interfaces, impls,
-                         interfaces.empty() ? nullptr : interfaces.front(),
+  TinyPtrVector<Decl *> interfacesVec;
+  for (ValueDecl *interface : interfaces)
+    interfacesVec.push_back(interface);
+  Decl *diagnoseOn = interfaces.front();
+
+  return constructResult(interfacesVec, impls, diagnoseOn,
                          /*categoryName=*/Identifier());
 }
 
