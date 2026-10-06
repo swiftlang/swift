@@ -52,6 +52,11 @@ private struct VTableSpecializer {
       return
     }
     guard let origVTable = context.lookupVTable(for: classDecl) else {
+      // A class with a unique definition has its metadata, including its
+      // vtable, emitted in the module that defines it.
+      if !classDecl.hasNonUniqueDefinition {
+        return
+      }
       if context.enableWMORequiredDiagnostics {
         context.diagnosticEngine.diagnose(.cannot_specialize_class, classType, at: errorLocation)
       }
