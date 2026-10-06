@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -135,6 +136,11 @@ namespace {
           ValueTypeAndIsOptional.getPointer()->getContext(), \
           getFixedSize().getValueInBits()); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -218,6 +224,11 @@ namespace {
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -266,6 +277,11 @@ namespace {
                               Address dest, SILType T, bool isOutlined) \
     const override { \
       return storeHeapObjectExtraInhabitant(IGF, index, dest); \
+    } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
     } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
@@ -503,9 +519,10 @@ void irgen::emitDeallocatePartialClassInstanceTyped(
 
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
-                                    std::optional<uint64_t> mallocTypeId,
-                                    const llvm::Twine &layoutName) {
+static llvm::Function *createDtorFn(
+    IRGenModule &IGM, const HeapLayout &layout,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &layoutName,
+    const llvm::BitVector &unownedFields, bool isStackAllocated) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
       "__swift_" + layoutName + "_destructor", &IGM.Module);
@@ -539,13 +556,20 @@ static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
     if (field.isTriviallyDestroyable())
       continue;
 
+    if (!unownedFields.empty() && unownedFields.test(i))
+      continue;
+
     field.getType().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
 
-  emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
-                           offsets.getAlignMask(), mallocTypeId);
+  // The caller is responsible for deallocating the stack slot, destruction in
+  // such cases is decoupled from deallocation.
+  if (!isStackAllocated)
+    emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
+                             offsets.getAlignMask(), mallocTypeId);
+
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -638,10 +662,14 @@ llvm::Constant *
 HeapLayout::getPrivateMetadata(IRGenModule &IGM,
                                llvm::Constant *captureDescriptor,
                                std::optional<uint64_t> mallocTypeId,
-                               const llvm::Twine &name) const {
+                               const llvm::Twine &name,
+                               const llvm::BitVector &unownedFields,
+                               bool isStackAllocated) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(
-        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name),
+        IGM, *this,
+        createDtorFn(IGM, *this, mallocTypeId, name, unownedFields,
+                     isStackAllocated),
         captureDescriptor, MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
@@ -682,8 +710,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
   }
 
   auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
-  llvm::Value *metadata =
-      layout.getPrivateMetadata(IGM, captureDescriptor, maybeDescriptor, name);
+  llvm::Value *metadata = layout.getPrivateMetadata(
+      IGM, captureDescriptor, maybeDescriptor, name, /*unownedFields=*/{});
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -700,6 +728,12 @@ namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1595,11 +1629,12 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
 
   // Only output the filepath in debug mode. It is going to leak into the
   // executable. This is the same behavior as asserts.
-  auto filename = IGM.IRGen.Opts.shouldOptimize()
+  bool shouldOptimize = IGM.IRGen.Opts.shouldOptimize();
+  auto filename = shouldOptimize
                       ? IGM.getAddrOfGlobalString("")
                       : IGM.getAddrOfGlobalString(loc.filename);
-  auto filenameLength =
-      llvm::ConstantInt::get(IGM.Int32Ty, loc.filename.size());
+  auto filenameLength = llvm::ConstantInt::get(
+      IGM.Int32Ty, shouldOptimize ? 0 : loc.filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call = Builder.CreateCall(
       IGM.getIsEscapingClosureAtFileLocationFunctionPointer(),
@@ -1640,6 +1675,12 @@ public:
 /// Common implementation for empty box type info.
 class EmptyBoxTypeInfo final : public BoxTypeInfo {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1674,6 +1715,12 @@ public:
 /// Common implementation for non-fixed box type info.
 class NonFixedBoxTypeInfo final : public BoxTypeInfo {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1788,6 +1835,12 @@ static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1803,6 +1856,12 @@ public:
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1848,6 +1907,12 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
   }
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {

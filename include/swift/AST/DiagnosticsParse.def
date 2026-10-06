@@ -705,6 +705,10 @@ ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
       "mark_unresolved_non_copyable_value requires an attribute like 'noImplicitCopy'", ())
+ERROR(sil_diagnose_invalid_attribute,none,
+      "Attribute '[%0]' is not known to the diagnose instruction", (StringRef))
+ERROR(sil_diagnose_requires_attribute,none,
+      "diagnose requires an attribute like '[unpermitted_copy]'", ())
 ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
@@ -748,6 +752,9 @@ ERROR(expected_sil_stage_name, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
 ERROR(multiple_sil_stage_decls, none,
       "sil_stage declared multiple times", ())
+ERROR(sil_function_stage_below_module_stage, none,
+      "function stage '%0' is below the module stage '%1'", (StringRef,
+      StringRef))
 
 // SIL VTable
 ERROR(expected_sil_vtable_colon,none,
@@ -1865,7 +1872,9 @@ ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
 ERROR(attr_called_expected_rparen,none,
       "expected ')' after execution semantics", ())
 ERROR(attr_called_expected_semantics,none,
-      "expected 'once' as the `@called` execution semantics", ())
+      "expected 'exactlyOnce' or 'atMostOnce' as the '@called' execution "
+      "semantics",
+      ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -2235,6 +2244,15 @@ ERROR(sil_thunkinst_failed_to_parse_kind,none,
 
 ERROR(sil_failed_to_parse_sil_optional,none,
       "Expected SIL optional value of the form '[' NAME ']'", ())
+
+//------------------------------------------------------------------------------
+// MARK: Scope restrictions
+//------------------------------------------------------------------------------
+
+ERROR(expected_scope_specifier, PointsToFirstBadToken,
+      "expected identifier or 'self' in '_scoped' attribute", ())
+ERROR(immortal_scope_cannot_be_access, none,
+      "cannot depend on the access scope of 'immortal'", ())
 
 //------------------------------------------------------------------------------
 // MARK: nonisolated(nonsending)

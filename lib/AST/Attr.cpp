@@ -248,6 +248,65 @@ void LifetimeTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+ScopedTypeAttr::ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
+                               SourceRange parens,
+                               ArrayRef<ScopeSpecifier> specifiers)
+    : SimpleTypeAttr(atLoc, kwLoc, parens) {
+  Bits.ScopedTypeAttr.NumSpecifiers = specifiers.size();
+  ASSERT(Bits.ScopedTypeAttr.NumSpecifiers == specifiers.size());
+  llvm::uninitialized_copy(specifiers, getTrailingObjects());
+}
+
+ScopedTypeAttr *ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc,
+                                       SourceLoc kwLoc, SourceRange parens,
+                                       ArrayRef<ScopeSpecifier> specifiers) {
+  ASSERT(!specifiers.empty());
+  void *mem = ctx.Allocate(totalSizeToAlloc<ScopeSpecifier>(specifiers.size()),
+                           alignof(ScopedTypeAttr));
+  return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, specifiers);
+}
+
+void ScopedTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_scoped");
+  printer << "(";
+  interleave(
+      getSpecifiers(),
+      [&](const ScopeSpecifier &specifier) {
+        if (auto label = specifier.getLabel()) {
+          printer.printName(label->Item.getIdentifier(),
+                            PrintNameContext::Attribute);
+          printer << ": ";
+        }
+
+        auto scope = specifier.getScope();
+        if (scope.isAccess())
+          printer << "&";
+
+        switch (scope.getSubject()) {
+        case ScopeDescriptor::Subject::Name: {
+          auto name = scope.isAccess() ? scope.getAccessedValue()
+                                       : scope.getScopeName().getIdentifier();
+          if (name.is("immortal"))
+            printer << "`immortal`";
+          else
+            printer.printName(name, PrintNameContext::Attribute);
+          break;
+        }
+        case ScopeDescriptor::Subject::Self:
+          printer << "self";
+          break;
+        case ScopeDescriptor::Subject::Immortal:
+          printer << "immortal";
+          break;
+        }
+      },
+      [&] { printer << ", "; });
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 void ConventionTypeAttr::printImpl(ASTPrinter &printer,
                                    const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
@@ -309,8 +368,30 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 const char *
 CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
   switch (semantics) {
-  case CalledTypeAttr::Semantics::Once:
-    return "once";
+  case CalledTypeAttr::Semantics::AtMostOnce:
+    return "atMostOnce";
+  case CalledTypeAttr::Semantics::ExactlyOnce:
+    return "exactlyOnce";
+  }
+  llvm_unreachable("bad kind");
+}
+
+ExecutionSemantics CalledTypeAttr::getExecutionSemantics() const {
+  switch (getSemantics()) {
+  case Semantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case Semantics::ExactlyOnce:
+    return ExecutionSemantics::Once;
+  }
+  llvm_unreachable("bad kind");
+}
+
+const char *CalledAttr::getSemanticsName(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::AtMostOnce:
+    return "atMostOnce";
+  case ExecutionSemantics::Once:
+    return "exactlyOnce";
   }
   llvm_unreachable("bad kind");
 }
@@ -2187,8 +2268,10 @@ StringRef DeclAttribute::getAttrName() const {
     return "nonexhaustive";
   case DeclAttrKind::Called:
     switch (cast<CalledAttr>(this)->getSemantics()) {
+    case ExecutionSemantics::AtMostOnce:
+      return "called(atMostOnce)";
     case ExecutionSemantics::Once:
-      return "called(once)";
+      return "called(exactlyOnce)";
     }
   case DeclAttrKind::Target:
     return "_target";
@@ -2607,12 +2690,15 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(
+  auto *attr = new (C) AvailableAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
       DomainOrIdentifier, implicit ? SourceLoc() : DomainLoc, getKind(),
       Message, Rename, Introduced, implicit ? SourceRange() : IntroducedRange,
       Deprecated, implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
+  if (!implicit)
+    attr->setMacroLoc(MacroLoc);
+  return attr;
 }
 
 bool AvailableAttr::isEquivalent(const AvailableAttr *other,

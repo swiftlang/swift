@@ -3155,7 +3155,7 @@ public:
                                         ConstraintLocatorBuilder locator);
 
   /// Match the execution semantics between two functions currently
-  /// represented by `@called(once)` bit.
+  /// represented by `@called(atMostOnce)` bit.
   SolutionKind
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
@@ -4414,7 +4414,7 @@ class TypeVarRefCollector : public ASTWalker {
   DeclContext *DC;
   ConstraintLocator *Locator;
 
-  llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> TypeVars;
   unsigned DCDepth = 0;
 
 public:

@@ -259,7 +259,7 @@ swift::constraints::getConversionBehavior(Type type) {
     if (canType->hasParameterPack())
       return true;
 
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
     canType->getTypeVariables(referencedTypeVars);
     for (auto *typeVar : referencedTypeVars) {
       if (typeVar->getImpl().isPackExpansion())
@@ -1136,7 +1136,9 @@ static Type superclassJoinMeetImpl(Operation op, Type lhs, Type rhs) {
     unsigned i = std::min(lhsSuper.size(), rhsSuper.size());
     while (i > 0) {
       --i;
-      if (lhsSuper[i]->isEqual(rhsSuper[i]))
+      auto result = isLikelyExactMatch(lhsSuper[i], rhsSuper[i]);
+      ASSERT(result);
+      if (*result)
         return lhsSuper[i];
     }
   } else {
@@ -1154,9 +1156,10 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, calledOnce, throwing, async;
+  bool noEscape, sendable, throwing, async;
+  std::optional<ExecutionSemantics> executionSemantics;
   Type sendableDep;
-  Type calledOnceDep;
+  Type executionSemanticsDep;
   Type thrownError;
 
   // Concurrency is too hard to reason about here.
@@ -1166,8 +1169,8 @@ extInfoJoinMeetImpl(Operation op,
   auto lhsSendableDep = lhsInfo.getSendableDependentType();
   auto rhsSendableDep = rhsInfo.getSendableDependentType();
 
-  auto lhsCalledOnceDep = lhsInfo.getCalledOnceDependentType();
-  auto rhsCalledOnceDep = rhsInfo.getCalledOnceDependentType();
+  auto lhsExecutionSemanticsDep = lhsInfo.getExecutionSemanticsDependentType();
+  auto rhsExecutionSemanticsDep = rhsInfo.getExecutionSemanticsDependentType();
 
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
@@ -1192,23 +1195,23 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
     }
 
-    if (lhsCalledOnceDep && rhsCalledOnceDep) {
-      // Form a tuple; its @called(once) iff both components are @called(once).
+    if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      // Form a tuple; its @called(atMostOnce) iff both components are
+      // @called(atMostOnce).
       SmallVector<TupleTypeElt, 2> elts;
-      elts.push_back(lhsCalledOnceDep);
-      elts.push_back(rhsCalledOnceDep);
-      calledOnceDep = TupleType::get(elts, lhsSendableDep->getASTContext());
-      calledOnce = false;
-    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
-      if (rhsInfo.isCalledOnce())
-        calledOnceDep = lhsCalledOnceDep;
-      calledOnce = false;
-    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
-      if (lhsInfo.isCalledOnce())
-        calledOnceDep = rhsCalledOnceDep;
-      calledOnce = false;
-    } else {
-      calledOnce = lhsInfo.isCalledOnce() && rhsInfo.isCalledOnce();
+      elts.push_back(lhsExecutionSemanticsDep);
+      elts.push_back(rhsExecutionSemanticsDep);
+      executionSemanticsDep =
+          TupleType::get(elts, lhsSendableDep->getASTContext());
+    } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
+      if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemanticsDep = lhsExecutionSemanticsDep;
+    } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemanticsDep = rhsExecutionSemanticsDep;
+    } else if (lhsInfo.hasCalledAtMostOnceSemantics() &&
+               rhsInfo.hasCalledAtMostOnceSemantics()) {
+      executionSemantics = lhsInfo.getExecutionSemantics();
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
@@ -1248,25 +1251,24 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
     }
 
-    if (lhsCalledOnceDep && rhsCalledOnceDep) {
-      // We cannot represent the meet of two @called(once)-dependent types.
+    if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      // We cannot represent the meet of two @called(atMostOnce)-dependent
+      // types.
       return std::nullopt;
-    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
-      if (rhsInfo.isCalledOnce()) {
-        calledOnce = true;
-      } else {
-        calledOnce = false;
-        calledOnceDep = lhsCalledOnceDep;
-      }
-    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
-      if (lhsInfo.isCalledOnce()) {
-        calledOnce = true;
-      } else {
-        calledOnce = false;
-        calledOnceDep = rhsCalledOnceDep;
-      }
+    } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
+      if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = rhsInfo.getExecutionSemantics();
+      else
+        executionSemanticsDep = lhsExecutionSemanticsDep;
+    } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = lhsInfo.getExecutionSemantics();
+      else
+        executionSemanticsDep = rhsExecutionSemanticsDep;
+    } else if (lhsInfo.hasCalledAtMostOnceSemantics()) {
+      executionSemantics = lhsInfo.getExecutionSemantics();
     } else {
-      calledOnce = lhsInfo.isCalledOnce() || rhsInfo.isCalledOnce();
+      executionSemantics = rhsInfo.getExecutionSemantics();
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
@@ -1293,8 +1295,8 @@ extInfoJoinMeetImpl(Operation op,
       .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
-      .withCalledOnce(calledOnce)
-      .withCalledOnceDependentType(calledOnceDep)
+      .withExecutionSemantics(executionSemantics)
+      .withExecutionSemanticsDependentType(executionSemanticsDep)
       .build();
 }
 

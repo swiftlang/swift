@@ -567,6 +567,10 @@ private:
                       ConsumableManagedValue src,
                       const SpecializationHandler &handleSpec,
                       const FailureHandler &failure);
+  bool tryEmitNoncopyableIsDispatch(ArrayRef<RowToSpecialize> rows,
+                                    ConsumableManagedValue src,
+                                    const SpecializationHandler &handleSpec,
+                                    const FailureHandler &failure);
   void emitEnumElementObjectDispatch(ArrayRef<RowToSpecialize> rows,
                                      ConsumableManagedValue src,
                                      const SpecializationHandler &handleSpec,
@@ -1422,7 +1426,8 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   //
   // If we're relying on ManualOwnership for explicit-copies enforcement,
   // we don't need the MoveOnlyWrapper.
-  if (!bindValue.getType().isMoveOnly() && !SGF.B.hasManualOwnershipAttr()) {
+  if (!bindValue.getType().isMoveOnly() &&
+      SGF.usingWrapperTypeImplicitCopyEnforcement()) {
     if (bindValue.getType().isAddress()) {
       bindValue = ManagedValue::forBorrowedAddressRValue(
         SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));
@@ -1959,11 +1964,124 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   return ConsumableManagedValue::forOwned(init->getManagedAddress());
 }
 
+/// Formally, `case is T` has the same meaning as `case _ as T`;
+/// they both verify the type without binding any payload in the result.
+static bool patternNeedsNoPayload(const Pattern *pattern) {
+  // True for `case is T`
+  if (!pattern)
+    return true;
+  // True for `case _ as T` (and variations thereof)
+  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
+}
+
+/// Try to dispatch a cast pattern by testing the subject's type
+/// in place instead of extracting its payload.  This supports
+/// noncopyable types and will also permit using more efficient
+/// test-only runtime functions for other `is` tests in the future.
+///
+/// This only supports the the no-binding form (`is T`, `_ as T`).
+/// Binding the payload additionally needs a borrowed projection out of
+/// the container, which is not yet implemented; that case returns false and is
+/// diagnosed by the caller.
+bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
+    ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+    const SpecializationHandler &handleCase, const FailureHandler &failure) {
+  auto *firstPattern = cast<IsPattern>(rows[0].Pattern);
+  CanType sourceType = firstPattern->getType()->getCanonicalType();
+  CanType targetType = getTargetType(rows[0]);
+
+  // For now, limit this path to noncopyable existentials
+  if (!canUseNoncopyableTypeTest(sourceType, targetType,
+                                 firstPattern->getCastKind()))
+    return false;
+
+  // The test reads the subject through a pointer.
+  // * Without OpaqueValues, return here if it's not an address
+  // * With OpaqueValues, fall through to borrow it into a temporary
+  ManagedValue subject = src.getFinalManagedValue();
+  if (!subject.getType().isAddress() && SGF.useLoweredAddresses())
+    return false;
+
+  // We can't yet support binding the payload, so diagnose here.
+  bool wantsPayload = false;
+  for (auto &row : rows) {
+    auto *is = cast<IsPattern>(row.Pattern);
+    if (!patternNeedsNoPayload(is->getSubPattern())) {
+      SGF.SGM.diagnose(is->getLoc(),
+                       diag::noncopyable_cast_pattern_binding_unimplemented);
+      wantsPayload = true;
+    }
+  }
+
+  // Enumerate the specializations of this test
+  SmallVector<SpecializedRow, 4> specializedRows;
+  specializedRows.reserve(rows.size());
+  for (auto &row : rows) {
+    assert(getTargetType(row) == targetType &&
+           "can only specialize on one type at a time");
+    specializedRows.push_back({});
+    specializedRows.back().RowIndex = row.RowIndex;
+    specializedRows.back().Patterns.push_back(
+        cast<IsPattern>(row.Pattern)->getSubPattern());
+  }
+
+  // Sketch the CFG and type test
+  SILLocation loc = rows[0].Pattern;
+
+  // Borrow a value subject into a temporary so the cast has an address to read.
+  // Close the borrow at the top of each successor block.
+  SILValue subjectTemp, subjectBorrow;
+  if (!subject.getType().isAddress()) {
+    subjectTemp = SGF.B.createAllocStack(loc, subject.getType());
+    subjectBorrow =
+        SGF.B.createStoreBorrow(loc, subject.getValue(), subjectTemp);
+    subject = ManagedValue::forBorrowedAddressRValue(subjectBorrow);
+  }
+  auto endSubjectBorrow = [&] {
+    if (!subjectTemp)
+      return;
+    SGF.B.createEndBorrow(loc, subjectBorrow);
+    SGF.B.createDeallocStack(loc, subjectTemp);
+  };
+
+  SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
+  SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
+  emitNoncopyableTypeTest(SGF, loc, subject, sourceType, targetType, trueBB,
+                          falseBB, rows[0].Count, ProfileCounter());
+
+  // Chain failure to the next case
+  SGF.B.setInsertionPoint(falseBB);
+  endSubjectBorrow();
+  failure(loc);
+
+  // Set up the success block.  If we diagnosed above, this is unreachable
+  SGF.B.setInsertionPoint(trueBB);
+  endSubjectBorrow();
+  if (wantsPayload) {
+    SGF.B.createUnreachable(loc);
+    return true;
+  }
+
+  // Leave the payload as `undef` since we bound nothing.
+  SILType payloadTy = SGF.getLoweredType(targetType).getAddressType();
+  ConsumableManagedValue payload = {
+      ManagedValue::forBorrowedAddressRValue(SILUndef::get(SGF.F, payloadTy)),
+      CastConsumptionKind::CopyOnSuccess};
+  // Recursively enumerate the specializations
+  handleCase(payload, specializedRows, failure);
+  assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+  return true;
+}
+
 /// Perform specialized dispatch for a sequence of IsPatterns.
 void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
                                       ConsumableManagedValue src,
                                       const SpecializationHandler &handleCase,
                                       const FailureHandler &failure) {
+  // Try to emit a noncopyable/noncopying dispatch
+  if (tryEmitNoncopyableIsDispatch(rows, src, handleCase, failure))
+    return;
+
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
   CanType targetType = getTargetType(rows[0]);
 

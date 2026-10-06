@@ -1825,7 +1825,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
 
   if (FuncType->getKind() != Node::Kind::FunctionType &&
       FuncType->getKind() != Node::Kind::NoEscapeFunctionType &&
-      FuncType->getKind() != Node::Kind::CalledOnceFunctionType)
+      FuncType->getKind() != Node::Kind::CalledOnceFunctionType &&
+      FuncType->getKind() != Node::Kind::CalledAtMostOnceFunctionType)
     return nullptr;
 
   unsigned FirstChildIdx = 0;
@@ -2508,8 +2509,13 @@ NodePointer Demangler::demangleImplFunctionType() {
     type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
                    *this);
 
-  if (nextIf('O'))
-    type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
+  if (nextIf('O')) {
+    if (nextIf('o'))
+      type->addChild(createNode(Node::Kind::ImplCalledAtMostOnceFunction),
+                     *this);
+    else
+      type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
+  }
 
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
@@ -4033,6 +4039,8 @@ NodePointer Demangler::demangleSpecialType() {
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
     case 'O':
+      if (nextIf('o'))
+        return popFunctionType(Node::Kind::CalledAtMostOnceFunctionType);
       return popFunctionType(Node::Kind::CalledOnceFunctionType);
     case 'g':
     case 'G':

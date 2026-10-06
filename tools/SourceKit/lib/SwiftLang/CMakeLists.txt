@@ -49,7 +49,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSymbolGraphGen
   swiftRefactoring
   # Clang dependencies.
-  clangIndex
+  clangUnifiedSymbolResolution
   clangFormat
   clangToolingCore
   clangFrontendTool

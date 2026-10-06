@@ -923,10 +923,7 @@ DECL_ATTR(diagnose, Diagnose,
   AllowMultipleAttributes | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   174)
 
-SIMPLE_DECL_ATTR(_hasHiddenStoredProperties, HasHiddenStoredProperties,
-  OnStruct,
-  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
-  175)
+// Unused '175': Used to be `@_hasHiddenStoredProperties`
 
 DECL_ATTR(com, COM,
   OnClass | OnProtocol,

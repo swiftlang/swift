@@ -21,7 +21,7 @@
 
 // expected-expansion@+13:63{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func simple(_ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func simple(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -36,7 +36,7 @@ void simple(int len, const void * __sized_by(len) __noescape p);
 
 // expected-expansion@+13:38{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func swiftAttr(_ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func swiftAttr(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -50,50 +50,62 @@ void simple(int len, const void * __sized_by(len) __noescape p);
 void swiftAttr(int len, const void *p) __attribute__((swift_attr(
     "@_SwiftifyImport(.sizedBy(pointer: .param(2), size: \"len\"), .nonescaping(pointer: .param(2)), spanAvailability: \"visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4\")")));
 
-// expected-expansion@+22:108{{
+// expected-expansion@+28:108{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func shared(_ p1: RawSpan, _ p2: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func shared(_ p1: RawSpan, _ p2: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p2.byteCount)!|}}
 //   expected-remark@4{{macro content: |    if p1.byteCount != len {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.byteCount)")|}}
-//   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _p1Ptr = p1.withUnsafeBytes {|}}
-//   expected-remark@8{{macro content: |        unsafe $0|}}
-//   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    defer {|}}
-//   expected-remark@11{{macro content: |        _fixLifetime(p1)|}}
+//   expected-remark@5{{macro content: |      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {|}}
+//   expected-remark@6{{macro content: |        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {|}}
+//   expected-remark@7{{macro content: |          fatalError("bounds check failure in \\(function): expected \\(expected) but got \\(actual)")|}}
+//   expected-remark@8{{macro content: |        }|}}
+//   expected-remark@9{{macro content: |        _fail("shared", expected, actual)|}}
+//   expected-remark@10{{macro content: |      }|}}
+//   expected-remark@11{{macro content: |      _boundsCheckFailure(len, p1.byteCount)|}}
 //   expected-remark@12{{macro content: |    }|}}
-//   expected-remark@13{{macro content: |    let _p2Ptr = p2.withUnsafeBytes {|}}
+//   expected-remark@13{{macro content: |    let _p1Ptr = p1.withUnsafeBytes {|}}
 //   expected-remark@14{{macro content: |        unsafe $0|}}
 //   expected-remark@15{{macro content: |    }|}}
 //   expected-remark@16{{macro content: |    defer {|}}
-//   expected-remark@17{{macro content: |        _fixLifetime(p2)|}}
+//   expected-remark@17{{macro content: |        _fixLifetime(p1)|}}
 //   expected-remark@18{{macro content: |    }|}}
-//   expected-remark@19{{macro content: |    return unsafe shared(len, _p1Ptr.baseAddress, _p2Ptr.baseAddress)|}}
-//   expected-remark@20{{macro content: |}|}}
+//   expected-remark@19{{macro content: |    let _p2Ptr = p2.withUnsafeBytes {|}}
+//   expected-remark@20{{macro content: |        unsafe $0|}}
+//   expected-remark@21{{macro content: |    }|}}
+//   expected-remark@22{{macro content: |    defer {|}}
+//   expected-remark@23{{macro content: |        _fixLifetime(p2)|}}
+//   expected-remark@24{{macro content: |    }|}}
+//   expected-remark@25{{macro content: |    return unsafe shared(len, _p1Ptr.baseAddress, _p2Ptr.baseAddress)|}}
+//   expected-remark@26{{macro content: |}|}}
 // }}
 void shared(int len, const void * __sized_by(len) __noescape p1, const void * __sized_by(len) __noescape p2);
 
-// expected-expansion@+15:89{{
+// expected-expansion@+21:89{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    if p.byteCount != (len - offset) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\((len - offset)) but got \\(p.byteCount)")|}}
-//   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
-//   expected-remark@7{{macro content: |        unsafe $0|}}
-//   expected-remark@8{{macro content: |    }|}}
-//   expected-remark@9{{macro content: |    defer {|}}
-//   expected-remark@10{{macro content: |        _fixLifetime(p)|}}
+//   expected-remark@4{{macro content: |      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {|}}
+//   expected-remark@5{{macro content: |        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {|}}
+//   expected-remark@6{{macro content: |          fatalError("bounds check failure in \\(function): expected \\(expected) but got \\(actual)")|}}
+//   expected-remark@7{{macro content: |        }|}}
+//   expected-remark@8{{macro content: |        _fail("complexExpr", expected, actual)|}}
+//   expected-remark@9{{macro content: |      }|}}
+//   expected-remark@10{{macro content: |      _boundsCheckFailure((len - offset), p.byteCount)|}}
 //   expected-remark@11{{macro content: |    }|}}
-//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress)|}}
-//   expected-remark@13{{macro content: |}|}}
+//   expected-remark@12{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
+//   expected-remark@13{{macro content: |        unsafe $0|}}
+//   expected-remark@14{{macro content: |    }|}}
+//   expected-remark@15{{macro content: |    defer {|}}
+//   expected-remark@16{{macro content: |        _fixLifetime(p)|}}
+//   expected-remark@17{{macro content: |    }|}}
+//   expected-remark@18{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress)|}}
+//   expected-remark@19{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, const void * __sized_by(len - offset) __noescape p);
 
 // expected-expansion@+13:90{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullUnspecified(_ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullUnspecified(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -108,7 +120,7 @@ void nullUnspecified(int len, const void * __sized_by(len) __noescape _Null_unsp
 
 // expected-expansion@+13:73{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nonnull(_ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nonnull(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -123,7 +135,7 @@ void nonnull(int len, const void * __sized_by(len) __noescape _Nonnull p);
 
 // expected-expansion@+13:75{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullable(_ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullable(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -138,7 +150,7 @@ void nullable(int len, const void * __sized_by(len) __noescape _Nullable p);
 
 // expected-expansion@+6:71{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {|}}
 //   expected-remark@3{{macro content: |    return unsafe UnsafeRawBufferPointer(start: unsafe returnPointer(len), count: Int(len))|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -147,7 +159,7 @@ const void * __sized_by(len) __noescape _Nonnull returnPointer(int len);
 typedef struct foo opaque_t;
 // expected-expansion@+13:61{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func opaque(_ p: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func opaque(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -162,7 +174,7 @@ void opaque(int len, opaque_t * __sized_by(len) __noescape p);
 
 // expected-expansion@+13:41{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let _bytesized_param0 = CInt(exactly: _bytesized_param1.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let __bytesized_param1Ptr = _bytesized_param1.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -177,7 +189,7 @@ void bytesized(int size, const uint8_t *__sized_by(size) __noescape);
 
 // expected-expansion@+13:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_charsized_param0: copy _charsized_param0) @_disfavoredOverload public func charsized(_ _charsized_param0: inout MutableRawSpan) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_charsized_param0: copy _charsized_param0) @_disfavoredOverload public func charsized(_ _charsized_param0: inout MutableRawSpan) {|}}
 //   expected-remark@3{{macro content: |    let _charsized_param1 = CInt(exactly: _charsized_param0.byteCount)!|}}
 //   expected-remark@4{{macro content: |    let __charsized_param0Ptr = _charsized_param0.withUnsafeMutableBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -199,7 +211,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: bde375302165d04691bbb612b91e2433944e192cba3443f545c010e74c894ab2
+// GENERATED-HASH: 715688a0a8852c406f2465d4f8ed38472786c8ab78336288a4185fbce45ac0b2
 import Test
 
 
@@ -209,7 +221,7 @@ func call_simple(_ len: CInt, _ p: UnsafeRawPointer!) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_simple(_ p: RawSpan) {
   return simple(p)
 }
 
@@ -218,7 +230,7 @@ func call_swiftAttr(_ len: CInt, _ p: UnsafeRawPointer!) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_swiftAttr(_ p: RawSpan) {
   return swiftAttr(p)
 }
 
@@ -227,7 +239,7 @@ func call_shared(_ len: CInt, _ p1: UnsafeRawPointer!, _ p2: UnsafeRawPointer!) 
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: RawSpan, _ p2: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_shared(_ p1: RawSpan, _ p2: RawSpan) {
   return shared(p1, p2)
 }
 
@@ -236,7 +248,7 @@ func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeRawPointer!) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) {
   return complexExpr(len, offset, p)
 }
 
@@ -245,7 +257,7 @@ func call_nullUnspecified(_ len: CInt, _ p: UnsafeRawPointer!) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_nullUnspecified(_ p: RawSpan) {
   return nullUnspecified(p)
 }
 
@@ -254,7 +266,7 @@ func call_nonnull(_ len: CInt, _ p: UnsafeRawPointer) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_nonnull(_ p: RawSpan) {
   return nonnull(p)
 }
 
@@ -263,7 +275,7 @@ func call_nullable(_ len: CInt, _ p: UnsafeRawPointer?) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_nullable(_ p: RawSpan) {
   return nullable(p)
 }
 
@@ -271,7 +283,7 @@ func call_returnPointer(_ len: CInt) -> UnsafeRawPointer {
   return unsafe returnPointer(len)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {
   return unsafe returnPointer(len)
 }
 
@@ -280,7 +292,7 @@ func call_opaque(_ len: CInt, _ p: OpaquePointer!) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ p: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_opaque(_ p: RawSpan) {
   return opaque(p)
 }
 
@@ -289,7 +301,7 @@ func call_bytesized(_ size: CInt, _ _bytesized_param1: UnsafePointer<UInt8>!) {
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ _bytesized_param1: RawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_bytesized(_ _bytesized_param1: RawSpan) {
   return bytesized(_bytesized_param1)
 }
 
@@ -299,7 +311,7 @@ func call_charsized(_ _charsized_param0: UnsafeMutablePointer<CChar>!, _ size: C
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(_charsized_param0: copy _charsized_param0)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ _charsized_param0: inout MutableRawSpan) {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func call_charsized(_ _charsized_param0: inout MutableRawSpan) {
   return charsized(&_charsized_param0)
 }
 

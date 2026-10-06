@@ -1389,9 +1389,10 @@ protected:
   OwnershipForwardingSingleValueInstruction(SILInstructionKind kind,
                                             SILDebugLocation debugLoc,
                                             SILType ty,
-                                            ValueOwnershipKind ownershipKind)
+                                            ValueOwnershipKind ownershipKind,
+                                            bool preservesOwnership = true)
       : SingleValueInstruction(kind, debugLoc, ty),
-        ForwardingInstruction(kind, ownershipKind) {
+        ForwardingInstruction(kind, ownershipKind, preservesOwnership) {
     assert(classof(kind) && "classof missing new subclass?!");
   }
 
@@ -3424,7 +3425,7 @@ private:
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
          OnStackKind onStack, StackAllocationIsNested_t isNested,
-         bool isCalledOnce,
+         std::optional<ExecutionSemantics> executionSemantics,
          std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt);
 
 public:
@@ -3442,10 +3443,16 @@ public:
     return getFunctionType()->getIsolation();
   }
 
-  bool isCalledOnce() const {
-    return getFunctionType()->isCalledOnce();
+  std::optional<ExecutionSemantics> getExecutionSemantics() const {
+    return getFunctionType()->getExecutionSemantics();
   }
-  
+
+  /// Returns true if the resulting closure can be called at most once. See
+  /// `SILFunctionType::hasCalledAtMostOnceSemantics()`.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getFunctionType()->hasCalledAtMostOnceSemantics();
+  }
+
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
@@ -3483,6 +3490,8 @@ class BeginApplyInst final
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
           InitialTrailingObjects<Operand, SILLocation>> {
+  bool IsUnresolved;
+
   friend SILBuilder;
 
   template <class, class...>
@@ -3501,7 +3510,8 @@ class BeginApplyInst final
                  std::optional<ArrayRef<SILLocation>> argLocs,
                  ApplyOptions options,
                  const GenericSpecializationInformation *specializationInfo,
-                 std::optional<ApplyIsolationCrossing> isolationCrossing);
+                 std::optional<ApplyIsolationCrossing> isolationCrossing,
+                 bool isUnresolved);
 
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue callee,
@@ -3511,7 +3521,8 @@ class BeginApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
-         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt,
+         bool isUnresolved = false);
 
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
@@ -3548,6 +3559,13 @@ public:
       SmallVectorImpl<Operand *> &endApplyInsts,
       SmallVectorImpl<Operand *> &abortApplyInsts,
       SmallVectorImpl<Operand *> *endBorrowInsts = nullptr) const;
+      
+  /// True if the `end_apply` and/or `abort_apply` resumptions for this
+  /// instruction are not yet in their final place. This should only be possible
+  /// in raw SILGen output that has not had lifetime resolution run on it yet.
+  bool isUnresolved() const { return IsUnresolved; }
+  
+  void setUnresolved(bool unresolved) { IsUnresolved = unresolved; }
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
@@ -5303,14 +5321,15 @@ public:
 class BeginAccessInst
     : public BeginAccessBase<UnaryInstructionBase<SILInstructionKind::BeginAccessInst,
                                   SingleValueInstruction>> {
+  bool IsUnresolved;
   friend class SILBuilder;
 
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
                   SILAccessKind accessKind, SILAccessEnforcement enforcement,
-                  bool noNestedConflict, bool fromBuiltin)
+                  bool noNestedConflict, bool fromBuiltin,
+                  bool unresolved)
       : BeginAccessBase(loc, accessKind, enforcement, noNestedConflict,
-        fromBuiltin, lvalue, lvalue->getType()) {
-
+        fromBuiltin, lvalue, lvalue->getType()), IsUnresolved(unresolved) {
     static_assert(unsigned(SILAccessKind::Last) < (1 << 3),
                   "reserve sufficient bits for serialized SIL");
     static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 3),
@@ -5334,6 +5353,13 @@ public:
 
   /// Find all the associated end_access instructions for this begin_access.
   EndAccessRange getEndAccesses() const;
+  
+  /// True if the `end_access` markers for this instruction are not yet in
+  /// their final place. This should only be possible in raw SILGen output
+  /// that has not had lifetime resolution run on it yet.
+  bool isUnresolved() const { return IsUnresolved; }
+  
+  void setUnresolved(bool unresolved) { IsUnresolved = unresolved; }
 };
 
 /// Represents the end of an access scope.
@@ -6837,16 +6863,15 @@ class UnconditionalCheckedCastInst final
   friend SILBuilder;
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc,
-                               CheckedCastInstOptions Options,
-                               SILValue Operand,
+                               CheckedCastInstOptions Options, SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestLoweredTy, CanType DestFormalTy,
-                               ValueOwnershipKind forwardingOwnershipKind)
+                               ValueOwnershipKind forwardingOwnershipKind,
+                               bool preservesOwnership)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestLoweredTy,
-            forwardingOwnershipKind),
-        DestFormalTy(DestFormalTy),
-        Options(Options) {}
+            forwardingOwnershipKind, preservesOwnership),
+        DestFormalTy(DestFormalTy), Options(Options) {}
 
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, CheckedCastInstOptions options,
@@ -9269,6 +9294,34 @@ class ExtendLifetimeInst
 
   ExtendLifetimeInst(SILDebugLocation loc, SILValue operand)
       : UnaryInstructionBase(loc, operand) {}
+};
+
+/// Marks a value as needing a diagnostic of the given kind to be emitted for it
+/// by a later diagnostic pass. Produces no result and does not consume its
+/// operand. Only valid in Raw SIL.
+class DiagnoseInst
+    : public UnaryInstructionBase<SILInstructionKind::DiagnoseInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+public:
+  // The raw values must match Instruction.DiagnoseInst.DiagnoseKind in SwiftCompilerSources
+  enum class DiagnoseKind : unsigned {
+    /// Sentinel for an unrecognized attribute string.
+    Invalid = 0,
+
+    /// The marked value is a copy that is not permitted by the language model.
+    UnpermittedCopy,
+  };
+
+private:
+  DiagnoseKind kind;
+
+  DiagnoseInst(SILDebugLocation loc, SILValue operand, DiagnoseKind kind)
+      : UnaryInstructionBase(loc, operand), kind(kind) {}
+
+public:
+  DiagnoseKind getKind() const { return kind; }
 };
 
 /// An unsafe conversion in between ownership kinds.

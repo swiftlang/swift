@@ -287,13 +287,6 @@ function(_add_target_variant_c_compile_flags)
     else()
       list(APPEND result "-g0")
     endif()
-
-    # Split DWARF is incompatible with RISC-V linker relaxation (-mrelax),
-    # which clang enables by default for RISC-V targets. Override any
-    # inherited -gsplit-dwarf from the parent (LLVM) build.
-    if("${CFLAGS_ARCH}" MATCHES "^riscv")
-      list(APPEND result "-gno-split-dwarf")
-    endif()
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
@@ -1050,9 +1043,9 @@ function(add_swift_target_library_single target name)
   # FIXME: swiftDarwin and swiftDifferentiationUnittest currently trip an assertion in SymbolGraphGen
   if (SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS AND NOT ${name} STREQUAL "swiftDarwin"
       AND NOT ${name} STREQUAL "swiftDifferentiationUnittest")
-    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend;-emit-symbol-graph")
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-emit-symbol-graph")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-         "-Xfrontend;-emit-symbol-graph-dir;-Xfrontend;${out_lib_dir}/symbol-graph/${VARIANT_NAME}")
+         "-emit-symbol-graph-dir;${out_lib_dir}/symbol-graph/${VARIANT_NAME}")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
          "-Xfrontend;-symbol-graph-allow-availability-platforms;-Xfrontend;Swift")
   endif()

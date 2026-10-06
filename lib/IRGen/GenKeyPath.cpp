@@ -1995,8 +1995,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   // built the same way here as it is there.
   if (!swiftImmortalRefCount) {
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-      // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
-      // (all-ones on both 32-bit and 64-bit).
+      // = HeapObject.staticRefCount (all ones)
       swiftImmortalRefCount = llvm::ConstantInt::getAllOnesValue(IntPtrTy);
     } else {
       swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(

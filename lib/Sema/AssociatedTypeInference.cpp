@@ -2281,8 +2281,8 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
       return funcType->isNoEscape();
     case TypeAdjustment::NonsendableToSendable:
       return !funcType->isSendable();
-    case TypeAdjustment::CalledOnceToPlain:
-      return funcType->isCalledOnce();
+    case TypeAdjustment::ExecutionSemanticsToPlain:
+      return funcType->hasCalledAtMostOnceSemantics();
     }
   };
   auto adjust = [=](const ASTExtInfo &info) -> ASTExtInfo {
@@ -2291,8 +2291,8 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
       return info.withNoEscape(false);
     case TypeAdjustment::NonsendableToSendable:
       return info.withSendable(true);
-    case TypeAdjustment::CalledOnceToPlain:
-      return info.withCalledOnce(false);
+    case TypeAdjustment::ExecutionSemanticsToPlain:
+      return info.withExecutionSemantics(std::nullopt);
     }
   };
 
@@ -2457,10 +2457,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       Type inferredType =
         adjustInferredAssociatedType(TypeAdjustment::NoescapeToEscaping,
                                      secondType, noescapeToEscaping);
-      bool calledOnceToPlain = false;
-      inferredType =
-        adjustInferredAssociatedType(TypeAdjustment::CalledOnceToPlain,
-                                     inferredType, calledOnceToPlain);
+      bool executionSemanticsToPlain = false;
+      inferredType = adjustInferredAssociatedType(
+          TypeAdjustment::ExecutionSemanticsToPlain, inferredType,
+          executionSemanticsToPlain);
       if (!inferredType->isMaterializable())
         return false;
 

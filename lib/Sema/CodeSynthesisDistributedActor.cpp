@@ -39,6 +39,17 @@ using namespace swift;
 /*********************** DISTRIBUTED THUNK SYNTHESIS **************************/
 /******************************************************************************/
 
+static Expr *createDistributedTargetRef(ASTContext &C, Expr *base,
+                                        FuncDecl *func) {
+  // A distributed static func is incorrect, but we diagnose this elsewhere;
+  // just don't form an incorrect member ref here
+  if (!func->isInstanceMember())
+    return UnresolvedDotExpr::createImplicit(C, base, func->getBaseName());
+
+  return new (C) MemberRefExpr(base, SourceLoc(), ConcreteDeclRef(func),
+                               DeclNameLoc(), /*Implicit=*/true);
+}
+
 static void forwardParameters(AbstractFunctionDecl *afd,
                               SmallVectorImpl<Expr*> &forwardingParams) {
   auto &C = afd->getASTContext();
@@ -166,10 +177,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     // -- forward arguments
     SmallVector<Expr*, 4> forwardingParams;
     forwardParameters(thunk, forwardingParams);
-    auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
-    auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
-    auto funcDeclRef =
-        UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+    auto forwardingArgList = ArgumentList::forImplicitCallTo(
+        DeclNameRef(func->getName()), forwardingParams, C);
+    auto funcDeclRef = createDistributedTargetRef(C, selfRefExpr, func);
 
     Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
     localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
@@ -774,11 +784,9 @@ deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
     } else {
       SmallVector<Expr *, 4> forwardingParams;
       forwardParameters(thunk, forwardingParams);
-      auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
       auto forwardingArgList = ArgumentList::forImplicitCallTo(
-          funcRef->getName(), forwardingParams, C);
-      auto funcDeclRef =
-          UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+          DeclNameRef(func->getName()), forwardingParams, C);
+      auto funcDeclRef = createDistributedTargetRef(C, selfRefExpr, func);
 
       Expr *localFuncCall =
           CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
@@ -1160,10 +1168,8 @@ static IfStmt *buildEmbeddedDispatchBranch(
                                      implicit)));
   }
 
-  auto *selfDotFunc =
-      UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(selfDecl, dloc, implicit),
-          funcDecl->getBaseName());
+  auto *selfDotFunc = createDistributedTargetRef(
+      C, new (C) DeclRefExpr(selfDecl, dloc, implicit), funcDecl);
   Expr *funcCall = CallExpr::createImplicit(
       C, selfDotFunc,
       ArgumentList::createImplicit(C, callArgs));

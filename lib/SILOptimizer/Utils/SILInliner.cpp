@@ -1082,12 +1082,6 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   return InlinedScope;
 }
 
-template <typename... T, typename... U>
-static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-                     U &&...args) {
-  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
 //===----------------------------------------------------------------------===//
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
@@ -1130,6 +1124,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExtendLifetimeInst:
+  case SILInstructionKind::DiagnoseInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:

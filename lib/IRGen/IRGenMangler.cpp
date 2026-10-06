@@ -193,6 +193,30 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   });
 }
 
+/// Mangle a protocol name for reflection records built with
+/// addNominalRef(), the protocol's own field descriptor, and the
+/// protocol of an associated type
+/// descriptor. EmptyStructMetadataBuilder also uses addNominalRef(),
+/// but only for structs and enums, never protocols.
+SymbolicMangling
+IRGenMangler::mangleBareProtocol(IRGenModule &IGM,
+                                 const ProtocolDecl *Decl) {
+  // Keep @objc protocols textual: references to them match this name
+  // or skip it.
+  if (Decl->isObjC()) {
+    beginMangling();
+    appendAnyGenericType(Decl);
+    return {finalize(), {}};
+  }
+
+  // Refer to Swift protocols symbolically. The textual name of a private
+  // protocol contains a private discriminator, which reflection cannot
+  // recover from the protocol descriptor, so the names would never match.
+  return withSymbolicReferences(IGM, [&]{
+    appendAnyGenericType(Decl);
+  });
+}
+
 SymbolicMangling
 IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
                                              CanType type) {

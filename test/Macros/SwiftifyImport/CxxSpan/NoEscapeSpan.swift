@@ -33,7 +33,7 @@ public func myFunc4(_ span: MutableSpanOfInt, _ secondSpan: MutableSpanOfInt) {
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ span: Span<CInt>, _ secondSpan: SpanOfInt) {
     return unsafe myFunc(SpanOfInt(span), secondSpan)
 }
@@ -41,7 +41,7 @@ public func myFunc(_ span: Span<CInt>, _ secondSpan: SpanOfInt) {
 @__swiftmacro_4test7myFunc215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(span: copy span) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(span: copy span) @_disfavoredOverload
 public func myFunc2(_ span: inout MutableSpan<CInt>, _ secondSpan: MutableSpanOfInt) {
     return span.withUnsafeMutableBufferPointer { _spanPtr in
       return unsafe myFunc2(MutableSpanOfInt(_spanPtr), secondSpan)
@@ -51,7 +51,7 @@ public func myFunc2(_ span: inout MutableSpan<CInt>, _ secondSpan: MutableSpanOf
 @__swiftmacro_4test7myFunc315_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(span: copy span) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(span: copy span) @_disfavoredOverload
 public func myFunc3(_ span: inout MutableSpan<CInt>, _ secondSpan: Span<CInt>) {
     return span.withUnsafeMutableBufferPointer { _spanPtr in
       return unsafe myFunc3(MutableSpanOfInt(_spanPtr), SpanOfInt(secondSpan))
@@ -61,7 +61,7 @@ public func myFunc3(_ span: inout MutableSpan<CInt>, _ secondSpan: Span<CInt>) {
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(span: copy span) @_lifetime(secondSpan: copy secondSpan) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(span: copy span) @_lifetime(secondSpan: copy secondSpan) @_disfavoredOverload
 public func myFunc4(_ span: inout MutableSpan<CInt>, _ secondSpan: inout MutableSpan<CInt>) {
     return secondSpan.withUnsafeMutableBufferPointer { _secondSpanPtr in
       return span.withUnsafeMutableBufferPointer { _spanPtr in

@@ -684,6 +684,8 @@ static StringRef getDumpString(ExplicitSafety safety) {
 }
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
+  case ExecutionSemantics::AtMostOnce:
+    return "atMostOnce";
   case ExecutionSemantics::Once:
     return "once";
   }
@@ -5152,8 +5154,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Frozen, frozen)
   TRIVIAL_ATTR_PRINTER(GKInspectable, gk_inspectable)
   TRIVIAL_ATTR_PRINTER(GlobalActor, global_actor)
-  TRIVIAL_ATTR_PRINTER(HasHiddenStoredProperties,
-                       has_hidden_stored_properties)
   TRIVIAL_ATTR_PRINTER(HasInitialValue, has_initial_value)
   TRIVIAL_ATTR_PRINTER(HasMissingDesignatedInitializers,
                        has_missing_designated_initializers)
@@ -6795,7 +6795,8 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
-        printFlag(T->isCalledOnce(), "called_once");
+        if (auto semantics = T->getExecutionSemantics())
+          printField(*semantics, Label::always("called"));
         printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {

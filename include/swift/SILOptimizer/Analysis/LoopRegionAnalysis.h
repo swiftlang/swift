@@ -829,12 +829,6 @@ template <> struct DenseMapInfo<swift::LoopRegion::SuccessorID> {
 
   static_assert(sizeof(Type) == sizeof(unsigned),
                 "Expected SuccessorID to be the size of an unsigned!");
-  static inline Type getEmptyKey() {
-    return Type(DenseMapInfo<unsigned>::getEmptyKey());
-  }
-  static inline Type getTombstoneKey() {
-    return Type(DenseMapInfo<unsigned>::getTombstoneKey());
-  }
   static unsigned getHashValue(const swift::LoopRegion::SuccessorID Val) {
     return DenseMapInfo<unsigned>::getHashValue(Val.asInt());
   }

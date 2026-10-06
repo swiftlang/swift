@@ -57,8 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1030; // unconditional_checked_cast_addr copy flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1036; // remove legacy hidden type layout block
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -281,6 +280,15 @@ enum class DifferentiabilityKind : uint8_t {
   Linear,
 };
 using DifferentiabilityKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class FunctionTypeExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce,
+  Once,
+};
+using FunctionTypeExecutionSemanticsField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing the
 // module version.
@@ -868,12 +876,6 @@ enum BlockID {
   /// \sa decl_member_tables_block
   DECL_MEMBER_TABLES_BLOCK_ID,
 
-  /// The hidden-type layouts block, which records layout information
-  /// for stored property that is hidden from module clients.
-  ///
-  /// \sa hidden_type_layouts_block
-  HIDDEN_TYPE_LAYOUTS_BLOCK_ID,
-
   /// The module documentation container block, which contains all other
   /// documentation blocks.
   ///
@@ -1413,7 +1415,7 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
-    BCFixed<1>,                      // called once
+    FunctionTypeExecutionSemanticsField, // execution semantics
     BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
@@ -1522,7 +1524,7 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result,
-    BCFixed<1>,                      // called once
+    FunctionTypeExecutionSemanticsField, // execution semantics
     BCFixed<1>,                      // coroutine?
     GenericSignatureIDField          // generic signature
 
@@ -1540,7 +1542,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
-    BCFixed<1>,                         // @called(once)?
+    FunctionTypeExecutionSemanticsField, // execution semantics
     SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
@@ -1642,11 +1644,6 @@ namespace decls_block {
     INTEGER_TYPE,
     BCFixed<1>,   // is negative?
     BCBlob        // integer value text
-  );
-
-  TYPE_LAYOUT(HiddenTypeLayout,
-    HIDDEN_TYPE,
-    BCBlob        // mangled name of the original (hidden) type
   );
 
   using TypeAliasLayout = BCRecordLayout<
@@ -3007,23 +3004,6 @@ namespace decl_member_tables_block {
     DECL_MEMBERS, // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // maps from DeclIDs to DeclID vectors
-  >;
-}
-
-/// \sa HIDDEN_TYPE_LAYOUTS_BLOCK_ID
-namespace hidden_type_layouts_block {
-  enum RecordKind {
-    HIDDEN_TYPE_LAYOUT = 1,
-  };
-
-  using HiddenTypeLayoutLayout = BCRecordLayout<
-    HIDDEN_TYPE_LAYOUT,
-    BCVBR<32>,    // size (bytes)
-    BCVBR<8>,     // alignment (bytes)
-    BCVBR<32>,    // stride (bytes)
-    BCFixed<1>,   // bitwiseCopyable (always 1 in V1)
-    BCFixed<1>,   // opaque (always 0 in V1)
-    BCBlob        // mangled name of the hidden type
   >;
 }
 

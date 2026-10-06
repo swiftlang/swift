@@ -1401,6 +1401,10 @@ ERROR(nonfinal_operator_in_class,none,
 ERROR(foreign_reference_subclass_must_be_final,none,
       "%kind0 must be 'final' because it subclasses a C++ foreign reference type",
       (const ValueDecl *))
+ERROR(foreign_reference_subclass_init_cannot_fail,none,
+      "%kind0 cannot be %select{throwing|failable}1 because it is declared in a "
+      "class that subclasses a C++ foreign reference type",
+      (const ValueDecl *, bool))
 ERROR(operator_in_unrelated_type,none,
       "member operator %2%select{| of protocol %0}1 must have at least one "
       "argument of type %select{%0|'Self'}1",
@@ -2283,28 +2287,28 @@ ERROR(cxx_pure_virtual_unsupported,none,
 NOTE(cxx_pure_virtual_declared_here,none,
      "%0 declared pure virtual here",
      (const clang::NamedDecl *))
-ERROR(cxx_virtual_key_function_unsupported,none,
-      "%kind0 cannot implement C++ method %1 because it is the first "
-      "non-inline virtual method of C++ class %2",
-      (ValueDecl *, const clang::NamedDecl *, const clang::NamedDecl *))
-NOTE(cxx_virtual_key_function_workaround,none,
-     "to implement %0 in Swift, declare another non-inline virtual method "
-     "before it and define that method in C++",
-     (const clang::NamedDecl *))
-ERROR(cxx_virtual_override_unsupported,none,
-      "%kind0 cannot implement C++ method %1 because it overrides a "
-      "virtual method %select{in a class hierarchy that uses multiple "
-      "inheritance|in a class hierarchy that has a virtual base|and changes "
-      "its return type}2",
-      (ValueDecl *, const clang::NamedDecl *, unsigned))
 ERROR(cxx_mutating_mismatch,none,
       "%kind0 should%select{|| not}1 be 'mutating' to match "
       "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
       (ValueDecl *, unsigned, const ValueDecl *))
-ERROR(cxx_references_unsupported,none,
-      "%kind0 cannot implement C++ function '%1' because reference "
+ERROR(cxx_param_ownership_unsupported,none,
+      "%kindonly0 cannot be marked '@cxx' because parameter %1 of non-trivial "
+      "C++ class type is '%select{borrowing|consuming}2'",
+      (const AbstractFunctionDecl *, const ParamDecl *, unsigned))
+ERROR(cxx_rvalue_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because rvalue reference "
       "parameters and return types are not yet supported",
       (ValueDecl *, StringRef))
+ERROR(cxx_references_require_unsafe,none,
+      "%kind0 must be marked '@unsafe' to implement C++ function '%1'",
+      (ValueDecl *, StringRef))
+NOTE(cxx_reference_param_aliasing,none,
+     "C++ callers may %select{modify %kind0 through another reference during "
+     "the call|violate exclusive access to 'inout' %kind0}1",
+     (ValueDecl *, bool))
+NOTE(cxx_reference_param_declared_here,none,
+     "%select{parameter|%1}0 declared as a C++ reference here",
+     (bool, const clang::NamedDecl *))
 
 // @used and @section
 ERROR(section_empty_name,none,
@@ -2678,18 +2682,19 @@ WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
 
-// @called(once)
-ERROR(called_once_cannot_be_used_with_borrowing,none,
-      "'@called(once)' cannot be used together with 'borrowing'", ())
-ERROR(called_once_function_type_mismatch,none,
-      "invalid conversion from '@called(once)' function of type %0 "
-      "to function type %1", (Type, Type))
+// @called
+ERROR(called_attr_cannot_be_used_with_borrowing,none,
+      "'@called(%0)' cannot be used together with 'borrowing'", (StringRef))
+ERROR(called_attr_function_type_mismatch,none,
+      "invalid conversion from '@called(%0)' function of type %1 "
+      "to function type %2", (StringRef, Type, Type))
 ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
       "'CalledAttribute' is enabled",
       ())
 ERROR(sending_capture_decl_requires_called_once,none,
-      "'sending' capture may only be declared in a '@called(once)' closure",
+      "'sending' capture may only be declared in a '@called(atMostOnce)' "
+      "closure",
       ())
 
 // Alignment attribute
@@ -7776,6 +7781,21 @@ ERROR(availability_escapable_generics_casting_only_version_newer, none,
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
+ERROR(availability_copyable_existential_casting_only_version_newer, none,
+      "runtime support for casting a non-'Copyable' existential "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_escapable_existential_casting_only_version_newer, none,
+      "runtime support for casting a non-'Escapable' existential "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_noncopyable_existential_casting_only_version_newer, none,
+      "runtime support for casting out of a non-'Copyable' existential "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
 ERROR(availability_typed_throws_only_version_newer, none,
       "runtime support for typed throws function types is only available in "
       "%0 %1 or newer",
@@ -8809,6 +8829,14 @@ WARNING(swiftify_nullable_as_empty_span_param_missing, none,
         "retain the legacy Optional-propagating behavior for _Nullable "
         "__counted_by and __sized_by pointers", ())
 
+ERROR(derivation_macro_could_not_be_loaded, none,
+      "derivation macro %0 for witness %1 could not be loaded from %2",
+      (Identifier, DeclName, Identifier))
+
+ERROR(failed_to_expand_derived_conformance, none,
+      "failed to expand derived conformance to %0; " SWIFT_BUG_REPORT_MESSAGE,
+      (Type))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
@@ -9325,7 +9353,7 @@ ERROR(inline_array_type_backwards,none,
 //===----------------------------------------------------------------------===//
 
 GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
-              "attribute %0 cannot be used in Embedded Swift",
+              "attribute %0 in Embedded Swift requires a 64-bit target",
               (ReferenceOwnership))
 
 GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,

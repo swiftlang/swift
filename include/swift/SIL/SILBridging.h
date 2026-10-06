@@ -125,7 +125,10 @@ struct BridgedResultInfo {
     : type(type), convention(conv), options(options) {}
   BRIDGED_INLINE swift::SILResultInfo unbridged() const;
 
-  BRIDGED_INLINE BridgedCanType getReturnValueType(BridgedFunction f) const;
+  /// `ofFunctionType` must be the function type this result belongs to; its pattern
+  /// substitutions are applied to the result's interface type.
+  BRIDGED_INLINE BridgedCanType getReturnValueType(BridgedCanType ofFunctionType,
+                                                   BridgedFunction f) const;
 };
 
 struct OptionalBridgedResultInfo {
@@ -291,6 +294,7 @@ struct BridgedType {
   isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const;
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
   BRIDGED_INLINE bool isLoadable(BridgedFunction f) const;
+  BRIDGED_INLINE bool isABIAccessible(BridgedFunction f) const;
   BRIDGED_INLINE bool isReferenceCounted(BridgedFunction f) const;
   BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
@@ -329,6 +333,12 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
   getTupleElementLabel(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
+  getFunctionTypeWithRepresentation(
+      BridgedASTType::FunctionTypeRepresentation representation) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
+  getFunctionTypeWithCalleeConvention(
+      BridgedArgumentConvention convention) const;
   BRIDGED_INLINE BridgedArgumentConvention getCalleeConvention() const;
 
   BRIDGED_INLINE SwiftInt getNumPackElements() const;
@@ -570,6 +580,9 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
+  // The function's SIL stage: 0=Raw, 1=Canonical, 2=Lowered. This returns
+  // SwiftInt because BridgedContext::SILStage is declared later.
+  BRIDGED_INLINE SwiftInt getStage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionTypeInContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
@@ -613,6 +626,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedDeclObj decl) const;
+  BRIDGED_INLINE bool isEffectivelyExhaustiveEnumDecl(BridgedDeclObj decl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type, bool maximallyAbstracted) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
   getLoweredTypeWithAbstractionPattern(BridgedCanType type) const;
@@ -743,6 +757,7 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE BridgedSILDebugVariable &operator=(const BridgedSILDebugVariable &rhs);
   BRIDGED_INLINE swift::SILDebugVariable unbridge() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getScope() const;
+  BRIDGED_INLINE bool isLet() const;
 };
 
 struct BridgedInstruction {
@@ -884,6 +899,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool MoveValue_isLexical() const;
   BRIDGED_INLINE bool MoveValue_hasPointerEscape() const;
   BRIDGED_INLINE bool MoveValue_isFromVarDecl() const;
+  BRIDGED_INLINE bool MoveValue_getAllowDiagnostics() const;
 
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
@@ -917,16 +933,19 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ObjCProtocolInst_getProtocol() const;
   BRIDGED_INLINE SwiftInt ObjectInst_getNumBaseElements() const;
   BRIDGED_INLINE SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg() const;
-  BRIDGED_INLINE bool PartialApplyInst_isCalledOnce() const;
+  BRIDGED_INLINE BridgedOptionalExecutionSemantics
+  PartialApplyInst_getExecutionSemantics() const;
   BRIDGED_INLINE bool PartialApplyInst_isOnStack() const;
   BRIDGED_INLINE bool PartialApplyInst_hasUnknownResultIsolation() const;
   BRIDGED_INLINE bool PartialApplyInst_isStackAllocationNested() const;
   BRIDGED_INLINE void PartialApplyInst_setStackAllocationIsNested(bool) const;
   BRIDGED_INLINE bool AllocStackInst_hasDynamicLifetime() const;
+  BRIDGED_INLINE void AllocStackInst_setDynamicLifetime() const;
   BRIDGED_INLINE bool AllocStackInst_isFromVarDecl() const;
   BRIDGED_INLINE bool AllocStackInst_usesMoveableValueDebugInfo() const;
   BRIDGED_INLINE bool AllocStackInst_isLexical() const;
   BRIDGED_INLINE bool AllocBoxInst_hasDynamicLifetime() const;
+  BRIDGED_INLINE void AllocBoxInst_setDynamicLifetime() const;
   BRIDGED_INLINE bool AllocRefInstBase_isObjc() const;
   BRIDGED_INLINE bool AllocRefInstBase_canAllocOnStack() const;
   BRIDGED_INLINE bool AllocRefInstBase_isStackAllocationNested() const;
@@ -952,6 +971,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
   BRIDGED_INLINE void StoreInst_setStoreOwnership(SwiftInt rawOwnership) const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
+  BRIDGED_INLINE void AssignInst_setAssignOwnership(SwiftInt assignOwnership) const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
   BRIDGED_INLINE void MarkDependenceInstruction_resolveToNonEscaping() const;
   BRIDGED_INLINE void MarkDependenceInstruction_settleToEscaping() const;
@@ -966,12 +986,15 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE void CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const;
   BRIDGED_INLINE void CopyAddrInst_setIsInitializationOfDest(bool isInitializationOfDest) const;
+  BRIDGED_INLINE bool TupleAddrConstructorInst_isInitializationOfDest() const;
+  BRIDGED_INLINE void TupleAddrConstructorInst_setIsInitializationOfDest(bool isInitializationOfDest) const;
   BRIDGED_INLINE bool DeallocBoxInst_isDeadEnd() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE SwiftInt MarkUninitializedInst_getKind() const;
   BRIDGED_INLINE SwiftInt MarkUnresolvedNonCopyableValue_getCheckKind() const;
   BRIDGED_INLINE bool MarkUnresolvedNonCopyableValue_isStrict() const;
+  BRIDGED_INLINE SwiftInt Diagnose_getKind() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
   BRIDGED_INLINE void AllocRefInstBase_setIsStackAllocatable() const;
@@ -1243,13 +1266,11 @@ struct BridgedConstExprFunctionState {
   swift::ConstExprEvaluator * _Nonnull constantEvaluator;
   unsigned int * _Nonnull numEvaluatedSILInstructions;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  SWIFT_IMPORT_UNSAFE
   static BridgedConstExprFunctionState create();
 
-  BRIDGED_INLINE
   bool isConstantValue(BridgedValue value);
 
-  BRIDGED_INLINE
   void deinitialize();
 };
 
@@ -1485,8 +1506,8 @@ struct BridgedBuilder{
       BridgedValue fn, BridgedValueArray bridgedCapturedArgs,
       BridgedArgumentConvention calleeConvention,
       BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
-      bool isOnStack, bool isNested,
-      bool isCalledOnce,
+      bool isOnStack, bool isNested, bool hasExecutionSemantics,
+      swift::ExecutionSemantics executionSemantics,
       OptionalBridgedInstruction argLocsFrom) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
@@ -1518,6 +1539,8 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestructureTuple(BridgedValue str) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createProjectBox(BridgedValue box, SwiftInt fieldIdx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStore(BridgedValue src, BridgedValue dst,
+                                          SwiftInt ownership) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAssign(BridgedValue src, BridgedValue dst,
                                           SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStoreBorrow(BridgedValue src, BridgedValue dst) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createInitExistentialRef(BridgedValue instance,
@@ -1554,6 +1577,9 @@ struct BridgedBuilder{
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkUnresolvedNonCopyableValue(
     BridgedValue value, SwiftInt checkKind, bool isStrict) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDiagnose(
+    BridgedValue operand, SwiftInt kind) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndAccess(BridgedValue value) const;
 
@@ -1628,7 +1654,7 @@ struct BridgedContext {
   // Module
 
   BridgedOwnedString getModuleDescription() const;
-  BRIDGED_INLINE SILStage getSILStage() const;
+  BRIDGED_INLINE SILStage getStageFloor() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
   BRIDGED_INLINE bool usesOpaqueValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;
@@ -1698,7 +1724,7 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
-  static BRIDGED_INLINE void salvageDebugInfo(BridgedInstruction inst);
+  static void salvageDebugInfo(BridgedInstruction inst);
 
   // Sets
 

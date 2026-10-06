@@ -101,6 +101,7 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
   case clang::BuiltinType::BoundMember:
   case clang::BuiltinType::BuiltinFn:
   case clang::BuiltinType::IncompleteMatrixIdx:
+  case clang::BuiltinType::MetaInfo:
   case clang::BuiltinType::Overload:
   case clang::BuiltinType::PseudoObject:
   case clang::BuiltinType::UnknownAny:
@@ -192,6 +193,16 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+    return std::nullopt;
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+    return std::nullopt;
+
+    // SPIRV opaque builtin types that don't have Swift equivalents.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
     return std::nullopt;
   }
 
@@ -454,6 +465,16 @@ namespace {
           Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
           clang::SourceLocation());
       // FIXME: (?) HLSL types are not supported in Swift.
+      return Type();
+    }
+
+    ImportResult
+    VisitOverflowBehaviorType(const clang::OverflowBehaviorType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: handle OverflowBehaviorType.
       return Type();
     }
 
@@ -1057,9 +1078,10 @@ namespace {
     SUGAR_TYPE(Attributed)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(SubstTemplateTypeParm)
-    SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
+    SUGAR_TYPE(PredefinedSugar)
+    SUGAR_TYPE(LateParsedAttr)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
@@ -1801,9 +1823,6 @@ void swift::findSwiftAttributes(
       [&](clang::QualType type) -> clang::QualType {
     if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
       return MQT->isSugared() ? skipUnrelatedSugar(MQT->desugar()) : type;
-
-    if (auto *ET = dyn_cast<clang::ElaboratedType>(type))
-      return ET->isSugared() ? skipUnrelatedSugar(ET->desugar()) : type;
 
     return type;
   };
@@ -2931,8 +2950,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.
-  // TODO: support default arguments of constructors
-  // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       impl->isDefaultArgSafeToImport(param) &&
@@ -3095,9 +3112,6 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
   // Don't introduce a default argument for the first parameter of setters.
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
-
-  if (auto elaboratedTy = type->getAs<clang::ElaboratedType>())
-    type = elaboratedTy->desugar();
 
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {

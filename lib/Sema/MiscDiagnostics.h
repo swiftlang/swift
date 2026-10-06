@@ -160,6 +160,7 @@ namespace swift {
   struct DeferredDiag {
     SourceLoc loc;
     ZeroArgDiagnostic diag;
+
     DeferredDiag(SourceLoc loc, ZeroArgDiagnostic diag)
       : loc(loc), diag(diag) {}
 

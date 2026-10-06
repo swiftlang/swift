@@ -345,6 +345,34 @@ bb0(%0 : $UInt8):
   return %5 : $UInt8
 }
 
+sil @write_through_stored_raw_pointer : $@convention(thin) (@inout Builtin.RawPointer) -> () {
+[%0: noescape **, read v**]
+[global: read,write]
+}
+
+// The address is stored as a raw pointer to memory which is passed to the callee.
+// The callee's write through the loaded pointer is only covered by its global effects.
+// CHECK-LABEL:  @allocstack_address_stored_as_pointer
+// CHECK:        PAIR #4.
+// CHECK-NEXT:       %7 = apply %6(%3) : $@convention(thin) (@inout Builtin.RawPointer) -> ()
+// CHECK-NEXT:       %1 = alloc_stack $UInt8
+// CHECK-NEXT:     r=1,w=1
+sil @allocstack_address_stored_as_pointer : $@convention(thin) (UInt8) -> UInt8 {
+bb0(%0 : $UInt8):
+  specify_test "memory_effects"
+  %1 = alloc_stack $UInt8
+  store %0 to %1 : $*UInt8
+  %3 = alloc_stack $Builtin.RawPointer
+  %4 = address_to_pointer %1 : $*UInt8 to $Builtin.RawPointer
+  store %4 to %3 : $*Builtin.RawPointer
+  %6 = function_ref @write_through_stored_raw_pointer : $@convention(thin) (@inout Builtin.RawPointer) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@inout Builtin.RawPointer) -> ()
+  %8 = load %1 : $*UInt8
+  dealloc_stack %3 : $*Builtin.RawPointer
+  dealloc_stack %1 : $*UInt8
+  return %8 : $UInt8
+}
+
 // CHECK-LABEL:  @tryapply_allocstack_and_copyaddr
 // CHECK:        PAIR #2.
 // CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error any Error), normal bb1, error bb2

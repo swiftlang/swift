@@ -239,6 +239,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, ExtendLifetime)
+OPERAND_OWNERSHIP(InstantaneousUse, Diagnose)
 OPERAND_OWNERSHIP(InstantaneousUse, MergeIsolationRegion)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
@@ -282,7 +283,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // later), so treat the conversion conservatively as a non-consuming pointer
 // escape.
 //
-// A `@called(once)` function value is single-owner and move-only-checked,
+// A `@called(atMostOnce)` function value is single-owner and move-only-checked,
 // so pre-conversion value doesn't survive to be used again -- any further
 // use would already be diagnosed as a double consumption by the move-only
 // checker. Treat the conversion as an ordinary forwarding consume in that
@@ -291,7 +292,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // special-case this instruction.
 OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *i) {
-  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+  return i->getType().castTo<SILFunctionType>()->hasCalledAtMostOnceSemantics()
              ? OperandOwnership::ForwardingConsume
              : OperandOwnership::PointerEscape;
 }
@@ -660,6 +661,15 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
       return OperandOwnership::TrivialUse;
     }
 
+    if (i->hasCalledAtMostOnceSemantics()) {
+      auto argConv = ApplySite(i).getArgumentConvention(op);
+      // Borrowed non-Copyable captures aren't owned by the closure.
+      if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
+        return OperandOwnership::Borrow;
+      // ... the rest of the operands are consumed.
+      return OperandOwnership::ForwardingConsume;
+    }
+
     return OperandOwnership::Borrow;
   }
   // All non-trivial types should be captured.
@@ -734,11 +744,6 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
     return OperandOwnership::ForwardingConsume;
   }
   return OperandOwnership::UnownedInstantaneousUse;
-}
-
-template<SILInstructionKind Opc, typename Derived>
-static OperandOwnership
-visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, Derived> *mdi) {
 }
 
 OperandOwnership

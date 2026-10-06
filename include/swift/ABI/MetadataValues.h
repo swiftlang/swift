@@ -247,7 +247,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  
+
   /// True if values of this type can be passed by value when borrowed.
   /// If this bit is true, then borrows of the value are independent of the
   /// value's address, so a value can be passed in registers or memcpy'd
@@ -268,7 +268,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
                                    (isBB ? 0 : IsNonBitwiseBorrowable));
   }
-  
+
   /// True if values of this type can be copied.
   /// NOTE: This is NOT accurate for types that are conditionally Copyable.
   /// You may need to use `checkInvertibleRequirements`.
@@ -277,7 +277,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
                                    (isCopyable ? 0 : IsNonCopyable));
   }
-  
+
   /// True if values of this type are addressable-for-dependencies, meaning
   /// that values of this type should be passed indirectly to functions that
   /// produce lifetime-dependent values that could possibly contain pointers
@@ -835,7 +835,7 @@ public:
                                  ? IsConformanceOfProtocolMask
                                  : 0));
   }
-  
+
   ConformanceFlags withHasGlobalActorIsolation(
                                            bool hasGlobalActorIsolation) const {
     return ConformanceFlags((Value & ~HasGlobalActorIsolation)
@@ -1159,6 +1159,14 @@ struct TargetFunctionMetadataDifferentiabilityKind {
 using FunctionMetadataDifferentiabilityKind =
     TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
+/// Execution semantics for function type metadata.
+/// Duplicates `ExecutionSemantics` in AST/AttrKind.h, plus `None`.
+enum class FunctionMetadataExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce = 1,
+  Once = 2,
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -1308,7 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    IsCalledOnce = 0x00000020U,
+    // Values for the enumerated execution semantics. Reserved; the compiler
+    // doesn't emit them yet.
+    ExecutionSemanticsMask = 0x00000060U, // two bits
+    ExecutionSemanticsShift = 5,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1351,9 +1362,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withCalledOnce(bool newValue = true) const {
+  withExecutionSemantics(FunctionMetadataExecutionSemantics semantics) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~IsCalledOnce) | (newValue ? IsCalledOnce : 0));
+        (Data & ~ExecutionSemanticsMask) |
+        (int_type(semantics) << ExecutionSemanticsShift));
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1362,7 +1374,7 @@ public:
         (Data & ~InvertedProtocolMask) |
         (inverted.rawBits() << InvertedProtocolshift));
   }
-  
+
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1377,8 +1389,9 @@ public:
     return bool(Data & HasSendingResult);
   }
 
-  bool isCalledOnce() const {
-    return bool(Data & IsCalledOnce);
+  FunctionMetadataExecutionSemantics getExecutionSemantics() const {
+    return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
+                                              ExecutionSemanticsShift);
   }
 
   int_type getIntValue() const {
@@ -1662,7 +1675,7 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
-  
+
   /// Whether this raw layout type is bitwise borrowable.
   ///
   /// No raw layout types are yet, but should we change our mind about that in the future,
@@ -1712,6 +1725,34 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
 
   const uint16_t ProtocolDescriptor = 0xe909; // = 59657
+
+  /// Protocol witness table pointers in the runtime's conformance cache.
+  ///
+  /// Computed with ptrauth_string_discriminator("protocol_witness_table").
+  const uint16_t ProtocolWitnessTable = 0x22d0; // = 8912
+
+  /// The combined pointer/tag words stored in the two swift::SignedPointerUnion
+  /// fields of the runtime conformance cache's entries. Each field has its own
+  /// discriminator so a signed word from one cannot be substituted into the
+  /// other.
+  ///
+  /// Computed with
+  /// ptrauth_string_discriminator("conformance_cache_type_or_descriptor") and
+  /// ptrauth_string_discriminator("conformance_cache_proto_or_storage").
+  const uint16_t ConformanceCacheTypeOrDescriptor = 0xbe9b; // = 48795
+  const uint16_t ConformanceCacheProtoOrStorage = 0x06a2; // = 1698
+
+  /// The individual pointer fields of a conformance cache entry's extended
+  /// storage (used for global-actor-isolated conformances). Each field is
+  /// signed with its own discriminator.
+  ///
+  /// Computed with
+  /// ptrauth_string_discriminator("conformance_cache_storage_protocol"),
+  /// ptrauth_string_discriminator("conformance_cache_storage_global_actor_type")
+  /// and ptrauth_string_discriminator("conformance_cache_storage_next").
+  const uint16_t ConformanceCacheStorageProtocol = 0x2465; // = 9317
+  const uint16_t ConformanceCacheStorageGlobalActorType = 0x31dc; // = 12764
+  const uint16_t ConformanceCacheStorageNext = 0x5664; // = 22116
 
   // Type descriptors as arguments.
   const uint16_t OpaqueTypeDescriptor = 0xbdd1; // = 48593
@@ -1793,6 +1834,14 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
+
+  /// Task pointers in a future's wait queue: the queue head in the future
+  /// fragment, and the link to the next waiter in a task dependency record.
+  const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
+  const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
+
+  /// Result type metadata stored in a future task or task group.
+  const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946

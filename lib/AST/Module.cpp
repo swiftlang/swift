@@ -1826,8 +1826,8 @@ void SourceFile::getImplicitImportsForModuleInterface(
 
 void SourceFile::dumpSeparatelyImportedOverlays() const {
   for (auto &pair : separatelyImportedOverlays) {
-    auto &underlying = std::get<0>(pair);
-    auto &overlays = std::get<1>(pair);
+    auto &underlying = pair.first;
+    auto &overlays = pair.second;
 
     llvm::errs() << (void*)underlying << " ";
     underlying->dump(llvm::errs());
@@ -2318,43 +2318,6 @@ bool ModuleDecl::isExternallyConsumed() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Hidden-Type Layouts
-//===----------------------------------------------------------------------===//
-
-void ModuleDecl::recordHiddenTypeLayout(StringRef mangledName,
-                                        const AbstractTypeLayout &layout) {
-  auto result = HiddenTypeLayouts.try_emplace(mangledName, layout);
-  if (!result.second) {
-    ASSERT(result.first->second.size == layout.size &&
-           result.first->second.alignment == layout.alignment &&
-           result.first->second.stride == layout.stride &&
-           result.first->second.bitwiseCopyable == layout.bitwiseCopyable &&
-           result.first->second.isOpaque == layout.isOpaque &&
-           "conflicting hidden-type layouts for the same mangled name");
-  }
-}
-
-std::optional<AbstractTypeLayout>
-ModuleDecl::lookupHiddenTypeLayout(StringRef mangledName) const {
-  auto it = HiddenTypeLayouts.find(mangledName);
-  if (it == HiddenTypeLayouts.end())
-    return std::nullopt;
-  return it->second;
-}
-
-SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
-ModuleDecl::getSortedHiddenTypeLayouts() const {
-  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4> result;
-  result.reserve(HiddenTypeLayouts.size());
-  for (auto &entry : HiddenTypeLayouts)
-    result.emplace_back(entry.getKey(), entry.getValue());
-  llvm::sort(result, [](const auto &a, const auto &b) {
-    return a.first < b.first;
-  });
-  return result;
-}
-
-//===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
 
@@ -2451,7 +2414,7 @@ findDeclaredCrossImportOverlays(Identifier bystanderName,
 void ModuleDecl::getDeclaredCrossImportBystanders(
     SmallVectorImpl<Identifier> &otherModules) {
   for (auto &pair : declaredCrossImports)
-    otherModules.push_back(std::get<0>(pair));
+    otherModules.push_back(pair.first);
 }
 
 void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
@@ -2494,8 +2457,8 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
     }
 
     for (auto &pair: current->declaredCrossImports) {
-      Identifier &bystander = std::get<0>(pair);
-      for (auto *file: std::get<1>(pair)) {
+      Identifier &bystander = pair.first;
+      for (auto *file: pair.second) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
           addOverlay(overlay);
@@ -2514,9 +2477,9 @@ namespace {
                                      CrossImportMap modCrossImports) {
     auto ret = std::find_if(modCrossImports.begin(), modCrossImports.end(),
                             [&](CrossImportMap::iterator::value_type &pair) {
-      for (OverlayFile *file: std::get<1>(pair)) {
+      for (OverlayFile *file: pair.second) {
         ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
-            mod, SourceLoc(), std::get<0>(pair));
+            mod, SourceLoc(), pair.first);
         if (std::find(overlays.begin(), overlays.end(),
                       overlay->getName()) != overlays.end())
           return true;

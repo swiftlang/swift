@@ -10,6 +10,8 @@
 // RUN: %target-codesign %t/test-opt
 // RUN: %target-run %t/test-opt %t/%target-library-name(COM) | %FileCheck %s
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import ForeignCOM
 
@@ -84,6 +86,22 @@ func pattern(_ source: borrowing any IValue) -> Int32 {
   }
 }
 
+@inline(never)
+func missingPattern(_ source: borrowing any IValue) -> Bool {
+  switch source {
+  case is any IMissing: return true
+  default: return false
+  }
+}
+
+@inline(never)
+func boundPattern(_ source: borrowing any IValue) -> (any IProperty)? {
+  switch source {
+  case let property as any IProperty: return property
+  default: return nil
+  }
+}
+
 // Preserve the closed existential in Any; direct erasure currently opens the
 // interface and requires the separate opened-archetype metadata work.
 @inline(never)
@@ -129,6 +147,38 @@ exerciseCasts()
 checkDestruction()
 print("interface casts balanced")
 // CHECK: interface casts balanced
+
+func exerciseMissingPattern() {
+  let source = makeValue(42)
+  let queries = GetForeignCOMQueryInterfaceCalls()
+  let adds = GetForeignCOMAddRefCalls()
+  let releases = GetForeignCOMReleaseCalls()
+  precondition(!missingPattern(source))
+  precondition(GetForeignCOMQueryInterfaceCalls() == queries + 1)
+  // The switch may copy its scrutinee, but a failed pattern must leave
+  // those temporary references balanced and the source alive.
+  precondition(GetForeignCOMAddRefCalls() - adds ==
+               GetForeignCOMReleaseCalls() - releases)
+  precondition(GetForeignCOMReferenceCount() == 1)
+  precondition(source.value(0) == 42)
+}
+exerciseMissingPattern()
+checkDestruction()
+print("failed pattern balanced")
+// CHECK-NEXT: failed pattern balanced
+
+func exerciseBoundPattern() {
+  // The source temporary is destroyed before the bound interface is used.
+  let property = boundPattern(makeValue(42))!
+  precondition(GetForeignCOMReferenceCount() == 1)
+  precondition(GetForeignCOMDestructionCount() == 0)
+  precondition(property.value == 42)
+  precondition(GetForeignCOMQueryInterfaceCalls() == 1)
+}
+exerciseBoundPattern()
+checkDestruction()
+print("bound pattern balanced")
+// CHECK-NEXT: bound pattern balanced
 
 // Both interfaces are class-bound. A borrowed cast must not consume the
 // source reference, and the returned interface must remain independently owned.

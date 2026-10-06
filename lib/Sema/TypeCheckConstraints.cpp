@@ -1627,12 +1627,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   // Thus, right now, a move-only type is only a subtype of itself.
   // We also want to prevent conversions of a move-only type's metatype.
-  //
-  // Exception: under NoncopyableCasting, a noncopyable existential value
-  // may be cast to a concrete (non-existential, non-archetype) type, since
-  // the existential's erased dynamic type is exactly the kind of thing a
-  // runtime cast can meaningfully recover. (This does not apply to
-  // metatypes, handled by the getMetatypeInstanceType() checks above.)
+
+  // Certain `~Copyable` casts are supported under `NoncopyableCasting`
   bool isSupportedNoncopyableExistentialCast =
       dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
       fromType->isNoncopyable() && fromType->isExistentialType() &&
@@ -1643,10 +1639,14 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
        || toType->getMetatypeInstanceType()->isNoncopyable()))
     return CheckedCastKind::Unresolved;
 
-  // Check for a bridging conversion.
-  // Anything bridges to AnyObject.
-  if (toType->isAnyObject())
+  // Anything bridges to AnyObject
+  if (toType->isAnyObject()) {
+    if (!fromType->isEscapable()) {
+      // ... except some ~Escapable values that can't be boxed at all.
+      return CheckedCastKind::Unresolved;
+    }
     return CheckedCastKind::BridgingCoercion;
+  }
 
   if (isObjCBridgedTo(fromType, toType, dc)){
     return CheckedCastKind::BridgingCoercion;
@@ -1711,6 +1711,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       return failed();
     }
   }
+
+  // ISwiftObject can recover a native object that does not itself conform to
+  // the source interface. Its class, including a final class, is determined
+  // by the runtime query rather than by a Swift protocol conformance.
+  if (fromType->isCOMExistentialType() && toType->getClassOrBoundGenericClass())
+    return CheckedCastKind::ValueCast;
 
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
@@ -1861,7 +1867,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     }
   }
 
-  assert(!toType->isAny() && "casts to 'Any' should've been handled above");
+  // We've handled all valid casts to `Any` above, so ...
+  // In particular, neither `~Copyable` nor `~Escapable` values
+  // can go into `Any`.
+  if (toType->isAny())
+    return failed();
+
   assert(!toType->isAnyObject() &&
          "casts to 'AnyObject' should've been handled above");
 

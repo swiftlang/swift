@@ -16,7 +16,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/build/SwiftFoo6.swiftmodule -module-name SwiftFoo6 -I %t/cfoo -Xcc -fmodule-map-file=%t/cfoo/module.modulemap %t/SwiftFoo6.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/build/SwiftFoo7.swiftmodule -module-name SwiftFoo7 -I %t/cfoo -Xcc -fmodule-map-file=%t/cfoo/module.modulemap %t/SwiftFoo7.swift
 
-// RUN: %target-swift-frontend -scan-dependencies %t/client.swift -I %t/build -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import &> %t/output.txt
+// RUN: not %target-swift-frontend -scan-dependencies %t/client.swift -I %t/build -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import &> %t/output.txt
 // RUN: %FileCheck %s < %t/output.txt
 
 // CHECK: error: unable to resolve module dependency: 'CFoo'

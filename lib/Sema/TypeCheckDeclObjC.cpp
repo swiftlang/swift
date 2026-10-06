@@ -386,14 +386,37 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    // Swift inout parameters are not representable in Objective-C.
-    if (param->isInOut()) {
+    // Swift inout parameters are not representable in Objective-C or C. In
+    // C++, an inout parameter is representable as a mutable reference.
+    if (param->isInOut() && language != ForeignLanguage::Cxx) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                        AFD, getObjCDiagnosticAttrKind(Reason),
                        language)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
+      Reason.describe(AFD);
+
+      return false;
+    }
+
+    // The C++ ABI decides whether the callee owns a non-trivial class passed
+    // by value (it does not under Itanium, it does under Microsoft), so
+    // `borrowing` and `consuming` each contradict one ABI. Only the default
+    // ownership follows the ABI.
+    auto ownership = param->getValueOwnership();
+    if (language == ForeignLanguage::Cxx &&
+        (ownership == ValueOwnership::Shared ||
+         ownership == ValueOwnership::Owned) &&
+        importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
+      softenIfAccessNote(AFD, Reason.getAttr(),
+                         diags
+                             .diagnose(param->getStartLoc(),
+                                       diag::cxx_param_ownership_unsupported,
+                                       AFD, param,
+                                       ownership == ValueOwnership::Owned)
+                             .highlight(param->getSourceRange())
+                             .limitBehavior(behavior));
       Reason.describe(AFD);
 
       return false;
@@ -3370,79 +3393,6 @@ fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
   llvm_unreachable("unknown StaticSpellingKind");
 }
 
-/// The Itanium C++ ABI's key function for \p RD: its first out-of-line,
-/// non-pure virtual method, whose translation unit emits the class's vtable.
-/// TODO: Remove this once we can use clang to emit vtable and friends.
-static const clang::CXXMethodDecl *
-computeItaniumKeyFunction(const clang::CXXRecordDecl *RD) {
-  RD = RD->getDefinition();
-  if (!RD || !RD->isPolymorphic() || !RD->isExternallyVisible())
-    return nullptr;
-
-  // Template instantiations have no key function.
-  switch (RD->getTemplateSpecializationKind()) {
-  case clang::TSK_ImplicitInstantiation:
-  case clang::TSK_ExplicitInstantiationDeclaration:
-  case clang::TSK_ExplicitInstantiationDefinition:
-    return nullptr;
-  case clang::TSK_Undeclared:
-  case clang::TSK_ExplicitSpecialization:
-    break;
-  }
-
-  for (const clang::CXXMethodDecl *MD : RD->methods()) {
-    if (!MD->isVirtual() || MD->isPureVirtual() || MD->isImplicit() ||
-        !MD->isUserProvided())
-      continue;
-    if (MD->isInlineSpecified() || MD->isConstexpr() || MD->hasInlineBody())
-      continue;
-    return MD;
-  }
-  return nullptr;
-}
-
-/// Why an override cannot be implemented. Keep in sync with the %select in
-/// diag::cxx_virtual_override_unsupported.
-enum class OverrideUnsupportedReason : unsigned {
-  MultipleInheritance = 0,
-  VirtualBase = 1,
-  CovariantReturn = 2,
-};
-
-/// Whether implementing the overriding \p method could require an adjusting
-/// thunk (multiple inheritance, virtual bases, and covariant returns).
-/// TODO: Remove this once we can use clang to emit vtable and friends.
-static std::optional<OverrideUnsupportedReason>
-cxxOverrideUnsupportedReason(const clang::CXXMethodDecl *method) {
-  if (method->size_overridden_methods() == 0)
-    return std::nullopt;
-
-  // Multiple inheritance or a virtual base anywhere in the base graph can
-  // place an overridden method's subobject at a nonzero offset.
-  const clang::CXXRecordDecl *RD = method->getParent()->getDefinition();
-  while (RD && RD->getNumBases() != 0) {
-    if (RD->getNumBases() > 1)
-      return OverrideUnsupportedReason::MultipleInheritance;
-    const clang::CXXBaseSpecifier &base = *RD->bases_begin();
-    if (base.isVirtual())
-      return OverrideUnsupportedReason::VirtualBase;
-    const auto *baseRD = base.getType()->getAsCXXRecordDecl();
-    RD = baseRD ? baseRD->getDefinition() : nullptr;
-  }
-
-  // A changed return type needs a return-adjusting thunk.
-  auto &clangCtx = method->getASTContext();
-  const clang::CXXMethodDecl *overridden = method;
-  while (overridden->size_overridden_methods() != 0) {
-    overridden = *overridden->begin_overridden_methods();
-    if (!clangCtx.hasSameType(overridden->getReturnType(),
-                              method->getReturnType()))
-      return OverrideUnsupportedReason::CovariantReturn;
-  }
-
-  return std::nullopt;
-}
-
 namespace {
 class ObjCImplementationChecker {
   Decl *decl;
@@ -4107,6 +4057,34 @@ private:
     return MatchOutcome::WrongType;
   }
 
+  /// The result of an '@c @implementation' function can be written as
+  /// 'Unmanaged<T>' (or 'Unmanaged<T>?') when the header's result type imports
+  /// as 'T' (or 'T?'). This lets the implementer take over the ownership
+  /// transfer for the result, and is the only way to implement an unretained
+  /// return for CF types.
+  static bool matchesUnmanagedCResult(Type reqTy, Type implTy,
+                                      ValueDecl *implDecl) {
+    if (!implDecl || !implDecl->getAttrs().hasAttribute<CDeclAttr>())
+      return false;
+
+    if (auto reqObjectTy = reqTy->getOptionalObjectType()) {
+      auto implObjectTy = implTy->getOptionalObjectType();
+      if (!implObjectTy)
+        return false;
+      reqTy = reqObjectTy;
+      implTy = implObjectTy;
+    }
+
+    if (!implTy->isUnmanaged() || !reqTy->isAnyClassReferenceType())
+      return false;
+
+    auto boundGenericType = implTy->getAs<BoundGenericType>();
+    if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
+      return false;
+
+    return reqTy->matches(boundGenericType->getGenericArgs()[0], {});
+  }
+
   static MatchOutcome matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
     TypeMatchOptions matchOpts = {};
 
@@ -4151,6 +4129,10 @@ private:
                 if (outcome < MatchOutcome::WrongSendability)
                   return false;
               }
+
+              if (matchesUnmanagedCResult(funcReqTy->getResult(),
+                                          funcImplTy->getResult(), implDecl))
+                return true;
 
               return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
                                 implDecl) == MatchOutcome::Match;
@@ -4362,42 +4344,14 @@ private:
     }
 
     if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD)) {
-      if (method->isVirtual()) {
-        auto getMethodRange = [&] {
-          auto *loader = req->getASTContext().getClangModuleLoader();
-          return SourceRange(
-              loader->importSourceLocation(method->getBeginLoc()),
-              loader->importSourceLocation(method->getEndLoc()));
-        };
-
-        if (method->isPureVirtual()) {
-          diagnose(cand, diag::cxx_pure_virtual_unsupported, cand, method);
-          diagnose(interface, diag::cxx_pure_virtual_declared_here, method)
-              .highlight(getMethodRange());
-          return true;
-        }
-
-        // C++ emits the vtable in the TU that defines the class's key
-        // function.
-        // TODO: Add support for emitting vtable from Swift.
-        const auto *keyFunction =
-            computeItaniumKeyFunction(method->getParent());
-        if (keyFunction &&
-            keyFunction->getCanonicalDecl() == method->getCanonicalDecl()) {
-          diagnose(cand, diag::cxx_virtual_key_function_unsupported, cand,
-                   method, method->getParent());
-          diagnose(interface, diag::cxx_virtual_key_function_workaround, method)
-              .highlight(getMethodRange());
-          return true;
-        }
-
-        // Ban the overrides that might need thunks.
-        // TODO: Add support for emitting the thunks.
-        if (auto reason = cxxOverrideUnsupportedReason(method)) {
-          diagnose(cand, diag::cxx_virtual_override_unsupported, cand, method,
-                   static_cast<unsigned>(*reason));
-          return true;
-        }
+      // A pure virtual method's vtable slot never names its definition.
+      if (method->isPureVirtual()) {
+        diagnose(cand, diag::cxx_pure_virtual_unsupported, cand, method);
+        auto *loader = req->getASTContext().getClangModuleLoader();
+        diagnose(interface, diag::cxx_pure_virtual_declared_here, method)
+            .highlight({loader->importSourceLocation(method->getBeginLoc()),
+                        loader->importSourceLocation(method->getEndLoc())});
+        return true;
       }
 
       // The importer maps a const method to a non-mutating Swift method and a
@@ -4415,14 +4369,59 @@ private:
       }
     }
 
-    // TODO: Not supported yet, ban C++ references for now.
-    bool usesReferences = clangFD->getReturnType()->isReferenceType();
-    for (const auto *param : clangFD->parameters())
-      usesReferences |= param->getType()->isReferenceType();
-    if (usesReferences) {
-      diagnose(cand, diag::cxx_references_unsupported, cand,
+    // RValue references are not supported: a `T &&` parameter imports as
+    // `consuming`, but the C++ caller destroys the referent after the call
+    // anyway, so a Swift body consuming the value would double-destroy it.
+    bool usesRValueReferences =
+        clangFD->getReturnType()->isRValueReferenceType() ||
+        llvm::any_of(clangFD->parameters(), [](const auto *param) {
+          return param->getType()->isRValueReferenceType();
+        });
+    if (usesRValueReferences) {
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
                clangFD->getName());
       return true;
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a by-value
+    // parameter. C++ callers may pass aliasing references, which `inout` and
+    // by-value parameters let the optimizer assume away, so the implementation
+    // must be marked `@unsafe`. A reference to a foreign reference type is
+    // exempt: the parameter carries the object, not the reference.
+    if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
+      auto *loader = cand->getASTContext().getClangModuleLoader();
+      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+      bool diagnosed = false;
+      for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
+        const auto *clangParam = clangFD->getParamDecl(i);
+        const auto *refType =
+            clangParam->getType()->getAs<clang::LValueReferenceType>();
+        if (!refType)
+          continue;
+        auto *param = params->get(i);
+        if (refType->getPointeeType()->isRecordType() &&
+            param->getInterfaceType()->isForeignReferenceType())
+          continue;
+
+        if (!diagnosed) {
+          diagnose(cand, diag::cxx_references_require_unsafe, cand,
+                   clangFD->getName())
+              .fixItInsert(
+                  cand->getAttributeInsertionLoc(/*forModifier=*/false),
+                  "@unsafe ");
+          diagnosed = true;
+        }
+        diagnose(param, diag::cxx_reference_param_aliasing, param,
+                 param->isInOut());
+        diagnose(loader->importSourceLocation(clangParam->getLocation()),
+                 diag::cxx_reference_param_declared_here,
+                 clangParam->getIdentifier() != nullptr, clangParam)
+            .highlight(SourceRange(
+                loader->importSourceLocation(clangParam->getBeginLoc()),
+                loader->importSourceLocation(clangParam->getEndLoc())));
+      }
+      if (diagnosed)
+        return true;
     }
 
     // The symbol this implementation will be emitted under must not be one the

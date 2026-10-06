@@ -117,16 +117,17 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function type not in a parameter is, more or less, implicitly @escaping.
     // For Sendable, we want to behave as though it was not necessary because
     // function types that aren't in a parameter can be Sendable or not.
-    // For `@called(once)`, we want to behave as though it was not necessary
-    // because function types that aren't in a parameter can be called once
-    // or not.
-    // For `@called(once)`, we want to behave as though it was necessary, just
-    // like noescape, because a plain function type can always satisfy a
-    // `@called(once)` requirement but a `@called(once)` function type cannot
-    // satisfy a plain one.
+    // For `@called(atMostOnce)`, we want to behave as though it was not
+    // necessary because function types that aren't in a parameter can be
+    // called once or not.
+    // For `@called(atMostOnce)`, we want to behave as though it was necessary,
+    // just like noescape, because a plain function type can always satisfy a
+    // `@called(atMostOnce)` requirement but a `@called(atMostOnce)` function
+    // type cannot satisfy a plain one.
     // FIXME: Should we check for a Sendable bound on the requirement type?
-    bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping &&
-                          adjustment != TypeAdjustment::CalledOnceToPlain);
+    bool inRequirement =
+        (adjustment != TypeAdjustment::NoescapeToEscaping &&
+         adjustment != TypeAdjustment::ExecutionSemanticsToPlain);
     Type adjustedReqtType =
       adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
@@ -150,7 +151,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
   applyAdjustment(TypeAdjustment::NonsendableToSendable);
-  applyAdjustment(TypeAdjustment::CalledOnceToPlain);
+  applyAdjustment(TypeAdjustment::ExecutionSemanticsToPlain);
 
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
@@ -5248,14 +5249,24 @@ static bool couldApplyNonisolated(WitnessIsolationError const &witnessError) {
     return false;
   if (auto *var = dyn_cast<VarDecl>(witnessError.witness)) {
     if (var->hasStorage()) {
+      // TODO: consider supporting patterns? Fix-it that can rewrite them to
+      // only isolate part? Skip them to avoid over isolating.
+      auto *PBD = var->getParentPatternBinding();
+      if (!PBD || PBD->getSingleVar() != var)
+        return false;
+      if (var->isLet())
+        return var->getTypeInContext()->isSendableType();
       // Mutable VarDecl with storage, for an immutable requirement, can be
       // converted to 'let nonisolated'.
-      return !var->isLet() && isa<VarDecl>(witnessError.requirement) &&
+      return isa<VarDecl>(witnessError.requirement) &&
              !cast<VarDecl>(witnessError.requirement)
                   ->isSettable(/*useDC=*/nullptr);
     }
-    // Computed VarDecl can be converted if no property wrapper is present.
-    return !var->hasAttachedPropertyWrapper();
+    // Computed VarDecl can be converted if no property wrapper, lazy, or
+    // override with observer is present.
+    return !var->hasAttachedPropertyWrapper() &&
+           !var->getAttrs().hasAttribute<LazyAttr>() &&
+           !(var->hasObservers() && var->getOverriddenDecl());
   }
   return isa<AbstractFunctionDecl, SubscriptDecl>(witnessError.witness);
 }
@@ -5435,8 +5446,7 @@ static void diagnoseConformanceIsolationErrors(
     if (!hasIsolatedConformances) {
       for (auto witness : potentialNonisolated) {
         auto var = dyn_cast<VarDecl>(witness);
-        // Not a variable, or a computed property.
-        if (!var || !var->hasStorage()) {
+        if (!var || !var->hasStorage() || var->isLet()) {
           ctx.Diags
               .diagnose(witness, diag::note_make_witness_nonisolated, witness)
               .fixItInsert(
@@ -5444,8 +5454,7 @@ static void diagnoseConformanceIsolationErrors(
                   "nonisolated ");
           continue;
         }
-        // Mutable variables (since we didn't add let witnesses), which can be
-        // converted to 'nonisolated let'.
+        // Mutable variables, which can be converted to 'nonisolated let'.
         auto loc = getFixItLocForVarToLet(var);
         if (loc.isValid()) {
           ctx.Diags.diagnose(var, diag::note_make_witness_immutable, var)

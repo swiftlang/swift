@@ -1760,6 +1760,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                        A->getOption().getPrefixedName(), A->getValue());
     }
+
+    // Preserve the stdcall convention of imported Win32 COM function types.
+    if (Opts.COMModel == LangOptions::COMInteropModel::Microsoft &&
+        Target.isOSWindows() && Target.getArch() == llvm::Triple::x86)
+      Opts.UseClangFunctionTypes = true;
   }
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -3414,8 +3419,19 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableRecompilationToOSSAModule |=
       Args.hasArg(OPT_enable_recompilation_to_ossa_module);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+
+  Opts.EnableLifetimeResolution =
+      Args.hasFlag(OPT_enable_lifetime_resolution,
+                   OPT_disable_lifetime_resolution,
+                   Opts.EnableLifetimeResolution);
+
+  // By default, enable SIL Opaque Values when using LifetimeResolution.
+  const bool OpaqueValuesDefaultEnablement = Opts.EnableLifetimeResolution;
+
   Opts.EnableSILOpaqueValues = Args.hasFlag(
-      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
+      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values,
+      OpaqueValuesDefaultEnablement);
+
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableThrowsPrediction = Args.hasFlag(
       OPT_enable_throws_prediction, OPT_disable_throws_prediction,
@@ -3463,10 +3479,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
                    OPT_disable_lifetime_dependence_diagnostics,
                    Opts.EnableLifetimeDependenceDiagnostics);
-  Opts.EnableLifetimeResolution =
-      Args.hasFlag(OPT_enable_lifetime_resolution,
-                   OPT_disable_lifetime_resolution,
-                   Opts.EnableLifetimeResolution);
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
@@ -3689,6 +3701,26 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   using namespace options;
 
   Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
+
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath()) {
+    // A TBD file would describe symbols that the object file doesn't have.
+    if (Args.hasArg(OPT_emit_empty_object_file)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::tbd_not_supported_with_empty_object_file);
+      return true;
+    }
+
+    // Under the "inlinable" code generation model of Embedded Swift, which
+    // symbols get strong definitions depends on how they are used.
+    const auto &langOpts = Invocation.getLangOptions();
+    if (langOpts.hasFeature(Feature::Embedded) &&
+        langOpts.CodeGenerationModelOverride.value_or(
+            CodeGenerationModel::Inlinable) == CodeGenerationModel::Inlinable) {
+      Diags.diagnose(SourceLoc(),
+                     diag::tbd_not_supported_with_inlinable_code_generation);
+      return true;
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
@@ -4165,6 +4197,25 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_dump_abstract_type_layout_info_EQ)) {
+    StringRef kind(A->getValue());
+    if (kind == "sil-type")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::SILType;
+    else if (kind == "type-lowering")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeLowering;
+    else if (kind == "type-info")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeInfo;
+    else if (kind == "all")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::All;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
   }
 
   auto getRuntimeCompatVersion = [&]() -> std::optional<llvm::VersionTuple> {

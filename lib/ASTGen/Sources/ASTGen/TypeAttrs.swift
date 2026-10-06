@@ -13,6 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
+@_spi(Diagnostics) import SwiftParser
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 extension ASTGenVisitor {
@@ -96,6 +97,10 @@ extension ASTGenVisitor {
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .Called:
         return (self.generateCalledTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+
+      case .Scoped:
+        return (self.generateScopedTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       // SIL type attributes are not supported.
@@ -302,7 +307,8 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
-        case "once": return .once
+        case "exactlyOnce": return .exactlyOnce
+        case "atMostOnce": return .atMostOnce
         default:
           // TODO: Diagnose.
           return nil
@@ -321,6 +327,95 @@ extension ASTGenVisitor {
       semantics: semantics,
       semanticsLoc: semanticsLoc
     )
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @_scoped(a)
+  ///   @_scoped(left: &a, right: self)
+  ///   @_scoped(immortal)
+  ///   ```
+  // TODO: If this feature will be available in production compilers with this
+  // syntax, give '@_scoped' dedicated syntax in SwiftParser. This is icky.
+  func generateScopedTypeAttr(attribute node: AttributeSyntax) -> BridgedScopedTypeAttr? {
+    // SwiftParser has already diagnosed it.
+    if node.hasError {
+      return nil
+    }
+    guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return nil
+    }
+    if let trailingComma = args.last?.trailingComma {
+      self.diagnose(.invalidArgumentInAttribute(node, trailingComma))
+      return nil
+    }
+
+    var specifiers: [BridgedScopeSpecifier] = []
+    for arg in args {
+      guard let specifier = self.generateScopeSpecifier(arg) else {
+        self.diagnose(.invalidArgumentInAttribute(node, arg))
+        return nil
+      }
+      specifiers.append(specifier)
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      specifiers: specifiers.lazy.bridgedArray(in: self)
+    )
+  }
+
+  func generateScopeSpecifier(_ arg: LabeledExprSyntax) -> BridgedScopeSpecifier? {
+    var label: Identifier = nil
+    var labelLoc = SourceLoc()
+    if let labelToken = arg.label {
+      // SwiftParser remaps keyword labels to identifiers, but here they must be
+      // escaped.
+      let isKeyword = Keyword(labelToken.rawText).map { TokenKind.keyword($0).isLexerClassifiedKeyword } ?? false
+      guard labelToken.rawTokenKind == .identifier, !isKeyword else {
+        return nil
+      }
+      label = self.generateIdentifier(labelToken)
+      labelLoc = self.generateSourceLoc(labelToken)
+    }
+
+    var expr = arg.expression
+    var isAccess = false
+    if let inOutExpr = expr.as(InOutExprSyntax.self) {
+      isAccess = true
+      expr = inOutExpr.expression
+    }
+
+    guard
+      let declRefExpr = expr.as(DeclReferenceExprSyntax.self),
+      declRefExpr.argumentNames == nil,
+      declRefExpr.moduleSelector == nil
+    else {
+      return nil
+    }
+
+    let loc = self.generateSourceLoc(declRefExpr)
+    let scope: BridgedScopeDescriptor
+    switch declRefExpr.baseName.tokenKind {
+    case .keyword(.`self`):
+      scope = .forSelf(loc: loc, isAccess: isAccess)
+    case .identifier("immortal"):
+      guard !isAccess else {
+        return nil
+      }
+      scope = .forImmortal(loc: loc)
+    case .identifier:
+      let name = self.generateIdentifier(declRefExpr.baseName)
+      scope = isAccess ? .forAccessedValue(name, loc: loc) : .forScopeName(name, loc: loc)
+    default:
+      return nil
+    }
+
+    return .create(label: label, labelLoc: labelLoc, scope: scope)
   }
 
   /// E.g.

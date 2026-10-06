@@ -531,25 +531,6 @@ ManagedValue Transform::transform(ManagedValue v,
         });
   }
 
-  // If the value is an optional, but the desired formal type isn't an
-  // optional or Any, force it.
-  if (inputIsOptional && !outputIsOptional &&
-      !outputSubstType->isExistentialType()) {
-    // isImplicitUnwrap is hardcoded true because the looseness in types of
-    // @objc witnesses/overrides that we're handling here only allows IUOs,
-    // not explicit Optionals.
-    v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
-                                            /*isImplicitUnwrap*/ true, 
-                                            SGF.getTypeLowering(v.getType()),
-                                            SGFContext());
-
-    // Check if we have any more conversions remaining.
-    if (v.getType() == loweredResultTy)
-      return v;
-
-    inputIsOptional = false;
-  }
-
   // Optional-to-optional conversion.
   if (inputIsOptional && outputIsOptional) {
     // If the conversion is trivial, just cast.
@@ -737,7 +718,9 @@ ManagedValue Transform::transform(ManagedValue v,
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
     auto conformance = lookupConformance(inputSubstType, protocol);
-    auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
+    auto addr = v;
+    if (SGF.silConv.useLoweredAddresses() && !v.getType().isAddress())
+      addr = v.materialize(SGF, Loc);
     auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,
                                              conformance, ctxt);
     if (result.isInContext())
@@ -828,6 +811,23 @@ ManagedValue Transform::transform(ManagedValue v,
         return SGF.emitOptionalTangentVectorToTangentVector(
             Loc, v, wrappedType, inputSubstType, outputSubstType, ctxt);
     }
+  }
+
+  // IUO unwrapping. This only comes up in a handful of situations. Check for
+  // this last, to avoid accidentally missing some other conversion from an
+  // optional type to a non-optional, of which there are several.
+  if (inputIsOptional && !outputIsOptional) {
+    // isImplicitUnwrap is hardcoded true because the looseness in types of
+    // @objc witnesses/overrides that we're handling here only allows IUOs,
+    // not explicit Optionals.
+    v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
+                                            /*isImplicitUnwrap*/ true,
+                                            SGF.getTypeLowering(v.getType()),
+                                            SGFContext());
+
+    return transform(v, inputOrigType.getOptionalObjectType(), inputObjectType,
+                     outputOrigType, outputObjectType, loweredResultTy,
+                     SGFContext());
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -5841,12 +5841,9 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
     thunkArgs.push_back(ManagedValue::forObjectRValueWithoutOwnership(value));
   }
 
-  return
-    SGF.B.createPartialApply(loc, thunkValue,
-                             interfaceSubs, thunkArgs,
-                             toType->getCalleeConvention(),
-                             toType->getIsolation(),
-                             toType->isCalledOnce());
+  return SGF.B.createPartialApply(
+      loc, thunkValue, interfaceSubs, thunkArgs, toType->getCalleeConvention(),
+      toType->getIsolation(), toType->getExecutionSemantics());
 }
 
 static ManagedValue createDifferentiableFunctionThunk(

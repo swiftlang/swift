@@ -18,6 +18,7 @@
 
 #include "clang/AST/Type.h"
 #include "ForeignRepresentationInfo.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Concurrency.h"
@@ -262,12 +263,7 @@ Type TypeBase::findAlwaysUnsafeType() const {
 static std::optional<ReferenceCounting>
 getHiddenTypeReferenceCounting(CanHiddenType type) {
   auto *layoutInfoDecl = type->getLayoutInfoDecl();
-  // TODO: Remove this legacy fallback once every HiddenType carries an
-  // abstract layout.
-  if (!layoutInfoDecl)
-    return std::nullopt;
-
-  assert(layoutInfoDecl->Layout &&
+  assert(layoutInfoDecl && layoutInfoDecl->Layout &&
          "HiddenTypeLayoutInfoDecl should have abstract layout");
   return layoutInfoDecl->Layout->referenceCountingSystem;
 }
@@ -381,6 +377,13 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   llvm_unreachable("Unhandled type kind!");
 }
 
+bool CanType::allowsOwnership(const GenericSignatureImpl *sig) const {
+  if (isReferenceTypeImpl(*this, sig, /*functionsCount=*/false))
+    return true;
+
+  return isCOMExistentialType();
+}
+
 /// Are variables of this type permitted to have
 /// ownership attributes?
 ///
@@ -388,6 +391,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 ///   - class types, generic or not
 ///   - archetypes with class or class protocol bounds
 ///   - existentials with class or class protocol bounds
+///   - COM interface existentials
 /// But not:
 ///   - function types
 bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
@@ -743,16 +747,16 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 }
 
 void TypeBase::getTypeVariables(
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (!hasTypeVariable())
     return;
 
   class Walker : public TypeWalker {
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables;
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVariables;
 
   public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables)
+    explicit Walker(SmallPtrSetVector<TypeVariableType *, 4> &typeVariables)
         : typeVariables(typeVariables) {}
 
     Action walkToTypePre(Type ty) override {
@@ -760,9 +764,8 @@ void TypeBase::getTypeVariables(
       if (!ty->hasTypeVariable())
         return Action::SkipNode;
 
-      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
+      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer()))
         typeVariables.insert(tv);
-      }
 
       return Action::Continue;
     }
@@ -1654,10 +1657,11 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
       // just become non-Sendable.
       return std::make_pair(Type(), false);
     }
-    std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
-      // Fold away the @called(once) dependence if present, the function type will
-      // just become non-@called(once).
-      return std::make_pair(Type(), false);
+    std::pair<Type, std::optional<ExecutionSemantics>>
+    transformExecutionSemanticsDependentType(Type ty) {
+      // Fold away the @called(atMostOnce) dependence if present, the function
+      // type will just become non-@called(atMostOnce).
+      return std::make_pair(Type(), std::nullopt);
     }
   };
   return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
@@ -3569,12 +3573,13 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         // Non-trivial C++ classes and structures are not
         // supported by @objc attribute, even though they can
-        // be represented in Objective-C++.
+        // be represented in Objective-C++. They are supported by C++.
         if (auto *cxxRec = dyn_cast_or_null<clang::CXXRecordDecl>(
                 nominal->getClangDecl())) {
-          if (cxxRec->hasNonTrivialCopyConstructor() ||
-              cxxRec->hasNonTrivialMoveConstructor() ||
-              cxxRec->hasNonTrivialDestructor())
+          if (language != ForeignLanguage::Cxx &&
+              (cxxRec->hasNonTrivialCopyConstructor() ||
+               cxxRec->hasNonTrivialMoveConstructor() ||
+               cxxRec->hasNonTrivialDestructor()))
             return failure();
         }
 
@@ -4107,6 +4112,12 @@ bool ArchetypeType::mayHaveIsolatedConformance() const {
   return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
 }
 
+bool ArchetypeType::hasCOMInterfaceConstraint() const {
+  return llvm::any_of(getConformsTo(), [](ProtocolDecl *protocol) {
+    return protocol->isCOMInterface();
+  });
+}
+
 bool ArchetypeType::requiresClass() const {
   if (auto layout = getLayoutConstraint())
     return layout->isClass();
@@ -4596,10 +4607,10 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
-Type AnyFunctionType::getCalledOnceDependentType() const {
+Type AnyFunctionType::getExecutionSemanticsDependentType() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getCalledOnceDependentType();
+    return cast<FunctionType>(this)->getExecutionSemanticsDependentType();
   case TypeKind::GenericFunction:
     return Type();
   default:
@@ -4657,9 +4668,11 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
   return getLifetimeDependenceFor(resultIndex);
 }
 
-bool AnyFunctionType::isCalledOnce() const {
-  ASSERT(!hasCalledOnceDependentType() && "Query CalledOnce dependence first");
-  return getExtInfo().isCalledOnce();
+std::optional<ExecutionSemantics>
+AnyFunctionType::getExecutionSemantics() const {
+  ASSERT(!hasExecutionSemanticsDependentType() &&
+         "Query execution semantics dependence first");
+  return getExtInfo().getExecutionSemantics();
 }
 
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
@@ -4702,15 +4715,16 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   if (sendableDependentType)
     sendableDependentType = sendableDependentType->getCanonicalType();
 
-  Type calledOnceDependentType = getCalledOnceDependentType();
-  if (calledOnceDependentType)
-    calledOnceDependentType = calledOnceDependentType->getCanonicalType();
+  Type executionSemanticsDependentType = getExecutionSemanticsDependentType();
+  if (executionSemanticsDependentType)
+    executionSemanticsDependentType =
+        executionSemanticsDependentType->getCanonicalType();
 
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
                  globalActor, thrownError, sendableDependentType,
-                 calledOnceDependentType, getLifetimeDependencies());
+                 executionSemanticsDependentType, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4952,7 +4966,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
     // It is still possible for an FRT to be involved in an archetype or
     // protocol type, so only short-circuit for cases other than those
-    if (!isa<ArchetypeType, ProtocolType, ProtocolCompositionType>(type))
+    if (!isa<ArchetypeType>(type) && !isa<ProtocolType>(type) &&
+        !isa<ProtocolCompositionType>(type))
       return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
                                                 : ReferenceCounting::Native;
   }
@@ -5145,11 +5160,13 @@ AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   return withExtInfo(info);
 }
 
-AnyFunctionType *AnyFunctionType::withCalledOnce(bool newValue) const {
-  auto info = getExtInfo().intoBuilder().withCalledOnce(newValue).build();
+AnyFunctionType *AnyFunctionType::withExecutionSemantics(
+    std::optional<ExecutionSemantics> newValue) const {
+  auto info =
+      getExtInfo().intoBuilder().withExecutionSemantics(newValue).build();
   return withExtInfo(info);
 }
-  
+
 AnyFunctionType *AnyFunctionType::getWithoutYields() const {
   auto resultType = getResult();
   auto noCoroExtInfo = getExtInfo().intoBuilder()

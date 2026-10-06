@@ -42,8 +42,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
-#include "swift/SILOptimizer/Utils/ConstExpr.h"
-#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SIL/SILConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -71,10 +69,13 @@ swift::SILResultInfo BridgedResultInfo::unbridged() const {
                               swift::SILResultInfo::Options(options));
 }
 
-BridgedCanType BridgedResultInfo::getReturnValueType(BridgedFunction f) const {
+BridgedCanType
+BridgedResultInfo::getReturnValueType(BridgedCanType ofFunctionType,
+                                      BridgedFunction f) const {
   const auto function = f.getFunction();
   return BridgedCanType(unbridged().getReturnValueType(
-      function->getModule(), function->getLoweredFunctionType().getPointer(),
+      function->getModule(),
+      ofFunctionType.unbridged()->castTo<swift::SILFunctionType>(),
       function->getTypeExpansionContext()));
 }
 
@@ -386,6 +387,10 @@ bool BridgedType::isLoadable(BridgedFunction f) const {
   return unbridged().isLoadable(f.getFunction());
 }
 
+bool BridgedType::isABIAccessible(BridgedFunction f) const {
+  return f.getFunction()->isTypeABIAccessible(unbridged());
+}
+
 bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
@@ -530,6 +535,22 @@ BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   auto newTy =
       fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(withNoEscape));
   return swift::SILType::getPrimitiveObjectType(newTy);
+}
+
+BridgedType BridgedType::getFunctionTypeWithRepresentation(
+    BridgedASTType::FunctionTypeRepresentation representation) const {
+  auto fnType = unbridged().castTo<swift::SILFunctionType>();
+  auto newType = fnType->getWithRepresentation(
+      static_cast<swift::SILFunctionTypeRepresentation>(representation));
+  return swift::SILType::getPrimitiveObjectType(newType);
+}
+
+BridgedType BridgedType::getFunctionTypeWithCalleeConvention(
+    BridgedArgumentConvention convention) const {
+  auto fnType = unbridged().castTo<swift::SILFunctionType>();
+  auto newType =
+      fnType->getWithCalleeConvention(getParameterConvention(convention));
+  return swift::SILType::getPrimitiveObjectType(newType);
 }
 
 BridgedArgumentConvention BridgedType::getCalleeConvention() const {
@@ -860,6 +881,10 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->hasLoweredAddresses(); }
 
+SwiftInt BridgedFunction::getStage() const {
+  return (SwiftInt)getFunction()->getFunctionStage();
+}
+
 BridgedCanType BridgedFunction::getLoweredFunctionType() const {
   return getFunction()->getLoweredFunctionType();
 }
@@ -1140,6 +1165,12 @@ bool BridgedFunction::isSpecialization() const {
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
   return decl.getAs<swift::NominalTypeDecl>()->isResilient(getFunction()->getModule().getSwiftModule(),
                                                            getFunction()->getResilienceExpansion());
+}
+
+bool BridgedFunction::isEffectivelyExhaustiveEnumDecl(BridgedDeclObj decl) const {
+  return decl.getAs<swift::EnumDecl>()->isEffectivelyExhaustive(
+      getFunction()->getModule().getSwiftModule(),
+      getFunction()->getResilienceExpansion());
 }
 
 BridgedType BridgedFunction::getLoweredType(BridgedASTType type, bool maximallyAbstracted) const {
@@ -1587,6 +1618,10 @@ bool BridgedInstruction::MoveValue_isFromVarDecl() const {
   return getAs<swift::MoveValueInst>()->isFromVarDecl();
 }
 
+bool BridgedInstruction::MoveValue_getAllowDiagnostics() const {
+  return getAs<swift::MoveValueInst>()->getAllowDiagnostics();
+}
+
 SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {
   return getAs<swift::ProjectBoxInst>()->getFieldIndex();
 }
@@ -1715,8 +1750,12 @@ SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() c
   return swift::ApplySite(unbridged()).getSubstCalleeArgIndexOfFirstAppliedArg();
 }
 
-bool BridgedInstruction::PartialApplyInst_isCalledOnce() const {
-  return getAs<swift::PartialApplyInst>()->isCalledOnce();
+BridgedOptionalExecutionSemantics
+BridgedInstruction::PartialApplyInst_getExecutionSemantics() const {
+  if (auto semantics =
+          getAs<swift::PartialApplyInst>()->getExecutionSemantics())
+    return *semantics;
+  return {};
 }
 
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
@@ -1741,6 +1780,10 @@ bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
 }
 
+void BridgedInstruction::AllocStackInst_setDynamicLifetime() const {
+  getAs<swift::AllocStackInst>()->setDynamicLifetime();
+}
+
 bool BridgedInstruction::AllocStackInst_isFromVarDecl() const {
   return getAs<swift::AllocStackInst>()->isFromVarDecl();
 }
@@ -1755,6 +1798,10 @@ bool BridgedInstruction::AllocStackInst_isLexical() const {
 
 bool BridgedInstruction::AllocBoxInst_hasDynamicLifetime() const {
   return getAs<swift::AllocBoxInst>()->hasDynamicLifetime();
+}
+
+void BridgedInstruction::AllocBoxInst_setDynamicLifetime() const {
+  getAs<swift::AllocBoxInst>()->setDynamicLifetime();
 }
 
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {
@@ -1874,6 +1921,10 @@ SwiftInt BridgedInstruction::AssignInst_getAssignOwnership() const {
   return (SwiftInt)getAs<swift::AssignInst>()->getOwnershipQualifier();
 }
 
+void BridgedInstruction::AssignInst_setAssignOwnership(SwiftInt assignOwnership) const {
+  getAs<swift::AssignInst>()->setOwnershipQualifier((swift::AssignOwnershipQualifier)assignOwnership);
+}
+
 BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_dependenceKind() const {
   return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
 }
@@ -1939,6 +1990,15 @@ void BridgedInstruction::CopyAddrInst_setIsInitializationOfDest(bool isInitializ
       isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
 }
 
+bool BridgedInstruction::TupleAddrConstructorInst_isInitializationOfDest() const {
+  return getAs<swift::TupleAddrConstructorInst>()->isInitializationOfDest();
+}
+
+void BridgedInstruction::TupleAddrConstructorInst_setIsInitializationOfDest(bool isInitializationOfDest) const {
+  getAs<swift::TupleAddrConstructorInst>()->setIsInitializationOfDest(
+      isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
+}
+
 bool BridgedInstruction::DeallocBoxInst_isDeadEnd() const {
   return getAs<swift::DeallocBoxInst>()->isDeadEnd();
 }
@@ -1961,6 +2021,10 @@ SwiftInt BridgedInstruction::MarkUnresolvedNonCopyableValue_getCheckKind() const
 
 bool BridgedInstruction::MarkUnresolvedNonCopyableValue_isStrict() const {
   return getAs<swift::MarkUnresolvedNonCopyableValueInst>()->isStrict();
+}
+
+SwiftInt BridgedInstruction::Diagnose_getKind() const {
+  return (SwiftInt)getAs<swift::DiagnoseInst>()->getKind();
 }
 
 void BridgedInstruction::RefCountingInst_setIsAtomic(bool isAtomic) const {
@@ -2241,6 +2305,10 @@ swift::SILDebugVariable BridgedSILDebugVariable::unbridge() const {
 
 OptionalBridgedDebugScope BridgedSILDebugVariable::getScope() const {
   return {unbridge().Scope};
+}
+
+bool BridgedSILDebugVariable::isLet() const {
+  return unbridge().isLet();
 }
 
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
@@ -2669,32 +2737,6 @@ SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
 BridgedWitnessTableEntry BridgedDefaultWitnessTable::getEntry(SwiftInt index) const {
   return BridgedWitnessTableEntry::bridge(table->getEntries()[index]);
 }
-
-//===----------------------------------------------------------------------===//
-//                         ConstExprFunctionState
-//===----------------------------------------------------------------------===//
-BridgedConstExprFunctionState BridgedConstExprFunctionState::create() {
-  auto allocator = new swift::SymbolicValueBumpAllocator();
-  auto evaluator = new swift::ConstExprEvaluator(*allocator, 0);
-  auto numEvaluatedSILInstructions = new unsigned int(0);
-  auto state = new swift::ConstExprFunctionState(*evaluator, nullptr, {},
-                                                 *numEvaluatedSILInstructions, true);
-  return {state, allocator, evaluator, numEvaluatedSILInstructions};
-}
-
-bool BridgedConstExprFunctionState::isConstantValue(BridgedValue bridgedValue) {
-  auto value = bridgedValue.getSILValue();
-  auto symbolicValue = state->getConstantValue(value);
-  return symbolicValue.isConstant();
-}
-
-void BridgedConstExprFunctionState::deinitialize() {
-  delete state;
-  delete numEvaluatedSILInstructions;
-  delete constantEvaluator;
-  delete allocator;
-}
-
 
 //===----------------------------------------------------------------------===//
 //                                BridgedBuilder
@@ -3178,7 +3220,8 @@ BridgedInstruction BridgedBuilder::createPartialApply(
     BridgedValue funcRef, BridgedValueArray bridgedCapturedArgs,
     BridgedArgumentConvention calleeConvention,
     BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
-    bool isOnStack, bool isNested, bool isCalledOnce,
+    bool isOnStack, bool isNested, bool hasExecutionSemantics,
+    swift::ExecutionSemantics executionSemantics,
     OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
   llvm::ArrayRef<swift::SILValue> args =
@@ -3188,7 +3231,7 @@ BridgedInstruction BridgedBuilder::createPartialApply(
       args, getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
-      isCalledOnce,
+      hasExecutionSemantics ? std::optional(executionSemantics) : std::nullopt,
       isOnStack ? swift::PartialApplyInst::OnStack
                 : swift::PartialApplyInst::NotOnStack,
       swift::StackAllocationIsNested_t(isNested),
@@ -3294,6 +3337,13 @@ BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue ds
                                   (swift::StoreOwnershipQualifier)ownership)};
 }
 
+BridgedInstruction BridgedBuilder::createAssign(BridgedValue src, BridgedValue dst,
+                               SwiftInt ownership) const {
+  return {unbridged().createAssign(regularLoc(), src.getSILValue(),
+                                   dst.getSILValue(),
+                                   (swift::AssignOwnershipQualifier)ownership)};
+}
+
 BridgedInstruction BridgedBuilder::createStoreBorrow(BridgedValue src, BridgedValue dst) const {
   return {unbridged().createStoreBorrow(regularLoc(), src.getSILValue(),
                                         dst.getSILValue())};
@@ -3395,6 +3445,13 @@ BridgedInstruction BridgedBuilder::createMarkUnresolvedNonCopyableValue(BridgedV
   return {unbridged().createMarkUnresolvedNonCopyableValueInst(
       regularLoc(), value.getSILValue(), (swift::MarkUnresolvedNonCopyableValueInst::CheckKind)checkKind,
       (swift::MarkUnresolvedNonCopyableValueInst::IsStrict_t)isStrict)};
+}
+
+BridgedInstruction BridgedBuilder::createDiagnose(BridgedValue operand,
+                                                  SwiftInt kind) const {
+  return {unbridged().createDiagnose(
+      regularLoc(), operand.getSILValue(),
+      (swift::DiagnoseInst::DiagnoseKind)kind)};
 }
 
 
@@ -3527,6 +3584,13 @@ static_assert((int)BridgedContext::SILStage::Raw == (int)swift::SILStage::Raw);
 static_assert((int)BridgedContext::SILStage::Canonical == (int)swift::SILStage::Canonical);
 static_assert((int)BridgedContext::SILStage::Lowered == (int)swift::SILStage::Lowered);
 
+// BridgedFunction::getStage returns a SwiftInt, which Function.silStage rebuilds
+// with SILStage(rawValue:). The Swift enum's raw values are positional, so pin
+// the numbering here as well.
+static_assert((int)swift::SILStage::Raw == 0);
+static_assert((int)swift::SILStage::Canonical == 1);
+static_assert((int)swift::SILStage::Lowered == 2);
+
 bool BridgedContext::isTransforming(BridgedFunction function) const {
   return context->getFunction() == function.getFunction();
 }
@@ -3539,8 +3603,8 @@ bool BridgedContext::hasChangeNotification(NotificationKind changeKind) const {
   return (context->getChangeNotifications() & (swift::SILContext::NotificationKind)changeKind) != 0;
 }
 
-BridgedContext::SILStage BridgedContext::getSILStage() const {
-  return (SILStage)context->getModule()->getStage();
+BridgedContext::SILStage BridgedContext::getStageFloor() const {
+  return (SILStage)context->getModule()->getStageFloor();
 }
 
 bool BridgedContext::moduleIsSerialized() const {
@@ -3754,10 +3818,6 @@ void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstr
 
 void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   inst.unbridged()->clone(beforeInst.unbridged());
-}
-
-void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
-  swift::salvageDebugInfo(inst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {

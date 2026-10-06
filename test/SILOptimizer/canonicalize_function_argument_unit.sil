@@ -10,6 +10,10 @@ import Builtin
 @_marker protocol Copyable {}
 
 class C {}
+struct Box {
+  var c: C
+  var ptr: Builtin.RawPointer
+}
 struct NC : ~Copyable {
   var c: C
 }
@@ -103,6 +107,36 @@ bb0(%c : @guaranteed $C):
   %ncd = struct $NCD (%copy)
   apply undef(%ncd) : $@convention(thin) (@guaranteed NCD) -> ()
   destroy_value %ncd
+  %retval = tuple ()
+  return %retval
+}
+
+// The base operand of a 'mark_dependence [nonescaping]' with an address result
+// has AnyInteriorPointer ownership. Such a use must still be rewritten when its
+// operand is an intermediate copy, otherwise the copy outlives its deleted
+// destroy_value and leaks.
+//
+// CHECK-LABEL: begin running test {{.*}} on mark_dependence_addr_base
+// CHECK-LABEL: sil [ossa] @mark_dependence_addr_base : {{.*}} {
+// CHECK:       bb0([[BOX:%[^,]+]] :
+// CHECK-NOT:     copy_value
+// CHECK-NEXT:    [[PTR:%[^,]+]] = struct_extract [[BOX]], #Box.ptr
+// CHECK-NEXT:    [[ADR:%[^,]+]] = pointer_to_address [[PTR]] to [strict] $*C
+// CHECK-NEXT:    [[MD:%[^,]+]] = mark_dependence [nonescaping] [[ADR]] on [[BOX]]
+// CHECK-NEXT:    apply undef([[MD]])
+// CHECK-NOT:     destroy_value
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'mark_dependence_addr_base'
+// CHECK-LABEL:   end running test {{.*}} on mark_dependence_addr_base
+sil [ossa] @mark_dependence_addr_base : $@convention(thin) (@guaranteed Box) -> () {
+bb0(%box : @guaranteed $Box):
+  specify_test "canonicalize_function_argument @argument"
+  %copy = copy_value %box
+  %ptr = struct_extract %box, #Box.ptr
+  %adr = pointer_to_address %ptr to [strict] $*C
+  %md = mark_dependence [nonescaping] %adr on %copy
+  apply undef(%md) : $@convention(thin) (@in_guaranteed C) -> ()
+  destroy_value %copy
   %retval = tuple ()
   return %retval
 }

@@ -3785,6 +3785,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
+  // TODO: Lower the specifiers into a type scope application instead of
+  // dropping the attribute.
+  if (auto scoped = claim<ScopedTypeAttr>(attrs)) {
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+        !scoped->isInvalid()) {
+      diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
+               "@_scoped", false, Feature::ScopeRestrictions.getName());
+      scoped->setInvalid();
+    }
+  }
+
   // Handle a type attribute that can only be used in inheritance clauses.
   // Returns true if we need to exit early, false otherwise.
   auto handleInheritedOnly = [&](AtTypeAttrBase *attr) {
@@ -4263,12 +4274,13 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->isCalledOnce()) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
         diagnose(eltTypeRepr->getLoc(),
-                 diag::called_once_cannot_be_used_with_borrowing);
+                 diag::called_attr_cannot_be_used_with_borrowing,
+                 CalledAttr::getSemanticsName(*fnTy->getExecutionSemantics()));
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
 
@@ -4278,7 +4290,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(once) is consuming by default and we don't
+      // @called(atMostOnce) is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;
@@ -4788,7 +4800,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
-  bool isCalledOnce = false;
+  std::optional<ExecutionSemantics> executionSemantics;
   if (auto called = claim<CalledTypeAttr>(attrs)) {
     if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
       if (representation != FunctionTypeRepresentation::Swift) {
@@ -4799,8 +4811,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         parsedClangFunctionType = nullptr;
       }
 
-      if (!repr->isInvalid() && called->isOnce())
-        isCalledOnce = true;
+      if (!repr->isInvalid())
+        executionSemantics = called->getExecutionSemantics();
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,
@@ -4811,7 +4823,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult, isCalledOnce);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult, executionSemantics);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -5062,14 +5074,13 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  bool isCalledOnce = false;
-  if (auto *called = claim<CalledTypeAttr>(attrs)) {
-    isCalledOnce = called->isOnce();
-  }
+  std::optional<ExecutionSemantics> executionSemantics;
+  if (auto *called = claim<CalledTypeAttr>(attrs))
+    executionSemantics = called->getExecutionSemantics();
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isCalledOnce, isolation, diffKind, clangFnType,
+      executionSemantics, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
@@ -5766,9 +5777,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        // `@called(once)` functions always have consuming semantics
+        // `@called(atMostOnce)` functions always have consuming semantics
         // regardless of whether they are @escaping or not.
-        if (fnTy->isCalledOnce())
+        if (fnTy->hasCalledAtMostOnceSemantics())
           break;
 
         diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),

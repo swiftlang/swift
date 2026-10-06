@@ -2264,8 +2264,16 @@ public:
       auto instance = metatype->getInstanceType();
       if (auto existential = metatype->getAs<ExistentialMetatypeType>())
         instance = existential->getExistentialInstanceType();
-      checkSameType(E->getBase()->getType(), instance,
-                    "base type of .Type expression");
+
+      Type baseType = E->getBase()->getType();
+      if (baseType->isCOMExistentialType()) {
+        if (!instance->isAny()) {
+          Out << "DynamicTypeExpr for a COM existential must have Any.Type\n";
+          abort();
+        }
+      } else {
+        checkSameType(baseType, instance, "base type of .Type expression");
+      }
       verifyCheckedBase(E);
     }
 
@@ -3785,11 +3793,6 @@ public:
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.Start);
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.End);
       return true;
-    }
-    
-    template<typename T>
-    void checkSourceRangesBase(T ASTNode) {
-      checkSourceRanges(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
     }
     
     void checkSourceRanges(Expr *E) {

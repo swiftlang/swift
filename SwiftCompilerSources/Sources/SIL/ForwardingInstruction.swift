@@ -325,8 +325,8 @@ extension UncheckedRefCastInst : ConversionInstruction {
 }
 
 extension UnconditionalCheckedCastInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
-  public var canForwardGuaranteedValues: Bool { true }
+  public var preservesRepresentation: Bool { preservesReferenceCounts }
+  public var canForwardGuaranteedValues: Bool { preservesReferenceCounts }
   public var canForwardOwnedValues: Bool { true }
 }
 

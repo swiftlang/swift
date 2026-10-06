@@ -975,11 +975,13 @@ BeginApplyInst::BeginApplyInst(
     ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
     std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing)
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    bool isUnresolved)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
                       typeDependentOperands, argLocs, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
-                                              allResultOwnerships) {
+                                              allResultOwnerships),
+      IsUnresolved(isUnresolved) {
   setApplyOptions(options);
   assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
@@ -991,7 +993,8 @@ BeginApplyInst *BeginApplyInst::create(
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
-    std::optional<ArrayRef<SILLocation>> argLocs) {
+    std::optional<ArrayRef<SILLocation>> argLocs,
+    bool isUnresolved) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -1044,7 +1047,8 @@ BeginApplyInst *BeginApplyInst::create(
   return ::new (buffer)
       BeginApplyInst(loc, callee, substCalleeSILType, resultTypes,
                      resultOwnerships, subs, args, typeDependentOperands,
-                     argLocs, options, specializationInfo, isolationCrossing);
+                     argLocs, options, specializationInfo, isolationCrossing,
+                     isUnresolved);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
@@ -1117,14 +1121,15 @@ PartialApplyInst *PartialApplyInst::create(
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested, bool isCalledOnce,
+    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    std::optional<ExecutionSemantics> executionSemantics,
     std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
-      F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
-      calleeConvention, resultIsolation, onStack, isCalledOnce);
+      F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(),
+      {}, calleeConvention, resultIsolation, onStack, executionSemantics);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -1385,7 +1390,7 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
   assert(witness && "Differentiability witness must not be null");
 #ifndef NDEBUG
   if (functionType.has_value()) {
-    assert(module.getStage() == SILStage::Lowered &&
+    assert(module.hasCommittedLowered() &&
            "Explicit type is valid only in lowered SIL");
   }
 #endif
@@ -3040,8 +3045,10 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(
-      DebugLoc, options, Operand, TypeDependentOperands,
-      DestLoweredTy, DestFormalTy, forwardingOwnershipKind);
+      DebugLoc, options, Operand, TypeDependentOperands, DestLoweredTy,
+      DestFormalTy, forwardingOwnershipKind,
+      doesCastPreserveOwnershipForTypes(Mod, Operand->getType().getASTType(),
+                                        DestFormalTy));
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
@@ -3133,9 +3140,12 @@ ConvertFunctionInst *ConvertFunctionInst::create(
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
+  // This reads the module, not a function's stage, because F is nullable here.
+  // ConvertEscapeToNoEscapeInst::create has a function and reads its stage.
+  //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (Mod.getStage() != SILStage::Lowered) {
+  if (!Mod.haveFunctionTypesBeenRewritten()) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
@@ -3263,7 +3273,7 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
   //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (F.getModule().getStage() != SILStage::Lowered) {
+  if (F.getFunctionStage() != SILStage::Lowered) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
@@ -3348,9 +3358,9 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     StringRef objcString) {
   llvm::FoldingSetNodeID id;
   Profile(id, signature, rootType, valueType, components, objcString);
-  
-  void *insertPos;
-  auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
+
+  llvm::FoldingSetInsertToken insertToken;
+  auto existing = M.KeyPathPatterns.lookup(id, insertToken);
   if (existing)
     return existing;
   
@@ -3377,7 +3387,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
                                            components, objcString,
                                            maxOperandNo + 1);
-  M.KeyPathPatterns.InsertNode(newPattern, insertPos);
+  M.KeyPathPatterns.insert(newPattern, insertToken);
   return newPattern;
 }
 

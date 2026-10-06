@@ -5319,6 +5319,10 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         // Nothing to do.
         break;
 
+      case MacroDefinition::Kind::Internal:
+        // Internal macros are compiler-synthesized and never printed.
+        break;
+
       case MacroDefinition::Kind::External: {
         auto external = def.getExternalMacro();
         Printer << " = #externalMacro(module: \"" << external.moduleName
@@ -6898,7 +6902,21 @@ public:
   }
 
   bool shouldDesugarTypeAliasType(TypeAliasType *T) {
-    return Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType;
+    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType)
+      return true;
+
+    // Implicit typealiases for generic parameters (such as the witness
+    // `typealias Element = Element` inferred for an associated type) are not
+    // printed in module interfaces, so references to them would not resolve.
+    // Print the underlying type instead.
+    if (Options.IsForSwiftInterface) {
+      auto *alias = T->getDecl();
+      if (alias->isImplicit() &&
+          alias->getUnderlyingType()->is<GenericTypeParamType>())
+        return true;
+    }
+
+    return false;
   }
 
   void visitTypeAliasType(TypeAliasType *T,
@@ -7261,10 +7279,16 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
-    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
-      Printer.printSimpleAttr("@called(once)") << " ";
+    if (!Options.excludeAttrKind(TypeAttrKind::Called)) {
+      if (auto semantics = info.getExecutionSemantics()) {
+        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+        Printer.printAttrName("@called");
+        Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
+        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+        Printer << " ";
+      }
     }
-    
+
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -7476,10 +7500,10 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
-    if (info.isCalledOnce()) {
+    if (auto semantics = info.getExecutionSemantics()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@called");
-      Printer << "(once)";
+      Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
       Printer << " ";
     }

@@ -634,6 +634,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
       (unsigned)F.forceEnableLexicalLifetimes(), OnlyReferencedByDebugInfo,
+      (unsigned)F.getFunctionStage(),
+      (unsigned)F.hasOwnershipForTrivialValues(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
       clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -1483,7 +1485,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)BI->getType().getCategory(),
         S.addDeclBaseNameRef(BI->getName()),
         unsigned(swift::ActorIsolation::Unspecified),
-        unsigned(swift::ActorIsolation::Unspecified), Args);
+        unsigned(swift::ActorIsolation::Unspecified),
+        /*unresolved*/ unsigned(false), Args);
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -1512,7 +1515,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
-        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+        unsigned(callerIsolation), unsigned(calleeIsolation),
+        /*unresolved*/ unsigned(false), Args);
     writeApplyArgLocs(ApplySite(const_cast<ApplyInst *>(AI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1543,7 +1547,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
-        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+        unsigned(callerIsolation), unsigned(calleeIsolation),
+        unsigned(AI->isUnresolved()), Args);
     writeApplyArgLocs(ApplySite(const_cast<BeginApplyInst *>(AI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1577,7 +1582,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
-        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+        unsigned(callerIsolation), unsigned(calleeIsolation),
+        /*unresolved*/ unsigned(false), Args);
     writeApplyArgLocs(ApplySite(const_cast<TryApplyInst *>(AI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1599,7 +1605,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()), flags,
-        unsigned(swift::ActorIsolation::Unspecified), Args);
+        unsigned(swift::ActorIsolation::Unspecified),
+        /*unresolved*/unsigned(false), Args);
     writeApplyArgLocs(ApplySite(const_cast<PartialApplyInst *>(PAI)),
                       SI.getModule().getSourceManager());
     break;
@@ -1943,6 +1950,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::MarkUninitializedInst: {
     unsigned Attr =
         (unsigned)cast<MarkUninitializedInst>(&SI)->getMarkUninitializedKind();
+    writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::DiagnoseInst: {
+    unsigned Attr = unsigned(cast<DiagnoseInst>(&SI)->getKind());
     writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
@@ -2462,7 +2474,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr = unsigned(BAI->getAccessKind())
                     + (unsigned(BAI->getEnforcement()) << 2)
                     + (BAI->hasNoNestedConflict() << 5)
-                    + (BAI->isFromBuiltin() << 6);
+                    + (BAI->isFromBuiltin() << 6)
+                    + (BAI->isUnresolved() << 7);
     SILValue operand = BAI->getOperand();
 
     SILOneOperandExtraAttributeLayout::emitRecord(
@@ -3994,6 +4007,16 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DebugValueDelimiterLayout>();
   registerSILAbbr<SILDebugReconstructionBlockLayout>();
   registerSILAbbr<SILExtraStringLayout>();
+
+  // The stage floor must lead the block. The deserializer reads it straight
+  // after the abbrevs, before it jumps to any per-entity offset.
+  //
+  // Emit it unabbreviated. The block declares a 6-bit abbrev width, and the
+  // registrations above already reach ID 63, so a further abbrev would not
+  // encode. One record per module gains nothing from one anyway.
+  ScratchRecord.clear();
+  ScratchRecord.push_back(unsigned(SILMod->getStageFloor()));
+  Out.EmitRecord(unsigned(SIL_STAGE), ScratchRecord);
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).

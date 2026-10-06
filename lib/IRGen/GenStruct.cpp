@@ -500,6 +500,12 @@ namespace {
       }
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -577,11 +583,11 @@ namespace {
 
     void emitCopyWithCopyFunction(IRGenFunction &IGF, SILType T, Address src,
                                   Address dst) const {
+      auto &clangCtx = clangDecl->getASTContext();
       auto *copyFunction =
           clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
               IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
-              /*isVolatile*/ false,
-              clang::QualType(clangDecl->getTypeForDecl(), 0));
+              /*isVolatile*/ false, clangCtx.getCanonicalTagType(clangDecl));
       auto *dstValue = dst.getAddress();
       auto *srcValue = src.getAddress();
       IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,
@@ -605,6 +611,12 @@ namespace {
                              IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -850,6 +862,12 @@ namespace {
       (void)ClangDecl;
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1063,6 +1081,12 @@ namespace {
         : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo, fields,
                              IGM, representation) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1173,6 +1197,12 @@ namespace {
                            isTriviallyDestroyable, isBT, isCopyable,
                            alwaysFixedSize, isABIAccessible)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -1303,6 +1333,12 @@ namespace {
                            structAccessible) {
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1332,10 +1368,18 @@ namespace {
 
         // If we're an array, use the ArrayLayoutEntry.
         if (rawLayout->getArrayLikeTypeAndCount()) {
+          // Don't return yet as a deinit below could replace the
+          // array's destroy.
           auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
-          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
-                                                           loweredLikeType,
-                                                           countType);
+          likeTypeLayout = IGM.typeLayoutCache.getOrCreateArrayEntry(
+              likeTypeLayout, loweredLikeType, countType);
+        }
+
+        // If there's a deinit, use it to destroy instead of the like
+        // type's destroy
+        if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+          return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+              {likeTypeLayout}, T, getBestKnownAlignment().getValue(), *this);
         }
 
         // Otherwise, this is just going to use the same layout entry as the
@@ -1931,6 +1975,12 @@ namespace {
                             IsABIAccessible_t abiAccessible)
       : ResilientTypeInfo(T, copyable, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>

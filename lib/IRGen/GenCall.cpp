@@ -309,6 +309,21 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
   }
 }
 
+static void addAlignmentAttributeToBuilder(IRGenModule &IGM,
+                                           llvm::AttrBuilder &b,
+                                           const TypeInfo &ti) {
+  // If we know the type to have a fixed alignment, then the pointer is
+  // guaranteed to be aligned to at least that alignment.
+  auto fixedTI = dyn_cast<FixedTypeInfo>(&ti);
+  if (!fixedTI) {
+    return;
+  }
+  auto align = fixedTI->getFixedAlignment().getValue();
+  if (align != 1) {
+    b.addAlignmentAttr(align);
+  }
+}
+
 static void addIndirectValueParameterAttributes(IRGenModule &IGM,
                                                 llvm::AttributeList &attrs,
                                                 const TypeInfo &ti,
@@ -323,6 +338,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
     b.addCapturesAttr(llvm::CaptureInfo::none());
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+  addAlignmentAttributeToBuilder(IGM, b, ti);
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
@@ -361,6 +377,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
     b.addCapturesAttr(llvm::CaptureInfo::none());
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+  addAlignmentAttributeToBuilder(IGM, b, ti);
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
@@ -1234,7 +1251,8 @@ namespace {
       case clang::Type::HLSLAttributedResource:
       case clang::Type::HLSLInlineSpirv:
         llvm_unreachable("HLSL type in ABI lowering");
-
+      case clang::Type::OverflowBehavior:
+        llvm_unreachable("OverflowBehavior type in ABI lowering");
 
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
@@ -1327,6 +1345,10 @@ namespace {
       case clang::BuiltinType::Void:
         llvm_unreachable("bare void type in ABI lowering");
 
+      // std::meta::info is a consteval-only type and is never imported.
+      case clang::BuiltinType::MetaInfo:
+        llvm_unreachable("consteval-only type in ABI lowering");
+
       // We should never see the OpenCL builtin types at all.
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLEvent:
@@ -1367,6 +1389,16 @@ namespace {
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
         llvm_unreachable("HLSL intangible type in ABI lowering");
+
+      // We should never see HLSL packed types at all.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+        llvm_unreachable("HLSL packed type in ABI lowering");
+
+      // We should never see SPIRV opaque types at all.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
+        llvm_unreachable("SPIRV type in ABI lowering");
 
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
@@ -1693,10 +1725,10 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   auto &FI = isCXXMethod ?
       clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All) :
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr) :
       clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All);
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
@@ -5754,8 +5786,7 @@ bool IRGenFunction::emitBranchToReturnBB() {
     // it into its predecessor.
   } else if (ReturnBB->hasOneUse()) {
     // return statements are never emitted as conditional branches.
-    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
-    assert(Br->isUnconditional());
+    auto *Br = cast<llvm::UncondBrInst>(*ReturnBB->use_begin());
     Builder.SetInsertPoint(Br->getParent());
     Br->eraseFromParent();
     ReturnBB->eraseFromParent();

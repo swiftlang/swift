@@ -890,20 +890,6 @@ makeTuple(const Gs & ...elementGenerators) {
   };
 }
 
-template <class... Gs>
-static BuiltinFunctionBuilder::LambdaGenerator
-makeBoundGenericType(NominalTypeDecl *decl,
-                     const Gs & ...argumentGenerators) {
-  return {
-    [=](BuiltinFunctionBuilder &builder) -> Type {
-      Type args[] = {
-        argumentGenerators.build(builder)...
-      };
-      return BoundGenericType::get(decl, Type(), args);
-    }
-  };
-}
-
 template <class T>
 static BuiltinFunctionBuilder::MetatypeGenerator<T>
 makeMetatype(const T &object,
@@ -1295,6 +1281,7 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
 
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
+  case BuiltinValueKind::TakeFromRawPointer:
     builtinTy = Context.TheRawPointerType;
     ownership = ParamSpecifier::Default;
     break;
@@ -1381,7 +1368,7 @@ static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   BuiltinFunctionBuilder builder(C, 1, true);
   auto T = makeGenericParam();
   builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
-  builder.addParameter(T);
+  builder.addParameter(T, ParamSpecifier::LegacyOwned);
   builder.setResult(T);
   return builder.build(Id);
 }
@@ -2428,6 +2415,79 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getApplyActorIsolatedUnchecked(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 3,
+                                 /* wantsAdditionalAnyObjectRequirement */ true);
+
+  // <A: AnyObject, T: ~Copyable, E: Error>(
+  //   _: (isolated A) throws(E) -> T, _: A
+  // ) throws(E) -> T
+
+  auto A = makeGenericParam(0);
+  auto T = makeGenericParam(1);
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+  auto E = makeGenericParam(2);
+  builder.addConformanceRequirement(E, KnownProtocolKind::Error);
+
+  auto extInfo = ASTExtInfoBuilder()
+      .withNoEscape()
+      .withThrows(/* throws */ true, E.build(builder))
+      .withIsolation(FunctionTypeIsolation::forParameter())
+      .build();
+
+  auto isolatedParam =
+      FunctionType::Param(A.build(builder), Identifier(),
+                          ParameterTypeFlags().withIsolated(true));
+  auto fnParamTy = FunctionType::get({isolatedParam}, /* yields */ {},
+                                     T.build(builder), extInfo);
+
+  builder.addParameter(makeConcrete(fnParamTy));
+  builder.addParameter(A);
+  builder.setResult(T);
+  builder.setThrows();
+  builder.setThrownError(E);
+
+  return builder.build(id);
+}
+
+static ValueDecl *getApplyGlobalActorIsolatedUnchecked(ASTContext &ctx,
+                                                Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 3);
+
+  // <G: GlobalActor, T: ~Copyable, E: Error>(
+  //   _: @G () throws(E) -> T
+  // ) throws(E) -> T
+  //
+  // Note: `@G` is not valid source syntax today, although we'd like it to be.
+  // A function type cannot be isolated to a generic global actor in source.
+  // The type is constructed directly here; the solver binds `G` from the
+  // argument's concrete global actor isolation (e.g. `@MainActor`)
+
+  auto G = makeGenericParam(0);
+  builder.addConformanceRequirement(G, KnownProtocolKind::GlobalActor);
+  auto T = makeGenericParam(1);
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+  auto E = makeGenericParam(2);
+  builder.addConformanceRequirement(E, KnownProtocolKind::Error);
+
+  auto extInfo =
+      ASTExtInfoBuilder()
+          .withNoEscape()
+          .withThrows(/* throws */ true, E.build(builder))
+          .withIsolation(FunctionTypeIsolation::forGlobalActor(G.build(builder)))
+          .build();
+
+  auto fnParamTy =
+      FunctionType::get({}, /* yields */ {}, T.build(builder), extInfo);
+
+  builder.addParameter(makeConcrete(fnParamTy));
+  builder.setResult(T);
+  builder.setThrows();
+  builder.setThrownError(E);
+
+  return builder.build(id);
+}
+
 static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
                                                 Identifier id) {
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
@@ -2749,11 +2809,11 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
-  case IITDescriptor::Subdivide2Argument:
-  case IITDescriptor::Subdivide4Argument:
+  case IITDescriptor::Subdivide2:
+  case IITDescriptor::Subdivide4:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
-  case IITDescriptor::OneNthEltsVecArgument:
+  case IITDescriptor::OneNthEltsVec:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2779,24 +2839,24 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   }
   
   // The element type of a vector type.
-  case IITDescriptor::VecElementArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::VecElement: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     auto vecType = argType->getAs<BuiltinVectorType>();
     if (!vecType) return Type();
     return vecType->getElementType();
   }
 
-  case IITDescriptor::ExtendArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Extend: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     if (auto vecType = argType->getAs<BuiltinVectorType>())
       return vecType->getExtended(Context);
     return Type();
   }
 
-  case IITDescriptor::TruncArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Trunc: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     if (auto vecType = argType->getAs<BuiltinVectorType>())
       return vecType->getTruncated(Context);
@@ -2811,12 +2871,16 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   }
 
   // A type argument.
-  case IITDescriptor::Argument:
-    return getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Overloaded:
+    return getTypeArgument(D.getOverloadIndex());
+
+  // A fully dependent type that mirrors a previously specified overload type.
+  case IITDescriptor::Match:
+    return getTypeArgument(D.getOverloadIndex());
 
   // A vector of the same width as a type argument.
-  case IITDescriptor::SameVecWidthArgument: {
-    Type maybeVectorType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::SameVecWidth: {
+    Type maybeVectorType = getTypeArgument(D.getOverloadIndex());
     if (!maybeVectorType) return Type();
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
@@ -3388,6 +3452,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CastFromNativeObject:
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
+  case BuiltinValueKind::TakeFromRawPointer:
     if (!Types.empty()) return nullptr;
     return getNativeObjectCast(Context, Id, BV);
 
@@ -3694,6 +3759,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     
   case BuiltinValueKind::Emplace:
     return getEmplace(Context, Id);
+
+  case BuiltinValueKind::ApplyActorIsolatedUnchecked:
+    return getApplyActorIsolatedUnchecked(Context, Id);
+
+  case BuiltinValueKind::ApplyGlobalActorIsolatedUnchecked:
+    return getApplyGlobalActorIsolatedUnchecked(Context, Id);
 
   case BuiltinValueKind::TaskAddCancellationHandler:
     return getTaskAddCancellationHandler(Context, Id);

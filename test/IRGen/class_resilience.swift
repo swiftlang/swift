@@ -394,7 +394,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x ptr]
 // CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{7|10}}
-// CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{12|24}}, ptr [[FIELDS]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
@@ -472,7 +472,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [2 x ptr]
 // CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{7|10}}
-// CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{8|16}}, ptr [[FIELDS]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 319)

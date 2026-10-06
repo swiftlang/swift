@@ -71,3 +71,38 @@ func useNotStd(_ n: inout NotStd) {
   // expected-warning@-1 {{'__insertUnsafe' is deprecated: renamed to 'insert(_:)'}}
   // expected-note@-2 {{use 'insert(_:)' instead}}
 }
+
+func useTemplates(_ t: inout TemplateProjections) {
+  // The original names are '@unsafe(always)', like those of other methods.
+  _ = t.projection(CInt(0)) // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'projection'}}
+  _ = t.metatype(T: CInt.self) // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'metatype(T:)'}}
+
+  // The migration stubs, which share their specialization, are only '@unsafe'.
+  _ = t.__projectionUnsafe(CInt(0)) // expected-warning {{'__projectionUnsafe' is deprecated: renamed to 'projection(_:)'}}
+  // expected-note@-1 {{use 'projection(_:)' instead}}
+  _ = t.__metatypeUnsafe(T: CInt.self) // expected-warning {{'__metatypeUnsafe(T:)' is deprecated: renamed to 'metatype(T:)'}}
+  // expected-note@-1 {{use 'metatype(T:)' instead}}
+}
+
+func useTemplateAndSafe(_ o: TemplateAndSafeOwner,
+                        _ p: UnsafeMutablePointer<CInt>) {
+  // Instantiating with a pointer doesn't make this a projection.
+  _ = o.identity(p)
+
+  _ = o.vouchedProjection()
+
+  // 'safe' doesn't exempt begin and end, which keep their stubs.
+  _ = o.begin() // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+  _ = unsafe o.begin()
+  _ = unsafe o.__beginUnsafe()
+  _ = unsafe o.__endUnsafe()
+}
+
+func useCustomNamed(_ c: inout CustomNamed) {
+  // Kept its name because of a custom Swift name, not because the feature let
+  // it; like without the feature, it is only '@unsafe'.
+  _ = c.get()
+}

@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Comparable enum synthesis
 enum Angel: Comparable {

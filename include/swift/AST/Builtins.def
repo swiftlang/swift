@@ -325,6 +325,11 @@ BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
+/// TakeFromRawPointer has type (Builtin.RawPointer) -> T.
+/// T must be a single reference supported by SILGen. The pointer carries an
+/// existing +1 reference, which the result takes without retaining it.
+BUILTIN_SIL_OPERATION(TakeFromRawPointer, "takeFromRawPointer", Special)
+
 /// castReference has type T -> U.
 /// T and U must be convertible to AnyObject.
 BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
@@ -1234,6 +1239,29 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n"
 /// which must initialize the memory before finishing execution. The value in
 /// memory becomes the result of the call.
 BUILTIN_SIL_OPERATION(Emplace, "emplace", Special)
+
+/// applyActorIsolatedUnchecked: <A: AnyObject, T: ~Copyable, E: Error>(
+///   _ fn: (isolated A) throws(E) -> T, _ actor: A
+/// ) throws(E) -> T
+///
+/// Calls the non-escaping function `fn` with `actor` as its isolated
+/// parameter, without checking that the caller is isolated to `actor`.
+///
+/// The caller must have established that isolation already.
+BUILTIN_SIL_OPERATION(ApplyActorIsolatedUnchecked, "applyActorIsolatedUnchecked", Special)
+
+/// applyGlobalActorIsolatedUnchecked: <G: GlobalActor, T: ~Copyable, E: Error>(
+///   _ fn: @G () throws(E) -> T
+/// ) throws(E) -> T
+///
+/// Calls the non-escaping, global actor isolated function `fn` without
+/// checking that the caller is isolated to the global actor `G`.
+///
+/// The caller must have established that isolation already.
+///
+/// `@G` is not expressible in source; the parameter type is isolated to the
+/// generic global actor `G`, which is bound from the argument's isolation
+BUILTIN_SIL_OPERATION(ApplyGlobalActorIsolatedUnchecked, "applyGlobalActorIsolatedUnchecked", Special)
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION

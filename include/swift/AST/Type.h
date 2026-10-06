@@ -431,12 +431,10 @@ public:
   ///   - class types, generic or not
   ///   - archetypes with class or class protocol bounds
   ///   - existentials with class or class protocol bounds
+  ///   - COM interface existentials
   /// But not:
   ///   - function types
-  bool allowsOwnership(const GenericSignatureImpl *sig) const {
-    return isReferenceTypeImpl(*this, sig,
-                               /*functions count*/ false);
-  }
+  bool allowsOwnership(const GenericSignatureImpl *sig) const;
 
   /// Are values of this type essentially just class references,
   /// possibly with some extra metadata?
@@ -626,12 +624,6 @@ namespace llvm {
 
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
-    static swift::Type getEmptyKey() {
-      return llvm::DenseMapInfo<swift::TypeBase*>::getEmptyKey();
-    }
-    static swift::Type getTombstoneKey() {
-      return llvm::DenseMapInfo<swift::TypeBase*>::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::Type Val) {
       return DenseMapInfo<swift::TypeBase*>::getHashValue(Val.getPointer());
     }
@@ -641,14 +633,6 @@ namespace llvm {
   };
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
-    static swift::CanType getEmptyKey() {
-      return swift::CanType(llvm::DenseMapInfo<swift::
-                              TypeBase*>::getEmptyKey());
-    }
-    static swift::CanType getTombstoneKey() {
-      return swift::CanType(llvm::DenseMapInfo<swift::
-                              TypeBase*>::getTombstoneKey());
-    }
   };
 
   // A Type is "pointer like".

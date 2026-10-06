@@ -248,7 +248,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
                                            Type type,
                                            bool *involvesOtherTypeVariables) {
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   type->getTypeVariables(typeVars);
 
   bool occurs = typeVars.count(typeVar);
@@ -600,15 +600,15 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   // Check whether a locator with this anchor + path already exists.
   llvm::FoldingSetNodeID id;
   ConstraintLocator::Profile(id, anchor, path);
-  void *insertPos = nullptr;
-  auto locator = ConstraintLocators.FindNodeOrInsertPos(id, insertPos);
+  llvm::FoldingSetInsertToken insertToken;
+  auto locator = ConstraintLocators.lookup(id, insertToken);
   if (locator)
     return locator;
 
   // Allocate a new locator and add it to the set.
   locator = ConstraintLocator::create(getAllocator(), anchor, path,
                                       summaryFlags);
-  ConstraintLocators.InsertNode(locator, insertPos);
+  ConstraintLocators.insert(locator, insertToken);
   return locator;
 }
 
@@ -1441,10 +1441,10 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
-  bool isCalledOnce = false;
+  std::optional<ExecutionSemantics> executionSemantics;
 
   if (auto *called = expr->getAttrs().getAttribute<CalledAttr>()) {
-    isCalledOnce = called->isOnce();
+    executionSemantics = called->getSemantics();
   }
 
   if (throws || async) {
@@ -1461,11 +1461,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
     }
 
     return ASTExtInfoBuilder()
-      .withThrows(throws, /*FIXME:*/Type())
-      .withAsync(async)
-      .withSendable(sendable)
-      .withCalledOnce(isCalledOnce)
-      .build();
+        .withThrows(throws, /*FIXME:*/ Type())
+        .withAsync(async)
+        .withSendable(sendable)
+        .withExecutionSemantics(executionSemantics)
+        .build();
   }
 
   // Scan the body to determine the effects.
@@ -1476,10 +1476,10 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
-      .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
+      .withThrows(throwFinder.foundThrow(), /*FIXME:*/ Type())
       .withAsync(bool(findAsyncNode(expr)))
       .withSendable(sendable)
-      .withCalledOnce(isCalledOnce)
+      .withExecutionSemantics(executionSemantics)
       .build();
 }
 
@@ -1774,15 +1774,18 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     return std::make_pair(Type(), isSendableCapture(ty));
   }
 
-  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+  std::pair<Type, std::optional<ExecutionSemantics>>
+  transformExecutionSemanticsDependentType(Type ty) {
     ty = simplify(ty);
 
     // If we still have type variables, we keep the dependence.
     if (ty->hasTypeVariable())
-      return std::pair(ty, false);
+      return std::make_pair(ty, std::nullopt);
 
-    // Otherwise we've flattened the dependence, evaluate @called(once).
-    return std::make_pair(Type(), ty->isNoncopyable());
+    // Otherwise we've flattened the dependence, evaluate @called(atMostOnce).
+    if (ty->isNoncopyable())
+      return std::make_pair(Type(), ExecutionSemantics::AtMostOnce);
+    return std::make_pair(Type(), std::nullopt);
   }
 };
 

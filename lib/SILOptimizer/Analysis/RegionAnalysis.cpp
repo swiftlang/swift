@@ -702,10 +702,10 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
       if (declRef.isAsyncLetClosure)
         return true;
 
-      // All of the non-Sendable captures of non-escaping @called(once) closures
-      // that aren't explicitly `sending` can be sent.
+      // All of the non-Sendable captures of non-escaping @called(atMostOnce)
+      // closures that aren't explicitly `sending` can be sent.
       if (auto *closure = declRef.getClosureExpr();
-          closure && closure->isCalledOnce()) {
+          closure && closure->hasCalledAtMostOnceSemantics()) {
         auto *closureTy = closure->getType()->castTo<FunctionType>();
         if (closureTy->getExtInfo().isNoEscape())
           return true;
@@ -2358,15 +2358,16 @@ class PartitionOpTranslator {
     partialApplyReachabilityDataflow.propagateReachability();
   }
 
-  /// The argument is a non-escaping `@called(once)` value,
+  /// The argument is a non-escaping `@called(atMostOnce)` value,
   /// if it's a closure, attempt to undo send of it's implicitly
   /// sending captures if the values weren't actually sent in the
   /// body of the closure.
-  void tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(
-      Operand *calledOnceArgument) {
+  void tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(
+      Operand *calledAtMostOnceSemanticsArgument) {
     // Dig up partial_apply that represents the closure.
-    auto *pai = getUnderlyingPartialApply(calledOnceArgument->get());
-    if (!pai || !pai->isCalledOnce())
+    auto *pai =
+        getUnderlyingPartialApply(calledAtMostOnceSemanticsArgument->get());
+    if (!pai || !pai->hasCalledAtMostOnceSemantics())
       return;
 
     auto *calleeFn = pai->getCalleeFunction();
@@ -2394,7 +2395,8 @@ class PartitionOpTranslator {
       assert(argIndex < calleeFn->getArguments().size());
 
       if (!calleeInfo.wasValueEverSent(calleeFn->getArgument(argIndex)))
-        builder.addUndoSend(trackedValue->value, calledOnceArgument->getUser());
+        builder.addUndoSend(trackedValue->value,
+                            calledAtMostOnceSemanticsArgument->getUser());
     }
   }
 
@@ -2816,10 +2818,10 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
-  void translateSILNoEscapeCalledOncePartialApply(PartialApplyInst *pai) {
+  void translateSILNoEscapeCalledAtMostOncePartialApply(PartialApplyInst *pai) {
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << "Translating non-escaping `@called(once)` Partial Apply!\n");
+        << "Translating non-escaping `@called(atMostOnce)` Partial Apply!\n");
 
     for (auto &op : ApplySite(pai).getArgumentOperands()) {
       // All of the non-Sendable captures are sent by default. This would
@@ -2836,10 +2838,10 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
-  void translateSILCalledOncePartialApply(PartialApplyInst *pai) {
+  void translateSILCalledAtMostOncePartialApply(PartialApplyInst *pai) {
     ApplySite applySite(pai);
-    REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                             << "Translating `@called(once)` Partial Apply!\n");
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "Translating `@called(atMostOnce)` Partial Apply!\n");
 
     SmallVector<Operand *> operandsToMerge;
     for (auto &op : applySite.getArgumentOperands()) {
@@ -2940,17 +2942,17 @@ public:
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
-    // `@called(once)` closures are allowed to have `sending` captures which
-    // need special handling.
-    if (pai->isCalledOnce()) {
+    // `@called(atMostOnce)` closures are allowed to have `sending` captures
+    // which need special handling.
+    if (pai->hasCalledAtMostOnceSemantics()) {
       // no-escaping closures treat non-Sendable captures that aren't explicitly
       // `sending` as individually sent and undo if the values were never
       // actually sent in the body.
       if (isNoEscapePartialApply(pai)) {
-        return translateSILNoEscapeCalledOncePartialApply(pai);
+        return translateSILNoEscapeCalledAtMostOncePartialApply(pai);
       }
 
-      return translateSILCalledOncePartialApply(pai);
+      return translateSILCalledAtMostOncePartialApply(pai);
     }
 
     SmallVector<SILValue, 8> directResults;
@@ -2996,9 +2998,9 @@ public:
     // For non-self parameters, gather all of the sending parameters and
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
-    // Non-escaping `@called(once)` closures require a post-call undo
+    // Non-escaping `@called(atMostOnce)` closures require a post-call undo
     // of their un-sent captures.
-    SmallVector<Operand *, 2> nonescapingCalledOnceArguments;
+    SmallVector<Operand *, 2> nonescapingCalledAtMostOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
 
     // NOTE: We want to process indirect parameters as if they are
@@ -3020,12 +3022,12 @@ public:
       if (!fas.isSending(op)) {
         auto argumentType = op.get()->getType();
 
-        // Non-escaping @called(once) closures require special
+        // Non-escaping @called(atMostOnce) closures require special
         // handling to undo send of non-Sendable captures that
         // weren't sent in the body.
-        if (argumentType.isCalledOnce() &&
+        if (argumentType.hasCalledAtMostOnceSemantics() &&
             argumentType.containsNoEscapeFunction()) {
-          nonescapingCalledOnceArguments.push_back(&op);
+          nonescapingCalledAtMostOnceArguments.push_back(&op);
         }
 
         nonSendingParameters.push_back(&op);
@@ -3057,9 +3059,9 @@ public:
       }
 
       // Attempt to undo send of captures that weren't sent in the body of
-      // a non-escaping `@called(once)` closure.
-      for (Operand *op : nonescapingCalledOnceArguments) {
-        tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(op);
+      // a non-escaping `@called(atMostOnce)` closure.
+      for (Operand *op : nonescapingCalledAtMostOnceArguments) {
+        tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(op);
       }
     };
 
@@ -4080,8 +4082,8 @@ CONSTANT_TRANSLATION(DereferenceBorrowAddrInst, LookThrough)
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 // `assign` is ordinarily lowered away by DI before this pass but
-// non-escaping `@called(once)` and `async let` bodies require analysis
-// as part of the use (calls for `@called(once)` and `await` for
+// non-escaping `@called(atMostOnce)` and `async let` bodies require analysis
+// as part of the use (calls for `@called(atMostOnce)` and `await` for
 // `async let`) to determine whether sends of captures have to be undone
 // and that can happen before DI run on the closure and so `assign` has
 // to be treated as a `store`.
@@ -4117,6 +4119,7 @@ CONSTANT_TRANSLATION(EndAccessInst, Ignored)
 CONSTANT_TRANSLATION(EndBorrowInst, Ignored)
 CONSTANT_TRANSLATION(EndLifetimeInst, Ignored)
 CONSTANT_TRANSLATION(ExtendLifetimeInst, Ignored)
+CONSTANT_TRANSLATION(DiagnoseInst, Ignored)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
@@ -4825,6 +4828,13 @@ PartitionOpTranslator::visitInitExistentialRefInst(
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
+
+  // A test_only cast has no destination operand.
+  // Only the source takes part, exactly as for checked_cast_br below.
+  if (!ccabi->hasDest()) {
+    translateSILRequire(ccabi->getSrc());
+    return TranslationSemantics::Special;
+  }
 
   // checked_cast_addr_br does not have any arguments in its resulting
   // block. We should just use a multi-assign on its operands.

@@ -2974,8 +2974,9 @@ void LoadableByAddress::recreateSingleApply(
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
-        castedApply->isOnStack(), castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation,
+        castedApply->getExecutionSemantics(), castedApply->isOnStack(),
+        castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -3381,7 +3382,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
 void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
   // verification.
-  getModule()->setStage(SILStage::Lowered);
+  getModule()->commitStage(SILStage::Lowered);
 
   for (auto &F : *getModule())
     runOnFunction(&F);

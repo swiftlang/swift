@@ -2382,8 +2382,12 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     return;
   }
   // Allocate temporary storage for a loadable operand.
-  AllocStackInst *allocInst =
-      argBuilder.createAllocStack(callLoc, argValue->getType());
+  // The call location may be a VarDecl (e.g. a default-argument generator),
+  // but this buffer is a compiler temporary, not that variable's storage.
+  AllocStackInst *allocInst = argBuilder.createAllocStack(
+      callLoc, argValue->getType(), {}, DoesNotHaveDynamicLifetime,
+      IsNotLexical, IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo,
+      /* skipVarDeclAssert = */ true);
   if (apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
@@ -2712,7 +2716,12 @@ SILValue ApplyRewriter::materializeIndirectOutputAddress(ApplyOutput kind,
     return storage.storageAddress;
   }
   // Allocate temporary call-site storage for an unused or loadable result.
-  auto *allocInst = argBuilder.createAllocStack(callLoc, argTy);
+  // The call location may be a VarDecl (e.g. a default-argument generator),
+  // but this buffer is a compiler temporary, not that variable's storage.
+  auto *allocInst = argBuilder.createAllocStack(
+      callLoc, argTy, {}, DoesNotHaveDynamicLifetime, IsNotLexical,
+      IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo,
+      /* skipVarDeclAssert = */ true);
 
   // Instead of using resultBuilder, insert dealloc immediately after the call
   // for stack discipline across loadable indirect results.
@@ -3714,6 +3723,14 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    // Polymorphic builtins (e.g. "generic_add") only ever borrow their
+    // operands (see the InstantaneousUse classification in
+    // OperandOwnershipBuiltinClassifier), so every operand is handled the
+    // same way: materialize its address in place.
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+    case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
@@ -4518,6 +4535,36 @@ protected:
       addrMat.materializeAddress(bi);
       SILValue destAddr = storage.storageAddress;
       builder.createZeroInitAddr(bi->getLoc(), destAddr);
+      storage.markRewritten();
+      break;
+    }
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+    case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
+    {
+      // Rewrite the value-form (with already address-converted operands,
+      // see UseRewriter::visitBuiltinInst above):
+      //   %result = builtin "generic_add"<T>(%0 : $*T, %1 : $*T) : $T
+      // into the address-form that non-opaque-values SILGen already emits:
+      //   builtin "generic_add"<T>(%dest : $*T, %0 : $*T, %1 : $*T) : $()
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      SmallVector<SILValue, 4> newArgs;
+      newArgs.push_back(destAddr);
+      for (SILValue arg : bi->getArguments()) {
+        // A polymorphic builtin is typed <T> (T, T) -> T, so an opaque result
+        // means opaque operands, which the UseRewriter has already given
+        // addresses. However, nothing enforces that on parsed SIL, and mixing
+        // a value operand into the address form below would go unnoticed.
+        assert(arg->getType().isAddress() &&
+               "polymorphic builtin operand should already be rewritten");
+        newArgs.push_back(arg);
+      }
+      auto &astCtx = pass.getModule()->getASTContext();
+      builder.createBuiltin(bi->getLoc(), bi->getName(),
+                            SILType::getEmptyTupleType(astCtx),
+                            bi->getSubstitutions(), newArgs);
       storage.markRewritten();
       break;
     }

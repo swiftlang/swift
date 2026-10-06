@@ -2503,6 +2503,7 @@ public:
 
     case MacroDefinition::Kind::Invalid:
     case MacroDefinition::Kind::Builtin:
+    case MacroDefinition::Kind::Internal:
     case MacroDefinition::Kind::Expanded:
       // Nothing else to check here.
       break;
@@ -4209,6 +4210,19 @@ public:
     if (throwsLoc.isValid() && !CD->getThrownTypeRepr() &&
         !CD->hasPolymorphicEffect(EffectKind::Throws)) {
       diagnoseUntypedThrows(CD, throwsLoc);
+    }
+
+    // If the class inherits from a C++ foreign reference type, prohibit
+    // failable and throwing initializers. There is no clear way to clean up the
+    // object if initialization fails.
+    if (auto classDecl = CD->getDeclContext()->getSelfClassDecl()) {
+      if (Ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          !classDecl->hasClangNode() &&
+          classDecl->getForeignReferenceSuperclassOrSelf() &&
+          (CD->isFailable() || CD->hasThrows())) {
+        CD->diagnose(diag::foreign_reference_subclass_init_cannot_fail, CD,
+                     CD->isFailable());
+      }
     }
 
     // Check whether this initializer overrides an initializer in its

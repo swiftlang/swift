@@ -85,6 +85,7 @@ FEATURE(TaskPriorityEscalationHandlers,                 (6, 2))
 FEATURE(TypedCoroAlloc,                                 (6, 2))
 
 FEATURE(NoncopyableReflectionSafety,                    (6, 4))
+FEATURE(Borrowing,                                      (6, 4))
 
 FEATURE(TaskCancellationScope,                          (6, 5))
 FEATURE(TaskDeadline,                                   (6, 5))
@@ -100,6 +101,8 @@ FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 FEATURE(CoroutineAccessors,                             FUTURE)
 FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
 FEATURE(CoroutineFunctions,                             FUTURE)
+// TODO: DynamicCastTest: Change to correct version number.
+FEATURE(DynamicCastTest,                                FUTURE)
 
 #undef FEATURE
 #undef FUTURE

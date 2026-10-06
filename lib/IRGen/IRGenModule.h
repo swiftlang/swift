@@ -1142,6 +1142,9 @@ public:
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
   const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
+
+  void dumpAbstractTypeLayoutInfo(CanType type, StringRef mangledName,
+                                  StringRef origin);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
@@ -1362,6 +1365,10 @@ public:
 
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
+
+  /// Global blocks, keyed by their invoke function and constant capture.
+  llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
+                 llvm::Constant *> GlobalBlocks;
 
 private:
   using CopyAddrHelperGenerator =

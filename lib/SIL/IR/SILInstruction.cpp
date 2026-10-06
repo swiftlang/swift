@@ -1067,6 +1067,10 @@ unsigned Operand::getOperandNumber() const {
 }
 
 MemoryBehavior SILInstruction::getMemoryBehavior() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return MemoryBehavior::MayHaveSideEffects;
+  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
@@ -1100,6 +1104,11 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
+  }
+
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastInst>(this)) {
+    if (!cast->preservesOwnership())
+      return MemoryBehavior::MayHaveSideEffects;
   }
 
   // Handle full apply sites that have a resolvable callee function with an
@@ -1193,6 +1202,10 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 bool SILInstruction::mayRelease() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return true;
+  }
   // Overrule a "DoesNotRelease" of dynamic casts. If a dynamic cast is not
   // RC identity preserving it can release it's source (in some cases - we are
   // conservative here).
@@ -2110,9 +2123,10 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         continue;
       }
 
-      // A `@called(once)` closure's context is consumed directly by the
+      // A `@called(atMostOnce)` closure's context is consumed directly by the
       // `apply`/`try_apply` its passed to.
-      if (isCalledOnce() && isa<ApplyInst, TryApplyInst>(use->getUser())) {
+      if (hasCalledAtMostOnceSemantics() &&
+          isa<ApplyInst, TryApplyInst>(use->getUser())) {
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
@@ -2156,12 +2170,13 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 
   for (auto *inst : boundary.lastUsers) {
     Operand *consumingOperand = nullptr;
-    // Non-`@called(once)` values end their lifetime only at `destroy_value`.
+    // Non-`@called(atMostOnce)` values end their lifetime only at
+    // `destroy_value`.
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       consumingOperand = &dvi->getOperandRef();
-    } else if (isCalledOnce()) {
-      // `@called(once)` is consumed by an apply, look up the operand where
-      // it appears.
+    } else if (hasCalledAtMostOnceSemantics()) {
+      // `@called(atMostOnce)` is consumed by an apply, look up the operand
+      // where it appears.
       for (auto &operand : inst->getAllOperands()) {
         if (operand.isConsuming() && lookThroughOwnershipAndForwardingInsts(
                                          operand.get()) == SILValue(this)) {

@@ -504,10 +504,14 @@ UNINTERESTING_FEATURE(LibkernOwnershipConventions)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(ForeignReferenceTypeSubclassing)
 UNINTERESTING_FEATURE(CxxImplementation)
+UNINTERESTING_FEATURE(GenerateBindingsForNoncopyableTypesInCXX)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
 UNINTERESTING_FEATURE(EmbeddedDistributed)
+
+// FIXME: Detect `_scope` and `@_scoped()`.
+static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
@@ -734,7 +738,6 @@ static bool usesFeatureReparenting(Decl *decl) {
 
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
-UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 
 UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
 
@@ -757,7 +760,7 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
   std::function<bool(Type)> hasCalled = [](Type T) {
     if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
-      return F->isCalledOnce();
+      return F->hasCalledAtMostOnceSemantics();
     return false;
   };
 

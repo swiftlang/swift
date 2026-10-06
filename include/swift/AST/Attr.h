@@ -33,6 +33,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/AST/StorageImpl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
 #include "swift/Basic/Feature.h"
@@ -45,6 +46,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Basic/WarningGroupBehavior.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -969,6 +971,9 @@ private:
   AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
 
+  /// Location of the availability macro expanded to create this attribute.
+  SourceLoc MacroLoc;
+
   const StringRef Message;
   const StringRef Rename;
 
@@ -989,6 +994,12 @@ public:
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
+
+  /// Returns the location of the availability macro that was expanded to create
+  /// this attribute, or an invalid location if the attribute did not come from
+  /// a `-define-availability` argument.
+  SourceLoc getMacroLoc() const { return MacroLoc; }
+  void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
 
   /// Returns the parsed version for `introduced:`.
   std::optional<llvm::VersionTuple> getRawIntroduced() const {
@@ -3939,11 +3950,25 @@ public:
   CalledAttr(ExecutionSemantics semantics)
       : CalledAttr(SourceLoc(), SourceRange(), semantics) {}
 
-  bool isOnce() const { return getSemantics() == ExecutionSemantics::Once; }
+  bool isAtMostOnce() const {
+    return getSemantics() == ExecutionSemantics::AtMostOnce;
+  }
+
+  bool isExactlyOnce() const {
+    return getSemantics() == ExecutionSemantics::Once;
+  }
 
   ExecutionSemantics getSemantics() const {
     return ExecutionSemantics(Bits.CalledAttr.Semantics);
   }
+
+  const char *getSemanticsName() const {
+    return getSemanticsName(getSemantics());
+  }
+
+  /// Returns the source spelling of the argument of `@called` for the given
+  /// execution semantics, such as `atMostOnce`.
+  static const char *getSemanticsName(ExecutionSemantics semantics);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Called;
@@ -4455,6 +4480,11 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(CalledTypeAttr, TypeAttribute, 8,
       Semantics : 8
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(ScopedTypeAttr, TypeAttribute, 32,
+      : NumPadBits,
+      NumSpecifiers : 32
+    );
   } Bits;
   // clang-format on
 
@@ -4657,6 +4687,127 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
+/// Wrapper for `Identifier`s which syntactically refer to scopes to reduce risk
+/// of confusion / implementation bugs.
+class ScopeName {
+  Identifier Name;
+
+public:
+  explicit ScopeName(Identifier name) : Name(name) {}
+
+  Identifier getIdentifier() const { return Name; }
+
+  friend bool operator==(ScopeName lhs, ScopeName rhs) {
+    return lhs.Name == rhs.Name;
+  }
+  friend bool operator!=(ScopeName lhs, ScopeName rhs) { return !(lhs == rhs); }
+};
+
+/// A scope as written, e.g. `&a`, `self`, or `immortal`, before resolution.
+class ScopeDescriptor {
+public:
+  /// Does this scope descriptor refer to something by name, `self`, or
+  /// `immortal`?
+  enum class Subject : uint8_t { Name, Self, Immortal };
+
+private:
+  /// The name (null unless the subject is `Name`), whether this is an access
+  /// (`&`), and the subject.
+  llvm::PointerIntPair<llvm::PointerIntPair<Identifier, 1, bool>, 2, Subject>
+      Storage;
+  SourceLoc Loc;
+
+  ScopeDescriptor(Subject subject, Identifier name, bool isAccess,
+                  SourceLoc loc)
+      : Storage({name, isAccess}, subject), Loc(loc) {}
+
+public:
+  /// Create a scope descriptor that refers to a name, e.g. `a`
+  static ScopeDescriptor forScopeName(Located<ScopeName> name) {
+    return {Subject::Name, name.Item.getIdentifier(), /*isAccess=*/false,
+            name.Loc};
+  }
+
+  /// Create a scope descriptor that describes the access of a value, e.g. `&a`
+  static ScopeDescriptor forAccessedValue(Located<Identifier> name) {
+    return {Subject::Name, name.Item, /*isAccess=*/true, name.Loc};
+  }
+
+  static ScopeDescriptor forSelf(SourceLoc selfLoc, bool isAccess) {
+    return {Subject::Self, Identifier(), isAccess, selfLoc};
+  }
+
+  static ScopeDescriptor forImmortal(SourceLoc immortalLoc) {
+    return {Subject::Immortal, Identifier(), /*isAccess=*/false, immortalLoc};
+  }
+
+  Subject getSubject() const { return Storage.getInt(); }
+
+  /// Whether this is `&a`, the scope of an access to the value `a`, rather than
+  /// a scope itself.
+  bool isAccess() const { return Storage.getPointer().getInt(); }
+
+  ScopeName getScopeName() const {
+    ASSERT(getSubject() == Subject::Name && !isAccess());
+    return ScopeName(Storage.getPointer().getPointer());
+  }
+
+  Identifier getAccessedValue() const {
+    ASSERT(getSubject() == Subject::Name && isAccess());
+    return Storage.getPointer().getPointer();
+  }
+
+  SourceLoc getLoc() const { return Loc; }
+};
+
+/// A single scope restriction within a `@_scoped` attribute, e.g. `left: &a` in
+/// `@_scoped(left: &a, right: b)`.
+class ScopeSpecifier {
+  /// Null when not specifying a scope restriction by name, e.g. `array` in
+  /// `@_scoped(array)`.
+  Identifier LabelName;
+  SourceLoc LabelLoc;
+  ScopeDescriptor Scope;
+
+public:
+  ScopeSpecifier(std::optional<Located<ScopeName>> label, ScopeDescriptor scope)
+      : Scope(scope) {
+    if (label) {
+      LabelName = label->Item.getIdentifier();
+      LabelLoc = label->Loc;
+      ASSERT(!LabelName.empty());
+    }
+  }
+
+  std::optional<Located<ScopeName>> getLabel() const {
+    if (LabelName.empty())
+      return std::nullopt;
+    return Located<ScopeName>(ScopeName(LabelName), LabelLoc);
+  }
+
+  ScopeDescriptor getScope() const { return Scope; }
+};
+
+class ScopedTypeAttr final
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::Scoped>,
+      private llvm::TrailingObjects<ScopedTypeAttr, ScopeSpecifier> {
+  friend TrailingObjects;
+
+  ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                 ArrayRef<ScopeSpecifier> specifiers);
+
+public:
+  static ScopedTypeAttr *create(const ASTContext &ctx, SourceLoc atLoc,
+                                SourceLoc kwLoc, SourceRange parens,
+                                ArrayRef<ScopeSpecifier> specifiers);
+
+  ArrayRef<ScopeSpecifier> getSpecifiers() const {
+    return getTrailingObjects(Bits.ScopedTypeAttr.NumSpecifiers);
+  }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
 class OpaqueReturnTypeOfTypeAttr
     : public SimpleTypeAttrWithArgs<TypeAttrKind::OpaqueReturnTypeOf> {
   Located<StringRef> MangledName;
@@ -4752,7 +4903,7 @@ public:
 
 class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
 public:
-  enum class Semantics : uint8_t { Once };
+  enum class Semantics : uint8_t { AtMostOnce, ExactlyOnce };
 
 private:
   SourceLoc SemanticsLoc;
@@ -4764,11 +4915,17 @@ public:
     Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
   }
 
-  bool isOnce() const { return getSemantics() == Semantics::Once; }
+  bool isAtMostOnce() const { return getSemantics() == Semantics::AtMostOnce; }
+  bool isExactlyOnce() const {
+    return getSemantics() == Semantics::ExactlyOnce;
+  }
 
   Semantics getSemantics() const {
     return Semantics(Bits.CalledTypeAttr.Semantics);
   }
+
+  /// Returns the execution semantics of function types with this attribute.
+  ExecutionSemantics getExecutionSemantics() const;
   SourceLoc getSemanticsLoc() const { return SemanticsLoc; }
 
   const char *getSemanticsName() const {

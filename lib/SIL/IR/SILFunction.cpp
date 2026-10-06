@@ -288,9 +288,13 @@ void SILFunction::init(
   // Set by AddressLowering when it lowers this function in the Raw-stage
   // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
   // born after the module advances past Raw are reported lowered by the
-  // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
+  // stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
   this->HasOwnershipForTrivialValues = false;
+
+  // A function is born at the stage floor. Content created after the module
+  // commits to a stage is built to that stage's rules.
+  this->FunctionStage = unsigned(Module.getStageFloor());
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -311,10 +315,30 @@ bool SILFunction::hasLoweredAddresses() const {
   // - This function was individually lowered by AddressLowering
   // - This function arrived already canonical via deserialization
   // - This is a non-opaque-values build
-  // - Module has committed past Raw SIL stage 
+  // - This function has committed past Raw SIL
   return HasLoweredAddresses || WasDeserializedCanonical ||
          !getModule().usesOpaqueValues() ||
-         getModule().getStage() != SILStage::Raw;
+         getFunctionStage() != SILStage::Raw;
+}
+
+SILStage SILFunction::getFunctionStage() const {
+  return SILStage(FunctionStage);
+}
+
+void SILFunction::setFunctionStage(SILStage stage) {
+  assert(stage >= getFunctionStage() && "regressing per-function stage?!");
+  assert(stage >= getModule().getStageFloor() &&
+         "per-function stage below the module stage floor?!");
+  FunctionStage = unsigned(stage);
+}
+
+void SILFunction::inheritDerivedFrom(const SILFunction *from) {
+  setHasLoweredAddresses(from->hasLoweredAddresses());
+  // Only ever move forward. The clone was born at the module's stage floor,
+  // which can already be ahead of a source that predates a commit, such as a
+  // snapshot.
+  if (from->getFunctionStage() > getFunctionStage())
+    setFunctionStage(from->getFunctionStage());
 }
 
 SILAddressConventions SILAddressConventions::forRawSIL(SILModule &M) {
@@ -651,6 +675,11 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (getName() == getASTContext().getEntryPointFunctionName())
     return false;
 
+  // Any module that uses a generic function can create the same
+  // specialization of it.
+  if (isSpecialization())
+    return true;
+
   // If this is for a declaration, ask it.
   if (auto declRef = getDeclRef()) {
     return declRef.hasNonUniqueDefinition();
@@ -774,12 +803,14 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
 SILBasicBlock *SILFunction::createBasicBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.push_back(newBlock);
   return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   newBlock->setDebugName(debugName);
   BlockList.push_back(newBlock);
   return newBlock;
@@ -787,12 +818,14 @@ SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
 
 SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.insertAfter(afterBB->getIterator(), newBlock);
   return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  assignFreshBlockNumber(*newBlock);
   BlockList.insert(beforeBB->getIterator(), newBlock);
   return newBlock;
 }
@@ -800,6 +833,11 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
 SILBasicBlock *SILFunction::createEmptyDebugReconstructionBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
   newBlock->index = -2;
+  // Even though this block is not part of the block list, generic graph
+  // algorithms (e.g. a dominator tree during SIL verification) may still be
+  // queried with it, so give it a valid, unique block number. The block will
+  // simply not be present in those structures.
+  assignFreshBlockNumber(*newBlock);
   // Do NOT insert into BlockList - this is a standalone debug block.
   return newBlock;
 }

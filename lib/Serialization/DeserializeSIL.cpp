@@ -210,7 +210,18 @@ SILDeserializer::SILDeserializer(
     return;
 
   // Load any abbrev records at the start of the block.
-  MF->fatalIfUnexpected(SILCursor.advance());
+  llvm::BitstreamEntry firstEntry = MF->fatalIfUnexpected(SILCursor.advance());
+
+  // The stage floor leads the block, ahead of every per-entity record. Reading
+  // it here costs nothing, because every other read jumps to its own offset.
+  if (firstEntry.Kind == llvm::BitstreamEntry::Record) {
+    SmallVector<uint64_t, 1> stageScratch;
+    unsigned stageKind = MF->fatalIfUnexpected(
+        SILCursor.readRecord(firstEntry.ID, stageScratch));
+    if (stageKind == SIL_STAGE && stageScratch.size() == 1 &&
+        stageScratch[0] <= unsigned(SILStage::Lowered))
+      SerializedStageFloor = SILStage(stageScratch[0]);
+  }
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
   // We expect SIL_FUNC_NAMES first, then SIL_VTABLE_NAMES, then
@@ -731,7 +742,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // canonical SIL form.
   assert(!forDebugScope || declarationOnly); // debug scopes must always be read
                                              // declaration only
-  switch (SILMod.getStage()) {
+  switch (SILMod.getStageFloor()) {
   case SILStage::Raw:
   case SILStage::Canonical:
     break;
@@ -815,7 +826,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo;
+      onlyReferencedByDebugInfo, serializedStage,
+      hasOwnershipForTrivialValues;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -825,7 +837,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
+      funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
       parentModuleID, SemanticsIDs);
 
@@ -1009,6 +1022,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
     fn->setMarkedAsUsed(bool(markedAsUsed));
+    fn->setOwnershipForTrivialValues(bool(hasOwnershipForTrivialValues));
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
@@ -1051,6 +1065,12 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
+
+  // Seed the stage from what the container recorded for this function, not from
+  // the container kind. 
+  auto recordedStage = SILStage(serializedStage);
+  if (recordedStage > fn->getFunctionStage())
+    fn->setFunctionStage(recordedStage);
 
   fn->setBare(IsBare);
   if (!fn->getDebugScope()) {
@@ -1437,6 +1457,7 @@ bool SILDeserializer::readBlockArgs(SILBasicBlock *CurrentBB, SILFunction *Fn,
       fArg->setFormalParameterPack(isFormalParameterPack);
       bool isInferredImmutable = (Args[I + 1] >> 18) & 0x1;
       fArg->setInferredImmutable(isInferredImmutable);
+      fArg->setOwnershipKind(OwnershipKind);
       Arg = fArg;
     } else {
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
@@ -1639,6 +1660,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   unsigned ApplyCallerIsolation = unsigned(ActorIsolation::Unspecified);
   unsigned ApplyCalleeIsolation = unsigned(ActorIsolation::Unspecified);
+  unsigned IsUnresolved = 0;
   unsigned ApplyHasArgumentLocs = 0;
 
   switch (RecordKind) {
@@ -1725,7 +1747,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     unsigned Kind, RawApplyOpts;
     SILInstApplyLayout::readRecord(
         scratch, Kind, RawApplyOpts, ApplyHasArgumentLocs, SubID, TyID, TyID2,
-        ValID, ApplyCallerIsolation, ApplyCalleeIsolation, ListOfValues);
+        ValID, ApplyCallerIsolation, ApplyCalleeIsolation, IsUnresolved,
+        ListOfValues);
     switch (Kind) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -2443,7 +2466,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       ResultInst = Builder.createBeginApply(
           Loc, getLocalValue(Builder.maybeGetFunction(), ValID, FnTy),
           Substitutions, Args, ApplyOpts, nullptr, IsolationCrossing,
-          argLocsRef);
+          argLocsRef, IsUnresolved);
     }
     break;
   }
@@ -2545,7 +2568,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args, closureTy->getCalleeConvention(),
-        closureTy->getIsolation(), closureTy->isCalledOnce(), onStack, isNested,
+        closureTy->getIsolation(), closureTy->getExecutionSemantics(), onStack,
+        isNested,
         /*SpecializationInfo=*/nullptr, argLocsRef);
     break;
   }
@@ -3200,6 +3224,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         CKind, Strict);
     break;
   }
+  case SILInstructionKind::DiagnoseInst: {
+    using DiagnoseKind = DiagnoseInst::DiagnoseKind;
+    auto Ty = MF->getType(TyID);
+    auto Kind = DiagnoseKind(Attr);
+    ResultInst = Builder.createDiagnose(
+        Loc,
+        getLocalValue(Builder.maybeGetFunction(), ValID,
+                      getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        Kind);
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipInst: {
     llvm_unreachable("Invalid unchecked_ownership in deserialization");
   }
@@ -3230,8 +3265,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x07);
     bool noNestedConflict = (Attr >> 5) & 0x01;
     bool fromBuiltin = (Attr >> 6) & 0x01;
+    bool isUnresolved = (Attr >> 7) & 0x01;
     ResultInst = Builder.createBeginAccess(Loc, op, accessKind, enforcement,
-                                           noNestedConflict, fromBuiltin);
+                                           noNestedConflict, fromBuiltin,
+                                           isUnresolved);
     break;
   }
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst: {
@@ -4342,7 +4379,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo;
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -4352,7 +4389,8 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
+      funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangOwnerID, parentModuleID,
       SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

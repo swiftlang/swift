@@ -54,7 +54,7 @@ func test(c : C, s : S) {
 // CHECK: %[[V5:.*]] = alloca %[[TSO1SV]], align 4
 // CHECK: %[[V6:.*]] = alloca %[[TSO1SV]], align 4
 // CHECK: %[[V7:.*]] = alloca %[[TSO1SV]], align 4
-// CHECK: call void @llvm.lifetime.start.p0(i64 4, ptr %[[V2]])
+// CHECK: call void @llvm.lifetime.start.p0(ptr %[[V2]])
 // CHECK: %[[V8:.*]] = load ptr, ptr @"\01L_selector(getS:)", align 8
 // CHECK: invoke void @objc_msgSend(ptr noalias sret(%[[TSO1SV]]) %[[V2]], ptr %[[V0]], ptr %[[V8]], i32 1)
 

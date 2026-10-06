@@ -1011,9 +1011,13 @@ bool IRGenModule::isResilientConformance(
   //
   // This is an optimization -- a conformance of a non-generic type cannot
   // resiliently become dependent.
-  if (!conformance->getDeclContext()->isGenericContext() &&
+  // Also check the @_originallyDefinedIn attribute to make sure the conforming
+  // type wasn't moved into the protocol's module. In that case, we need to keep
+  // the conformance resilient.
+  if (!disableOptimizations &&
+      !conformance->getDeclContext()->isGenericContext() &&
       conformanceModule == conformance->getProtocol()->getParentModule() &&
-      !disableOptimizations)
+      conformance->isOriginallyInSameModuleAsProtocol())
     return false;
 
   // We have a resilient conformance.
@@ -2661,10 +2665,21 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
 
+  // Whether `wt` is the specialized witness table of `conf`. Specialized
+  // witness tables are shared by conformances which only differ in type sugar.
+  auto isSpecializedTableOf = [](SILWitnessTable *wt,
+                                 const ProtocolConformance *conf) {
+    auto canonical = [](const ProtocolConformance *c) {
+      return const_cast<ProtocolConformance *>(c)->getCanonicalConformance();
+    };
+    return wt && wt->isSpecialized() &&
+           canonical(wt->getConformance()) == canonical(conf);
+  };
+
   auto *specConf = conformance;
   if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(inheritedC);
-    if (wt && wt->getConformance() == inheritedC) {
+    if (isSpecializedTableOf(wt, inheritedC)) {
       info = new SpecializedConformanceInfo(inheritedC);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -2676,7 +2691,7 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // directly use it.
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(specConf)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(specConf);
-    if (wt && wt->getConformance() == sc) {
+    if (isSpecializedTableOf(wt, sc)) {
       info = new SpecializedConformanceInfo(sc);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -3921,6 +3936,25 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    if (proto->isCOMInterface()) {
+      auto archetype = cast<ArchetypeType>(srcType);
+      for (auto *required : archetype->getConformsTo()) {
+        if (!required->isCOMInterface())
+          continue;
+        auto *hierarchy = required->getCOMInterfaceHierarchy();
+        assert(hierarchy && !hierarchy->isInvalid());
+        if (!llvm::is_contained(hierarchy->getABIChain(), proto))
+          continue;
+        auto *adjustment =
+            emitArchetypeWitnessTableRef(IGF, archetype, required);
+        // Pack elements use pointer-sized slots shared with native witnesses.
+        if (adjustment->getType()->isPointerTy())
+          adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
+        return adjustment;
+      }
+      llvm_unreachable("COM archetype is missing an interface adjustment");
+    }
+
     auto archetype = cast<ArchetypeType>(srcType);
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
@@ -4331,6 +4365,12 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   }
 }
 
+llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {
+  if (isCOMInterfaceAdjustment())
+    return IGM.IntPtrTy;
+  return typeForKind(IGM, getKind());
+}
+
 void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
@@ -4353,6 +4393,10 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
   }
 
+  // A conformance loaded from a pack uses a pointer-sized storage slot. Restore
+  // the integer representation used for individual COM requirements.
+  if (requirement.isCOMInterfaceAdjustment() && value->getType()->isPointerTy())
+    value = IGF.Builder.CreatePtrToInt(value, IGF.IGM.IntPtrTy);
   assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {

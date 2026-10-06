@@ -835,6 +835,7 @@ bool Parser::parseAvailability(
           /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
       addAttribute(Attr);
 
+      Attr->setMacroLoc(Spec->getMacroLoc());
       Attr->setIsGroupMember();
       if (groupContainsWildcard)
         Attr->setIsGroupedWithWildcard();
@@ -1882,6 +1883,7 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   if (NameMatch == Map.Impl.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
+  SourceLoc MacroLoc = Tok.getLoc();
   consumeToken();
 
   llvm::VersionTuple Version;
@@ -1899,9 +1901,9 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     return makeParserError(); // Failed to match the version, that's an error.
   }
 
-  // Make a copy of the specs to add the macro source location
-  // for the diagnostic about the use of macros in inlinable code.
-  SourceLoc MacroLoc = Tok.getLoc();
+  // Make a copy of the specs to add the macro source location, which is used
+  // for the diagnostic about the use of macros in inlinable code and to index
+  // references to availability domains named by the macro.
   for (auto *Spec : VersionMatch->getSecond()) {
     auto SpecCopy = Spec->clone(Context);
     SpecCopy->setMacroLoc(MacroLoc);
@@ -4436,7 +4438,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Called: {
     auto semantics = parseSingleAttrOption<ExecutionSemantics>(
         *this, Loc, AttrRange, AttrName, DK,
-        {{Context.Id_once, ExecutionSemantics::Once}});
+        {{Context.Id_exactlyOnce, ExecutionSemantics::Once},
+         {Context.Id_atMostOnce, ExecutionSemantics::AtMostOnce}});
     if (!semantics)
       return makeParserSuccess();
 
@@ -5017,6 +5020,112 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
 }
 
 /// \verbatim
+///   scope-descriptor:
+///     'immortal'
+///     '&'? (identifier | 'self')
+/// \endverbatim
+static std::optional<ScopeDescriptor> parseScopeDescriptor(Parser &P) {
+  SourceLoc ampersandLoc;
+  bool isAccess = P.consumeIf(tok::amp_prefix, ampersandLoc);
+
+  if (P.Tok.isContextualKeyword("immortal")) {
+    if (isAccess) {
+      P.diagnose(ampersandLoc, diag::immortal_scope_cannot_be_access)
+          .fixItRemove(ampersandLoc);
+    }
+    return ScopeDescriptor::forImmortal(P.consumeToken());
+  }
+
+  if (P.Tok.is(tok::kw_self))
+    return ScopeDescriptor::forSelf(P.consumeToken(tok::kw_self), isAccess);
+
+  if (P.Tok.is(tok::identifier)) {
+    Identifier name;
+    auto loc = P.consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+    if (isAccess)
+      return ScopeDescriptor::forAccessedValue({name, loc});
+    return ScopeDescriptor::forScopeName({ScopeName(name), loc});
+  }
+
+  P.diagnose(P.Tok, diag::expected_scope_specifier);
+  return std::nullopt;
+}
+
+/// \verbatim
+///   scope-specifier:
+///     (identifier ':')? scope-descriptor
+/// \endverbatim
+static std::optional<ScopeSpecifier> parseScopeSpecifier(Parser &P) {
+  std::optional<Located<ScopeName>> label;
+  if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon)) {
+    Identifier name;
+    auto loc = P.consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+    label = {ScopeName(name), loc};
+    P.consumeToken(tok::colon);
+  } else if (P.Tok.isKeyword() && P.peekToken().is(tok::colon)) {
+    P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
+    P.diagnose(P.Tok, diag::backticks_to_escape)
+        .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
+    auto name = P.Context.getIdentifier(P.Tok.getText());
+    label = {ScopeName(name), P.consumeToken()};
+    P.consumeToken(tok::colon);
+  }
+
+  auto scope = parseScopeDescriptor(P);
+  if (!scope)
+    return std::nullopt;
+  return ScopeSpecifier(label, *scope);
+}
+
+/// \verbatim
+///   scoped-attribute-arguments:
+///     '(' scope-specifier (',' scope-specifier)* ')'
+/// \endverbatim
+///
+/// Only returns an error for missing parentheses, returns success and leaves
+/// \p result unset for invalid arguments to avoid cascading parse failure.
+static ParserStatus parseScopedTypeAttr(Parser &P, SourceLoc atLoc,
+                                        SourceLoc attrLoc,
+                                        TypeOrCustomAttr &result) {
+  SourceLoc lParenLoc = P.Tok.getLoc();
+  if (!P.consumeIfAttributeLParen()) {
+    P.diagnose(P.Tok, diag::attr_expected_lparen, "_scoped",
+               /*DeclModifier=*/false);
+    return makeParserError();
+  }
+
+  if (P.Tok.is(tok::r_paren)) {
+    P.diagnose(P.Tok, diag::expected_scope_specifier);
+    P.consumeToken(tok::r_paren);
+    return makeParserSuccess();
+  }
+
+  SmallVector<ScopeSpecifier, 2> specifiers;
+  bool invalidSpecifier = false;
+  SourceLoc rParenLoc;
+  auto status = P.parseList(
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
+      {diag::attr_expected_rparen, {"_scoped", /*DeclModifier=*/false}},
+      [&]() -> ParserStatus {
+        auto specifier = parseScopeSpecifier(P);
+        if (!specifier) {
+          invalidSpecifier = true;
+          return makeParserError();
+        }
+        specifiers.push_back(*specifier);
+        return makeParserSuccess();
+      });
+  if (status.isError())
+    return status;
+
+  if (!invalidSpecifier) {
+    result = ScopedTypeAttr::create(P.Context, atLoc, attrLoc,
+                                    {lParenLoc, rParenLoc}, specifiers);
+  }
+  return status;
+}
+
+/// \verbatim
 ///   attribute-type:
 ///     'noreturn'
 /// \endverbatim
@@ -5336,6 +5445,10 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
+  case TypeAttrKind::Scoped:
+    // TODO: Don't allocate / diagnose when justChecking?
+    return parseScopedTypeAttr(*this, AtLoc, attrLoc, result);
+
   case TypeAttrKind::Convention: {
     ConventionTypeAttr *convention = nullptr;
     if (parseConventionAttributeInternal(AtLoc, attrLoc, convention,
@@ -5415,14 +5528,15 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
     bool invalid = false;
     std::optional<CalledTypeAttr::Semantics> semantics;
-    if (isIdentifier(Tok, "once")) {
+    if (isIdentifier(Tok, "exactlyOnce")) {
       semanticsLoc = consumeToken(tok::identifier);
-      semantics = CalledTypeAttr::Semantics::Once;
+      semantics = CalledTypeAttr::Semantics::ExactlyOnce;
+    } else if (isIdentifier(Tok, "atMostOnce")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::AtMostOnce;
     } else {
-      if (!justChecking) {
-        diagnose(Tok, diag::attr_called_expected_semantics)
-            .fixItReplace(Tok.getLoc(), "once");
-      }
+      if (!justChecking)
+        diagnose(Tok, diag::attr_called_expected_semantics);
       invalid = true;
       consumeIf(tok::identifier);
     }

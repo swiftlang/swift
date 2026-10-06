@@ -10,7 +10,6 @@ class X : B {}
 
 // CHECK-LABEL: sil [ossa] @test_ossa :
 // CHECK:         %0 = alloc_ref
-// CHECK-NEXT:  debug_value undef : $AnyObject, var, name "x"
 // CHECK-NEXT:  checked_cast_br X in %0 : $X
 // CHECK:     bb2([[A:%.*]] : @owned $X):
 // CHECK-NEXT:  [[U:%.*]] = upcast [[A]] : $X to $B, loc "dv":1:1

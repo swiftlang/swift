@@ -14,7 +14,7 @@ import Basic
 import ASTBridging
 
 /// A Swift type.
-/// It is not necessarily canonical, e.g. typealiases are not resolved.
+/// It is not necessarily canonical, e.g. typealiases are not desugared.
 public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildren {
   public enum TraitResult {
     case isNot
@@ -130,6 +130,12 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   public func hasLocalArchetype(from environment: GenericEnvironment) -> Bool {
     bridged.hasLocalArchetypeFromEnvironment(environment.bridged)
   }
+
+  /// Collect the conformances of \c fromType to each of the protocols of an
+  /// existential type's layout.
+  public func collectExistentialConformances(existentialType: CanonicalType) -> ConformanceArray {
+    return ConformanceArray(bridged: bridged.collectExistentialConformances(existentialType.bridged))
+  }
 }
 
 /// Implements the common members of `AST.Type`, `AST.CanonicalType` and `SIL.Type`.
@@ -215,6 +221,11 @@ extension TypeProperties {
 
   /// True if this the nominal type `Swift.Optional`.
   public var isOptional: Bool { rawType.bridged.isOptional() }
+
+  /// True if no value of this type can exist, e.g. `Never`, a case-less enum, or a tuple which
+  /// contains such a type. Note that this doesn't take resilience into account: a case-less enum
+  /// from another module can gain cases in a future version of that module.
+  public var isStructurallyUninhabited: Bool { rawType.bridged.isStructurallyUninhabited() }
 
   /// A non-nil result type implies isUnsafe[Raw][Mutable]Pointer. A raw
   /// pointer has a `void` element type.
@@ -473,3 +484,6 @@ extension CanonicalType: Hashable {
 }
 
 public typealias GenericTypeParameterKind = swift.GenericTypeParamKind
+
+/// The execution semantics of a function type, such as `@called(atMostOnce)`.
+public typealias ExecutionSemantics = swift.ExecutionSemantics

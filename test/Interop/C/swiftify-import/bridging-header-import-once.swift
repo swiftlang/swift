@@ -18,7 +18,7 @@ const int FOO = 42;
 
 // expected-expansion@+10:52{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func func1(_ p: UnsafeBufferPointer<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func func1(_ p: UnsafeBufferPointer<CInt>) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe func1(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}

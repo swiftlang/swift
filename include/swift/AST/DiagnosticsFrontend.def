@@ -347,6 +347,18 @@ ERROR(tbd_not_supported_with_cmo,none,
         "Test-Based InstallAPI (TBD) is not support with cross-module-optimization",
         ())
 
+ERROR(tbd_not_supported_with_empty_object_file,none,
+      "cannot emit a TBD file with '-emit-empty-object-file', which produces "
+      "an object file without any symbols",
+      ())
+
+ERROR(tbd_not_supported_with_inlinable_code_generation,none,
+      "cannot emit a TBD file with the 'inlinable' code generation model of "
+      "Embedded Swift; use '-enable-experimental-feature "
+      "CodeGenerationModel=interface' or '-enable-experimental-feature "
+      "CodeGenerationModel=implementation'",
+      ())
+
 WARNING(api_descriptor_only_supported_in_whole_module,none,
         "API descriptor generation is only supported when the whole module can be seen",
         ())

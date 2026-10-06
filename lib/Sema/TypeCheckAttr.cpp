@@ -185,7 +185,6 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
-  IGNORED_ATTR(HasHiddenStoredProperties)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
@@ -2642,7 +2641,8 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     }
 
     // Verify that the declaration is exposable.
-    auto repr = cxx_translation::getDeclRepresentation(VD, std::nullopt);
+    auto repr = cxx_translation::getDeclRepresentation(
+        VD, /*layoutQueries=*/nullptr);
     if (repr.isUnsupported())
       diagnose(attr->getLocation(),
                cxx_translation::diagnoseRepresenationError(*repr.error, VD));
@@ -6067,7 +6067,14 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     underlyingType = type;
 
   auto sig = var->getDeclContext()->getGenericSignatureOfContext();
-  if (!underlyingType->allowsOwnership(sig.getPointer())) {
+  if ((ownershipKind == ReferenceOwnership::Weak ||
+       ownershipKind == ReferenceOwnership::Unowned) &&
+      underlyingType->isCOMExistentialType()) {
+    Diags.diagnose(attr->getLocation(),
+                   diag::invalid_ownership_incompatible_class, underlyingType,
+                   ownershipKind);
+    attr->setInvalid();
+  } else if (!underlyingType->allowsOwnership(sig.getPointer())) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||
@@ -6116,15 +6123,18 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
-  // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
-  if (auto behavior = shouldDiagnoseEmbeddedLimitations(
-          dc, attr->getLocation(),
-          /*wasAlwaysEmbeddedError=*/true)) {
-    if (ownershipKind == ReferenceOwnership::Weak ||
-        ownershipKind == ReferenceOwnership::Unowned) {
-      Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
-               ownershipKind)
-        .limitBehavior(*behavior);
+  // Embedded Swift always allows unowned(unsafe), but only allows weak/unowned
+  // on 64-bit targets.
+  if (!ctx.LangOpts.Target.isArch64Bit()) {
+    if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+            dc, attr->getLocation(),
+            /*wasAlwaysEmbeddedError=*/true)) {
+      if (ownershipKind == ReferenceOwnership::Weak ||
+          ownershipKind == ReferenceOwnership::Unowned) {
+        Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
+                 ownershipKind)
+          .limitBehavior(*behavior);
+      }
     }
   }
 
@@ -9574,17 +9584,6 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
-}
-
-template <typename ATTR>
-static void forEachCustomAttribute(
-    Decl *decl,
-    llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
-  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    auto *nominal = attr->getNominalDecl();
-    if (nominal && nominal->getAttrs().hasAttribute<ATTR>())
-      fn(attr, nominal);
-  }
 }
 
 ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(

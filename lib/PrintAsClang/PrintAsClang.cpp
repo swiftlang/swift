@@ -594,16 +594,20 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
             return lhs.str() < rhs.str();
           });
           for (const auto &header : sortedIncludes) {
-            out << "#import \"" << header << "\"\n";
+            out << "#import \"" << llvm::sys::path::convert_to_slash(header)
+                << "\"\n";
           }
           out << "\n";
         }
       }
     } else {
+      // Spell the path with forward slashes: clang rejects a quoted include
+      // containing backslashes under -Wnonportable-include-path-separator.
+      auto portableHeader = llvm::sys::path::convert_to_slash(bridgingHeader);
       out << "#if defined(__OBJC__)\n";
-      out << "#import \"" << bridgingHeader << "\"\n";
+      out << "#import \"" << portableHeader << "\"\n";
       out << "#else\n";
-      out << "#include \"" << bridgingHeader << "\"\n";
+      out << "#include \"" << portableHeader << "\"\n";
       out << "#endif\n\n";
     }
   }

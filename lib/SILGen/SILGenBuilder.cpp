@@ -70,7 +70,7 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
     SILFunctionTypeIsolation ResultIsolation,
     PartialApplyInst::OnStackKind OnStack, StackAllocationIsNested_t IsNested,
     const GenericSpecializationInformation *SpecializationInfo,
-    bool IsCalledOnce) {
+    std::optional<ExecutionSemantics> Semantics) {
 
   // We completely drop the generic signature if all generic parameters were
   // concrete. Similar to emitRawApply.
@@ -78,7 +78,7 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
     Subs = SubstitutionMap();
 
   return SILBuilder::createPartialApply(
-      Loc, Fn, Subs, Args, CalleeConvention, ResultIsolation, IsCalledOnce,
+      Loc, Fn, Subs, Args, CalleeConvention, ResultIsolation, Semantics,
       OnStack, IsNested, SpecializationInfo, std::nullopt);
 }
 
@@ -86,22 +86,20 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
 //                             Managed Value APIs
 //===----------------------------------------------------------------------===//
 
-ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
-                                               SubstitutionMap subs,
-                                               ArrayRef<ManagedValue> args,
-                                               ParameterConvention calleeConvention,
-                                               SILFunctionTypeIsolation resultIsolation,
-                                               bool isCalledOnce) {
+ManagedValue SILGenBuilder::createPartialApply(
+    SILLocation loc, SILValue fn, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, ParameterConvention calleeConvention,
+    SILFunctionTypeIsolation resultIsolation,
+    std::optional<ExecutionSemantics> executionSemantics) {
   llvm::SmallVector<SILValue, 8> values;
   llvm::transform(args, std::back_inserter(values),
                   [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
-  SILValue result =
-      createPartialApply(loc, fn, subs, values, calleeConvention,
-                         resultIsolation,
-                         PartialApplyInst::OnStackKind::NotOnStack,
-                         StackAllocationIsNested, nullptr, isCalledOnce);
+  SILValue result = createPartialApply(
+      loc, fn, subs, values, calleeConvention, resultIsolation,
+      PartialApplyInst::OnStackKind::NotOnStack, StackAllocationIsNested,
+      nullptr, executionSemantics);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
@@ -131,7 +129,7 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
          "Expect a escaping to noescape conversion");
   (void)fnType;
 
-  // For a `@called(once)` function value, the conversion is a
+  // For a `@called(atMostOnce)` function value, the conversion is a
   // ownership-consuming forwarding operation, so forward `fn`'s cleanup onto
   // the result, exactly like the sibling `createConvertFunction` above does for
   // other function conversions. Mark the conversion's lifetime as already
@@ -139,8 +137,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   // lifetime is already exactly as long as it needs to be, by construction.
   //
   // `OperandOwnershipClassifier` treats `ConvertEscapeToNoEscapeInst` as
-  // `ForwardingConsume` as well when the result type is `@called(once)`.
-  if (resultFnType->isCalledOnce()) {
+  // `ForwardingConsume` as well when the result type is `@called(atMostOnce)`.
+  if (resultFnType->hasCalledAtMostOnceSemantics()) {
     CleanupCloner cloner(*this, fn);
     SILValue result =
         createConvertEscapeToNoEscape(loc, fn.forward(getSILGenFunction()),
@@ -609,6 +607,8 @@ static ManagedValue createInputFunctionArgument(
     }
 
     // ManualOwnership checks everything for implicit copies already.
+    // LifetimeResolution still looks for the @noImplicitCopies attribute,
+    // but does not rely on the wrapper for enforcement.
     if (B.hasManualOwnershipAttr())
       isNoImplicitCopy = false;
   }

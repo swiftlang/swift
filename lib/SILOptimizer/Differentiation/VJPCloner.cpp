@@ -1150,7 +1150,7 @@ public:
         vjpFnTy->getDirectFormalResultsType(getModule(),
                                             TypeExpansionContext::minimal(),
                                             vjp->hasLoweredAddresses()),
-        tai->getNormalBB()->getArgument(0)->getOwnershipKind());
+        OwnershipKind::Owned);
 
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
@@ -1595,7 +1595,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
-  pullback->setHasLoweredAddresses(original->hasLoweredAddresses());
+  pullback->inheritDerivedFrom(original);
 
   return pullback;
 }
@@ -1671,7 +1671,7 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     auto pbTupleMetatypeSILType =
         SILType::getPrimitiveObjectType(pbTupleMetatypeType);
     auto pbTupleMetatype =
-        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+        builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
 
     auto rawBufferValue = builder.createBuiltin(
         loc,

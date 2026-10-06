@@ -13,6 +13,7 @@
 #include "Serialization.h"
 #include "ModuleFormat.h"
 #include "SILFormat.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -57,7 +58,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/Index/USRGeneration.h"
+#include "clang/UnifiedSymbolResolution/USRGeneration.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -994,6 +995,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE_DELIMITER);
   BLOCK_RECORD(sil_block, SIL_EXTRA_STRING);
+  BLOCK_RECORD(sil_block, SIL_STAGE);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1550,7 +1552,8 @@ void Serializer::writeInputBlock() {
         auto *pch = clangImporter->getClangInstance()
                         .getASTReader()
                         ->getModuleManager()
-                        .lookupByFileName(Options.ImportedPCHPath);
+                        .lookupByFileName(clang::ModuleFileName::makeExplicit(
+                            Options.ImportedPCHPath));
         if (importedHeaderPath.empty())
           importedHeaderPath = pch->OriginalSourceFileName;
         pchIncludeTree = pch->IncludeTreeID;
@@ -2986,6 +2989,22 @@ static uint8_t getRawStableDifferentiabilityKind(
   SIMPLE_CASE(DifferentiabilityKind, Linear)
   }
   llvm_unreachable("bad differentiability kind");
+}
+
+/// Translate from the execution semantics of a function type to the
+/// Serialization enum values, which are guaranteed to be stable.
+static uint8_t getRawStableFunctionTypeExecutionSemantics(
+    std::optional<swift::ExecutionSemantics> semantics) {
+  if (!semantics)
+    return uint8_t(serialization::FunctionTypeExecutionSemantics::None);
+
+  switch (*semantics) {
+  case swift::ExecutionSemantics::AtMostOnce:
+    return uint8_t(serialization::FunctionTypeExecutionSemantics::AtMostOnce);
+  case swift::ExecutionSemantics::Once:
+    return uint8_t(serialization::FunctionTypeExecutionSemantics::Once);
+  }
+  llvm_unreachable("bad execution semantics");
 }
 
 #undef SIMPLE_CASE
@@ -4959,17 +4978,6 @@ public:
 
     unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
-    // If Sema marked this stored property's type as one to hide on emission
-    // swap in a HiddenType placeholder carrying just the mangled name. Clients of
-    // the emitted .swiftmodule will deserialize the HiddenType instead of the
-    // real type, breaking the link to the internal bridging-header dependency.
-    auto &ctx = var->getASTContext();
-    if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
-            ty->getCanonicalType())) {
-      ty = HiddenType::get(ctx, *mangledName,
-                           var->getDeclContext()->getParentModule(), nullptr,
-                           CanType());
-    }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
@@ -5502,6 +5510,11 @@ public:
     switch (def.kind) {
       case MacroDefinition::Kind::Invalid:
       case MacroDefinition::Kind::Undefined:
+        break;
+
+      case MacroDefinition::Kind::Internal:
+        // Internal macros are synthesized by the compiler on demand and are
+        // never serialized.
         break;
 
       case MacroDefinition::Kind::External: {
@@ -6279,19 +6292,15 @@ public:
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
-    FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-        resultType,
+    FunctionTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, resultType,
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        clangType,
-        fnTy->isNoEscape(),
-        fnTy->isSendable(),
-        fnTy->isAsync(),
-        fnTy->isThrowing(),
-        S.addTypeRef(fnTy->getThrownError()),
+        clangType, fnTy->isNoEscape(), fnTy->isSendable(), fnTy->isAsync(),
+        fnTy->isThrowing(), S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation,
-        fnTy->hasSendingResult(),
-        fnTy->isCalledOnce(),
+        isolation, fnTy->hasSendingResult(),
+        getRawStableFunctionTypeExecutionSemantics(
+            fnTy->getExecutionSemantics()),
         fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
@@ -6309,15 +6318,16 @@ public:
     auto genericSig = fnTy->getGenericSignature();
     auto isolation = encodeIsolation(fnTy->getIsolation());
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-    GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(fnTy->getResult()),
+    GenericFunctionTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
-        fnTy->isCoroutine(),                                          
-        S.addGenericSignatureRef(genericSig));
+        isolation, fnTy->hasSendingResult(),
+        getRawStableFunctionTypeExecutionSemantics(
+            fnTy->getExecutionSemantics()),
+        fnTy->isCoroutine(), S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6408,12 +6418,12 @@ public:
         S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
         stableCoroutineKind, stableCalleeConvention, stableRepresentation,
         fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
-        fnTy->isCalledOnce(), fnTy->getIsolation().getKind(),
-        stableDiffKind, fnTy->hasErrorResult(),
-        fnTy->getParameters().size(),
-        fnTy->getNumYields(), fnTy->getNumResults(),
-        invocationSigID, invocationSubstMapID, patternSubstMapID,
-        clangTypeID, variableData);
+        getRawStableFunctionTypeExecutionSemantics(
+            fnTy->getExecutionSemantics()),
+        fnTy->getIsolation().getKind(), stableDiffKind, fnTy->hasErrorResult(),
+        fnTy->getParameters().size(), fnTy->getNumYields(),
+        fnTy->getNumResults(), invocationSigID, invocationSubstMapID,
+        patternSubstMapID, clangTypeID, variableData);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6549,17 +6559,12 @@ public:
 
   void visitHiddenType(const HiddenType *hidden) {
     using namespace decls_block;
-    if (auto *layoutDecl = hidden->getLayoutInfoDecl()) {
-      unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
-      NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                    S.addDeclRef(layoutDecl),
-                                    S.addTypeRef(hidden->getParent()));
-      return;
-    }
-
-    unsigned abbrCode = S.DeclTypeAbbrCodes[HiddenTypeLayout::Code];
-    HiddenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                 hidden->getMangledName());
+    auto *layoutDecl = hidden->getLayoutInfoDecl();
+    assert(layoutDecl && "HiddenType must carry an abstract layout");
+    unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
+    NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  S.addDeclRef(layoutDecl),
+                                  S.addTypeRef(hidden->getParent()));
   }
 };
 
@@ -6744,6 +6749,7 @@ static unsigned encodeLLVMTypeID(llvm::Type::TypeID kind) {
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
+  case llvm::Type::ByteTyID:
     llvm_unreachable("unsupported serialized LLVM type");
   }
   llvm_unreachable("unhandled LLVM type kind");
@@ -6798,12 +6804,11 @@ void Serializer::writeSerializableFixedTypeInfo(
   using namespace decls_block;
 
   writeSerializableTypeInfoBase(representation);
+  auto spareBits = representation.spareBits.asAPInt();
   ArrayRef<uint64_t> spareBitWords;
   unsigned abbrCode = DeclTypeAbbrCodes[SerializableFixedTypeInfoLayout::Code];
-  if (!representation.spareBits.empty()) {
-    auto spareBits = representation.spareBits.asAPInt();
+  if (!representation.spareBits.empty())
     spareBitWords = ArrayRef(spareBits.getRawData(), spareBits.getNumWords());
-  }
   SerializableFixedTypeInfoLayout::emitRecord(
       Out, ScratchRecord, abbrCode, representation.spareBits.size(),
       spareBitWords);
@@ -6997,7 +7002,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
   registerDeclTypeAbbr<IntegerTypeLayout>();
-  registerDeclTypeAbbr<HiddenTypeLayout>();
   registerDeclTypeAbbr<InlineArrayTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
@@ -7939,25 +7943,6 @@ void SerializerBase::writeToStream(raw_ostream &os) {
   os.flush();
 }
 
-void Serializer::writeHiddenTypeLayoutsBlock() {
-  auto layouts = M->getSortedHiddenTypeLayouts();
-  if (layouts.empty())
-    return;
-
-  BCBlockRAII block(Out, HIDDEN_TYPE_LAYOUTS_BLOCK_ID, /*abbrev width=*/3);
-  hidden_type_layouts_block::HiddenTypeLayoutLayout HiddenTypeLayoutRecord(Out);
-  for (auto &entry : layouts) {
-    StringRef name = entry.first;
-    const AbstractTypeLayout &layout = entry.second;
-    HiddenTypeLayoutRecord.emit(
-        ScratchRecord,
-        layout.size, layout.alignment, layout.stride,
-        layout.bitwiseCopyable ? 1u : 0u,
-        layout.isOpaque ? 1u : 0u,
-        name);
-  }
-}
-
 SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
                                ModuleOrSourceFile DC) {
   for (unsigned char byte : signature)
@@ -7983,7 +7968,6 @@ void Serializer::writeToStream(
     S.writeInputBlock();
     S.writeSIL(SILMod);
     S.writeAST(DC);
-    S.writeHiddenTypeLayoutsBlock();
 
     if (S.hadError)
       S.getASTContext().Diags.diagnose(SourceLoc(), diag::serialization_failed,

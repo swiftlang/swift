@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil %s -sil-verify-all -verify -enable-experimental-feature NoncopyableCasting
+// RUN: %target-swift-emit-sil %s -target %target-future-triple -sil-verify-all -verify -enable-experimental-feature NoncopyableCasting
 
 // REQUIRES: swift_feature_NoncopyableCasting
 

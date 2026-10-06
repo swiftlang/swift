@@ -18,3 +18,21 @@
 // CHECK-NEXT:   init(_ __unnamed_param_0: CInt, _ __unnamed_param_1: CInt)
 // CHECK-NEXT:   @available(*, deprecated, message: "don't construct from three ints")
 // CHECK-NEXT:   init(_ __unnamed_param_0: CInt, _ __unnamed_param_1: CInt, _ __unnamed_param_2: CInt)
+
+// Default arguments of constructors carry over to the synthesized initializers.
+// CHECK:      class FRTCtorWithDefaultPointerArg {
+// CHECK-NEXT:   init(_ parent: FRTCtorWithDefaultPointerArg! = cxxDefaultArg)
+
+// CHECK:      class FRTCtorWithDefaultIntArgs {
+// CHECK-NEXT:   init(_ a: CInt, _ b: CInt = cxxDefaultArg, _ c: CInt = cxxDefaultArg)
+
+// Default arguments of view type parameters import only if marked unsafe.
+// CHECK:      class FRTCtorWithDefaultViewArg {
+// CHECK-NEXT:   init(_ view: FRTCtorArgView){{$}}
+
+// CHECK:      class FRTCtorWithUnsafeDefaultViewArg {
+// CHECK-NEXT:   init(_ view: FRTCtorArgView = cxxDefaultArg)
+
+// Constructors of class templates do not get their default arguments imported.
+// CHECK:      class FRTTemplateCtorWithDefaultArg<CInt> {
+// CHECK-NEXT:   init(_ value: CInt){{$}}

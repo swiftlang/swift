@@ -18,10 +18,10 @@
 ### Accessing Individual Results
 
 - ``Swift/ThrowingTaskGroup/next()``
-- ``Swift/ThrowingTaskGroup/nextResult(isolation:)``
+- ``Swift/ThrowingTaskGroup/nextResult()``
 - ``Swift/ThrowingTaskGroup/next(isolation:)``
 - ``Swift/ThrowingTaskGroup/isEmpty``
-- ``Swift/ThrowingTaskGroup/waitForAll(isolation:)``
+- ``Swift/ThrowingTaskGroup/waitForAll()``
 
 ### Accessing an Asynchronous Sequence of Results
 
@@ -66,5 +66,7 @@
 - ``Swift/ThrowingTaskGroup/add(priority:operation:)``
 - ``Swift/ThrowingTaskGroup/async(priority:operation:)``
 - ``Swift/ThrowingTaskGroup/asyncUnlessCancelled(priority:operation:)``
+- ``Swift/ThrowingTaskGroup/nextResult(isolation:)``
 - ``Swift/ThrowingTaskGroup/spawn(priority:operation:)``
 - ``Swift/ThrowingTaskGroup/spawnUnlessCancelled(priority:operation:)``
+- ``Swift/ThrowingTaskGroup/waitForAll(isolation:)``

@@ -2940,16 +2940,16 @@ ConstraintSystem::matchFunctionExecutionSemantics(
     return SolutionKind::Unsolved;
   };
 
-  // First check to see if we have any @called(once) dependent function types,
-  // if any of them still have unresolved type variables we need to wait until
-  // they're fully resolved.
-  auto dep1 = func1->getCalledOnceDependentType();
+  // First check to see if we have any @called(atMostOnce) dependent function
+  // types, if any of them still have unresolved type variables we need to wait
+  // until they're fully resolved.
+  auto dep1 = func1->getExecutionSemanticsDependentType();
   if (dep1) {
     dep1 = simplifyType(dep1);
     if (dep1->hasTypeVariable())
       return formUnsolved();
   }
-  auto dep2 = func2->getCalledOnceDependentType();
+  auto dep2 = func2->getExecutionSemanticsDependentType();
   if (dep2) {
     dep2 = simplifyType(dep2);
     if (dep2->hasTypeVariable())
@@ -2958,11 +2958,13 @@ ConstraintSystem::matchFunctionExecutionSemantics(
 
   // Sendability is given by either the sendability of the dependent type if
   // present, otherwise it's given by the function itself.
-  auto func1CalledOnce = dep1 ? dep1->isNoncopyable() : func1->isCalledOnce();
-  auto func2CalledOnce = dep2 ? dep2->isNoncopyable() : func2->isCalledOnce();
+  auto func1HasCalledAtMostOnceSemantics =
+      dep1 ? dep1->isNoncopyable() : func1->hasCalledAtMostOnceSemantics();
+  auto func2HasCalledAtMostOnceSemantics =
+      dep2 ? dep2->isNoncopyable() : func2->hasCalledAtMostOnceSemantics();
 
-  if (func1CalledOnce != func2CalledOnce) {
-    if (func1CalledOnce || kind < ConstraintKind::Subtype) {
+  if (func1HasCalledAtMostOnceSemantics != func2HasCalledAtMostOnceSemantics) {
+    if (func1HasCalledAtMostOnceSemantics || kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
@@ -7293,7 +7295,7 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
   // though since pack expansions can be present in fixed types for nested
   // type vars.
   auto baseTy = cs.simplifyType(type->getDependentMemberRoot());
-  llvm::SmallPtrSet<TypeVariableType *, 2> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   baseTy->getTypeVariables(typeVars);
   return llvm::any_of(typeVars, [](const TypeVariableType *typeVar) {
     return typeVar->getImpl().isPackExpansion();
@@ -7629,8 +7631,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // them. If they
   //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is
   //  converted.
+  //
+  // Also check the fixed types: a type variable can be bound to a tuple with
+  // an unresolved pack expansion, for example when matching the root and value
+  // of an identity key path to its contextual type.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
-      isTupleWithUnresolvedPackExpansion(origType2)) {
+      isTupleWithUnresolvedPackExpansion(origType2) ||
+      isTupleWithUnresolvedPackExpansion(type1) ||
+      isTupleWithUnresolvedPackExpansion(type2)) {
     auto isTypeVariableWrappedInOptional = [](Type type) {
       if (type->getOptionalObjectType()) {
         return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
@@ -7808,7 +7816,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         bool afterPack = false;
         for (auto element : tuple->getElements()) {
           if (afterPack && !element.hasName()) {
-            SmallPtrSet<TypeVariableType *, 2> typeVars;
+            SmallPtrSetVector<TypeVariableType *, 4> typeVars;
             element.getType()->getTypeVariables(typeVars);
 
             bool hasUnresolvedPack = llvm::any_of(typeVars, [](auto *tv) {
@@ -12587,12 +12595,14 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
-    // Infer `@called(once)` from the contextual type.
-    if (!closureExtInfo.isCalledOnce()) {
-      if (auto calledOnceTy = contextualFnType->getCalledOnceDependentType()) {
-        closureExtInfo = closureExtInfo.withCalledOnceDependentType(calledOnceTy);
-      } else if (contextualFnType->isCalledOnce()) {
-        closureExtInfo = closureExtInfo.withCalledOnce();
+    // Infer `@called(atMostOnce)` from the contextual type.
+    if (!closureExtInfo.hasCalledAtMostOnceSemantics()) {
+      if (auto executionSemanticsTy =
+              contextualFnType->getExecutionSemanticsDependentType()) {
+        closureExtInfo = closureExtInfo.withExecutionSemanticsDependentType(
+            executionSemanticsTy);
+      } else if (auto semantics = contextualFnType->getExecutionSemantics()) {
+        closureExtInfo = closureExtInfo.withExecutionSemantics(semantics);
       }
     }
   }
@@ -12709,7 +12719,10 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
-      dynamicType2 = ExistentialMetatypeType::get(type2);
+      if (type2->isCOMExistentialType())
+        dynamicType2 = ExistentialMetatypeType::get(getASTContext().TheAnyType);
+      else
+        dynamicType2 = ExistentialMetatypeType::get(type2);
     } else {
       dynamicType2 = MetatypeType::get(type2);
     }
@@ -14172,7 +14185,7 @@ static bool hasUnresolvedPackVars(Type type) {
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
   // or pack expansions.
-  SmallPtrSet<TypeVariableType *, 2> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   type->getTypeVariables(typeVars);
   return llvm::any_of(typeVars, [](const TypeVariableType *typeVar) {
     return typeVar->getImpl().canBindToPack() ||
@@ -14208,7 +14221,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
   // or pack expansions.
-  SmallPtrSet<TypeVariableType *, 2> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   packTy->getTypeVariables(typeVars);
   for (auto *typeVar : typeVars) {
     if (typeVar->getImpl().canBindToPack() ||
@@ -16397,16 +16410,13 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
       // Extract any type variables present in the parameter's result builder.
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
       if (auto builderTy = getOpenedResultBuilderTypeFor(*this, locator))
-        builderTy->getTypeVariables(typeVars);
-
-      SmallVector<TypeVariableType *, 4> referencedVars{typeVars.begin(),
-                                                        typeVars.end()};
+        builderTy->getTypeVariables(referencedVars);
 
       auto *loc = getConstraintLocator(locator);
-      addUnsolvedConstraint(
-          Constraint::create(*this, kind, first, second, loc, referencedVars));
+      addUnsolvedConstraint(Constraint::create(*this, kind, first, second, loc,
+                                               referencedVars.getArrayRef()));
       return SolutionKind::Solved;
     }
   }

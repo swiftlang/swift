@@ -28,6 +28,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AbstractLayout.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
@@ -92,7 +93,15 @@ public:
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 
   std::optional<IRABIDetailsProvider::SizeAndAlignment>
-  getTypeSizeAlignment(const NominalTypeDecl *TD) {
+  getTypeSizeAlignment(const NominalTypeDecl *TD,
+                       ResilienceExpansion expansion) {
+    // A layout known inside its defining module may still be opaque to clients.
+    if (expansion == ResilienceExpansion::Minimal &&
+        !typeConverter
+             .getTypeProperties(TD->getDeclaredTypeInContext(),
+                                TypeExpansionContext::minimal())
+             .isFixedABI())
+      return std::nullopt;
     auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
     auto *fixedTI = dyn_cast<FixedTypeInfo>(TI);
     if (!fixedTI)
@@ -105,6 +114,14 @@ public:
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
     auto &typeInfo =
         IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+
+    if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
+        IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
+      auto type = TD->getDeclaredTypeInContext()->getCanonicalType();
+      auto mangledName =
+          Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
+      IGM.dumpAbstractTypeLayoutInfo(type, mangledName, "serialization");
+    }
 
     AbstractTypeLayout layout;
     auto type = TD->getDeclaredInterfaceType();
@@ -485,8 +502,9 @@ IRABIDetailsProvider::IRABIDetailsProvider(ModuleDecl &mod,
 IRABIDetailsProvider::~IRABIDetailsProvider() {}
 
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
-IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
-  return impl->getTypeSizeAlignment(TD);
+IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD,
+                                           ResilienceExpansion expansion) {
+  return impl->getTypeSizeAlignment(TD, expansion);
 }
 
 AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(

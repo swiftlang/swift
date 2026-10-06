@@ -1,0 +1,106 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=thin_to_thick_function | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class A {}
+class B : A {}
+
+sil @impl : $@convention(thin) (@guaranteed A) -> @owned B
+sil @consume_thin : $@convention(thin) (@convention(thin) (@guaranteed B) -> @owned A) -> ()
+
+// CHECK-LABEL: {{^}}sil [ossa] @escaping :
+// CHECK:         %[[#F0:]] = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#T0:]] = thin_to_thick_function %[[#F0]] to $@callee_guaranteed (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#C0:]] = convert_function %[[#T0]] to $@callee_guaranteed (@guaranteed B) -> @owned A
+// CHECK-NEXT:    return %[[#C0]]{{( |$)}}
+// CHECK-NEXT:  {{^}}} // end sil function 'escaping'{{$}}
+sil [ossa] @escaping : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed B) -> @owned A {
+bb0:
+  %f = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+  %converted = convert_function %f to $@convention(thin) (@guaranteed B) -> @owned A
+  %thick = thin_to_thick_function %converted to $@callee_guaranteed (@guaranteed B) -> @owned A
+  return %thick
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @noescape :
+// CHECK:       bb0(%[[#ARG1:]] : @guaranteed $B):
+// CHECK:         %[[#F1:]] = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#T1:]] = thin_to_thick_function %[[#F1]] to $@noescape @callee_guaranteed (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#C1:]] = convert_function %[[#T1]] to $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+// CHECK-NEXT:    %[[#R1:]] = apply %[[#C1]](%[[#ARG1]]) : $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+// CHECK-NEXT:    return %[[#R1]]{{( |$)}}
+// CHECK-NEXT:  {{^}}} // end sil function 'noescape'{{$}}
+sil [ossa] @noescape : $@convention(thin) (@guaranteed B) -> @owned A {
+bb0(%arg : @guaranteed $B):
+  %f = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+  %converted = convert_function %f to $@convention(thin) (@guaranteed B) -> @owned A
+  %thick = thin_to_thick_function %converted to $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+  %result = apply %thick(%arg) : $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+  return %result
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @callee_owned :
+// CHECK:         %[[#F2:]] = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#T2:]] = thin_to_thick_function %[[#F2]] to $@callee_owned (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#C2:]] = convert_function %[[#T2]] to $@callee_owned (@guaranteed B) -> @owned A
+// CHECK-NEXT:    return %[[#C2]]{{( |$)}}
+// CHECK-NEXT:  {{^}}} // end sil function 'callee_owned'{{$}}
+sil [ossa] @callee_owned : $@convention(thin) () -> @owned @callee_owned (@guaranteed B) -> @owned A {
+bb0:
+  %f = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+  %converted = convert_function %f to $@convention(thin) (@guaranteed B) -> @owned A
+  %thick = thin_to_thick_function %converted to $@callee_owned (@guaranteed B) -> @owned A
+  return %thick
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @without_actually_escaping :
+// CHECK:         %[[#F3:]] = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#T3:]] = thin_to_thick_function %[[#F3]] to $@callee_guaranteed (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#C3:]] = convert_function %[[#T3]] to [without_actually_escaping] $@callee_guaranteed (@guaranteed B) -> @owned A
+// CHECK-NEXT:    return %[[#C3]]{{( |$)}}
+// CHECK-NEXT:  {{^}}} // end sil function 'without_actually_escaping'{{$}}
+sil [ossa] @without_actually_escaping : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed B) -> @owned A {
+bb0:
+  %f = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+  %converted = convert_function %f to [without_actually_escaping] $@convention(thin) (@guaranteed B) -> @owned A
+  %thick = thin_to_thick_function %converted to $@callee_guaranteed (@guaranteed B) -> @owned A
+  return %thick
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @shared_conversion :
+// CHECK:         %[[#F4:]] = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#OLD4:]] = convert_function %[[#F4]] to $@convention(thin) (@guaranteed B) -> @owned A
+// CHECK-NEXT:    %[[#T4:]] = thin_to_thick_function %[[#F4]] to $@callee_guaranteed (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#C4:]] = convert_function %[[#T4]] to $@callee_guaranteed (@guaranteed B) -> @owned A
+// CHECK:         %[[#SINK4:]] = function_ref @consume_thin :
+// CHECK-NEXT:    %[[#R4:]] = apply %[[#SINK4]](%[[#OLD4]])
+// CHECK-NEXT:    return %[[#C4]]{{( |$)}}
+// CHECK-NEXT:  {{^}}} // end sil function 'shared_conversion'{{$}}
+sil [ossa] @shared_conversion : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed B) -> @owned A {
+bb0:
+  %f = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+  %converted = convert_function %f to $@convention(thin) (@guaranteed B) -> @owned A
+  %thick = thin_to_thick_function %converted to $@callee_guaranteed (@guaranteed B) -> @owned A
+  %sink = function_ref @consume_thin : $@convention(thin) (@convention(thin) (@guaranteed B) -> @owned A) -> ()
+  %unused = apply %sink(%converted) : $@convention(thin) (@convention(thin) (@guaranteed B) -> @owned A) -> ()
+  return %thick
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @conversion_chain :
+// CHECK:         %[[#F5:]] = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#T5:]] = thin_to_thick_function %[[#F5]] to $@callee_guaranteed (@guaranteed A) -> @owned B
+// CHECK-NEXT:    %[[#C5_0:]] = convert_function %[[#T5]] to $@callee_guaranteed (@guaranteed B) -> @owned B
+// CHECK-NEXT:    %[[#C5_1:]] = convert_function %[[#C5_0]] to $@callee_guaranteed (@guaranteed B) -> @owned A
+// CHECK-NEXT:    return %[[#C5_1]]{{( |$)}}
+// CHECK-NEXT:  {{^}}} // end sil function 'conversion_chain'{{$}}
+sil [ossa] @conversion_chain : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed B) -> @owned A {
+bb0:
+  %f = function_ref @impl : $@convention(thin) (@guaranteed A) -> @owned B
+  %converted_arg = convert_function %f to $@convention(thin) (@guaranteed B) -> @owned B
+  %converted_result = convert_function %converted_arg to $@convention(thin) (@guaranteed B) -> @owned A
+  %thick = thin_to_thick_function %converted_result to $@callee_guaranteed (@guaranteed B) -> @owned A
+  return %thick
+}

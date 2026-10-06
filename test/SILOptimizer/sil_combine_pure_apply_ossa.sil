@@ -75,14 +75,12 @@ sil @marker : $@convention(thin) () -> ()
 
 // A debug use of the erased apply's result must not extend the liverange: the
 // owned argument is destroyed at the call site, before the marker call.
-// The debug_value is killed by salvageDebugInfo.
 // CHECK-LABEL: sil [ossa] @debug_value_does_not_extend_liverange
 // CHECK:       bb0(%0 : @owned $Foo):
 // CHECK-NEXT:    destroy_value %0
 // CHECK-NEXT:    // function_ref marker
 // CHECK-NEXT:    [[MARKER:%[0-9]+]] = function_ref @marker
 // CHECK-NEXT:    apply [[MARKER]]()
-// CHECK-NEXT:    debug_value undef : $Foo, let, name "unused"
 // CHECK-NEXT:    [[T:%[0-9]+]] = tuple ()
 // CHECK-NEXT:    return [[T]]
 // CHECK-NEXT:  } // end sil function 'debug_value_does_not_extend_liverange'

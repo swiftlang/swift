@@ -2852,8 +2852,8 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     // Let go of borrows introduced for stack closures.
     if (pai->isOnStack() && pai->getFunction()->hasOwnership()) {
       pai->visitOnStackLifetimeEnds([&](Operand *op) -> bool {
-        // A `@called(once)` closure's context can be consumed directly by a
-        // `try_apply`, a terminator with no single "next instruction" to
+        // A `@called(atMostOnce)` closure's context can be consumed directly by
+        // a `try_apply`, a terminator with no single "next instruction" to
         // insert after -- the cleanup has to be duplicated at the start of
         // every successor block instead.
         if (auto *term = dyn_cast<TermInst>(op->getUser())) {
@@ -2871,8 +2871,8 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     }
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments, pai->getCalleeConvention(),
-        pai->getResultIsolation(), pai->isCalledOnce(), pai->isOnStack(),
-        pai->isStackAllocationNested());
+        pai->getResultIsolation(), pai->getExecutionSemantics(),
+        pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
   }
@@ -2987,7 +2987,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Thunk->setOwnershipEliminated();
   }
 
-  Thunk->setHasLoweredAddresses(SpecializedFunc->hasLoweredAddresses());
+  Thunk->inheritDerivedFrom(SpecializedFunc);
 
   if (!Thunk->hasLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
@@ -3738,8 +3738,8 @@ void swift::trySpecializeApplyOfGeneric(
     Subs = SubstitutionMap::get(FnTy->getSubstGenericSignature(), Subs);
     SingleValueInstruction *newPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments, PAI->getCalleeConvention(),
-        PAI->getResultIsolation(), PAI->isCalledOnce(), PAI->isOnStack(),
-        PAI->isStackAllocationNested());
+        PAI->getResultIsolation(), PAI->getExecutionSemantics(),
+        PAI->isOnStack(), PAI->isStackAllocationNested());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);
     return;

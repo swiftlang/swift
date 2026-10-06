@@ -251,6 +251,10 @@ BridgedASTType BridgedDeclObj::Enum_getRawType() const {
   return {nullptr};
 }
 
+bool BridgedDeclObj::Enum_hasCasesUnavailableDuringLowering() const {
+  return getAs<swift::EnumDecl>()->hasCasesUnavailableDuringLowering();
+}
+
 bool BridgedDeclObj::Struct_hasUnreferenceableStorage() const {
   return getAs<swift::StructDecl>()->hasUnreferenceableStorage();
 }
@@ -720,6 +724,10 @@ bool BridgedASTType::isOptional() const {
   return unbridged()->getCanonicalType()->isOptional();
 }
 
+bool BridgedASTType::isStructurallyUninhabited() const {
+  return unbridged()->isStructurallyUninhabited();
+}
+
 bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
 }
@@ -906,6 +914,13 @@ BridgedCanType::SILFunctionType_getSubstGenericSignature() const {
               .getPointer()};
 }
 
+BridgedConformanceArray
+BridgedCanType::collectExistentialConformances(BridgedCanType existential) const {
+  return {swift::collectExistentialConformances(unbridged(),
+                                                existential.unbridged(),
+                                                /*allowMissing=*/ false)};
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTTypeArray
 //===----------------------------------------------------------------------===//
@@ -955,6 +970,10 @@ BridgedDeclObj BridgedConformance::getRequirement() const {
 BridgedConformance BridgedConformance::getGenericConformance() const {
   auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
   return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
+}
+
+BridgedConformance BridgedConformance::getCanonicalConformance() const {
+  return {unbridged().getCanonicalConformanceRef()};
 }
 
 BridgedConformance BridgedConformance::getInheritedConformance() const {

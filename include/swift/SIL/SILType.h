@@ -32,6 +32,8 @@ namespace swift {
 class ASTContext;
 class VarDecl;
 class SILFunction;
+class SILModule;
+class TypeExpansionContext;
 
 namespace Lowering {
   class AbstractionPattern;
@@ -240,7 +242,7 @@ public:
   }
 
   /// Whether the type is an enum, struct, or tuple.
-  bool isAggregate() {
+  bool isAggregate() const {
     return is<TupleType>() || is<StructType>() ||
            is<BoundGenericStructType>() || is<EnumType>() ||
            is<BoundGenericEnumType>();
@@ -904,8 +906,10 @@ public:
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
 
-  /// Returns true if this SILType is a `@called(once)` function type.
-  bool isCalledOnce() const;
+  /// Returns true if this SILType is a function type whose values can be
+  /// called at most once, which is true for every kind of `@called` attribute.
+  /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
+  bool hasCalledAtMostOnceSemantics() const;
 
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {
@@ -1119,6 +1123,10 @@ public:
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions::printSIL()) const;
 
+  /// Print SIL type properties used by abstract type lowering.
+  void printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
+                                   TypeExpansionContext expansion) const;
+
   std::string getDebugDescription() const;
 };
 
@@ -1208,12 +1216,6 @@ struct DenseMapInfo<swift::SILType> {
   using SILType = swift::SILType;
   using PointerMapInfo = DenseMapInfo<void*>;
 public:
-  static SILType getEmptyKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getEmptyKey());
-  }
-  static SILType getTombstoneKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getTombstoneKey());
-  }
   static unsigned getHashValue(SILType t) {
     return PointerMapInfo::getHashValue(t.getOpaqueValue());
   }

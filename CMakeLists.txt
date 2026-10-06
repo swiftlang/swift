@@ -87,6 +87,8 @@ set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to c
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
+define_property(TARGET PROPERTY PURE_SWIFT_LIB)
+
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
@@ -251,6 +253,14 @@ option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
+
+option(SWIFT_BUILD_COMPILER_DYLIB
+  "Builds a swift compiler dylib for tools to link against"
+  FALSE)
+
+if (SWIFT_BUILD_COMPILER_DYLIB AND NOT APPLE)
+  message(FATAL_ERROR "SWIFT_BUILD_COMPILER_DYLIB is only supported on Darwin platforms currently.")
+endif()
 
 # The SDK overlay is provided by the SDK itself on Darwin platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -473,6 +483,26 @@ if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
     set(BRIDGING_MODE "INLINE")
   endif()
 endif()
+
+# LLVM_VERSION_MAJOR conditions for Swift sources in the compiler and Lit tests,
+# where (in)equality operations cannot be metaprogrammed.
+#
+# NB: Before you bump the below minimum, please make sure to audit all
+#     occurrences of LLVM_VERSION_MAJOR_AT_LEAST_<current minimum>.
+#
+set(SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR 23)
+if(LLVM_VERSION_MAJOR LESS ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR})
+  message(FATAL_ERROR
+    "LLVM_VERSION_MAJOR is ${LLVM_VERSION_MAJOR}, which is older than "
+    "SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR "
+    "(${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}).")
+endif()
+set(SWIFT_LLVM_VERSION_MAJOR_CONDITIONS)
+foreach(version RANGE ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}
+                      ${LLVM_VERSION_MAJOR})
+  list(APPEND SWIFT_LLVM_VERSION_MAJOR_CONDITIONS
+    "LLVM_VERSION_MAJOR_AT_LEAST_${version}")
+endforeach()
 
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)

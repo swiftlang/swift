@@ -419,6 +419,13 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
     if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(arg.get()))
       if (m->hasGuaranteedInitialKind())
         continue;
+
+    // A `@called(atMostOnce)` closure's on-stack context takes ownership of its
+    // Copyable captures directly.
+    if (pai->hasCalledAtMostOnceSemantics() &&
+        !arg.get()->getType().isAddress())
+      continue;
+
     curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
                                   MarkDependenceKind::NonEscaping);
   }
@@ -535,8 +542,8 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
       continue;
     }
 
-    // `@called(once)` is always consumed by a call.
-    if (v->getType().isCalledOnce() &&
+    // `@called(atMostOnce)` is always consumed by a call.
+    if (v->getType().hasCalledAtMostOnceSemantics() &&
         (isa<ApplyInst>(consumer) || isa<TryApplyInst>(consumer))) {
       lifetimeEnds.push_back(consumer);
       continue;
@@ -591,16 +598,6 @@ static SILValue tryRewriteToPartialApplyStack(
   if (!origPA)
     return SILValue();
 
-  // TODO: Make it possible to stack-promote `@called(once)` closure with
-  //       consuming captures.
-  if (origPA->isCalledOnce()) {
-    ApplySite origSite(origPA);
-    for (auto &arg : origPA->getArgumentOperands()) {
-      if (origSite.getArgumentConvention(arg).isOwnedConventionInCaller())
-        return SILValue();
-    }
-  }
-
   auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
   if (cvt->getOperand() != origPA)
     convertOrPartialApply = cast<ConvertFunctionInst>(cvt->getOperand());
@@ -651,6 +648,21 @@ static SILValue tryRewriteToPartialApplyStack(
           noImplicitCopyWrapperToDelete.push_back(mmci);
         }
       }
+
+      // A `@called(atMostOnce)` closure's on-stack context takes ownership of
+      // its Copyable captured arguments unlike regular closures that always
+      // borrow. This is done because a `@called(atMostOnce)` closure has a
+      // destructor. A move-only consuming capture has to be transferred
+      // into the closure, not borrowed as well.
+      bool isConsumedInCaller = ApplySite(origPA)
+                                    .getArgumentConvention(arg)
+                                    .isOwnedConventionInCaller();
+      if (origPA->hasCalledAtMostOnceSemantics() && !foundNoImplicitCopy &&
+          (!argValue->getType().isMoveOnly() || isConsumedInCaller)) {
+        args.push_back(argValue);
+        continue;
+      }
+
       SILValue borrow = b.createBeginBorrow(origPA->getLoc(), argValue);
       if (foundNoImplicitCopy)
         borrow = b.createGuaranteedMoveOnlyWrapperToCopyableValue(
@@ -666,7 +678,7 @@ static SILValue tryRewriteToPartialApplyStack(
   auto newPA = b.createPartialApply(
       origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
       origPA->getCalleeConvention(), origPA->getResultIsolation(),
-      origPA->isCalledOnce(), PartialApplyInst::OnStackKind::OnStack);
+      origPA->getExecutionSemantics(), PartialApplyInst::OnStackKind::OnStack);
 
   // Insert mark_dependence for any non-trivial address operands to the
   // partial_apply.
@@ -956,6 +968,15 @@ static SILValue tryRewriteToPartialApplyStack(
           argValue = argBorrow->getOperand();
           builder.createEndBorrow(newPA->getLoc(), argBorrow);
         }
+
+        // Unlike regular on-stack closures `@called(atMostOnce)` don't borrow
+        // their non-trivially destroyable Copyable captures because they always
+        // have a destructor and so no separate cleanup for such values in
+        // necessary.
+        if (newPA->hasCalledAtMostOnceSemantics() && !argBorrow &&
+            !argValue->getType().isAddress())
+          return SILValue();
+
         // Don't need to destroy if we borrowed in place .
         return borrowedOriginals.count(argValue) ? SILValue() : argValue;
       };
@@ -963,8 +984,8 @@ static SILValue tryRewriteToPartialApplyStack(
                                        newPA->getLoc());
     };
 
-    // `try_apply` is a terminator: a `@called(once)` closure consumed as the
-    // callee of a throwing call ends its lifetime at the call itself, but
+    // `try_apply` is a terminator: a `@called(atMostOnce)` closure consumed as
+    // the callee of a throwing call ends its lifetime at the call itself, but
     // there is no "next instruction in the same block" to insert after. The
     // consuming callee operand is spent before either successor runs, so the
     // cleanup has to be duplicated at the start of both.
@@ -1074,7 +1095,7 @@ static bool tryExtendLifetimeToLastUse(
   // Prevent a copy of the closure below because they have owned convention
   // and are forwarded through the escape -> no-escape conversion into the
   // callee that consumed the value.
-  if (cvt->getType().isCalledOnce())
+  if (cvt->getType().hasCalledAtMostOnceSemantics())
     return false;
 
   // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
@@ -1504,12 +1525,13 @@ static bool fixupClosureLifetimes(SILFunction &fn,
       if (!cvt)
         continue;
 
-      // @called(once) has owned convention so it's always lifetime guaranteed
-      // due to owned convention, but that only means no extra `destroy_value`.
-      // Stack promotion should still be attempted were call that takes it is
-      // a lifetime ending use.
-      bool isCalledOnce = cvt->getType().isCalledOnce();
-      if (cvt->isLifetimeGuaranteed() && !isCalledOnce)
+      // @called(atMostOnce) has owned convention so it's always lifetime
+      // guaranteed due to owned convention, but that only means no extra
+      // `destroy_value`. Stack promotion should still be attempted were call
+      // that takes it is a lifetime ending use.
+      bool hasCalledAtMostOnceSemantics =
+          cvt->getType().hasCalledAtMostOnceSemantics();
+      if (cvt->isLifetimeGuaranteed() && !hasCalledAtMostOnceSemantics)
         continue;
 
       // First try to peephole a known pattern.
@@ -1529,9 +1551,9 @@ static bool fixupClosureLifetimes(SILFunction &fn,
         continue;
       }
 
-      // A `@called(once)` conversion's ownership is already fully accounted
-      // for even when on-stack promotion above didn't apply.
-      if (isCalledOnce) {
+      // A `@called(atMostOnce)` conversion's ownership is already fully
+      // accounted for even when on-stack promotion above didn't apply.
+      if (hasCalledAtMostOnceSemantics) {
         assert(cvt->isLifetimeGuaranteed());
         continue;
       }

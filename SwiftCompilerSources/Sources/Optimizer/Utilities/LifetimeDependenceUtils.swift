@@ -282,6 +282,18 @@ private func guaranteedResultBase(of value: Value) -> Value? {
   return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
 }
 
+/// If `value` is an address result of a call that returns `@guaranteed_address`,
+/// return the argument that the result is a borrow of.
+private func guaranteedAddressResultBase(of value: Value) -> Value? {
+  guard value.type.isAddress,
+        let apply = value.definingInstruction as? ApplyInst,
+        apply.hasGuaranteedAddressResult,
+        let selfArgument = apply.selfArgument else {
+    return nil
+  }
+  return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
+}
+
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -297,6 +309,11 @@ extension LifetimeDependence.Scope {
   /// multiple guaranteed values.
   init(base: Value, _ context: some Context) {
     if base.type.isAddress {
+      if let accessorBase = guaranteedAddressResultBase(of: base) {
+        // When `base` is @guaranteed_address result of a borrow accessor, root the dependence on the accessor's base.
+        self.init(base: accessorBase, context)
+        return
+      }
       self.init(enclosingAccess: base.enclosingAccessScope, address: base, context)
       return
     }

@@ -42,6 +42,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySliceTests
     single-source/ArraySubscript
     single-source/ArrayTests
+    single-source/AssumeIsolated
     single-source/AsyncTree
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties

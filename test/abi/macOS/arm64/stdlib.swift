@@ -1378,3 +1378,6 @@ Added: _swift_tupleWitnesses_nonpod_inline
 Added: _swift_tupleWitnesses_nonpod_noninline
 Added: _swift_tupleWitnesses_pod_inline
 Added: _swift_tupleWitnesses_pod_noninline
+
+// Recover the dynamic type of a COM interface through ISwiftObject.
+Added: _swift_getCOMDynamicType

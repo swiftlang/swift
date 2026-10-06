@@ -20,8 +20,6 @@
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
@@ -372,7 +370,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
         break;
       case clang::TargetInfo::AArch64ABIBuiltinVaList:
         break;
-      case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
       case clang::TargetInfo::XtensaABIBuiltinVaList:
@@ -2363,8 +2360,11 @@ namespace {
         }
       }
 
+      auto *const declTy =
+          Impl.getClangASTContext().getCanonicalTagType(decl).getTypePtr();
+
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
-      if (decl->getTypeForDecl()->isDependentType()) {
+      if (declTy->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_is_dependent,
@@ -2472,7 +2472,7 @@ namespace {
 
       // Do not import std::promise.
       if (decl->isInStdNamespace() && decl->getName() == "promise" &&
-          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+          getCxxValueSemanticsKind(declTy, Impl) !=
               CxxValueSemanticsKind::Copyable) {
         return nullptr;
       }
@@ -2481,7 +2481,7 @@ namespace {
         // Swift classes are always Escapable.
         if (evaluateOrDefault(
                 Impl.SwiftContext.evaluator,
-                ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+                ClangTypeEscapability({declTy, &Impl}),
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
           Impl.diagnose(HeaderLoc(decl->getLocation()),
                         diag::nonescapable_foreign_reference_type, decl);
@@ -2516,7 +2516,7 @@ namespace {
         Impl.ImportedDecls.erase(canonicalKey);
       };
 
-      if (getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+      if (getCxxValueSemanticsKind(declTy, Impl) !=
           CxxValueSemanticsKind::Copyable) {
         result->addAttribute(new (Impl.SwiftContext)
                                  MoveOnlyAttr(/*Implicit=*/true));
@@ -2526,7 +2526,7 @@ namespace {
       bool isNonEscapable = false;
       if (evaluateOrDefault(
               Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+              ClangTypeEscapability({declTy, &Impl}),
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->addAttribute(new (Impl.SwiftContext)
                                  NonEscapableAttr(/*Implicit=*/true));
@@ -2933,14 +2933,9 @@ namespace {
           // Check if the given type is non-trivial to ensure we can
           // still perform the right copy/move/destroy even if it's
           // not an address-only type.
-          auto isNonTrivial = [](const clang::CXXRecordDecl *decl) -> bool {
-            return decl->hasNonTrivialCopyConstructor() ||
-                   decl->hasNonTrivialMoveConstructor() ||
-                   !decl->hasTrivialDestructor();
-          };
           if (!isAddressOnly &&
               Impl.SwiftContext.LangOpts.Target.isWindowsMSVCEnvironment() &&
-              isNonTrivial(cxxRecordDecl)) {
+              isNonTrivialCxxRecord(cxxRecordDecl)) {
             // MSVC ABI allows non-trivially destroyed C++ types
             // to be passed in register. This is not supported, as such
             // type wouldn't be destroyed in Swift correctly. Therefore,
@@ -3213,8 +3208,9 @@ namespace {
 
       // It is important that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto valueSemanticsKind =
-          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl);
+      auto *const declTy =
+          Impl.getClangASTContext().getCanonicalTagType(decl).getTypePtr();
+      auto valueSemanticsKind = getCxxValueSemanticsKind(declTy, Impl);
       if (valueSemanticsKind == CxxValueSemanticsKind::Unknown) {
 
         HeaderLoc loc(decl->getLocation());
@@ -3307,8 +3303,12 @@ namespace {
       //
       //    template <> struct MyTemplate<int>;
       //
+      // N.B. Consult the redeclaration chain rather than this particular
+      // declaration: an explicit specialization may well be declared before it
+      // is defined, and `decl` can be any declaration of the specialization —
+      // notably, canonical tag types are formed with the first one.
       if (decl->getSpecializationKind() == clang::TSK_ExplicitSpecialization &&
-          !decl->isCompleteDefinition())
+          !decl->getDefinition())
         return nullptr;
 
       // `decl->getDefinition()` can return nullptr before the call to sema and
@@ -3401,7 +3401,7 @@ namespace {
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
         auto type = Impl.importTypeIgnoreIUO(
-            clangContext.getTagDeclType(clangEnum), ImportTypeKind::Value,
+            clangContext.getCanonicalTagType(clangEnum), ImportTypeKind::Value,
             ImportDiagnosticAdder(Impl, clangEnum, clangEnum->getLocation()),
             isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (!type)
@@ -3518,8 +3518,9 @@ namespace {
       // when it comes to getter/setter generation.
       if (auto parent = dyn_cast<clang::CXXRecordDecl>(
               decl->getAnonField()->getParent())) {
-        auto semanticsKind =
-            getCxxValueSemanticsKind(parent->getTypeForDecl(), Impl);
+        auto *parentTy =
+            Impl.getClangASTContext().getCanonicalTagType(parent).getTypePtr();
+        auto semanticsKind = getCxxValueSemanticsKind(parentTy, Impl);
         if (semanticsKind == CxxValueSemanticsKind::Unknown)
           return nullptr;
       }
@@ -4365,7 +4366,7 @@ namespace {
       clang::QualType resultTypeForEscapability = retType;
       if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
         resultTypeForEscapability =
-            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
+            Impl.getClangASTContext().getCanonicalTagType(ctordecl->getParent());
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(
@@ -4506,6 +4507,8 @@ namespace {
             idx, LifetimeFlags().withAnnotated());
       }
 
+      auto &clangCtx = Impl.getClangASTContext();
+
       if (inheritLifetimeParamIndicesForReturn.any() ||
           scopedLifetimeParamIndicesForReturn.any())
         lifetimeDependencies.emplace_back(
@@ -4520,13 +4523,17 @@ namespace {
             returnIdx, LifetimeFlags().withAnnotated());
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
-        if (ctordecl->isDefaultConstructor() &&
-            evaluateOrDefault(
-                Impl.SwiftContext.evaluator,
-                ClangTypeEscapability(
-                    {ctordecl->getParent()->getTypeForDecl(), &Impl}),
-                CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
-          lifetimeDependencies.push_back(immortalLifetime);
+        if (ctordecl->isDefaultConstructor()) {
+          auto *parentTy =
+              clangCtx.getCanonicalTagType(ctordecl->getParent()).getTypePtr();
+
+          if (evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                ClangTypeEscapability({parentTy, &Impl}),
+                                CxxEscapability::Unknown) ==
+              CxxEscapability::NonEscapable) {
+            lifetimeDependencies.push_back(immortalLifetime);
+          }
+        }
       }
       bool resultIsNonEscapable =
           isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
@@ -4667,9 +4674,9 @@ namespace {
     /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
     ///
     /// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, the method keeps its original
-    /// name (it is marked '@unsafe(always)' by importAttributes instead), and
-    /// the renamed spelling is imported a second time as a deprecated migration
-    /// stub, which is only '@unsafe'.
+    /// name and is marked '@unsafe(always)' here instead, and the renamed
+    /// spelling is imported a second time as a deprecated migration stub, which
+    /// is only '@unsafe'.
     void renameToUnsafeIfNeeded(
         const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
         const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
@@ -4696,9 +4703,20 @@ namespace {
       if (currentName == unsafeName)
         return;
 
-      if (!keepsNameWhenImportedAsUnsafe(clangDecl, Impl.SwiftContext)) {
+      if (!Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
         swiftDecl->setName(unsafeName);
         return;
+      }
+
+      // Keeping the original name means every use has to be acknowledged.
+      auto *unsafeAttr = swiftDecl->getAttrs().getAttribute<UnsafeAttr>();
+      if (!unsafeAttr || !unsafeAttr->isAlways()) {
+        bool implicit = !unsafeAttr || unsafeAttr->isImplicit();
+        if (unsafeAttr)
+          swiftDecl->getAttrs().removeAttribute(unsafeAttr);
+        swiftDecl->addAttribute(new (Impl.SwiftContext) UnsafeAttr(
+            SourceLoc(), SourceRange(), /*always=*/true, implicit));
       }
 
       // Keeping the original name collides with the same-named safe wrapper
@@ -4724,23 +4742,13 @@ namespace {
                                /*correctSwiftName=*/std::nullopt,
                                /*accessorInfo=*/std::nullopt, funcTemplate));
       }
-      if (!stub || stub == swiftDecl)
-        return;
-
       // The stub's own name says 'Unsafe', so its uses don't have to be
       // acknowledged with 'unsafe' unless strict memory safety is on; that
       // also keeps existing code that already calls the renamed spelling
-      // compiling. Only the original name is '@unsafe(always)'.
-      //
-      // An implicit '@unsafe(always)' here is necessarily the one the rename
-      // heuristic asked importSwiftAttrAttributes() for; an 'unsafe(always)'
-      // spelled in C++ is explicit, and still wins.
-      if (auto *unsafeAttr = stub->getAttrs().getAttribute<UnsafeAttr>();
-          unsafeAttr && unsafeAttr->isAlways() && unsafeAttr->isImplicit()) {
-        stub->getAttrs().removeAttribute(unsafeAttr);
-        stub->addAttribute(new (Impl.SwiftContext)
-                               UnsafeAttr(/*implicit=*/true));
-      }
+      // compiling. It is imported from the same declaration, so it gets the
+      // heuristic's plain '@unsafe', and only the original name is promoted.
+      if (!stub || stub == swiftDecl)
+        return;
 
       // A method that C++ already deprecates keeps that deprecation; Clang's
       // message wins at the use site either way.
@@ -9223,8 +9231,6 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
     return nullptr;
 
   clang::QualType UnderlyingType = ClangTypedef->getUnderlyingType();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(UnderlyingType))
-    UnderlyingType = elaborated->desugar();
 
   // A typedef to a typedef should get imported as a typealias.
   auto *TypedefT = UnderlyingType->getAs<clang::TypedefType>();
@@ -9582,22 +9588,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
-    bool importUnsafeHeuristic = false;
-    bool heuristicIsAlways = false;
-    if (const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
-        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext)) {
-      importUnsafeHeuristic = true;
-      // Only require every use to be acknowledged for methods that actually
-      // kept their original name; a method that is still renamed has no
-      // un-renamed spelling to migrate to.
-      heuristicIsAlways =
-          keepsNameWhenImportedAsUnsafe(CXXMethod, SwiftContext);
-    }
+    // A method that keeps a name it would otherwise have been renamed away
+    // from is promoted to '@unsafe(always)' by renameToUnsafeIfNeeded(), which
+    // is the only place that knows whether the rename applies.
+    const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
+    bool importUnsafeHeuristic =
+        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext);
 
     if (seenUnsafe || importUnsafeHeuristic) {
       auto attr = new (SwiftContext)
-          UnsafeAttr(SourceLoc(), SourceRange(),
-                     seenUnsafe.value_or(false) || heuristicIsAlways,
+          UnsafeAttr(SourceLoc(), SourceRange(), seenUnsafe.value_or(false),
                      /*implicit=*/!seenUnsafe.has_value());
       MappedDecl->addAttribute(attr);
     }
@@ -11150,8 +11150,7 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       if (auto spectType =
               dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
-      if (auto elaborated = dyn_cast<clang::ElaboratedType>(baseType))
-        baseType = elaborated->desugar();
+
       if (!isa<clang::RecordType>(baseType))
         continue;
 
@@ -11565,44 +11564,6 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 };
 
 static ClangDeclTraceFormatter TF;
-
-// MARK: - Abstract Layout Computation
-
-std::optional<AbstractTypeLayout>
-swift::computeClangAbstractLayout(const NominalTypeDecl *decl) {
-  auto *clangDecl =
-      dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl());
-  if (!clangDecl)
-    return std::nullopt;
-
-  clangDecl = clangDecl->getDefinition();
-  if (!clangDecl)
-    return std::nullopt;
-
-  auto &ctx = decl->getASTContext();
-  auto *clangLoader = ctx.getClangModuleLoader();
-  if (!clangLoader)
-    return std::nullopt;
-
-  auto &clangCtx = clangLoader->getClangASTContext();
-  const auto &recordLayout = clangCtx.getASTRecordLayout(clangDecl);
-
-  AbstractTypeLayout result;
-  result.mangledName = Mangle::ASTMangler(ctx).mangleNominalType(decl);
-  result.size = recordLayout.getSize().getQuantity();
-  result.alignment = recordLayout.getAlignment().getQuantity();
-  result.stride = llvm::alignTo(result.size, result.alignment);
-
-  Type swiftType = decl->getDeclaredInterfaceType();
-  result.bitwiseCopyable = swiftType->isBitwiseCopyable();
-
-  if (auto *structDecl = dyn_cast<StructDecl>(decl))
-    result.isOpaque = structDecl->isCxxNonTrivial();
-  else
-    result.isOpaque = false;
-
-  return result;
-}
 
 template<>
 const UnifiedStatsReporter::TraceFormatter*

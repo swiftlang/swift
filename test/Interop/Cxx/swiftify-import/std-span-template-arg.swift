@@ -24,14 +24,14 @@ template <typename T>
 struct S {
     // expected-expansion@+14:10{{
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
     //   expected-remark@3{{macro content: |public borrowing func get() -> Span<CChar> {|}}
     //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe get()), copying: ())|}}
     //   expected-remark@5{{macro content: |}|}}
     // }}
     // expected-expansion@+7:10{{
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
     //   expected-remark@3{{macro content: |public borrowing func get() -> Span<CInt> {|}}
     //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe get()), copying: ())|}}
     //   expected-remark@5{{macro content: |}|}}
@@ -48,7 +48,7 @@ template <typename T, typename U>
 struct S2 {
     // expected-expansion@+7:11{{
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
     //   expected-remark@3{{macro content: |public borrowing func getT() -> Span<CChar> {|}}
     //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe getT()), copying: ())|}}
     //   expected-remark@5{{macro content: |}|}}
@@ -56,7 +56,7 @@ struct S2 {
     T getT() const [[clang::lifetimebound]];
     // expected-expansion@+7:11{{
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
     //   expected-remark@3{{macro content: |public borrowing func getU() -> Span<CInt> {|}}
     //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe getU()), copying: ())|}}
     //   expected-remark@5{{macro content: |}|}}

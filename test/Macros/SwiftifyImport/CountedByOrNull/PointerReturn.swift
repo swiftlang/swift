@@ -33,7 +33,7 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafePointer<CInt>, _ len1: 
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
     return unsafe UnsafeMutableBufferPointer<CInt> (start: unsafe myFunc(len), count: Int(len))
 }
@@ -41,7 +41,7 @@ public func myFunc(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
 @__swiftmacro_4test11nonEscaping15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
     return unsafe UnsafeBufferPointer<CInt> (start: unsafe nonEscaping(len), count: Int(len))
 }
@@ -49,7 +49,7 @@ public func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
 @__swiftmacro_4test21lifetimeDependentCopy15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_disfavoredOverload
 public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
     let len1 = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeBufferPointer {
@@ -64,7 +64,7 @@ public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
 @__swiftmacro_4test23lifetimeDependentBorrow15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(borrow p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(borrow p) @_disfavoredOverload
 public func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), count: Int(len2)), copying: ())

@@ -858,8 +858,11 @@ public:
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   // Cache for already-specialized function templates and any thunks they may
-  // have.
-  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+  // have, per Swift declaration of the template: e.g. a member template and its
+  // '__<name>Unsafe' migration stub share a C++ specialization, but resolve to
+  // different Swift declarations.
+  llvm::DenseMap<std::pair<clang::FunctionDecl *, const ValueDecl *>,
+                 ValueDecl *>
       specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
@@ -2238,7 +2241,7 @@ void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+T *dynCastIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2251,7 +2254,7 @@ static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *castIgnoringCompatibilityAlias(Decl *D) {
+T *castIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2462,25 +2465,13 @@ std::optional<CxxUnsafetyReason>
 shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
                               ASTContext &ctx);
 
-/// Whether \p method keeps its original Swift name, and is imported
-/// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .
-///
-/// False unless \c ImportUnsafeCxxMethodsAsAlwaysUnsafe is enabled. Also false
-/// for the handful of C++ standard library methods that the overlay in
-/// stdlib/public/Cxx wraps in a safe Swift API of the same name, since the
-/// original-named import would shadow or ambiguate the wrapper.
-bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
-
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar().getTypePtr();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 
 inline clang::QualType desugarIfElaborated(clang::QualType type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 

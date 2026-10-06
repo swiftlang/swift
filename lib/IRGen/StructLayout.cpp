@@ -29,6 +29,8 @@
 #include "StructLayout.h"
 #include "TypeInfo.h"
 
+#include <limits>
+
 using namespace swift;
 using namespace irgen;
 
@@ -120,7 +122,9 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
         countType = loweredType.getRawLayoutSubstitutedCountType();
       }
 
-      auto loweredLikeType = IGM.getLoweredType(likeType);
+      // The storage is accessed generically, so use opaque abstraction.
+      auto loweredLikeType =
+          IGM.getLoweredType(AbstractionPattern::getOpaque(), likeType);
       auto &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
       auto likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo);
 
@@ -242,20 +246,27 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
-    // Force non-loadable when the struct has stored properties of hidden types.
-    // With a stored property of hidden type, having the library and client side
-    // to agree on expansion scheme is challenging and error-prone. Therefore,
-    // we make these types always address-only.
-    if (decl->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-      IsLoadable = false;
-      // Set zero spare bits so both sides agree on 0 extra inhabitants
-      // (the client can't know the hidden field's
-      // spare-bit pattern, so Optional<S> must use a tag byte).
-      SpareBits =
-          SpareBitVector::getConstant(MinimumSize.getValueInBits(), false);
-    }
-
     applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
+  }
+
+  // A fixed-layout type's storage size is recorded in a 32-bit field, so a
+  // type whose size does not fit in 32 bits cannot be represented. Reject it
+  // and fall back to a non-fixed layout so we never build a fixed-size type
+  // info with a truncated size.
+  if (IsFixedLayout &&
+      MinimumSize.getValue() > std::numeric_limits<uint32_t>::max()) {
+    if (type)
+      IGM.Context.Diags.diagnose(SourceLoc(), diag::fixed_type_too_large,
+                                 *type);
+    else
+      IGM.Context.Diags.diagnose(SourceLoc(),
+                                 diag::fixed_type_too_large_unnamed);
+    IsFixedLayout = false;
+    IsLoadable = false;
+    IsKnownAlwaysFixedSize = IsNotFixedSize;
+    MinimumSize = Size(0);
+    SpareBits.clear();
+    Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
   }
 }
 

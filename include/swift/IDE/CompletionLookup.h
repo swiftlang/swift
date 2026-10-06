@@ -627,12 +627,6 @@ namespace llvm {
 using RequestedResultsTy = swift::ide::CompletionLookup::RequestedResultsTy;
 template <>
 struct DenseMapInfo<RequestedResultsTy> {
-  static inline RequestedResultsTy getEmptyKey() {
-    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), {}, false};
-  }
-  static inline RequestedResultsTy getTombstoneKey() {
-    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), {}, false};
-  }
   static unsigned getHashValue(const RequestedResultsTy &Val) {
     return hash_combine(
         DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),

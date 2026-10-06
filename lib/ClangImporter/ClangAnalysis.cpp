@@ -537,8 +537,10 @@ static const clang::RecordDecl *
 getReturnTypeAsRecordDeclPtr(const clang::NamedDecl *ND) {
   clang::QualType retTy;
 
+  auto &clangCtx = ND->getASTContext();
+
   if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
-    retTy = CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+    retTy = clangCtx.getCanonicalTagType(CD->getParent());
   else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     retTy = FD->getReturnType();
   else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
@@ -1195,12 +1197,11 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
     return true;
 
   auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        return anySubobjectsSelfContained(cxxRecord);
-      }
-    }
+    // N.B. Use Type::getAsCXXRecordDecl() rather than reaching for
+    // RecordType::getDecl(): the latter can be any declaration of the record,
+    // and Swift attributes are not propagated across redeclarations.
+    if (auto *cxxRecord = t->getAsCXXRecordDecl())
+      return anySubobjectsSelfContained(cxxRecord);
 
     return false;
   };
@@ -1233,15 +1234,33 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
       method->getNameAsString() == "end")
     return unsafe(CxxUnsafetyReason::IteratorFromBeginEnd);
 
+  // The user vouched for this method's safety. Without the feature, such a
+  // method is still renamed, for source compatibility. This doesn't apply to
+  // begin and end, whose renamed spellings the conformance to RAC relies on.
+  if (ctx.LangOpts.hasFeature(Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
+      hasSwiftAttribute(method, {"safe"}))
+    return safe();
+
+  // A method template returning one of its own template parameters returns
+  // whatever type the caller picked, not a projection of 'this'.
+  if (auto *primary = method->getPrimaryTemplate()) {
+    auto *parmType = primary->getTemplatedDecl()
+                         ->getReturnType()
+                         ->getAs<clang::TemplateTypeParmType>();
+    if (parmType &&
+        parmType->getDepth() == primary->getTemplateParameters()->getDepth())
+      return safe();
+  }
+
   if (clangTypeIsForeignReference(method->getReturnType(), ctx))
     return safe();
 
-  auto parentQualType =
-      method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+  auto *parentDecl = method->getParent();
+  auto parentQualType = method->getASTContext().getCanonicalTagType(parentDecl);
 
   bool parentIsSelfContained =
       !clangTypeIsForeignReference(parentQualType, ctx) &&
-      anySubobjectsSelfContained(method->getParent());
+      anySubobjectsSelfContained(parentDecl);
 
   // If it returns a pointer or reference from an owned parent, that's a
   // projection (unsafe).
@@ -1257,41 +1276,31 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
 
   // Try to figure out the semantics of the return type. If it's a
   // pointer/iterator, it's unsafe.
-  if (auto returnType = dyn_cast<clang::RecordType>(
-          method->getReturnType().getCanonicalType())) {
-    if (auto cxxRecordReturnType =
-            dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
-      if (isSwiftClassType(cxxRecordReturnType))
-        return safe();
+  if (auto *cxxRecordReturnType =
+          method->getReturnType()->getAsCXXRecordDecl()) {
+    if (isSwiftClassType(cxxRecordReturnType))
+      return safe();
 
-      if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-          hasIteratorCategory(cxxRecordReturnType))
-        return unsafe(CxxUnsafetyReason::ReturnsIterator);
+    if (hasIteratorAPIAttr(cxxRecordReturnType) ||
+        hasIteratorCategory(cxxRecordReturnType))
+      return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
-      // Mark this as safe to help our diganostics down the road.
-      if (!cxxRecordReturnType->getDefinition()) {
-        return safe();
-      }
+    // Mark this as safe to help our diganostics down the road.
+    if (!cxxRecordReturnType->getDefinition()) {
+      return safe();
+    }
 
-      // A projection of a view type (such as a string_view) from a self
-      // contained parent is a proejction (unsafe).
-      if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-          isViewType(cxxRecordReturnType)) {
+    // A projection of a view type (such as a string_view) from a self
+    // contained parent is a proejction (unsafe).
+    if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
+        isViewType(cxxRecordReturnType)) {
         return parentIsSelfContained ? unsafe(CxxUnsafetyReason::ViewProjection)
                                      : safe();
-      }
     }
   }
 
   // Otherwise, it's safe.
   return safe();
-}
-
-bool importer::keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
-                                             ASTContext &ctx) {
-  return ctx.LangOpts.hasFeature(
-             Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
-         shouldRenameCXXMethodAsUnsafe(method, ctx);
 }
 
 /// Whether a note at \p loc would land in a system header. Such a note names

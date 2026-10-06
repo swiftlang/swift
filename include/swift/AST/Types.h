@@ -38,6 +38,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -413,8 +414,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 18 };
-  enum { NumSILExtInfoBits = 16 };
+  enum { NumAFTExtInfoBits = 19 };
+  enum { NumSILExtInfoBits = 17 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -452,7 +453,7 @@ protected:
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
     HasSendableDependence : 1,
-    HasCalledOnceDependence : 1
+    HasExecutionSemanticsDependence : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -872,7 +873,8 @@ public:
   ///
   /// \param typeVariables This vector is populated with the set of
   /// type variables referenced by this type.
-  void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
+  void
+  getTypeVariables(SmallPtrSetVector<TypeVariableType *, 4> &typeVariables);
 
 public:
   /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
@@ -3773,8 +3775,8 @@ protected:
           !Info.value().getLifetimeDependencies().empty();
       Bits.AnyFunctionType.HasSendableDependence =
           !Info->getSendableDependentType().isNull();
-      Bits.AnyFunctionType.HasCalledOnceDependence =
-          !Info->getCalledOnceDependentType().isNull();
+      Bits.AnyFunctionType.HasExecutionSemanticsDependence =
+          !Info->getExecutionSemanticsDependentType().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3788,7 +3790,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
       Bits.AnyFunctionType.HasSendableDependence = false;
-      Bits.AnyFunctionType.HasCalledOnceDependence = false;
+      Bits.AnyFunctionType.HasExecutionSemanticsDependence = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3863,8 +3865,8 @@ public:
     return Bits.AnyFunctionType.HasSendableDependence;
   }
 
-  bool hasCalledOnceDependentType() const {
-    return Bits.AnyFunctionType.HasCalledOnceDependence;
+  bool hasExecutionSemanticsDependentType() const {
+    return Bits.AnyFunctionType.HasExecutionSemanticsDependence;
   }
 
   bool hasLifetimeDependencies() const {
@@ -3886,10 +3888,10 @@ public:
   /// variables if present.
   Type getSendableDependentType() const;
 
-  /// A dependent type that determines whether the function is @called(once).
-  /// This is only used within the constraint system, and will contain type
-  /// variables if present.
-  Type getCalledOnceDependentType() const;
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// will contain type variables if present.
+  Type getExecutionSemanticsDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3941,10 +3943,10 @@ public:
 
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
-    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getGlobalActor(), getThrownError(),
-                   getSendableDependentType(), getCalledOnceDependentType(),
-                   getLifetimeDependencies());
+    return ExtInfo(
+        Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(), getGlobalActor(),
+        getThrownError(), getSendableDependentType(),
+        getExecutionSemanticsDependentType(), getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4092,8 +4094,9 @@ public:
   /// Return the function type setting sendable to \p newValue.
   AnyFunctionType *withSendable(bool newValue) const;
 
-  /// Return the function type setting @called(once) to \p newValue.
-  AnyFunctionType *withCalledOnce(bool newValue) const;
+  /// Return the function type setting the execution semantics to \p newValue.
+  AnyFunctionType *
+  withExecutionSemantics(std::optional<ExecutionSemantics> newValue) const;
 
   /// Return the function type without yields (and coroutine flag)
   AnyFunctionType *getWithoutYields() const;
@@ -4121,7 +4124,20 @@ public:
     return getExtInfo().getDifferentiabilityKind();
   }
 
-  bool isCalledOnce() const;
+  std::optional<ExecutionSemantics> getExecutionSemantics() const;
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getExecutionSemantics().has_value();
+  }
+
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
+  bool isCalledOnce() const {
+    return getExecutionSemantics() == ExecutionSemantics::Once;
+  }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
@@ -4214,7 +4230,7 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return hasGlobalActor() + hasThrownError() + hasSendableDependentType() +
-           hasCalledOnceDependentType();
+           hasExecutionSemanticsDependentType();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4271,11 +4287,11 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError()];
   }
 
-  /// A dependent type that determines whether the function is @called(once).
-  /// This is only used within the constraint system, and will contain type
-  /// variables if present.
-  Type getCalledOnceDependentType() const {
-    if (!hasCalledOnceDependentType())
+  /// A dependent type that determines whether the function is
+  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// will contain type variables if present.
+  Type getExecutionSemanticsDependentType() const {
+    if (!hasExecutionSemanticsDependentType())
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError() +
                                       hasSendableDependentType()];
@@ -5637,6 +5653,18 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  std::optional<ExecutionSemantics> getExecutionSemantics() const {
+    return getExtInfo().getExecutionSemantics();
+  }
+
+  /// Returns true if values of this function type can be called at most once.
+  /// This is true for function types that may either be called exactly once or
+  /// at most once.
+  bool hasCalledAtMostOnceSemantics() const {
+    return getExtInfo().hasCalledAtMostOnceSemantics();
+  }
+  /// Returns true if values of this function type must be called exactly
+  /// once, which is true only for `@called(exactlyOnce)` function types.
   bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
@@ -6280,7 +6308,7 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick &&
-           !isCalledOnce();
+           !hasCalledAtMostOnceSemantics();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
@@ -7334,7 +7362,11 @@ public:
     return { getSubclassTrailingObjects<ProtocolDecl *>(),
              static_cast<size_t>(Bits.ArchetypeType.NumProtocols) };
   }
-  
+
+  /// Whether at least one of the archetype's protocol constraints is a COM
+  /// interface. This does not imply a COM existential representation.
+  bool hasCOMInterfaceConstraint() const;
+
   /// requiresClass - True if the type can only be substituted with class types.
   /// This is true if the type conforms to one or more class protocols or has
   /// a superclass constraint.
@@ -7966,7 +7998,8 @@ END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 /// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///
-/// The referent type always satisfies allowsOwnership().
+/// The referent type always satisfies allowsOwnership(). Managed ownership
+/// may still be rejected for a particular reference model.
 ///
 /// These types may appear in the AST only as the type of a variable;
 /// getTypeOfReference strips this layer from the formal type of a
@@ -8542,40 +8575,32 @@ class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef MangledName;
-  ModuleDecl *DefiningModule;
   HiddenTypeLayoutInfoDecl *LayoutInfoDecl = nullptr;
   CanType Parent;
 
-  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
-             HiddenTypeLayoutInfoDecl *layoutInfoDecl, CanType parent,
-             const ASTContext &ctx)
+  HiddenType(StringRef mangledName, HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+             CanType parent, const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx,
                  parent ? parent->getRecursiveProperties()
                         : RecursiveTypeProperties()),
-        MangledName(mangledName), DefiningModule(definingModule),
-        LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
+        MangledName(mangledName), LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
 
 public:
   static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
-                         ModuleDecl *definingModule,
                          HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                          CanType parent);
 
   StringRef getMangledName() const { return MangledName; }
-  ModuleDecl *getDefiningModule() const { return DefiningModule; }
   HiddenTypeLayoutInfoDecl *getLayoutInfoDecl() const { return LayoutInfoDecl; }
   CanType getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    Profile(ID, getMangledName(), getDefiningModule(), getLayoutInfoDecl(),
-            getParent());
+    Profile(ID, getMangledName(), getLayoutInfoDecl(), getParent());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
-                      ModuleDecl *definingModule,
                       HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                       CanType parent) {
     ID.AddString(mangledName);
-    ID.AddPointer(definingModule);
     ID.AddPointer(layoutInfoDecl);
     ID.AddPointer(parent.getPointer());
   }
@@ -8799,12 +8824,6 @@ inline CanType CanType::getNominalParent() const {
 }
 
 inline bool CanType::isActuallyCanonicalOrNull() const {
-#if LLVM_VERSION_MAJOR <= 21
-  if (getPointer() == llvm::DenseMapInfo<TypeBase *>::getEmptyKey() ||
-      getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey())
-    return true;
-#endif
-
   return getPointer() == nullptr || getPointer()->isCanonical();
 }
 

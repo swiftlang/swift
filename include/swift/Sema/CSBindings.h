@@ -380,45 +380,13 @@ template <>
 struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   using Binding = swift::constraints::inference::PotentialBinding;
 
-  static Binding getEmptyKey() {
-    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
-  }
-
-  static Binding getTombstoneKey() {
-    return placeholderKey(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(const Binding &Val) {
     return DenseMapInfo<swift::Type>::getHashValue(
         Val.BindingType->getCanonicalType());
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
-#if LLVM_VERSION_MAJOR <= 21
-    // If either side is empty or tombstone, let's use pointer equality.
-    {
-      auto lhsTy = LHS.BindingType.getPointer();
-      auto rhsTy = RHS.BindingType.getPointer();
-
-      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
-      auto tombstoneTy =
-          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
-
-      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-
-      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-    }
-#endif
-
     return LHS == RHS;
-  }
-
-private:
-  static Binding placeholderKey(swift::Type type) {
-    return Binding::forPlaceholder(type);
   }
 };
 

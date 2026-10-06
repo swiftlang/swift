@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage- -swift-version 5
-// RUN: %target-typecheck-verify-swift -solver-disable-diagnose-valid-salvage -swift-version 5
-
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -swift-version 5
 // REQUIRES: objc_interop
 
 // Note this cannot use the mock SDK Foundation because it lacks required
@@ -127,14 +125,14 @@ func testLeadingDotAmbiguity() {
   func f16(_: CGFloat?, _: Double?) {}
 
   func test1(z: Double) {
-    f1(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f2(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f3(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f4(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f5(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f6(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f7(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f8(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    f1(max(.x, z), max(.y, z))
+    f2(max(.x, z), max(.y, z))
+    f3(max(.x, z), max(.y, z))
+    f4(max(.x, z), max(.y, z))
+    f5(max(.x, z), max(.y, z))
+    f6(max(.x, z), max(.y, z))
+    f7(max(.x, z), max(.y, z))
+    f8(max(.x, z), max(.y, z))
     f9(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
     f10(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
     f11(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
@@ -146,10 +144,10 @@ func testLeadingDotAmbiguity() {
   }
 
   func test2(z: Double) {
-    f1(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f2(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f3(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f4(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    f1(max(.y, z), max(.x, z))
+    f2(max(.y, z), max(.x, z))
+    f3(max(.y, z), max(.x, z))
+    f4(max(.y, z), max(.x, z))
     f5(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f6(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f7(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
@@ -158,10 +156,10 @@ func testLeadingDotAmbiguity() {
     f10(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f11(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f12(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f13(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f14(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f15(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f16(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    f13(max(.y, z), max(.x, z))
+    f14(max(.y, z), max(.x, z))
+    f15(max(.y, z), max(.x, z))
+    f16(max(.y, z), max(.x, z))
   }
 }
 
