@@ -5,5 +5,5 @@
 // RUN: touch %t/foo.tbd
 // RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift %t/foo.tbd | %FileCheck %s
 
-// CHECK: bin/ld{{"? }}
+// CHECK: /ld{{"? }}
 // CHECK-SAME: foo.tbd
