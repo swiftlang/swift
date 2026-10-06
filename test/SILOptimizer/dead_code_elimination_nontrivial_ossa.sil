@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -dce %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits -dce %s | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // REQUIRES: swift_in_compiler
 
@@ -1523,3 +1525,107 @@ bb0(%0 : @owned $MoveOnlyPair):
   return %r
 }
 
+
+// The dead reborrow phi in bb6 requires end_borrows in bb3 and bb4. Therefore
+// the cond_br in bb2 must not be replaced by a jump which bypasses bb3 and bb4.
+//
+// CHECK-LABEL: sil [ossa] @dead_reborrow_phi_in_controlled_blocks :
+// CHECK:       bb2:
+// CHECK-NEXT:    cond_br %2, bb3, bb4
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow %3
+// CHECK:       bb4:
+// CHECK-NEXT:    end_borrow %3
+// CHECK-LABEL: } // end sil function 'dead_reborrow_phi_in_controlled_blocks'
+sil [ossa] @dead_reborrow_phi_in_controlled_blocks : $@convention(thin) (@owned Klass, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
+  %3 = begin_borrow %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  br bb5(%3)
+
+bb2:
+  cond_br %2, bb3, bb4
+
+bb3:
+  br bb6(%3)
+
+bb4:
+  br bb6(%3)
+
+bb5(%4 : @reborrow $Klass):
+  %5 = borrowed %4 from (%0)
+  %6 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %5
+  br bb7
+
+bb6(%8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%0)
+  end_borrow %9
+  br bb7
+
+bb7:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+enum MoveOnlyNoPayloadEnum : ~Copyable {
+  case a
+  case b
+}
+
+enum MoveOnlyNoPayloadEnumWithDeinit : ~Copyable {
+  case a
+  case b
+  deinit
+}
+
+sil @getMoveOnlyNoPayloadEnum : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnum
+sil @getMoveOnlyNoPayloadEnumWithDeinit : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnumWithDeinit
+
+// CHECK-LABEL: sil [ossa] @dce_dead_switch_enum_of_owned_moveonly :
+// CHECK:         [[E:%.*]] = apply
+// CHECK-NEXT:    destroy_value [[E]]
+// CHECK-NEXT:    br bb1
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'dce_dead_switch_enum_of_owned_moveonly'
+sil [ossa] @dce_dead_switch_enum_of_owned_moveonly : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getMoveOnlyNoPayloadEnum : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnum
+  %1 = apply %0() : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnum
+  switch_enum %1, case #MoveOnlyNoPayloadEnum.a!enumelt: bb1, case #MoveOnlyNoPayloadEnum.b!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dce_dont_delete_dead_switch_enum_of_owned_moveonly_with_deinit :
+// CHECK:         switch_enum
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dce_dont_delete_dead_switch_enum_of_owned_moveonly_with_deinit'
+sil [ossa] @dce_dont_delete_dead_switch_enum_of_owned_moveonly_with_deinit : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getMoveOnlyNoPayloadEnumWithDeinit : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnumWithDeinit
+  %1 = apply %0() : $@convention(thin) () -> @owned MoveOnlyNoPayloadEnumWithDeinit
+  switch_enum %1, case #MoveOnlyNoPayloadEnumWithDeinit.a!enumelt: bb1, case #MoveOnlyNoPayloadEnumWithDeinit.b!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
