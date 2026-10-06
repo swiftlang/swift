@@ -186,8 +186,9 @@ public:
     os << "@end\n\n";
   }
 
-  bool shouldInclude(const ValueDecl *VD) {
-    return owningPrinter.shouldInclude(VD);
+  bool shouldInclude(const ValueDecl *VD,
+                     bool isImportedInheritedMember = false) {
+    return owningPrinter.shouldInclude(VD, isImportedInheritedMember);
   }
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
@@ -251,7 +252,7 @@ private:
 
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
-  void printMembers(R &&members) {
+  void printMembers(R &&members, ClassDecl *classDecl = nullptr) {
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
       for (const Decl *member : members) {
@@ -265,6 +266,7 @@ private:
       }
     }
     bool protocolMembersOptional = false;
+    SmallVector<const ValueDecl *, 4> delayedCxxMembers;
     for (const Decl *member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
@@ -272,9 +274,11 @@ private:
       if (isa<AccessorDecl>(VD))
         continue;
       if (!AllowDelayed && owningPrinter.objcDelayedMembers.count(VD)) {
-        os << "// '" << VD->getName()
-           << ((outputLang == OutputLanguageMode::Cxx) ? "' cannot be printed\n"
-                                                       : "' below\n");
+        if (outputLang == OutputLanguageMode::Cxx) {
+          delayedCxxMembers.push_back(VD);
+          continue;
+        }
+        os << "// '" << VD->getName() << "' below\n";
         continue;
       }
       if (VD->getAttrs().hasAttribute<OptionalAttr>() !=
@@ -283,6 +287,54 @@ private:
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
+    }
+    // Preserve existing overloads before adding members that previously could
+    // not be printed because they referenced a same-module generic type.
+    if (!delayedCxxMembers.empty()) {
+      if (classDecl)
+        preserveInheritedFunctionNames(classDecl);
+      printMembers</*AllowDelayed=*/true>(delayedCxxMembers);
+    }
+  }
+
+  void preserveInheritedFunctionNames(ClassDecl *classDecl) {
+    auto &scope = owningPrinter.getCxxDeclEmissionScope();
+    auto preserveName = [&](StringRef name) {
+      // Existing local members already hide inherited overloads of this name.
+      if (!scope.emittedFunctionOverloads.count(name))
+        scope.inheritedFunctionNamesToPreserve.insert(name);
+    };
+    for (auto *base = classDecl->getSuperclassDecl(); base;
+         base = base->getSuperclassDecl()) {
+      for (auto *member : base->getAllMembers()) {
+        auto *VD = dyn_cast<ValueDecl>(member);
+        if (!VD ||
+            !shouldInclude(VD, /*isImportedInheritedMember=*/
+                           VD->getModuleContext() != &owningPrinter.M) ||
+            owningPrinter.objcDelayedMembers.count(VD))
+          continue;
+        // Conservatively preserve exposable inherited names, including those
+        // whose signatures might subsequently be declined by ABI printing.
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+          if (!isa<AccessorDecl>(AFD) && !isa<DestructorDecl>(AFD) &&
+              !AFD->isOperator())
+            preserveName(cxx_translation::getNameForCxx(AFD));
+        } else if (auto *var = dyn_cast<VarDecl>(VD)) {
+          for (auto kind : {AccessorKind::Get, AccessorKind::Set}) {
+            if (auto *accessor = var->getOpaqueAccessor(kind)) {
+              auto *methodTy =
+                  accessor->getMethodInterfaceType()->castTo<FunctionType>();
+              auto resultTy = getForeignResultType(
+                  accessor, methodTy, accessor->getForeignAsyncConvention(),
+                  accessor->getForeignErrorConvention());
+              preserveName(remapPropertyName(accessor, resultTy));
+            }
+          }
+        } else if (auto *subscript = dyn_cast<SubscriptDecl>(VD)) {
+          if (subscript->isInstanceMember())
+            preserveName("operator[]");
+        }
+      }
     }
   }
 
@@ -374,7 +426,7 @@ private:
           CD,
           [&]() {
             CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
-            printMembers(CD->getAllMembers());
+            printMembers(CD->getAllMembers(), CD);
           },
           owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
@@ -1137,6 +1189,17 @@ private:
     return result;
   }
 
+  bool canPrintInheritedFunctionName(const AbstractFunctionDecl *funcDecl,
+                                     StringRef cxxName) const {
+    auto &scope = owningPrinter.getCxxDeclEmissionScope();
+    if (!scope.inheritedFunctionNamesToPreserve.count(cxxName))
+      return true;
+    scope.additionalUnrepresentableDeclarations.insert(
+        {funcDecl,
+         "A newly printable member would hide an inherited C++ name"});
+    return false;
+  }
+
   /// Returns true if the given function overload is safe to emit in the current
   /// C++ lexical scope. If \p cxxNameOverride is non-empty, it is used as the
   /// C++ function name instead of the default name derived from the
@@ -1150,6 +1213,8 @@ private:
     auto cxxName = cxxNameOverride.empty()
                        ? cxx_translation::getNameForCxx(funcDecl)
                        : cxxNameOverride;
+    if (!canPrintInheritedFunctionName(funcDecl, cxxName))
+      return false;
     auto paramTypes = getCxxParamTypes(funcDecl);
     auto [overloadIt, inserted] = overloads.try_emplace(
         cxxName,
@@ -1215,7 +1280,12 @@ private:
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         // Subscript accessors emit as operator[] and cannot conflict with
         // named methods, so skip the overload check for them.
-        if (!SD) {
+        if (SD) {
+          if (!canPrintInheritedFunctionName(AFD, "operator[]"))
+            return;
+          owningPrinter.getCxxDeclEmissionScope()
+              .emittedFunctionOverloads.try_emplace("operator[]");
+        } else {
           std::string remappedName = remapPropertyName(accessor, resultTy);
           if (!canPrintOverloadOfFunction(AFD, remappedName)) {
             auto comment = ("  // skip emitting accessor method for \'" +
@@ -3117,11 +3187,13 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
   return true;
 }
 
-bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
+bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
+                                       bool isImportedInheritedMember) {
   if (VD->isInvalid())
     return false;
 
-  if (requiresExposedAttribute && !hasExposeAttr(VD))
+  if (!isImportedInheritedMember && requiresExposedAttribute &&
+      !hasExposeAttr(VD))
     return false;
 
   if (hasExposeNotCxxAttr(VD))
@@ -3131,7 +3203,8 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     return false;
 
   if (outputLang == OutputLanguageMode::Cxx) {
-    if (!isExposedToThisModule(M, VD, exposedModules))
+    if (!isImportedInheritedMember &&
+        !isExposedToThisModule(M, VD, exposedModules))
       return false;
     if (!cxx_translation::isExposableToCxx(VD, this))
       return false;
@@ -3192,10 +3265,12 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
 }
 
 bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
-  if (decl->isResilient() || decl->hasGenericParamList())
+  if (decl->isResilient())
     return true;
   // The size and alignment are also unknown when a field is resilient.
-  return !interopContext.getIrABIDetails().getTypeSizeAlignment(decl);
+  return !interopContext.getIrABIDetails().getTypeSizeAlignment(
+      decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
+                                        : ResilienceExpansion::Maximal);
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {

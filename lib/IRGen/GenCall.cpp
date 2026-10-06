@@ -1345,6 +1345,10 @@ namespace {
       case clang::BuiltinType::Void:
         llvm_unreachable("bare void type in ABI lowering");
 
+      // std::meta::info is a consteval-only type and is never imported.
+      case clang::BuiltinType::MetaInfo:
+        llvm_unreachable("consteval-only type in ABI lowering");
+
       // We should never see the OpenCL builtin types at all.
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLEvent:
@@ -1385,6 +1389,11 @@ namespace {
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
         llvm_unreachable("HLSL intangible type in ABI lowering");
+
+      // We should never see HLSL packed types at all.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+        llvm_unreachable("HLSL packed type in ABI lowering");
 
       // We should never see SPIRV opaque types at all.
 #define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
@@ -1716,10 +1725,10 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   auto &FI = isCXXMethod ?
       clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All) :
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr) :
       clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All);
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&

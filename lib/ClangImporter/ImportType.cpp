@@ -101,6 +101,7 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
   case clang::BuiltinType::BoundMember:
   case clang::BuiltinType::BuiltinFn:
   case clang::BuiltinType::IncompleteMatrixIdx:
+  case clang::BuiltinType::MetaInfo:
   case clang::BuiltinType::Overload:
   case clang::BuiltinType::PseudoObject:
   case clang::BuiltinType::UnknownAny:
@@ -192,6 +193,11 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+    return std::nullopt;
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
     return std::nullopt;
 
     // SPIRV opaque builtin types that don't have Swift equivalents.

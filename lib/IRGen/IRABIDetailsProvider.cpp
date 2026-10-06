@@ -92,7 +92,15 @@ public:
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 
   std::optional<IRABIDetailsProvider::SizeAndAlignment>
-  getTypeSizeAlignment(const NominalTypeDecl *TD) {
+  getTypeSizeAlignment(const NominalTypeDecl *TD,
+                       ResilienceExpansion expansion) {
+    // A layout known inside its defining module may still be opaque to clients.
+    if (expansion == ResilienceExpansion::Minimal &&
+        !typeConverter
+             .getTypeProperties(TD->getDeclaredTypeInContext(),
+                                TypeExpansionContext::minimal())
+             .isFixedABI())
+      return std::nullopt;
     auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
     auto *fixedTI = dyn_cast<FixedTypeInfo>(TI);
     if (!fixedTI)
@@ -500,8 +508,9 @@ IRABIDetailsProvider::IRABIDetailsProvider(ModuleDecl &mod,
 IRABIDetailsProvider::~IRABIDetailsProvider() {}
 
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
-IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
-  return impl->getTypeSizeAlignment(TD);
+IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD,
+                                           ResilienceExpansion expansion) {
+  return impl->getTypeSizeAlignment(TD, expansion);
 }
 
 bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {

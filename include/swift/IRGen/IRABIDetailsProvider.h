@@ -14,16 +14,17 @@
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -212,8 +213,9 @@ public:
 
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.
-  std::optional<SizeAndAlignment>
-  getTypeSizeAlignment(const NominalTypeDecl *TD);
+  std::optional<SizeAndAlignment> getTypeSizeAlignment(
+      const NominalTypeDecl *TD,
+      ResilienceExpansion expansion = ResilienceExpansion::Maximal);
 
   /// Whether the type has a fixed layout and can be copied and taken with a
   /// byte copy and destroyed without any action, using only properties visible
