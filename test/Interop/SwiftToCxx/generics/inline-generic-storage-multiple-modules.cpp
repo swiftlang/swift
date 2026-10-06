@@ -20,9 +20,11 @@
 
 //--- first.swift
 public func makeArray() -> [Int32] { [11, 22] }
+public func makeOptional() -> String? { "optional across modules" }
 
 //--- second.swift
 public func passArray(_ value: [Int32]) -> [Int32] { value }
+public func passOptional(_ value: String?) -> String? { value }
 public func appendArray(_ value: inout [Int32]) { value.append(33) }
 public func consumeArray(_ value: consuming [Int32]) -> Int32 {
   value.reduce(0, +)
@@ -38,15 +40,21 @@ swift::Array<int32_t> makeArrayInOtherTranslationUnit() {
   return Second::passArray(First::makeArray());
 }
 
+swift::Optional<swift::String> makeOptionalInOtherTranslationUnit() {
+  return Second::passOptional(First::makeOptional());
+}
+
 //--- main.cpp
 // Include the generated headers in the opposite order in this translation unit.
 #include "second.h"
 #include "first.h"
 #include <cassert>
+#include <string>
 
 static_assert(!swift::_impl::isOpaqueLayout<swift::Array<int32_t>>);
 
 swift::Array<int32_t> makeArrayInOtherTranslationUnit();
+swift::Optional<swift::String> makeOptionalInOtherTranslationUnit();
 
 int main() {
   auto array = makeArrayInOtherTranslationUnit();
@@ -57,4 +65,9 @@ int main() {
   assert(array.getCount() == 2);
   assert(Second::consumeArray(copy) == 66);
   assert(copy.getCount() == 3);
+  auto optional = makeOptionalInOtherTranslationUnit();
+  auto optionalCopy = optional;
+  optional = swift::Optional<swift::String>::none();
+  assert(optional.isNone());
+  assert(std::string(optionalCopy.get()) == "optional across modules");
 }

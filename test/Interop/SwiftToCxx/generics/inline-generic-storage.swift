@@ -97,3 +97,22 @@ public final class Lifetime {
 }
 public func getLiveCount() -> Int { liveCount }
 public func makeTrackedArray() -> [Lifetime] { [Lifetime()] }
+public func makeTrackedOptional() -> Lifetime? { Lifetime() }
+public func makeOptionalString() -> String? { "inline optional" }
+public func resetOptional<T>(_ value: inout T?) { value = nil }
+
+@frozen public struct WordPair {
+  public var a, b: Int
+  public init(_ value: Int) { a = value; b = value + 1 }
+}
+
+@_alignment(16)
+@frozen public struct AlignedByte {
+  public var value: UInt8
+  public init(_ value: UInt8) { self.value = value }
+}
+
+@frozen public struct LargePayload {
+  public var a, b, c, d: Int64
+  public init(_ value: Int64) { a = value; b = value; c = value; d = value }
+}

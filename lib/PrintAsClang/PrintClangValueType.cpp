@@ -368,10 +368,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << baseName << "(const " << baseName << " &other) noexcept {\n";
       printVWTable(os);
       if (isOpaqueLayout) {
-        os << "    _storage = ";
-        printer.printSwiftImplQualifier();
-        os << cxx_synthesis::getCxxOpaqueStorageClassName()
-           << "(vwTable->size, vwTable->getAlignment());\n";
+        os << "    _storage.allocate(vwTable->size, "
+              "vwTable->getAlignment());\n";
       }
       os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
             "const_cast<char "

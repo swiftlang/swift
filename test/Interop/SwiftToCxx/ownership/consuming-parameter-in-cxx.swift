@@ -35,6 +35,10 @@ public func createSmallStructNonTrivial(_ k: AKlass) -> SmallStructNonTrivial {
     return SmallStructNonTrivial(k: k, x: 0)
 }
 
+public func createLargeStructNonTrivial(_ k: AKlass) -> LargeStructNonTrivial {
+    return LargeStructNonTrivial(x1: 1, x2: 2, x3: 3, x4: 4, x5: 5, x6: 6, k: k)
+}
+
 public enum EnumNonTrivial {
     case a(Int)
     case b(AKlass)
