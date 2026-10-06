@@ -2,7 +2,6 @@
 
 // REQUIRES: executable_test
 // XFAIL: OS=windows-msvc
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // FIXME: We can't import std::unique_ptr or std::shared_ptr properly on Windows (https://github.com/apple/swift/issues/70226)
 
 import StdStringAndVector
