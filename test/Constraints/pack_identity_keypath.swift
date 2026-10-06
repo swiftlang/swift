@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple -swift-version 6
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple -swift-version 5
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple -swift-version 5 -enable-upcoming-feature InferSendableFromCaptures
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 // https://github.com/swiftlang/swift/issues/92911
 // An identity key path unifies its root and value type variables. The root
