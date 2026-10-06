@@ -48,6 +48,17 @@ public struct S {
 }
 
 // CHECK:      class SWIFT_SYMBOL("s:5Enums1EO") E final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E() noexcept {
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E(const E &other) noexcept {
+// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E &operator =(const E &other) noexcept {
+// CHECK-NEXT:     if (this == &other) return *this;
+// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
+// CHECK-NEXT:   return *this;
+// CHECK-NEXT:   }
 // CHECK:        enum class cases {
 // CHECK-NEXT:     x SWIFT_SYMBOL("s:5Enums1EO1xyACSdcACmF"),
 // CHECK-NEXT:     y SWIFT_SYMBOL("s:5Enums1EO1yyACSVSgcACmF"),
@@ -170,17 +181,21 @@ public struct S {
 // CHECK-NEXT: class _impl_E {
 // CHECK-NEXT: public:
 // CHECK:        static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
-// CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
-// CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
-// CHECK-NEXT: #ifdef __arm64e__
-// CHECK-NEXT:     auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
-// CHECK-NEXT: #else
-// CHECK-NEXT:     auto *vwTable = *vwTableAddr;
-// CHECK-NEXT: #endif
-// CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
+// CHECK-NEXT:     memcpy(destStorage, srcStorage, {{[0-9]+}});
 // CHECK-NEXT:   }
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) E2 final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E2() noexcept {
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E2(const E2 &other) noexcept {
+// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E2 &operator =(const E2 &other) noexcept {
+// CHECK-NEXT:     if (this == &other) return *this;
+// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
+// CHECK-NEXT:   return *this;
+// CHECK-NEXT:   }
 // CHECK: SWIFT_INLINE_THUNK operator cases() const {
 // CHECK: }
 // CHECK-NEXT: }

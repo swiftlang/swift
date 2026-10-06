@@ -106,6 +106,17 @@ public struct FirstSmallStruct {
     private let storedInt: Int32
 }
 // CHECK: class SWIFT_SYMBOL("s:7Structs12FrozenStructV") FrozenStruct final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~FrozenStruct() noexcept {
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct(const FrozenStruct &other) noexcept {
+// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct &operator =(const FrozenStruct &other) noexcept {
+// CHECK-NEXT:     if (this == &other) return *this;
+// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
+// CHECK-NEXT:   return *this;
+// CHECK-NEXT:   }
 // CHECK:        alignas(4) char _storage[4];
 // CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -117,6 +128,30 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
+
+// A frozen outer type can contain a field whose ownership may change.
+// Knowledge of that field inside its defining module is not a client promise.
+@frozen public struct FrozenWithResilientField {
+    public let value: FirstSmallStruct
+}
+
+// CHECK: class SWIFT_SYMBOL({{.*}}) FrozenWithResilientField final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~FrozenWithResilientField() noexcept {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->destroy(_getOpaquePointer(), metadata._0);
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenWithResilientField(const FrozenWithResilientField &other) noexcept {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenWithResilientField &operator =(const FrozenWithResilientField &other) noexcept {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK: class _impl_FrozenWithResilientField {
+// CHECK:   static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 
 public struct LargeStruct {
     public let x1: Int

@@ -102,6 +102,21 @@ public:
         fixedTI->getFixedAlignment().getValue()};
   }
 
+  bool isTypeTrivial(const NominalTypeDecl *TD) {
+    auto type = TD->getDeclaredTypeInContext();
+    // The TypeInfo can use the defining module's layout. Do not expose those
+    // assumptions in a header if the type is nontrivial at minimal expansion.
+    if (!typeConverter.getTypeProperties(type, TypeExpansionContext::minimal())
+             .isTrivial())
+      return false;
+
+    auto &TI = IGM.getTypeInfoForUnlowered(type);
+    return TI.isFixedSize(ResilienceExpansion::Minimal) &&
+           TI.isTriviallyDestroyable(ResilienceExpansion::Minimal) &&
+           TI.isCopyable(ResilienceExpansion::Minimal) &&
+           TI.isBitwiseTakable(ResilienceExpansion::Minimal);
+  }
+
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
     auto &typeInfo =
         IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
@@ -487,6 +502,10 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
+  return impl->isTypeTrivial(TD);
 }
 
 AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(

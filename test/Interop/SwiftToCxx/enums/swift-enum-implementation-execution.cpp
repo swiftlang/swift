@@ -45,6 +45,28 @@ int switchTest(const E &e) {
 
 int main() {
     {
+        auto e = E::w(5678);
+        auto copy = e;
+        e = E::x(3.14);
+        assert(copy.getW() == 5678);
+        e = copy;
+        auto &alias = e;
+        e = alias;
+        assert(e.getW() == 5678);
+    }
+
+    {
+        auto e = E2::foobar();
+        auto copy = e;
+        e = E2::baz();
+        assert(copy.isFoobar());
+        copy = e;
+        auto &alias = copy;
+        copy = alias;
+        assert(copy.isBaz());
+    }
+
+    {
         auto e = E::x(3.14);
         assert(switchTest(e) == 0);
     }

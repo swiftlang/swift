@@ -237,6 +237,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   assert((!isNoncopyable || !isOpaqueLayout) &&
          "noncopyable types with an opaque layout are not exposed to C++");
 
+  bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
+                   interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
+
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
@@ -312,14 +315,18 @@ void ClangValueTypePrinter::printValueTypeDecl(
       ClangSyntaxPrinter(Context, os).printGenericSignatureInnerStaticAsserts(
           genericSignature);
 
+    // Keep user-provided special members even for trivial Swift values, so
+    // their C++ triviality traits and calling convention do not change.
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
     os << '~' << baseName << "() noexcept {\n";
-    if (isNoncopyable)
-      os << "    if (_isMovedFrom) return;\n";
-    printVWTable(os);
-    os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+    if (!isTrivial) {
+      if (isNoncopyable)
+        os << "    if (_isMovedFrom) return;\n";
+      printVWTable(os);
+      os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+    }
     os << "  }\n";
 
     if (isNoncopyable) {
@@ -370,16 +377,20 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << "(const " << baseName << " &other) noexcept {\n";
-      printVWTable(os);
-      if (isOpaqueLayout) {
-        os << "    _storage = ";
-        printer.printSwiftImplQualifier();
-        os << cxx_synthesis::getCxxOpaqueStorageClassName()
-           << "(vwTable->size, vwTable->getAlignment());\n";
+      if (isTrivial) {
+        os << "    memcpy(_storage, other._storage, sizeof(_storage));\n";
+      } else {
+        printVWTable(os);
+        if (isOpaqueLayout) {
+          os << "    _storage = ";
+          printer.printSwiftImplQualifier();
+          os << cxx_synthesis::getCxxOpaqueStorageClassName()
+             << "(vwTable->size, vwTable->getAlignment());\n";
+        }
+        os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
       }
-      os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-            "const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
       os << "  }\n";
 
       // copy assignment.
@@ -387,9 +398,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
          << " &other) noexcept {\n";
-      printVWTable(os);
-      os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
+      if (isTrivial) {
+        os << "    if (this == &other) return *this;\n";
+        os << "    memcpy(_storage, other._storage, sizeof(_storage));\n";
+      } else {
+        printVWTable(os);
+        os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+      }
       os << "  return *this;\n";
       os << "  }\n";
 
@@ -550,9 +566,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
-          printVWTable(os);
-          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
-                "metadata._0);\n";
+          if (isTrivial) {
+            os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
+               << ");\n";
+          } else {
+            printVWTable(os);
+            os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+                  "metadata._0);\n";
+          }
           os << "  }\n";
           os << "};\n";
         });
