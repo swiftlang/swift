@@ -18,6 +18,33 @@ Perform asynchronous and parallel operations.
 - ``Swift/ThrowingDiscardingTaskGroup``
 - ``Swift/withThrowingDiscardingTaskGroup(returning:isolation:body:)``
 - ``Swift/UnsafeCurrentTask``
+- 
+### Task-Local Storage
+
+- ``Swift/TaskLocal``
+- ``Swift/TaskLocal()``
+
+### Task Deadlines
+
+- ``Swift/withDeadline(_:tolerance:clock:operation:)``
+- ``Swift/withDeadline(in:tolerance:clock:operation:)``
+- ``Swift/Task/hasActiveDeadline``
+- ``Swift/Task/activeDeadline(for:)``
+
+### Task Cancellation
+
+- ``Swift/Task/isCancelled-type.property``
+- ``Swift/Task/cancel()``
+- ``Swift/Task/cancel(reason:)``
+- ``Swift/Task/cancellationReason``
+- ``Swift/Task/checkCancellation()``
+- ``Swift/CancellationError``
+- ``Swift/CancellationError/Reason``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
+- ``Swift/withTaskCancellationShield(operation:)-8zlgh``
+- ``Swift/withTaskCancellationShield(operation:)-2lzl8``
+- ``Swift/Task/hasActiveCancellationShield``
 
 ### Asynchronous Sequences
 
@@ -27,31 +54,26 @@ Perform asynchronous and parallel operations.
 
 ### Continuations
 
+- ``Swift/Continuation``
+- ``Swift/withContinuation(of:_:)``
+- ``Swift/withContinuation(of:throwing:_:)``
 - ``Swift/CheckedContinuation``
-- ``Swift/withCheckedContinuation(isolation:function:_:)``
-- ``Swift/withCheckedThrowingContinuation(isolation:function:_:)``
+- ``Swift/withCheckedContinuation(function:_:)``
+- ``Swift/withCheckedThrowingContinuation(function:_:)-13yf6``
+- ``Swift/withCheckedThrowingContinuation(function:_:)-2k46m``
 - ``Swift/UnsafeContinuation``
-- ``Swift/withUnsafeContinuation(isolation:_:)``
-- ``Swift/withUnsafeThrowingContinuation(isolation:_:)``
+- ``Swift/withUnsafeContinuation(_:)``
+- ``Swift/withUnsafeThrowingContinuation(_:)-32nwt``
+- ``Swift/withUnsafeThrowingContinuation(_:)-7zhvy``
 
 ### Actors
 
 - ``Swift/Sendable``
 - ``Swift/Actor``
-- ``Swift/AnyActor``
 - ``Swift/MainActor``
 - ``Swift/GlobalActor``
 - ``Swift/SendableMetatype``
-- ``Swift/ConcurrentValue``
-- ``Swift/UnsafeSendable``
-- ``Swift/UnsafeConcurrentValue``
 - ``Swift/isolation()-u1o6``
-- ``Swift/extractIsolation(_:)``
-
-### Task-Local Storage
-
-- ``Swift/TaskLocal``
-- ``Swift/TaskLocal()``
 
 ### Executors
 
@@ -59,7 +81,6 @@ Perform asynchronous and parallel operations.
 - ``Swift/ExecutorJob``
 - ``Swift/SerialExecutor``
 - ``Swift/TaskExecutor``
-- ``Swift/PartialAsyncTask``
 - ``Swift/UnownedJob``
 - ``Swift/JobPriority``
 - ``Swift/UnownedSerialExecutor``
@@ -80,5 +101,16 @@ Perform asynchronous and parallel operations.
 
 ### Deprecated
 
+- ``Swift/extractIsolation(_:)``
+- ``Swift/withCheckedContinuation(isolation:function:_:)``
+- ``Swift/withCheckedThrowingContinuation(isolation:function:_:)``
+- ``Swift/withUnsafeContinuation(isolation:_:)``
+- ``Swift/AnyActor``
+- ``Swift/ConcurrentValue``
 - ``Swift/Job``
+- ``Swift/PartialAsyncTask``
+- ``Swift/UnsafeConcurrentValue``
+- ``Swift/UnsafeSendable``
 - ``Swift/UnsafeThrowingContinuation``
+- ``Swift/withUnsafeThrowingContinuation(isolation:_:)``
+- ``Swift/withUnsafeThrowingContinuation(isolation:_:)``
