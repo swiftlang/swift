@@ -351,7 +351,15 @@ Globals:
   Type: DWORD
 - Name: FIONBIO
   Type: int
+- Name: FOF_NOCONFIRMATION
+  Type: FILEOP_FLAGS
+- Name: FOF_NOCONFIRMMKDIR
+  Type: FILEOP_FLAGS
+- Name: FOF_NOERRORUI
+  Type: FILEOP_FLAGS
 - Name: FOF_NO_UI
+  Type: FILEOP_FLAGS
+- Name: FOF_SILENT
   Type: FILEOP_FLAGS
 - Name: FORMAT_MESSAGE_ALLOCATE_BUFFER
   Type: DWORD
@@ -737,11 +745,23 @@ Globals:
   Type: DWORD
 - Name: WS_HSCROLL
   Type: DWORD
+- Name: WS_MAXIMIZEBOX
+  Type: DWORD
+- Name: WS_MINIMIZEBOX
+  Type: DWORD
+- Name: WS_OVERLAPPED
+  Type: DWORD
 - Name: WS_OVERLAPPEDWINDOW
+  Type: DWORD
+- Name: WS_POPUP
   Type: DWORD
 - Name: WS_POPUPWINDOW
   Type: DWORD
+- Name: WS_SYSMENU
+  Type: DWORD
 - Name: WS_TABSTOP
+  Type: DWORD
+- Name: WS_THICKFRAME
   Type: DWORD
 - Name: WS_VISIBLE
   Type: DWORD
