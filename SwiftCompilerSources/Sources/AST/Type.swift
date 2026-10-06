@@ -14,7 +14,7 @@ import Basic
 import ASTBridging
 
 /// A Swift type.
-/// It is not necessarily canonical, e.g. typealiases are not resolved.
+/// It is not necessarily canonical, e.g. typealiases are not desugared.
 public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildren {
   public enum TraitResult {
     case isNot
@@ -129,6 +129,12 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   /// True if this type involves a local archetype defined in `environment`.
   public func hasLocalArchetype(from environment: GenericEnvironment) -> Bool {
     bridged.hasLocalArchetypeFromEnvironment(environment.bridged)
+  }
+
+  /// Collect the conformances of \c fromType to each of the protocols of an
+  /// existential type's layout.
+  public func collectExistentialConformances(existentialType: CanonicalType) -> ConformanceArray {
+    return ConformanceArray(bridged: bridged.collectExistentialConformances(existentialType.bridged))
   }
 }
 

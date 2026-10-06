@@ -914,6 +914,13 @@ BridgedCanType::SILFunctionType_getSubstGenericSignature() const {
               .getPointer()};
 }
 
+BridgedConformanceArray
+BridgedCanType::collectExistentialConformances(BridgedCanType existential) const {
+  return {swift::collectExistentialConformances(unbridged(),
+                                                existential.unbridged(),
+                                                /*allowMissing=*/ false)};
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTTypeArray
 //===----------------------------------------------------------------------===//
