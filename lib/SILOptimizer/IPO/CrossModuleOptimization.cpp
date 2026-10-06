@@ -134,6 +134,8 @@ private:
 
   void makeFunctionUsableFromInline(SILFunction *F);
 
+  void makeClassMethodWitnessesUsableFromInline(SILFunction *thunk);
+
   void makeDeclUsableFromInline(ValueDecl *decl);
 
   void makeTypeUsableFromInline(CanType type);
@@ -534,6 +536,8 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 
       if (everything) {
         makeFunctionUsableFromInline(witness);
+        if (isEmbedded())
+          makeClassMethodWitnessesUsableFromInline(witness);
       } else {
         assert(isPackageCMOEnabled(M.getSwiftModule()));
 
@@ -1194,6 +1198,33 @@ void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
   // Prevent the method from dead-method elimination.
   auto *methodDecl = cast<AbstractFunctionDecl>(method.getDecl());
   M.addExternallyVisibleDecl(getBaseMethod(methodDecl));
+}
+
+/// In Embedded Swift, a witness thunk can dispatch to a class method through
+/// the vtable, unless the optimizer devirtualized the call. Make the vtable
+/// implementation public either way, so that the symbols of this module don't
+/// depend on whether the call was devirtualized.
+void CrossModuleOptimization::makeClassMethodWitnessesUsableFromInline(
+    SILFunction *thunk) {
+  for (SILBasicBlock &block : *thunk) {
+    for (SILInstruction &inst : block) {
+      auto *cmi = dyn_cast<ClassMethodInst>(&inst);
+      if (!cmi)
+        continue;
+
+      auto *classDecl = cmi->getOperand()
+                            ->getType()
+                            .getASTType()
+                            ->getMetatypeInstanceType()
+                            ->getClassOrBoundGenericClass();
+      if (!classDecl)
+        continue;
+
+      SILFunction *impl = M.lookUpFunctionInVTable(classDecl, cmi->getMember());
+      if (impl && impl->isDefinition() && !impl->hasNonUniqueDefinition())
+        makeFunctionUsableFromInline(impl);
+    }
+  }
 }
 
 void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function) {
