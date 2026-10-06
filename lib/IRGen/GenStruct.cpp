@@ -500,6 +500,12 @@ namespace {
       }
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -605,6 +611,12 @@ namespace {
                              IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -850,6 +862,12 @@ namespace {
       (void)ClangDecl;
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1063,6 +1081,12 @@ namespace {
         : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo, fields,
                              IGM, representation) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1173,6 +1197,12 @@ namespace {
                            isTriviallyDestroyable, isBT, isCopyable,
                            alwaysFixedSize, isABIAccessible)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -1301,6 +1331,12 @@ namespace {
                            fields, fieldsAccessible,
                            T, align, isTriviallyDestroyable, isBT, isCopyable,
                            structAccessible) {
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -1939,6 +1975,12 @@ namespace {
                             IsABIAccessible_t abiAccessible)
       : ResilientTypeInfo(T, copyable, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>

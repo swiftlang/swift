@@ -29,6 +29,141 @@
 using namespace swift;
 using namespace swift::Lowering;
 
+static StringRef getReferenceCountingName(ReferenceCounting referenceCounting) {
+  switch (referenceCounting) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+static StringRef
+getExistentialRepresentationName(ExistentialRepresentation representation) {
+  switch (representation) {
+  case ExistentialRepresentation::None:
+    return "none";
+  case ExistentialRepresentation::Opaque:
+    return "opaque";
+  case ExistentialRepresentation::Class:
+    return "class";
+  case ExistentialRepresentation::Metatype:
+    return "metatype";
+  case ExistentialRepresentation::Boxed:
+    return "boxed";
+  case ExistentialRepresentation::COM:
+    return "com";
+  }
+  llvm_unreachable("unhandled existential representation");
+}
+
+void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
+                                          TypeExpansionContext expansion) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS << "  " << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  auto printOptionalType = [&](StringRef name, Type type) {
+    OS << "  " << name << ": ";
+    if (type)
+      type.print(OS);
+    else
+      OS << "none";
+    OS << "\n";
+  };
+
+  auto printOptionalSILType = [&](StringRef name, SILType type) {
+    OS << "  " << name << ": ";
+    if (type)
+      type.print(OS);
+    else
+      OS << "none";
+    OS << "\n";
+  };
+
+  OS << "SILType:\n";
+  OS << "  type: ";
+  print(OS);
+  OS << "\n";
+  OS << "  category: " << (isObject() ? "object" : "address") << "\n";
+
+  auto type = getASTType();
+  bool referenceSemantics = hasReferenceSemantics();
+  printFlag("isVoid", isVoid());
+  printFlag("isTuple", isTuple());
+  printFlag("isFunction", isFunction());
+  printFlag("isMetatype", isMetatype());
+  printFlag("isAggregate", isAggregate());
+  printFlag("isOrHasEnum", isOrHasEnum());
+  StringRef nominalKind = "none";
+  if (getClassOrBoundGenericClass())
+    nominalKind = "class";
+  else if (getStructOrBoundGenericStruct())
+    nominalKind = "struct";
+  else if (getEnumOrBoundGenericEnum())
+    nominalKind = "enum";
+  else if (getNominalOrBoundGenericNominal())
+    nominalKind = "other";
+  OS << "  nominalKind: " << nominalKind << "\n";
+  printOptionalSILType("optionalObjectType", getOptionalObjectType());
+  printFlag("isForeignReferenceType", isForeignReferenceType());
+  printFlag("isSensitive", isSensitive());
+  printFlag("isMoveOnly", isMoveOnly());
+  printFlag("isValueTypeWithDeinit", isValueTypeWithDeinit());
+  printFlag("hasTypeParameter", hasTypeParameter());
+  printFlag("hasArchetype", type->hasArchetype());
+  printFlag("hasPrimaryArchetype", type->hasPrimaryArchetype());
+  printFlag("hasLocalArchetype", hasLocalArchetype());
+  printFlag("hasOpaqueArchetype", type->hasOpaqueArchetype());
+  printFlag("hasOpenedExistential", hasOpenedExistential());
+  printFlag("hasElementArchetype", hasElementArchetype());
+  printFlag("hasParameterPack", hasParameterPack());
+  printFlag("hasPack", hasPack());
+  printFlag("hasPackArchetype", hasPackArchetype());
+  printFlag("hasAnyPack", hasAnyPack());
+  printFlag("hasParameterizedExistential", hasParameterizedExistential());
+  printFlag("hasDynamicSelf", type->hasDynamicSelfType());
+  printFlag("hasUnboundGeneric", type->hasUnboundGenericType());
+  printFlag("hasError", type->hasError());
+  printFlag("hasBareError", type->hasBareError());
+  printFlag("hasReferenceSemantics", referenceSemantics);
+  printFlag("isAnyClassReferenceType", isAnyClassReferenceType());
+  printFlag("hasRetainablePointerRepresentation",
+            hasRetainablePointerRepresentation());
+  printFlag("isConstraintType", type.isConstraintType());
+  printFlag("isExistentialType", isExistentialType());
+  printFlag("isAnyExistentialType", isAnyExistentialType());
+  printFlag("isClassExistentialType", isClassExistentialType());
+  OS << "  existentialRepresentation: "
+     << getExistentialRepresentationName(
+            getPreferredExistentialRepresentation())
+     << "\n";
+  printFlag("isBridgeableObjectType", isBridgeableObjectType());
+  printFlag("isClassOrClassMetatype", isClassOrClassMetatype(type));
+  printFlag("isAddressableForDependencies",
+            isAddressableForDeps(M, expansion));
+  auto rawLayout = getRawLayout();
+  printFlag("hasRawLayout", rawLayout != nullptr);
+  printOptionalType("rawLayoutLikeType", getRawLayoutSubstitutedLikeType());
+  printOptionalType("rawLayoutCountType", getRawLayoutSubstitutedCountType());
+  if (referenceSemantics)
+    OS << "  referenceCounting: "
+       << getReferenceCountingName(type->getReferenceCounting()) << "\n";
+}
+
 /// Find a local archetype represented by this type.
 /// It is assumed by this method that the type contains
 /// at most one opened archetype.
