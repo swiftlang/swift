@@ -8040,6 +8040,10 @@ ERROR(availability_macro_in_inlinable, none,
 
 #undef FRAGILE_FUNC_KIND
 
+ERROR(embedded_interface_decl_not_usable_from_inline,
+      none, "%kind0 is %select{private|fileprivate|internal|package|%error|%error}1 and "
+      "cannot be referenced from %kind2",
+      (const ValueDecl *, AccessLevel, const ValueDecl *))
 NOTE(resilience_decl_declared_here,
      none, "%kind0 is not '@usableFromInline' or public",
      (const ValueDecl *))

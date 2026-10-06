@@ -2087,6 +2087,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                                  const FrontendOptions &FrontendOpts) {
   using namespace options;
 
+  Opts.IsEmittingTBD = FrontendOpts.InputsAndOutputs.hasTBDPath();
+
   bool HadError = false;
   auto setUnsignedIntegerArgument =
       [&Args, &Diags, &HadError](options::ID optionID, unsigned &valueToSet) {

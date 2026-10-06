@@ -475,12 +475,8 @@ bool CrossModuleOptimization::isEmittedIntoClients(SILFunction *function) {
   // A closure is emitted wherever the declaration containing it is.
   if (auto declRef = function->getDeclRef()) {
     if (auto *closure = declRef.getAbstractClosureExpr()) {
-      const DeclContext *dc = closure;
-      while (dc->getParent() && dc->getParent()->isLocalContext())
-        dc = dc->getParent();
-      if (auto *decl = dc->getAsDecl())
-        return !hasInterfaceModel(decl);
-      return true;
+      return closure->getCodeGenerationModelOfCode() !=
+             CodeGenerationModel::Interface;
     }
   }
 

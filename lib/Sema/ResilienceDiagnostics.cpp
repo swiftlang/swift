@@ -23,6 +23,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/CodeGenerationModel.h"
 
 using namespace swift;
 
@@ -45,6 +46,30 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   SF->addImplicitImportForModuleInterface(missingImport);
   ctx.Diags.diagnose(loc, diag::missing_import_inserted, M->getName());
   return true;
+}
+
+/// In Embedded Swift with the "interface" code generation model, return the
+/// declaration whose code clients emit themselves, if the given context is
+/// part of its body. That's a declaration with the "implementation" model,
+/// such as a generic function, that clients can use.
+static const ValueDecl *getClientEmittedDecl(const DeclContext *DC) {
+  if (DC->getParentModule()->codeGenerationModel() !=
+      CodeGenerationModel::Interface)
+    return nullptr;
+
+  const ValueDecl *decl = nullptr;
+  if (DC->getCodeGenerationModelOfCode(&decl) !=
+          CodeGenerationModel::Implementation ||
+      !decl)
+    return nullptr;
+
+  // Clients can only emit code for declarations they can use.
+  if (!decl->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true)
+           .isPublic())
+    return nullptr;
+
+  return decl;
 }
 
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
@@ -112,10 +137,27 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     return false;
   }
 
-  // Embedded functions can reference non-public decls as they are visible
-  // to clients.
-  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
-    return false;
+  // Embedded functions can reference non-public decls because their bodies
+  // can be serialized. However, this is not the case in the "interface" code
+  // generation model, so diagnose cases where this would happen and require
+  // @usableFromInline (or similar). To accommodate existing clients of
+  // using the "interface" code generation model, downgrade this to a warning
+  // unless we are also emitted a TBD file. There, we need to ensure that we
+  // know the full set of symbols ahead of time.
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
+    auto *clientEmittedDecl = getClientEmittedDecl(DC);
+    if (!clientEmittedDecl)
+      return false;
+
+    bool isError = Context.TypeCheckerOpts.IsEmittingTBD;
+    Context.Diags
+        .diagnose(loc, diag::embedded_interface_decl_not_usable_from_inline, D,
+                  declAccessScope.accessLevelForDiagnostics(),
+                  clientEmittedDecl)
+        .limitBehaviorIf(!isError, DiagnosticBehavior::Warning);
+    Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
+    return isError;
+  }
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
