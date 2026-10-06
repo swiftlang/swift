@@ -6713,16 +6713,9 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
     storedRef = SubscriptExpr::create(ctx, pointeePropertyRefExpr, argList, subscript);
     storedRef->setType(LValueType::get(subscript->getElementInterfaceType()));
   } else {
-    // If the base class var has a clang decl, that means it's an access into a
-    // stored field. Otherwise, we're looking into another base class, so it's a
-    // another synthesized accessor.
-    AccessSemantics accessKind = baseClassVar->getClangDecl()
-                                     ? AccessSemantics::DirectToStorage
-                                     : AccessSemantics::DirectToImplementation;
-
     storedRef =
         new (ctx) MemberRefExpr(pointeePropertyRefExpr, SourceLoc(), baseClassVar,
-                                DeclNameLoc(), /*Implicit=*/true, accessKind);
+                                DeclNameLoc(), /*Implicit=*/true);
     storedRef->setType(LValueType::get(cast<VarDecl>(baseClassVar)->getTypeInContext()));
   }
 
