@@ -551,7 +551,8 @@ void CrossModuleOptimization::serializeVTablesInModule() {
   if (everything) {
     for (SILVTable *vt : M.getVTables()) {
       // In Embedded Swift, a class with the "interface" model has unique
-      // metadata in this module, which clients refer to by symbol.
+      // metadata in this module, which clients refer to by symbol. Generic
+      // classes cannot use the "interface" model.
       if (isEmbedded() && hasInterfaceModel(vt->getClass()))
         continue;
 
