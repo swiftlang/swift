@@ -634,7 +634,8 @@ private extension AnalyzedInstructions {
   ) -> Bool {
     for sideEffectInst in loopSideEffects {
       if sideEffectInst.mayWrite(toAddress: address, context.aliasAnalysis),
-         !scope.inclusiveRangeContains(sideEffectInst)
+         !scope.inclusiveRangeContains(sideEffectInst),
+         !scope.containsBorrowScopeBegin(of: sideEffectInst)
       {
         return true
       }
@@ -648,7 +649,8 @@ private extension AnalyzedInstructions {
   ) -> Bool {
     for sideEffectInst in loopSideEffects {
       if sideEffectInst.mayReadOrWrite(address: address, context.aliasAnalysis),
-         !scope.inclusiveRangeContains(sideEffectInst)
+         !scope.inclusiveRangeContains(sideEffectInst),
+         !scope.containsBorrowScopeBegin(of: sideEffectInst)
       {
         return true
       }
@@ -1218,6 +1220,29 @@ private extension FullApplySite {
     }
 
     return true
+  }
+}
+
+private extension InstructionRange {
+  /// Returns true if `inst` is an `end_borrow` whose `load_borrow` is inside this range.
+  ///
+  /// Alias analysis reports an `end_borrow` of a `load_borrow` as writing the loaded memory location,
+  /// so that the memory location cannot be changed during the borrow scope. If this range is extended,
+  /// it's fine to also include such an `end_borrow` because the whole borrow scope is then inside the range.
+  /// For example, a `load_borrow` within a `begin_access` scope whose `end_borrow` is after the `end_access`:
+  /// ```
+  ///   %1 = begin_access [read] %0
+  ///   %2 = load_borrow %1
+  ///   end_access %1
+  ///   end_borrow %2
+  /// ```
+  func containsBorrowScopeBegin(of inst: Instruction) -> Bool {
+    if let endBorrow = inst as? EndBorrowInst,
+       let loadBorrow = endBorrow.borrow as? LoadBorrowInst
+    {
+      return inclusiveRangeContains(loadBorrow)
+    }
+    return false
   }
 }
 

@@ -1878,6 +1878,126 @@ bb3:
   return %r : $()
 }
 
+class ClassWithObjects {
+  var o1: Builtin.NativeObject
+  var o2: Builtin.NativeObject
+}
+
+// The end_borrows of the load_borrows must not prevent hoisting the access scopes.
+// CHECK-LABEL: sil [ossa] @hoist_access_with_load_borrow_ending_after_end_access :
+// CHECK:       bb0(%0 : @guaranteed $ClassWithObjects):
+// CHECK:         [[R1:%.*]] = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+// CHECK:         [[R2:%.*]] = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o2
+// CHECK:         [[A1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
+// CHECK-NEXT:    [[B1:%.*]] = load_borrow [[A1]]
+// CHECK-NEXT:    [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R2]]
+// CHECK-NEXT:    [[B2:%.*]] = load_borrow [[A2]]
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime [[B1]]
+// CHECK-NEXT:    fix_lifetime [[B2]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow [[B2]]
+// CHECK-NEXT:    end_access [[A2]]
+// CHECK-NEXT:    end_borrow [[B1]]
+// CHECK-NEXT:    end_access [[A1]]
+// CHECK:       } // end sil function 'hoist_access_with_load_borrow_ending_after_end_access'
+sil [ossa] @hoist_access_with_load_borrow_ending_after_end_access : $@convention(thin) (@guaranteed ClassWithObjects) -> () {
+bb0(%0 : @guaranteed $ClassWithObjects):
+  %1 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+  %2 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o2
+  br bb1
+
+bb1:
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %1
+  %5 = load_borrow %4
+  end_access %4
+  fix_lifetime %5
+  end_borrow %5
+  %8 = begin_access [read] [dynamic] [no_nested_conflict] %2
+  %9 = load_borrow %8
+  end_access %8
+  fix_lifetime %9
+  end_borrow %9
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Same for a modify access scope.
+// CHECK-LABEL: sil [ossa] @hoist_modify_access_with_load_borrow_ending_after_end_access :
+// CHECK:       bb0(%0 : @guaranteed $ClassWithObjects):
+// CHECK:         [[R:%.*]] = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+// CHECK:         [[A:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[R]]
+// CHECK-NEXT:    [[B:%.*]] = load_borrow [[A]]
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'hoist_modify_access_with_load_borrow_ending_after_end_access'
+sil [ossa] @hoist_modify_access_with_load_borrow_ending_after_end_access : $@convention(thin) (@guaranteed ClassWithObjects) -> () {
+bb0(%0 : @guaranteed $ClassWithObjects):
+  %1 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [dynamic] [no_nested_conflict] %1
+  %4 = load_borrow %3
+  end_access %3
+  fix_lifetime %4
+  end_borrow %4
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The end_borrow of a (non-hoistable) load_borrow which begins before the access scope must still prevent
+// hoisting the scope.
+// CHECK-LABEL: sil [ossa] @dont_hoist_access_with_load_borrow_beginning_before_begin_access :
+// CHECK:       bb1(%{{.*}} : $Builtin.RawPointer):
+// CHECK:         [[OB:%.*]] = load_borrow
+// CHECK:         [[A:%.*]] = begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK:         end_access [[A]]
+// CHECK:         end_borrow [[OB]]
+// CHECK:       bb2:
+// CHECK:       } // end sil function 'dont_hoist_access_with_load_borrow_beginning_before_begin_access'
+sil [ossa] @dont_hoist_access_with_load_borrow_beginning_before_begin_access : $@convention(thin) (@guaranteed ClassWithObjects, Builtin.RawPointer) -> () {
+bb0(%0 : @guaranteed $ClassWithObjects, %1 : $Builtin.RawPointer):
+  %2 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+  br bb1(%1)
+
+bb1(%4 : $Builtin.RawPointer):
+  %5 = pointer_to_address %4 to $*Builtin.NativeObject
+  %6 = load_borrow %5
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %2
+  %8 = load_borrow %7
+  end_access %7
+  fix_lifetime %8
+  end_borrow %8
+  fix_lifetime %6
+  end_borrow %6
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%4)
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_hoist_struct :
 // CHECK:       bb1:
 // CHECK-NEXT:    struct $NonCopyable
