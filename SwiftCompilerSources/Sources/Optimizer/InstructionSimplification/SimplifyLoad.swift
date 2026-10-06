@@ -336,6 +336,13 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   }
 }
 
+extension LoadInst : DebugReconstructionBlockSimplifiable {
+  /// Only fold `load undef` to `undef`.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    foldUndefOperands(context)
+  }
+}
+
 /// Returns the init value of a global which is loaded from `address`.
 private func getGlobalInitValue(address: Value, _ context: SimplifyContext) -> Value? {
   switch address {
