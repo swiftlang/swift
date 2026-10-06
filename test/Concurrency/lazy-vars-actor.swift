@@ -59,6 +59,18 @@ public struct MainActorHasLazyVars {
 }
 
 
+// CHECK-LABEL: nonisolated public struct NonisolatedHasLazyVars {
+// CHECK-NEXT: nonisolated public var foo: Swift::Int {
+// CHECK-NEXT:   mutating get
+// CHECK-NEXT:   set
+// CHECK-NEXT: }
+// NONRESILIENT: {{^}} @_hasInitialValue private var $__lazy_storage_$_foo: Swift::Int?
+// CHECK-NEXT: }
+nonisolated public struct NonisolatedHasLazyVars {
+  public lazy var foo: Int = 0
+}
+
+
 // CHECK: {{(@preconcurrency @_Concurrency::MainActor|@_Concurrency::MainActor @preconcurrency)}} public struct PreconcurrencyMainActorHasLazyVars {
 // CHECK-NEXT: {{(@preconcurrency @_Concurrency::MainActor|@_Concurrency::MainActor @preconcurrency)}} public var foo: Swift::Int {
 // CHECK-NEXT:   mutating get
