@@ -32,7 +32,9 @@
 // RUN: %empty-directory(%t/without-module)
 // RUN: %target-swift-frontend -emit-ir -emit-module-path %t/Lib.swiftmodule -o %t/with-module/Lib.ll %t/Lib.swift -parse-as-library -module-name Lib -enable-experimental-feature Embedded -O
 // RUN: %FileCheck -check-prefix DEFAULT-IR %s < %t/with-module/Lib.ll
-// RUN: %target-swift-frontend -emit-ir -o %t/Lib.ll %t/Lib.swift -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -O
+// Nothing in the library references its "implementation" globals, so LLVM
+// would drop them.
+// RUN: %target-swift-frontend -emit-ir -o %t/Lib.ll %t/Lib.swift -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -O -disable-llvm-optzns
 // RUN: %FileCheck -check-prefix IMPLEMENTATION-IR %s < %t/Lib.ll
 
 // Whether a module is emitted doesn't affect the IR, apart from the module ID
@@ -50,6 +52,8 @@ func makeArray() -> [Int] { [1, 2, 3] }
 
 // DEFAULT-IR-DAG: @"$e3Lib7lazyVarSaySiGvp" = {{.*}}global %TSa zeroinitializer
 // IMPLEMENTATION-IR-DAG: @"$e3Lib7lazyVarSaySiGvp" = linkonce_odr {{.*}}global %TSa zeroinitializer
+// IMPLEMENTATION-IR-DAG: @"$e3Lib7lazyVar_Wz" = linkonce_odr {{.*}}global
+// IMPLEMENTATION-IR-DAG: define linkonce_odr {{.*}}@"$e3Lib7lazyVar_WZ"(
 public var lazyVar: [Int] = makeArray()
 
 // DEFAULT-IR-DAG: @"$e3Lib7lazyLetSaySiGvp" = {{.*}}global %TSa zeroinitializer

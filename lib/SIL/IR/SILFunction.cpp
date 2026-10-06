@@ -692,6 +692,19 @@ bool SILFunction::hasNonUniqueDefinition() const {
     return declRef.hasNonUniqueDefinition();
   }
 
+  // A function without a declaration, such as a global's once-initializer,
+  // can record the code generation model of the code it was emitted for.
+  if (auto cgModel = codeGenerationModel()) {
+    switch (*cgModel) {
+    case CodeGenerationModel::Implementation:
+      return true;
+    case CodeGenerationModel::Interface:
+      return false;
+    case CodeGenerationModel::Inlinable:
+      break;
+    }
+  }
+
   // If this function is from a different module than the one we are emitting
   // code for, then it must have a non-unique definition.
   if (getParentModule() != getModule().getSwiftModule())
