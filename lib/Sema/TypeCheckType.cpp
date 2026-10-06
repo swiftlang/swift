@@ -5578,6 +5578,30 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
   return result->hasError() ? ErrorType::get(ctx) : result;
 }
 
+/// Returns true if a reference to Deinitable in the given position is part of
+/// a `~Deinitable` that the NondeinitableTypes feature allows: in the
+/// inheritance clause of a struct or an enum, or on a generic parameter or an
+/// associated type.
+static bool canSuppressDeinitable(TypeResolutionOptions options,
+                                  DeclContext *dc) {
+  if (!dc->getASTContext().LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  if (!options.is(TypeResolverContext::Inverted))
+    return false;
+
+  switch (options.getBaseContext()) {
+  case TypeResolverContext::Inherited:
+    return isa<StructDecl>(dc) || isa<EnumDecl>(dc);
+  case TypeResolverContext::GenericParameterInherited:
+  case TypeResolverContext::AssociatedTypeInherited:
+  case TypeResolverContext::GenericRequirement:
+    return true;
+  default:
+    return false;
+  }
+}
+
 NeverNullType
 TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                      TypeResolutionOptions options) {
@@ -5586,7 +5610,8 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   // The compiler reserves Deinitable for its own use.
   if (auto *protoTy = result->getAs<ProtocolType>()) {
     if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Deinitable) &&
-        !getDeclContext()->getParentModule()->isStdlibModule()) {
+        !getDeclContext()->getParentModule()->isStdlibModule() &&
+        !canSuppressDeinitable(options, getDeclContext())) {
       if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
         diagnose(repr->getNameLoc(), diag::deinitable_reserved);
       repr->setInvalid();
@@ -6785,6 +6810,13 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
       auto *proto = getASTContext().getProtocol(kp);
       for (auto *otherProto : layout.getProtocols()) {
+        // If Copyable implies Deinitable, then applyInverses() explains that
+        // `~Deinitable` also requires `~Copyable`.
+        if (ip == InvertibleProtocolKind::Deinitable &&
+            otherProto->isSpecificProtocol(KnownProtocolKind::Copyable) &&
+            InverseRequirement::copyableImpliesDeinitable(getASTContext()))
+          continue;
+
         if (proto == otherProto ||
             otherProto->inheritsFrom(proto)) {
           diagnose(repr->getLoc(),

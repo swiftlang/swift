@@ -7111,10 +7111,17 @@ public:
             "Result and operand must have the same type.");
     require(type.isMoveOnly(/*orWrapped=*/false),
             "drop_deinit only allowed for move-only types");
-    require(type.getNominalOrBoundGenericNominal()
-            ->hasValueTypeDestructor(), "drop_deinit only allowed for "
-            "struct/enum types that define a deinit");
-    assert(!type.isTrivial(F) && "a type with a deinit is nontrivial");
+    // A ~Deinitable type has no deinit, and `discard self` is how its values'
+    // lifetimes end.
+    auto *nominal = type.getNominalOrBoundGenericNominal();
+    bool hasDeinit = nominal->hasValueTypeDestructor();
+    require(hasDeinit ||
+                nominal->canConformTo(InvertibleProtocolKind::Deinitable) ==
+                    TypeDecl::CanBeInvertible::Never,
+            "drop_deinit only allowed for struct/enum types that define a "
+            "deinit or that suppress Deinitable");
+    assert((!hasDeinit || !type.isTrivial(F)) &&
+           "a type with a deinit is nontrivial");
 
     checkDropDeinitUses(ddi);
   }

@@ -42,6 +42,9 @@ struct RequirementError {
     /// it's an outer generic parameter, e.g.,
     ///   protocol P { func f() where Self: ~Copyable }
     InvalidInverseOuterSubject,
+    /// A `~Deinitable` on a subject that doesn't also suppress Copyable,
+    /// which implies Deinitable, e.g. T: ~Deinitable.
+    DeinitableInverseRequiresNoncopyable,
     /// An invalid shape requirement, e.g. T.shape == Int.shape
     InvalidShapeRequirement,
     /// A pair of conflicting requirements, T == Int, T == String
@@ -109,7 +112,8 @@ public:
   InverseRequirement getInverse() const {
     ASSERT(kind == Kind::InvalidInverseOuterSubject ||
            kind == Kind::InvalidInverseSubject ||
-           kind == Kind::ConflictingInverseRequirement);
+           kind == Kind::ConflictingInverseRequirement ||
+           kind == Kind::DeinitableInverseRequiresNoncopyable);
     return inverse;
   }
 
@@ -132,6 +136,11 @@ public:
   static
   RequirementError forInvalidInverseOuterSubject(InverseRequirement inv) {
     return {Kind::InvalidInverseOuterSubject, inv, inv.loc};
+  }
+
+  static RequirementError
+  forDeinitableInverseRequiresNoncopyable(InverseRequirement inv) {
+    return {Kind::DeinitableInverseRequiresNoncopyable, inv, inv.loc};
   }
 
   static RequirementError forConflictingInverseRequirement(

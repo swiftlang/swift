@@ -3076,6 +3076,15 @@ ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
 ERROR(deinitable_reserved,none,
       "'Deinitable' is reserved for use by the compiler", ())
+ERROR(deinitable_inverse_requires_noncopyable,none,
+      "%0 cannot suppress 'Deinitable' without also suppressing 'Copyable'",
+      (Type))
+ERROR(deinitable_nominal_inverse_requires_noncopyable,none,
+      "%kind0 cannot suppress 'Deinitable' without also suppressing "
+      "'Copyable'", (const ValueDecl *))
+ERROR(deinitable_illegal_deinit,none,
+      "deinitializer cannot be declared in %kind0, which suppresses "
+      "'Deinitable'", (const ValueDecl *))
 
 // Extensions
 GROUPED_ERROR(non_nominal_extension,NominalTypes,none,

@@ -7934,6 +7934,12 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return nullptr;
 
+  // Sendable doesn't suppress Deinitable, so a ~Deinitable type can't conform
+  // to it.
+  if (nominal->canConformTo(InvertibleProtocolKind::Deinitable) ==
+      TypeDecl::CanBeInvertible::Never)
+    return nullptr;
+
   // Actor types are always Sendable; they don't get it via this path.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl && classDecl->isActor())

@@ -794,6 +794,48 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 
+static bool usesFeatureNondeinitableTypes(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  // A struct or enum that suppresses Deinitable.
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void)getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject);
+    if (inverses.contains(InvertibleProtocolKind::Deinitable))
+      return true;
+  }
+
+  // A generic signature that suppresses Deinitable.
+  if (auto *genericContext = decl->getAsGenericContext()) {
+    if (auto sig = genericContext->getGenericSignature()) {
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      sig->getRequirementsWithInverses(reqs, inverses);
+      for (auto inverse : inverses) {
+        if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+          return true;
+      }
+    }
+  }
+
+  // A protocol with an associated type that suppresses Deinitable.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    proto->getRequirementSignature().getRequirementsWithInverses(proto, reqs,
+                                                                 inverses);
+    for (auto inverse : inverses) {
+      if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

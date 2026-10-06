@@ -672,6 +672,10 @@ EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 /// Allow use of `@called(...)` on function types.
 EXPERIMENTAL_FEATURE(CalledAttribute, false)
 
+/// Allow structs, enums, and generic parameters to suppress `Deinitable`, for
+/// testing the compiler's support for `~Deinitable` types.
+EXPERIMENTAL_FEATURE(NondeinitableTypes, false)
+
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 

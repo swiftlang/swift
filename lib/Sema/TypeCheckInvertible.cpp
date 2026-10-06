@@ -137,6 +137,19 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
 
   bool hasExplicitInverse = inverses.contains(ip);
 
+  // If Copyable implies Deinitable, then `~Deinitable` requires `~Copyable`.
+  if (ip == InvertibleProtocolKind::Copyable &&
+      ctx.LangOpts.hasFeature(Feature::NondeinitableTypes) &&
+      isa<StructDecl, EnumDecl>(nominalDecl) &&
+      inverses.contains(InvertibleProtocolKind::Deinitable) &&
+      !hasExplicitInverse &&
+      InverseRequirement::copyableImpliesDeinitable(ctx)) {
+    ctx.Diags.diagnose(nominalDecl->getLoc(),
+                       diag::deinitable_nominal_inverse_requires_noncopyable,
+                       nominalDecl);
+    return;
+  }
+
   bool hasUnconditionalConformance = conformance.isAbstract();
   SourceLoc conformanceLoc = nominalDecl->getLoc();
 

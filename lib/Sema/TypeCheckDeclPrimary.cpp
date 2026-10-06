@@ -2159,6 +2159,16 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (!genericSig->requiresProtocol(ir.subject, ir.protocol))
       continue;
 
+    // If Copyable implies Deinitable, then applyInverses() already diagnosed a
+    // `~Deinitable` without `~Copyable`.
+    if (ir.getKind() == InvertibleProtocolKind::Deinitable &&
+        InverseRequirement::copyableImpliesDeinitable(ctx)) {
+      if (auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable)) {
+        if (genericSig->requiresProtocol(ir.subject, copyable))
+          continue;
+      }
+    }
+
     // We didn't diagnose this as an error for associated types prior to
     // SuppressedAssociatedTypesWithDefaults.
     //
@@ -4356,6 +4366,13 @@ public:
                              DD->getDeclContext()->getImplementedObjCContext());
       if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
+      }
+
+      // A `~Deinitable` type cannot have a user-defined deinit.
+      if (nom && isa<StructDecl, EnumDecl>(nom) &&
+          nom->canConformTo(InvertibleProtocolKind::Deinitable) ==
+              TypeDecl::CanBeInvertible::Never) {
+        DD->diagnose(diag::deinitable_illegal_deinit, nom);
       }
 
       // Temporarily ban deinit on noncopyable enums, unless the experimental
