@@ -1,4 +1,8 @@
 // Just enough definition here to test the behavior of referencing the names.
+
+@_marker
+public protocol Copyable {}
+
 public struct Cell<Value: ~Copyable>: ~Copyable {
   init() {}
 }
