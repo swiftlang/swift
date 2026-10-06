@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <type_traits>
 
 static size_t allocations = 0;
 static size_t liveAllocations = 0;
@@ -38,6 +39,13 @@ void trackedFree(void *pointer) {
 
 int main() {
   using namespace InlineStorage;
+
+  static_assert(std::is_trivial<InlineByte<int32_t>>::value, "");
+  static_assert(std::is_trivial<InlineEnum<int32_t>>::value, "");
+  static_assert(std::is_trivial<InlineLarge<int32_t>>::value, "");
+  static_assert(!std::is_trivially_copyable<swift::Array<int32_t>>::value, "");
+  static_assert(!std::is_trivially_copyable<Dependent<int32_t>>::value, "");
+  static_assert(!std::is_trivially_copyable<Resilient<int32_t>>::value, "");
 
   // Creation, copying and mutation must not box the Array handle.
   {

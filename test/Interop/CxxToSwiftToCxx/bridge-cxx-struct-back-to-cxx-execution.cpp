@@ -28,6 +28,19 @@ struct Trivial {
     inline Trivial(int x, int y) : x(x), y(y) {}
 };
 
+extern int customCopies;
+
+struct CustomCopy {
+    int value;
+    CustomCopy(int value) : value(value) {}
+    CustomCopy(const CustomCopy &other) : value(other.value) { ++customCopies; }
+    CustomCopy &operator=(const CustomCopy &other) {
+        value = other.value;
+        ++customCopies;
+        return *this;
+    }
+};
+
 template<class T>
 struct NonTrivialTemplate {
     T x;
@@ -56,6 +69,14 @@ module CxxTest {
 
 //--- use-cxx-types.swift
 import CxxTest
+
+public struct WithCustomCopy {
+    private var value: CustomCopy
+
+    public init(_ value: CInt) {
+        self.value = CustomCopy(value)
+    }
+}
 
 public func retNonTrivial(y: CInt) -> NonTrivialTemplateTrivial {
     return NonTrivialTemplateTrivial(Trivial(42, y))
@@ -107,8 +128,24 @@ public func retArrayNonTrivial(_ x: CInt) -> [NonTrivialTemplateTrivial] {
 #include "Swift.h"
 #include "UseCxx.h"
 #include <assert.h>
+#include <type_traits>
+
+int customCopies = 0;
 
 int main() {
+  // A trivial destructor does not make a custom copy operation trivial.
+  static_assert(std::is_trivially_destructible<CustomCopy>::value, "");
+  static_assert(!std::is_trivially_copyable<UseCxx::WithCustomCopy>::value, "");
+  {
+    auto value = UseCxx::WithCustomCopy::init(42);
+    customCopies = 0;
+    auto copy = value;
+    assert(customCopies > 0);
+    customCopies = 0;
+    copy = value;
+    assert(customCopies > 0);
+  }
+
   {
     auto x = UseCxx::retTrivial(423421);
     assert(x.x == 423421);

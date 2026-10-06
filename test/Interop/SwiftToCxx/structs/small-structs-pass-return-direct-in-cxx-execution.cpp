@@ -17,11 +17,17 @@
 int main() {
   using namespace Structs;
 
-  // User-provided special members preserve the wrapper's C++ ABI.
-  static_assert(!std::is_trivially_copyable<StructDoubleAndFloat>::value, "");
-  static_assert(!std::is_trivially_destructible<StructDoubleAndFloat>::value, "");
-  static_assert(!std::is_trivially_copy_constructible<StructDoubleAndFloat>::value, "");
-  static_assert(!std::is_trivially_copy_assignable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivial<StructOneI64>::value, "");
+  static_assert(std::is_trivial<StructOneI16AndOneStruct>::value, "");
+  static_assert(std::is_trivial<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copyable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_destructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copy_constructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copy_assignable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_move_constructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_move_assignable<StructDoubleAndFloat>::value, "");
+  // Storage must still be initialized through a Swift factory.
+  static_assert(!std::is_default_constructible<StructDoubleAndFloat>::value, "");
 
   static_assert(sizeof(StructOneI64) == 8, "");
   static_assert(sizeof(StructTwoI32) == 8, "");

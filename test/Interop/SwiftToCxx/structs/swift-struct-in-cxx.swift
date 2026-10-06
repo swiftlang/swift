@@ -34,18 +34,11 @@
 
 // CHECK:      class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField final {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithIntField() noexcept {
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField(const StructWithIntField &other) noexcept {
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField &operator =(const StructWithIntField &other) noexcept {
-// CHECK-NEXT:     if (this == &other) return *this;
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   return *this;
-// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithIntField() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField(const StructWithIntField &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField &operator =(const StructWithIntField &other) noexcept = default;
 // CHECK-NEXT: private:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept {}
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept = default;
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK StructWithIntField _make() noexcept { return StructWithIntField(); }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage; }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { return _storage; }

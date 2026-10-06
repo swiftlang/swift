@@ -11,9 +11,17 @@
 // REQUIRES: executable_test
 
 #include <cassert>
+#include <type_traits>
 #include "enums.h"
 
 using namespace Enums;
+
+static_assert(std::is_trivial<E>::value, "");
+static_assert(std::is_trivially_copyable<E>::value, "");
+static_assert(std::is_trivially_destructible<E>::value, "");
+static_assert(std::is_trivial<E2>::value, "");
+static_assert(std::is_trivial<S>::value, "");
+static_assert(!std::is_default_constructible<E>::value, "");
 
 int switchTest(const E &e) {
     switch (e) {

@@ -311,19 +311,20 @@ void ClangValueTypePrinter::printValueTypeDecl(
       ClangSyntaxPrinter(Context, os).printGenericSignatureInnerStaticAsserts(
           genericSignature);
 
-    // Keep user-provided special members even for trivial Swift values, so
-    // their C++ triviality traits and calling convention do not change.
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
-    os << '~' << baseName << "() noexcept {\n";
-    if (!isTrivial) {
+    os << '~' << baseName << "() noexcept";
+    if (isTrivial) {
+      os << " = default;\n";
+    } else {
+      os << " {\n";
       if (isNoncopyable)
         os << "    if (_isMovedFrom) return;\n";
       printVWTable(os);
       os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "  }\n";
     }
-    os << "  }\n";
 
     if (isNoncopyable) {
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
@@ -372,10 +373,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
-      os << baseName << "(const " << baseName << " &other) noexcept {\n";
+      os << baseName << "(const " << baseName << " &other) noexcept";
       if (isTrivial) {
-        os << "    memcpy(_storage, other._storage, sizeof(_storage));\n";
+        os << " = default;\n";
       } else {
+        os << " {\n";
         printVWTable(os);
         if (isOpaqueLayout) {
           os << "    _storage = ";
@@ -386,24 +388,25 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
               "const_cast<char "
               "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  }\n";
       }
-      os << "  }\n";
 
       // copy assignment.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
-         << " &other) noexcept {\n";
+         << " &other) noexcept";
       if (isTrivial) {
-        os << "    if (this == &other) return *this;\n";
-        os << "    memcpy(_storage, other._storage, sizeof(_storage));\n";
+        os << " = default;\n";
       } else {
+        os << " {\n";
         printVWTable(os);
-        os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
+        os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
               "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  return *this;\n";
+        os << "  }\n";
       }
-      os << "  return *this;\n";
-      os << "  }\n";
 
       // FIXME: implement the move assignment.
       // FIXME: implement the move constructor.
@@ -425,6 +428,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
             "_storage(vwTable->size, "
             "vwTable->getAlignment()) {}\n";
+    } else if (isTrivial) {
+      // A user-provided default constructor would make the C++ type nontrivial.
+      os << "() noexcept = default;\n";
     } else {
       os << "() noexcept {}\n";
     }

@@ -107,16 +107,9 @@ public struct FirstSmallStruct {
 }
 // CHECK: class SWIFT_SYMBOL("s:7Structs12FrozenStructV") FrozenStruct final {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK ~FrozenStruct() noexcept {
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct(const FrozenStruct &other) noexcept {
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct &operator =(const FrozenStruct &other) noexcept {
-// CHECK-NEXT:     if (this == &other) return *this;
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   return *this;
-// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~FrozenStruct() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct(const FrozenStruct &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct &operator =(const FrozenStruct &other) noexcept = default;
 // CHECK:        alignas(4) char _storage[4];
 // CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
 // CHECK-NEXT: #pragma clang diagnostic push

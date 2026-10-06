@@ -49,16 +49,9 @@ public struct S {
 
 // CHECK:      class SWIFT_SYMBOL("s:5Enums1EO") E final {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E() noexcept {
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK E(const E &other) noexcept {
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK E &operator =(const E &other) noexcept {
-// CHECK-NEXT:     if (this == &other) return *this;
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   return *this;
-// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E(const E &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E &operator =(const E &other) noexcept = default;
 // CHECK:        enum class cases {
 // CHECK-NEXT:     x SWIFT_SYMBOL("s:5Enums1EO1xyACSdcACmF"),
 // CHECK-NEXT:     y SWIFT_SYMBOL("s:5Enums1EO1yyACSVSgcACmF"),
@@ -186,16 +179,9 @@ public struct S {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) E2 final {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E2() noexcept {
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK E2(const E2 &other) noexcept {
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK E2 &operator =(const E2 &other) noexcept {
-// CHECK-NEXT:     if (this == &other) return *this;
-// CHECK-NEXT:     memcpy(_storage, other._storage, sizeof(_storage));
-// CHECK-NEXT:   return *this;
-// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E2() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E2(const E2 &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E2 &operator =(const E2 &other) noexcept = default;
 // CHECK: SWIFT_INLINE_THUNK operator cases() const {
 // CHECK: }
 // CHECK-NEXT: }
