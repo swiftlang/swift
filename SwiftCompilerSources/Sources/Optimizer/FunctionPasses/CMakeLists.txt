@@ -26,6 +26,7 @@ swift_compiler_sources(Optimizer
   DeadDebugVariableElimination.swift
   DeadObjectElimination.swift
   DeadStoreElimination.swift
+  Debugify.swift
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
