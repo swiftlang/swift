@@ -224,8 +224,7 @@ public func renderQueuedDiagnosticsAsSARIF(
     let json = try builder.log.toJSONString(formatting: .pretty) + "\n"
     renderedString.pointee = allocateBridgedString(json)
   } catch {
-    errorMessageOut.pointee = allocateBridgedString(
-      "could not serialize SARIF diagnostics: \(error)")
+    errorMessageOut.pointee = allocateBridgedString("\(error)")
     return false
   }
 

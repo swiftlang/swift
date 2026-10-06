@@ -52,13 +52,12 @@ class SARIFDiagnosticConsumer : public DiagnosticConsumer {
   /// Report that the log could not be produced, using a temporary diagnostic
   /// engine as the serialized diagnostics consumer does. Always returns true,
   /// the "an error occurred" result of finishProcessing().
-  bool reportFailure(StringRef reason) {
+  bool reportFailure(Diag<StringRef, StringRef> diagID, StringRef reason) {
     SourceManager dummyMgr;
     DiagnosticEngine DE(dummyMgr);
     PrintingDiagnosticConsumer PDC;
     DE.addConsumer(PDC);
-    DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,
-                SARIFDiagnosticsPath, reason);
+    DE.diagnose(SourceLoc(), diagID, SARIFDiagnosticsPath, reason);
     return true;
   }
 
@@ -82,7 +81,7 @@ public:
     OS.reset(new llvm::raw_fd_ostream(SARIFDiagnosticsPath, EC,
                                       llvm::sys::fs::OF_None));
     if (EC)
-      return reportFailure(EC.message());
+      return reportFailure(diag::cannot_open_serialized_file, EC.message());
 
     // In batch mode, if any error occurs then no primaries can be compiled. In
     // that case we match the existing behavior of serialized diagnostics
@@ -97,7 +96,8 @@ public:
     auto sarif =
         Bridge.takeQueuedDiagnosticsAsSARIF(version::getSwiftFullVersion());
     if (!sarif)
-      return reportFailure(llvm::toString(sarif.takeError()));
+      return reportFailure(diag::cannot_serialize_sarif_diagnostics,
+                           llvm::toString(sarif.takeError()));
 
     *OS << *sarif;
     OS->flush();
