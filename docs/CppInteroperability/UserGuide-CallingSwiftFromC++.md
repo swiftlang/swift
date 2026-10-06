@@ -336,7 +336,7 @@ Similarly, any type that conforms to `ExpressibleByArrayLiteral` will receive a 
 
 ### Resilient Swift Structures
 
-Swift resilient structures are bridged over as a C++ class that boxes the Swift value on the heap. Their generated C++ interface resembles the C++ interface for a non-resilient structure, so all the methods and properties can be accessed in the same manner. For example, you can call methods and access the properties on `Foundation::URL` , which is a resilient Swif structure, in the same manner as you would for any other fixed layout Swift structure:
+Swift resilient structures use a C++ class whose storage is selected at runtime. Values that fit in three pointer-sized words and require no more alignment than a pointer are stored inside the wrapper. Larger or more strictly aligned values use a heap box. Their generated C++ interface resembles the C++ interface for a non-resilient structure, so all the methods and properties can be accessed in the same manner. For example, you can call methods and access the properties on `Foundation::URL` , which is a resilient Swif structure, in the same manner as you would for any other fixed layout Swift structure:
 
 ```c++
 #include "Foundation-Swift.h"
@@ -349,16 +349,16 @@ void workWithURL() {
 }
 ```
 
-The boxing implies that the following operations will allocate and store a new value on the heap:
+For values that require a heap box, the following operations allocate a new box:
 
 * Returning a value from a call to a Swift method/function allocates a new value on the heap.
 * Returning a value from a getter call to a Swift property `get` accessor allocates a new value on the heap.
 * Creating a new instance of a resilient structure in C++ using the static `init` method allocates a new value on the heap.
 * Copying a C++ `class` that represents a resilient Swift structure using a C++ copy constructor allocates a new value on the heap.
 
-**NOTE**: A fixed-layout structure that contains a resilient structure as a stored property is also boxed on the C++ side.
+**NOTE**: A fixed-layout structure that contains a resilient structure as a stored property also uses runtime-selected storage on the C++ side.
 
-Moving a boxed value with a C++ move constructor or move assignment transfers its heap allocation and leaves the source empty. The Swift value is not copied and no new allocation is made. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`. A copyable value with a fixed layout has no move operations yet, so moving it calls the copy constructor and the source keeps its value.
+Moving a value with runtime-selected storage transfers ownership and leaves the source empty. A heap-backed value transfers its allocation; an inline value is relocated by its Swift value witness. Neither operation copies the Swift value or allocates a new box. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`. A copyable value with a fixed layout has no move operations yet, so moving it calls the copy constructor and the source keeps its value.
 
 ```c++
 auto url = Foundation::URL::init("https://swift.org");
