@@ -238,6 +238,12 @@ private func isOptimizableLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
     return false
   }
 
+  // In Embedded Swift, don't inline a body that clients can't see into code
+  // that they emit themselves.
+  if callee.wouldExposeBodyToClients(ifInlinedInto: ai.parentFunction) {
+    return false
+  }
+
   // A getter that binds dynamic Self can only be inlined when the caller also
   // binds dynamic Self and the callee is called on the self value itself.
   if callee.mayBindDynamicSelf {

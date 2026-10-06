@@ -457,37 +457,17 @@ bool CrossModuleOptimization::hasInterfaceModel(const Decl *decl) {
          CodeGenerationModel::Interface;
 }
 
-/// In Embedded Swift, determine whether the code for the given function is
-/// emitted into clients, so they need its body. Code with the "interface"
-/// model has a unique definition in this module, which clients refer to by
-/// symbol.
+/// In Embedded Swift, determine whether the given function should be
+/// serialized because clients emit their own copies of it.
 bool CrossModuleOptimization::isEmittedIntoClients(SILFunction *function) {
   assert(isEmbedded());
-
-  if (function->isNeverEmitIntoClient())
-    return false;
-
-  // Any module that uses a generic function can create the same
-  // specialization of it.
-  if (function->isSpecialization())
-    return true;
-
-  // A closure is emitted wherever the declaration containing it is.
-  if (auto declRef = function->getDeclRef()) {
-    if (auto *closure = declRef.getAbstractClosureExpr()) {
-      return closure->getCodeGenerationModelOfCode() !=
-             CodeGenerationModel::Interface;
-    }
-  }
 
   // A global's one-time initializer is only called from its addressor, which
   // is serialized if clients need it.
   if (function->isGlobalInitOnceFunction())
     return false;
 
-  // Other functions, such as witness thunks, can be reached from serialized
-  // witness tables, and clients need their bodies to specialize them.
-  return true;
+  return function->isEmittedIntoClients();
 }
 
 /// Select functions in the module which should be serialized.

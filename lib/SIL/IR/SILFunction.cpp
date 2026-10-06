@@ -597,6 +597,43 @@ bool SILFunction::isNeverEmitIntoClient() const {
   return codeGenerationModel() == CodeGenerationModel::Interface;
 }
 
+bool SILFunction::isEmittedIntoClients() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  if (isNeverEmitIntoClient())
+    return false;
+
+  // Any module that uses a generic function can create the same
+  // specialization of it.
+  if (isSpecialization())
+    return true;
+
+  // A closure is emitted wherever the declaration containing it is.
+  if (auto declRef = getDeclRef()) {
+    if (auto *closure = declRef.getAbstractClosureExpr()) {
+      return closure->getCodeGenerationModelOfCode() !=
+             CodeGenerationModel::Interface;
+    }
+  }
+
+  // Other functions, such as witness thunks, can be reached from serialized
+  // witness tables, and clients need their bodies to specialize them.
+  return true;
+}
+
+bool SILFunction::wouldExposeBodyToClients(const SILFunction *caller) const {
+  // Once the module is serialized, clients can't see what gets inlined.
+  if (getModule().isSerialized())
+    return false;
+
+  // A serialized body is meant to be inlined into clients.
+  if (!isNeverEmitIntoClient() || isAnySerialized())
+    return false;
+
+  return caller->isEmittedIntoClients();
+}
+
 OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
   if (OptimizationMode(OptMode) != OptimizationMode::NotSet)
     return OptimizationMode(OptMode);

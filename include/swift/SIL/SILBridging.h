@@ -615,6 +615,7 @@ struct BridgedFunction {
   BRIDGED_INLINE ABILanguage getSILFunctionLanguage() const;
   BRIDGED_INLINE SerializedKind getSerializedKind() const;
   BRIDGED_INLINE bool canBeInlinedIntoCaller(SerializedKind) const;
+  BRIDGED_INLINE bool wouldExposeBodyToClients(BridgedFunction caller) const;
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;

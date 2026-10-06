@@ -269,6 +269,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  /// In Embedded Swift, whether inlining this function into `caller` would expose this function's body to
+  /// clients, because they emit their own copies of `caller`.
+  public func wouldExposeBodyToClients(ifInlinedInto caller: Function) -> Bool {
+    bridged.wouldExposeBodyToClients(caller.bridged)
+  }
+
   public func canBeInlinedIntoCaller(withSerializedKind callerSerializedKind: SerializedKind) -> Bool {
     switch serializedKind {
     // If both callee and caller are not_serialized, the callee can be inlined into the caller

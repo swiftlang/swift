@@ -430,6 +430,11 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
+  // In Embedded Swift, don't inline a body that clients can't see into code that they emit themselves.
+  if callee.wouldExposeBodyToClients(ifInlinedInto: apply.parentFunction) {
+    return false
+  }
+
   // Cannot inline a non-ossa function into an ossa function
   if apply.parentFunction.hasOwnership && !callee.hasOwnership {
     return false
