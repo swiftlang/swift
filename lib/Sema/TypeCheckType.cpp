@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
@@ -6559,28 +6560,12 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
-  std::optional<unsigned> moveOnlyElementIndex = std::nullopt;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     auto ty = resolveType(tyR, elementOptions);
     if (ty->hasError()) {
       hadError = true;
-    }
-    // Tuples with move-only elements aren't yet supported.
-    // Track the presence of a noncopyable field for diagnostic purposes only.
-    // We don't need to re-diagnose if a tuple contains another tuple, though,
-    // since we should've diagnosed the inner tuple already.
-    // FIXME: This won't diagnose if the type contains unbound generics
-    if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
-        !options.contains(TypeResolutionFlags::SILMode) &&
-        inStage(TypeResolutionStage::Interface) &&
-        !moveOnlyElementIndex.has_value() && !ty->hasUnboundGenericType() &&
-        !ty->hasTypeVariable() && !isa<TupleTypeRepr>(tyR)) {
-      auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
-          resolution.getGenericSignature().getGenericEnvironment(), ty);
-      if (!contextTy->hasError() && contextTy->isNoncopyable())
-        moveOnlyElementIndex = i;
     }
 
     auto eltName = repr->getElementName(i);
@@ -6630,12 +6615,28 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !elements[0].getType()->is<PackExpansionType>())
       return elements[0].getType();
   }
-  
-  if (moveOnlyElementIndex.has_value()) {
-    auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
-    auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
-    assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
-    diagnose(loc, diag::tuple_move_only_not_supported, noncopyableTy);
+
+  // Diagnose the first element that a tuple can't contain. A nested tuple
+  // was already diagnosed when it was resolved.
+  // FIXME: This won't diagnose if the type contains unbound generics
+  if (!options.contains(TypeResolutionFlags::SILMode) &&
+      inStage(TypeResolutionStage::Interface)) {
+    auto *genericEnv = resolution.getGenericSignature().getGenericEnvironment();
+    for (unsigned i : indices(elements)) {
+      auto *tyR = repr->getElementType(i);
+      auto ty = elements[i].getType();
+      if (ty->hasUnboundGenericType() || ty->hasTypeVariable() ||
+          isa<TupleTypeRepr>(tyR))
+        continue;
+
+      auto contextTy =
+          GenericEnvironment::mapTypeIntoEnvironment(genericEnv, ty);
+      if (contextTy->hasError())
+        continue;
+
+      if (diagnoseUnsupportedTupleElement(contextTy, tyR->getLoc(), ctx))
+        break;
+    }
   }
 
   return TupleType::get(elements, ctx);

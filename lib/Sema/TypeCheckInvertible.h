@@ -42,6 +42,13 @@ void checkDeinitableConformance(DeclContext *dc,
 /// Checks that all stored properties or associated values are Escapable.
 void checkEscapableConformance(DeclContext *dc,
                                ProtocolConformanceRef conformance);
+
+/// Diagnoses a tuple element of type \p eltTy at \p loc if tuples can't
+/// contain it.
+///
+/// \returns true if a diagnostic was emitted.
+bool diagnoseUnsupportedTupleElement(Type eltTy, SourceLoc loc,
+                                     ASTContext &ctx);
 }
 
 

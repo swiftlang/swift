@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEmbedded.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTPrinter.h"
@@ -309,14 +310,19 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         diagnoseDuplicateLabels(tupleExpr->getLoc(),
                                 tupleExpr->getElementNames());
 
-        // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable()
-            && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
-          auto noncopyableTy = E->getType();
-          assert(noncopyableTy->is<TupleType>() && "will use poor wording");
-          Ctx.Diags.diagnose(E->getLoc(),
-                             diag::tuple_containing_move_only_not_supported,
-                             noncopyableTy);
+        // Diagnose the first element that a tuple can't contain. A nested
+        // tuple was already diagnosed when it was formed.
+        for (auto *elt : tupleExpr->getElements()) {
+          auto eltTy = elt->getType();
+          if (!eltTy || eltTy->hasError())
+            continue;
+
+          eltTy = eltTy->getWithoutSpecifierType();
+          if (eltTy->is<TupleType>())
+            continue;
+
+          if (diagnoseUnsupportedTupleElement(eltTy, elt->getLoc(), Ctx))
+            break;
         }
       }
 

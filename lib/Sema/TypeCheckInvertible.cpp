@@ -230,8 +230,9 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
     }
   }
 
-  // All classes can store noncopyable/nonescaping values.
-  if (isa<ClassDecl>(nominalDecl))
+  // All classes can store noncopyable/nonescaping values, but a class destroys
+  // its stored properties implicitly, so they must be Deinitable.
+  if (isa<ClassDecl>(nominalDecl) && ip != InvertibleProtocolKind::Deinitable)
     return;
 
   // Nothing can suppress Deinitable yet.
@@ -383,4 +384,26 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 
   assert(!isa<ProtocolDecl>(nominal) || !isa<BuiltinTupleDecl>(nominal));
   return false;
+}
+
+bool swift::diagnoseUnsupportedTupleElement(Type eltTy, SourceLoc loc,
+                                           ASTContext &ctx) {
+  // Tuples with noncopyable elements aren't supported yet.
+  if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+    if (eltTy->isNoncopyable()) {
+      ctx.Diags.diagnose(loc, diag::tuple_move_only_not_supported, eltTy);
+      return true;
+    }
+
+    // If Copyable implies Deinitable, then a Copyable element is Deinitable.
+    if (InverseRequirement::copyableImpliesDeinitable(ctx))
+      return false;
+  }
+
+  // A tuple destroys its elements implicitly, so they must be Deinitable.
+  if (eltTy->isDeinitable())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::tuple_nondeinitable_element, eltTy);
+  return true;
 }

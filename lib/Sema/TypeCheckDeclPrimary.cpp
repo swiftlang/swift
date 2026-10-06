@@ -2584,6 +2584,33 @@ public:
     llvm_unreachable("hidden layout declarations are not type checked");
   }
 
+  /// Nothing consumes the value of a global, a static property, a lazy
+  /// property, or an `async let` binding explicitly, so its type must be
+  /// Deinitable.
+  static void checkNondeinitableStorage(VarDecl *VD) {
+    if (VD->isImplicit() || !VD->hasInterfaceType())
+      return;
+
+    enum : unsigned { Global, Static, Lazy, AsyncLet };
+    std::optional<unsigned> kind;
+    if (VD->isAsyncLet())
+      kind = AsyncLet;
+    else if (VD->getAttrs().hasAttribute<LazyAttr>())
+      kind = Lazy;
+    else if (VD->hasStorage() && VD->isStatic())
+      kind = Static;
+    else if (VD->hasStorage() && VD->getDeclContext()->isModuleScopeContext())
+      kind = Global;
+    if (!kind)
+      return;
+
+    auto type = VD->getTypeInContext();
+    if (type->hasError() || type->isDeinitable())
+      return;
+
+    VD->diagnose(diag::nondeinitable_storage, *kind, VD->getName(), type);
+  }
+
   void visitBoundVariable(VarDecl *VD) {
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
@@ -2643,6 +2670,8 @@ public:
         }
       }
     }
+
+    checkNondeinitableStorage(VD);
 
     TypeChecker::checkDeclAttributes(VD);
 

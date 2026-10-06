@@ -1,12 +1,15 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -verify-additional-prefix copytuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_NondeinitableTypes
+// REQUIRES: swift_feature_MoveOnlyTuples
 
 // The NondeinitableTypes feature lets structs, enums, generic parameters, and
 // associated types suppress `Deinitable`, so that the compiler's support for
 // `~Deinitable` types can be tested.
 
-struct ND: ~Copyable, ~Deinitable { // expected-note {{struct 'ND' has '~Deinitable' constraint preventing 'Deinitable' conformance}}
+struct ND: ~Copyable, ~Deinitable { // expected-note 3 {{struct 'ND' has '~Deinitable' constraint preventing 'Deinitable' conformance}}
   consuming func finish() {
     discard self // Ok, even without a deinit
   }
@@ -115,3 +118,70 @@ struct Box<T: ~Copyable>: ~Copyable {
 }
 
 func spelled(_: consuming Box<ND>) {} // expected-error {{type 'ND' does not conform to protocol 'Deinitable'}}
+
+// MARK: - Storage that nothing consumes explicitly
+
+func makeND() -> ND { ND() }
+
+class ClassHolder {
+  var nd: ND // expected-error {{stored property 'nd' of 'Deinitable'-conforming class 'ClassHolder' has non-Deinitable type 'ND'}}
+  init() { nd = ND() }
+}
+
+actor ActorHolder {
+  let nd = ND() // expected-error {{stored property 'nd' of 'Deinitable'-conforming actor 'ActorHolder' has non-Deinitable type 'ND'}}
+}
+
+let globalND = ND() // expected-error {{global variable 'globalND' cannot have non-Deinitable type 'ND'}}
+
+struct StaticHolder: ~Copyable, ~Deinitable {
+  static let staticND = ND() // expected-error {{static property 'staticND' cannot have non-Deinitable type 'ND'}}
+}
+
+class LazyHolder {
+  lazy var nd = ND() // expected-error {{lazy property 'nd' cannot have non-Deinitable type 'ND'}}
+}
+
+func asyncLet() async {
+  async let x = makeND() // expected-error {{'async let' binding 'x' cannot have non-Deinitable type 'ND'}}
+  _ = await x
+}
+
+func tuples<T: ~Copyable & ~Deinitable>(_ t: consuming T) {
+  let _: (ND, Int) = (ND(), 0)
+  // expected-movetuples-error@-1 2 {{tuple cannot contain non-Deinitable element type 'ND'}}
+  // expected-copytuples-error@-2 2 {{tuple with noncopyable element type 'ND' is not supported}}
+  let _ = (makeND(), 1)
+  // expected-movetuples-error@-1 {{tuple cannot contain non-Deinitable element type 'ND'}}
+  // expected-copytuples-error@-2 {{tuple with noncopyable element type 'ND' is not supported}}
+  let _ = (t, 1)
+  // expected-movetuples-error@-1 {{tuple cannot contain non-Deinitable element type 'T'}}
+  // expected-copytuples-error@-2 {{tuple with noncopyable element type 'T' is not supported}}
+}
+
+// MARK: - Optional and existentials
+
+func optionalAndExistential() {
+  // FIXME: [deinitable] Optional's payload must be Deinitable.
+  let _: _? = ND()
+  let _: Optional<ND> = nil // expected-error {{type 'ND' does not conform to protocol 'Deinitable'}}
+  let _: any ~Copyable = ND() // expected-error {{value of type 'ND' does not conform to specified type 'Deinitable'}}
+}
+
+struct MakesND {
+  func make() -> ND { ND() }
+  func makeOrThrow() throws -> ND { ND() }
+}
+
+func inferredOptional(_ m: MakesND?, _ n: MakesND) {
+  // FIXME: [deinitable] Optional's payload must be Deinitable.
+  _ = m?.make()
+  // FIXME: [deinitable] Optional's payload must be Deinitable.
+  _ = try? n.makeOrThrow()
+}
+
+// Local variables keep the obligation with their scope.
+func locals() {
+  let nd = ND()
+  nd.finish()
+}
