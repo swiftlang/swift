@@ -63,6 +63,7 @@ option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime lib
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment"
   ${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT})
+option(SwiftOverlay_EMBED_PLIST "Embed the generated plist in targets" ${APPLE})
 
 add_compile_definitions(
   $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
