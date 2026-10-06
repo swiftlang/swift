@@ -190,7 +190,7 @@ public struct S {
 
 // CHECK:      namespace Enums SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        SWIFT_INLINE_THUNK E E::_impl_x::operator()(double val) const {
-// CHECK-NEXT:     auto result = E::_make();
+// CHECK-NEXT:     E result;
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(0);
 // CHECK-NEXT:     return result;
@@ -208,7 +208,7 @@ public struct S {
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_y::operator()(void const * _Nullable val) const {
-// CHECK-NEXT:     auto result = E::_make();
+// CHECK-NEXT:     E result;
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(1);
 // CHECK-NEXT:     return result;
@@ -226,7 +226,7 @@ public struct S {
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_z::operator()(const S& val) const {
-// CHECK-NEXT:     auto result = E::_make();
+// CHECK-NEXT:     E result;
 // CHECK-NEXT:     alignas(S) unsigned char buffer[sizeof(S)];
 // CHECK-NEXT:     auto *valCopy = new(buffer) S(val);
 // CHECK-NEXT:     swift::_impl::implClassFor<S>::type::initializeWithTake(result._getOpaquePointer(), swift::_impl::implClassFor<S>::type::getOpaquePointer(*valCopy));
@@ -246,7 +246,7 @@ public struct S {
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_w::operator()(swift::Int val) const {
-// CHECK-NEXT:     auto result = E::_make();
+// CHECK-NEXT:     E result;
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(3);
 // CHECK-NEXT:     return result;
@@ -264,7 +264,7 @@ public struct S {
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_auto::operator()(void * _Nonnull val) const {
-// CHECK-NEXT:     auto result = E::_make();
+// CHECK-NEXT:     E result;
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(4);
 // CHECK-NEXT:     return result;
@@ -282,7 +282,7 @@ public struct S {
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_foobar::operator()() const {
-// CHECK-NEXT:     auto result = E::_make();
+// CHECK-NEXT:     E result;
 // CHECK-NEXT:     result._destructiveInjectEnumTag(5);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }

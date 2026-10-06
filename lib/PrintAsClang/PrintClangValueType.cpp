@@ -174,7 +174,7 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
         os << "static ";
         ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForThunk();
         os << "String init(NSString * _Nonnull nsString) noexcept {\n";
-        os << "    auto result = _make();\n";
+        os << "    String result;\n";
         os << "    auto res = "
               "_impl::$sSS10FoundationE36_"
               "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge "
@@ -229,13 +229,17 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
   }
   bool isOpaqueLayout = declAndTypePrinter.isOpaqueLayout(typeDecl);
-  // A noncopyable type is exposed as a move-only C++ class. Because Swift's
-  // moves are destructive and C++'s are not, such a class carries a flag that
-  // records whether it was moved from, so that its destructor can be a no-op.
+  // Swift moves are destructive. Inline wrappers track whether they still
+  // contain a Swift value. Opaque wrappers use a null allocation.
   bool isNoncopyable =
       cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
   assert((!isNoncopyable || !isOpaqueLayout) &&
          "noncopyable types with an opaque layout are not exposed to C++");
+
+  StringRef isMovedFrom =
+      isOpaqueLayout ? "!_storage.isAllocated()" : "_isMovedFrom";
+  StringRef otherIsMovedFrom =
+      isOpaqueLayout ? "!other._storage.isAllocated()" : "other._isMovedFrom";
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
@@ -316,8 +320,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  ";
     printer.printInlineForThunk();
     os << '~' << baseName << "() noexcept {\n";
-    if (isNoncopyable)
-      os << "    if (_isMovedFrom) return;\n";
+    os << "    if (" << isMovedFrom << ") return;\n";
     printVWTable(os);
     os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
     os << "  }\n";
@@ -326,7 +329,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
       os << "  " << baseName << " &operator =(const " << baseName
          << " &) = delete;\n";
+    }
 
+    if (!isOpaqueLayout) {
       // move constructor.
       os << "  ";
       printer.printInlineForThunk();
@@ -365,11 +370,18 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "    other._isMovedFrom = true;\n";
       os << "  return *this;\n";
       os << "  }\n";
-    } else {
+    }
+
+    if (!isNoncopyable) {
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << "(const " << baseName << " &other) noexcept {\n";
+      os << "    if (" << otherIsMovedFrom << ") {\n";
+      if (!isOpaqueLayout)
+        os << "      _isMovedFrom = true;\n";
+      os << "      return;\n";
+      os << "    }\n";
       printVWTable(os);
       if (isOpaqueLayout) {
         os << "    _storage = ";
@@ -387,14 +399,46 @@ void ClangValueTypePrinter::printValueTypeDecl(
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
          << " &other) noexcept {\n";
+      os << "    if (this == &other) return *this;\n";
+      // Copying an empty wrapper propagates its state. Reinitializing an empty
+      // destinations use initializeWithCopy through the copy constructor.
+      os << "    if (" << isMovedFrom << " || " << otherIsMovedFrom << ") {\n";
+      os << "      *this = " << baseName << "(other);\n";
+      os << "      return *this;\n";
+      os << "    }\n";
       printVWTable(os);
       os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
             "*>(other._getOpaquePointer()), metadata._0);\n";
       os << "  return *this;\n";
       os << "  }\n";
 
-      // FIXME: implement the move assignment.
-      // FIXME: implement the move constructor.
+      if (isOpaqueLayout) {
+        // Transfer the allocation without relocating the Swift value.
+        os << "  ";
+        printer.printInlineForThunk();
+        os << baseName << "(" << baseName
+           << " &&other) noexcept : "
+              "_storage(static_cast<";
+        printer.printSwiftImplQualifier();
+        os << cxx_synthesis::getCxxOpaqueStorageClassName()
+           << " &&>(other._storage)) {}\n";
+
+        os << "  ";
+        printer.printInlineForThunk();
+        os << baseName << " &operator =(" << baseName
+           << " &&other) noexcept {\n";
+        os << "    if (this == &other) return *this;\n";
+        os << "    if (_storage.isAllocated()) {\n";
+        printVWTable(os);
+        os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+        os << "    }\n";
+        os << "    _storage = static_cast<";
+        printer.printSwiftImplQualifier();
+        os << cxx_synthesis::getCxxOpaqueStorageClassName()
+           << " &&>(other._storage);\n";
+        os << "    return *this;\n";
+        os << "  }\n";
+      }
     }
 
     bodyPrinter();
@@ -403,41 +447,28 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
     os << "private:\n";
 
-    // Print out private default constructor.
+    // Construct uninitialized storage directly in the factory's local variable.
+    // Returning it from a separate factory could invoke a move before Swift has
+    // initialized the value when C++ copy elision is disabled.
     os << "  ";
     printer.printInlineForThunk();
     printer.printBaseName(typeDecl);
-    if (isOpaqueLayout) {
-      os << "(";
-      printer.printSwiftImplQualifier();
-      os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
-            "_storage(vwTable->size, "
-            "vwTable->getAlignment()) {}\n";
-    } else {
-      os << "() noexcept {}\n";
-    }
-    // Print out '_make' function which returns an unitialized instance for
-    // passing to Swift.
-    os << "  static ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " _make() noexcept {";
+    os << "() noexcept {";
     if (isOpaqueLayout) {
       os << "\n";
       printVWTable(os);
-      os << "    return ";
-      printer.printBaseName(typeDecl);
-      os << "(vwTable);\n  }\n";
+      os << "    _storage = ";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << "(vwTable->size, vwTable->getAlignment());\n  }\n";
     } else {
-      os << " return ";
-      printer.printBaseName(typeDecl);
-      os << "(); }\n";
+      os << "}\n";
     }
     // Print out the private accessors to the underlying Swift value storage.
     // Every use of a value by Swift goes through these, so they are where a
-    // moved-from noncopyable value, which holds no Swift value, is caught.
+    // moved-from value, which holds no Swift value, is caught.
     StringRef movedFromCheck =
-        isNoncopyable ? "if (_isMovedFrom) abort(); " : "";
+        isOpaqueLayout ? "" : "if (_isMovedFrom) abort(); ";
     os << "  ";
     printer.printInlineForThunk();
     os << "const char * _Nonnull _getOpaquePointer() const noexcept { "
@@ -490,7 +521,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
     // The moved-from flag has to come after the Swift value, so that the
     // address of this class stays the address of the value itself.
-    if (isNoncopyable)
+    if (!isOpaqueLayout)
       os << "  bool _isMovedFrom = false;\n";
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
@@ -538,10 +569,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << " returnNewValue(T callable) {\n";
-          os << "    auto result = ";
+          os << "    ";
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
-          os << "::_make();\n";
+          os << " result;\n";
           os << "    callable(result._getOpaquePointer());\n";
           os << "    return result;\n";
           os << "  }\n";

@@ -16,7 +16,7 @@
 int main() {
   using namespace Structs;
 
-  static_assert(sizeof(StructSeveralI64) == 40);
+  static_assert(sizeof(StructSeveralI64) == 40 + alignof(StructSeveralI64));
 
   printStructSeveralI64(returnNewStructSeveralI64(42));
 // CHECK: StructSeveralI64.1 = 42, .2 = 0, .3 = -17, .4 = 12345612, .5 = -65535

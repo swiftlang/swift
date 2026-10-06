@@ -83,8 +83,11 @@ public final class ExposedClass {
 // CHECK: class SWIFT_SYMBOL("{{.*}}") ExposedStruct final {
 // CHECK: class SWIFT_SYMBOL("{{.*}}") ExposedStruct2 final {
 // CHECK: SWIFT_INLINE_THUNK ExposedStruct2 &operator =(const ExposedStruct2 &other) noexcept {
-// CHECK: }
-// CHECK-NEXT: swift::Int getY() const noexcept SWIFT_SYMBOL("{{.*}}");
+// CHECK: return *this;
+// CHECK: vwTable->assignWithCopy
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
+// CHECK: swift::Int getY() const noexcept SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: void setY(swift::Int value) noexcept SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 init() noexcept SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 initWithValue(swift::Int x) noexcept SWIFT_SYMBOL("{{.*}}");

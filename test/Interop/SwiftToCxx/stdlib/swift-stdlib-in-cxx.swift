@@ -80,11 +80,11 @@
 // CHECK-NEXT: public:
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~String() noexcept {
 // CHECK:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String(const String &other) noexcept {
+// CHECK:  SWIFT_INLINE_THUNK String(const String &other) noexcept {
 // CHECK:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
+// CHECK:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
 // CHECK:  }
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() noexcept SWIFT_SYMBOL({{.*}});
+// CHECK:  static SWIFT_INLINE_THUNK String init() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK __StringNested::UTF8View getUtf8() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const __StringNested::UTF8View& newValue) noexcept SWIFT_SYMBOL({{.*}});
@@ -92,7 +92,7 @@
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
 // CHECK-NEXT:   }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init(NSString * _Nonnull nsString) noexcept {
-// CHECK-NEXT:  auto result = _make();
+// CHECK-NEXT:  String result;
 // CHECK-NEXT:  auto res = _impl::$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge void *)nsString);
 // CHECK-NEXT:  memcpy(result._getOpaquePointer(), &res, sizeof(res));
 // CHECK-NEXT:  return result;
@@ -120,7 +120,7 @@
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
 // CHECK: SWIFT_INLINE_THUNK UTF8View &operator =(const UTF8View &other) noexcept {
 // CHECK: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK __StringNested::Index getEndIndex() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Optional<__StringNested::Index> indexOffsetByLimitedBy(const __StringNested::Index& i, swift::Int n, const __StringNested::Index& limit) const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Int distanceFromTo(const __StringNested::Index& i, const __StringNested::Index& j) const noexcept SWIFT_SYMBOL({{.*}});

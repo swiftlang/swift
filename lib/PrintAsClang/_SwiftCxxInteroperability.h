@@ -183,16 +183,27 @@ public:
   }
 
   SWIFT_INLINE_THUNK void operator=(OpaqueStorage &&other) noexcept {
-    auto temp = storage;
+    if (this == &other)
+      return;
+    if (storage)
+      opaqueFree(static_cast<char *_Nonnull>(storage));
     storage = other.storage;
-    other.storage = temp;
+    other.storage = nullptr;
   }
   void operator=(const OpaqueStorage &) noexcept = delete;
 
+  SWIFT_INLINE_THUNK bool isAllocated() const noexcept {
+    return storage != nullptr;
+  }
+
   SWIFT_INLINE_THUNK char *_Nonnull getOpaquePointer() noexcept {
+    if (!storage)
+      abort();
     return static_cast<char *_Nonnull>(storage);
   }
   SWIFT_INLINE_THUNK const char *_Nonnull getOpaquePointer() const noexcept {
+    if (!storage)
+      abort();
     return static_cast<char *_Nonnull>(storage);
   }
 
@@ -301,15 +312,15 @@ static inline const constexpr bool isSwiftBridgedCxxRecord = false;
 /// Returns the opaque pointer to the given value.
 template <class T>
 SWIFT_INLINE_THUNK const void *_Nonnull getOpaquePointer(const T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<const void *>(&value);
 }
 
 template <class T>
 SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<void *>(&value);
 }
 
