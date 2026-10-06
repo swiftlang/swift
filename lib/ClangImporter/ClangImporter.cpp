@@ -6320,12 +6320,17 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
     return {body, /*isTypeChecked=*/true};
   }
 
-  SmallVector<Expr *, 8> forwardingParams;
+  SmallVector<Argument, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                              /*Implicit=*/true);
-    paramRefExpr->setType(param->getTypeInContext());
-    forwardingParams.push_back(paramRefExpr);
+    Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                               /*Implicit=*/true);
+    paramRefExpr->setType(param->isInOut()
+                              ? LValueType::get(param->getTypeInContext())
+                              : param->getTypeInContext());
+
+    forwardingParams.push_back(param->isInOut()
+                                   ? Argument::implicitInOut(ctx, paramRefExpr)
+                                   : Argument::unlabeled(paramRefExpr));
   }
 
   Argument selfArg = [&]() {
@@ -6350,7 +6355,7 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   baseMemberDotCallExpr->setType(baseMember->getMethodInterfaceType());
   baseMemberDotCallExpr->setThrows(nullptr);
 
-  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
+  auto *argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *baseMemberCallExpr = CallExpr::createImplicit(
       ctx, baseMemberDotCallExpr, argList);
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
