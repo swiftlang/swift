@@ -673,6 +673,10 @@ static bool usesFeatureDeinitableProtocol(Decl *decl) {
   if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
     return true;
 
+  // The printer never prints Sendable's inverses.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    return false;
+
   // Copyable inherits Deinitable, and a protocol may suppress it.
   InheritedTypes inherited(proto);
   return llvm::any_of(inherited.getIndices(), [&](unsigned i) {
@@ -823,8 +827,11 @@ static bool usesFeatureNondeinitableTypes(Decl *decl) {
   if (!ctx.LangOpts.hasFeature(Feature::NondeinitableTypes))
     return false;
 
-  // A struct or enum that suppresses Deinitable.
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+  // A struct or enum that suppresses Deinitable, or an extension of one.
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    nominal = ext->getExtendedNominal();
+  if (nominal) {
     InvertibleProtocolSet inverses;
     bool anyObject = false;
     (void)getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject);

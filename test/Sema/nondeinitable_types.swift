@@ -185,3 +185,21 @@ func locals() {
   let nd = ND()
   nd.finish()
 }
+
+// MARK: - Sendable
+
+// `Sendable` and `SendableMetatype` don't require `Deinitable`.
+struct ExplicitlySendable: ~Copyable, ~Deinitable, Sendable {}
+
+func requireSendable<T: ~Copyable & ~Deinitable & Sendable>(_ t: consuming T) -> T { t }
+func requireSendableMetatype<T: ~Copyable & ~Deinitable & SendableMetatype>(_: T.Type) {}
+
+func sendable(_ s: consuming ExplicitlySendable) -> ExplicitlySendable {
+  requireSendableMetatype(ND.self)
+  return requireSendable(s)
+}
+
+// A `~Deinitable` type is implicitly `Sendable` like any other.
+func implicitlySendable(_ nd: consuming ND) -> ND {
+  requireSendable(nd)
+}

@@ -65,6 +65,8 @@ public struct Box<T: ~Copyable & ~Deinitable>: ~Copyable, ~Deinitable {
   public var value: T
 }
 
-// `Sendable` doesn't suppress `Deinitable`, so a `~Deinitable` type can't
-// conform to it, and no implicit conformance is inferred.
-// CHECK-NOT: extension DeinitableLib::NC : Swift::Sendable
+// The implicit `Sendable` conformance of a `~Deinitable` type needs the
+// feature, too.
+// CHECK:      #if compiler(>=5.3) && $NondeinitableTypes
+// CHECK-NEXT: extension DeinitableLib::ND : Swift::Sendable {}
+// CHECK-NEXT: #endif
