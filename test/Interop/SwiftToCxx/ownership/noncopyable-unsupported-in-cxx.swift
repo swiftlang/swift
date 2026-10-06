@@ -1,5 +1,5 @@
 // The cases a noncopyable Swift type is not yet exposed to C++ in, and the
-// layouts that are boxed.
+// layouts that use opaque storage.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Unsup -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/unsup.h
@@ -30,7 +30,7 @@ public struct Box<T: ~Copyable>: ~Copyable {
 }
 
 // A 'Mirror' field is resilient, which leaves the layout opaque. The value is
-// boxed, so a moved-from object needs no flag.
+// stored in OpaqueStorage, so a moved-from object needs no separate flag.
 public struct OpaqueMO: ~Copyable {
     public var o: Mirror
     public init(o: Mirror) { self.o = o }
@@ -84,7 +84,7 @@ public struct FrozenMO: ~Copyable {
 
 // CHECK-DAG: class Box { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' generic struct 'Box' can not yet be represented in C++");
 // CHECK-DAG: class EnumWithMOPayload { } SWIFT_UNAVAILABLE_MSG("Swift enum 'EnumWithMOPayload' cannot be represented in C++");
-// CHECK-DAG: SWIFT_INLINE_THUNK OpaqueMO(OpaqueMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// CHECK-DAG: SWIFT_INLINE_THUNK OpaqueMO(OpaqueMO &&other) noexcept {
 // CHECK-DAG: SWIFT_INLINE_THUNK OpaqueMO makeOpaqueMO() noexcept
 // CHECK-DAG: // Unavailable in C++: Swift global function 'optMO()'. Return type 'MO?' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takeOptMO(_:)'. Parameter 'x' of type 'MO?' is not representable in C++.
@@ -95,12 +95,16 @@ public struct FrozenMO: ~Copyable {
 // CHECK-DAG: class EmptyMO { } SWIFT_UNAVAILABLE_MSG("'EmptyMO' is a zero sized value type, it cannot be exposed to C++ yet");
 // CHECK-DAG: class EmptyDeinitMO { } SWIFT_UNAVAILABLE_MSG("'EmptyDeinitMO' is a zero sized value type, it cannot be exposed to C++ yet");
 
-// Under library evolution a non-frozen type is boxed, including a zero sized
-// one, while a frozen one keeps its inline layout.
+// Under library evolution a non-frozen type uses opaque storage, including a
+// zero sized one, while a frozen one keeps its known inline layout.
 // EVO: class SWIFT_SYMBOL({{.*}}) EmptyMO final {
-// EVO: SWIFT_INLINE_THUNK EmptyMO(EmptyMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// EVO: SWIFT_INLINE_THUNK EmptyMO(EmptyMO &&other) noexcept {
+// EVO-NEXT: _storage.moveFrom(other._storage, [](char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// EVO: vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // EVO: class SWIFT_SYMBOL({{.*}}) FrozenMO final {
 // EVO: SWIFT_INLINE_THUNK FrozenMO(FrozenMO &&other) noexcept {
 // EVO: bool _isMovedFrom = false;
 // EVO: class SWIFT_SYMBOL({{.*}}) MO final {
-// EVO: SWIFT_INLINE_THUNK MO(MO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// EVO: SWIFT_INLINE_THUNK MO(MO &&other) noexcept {
+// EVO-NEXT: _storage.moveFrom(other._storage, [](char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// EVO: vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);

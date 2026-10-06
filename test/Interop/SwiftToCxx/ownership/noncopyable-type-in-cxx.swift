@@ -147,14 +147,18 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   bool _isMovedFrom = false;
 
-// A boxed value has no moved-from flag. A move transfers the box, and a
-// moved-from object has none.
+// An opaque value has no separate moved-from flag. Its storage tracks whether
+// it holds a live value, including when the value fits inline.
 // BOXED: class SWIFT_SYMBOL({{.*}}) MoveOnlyStruct final {
 // BOXED:   SWIFT_INLINE_THUNK ~MoveOnlyStruct() noexcept {
 // BOXED-NEXT:     if (!_storage.isAllocated()) return;
 // BOXED:   MoveOnlyStruct(const MoveOnlyStruct &) = delete;
 // BOXED-NEXT:   MoveOnlyStruct &operator =(const MoveOnlyStruct &) = delete;
-// BOXED-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct(MoveOnlyStruct &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// BOXED-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct(MoveOnlyStruct &&other) noexcept {
+// BOXED-NEXT:     _storage.moveFrom(other._storage, [](char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// BOXED:       vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
+// BOXED-NEXT:     });
+// BOXED-NEXT:   }
 // BOXED-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct &operator =(MoveOnlyStruct &&other) noexcept {
 // BOXED:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage.getOpaquePointer(); }
 // BOXED:   swift::_impl::OpaqueStorage _storage;
