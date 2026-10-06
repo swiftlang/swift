@@ -675,6 +675,50 @@ bb0:
   return %999 : $()
 }
 
+struct ClosureWrapper {
+  var f: () -> Builtin.Int64
+}
+
+sil [ossa] @closureCapturingKlass : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+
+// RLE replaced the loaded closure with a value hint. Through the hint chain the partial_apply
+// can be combined with the apply.
+// CHECK-LABEL: sil [ossa] @applied_partial_apply_via_value_hint :
+// CHECK:         [[F:%.*]] = function_ref @closureCapturingKlass
+// CHECK:         partial_apply [callee_guaranteed] [[F]]
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]](%0) : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'applied_partial_apply_via_value_hint'
+sil [ossa] @applied_partial_apply_via_value_hint : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %fn = function_ref @closureCapturingKlass : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %pa = partial_apply [callee_guaranteed] %fn(%0) : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %s = struct $ClosureWrapper (%pa)
+  %u = unchecked_ownership %s, forwarding: @none
+  %e = struct_extract %u, #ClosureWrapper.f
+  %a = alloc_stack $ClosureWrapper
+  store %s to [init] %a
+  %fa = struct_element_addr %a, #ClosureWrapper.f
+  br bb1
+
+bb1:
+  %l = load_borrow %fa, value_hint %e
+  %r = apply %l() : $@callee_guaranteed () -> Builtin.Int64
+  end_borrow %l
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_addr %a
+  dealloc_stack %a
+  %999 = tuple ()
+  return %999
+}
+
 // CHECK-LABEL: sil shared [ossa] @appliedEscapeToNoEscapeNonTrivial : $@convention(thin) (@owned Klass) -> () {
 // CHECK: [[F:%.*]] = function_ref @indirectClosure_non_trivial : $@convention(thin) (@in Klass) -> @out Klass
 // CHECK: apply [[F]](%{{.*}}, %{{.*}}) : $@convention(thin) (@in Klass) -> @out Klass
