@@ -617,8 +617,19 @@ bool SILFunction::isEmittedIntoClients() const {
     }
   }
 
-  // Other functions, such as witness thunks, can be reached from serialized
-  // witness tables, and clients need their bodies to specialize them.
+  // A protocol witness thunk is serialized along with its witness table, if
+  // clients can use the conformance.
+  if (isThunk() && getLoweredFunctionType()->getRepresentation() ==
+                       SILFunctionTypeRepresentation::WitnessMethod) {
+    auto conformance =
+        getLoweredFunctionType()->getWitnessMethodConformanceOrInvalid();
+    if (conformance.isConcrete())
+      return SILWitnessTable::isUsableByEmbeddedClients(
+          conformance.getConcrete()->getRootConformance());
+  }
+
+  // Other functions can be reached from serialized code, and clients need
+  // their bodies to specialize them.
   return true;
 }
 

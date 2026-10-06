@@ -198,6 +198,14 @@ SerializedKind_t SILWitnessTable::conformanceSerializedKind(
   return IsNotSerialized;
 }
 
+bool SILWitnessTable::isUsableByEmbeddedClients(
+    const RootProtocolConformance *conformance) {
+  return conformance->getProtocol()
+      ->getFormalAccessScope(/*useDC=*/nullptr,
+                             /*treatUsableFromInlineAsPublic=*/true)
+      .isPublic();
+}
+
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(
     const ProtocolConformance *conformance,
     llvm::function_ref<bool(unsigned, CanType, ProtocolDecl *)> fn) {

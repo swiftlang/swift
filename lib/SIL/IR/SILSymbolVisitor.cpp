@@ -257,7 +257,94 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     }
   }
 
+  /// The witnesses listed by \c addEmbeddedSerializedWitnesses.
+  llvm::DenseSet<SILDeclRef> EmbeddedSerializedWitnesses;
+
+  bool isEmbedded() const {
+    return Ctx.getModule()->getASTContext().LangOpts.hasFeature(
+        Feature::Embedded);
+  }
+
+  /// In Embedded Swift, cross-module optimization serializes the witness
+  /// tables of conformances that clients can use, along with their witness
+  /// thunks, which refer to the witnesses by symbol. Clients emit their own
+  /// copies of witnesses without a unique definition, but the others are
+  /// symbols of this module, whatever their access level.
+  void addEmbeddedSerializedWitnesses(const IterableDeclContext *IDC) {
+    if (!isEmbedded())
+      return;
+
+    for (auto conformance :
+         IDC->getLocalConformances(ConformanceLookupKind::NonInherited)) {
+      auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+      if (!rootConformance ||
+          !Lowering::TypeConverter::protocolRequiresWitnessTable(
+              rootConformance->getProtocol()) ||
+          !SILWitnessTable::isUsableByEmbeddedClients(rootConformance))
+        continue;
+
+      auto addWitness = [&](ValueDecl *witnessDecl) {
+        if (!witnessDecl)
+          return;
+
+        // Witnesses with public linkage are listed with their declarations.
+        SILDeclRef witnessRef(witnessDecl);
+        auto linkage =
+            effectiveLinkageForClassMember(witnessRef.getLinkage(ForDefinition),
+                                           witnessRef.getSubclassScope());
+        if (!shouldSkipVisit(linkage))
+          return;
+
+        // A declaration can witness requirements of several conformances.
+        if (!EmbeddedSerializedWitnesses.insert(witnessRef).second)
+          return;
+
+        addFunction(witnessRef, /*ignoreLinkage=*/true);
+      };
+
+      rootConformance->forEachValueWitness(
+          [&](ValueDecl *valueReq, Witness witness) {
+            auto witnessDecl = witness.getDecl();
+            if (!witnessDecl)
+              return;
+
+            if (isa<AbstractFunctionDecl>(valueReq)) {
+              addWitness(witnessDecl);
+            } else if (auto *storage =
+                           dyn_cast<AbstractStorageDecl>(valueReq)) {
+              if (auto witnessStorage =
+                      dyn_cast<AbstractStorageDecl>(witnessDecl)) {
+                storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
+                  addWitness(witnessStorage->getSynthesizedAccessor(
+                      reqtAccessor->getAccessorKind()));
+                });
+              } else if (isa<EnumElementDecl>(witnessDecl)) {
+                addWitness(witnessDecl);
+              }
+            }
+          },
+          /*useResolver=*/true);
+    }
+  }
+
+  /// In Embedded Swift, find the serialized witnesses of conformances in a
+  /// context whose own symbols aren't listed.
+  void addEmbeddedSerializedWitnessesInHiddenContext(
+      const IterableDeclContext *IDC) {
+    if (!isEmbedded())
+      return;
+
+    addEmbeddedSerializedWitnesses(IDC);
+    for (auto *member : IDC->getMembers()) {
+      auto *nested = dyn_cast<NominalTypeDecl>(member);
+      if (nested && !isa<ProtocolDecl>(nested))
+        addEmbeddedSerializedWitnessesInHiddenContext(nested);
+    }
+  }
+
   void addConformances(const IterableDeclContext *IDC) {
+    addEmbeddedSerializedWitnesses(IDC);
+
     for (auto conformance :
          IDC->getLocalConformances(ConformanceLookupKind::NonInherited)) {
       auto protocol = conformance->getProtocol();
@@ -663,8 +750,10 @@ public:
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if (canSkipNominal(NTD))
+    if (canSkipNominal(NTD)) {
+      addEmbeddedSerializedWitnessesInHiddenContext(NTD);
       return;
+    }
 
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
@@ -692,8 +781,11 @@ public:
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    if (!addClassMetadata(CD))
+    if (!addClassMetadata(CD)) {
+      if (canSkipNominal(CD))
+        addEmbeddedSerializedWitnessesInHiddenContext(CD);
       return;
+    }
 
     // Emit dispatch thunks for every new vtable entry.
     struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -787,8 +879,11 @@ public:
     if (!nominal)
       return;
 
-    if (canSkipNominal(nominal))
+    if (canSkipNominal(nominal)) {
+      if (!isa<ProtocolDecl>(nominal))
+        addEmbeddedSerializedWitnessesInHiddenContext(ED);
       return;
+    }
 
     if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
       // @_objcImplementation extensions generate the class metadata symbols.

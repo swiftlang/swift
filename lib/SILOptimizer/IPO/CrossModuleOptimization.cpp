@@ -71,6 +71,10 @@ class CrossModuleOptimization {
   typedef llvm::DenseMap<SILFunction *, bool> FunctionFlags;
   FunctionFlags canSerializeFlags;
 
+  /// In Embedded Swift, the functions that were already serialized, such as
+  /// witness thunks, whose callees have been visited.
+  llvm::DenseSet<SILFunction *> visitedSerializedFunctions;
+
 public:
   CrossModuleOptimization(SILModule &M, bool conservative, bool everything)
       : M(M), conservative(conservative), everything(everything) {}
@@ -467,6 +471,11 @@ bool CrossModuleOptimization::isEmittedIntoClients(SILFunction *function) {
   if (function->isGlobalInitOnceFunction())
     return false;
 
+  // Clients create their own specializations from the serialized generic
+  // code. A specialization is only serialized if serialized code refers to it.
+  if (function->isSpecialization())
+    return false;
+
   return function->isEmittedIntoClients();
 }
 
@@ -505,6 +514,12 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
       continue;
 
     if (!hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true) && !everything)
+      continue;
+
+    // In Embedded Swift, clients only need the witness tables of conformances
+    // they can use.
+    if (isEmbedded() && !SILWitnessTable::isUsableByEmbeddedClients(
+                            wt.getConformance()->getRootConformance()))
       continue;
 
     bool containsInternal = false;
@@ -1042,8 +1057,20 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(
     SILFunction *function, FunctionFlags &canSerializeFlags) {
-  if (isSerializedWithRightKind(M, function))
+  if (isSerializedWithRightKind(M, function)) {
+    // In Embedded Swift, a function that was serialized before this pass,
+    // such as a witness thunk, can refer to functions that the optimizer
+    // created since, such as specializations. Those have to be serialized
+    // too.
+    if (everything && isEmbedded() &&
+        visitedSerializedFunctions.insert(function).second) {
+      for (SILBasicBlock &block : *function) {
+        for (SILInstruction &inst : block)
+          serializeInstruction(&inst, canSerializeFlags);
+      }
+    }
     return;
+  }
 
   if (!canSerializeFlags.lookup(function))
     return;
