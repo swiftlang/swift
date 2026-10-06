@@ -27,6 +27,7 @@ class DiagnosticConsumer;
 
 namespace sarif_diagnostics {
 
+#if SWIFT_BUILD_SARIF
 /// Create a DiagnosticConsumer that serializes diagnostics to a file in SARIF
 /// format.
 ///
@@ -35,6 +36,7 @@ namespace sarif_diagnostics {
 /// \returns A new diagnostic consumer that serializes diagnostics.
 std::unique_ptr<DiagnosticConsumer>
 createConsumer(StringRef outputPath, bool emitMacroExpansionFiles);
+#endif
 
 } // namespace sarif_diagnostics
 } // namespace swift

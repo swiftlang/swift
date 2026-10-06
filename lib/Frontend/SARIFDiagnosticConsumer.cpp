@@ -131,8 +131,6 @@ public:
 
 } // end anonymous namespace
 
-#endif // SWIFT_BUILD_SARIF
-
 std::unique_ptr<DiagnosticConsumer>
 sarif_diagnostics::createConsumer(StringRef outputPath,
                                   bool emitMacroExpansionFiles) {
@@ -141,13 +139,7 @@ sarif_diagnostics::createConsumer(StringRef outputPath,
   // buffers yet.
   (void)emitMacroExpansionFiles;
 
-#if SWIFT_BUILD_SARIF
   return std::make_unique<SARIFDiagnosticConsumer>(outputPath);
-#else
-  // '-serialize-diagnostics=sarif' is rejected while parsing arguments in this
-  // configuration, so the SARIF format is never selected and nothing asks for
-  // this consumer.
-  (void)outputPath;
-  llvm_unreachable("SARIF diagnostics requested from a build without SARIF");
-#endif
 }
+
+#endif // SWIFT_BUILD_SARIF

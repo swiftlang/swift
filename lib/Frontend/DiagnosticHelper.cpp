@@ -17,6 +17,7 @@
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
@@ -173,9 +174,14 @@ static std::unique_ptr<DiagnosticConsumer> createDiagnosticConsumerIfNeeded(
           createConsumer = serialized_diagnostics::createConsumer;
           break;
         case DiagnosticOptions::SerializedFormat::SARIF:
+#if SWIFT_BUILD_SARIF
           path = input.getSARIFDiagnosticsPath();
           createConsumer = sarif_diagnostics::createConsumer;
           break;
+#else
+          ABORT("'-serialize-diagnostics=sarif' is rejected while parsing "
+                "arguments in a build without SARIF support");
+#endif
         }
 
         if (path.empty())
