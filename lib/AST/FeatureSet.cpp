@@ -509,6 +509,7 @@ UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
 UNINTERESTING_FEATURE(EmbeddedDistributed)
+UNINTERESTING_FEATURE(TargetFeaturePredicate)
 
 // FIXME: Detect `_scope` and `@_scoped()`.
 static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
