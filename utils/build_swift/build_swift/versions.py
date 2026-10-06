@@ -71,8 +71,7 @@ def _get_component_type(component):
         elif component.islower():
             return _ComponentType.ALPHA_LOWER
         else:
-            raise ValueError('Unknown component type for {!r}'.format(
-                component))
+            raise ValueError(f'Unknown component type for {component!r}')
 
     return _ComponentType.OTHER
 
@@ -157,7 +156,7 @@ class InvalidVersionError(Exception):
         self.version = version
 
         if msg is None:
-            msg = 'Invalid version: {}'.format(self.version)
+            msg = f'Invalid version: {self.version}'
 
         super(InvalidVersionError, self).__init__(msg)
 
@@ -199,4 +198,4 @@ class Version(object):
         return self._str
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self._str)
+        return f'{type(self).__name__}({self._str!r})'
