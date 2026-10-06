@@ -1461,6 +1461,14 @@ static bool hasLessAccessibleSetter(const AbstractStorageDecl *ASD) {
   return ASD->getSetterFormalAccess() < ASD->getFormalAccess();
 }
 
+/// Whether \c PrintOptions::SetterAccessFilter hides the setter of \p ASD.
+/// Only setters that are less accessible than their storage can be hidden.
+static bool isSetterFilteredOut(const AbstractStorageDecl *ASD,
+                                const PrintOptions &Options) {
+  return Options.SetterAccessFilter && hasLessAccessibleSetter(ASD) &&
+         ASD->getSetterFormalAccess() < *Options.SetterAccessFilter;
+}
+
 bool canPrintSyntheticSILGenName(const Decl *D) {
   ASSERT(!D->getAttrs().hasAttribute<SILGenNameAttr>());
 
@@ -2829,7 +2837,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     }
     // ...or you're private/internal(set), at which point we'll print
     //    @_hasStorage var x: T { get }
-    else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
+    //    unless SetterAccessFilter allows the setter.
+    else if (ASD->isSettable(nullptr) &&
+             (Options.SetterAccessFilter ? isSetterFilteredOut(ASD, Options)
+                                         : hasLessAccessibleSetter(ASD))) {
       Printer << " {";
       printDisambiguationMarkerIfNeeded();
       if (PrintAbstract) {
@@ -2863,7 +2874,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if ((inProtocol && !Options.PrintAccessorBodiesInProtocols) ||
       PrintAbstract) {
-    bool settable = ASD->isSettable(nullptr);
+    bool settable =
+        ASD->isSettable(nullptr) && !isSetterFilteredOut(ASD, Options);
     bool mutatingGetter = hasMutatingGetter(ASD);
     bool nonmutatingSetter = hasNonMutatingSetter(ASD);
 
