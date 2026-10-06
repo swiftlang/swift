@@ -1995,7 +1995,8 @@ void IRGenModule::addLinkLibraries() {
     bool hasStaticCxxStdlib = false;
     if (const auto *M = Context.getModuleByName(CXX_MODULE_NAME))
       hasStaticCxx = M->isStaticLibrary();
-    if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
+    if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32 &&
+        !Context.LangOpts.hasFeature(Feature::Embedded))
       if (const auto *M = Context.getModuleByName("CxxStdlib"))
         hasStaticCxxStdlib = M->isStaticLibrary();
     dependencies::registerCxxInteropLibraries(Context.LangOpts.Target,
