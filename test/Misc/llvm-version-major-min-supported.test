@@ -1,0 +1,8 @@
+# This test is designed to fail when SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR is
+# bumped and serves as an extra reminder to audit any uses of the below
+# identifier before bumping it (sorry). Once you are done, please also bump the
+# condition here to match the new minimum.
+#
+UNSUPPORTED: LLVM_VERSION_MAJOR_AT_LEAST_23
+
+RUN: false

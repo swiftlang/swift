@@ -157,7 +157,7 @@ function(add_swift_compiler_modules_library name)
 
   # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
   # need it.
-  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS})
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_CONDITIONS})
     list(APPEND swift_compile_options "-D${condition}")
   endforeach()
 
