@@ -46,6 +46,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 
+#include "GenCall.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenRecord.h"
@@ -2083,4 +2084,18 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);
   return builder.layout(fields);
+}
+
+const LoadableTypeInfo *irgen::getAsLoadableCXXRecord(IRGenModule &IGM,
+                                                      SILType silType) {
+  auto *structDecl = silType.getStructOrBoundGenericStruct();
+  if (!structDecl ||
+      !isa_and_nonnull<clang::CXXRecordDecl>(structDecl->getClangDecl()))
+    return nullptr;
+
+  auto &type = IGM.getTypeInfo(silType);
+  if (getStructTypeInfoKind(type) !=
+      StructTypeInfoKind::LoadableClangRecordTypeInfo)
+    return nullptr;
+  return &cast<LoadableTypeInfo>(type);
 }
