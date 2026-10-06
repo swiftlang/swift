@@ -11,7 +11,7 @@
 // RUN:   -I %S/Inputs \
 // RUN:   -clang-header-expose-decls=all-public \
 // RUN:   -emit-clang-header-path %t/imported.h
-// RUN: %FileCheck --implicit-check-not=_isMovedFrom %s < %t/imported.h
+// RUN: %FileCheck --implicit-check-not=_impl_CxxMoveOnly %s < %t/imported.h
 // RUN: %FileCheck --check-prefix=PAYLOAD %s < %t/imported.h
 
 // RUN: echo '#include "cxx-move-only.h"' > %t/combined.h

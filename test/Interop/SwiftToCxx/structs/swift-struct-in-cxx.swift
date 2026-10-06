@@ -35,10 +35,20 @@
 // CHECK:      class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithIntField() noexcept {
+// CHECK-NEXT: if (_isMovedFrom) return;
 // CHECK:        }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField(const StructWithIntField &other) noexcept {
+// CHECK:   SWIFT_INLINE_THUNK StructWithIntField(const StructWithIntField &other) noexcept {
+// CHECK-NEXT: if (other._isMovedFrom) {
+// CHECK-NEXT: _isMovedFrom = true;
+// CHECK-NEXT: return;
+// CHECK-NEXT: }
 // CHECK:        }
 // CHECK:        SWIFT_INLINE_THUNK StructWithIntField &operator =(const StructWithIntField &other) noexcept {
+// CHECK-NEXT: if (this == &other) return *this;
+// CHECK-NEXT: if (_isMovedFrom || other._isMovedFrom) {
+// CHECK-NEXT: *this = StructWithIntField(other);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs18StructWithIntFieldVMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT:   #ifdef __arm64e__
@@ -51,11 +61,11 @@
 // CHECK-NEXT:  }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept {}
-// CHECK-NEXT:   static SWIFT_INLINE_THUNK StructWithIntField _make() noexcept { return StructWithIntField(); }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage; }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { return _storage; }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { if (_isMovedFrom) abort(); return _storage; }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { if (_isMovedFrom) abort(); return _storage; }
 // CHECK-EMPTY:
 // CHECK-NEXT:   alignas(8) char _storage[8];
+// CHECK-NEXT: bool _isMovedFrom = false;
 // CHECK-NEXT:   friend class _impl::_impl_StructWithIntField;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
@@ -75,7 +85,7 @@
 // CHECK-NEXT: static SWIFT_INLINE_THUNK const char * _Nonnull getOpaquePointer(const StructWithIntField &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT: template<class T>
 // CHECK-NEXT: static SWIFT_INLINE_PRIVATE_HELPER StructWithIntField returnNewValue(T callable) {
-// CHECK-NEXT:   auto result = StructWithIntField::_make();
+// CHECK-NEXT:   StructWithIntField result;
 // CHECK-NEXT:   callable(result._getOpaquePointer());
 // CHECK-NEXT:   return result;
 // CHECK-NEXT:  }
@@ -122,6 +132,7 @@ public struct StructWithIntField {
 // Special name gets renamed in C++.
 // CHECK: class SWIFT_SYMBOL({{.*}}) register_ final {
 // CHECK: alignas(8) char _storage[16];
+// CHECK-NEXT: bool _isMovedFrom = false;
 // CHECK-NEXT:   friend class
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"

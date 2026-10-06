@@ -549,6 +549,9 @@ EXPERIMENTAL_FEATURE(CxxImplementation, true)
 /// Expose noncopyable Swift structs and enums to C++ as move-only C++ classes.
 EXPERIMENTAL_FEATURE(GenerateBindingsForNoncopyableTypesInCXX, true)
 
+/// Pass copyable values consumed by Swift by value in generated C++ bindings.
+EXPERIMENTAL_FEATURE(GenerateConsumingValueParametersInCXX, true)
+
 /// Allow a Swift class to subclass a C++ foreign reference type.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 

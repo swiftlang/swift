@@ -28,6 +28,7 @@ public func printBreak(_ x: Int) {
 // CHECK:      class SWIFT_SYMBOL({{.*}}) StructWithRefcountedMember final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithRefcountedMember() noexcept {
+// CHECK-NEXT: if (_isMovedFrom) return;
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -37,7 +38,11 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->destroy(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember(const StructWithRefcountedMember &other) noexcept {
+// CHECK:   SWIFT_INLINE_THUNK StructWithRefcountedMember(const StructWithRefcountedMember &other) noexcept {
+// CHECK-NEXT: if (other._isMovedFrom) {
+// CHECK-NEXT: _isMovedFrom = true;
+// CHECK-NEXT: return;
+// CHECK-NEXT: }
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -48,6 +53,11 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT:     vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember &operator =(const StructWithRefcountedMember &other) noexcept {
+// CHECK-NEXT: if (this == &other) return *this;
+// CHECK-NEXT: if (_isMovedFrom || other._isMovedFrom) {
+// CHECK-NEXT: *this = StructWithRefcountedMember(other);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT:   #ifdef __arm64e__

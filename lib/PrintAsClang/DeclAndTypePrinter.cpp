@@ -730,10 +730,10 @@ private:
             [&](auto &types) {
               auto *ED = elementDecl->getParentEnum();
               // Printing function body
-              outOfLineOS << "    auto result = ";
-              outOfLineSyntaxPrinter.printNominalTypeQualifier(
+              outOfLineOS << "    ";
+              outOfLineSyntaxPrinter.printNominalTypeReference(
                   ED, ED->getModuleContext());
-              outOfLineOS << "_make();\n";
+              outOfLineOS << " result;\n";
               if (paramType) {
                 if (paramType->getAs<GenericTypeParamType>()) {
                   auto type = types[paramType];
