@@ -1808,7 +1808,11 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
                                                 /*SkipFunctionBodies=*/false));
 
   clangPP.EnterMainSourceFile();
+#if LLVM_VERSION_MAJOR >= 24
+  importer->Impl.Parser->Initialize();
+#else
   importer->Impl.Parser->ConsumeToken();
+#endif
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
