@@ -1476,6 +1476,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
       resolveImportedModuleDependencies(batchOverlayQueryModuleID);
   // Remove the dummy module
   allNewModules.remove(batchOverlayQueryModuleID);
+  DependencyCache.removeDependency(batchOverlayQueryModuleID);
 
   allDiscoveredDependencies.insert(allNewModules.begin(), allNewModules.end());
 }
@@ -1891,6 +1892,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   // Update main module's dependencies to include these new overlays.
   DependencyCache.setCrossImportOverlayDependencies(
       mainModuleID, DependencyCache.getAllDependencies(queryModuleID));
+  DependencyCache.removeDependency(queryModuleID);
 
   // Report any discovered modules to the clients, which include all overlays
   // and their dependencies.
