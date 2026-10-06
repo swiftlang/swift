@@ -105,6 +105,7 @@
 // CHECK-NEXT:    var val: CInt
 // CHECK-NEXT:    func Get_X() -> CInt
 // CHECK-NEXT:    mutating func Set_X(_ v: CInt)
+// CHECK-NEXT:    var X: CInt
 // CHECK-NEXT: }
 
 // CHECK:      struct IntGetterSetterSnakeCase {
