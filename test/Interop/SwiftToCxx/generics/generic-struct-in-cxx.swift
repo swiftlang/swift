@@ -127,6 +127,9 @@ public struct GenericPair<T, T2> {
             x = newValue
         }
     }
+
+    // Metadata caching must not reserve a member name in this wrapper.
+    public func _getTypeMetadata() -> Int { return 42 }
 }
 
 public func makeGenericPair<T, T1>(_ x: T, _ y: T1) -> GenericPair<T, T1> {
@@ -172,6 +175,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8Generics11GenericPairV12computedPropSivg(void * _Nonnull , SWIFT_CONTEXT const void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV11computedVarxvg(SWIFT_INDIRECT_RESULT void * _Nonnull, void * _Nonnull , SWIFT_CONTEXT const void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV11computedVarxvs(const void * _Nonnull newValue, void * _Nonnull , SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
+// CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8Generics11GenericPairV16_getTypeMetadataSiyF(void * _Nonnull , SWIFT_CONTEXT const void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _getTypeMetadata()
 
 // CHECK: SWIFT_EXTERN void $s8Generics17inoutConcretePairyys6UInt16V_AA07GenericD0VyA2DGztF(uint16_t x, void * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inoutConcretePair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // inoutGenericPair(_:_:)
@@ -235,7 +239,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   SWIFT_INLINE_THUNK ~GenericPair() noexcept {
-// CHECK-NEXT:     auto metadata = _impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
+// CHECK-NEXT:     auto metadata = swift::_impl::MetadataResponseTy{swift::_impl::TypeMetadataCache<::Generics::GenericPair<T_0_0, T_0_1>>::get([] { return _impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata())._0; }), 0};
 
 // CHECK: swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
@@ -278,7 +282,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #endif
 // CHECK-NEXT: struct TypeMetadataTrait<Generics::GenericPair<T_0_0, T_0_1>> {
 // CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return Generics::_impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata())._0;
+// CHECK-NEXT:     return swift::_impl::TypeMetadataCache<::Generics::GenericPair<T_0_0, T_0_1>>::get([] { return Generics::_impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata())._0; });
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
