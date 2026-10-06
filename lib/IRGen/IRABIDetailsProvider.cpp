@@ -381,7 +381,12 @@ std::optional<LoweredFunctionSignature::DirectResultType>
 LoweredFunctionSignature::getDirectResultType() const {
   if (!abiDetails.directResult)
     return std::nullopt;
-  return DirectResultType(owner, abiDetails.directResult->typeInfo);
+  // A result with an empty native representation, like `Never` or an empty C++
+  // record, is not returned in the LLVM IR signature.
+  const auto &typeInfo = abiDetails.directResult->typeInfo.get();
+  if (typeInfo.nativeReturnValueSchema(owner.IGM).empty())
+    return std::nullopt;
+  return DirectResultType(owner, typeInfo);
 }
 
 size_t LoweredFunctionSignature::getNumIndirectResultValues() const {

@@ -732,12 +732,6 @@ static bool printDirectReturnOrParamCType(
                                    emittedModule->getASTContext());
       }))
     return false;
-  if (isResultType && Count == 0) {
-    // A direct result with no record members can happen for uninhabited result
-    // types like `Never`.
-    os << "void";
-    return true;
-  }
   assert(Count > 0 && "missing return values");
 
   // FIXME: is this "prettyfying" logic sound for multiple return values?
@@ -1648,6 +1642,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
              << resultPointerName << ", ";
           printCallToCFunc(std::nullopt);
           os << ')';
+        } else if (signature.getNumIndirectResultValues() == 0) {
+          // The result has an empty native representation, like an empty C++
+          // record, so Swift doesn't write anything into the result storage.
+          os << "(void)" << resultPointerName << ";\n";
+          printCallToCFunc(std::nullopt);
         } else {
           printCallToCFunc(/*firstParam=*/resultPointerName);
         }
