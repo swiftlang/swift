@@ -7631,8 +7631,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // them. If they
   //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is
   //  converted.
+  //
+  // Also check the fixed types: a type variable can be bound to a tuple with
+  // an unresolved pack expansion, for example when matching the root and value
+  // of an identity key path to its contextual type.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
-      isTupleWithUnresolvedPackExpansion(origType2)) {
+      isTupleWithUnresolvedPackExpansion(origType2) ||
+      isTupleWithUnresolvedPackExpansion(type1) ||
+      isTupleWithUnresolvedPackExpansion(type2)) {
     auto isTypeVariableWrappedInOptional = [](Type type) {
       if (type->getOptionalObjectType()) {
         return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
