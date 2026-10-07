@@ -2087,7 +2087,12 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                                  const FrontendOptions &FrontendOpts) {
   using namespace options;
 
-  Opts.IsEmittingTBD = FrontendOpts.InputsAndOutputs.hasTBDPath();
+  Opts.RequiresPredictableTBD =
+      FrontendOpts.InputsAndOutputs.hasTBDPath() ||
+      FrontendOpts.ValidateTBDAgainstIR ==
+          FrontendOptions::TBDValidationMode::MissingFromTBD ||
+      FrontendOpts.ValidateTBDAgainstIR ==
+          FrontendOptions::TBDValidationMode::All;
 
   bool HadError = false;
   auto setUnsignedIntegerArgument =
@@ -3704,6 +3709,15 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
 
+  // Under the "inlinable" code generation model of Embedded Swift, which
+  // symbols get strong definitions depends on how they are used, so neither
+  // emitting a TBD file nor validating one against the IR is supported.
+  const auto &langOpts = Invocation.getLangOptions();
+  bool isInlinableEmbedded =
+      langOpts.hasFeature(Feature::Embedded) &&
+      langOpts.CodeGenerationModelOverride.value_or(
+          CodeGenerationModel::Inlinable) == CodeGenerationModel::Inlinable;
+
   if (Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath()) {
     // A TBD file would describe symbols that the object file doesn't have.
     if (Args.hasArg(OPT_emit_empty_object_file)) {
@@ -3712,15 +3726,36 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
       return true;
     }
 
-    // Under the "inlinable" code generation model of Embedded Swift, which
-    // symbols get strong definitions depends on how they are used.
-    const auto &langOpts = Invocation.getLangOptions();
-    if (langOpts.hasFeature(Feature::Embedded) &&
-        langOpts.CodeGenerationModelOverride.value_or(
-            CodeGenerationModel::Inlinable) == CodeGenerationModel::Inlinable) {
+    if (isInlinableEmbedded) {
       Diags.diagnose(SourceLoc(),
-                     diag::tbd_not_supported_with_inlinable_code_generation);
+                     diag::tbd_not_supported_with_inlinable_code_generation,
+                     /*validating=*/false);
       return true;
+    }
+  }
+
+  // Embedded Swift only validates the TBD against the IR when a TBD file is
+  // emitted or validation is explicitly requested. Then, diagnostics that keep
+  // the exported symbols predictable are errors, so the TBD can be exact.
+  if (langOpts.hasFeature(Feature::Embedded)) {
+    auto &frontendOpts = Invocation.getFrontendOptions();
+    auto &validationMode = frontendOpts.ValidateTBDAgainstIR;
+    switch (validationMode) {
+    case FrontendOptions::TBDValidationMode::None:
+      break;
+    case FrontendOptions::TBDValidationMode::Default:
+      if (isInlinableEmbedded || !frontendOpts.InputsAndOutputs.hasTBDPath())
+        validationMode = FrontendOptions::TBDValidationMode::None;
+      break;
+    case FrontendOptions::TBDValidationMode::MissingFromTBD:
+    case FrontendOptions::TBDValidationMode::All:
+      if (isInlinableEmbedded) {
+        Diags.diagnose(SourceLoc(),
+                       diag::tbd_not_supported_with_inlinable_code_generation,
+                       /*validating=*/true);
+        return true;
+      }
+      break;
     }
   }
 

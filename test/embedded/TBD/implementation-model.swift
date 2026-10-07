@@ -12,6 +12,10 @@
 
 // RUN: %target-swift-frontend -c -emit-module -o %t/Lib.o %t/Lib.swift -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation
 // RUN: %target-swift-frontend -c -I %t -o %t/Client.o %t/Client.swift -parse-as-library -module-name Client -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation
+
+// A program's entry point is unique, even though its '@main' type isn't.
+// RUN: %target-swift-frontend -emit-ir -o /dev/null -I %t %t/Client.swift -parse-as-library -module-name Client -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -emit-tbd-path %t/Client.tbd -tbd-install_name Client -validate-tbd-against-ir=all
+// RUN: %FileCheck -check-prefix CLIENT-TBD %s < %t/Client.tbd
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Lib.o %t/Client.o -o %t/Client
 // RUN: %target-run %t/Client | %FileCheck -check-prefix OUTPUT %s
 
@@ -47,6 +51,8 @@ struct Main {
     print(publicInterface())
   }
 }
+
+// CLIENT-TBD: "_main"
 
 // OUTPUT: 49
 // OUTPUT-NEXT: 41

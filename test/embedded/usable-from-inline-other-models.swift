@@ -2,13 +2,14 @@
 // copies of almost all code, including internal declarations. An explicit
 // '@export(interface)' declaration has a unique definition, though, so code
 // that clients emit can only refer to it if it's public or
-// '@usableFromInline'. That's an error when emitting a TBD file, and a warning
-// otherwise.
+// '@usableFromInline'. That's an error when emitting a TBD file or validating
+// one against the IR, and a warning otherwise.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix warn- -parse-as-library -module-name Lib -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix warn- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix tbd- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -emit-tbd-path %t/Lib.tbd -tbd-install_name Lib
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix tbd- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -validate-tbd-against-ir=all
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: VENDOR=apple

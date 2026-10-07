@@ -2,12 +2,17 @@
 // of generic code, but refer to everything else by symbol. So, as with
 // '@inlinable', code that clients emit can only refer to declarations with a
 // unique definition that are public or '@usableFromInline'. That's an error
-// when emitting a TBD file, which lists exactly those symbols, and a warning
-// otherwise.
+// when emitting a TBD file, which lists exactly those symbols, or validating
+// one against the IR, and a warning otherwise.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix tbd- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface -emit-tbd-path %t/Lib.tbd -tbd-install_name Lib
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix tbd- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface -validate-tbd-against-ir=missing
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix warn- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface
+
+// Without a TBD file or explicit validation, the TBD isn't validated, even in
+// a compiler with assertions.
+// RUN: %target-swift-frontend -emit-ir -o /dev/null %s -verify -verify-additional-prefix warn- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface
 
 // Other code generation models copy internal declarations into clients too.
 // RUN: %target-swift-frontend -typecheck %s -verify -parse-as-library -module-name Lib -enable-experimental-feature Embedded

@@ -167,7 +167,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     if (!clientEmittedDecl || isAccessedWithoutSymbol(D))
       return false;
 
-    bool isError = Context.TypeCheckerOpts.IsEmittingTBD;
+    bool isError = Context.TypeCheckerOpts.RequiresPredictableTBD;
     Context.Diags
         .diagnose(loc, diag::embedded_interface_decl_not_usable_from_inline, D,
                   declAccessScope.accessLevelForDiagnostics(),

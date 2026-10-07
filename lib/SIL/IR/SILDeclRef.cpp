@@ -1242,6 +1242,10 @@ bool SILDeclRef::isBackDeployed() const {
 }
 
 bool SILDeclRef::hasNonUniqueDefinition() const {
+  // A program's entry point is unique, whatever the model of its '@main' type.
+  if (kind == Kind::EntryPoint || kind == Kind::AsyncEntryPoint)
+    return false;
+
   if (auto decl = getDecl()) {
     // Default argument generators are always @export(implementation), so
     // each client that uses one emits its own copy.
