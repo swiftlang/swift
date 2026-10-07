@@ -1,36 +1,35 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb %s > %t/main.swift
+// RUN: %timer-scale-test --begin 10000 --end 20000 --superlinear-threshold 1.5 --save-temps --ignore-no-data --trace --select SIL-and-LLVM-processing.instr -O %s
 
-// rdar://175803465 (Large InlineArray compilation takes forever)
-// UNSUPPORTED: OS=linux-gnu || OS=freebsd
+// UNSUPPORTED: OS=freebsd
 
-// The compiler should finish in less than 15 seconds. To give some slack,
-// specify a timeout of 1 minute.
-// If the compiler needs more than 1 minute, there is probably a real problem.
-// So please don't just increase the timeout in case this fails.
+// Regression test for rdar://175803465 (Large InlineArray compilation takes forever)
+
+// Check if the optimizer can optimize the whole array into a statically
+// initialized global.
 
 // We emit assembly rather than SIL because the bottleneck in rdar://175803465
 // was LLVM machine code generation.
 
-// RUN: %{python} %S/../../test/Inputs/timeout.py 60 %target-swift-frontend -O -parse-as-library -disable-availability-checking -S %t/main.swift | %FileCheck %s
+// RUN: %gyb -D N=10000 %s > %t/main.swift
 
-// There is a separate test for an assert-enabled stdlib
+// RUN: %target-swift-frontend -O -parse-as-library -disable-availability-checking -S %t/main.swift | %FileCheck %s
+
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
-// REQUIRES: long_test
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
 
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
 
-// CHECK: $s4main3arrs11InlineArrayVy$99999_SiGvp:
+// CHECK: $s4main3arrs11InlineArrayVy$9999_SiGvp:
 // CHECK-NEXT: 8
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
 
-public let arr: InlineArray<100000, Int> = [
+public let arr: [_ of Int] = [
 
-% for i in range(100000):
+% for i in range(int(N)):
   ${i},
 %end
 
