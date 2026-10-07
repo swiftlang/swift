@@ -7173,13 +7173,18 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
 
   ASTContext &ctx = func->getASTContext();
 
-  // When the explicit C++ name differs from the Swift base name, also look
-  // candidates up under that C++ base name.
+  // Also look up the C++ name if it differs from the Swift one, or, for a free
+  // operator, its Swift spelling.
   DeclName foreignName;
-  if (auto cxxAttr = func->getAttrs().getAttribute<CxxDeclAttr>()) {
-    if (!cxxAttr->Name.empty() &&
-        cxxAttr->Name != swiftName.getBaseName().userFacingName())
-      foreignName = DeclName(ctx.getIdentifier(cxxAttr->Name));
+  std::optional<clang::OverloadedOperatorKind> opKind;
+  if (func->getAttrs().hasAttribute<CxxDeclAttr>()) {
+    StringRef cxxName = func->getCDeclName();
+    opKind = importer::getCxxOperatorKind(cxxName);
+    if (opKind)
+      foreignName =
+          DeclName(ctx.getIdentifier(clang::getOperatorSpelling(*opKind)));
+    else if (cxxName != swiftName.getBaseName().userFacingName())
+      foreignName = DeclName(ctx.getIdentifier(cxxName));
   }
 
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -7203,17 +7208,22 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
       }
     };
     doLookup(swiftName);
-    if (foreignName)
+    // Member operators are found by the Clang lookup below.
+    if (foreignName && !opKind)
       doLookup(foreignName);
 
     // The lookups above go by Swift name, which the importer may have renamed
     // (the non-const overload of a const/non-const pair gets a `Mutating`
-    // suffix), so look the C++ name up in the Clang scope directly too.
+    // suffix, and a member operator becomes e.g. `__operatorPlus`), so look the
+    // C++ name up in the Clang scope directly too.
     if (const auto *clangDC =
             dyn_cast_or_null<clang::DeclContext>(ty->getClangDecl())) {
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-      auto &clangIdents = clangDC->getParentASTContext().Idents;
-      clang::DeclarationName clangName(&clangIdents.get(func->getCDeclName()));
+      auto &clangCtx = clangDC->getParentASTContext();
+      clang::DeclarationName clangName =
+          opKind ? clangCtx.DeclarationNames.getCXXOperatorName(*opKind)
+                 : clang::DeclarationName(
+                       &clangCtx.Idents.get(func->getCDeclName()));
       for (const auto *member : clangDC->lookup(clangName))
         if (auto *imported = dyn_cast_or_null<ValueDecl>(
                 importer->importDeclDirectly(member)))
@@ -7235,8 +7245,12 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
           func->getLoc(), options);
       auto lookup = evaluateOrDefault(ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
-      for (const auto &result : lookup)
+      for (const auto &result : lookup) {
+        // Skip operator functions declared in types.
+        if (result.getValueDecl()->getDeclContext()->isTypeContext())
+          continue;
         results.insert(result.getValueDecl());
+      }
     };
     doLookup(swiftName);
     if (foreignName)
@@ -9873,6 +9887,34 @@ bool importer::isClangCxxRecord(const DeclContext *dc) {
     return isa_and_nonnull<clang::CXXRecordDecl>(nominal->getClangDecl());
 
   return false;
+}
+
+StringRef importer::getCxxOperatorName(clang::OverloadedOperatorKind op) {
+  switch (op) {
+  case clang::OO_None:
+  case clang::NUM_OVERLOADED_OPERATORS:
+    return StringRef();
+// Word spellings need a space, e.g. `operator new`.
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  case clang::OO_##Name:                                                       \
+    return llvm::isAlpha(Spelling[0]) ? "operator " Spelling                   \
+                                      : "operator" Spelling;
+#include "clang/Basic/OperatorKinds.def"
+  }
+  llvm_unreachable("unknown overloaded operator kind");
+}
+
+std::optional<clang::OverloadedOperatorKind>
+importer::getCxxOperatorKind(StringRef name) {
+  if (!name.starts_with("operator"))
+    return std::nullopt;
+  for (unsigned i = clang::OO_None + 1; i < clang::NUM_OVERLOADED_OPERATORS;
+       ++i) {
+    auto op = static_cast<clang::OverloadedOperatorKind>(i);
+    if (name == getCxxOperatorName(op))
+      return op;
+  }
+  return std::nullopt;
 }
 
 bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,

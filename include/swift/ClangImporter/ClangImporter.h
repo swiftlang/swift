@@ -1015,6 +1015,12 @@ bool isClangNamespace(const DeclContext *dc);
 /// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
 bool isClangCxxRecord(const DeclContext *dc);
 
+/// The C++ name of an overloaded operator, e.g. "operator==".
+StringRef getCxxOperatorName(clang::OverloadedOperatorKind op);
+
+/// The overloaded operator named \p name, e.g. "operator==", if any.
+std::optional<clang::OverloadedOperatorKind> getCxxOperatorKind(StringRef name);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///
