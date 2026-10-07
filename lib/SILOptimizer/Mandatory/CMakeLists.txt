@@ -19,6 +19,7 @@ target_sources(swiftSILOptimizer PRIVATE
   DiagnoseUnreachable.cpp
   Differentiation.cpp
   FlowIsolation.cpp
+  ImplicitDestroyChecker.cpp
   IRGenPrepare.cpp
   LexicalLifetimeEliminator.cpp
   LowerHopToActor.cpp
