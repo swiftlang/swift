@@ -1001,7 +1001,7 @@ namespace swift {
     unsigned SolverMemoryThreshold = 516 * 1024 * 1024;
 
     /// The maximum number of scopes we explore before giving up.
-    unsigned SolverScopeThreshold = 1024 * 1024;
+    unsigned SolverScopeThreshold = 75 * 1024;
 
     /// The maximum number of trail steps we take before giving up.
     unsigned SolverTrailThreshold = 64 * 1024 * 1024;
@@ -1111,10 +1111,10 @@ namespace swift {
     bool SolverEnableEnumerateSupertypes = true;
 
     /// Enable type variable joins. This will be on by default eventually.
-    bool SolverEnableTypeVariableJoins = false;
+    bool SolverEnableTypeVariableJoins = true;
 
     /// Enable type variable joins. This will be on by default eventually.
-    bool SolverEnablePromoteSupertypes = false;
+    bool SolverEnablePromoteSupertypes = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.

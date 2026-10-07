@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple
 
 class A {}
 class B: A {}
@@ -298,5 +298,36 @@ do {
         C($0 as Int)
       ].xmap(S.init)
     }
+  }
+}
+
+// Test coverage for join and meet of typed throws.
+do {
+
+  struct YourError: Error {}
+  struct MyError: Error {}
+
+  func g<T>(_: T, _: T) {}
+
+  func join(x: @escaping () throws(YourError) -> (),
+            y: @escaping () throws(MyError) -> (),
+            z: @escaping () throws -> ()) {
+    g(x, y)
+    g(y, x)
+    g(x, z)
+    g(z, x)
+    g(y, z)
+    g(z, y)
+  }
+
+  func meet(x: @escaping (() throws(YourError) -> ()) -> (),
+            y: @escaping (() throws(MyError) -> ()) -> (),
+            z: @escaping (() throws -> ()) -> ()) {
+    g(x, y)
+    g(y, x)
+    g(x, z)
+    g(z, x)
+    g(y, z)
+    g(z, y)
   }
 }

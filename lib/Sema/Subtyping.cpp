@@ -1215,13 +1215,12 @@ extInfoJoinMeetImpl(Operation op,
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
-    Type thrownError;
     if (throwing) {
       // Join is only typed-throws if both functions are typed throws.
       auto lhsThrownError = lhsInfo.getThrownError();
       auto rhsThrownError = rhsInfo.getThrownError();
       if (lhsThrownError && rhsThrownError) {
-        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
+        auto result = isLikelyExactMatch(lhsThrownError, rhsThrownError);
         if (result && *result)
           thrownError = lhsThrownError;
       }
@@ -1272,7 +1271,6 @@ extInfoJoinMeetImpl(Operation op,
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
-    Type thrownError;
     if (throwing) {
       auto lhsThrownError = lhsInfo.getThrownError();
       auto rhsThrownError = rhsInfo.getThrownError();
@@ -1280,10 +1278,16 @@ extInfoJoinMeetImpl(Operation op,
       // Meet is typed-throws if at least one is typed throws.
       if (!lhsThrownError) {
         thrownError = rhsThrownError;
+      } else if (!rhsThrownError) {
+        thrownError = lhsThrownError;
       } else {
-        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
-        if (result && !*result)
+        bool uninhabited = false;
+        thrownError = subtypeMeet(lhsThrownError, rhsThrownError,
+                                  &uninhabited);
+        if (uninhabited) {
+          throwing = false;
           thrownError = Type();
+        }
       }
     }
   }
