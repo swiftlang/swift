@@ -175,9 +175,16 @@ public class Instruction : CustomStringConvertible, Hashable {
       return true
 
     case let builtin as BuiltinInst:
-      // A memory accessing builtin can be an implicit load weak, a synchronization point or a
-      // pointer access.
-      return builtin.mayReadOrWriteMemory
+      switch builtin.id {
+      case .CopyArray:
+        // Copying array elements only retains the elements. It cannot run any user code and
+        // therefore cannot observe a de-initializer running earlier.
+        return false
+      default:
+        // A memory accessing builtin can be an implicit load weak, a synchronization point or a
+        // pointer access.
+        return builtin.mayReadOrWriteMemory
+      }
 
     case let endBorrow as EndBorrowInst:
       // Accessing memory via an arbitrary pointer is a deinit barrier, because it may conflict
