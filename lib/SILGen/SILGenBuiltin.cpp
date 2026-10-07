@@ -400,6 +400,15 @@ static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &SGF,
   return emitCastFromReferenceType(SGF, loc, substitutions, args, C);
 }
 
+// A COM-constrained archetype has an object or interface pointer
+// representation, even when its generic ABI passes it indirectly. The
+// pointer need not refer to a particular COM interface.
+static bool isCOMConstrainedArchetype(SILType type) {
+  if (auto *archetype = type.getASTType()->getAs<ArchetypeType>())
+    return archetype->hasCOMInterfaceConstraint();
+  return false;
+}
+
 /// Specialized emitter for Builtin.bridgeToRawPointer.
 static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
                                         SILLocation loc,
@@ -412,7 +421,25 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
-  if (args[0].getType().getASTType().isCOMExistentialType()) {
+  if (!SGF.getTypeLowering(args[0].getType()).isLoadable()) {
+    if (!isCOMConstrainedArchetype(args[0].getType())) {
+      SGF.SGM.diagnose(
+          loc, diag::invalid_sil_builtin,
+          "bridgeToRawPointer operand must have an object or interface "
+          "pointer representation");
+      return SGF.emitUndef(rawPointerType);
+    }
+    if (args[0].getType().isAddress()) {
+      auto address = SGF.B.createUncheckedAddrCast(
+          loc, args[0].getValue(), rawPointerType.getAddressType());
+      auto result =
+          SGF.B.createLoad(loc, address, LoadOwnershipQualifier::Trivial);
+      return ManagedValue::forObjectRValueWithoutOwnership(result);
+    }
+  }
+
+  if (args[0].getType().getASTType().isCOMExistentialType() ||
+      isCOMConstrainedArchetype(args[0].getType())) {
     auto value = args[0];
     if (value.getType().isMoveOnlyWrapped()) {
       if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
@@ -429,6 +456,24 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(result);
 }
 
+static ManagedValue emitAddressOnlyFromRawPointer(
+    SILGenFunction &SGF, SILLocation loc, const TypeLowering &lowering,
+    ManagedValue pointer, SGFContext C, IsTake_t isTake) {
+  auto source = pointer.materialize(SGF, loc);
+  auto address = SGF.B.createUncheckedAddrCast(
+      loc, source.getValue(), lowering.getLoweredType().getAddressType());
+  if (lowering.isLoadableOrOpaque(SGF.F)) {
+    auto ownership =
+        isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+    auto value = SGF.B.emitLoadValueOperation(loc, address, ownership);
+    return SGF.emitManagedRValueWithCleanup(value, lowering);
+  }
+  return SGF.B.bufferForExpr(
+      loc, lowering.getLoweredType(), lowering, C, [&](SILValue buffer) {
+        SGF.B.createCopyAddr(loc, address, buffer, isTake, IsInitialization);
+      });
+}
+
 /// Specialized emitter for Builtin.bridgeFromRawPointer.
 static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
                                         SILLocation loc,
@@ -440,9 +485,20 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   assert(args.size() == 1 && "bridge should have a single argument");
   
   // The substitution determines the destination type.
-  // FIXME: Archetype destination type?
   auto &destLowering =
     SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (!destLowering.isLoadable()) {
+    if (!isCOMConstrainedArchetype(destLowering.getLoweredType())) {
+      SGF.SGM.diagnose(
+          loc, diag::invalid_sil_builtin,
+          "bridgeFromRawPointer result must have an object or interface "
+          "pointer representation");
+      return SGF.emitUndef(destLowering.getLoweredType());
+    }
+    return emitAddressOnlyFromRawPointer(SGF, loc, destLowering, args[0], C,
+                                         IsNotTake);
+  }
+
   assert(destLowering.isLoadable());
   SILType destType = destLowering.getLoweredType();
 
@@ -474,11 +530,16 @@ static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
 
   auto &lowering = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   auto type = lowering.getLoweredType();
+  if (!lowering.isLoadable() && isCOMConstrainedArchetype(type))
+    return emitAddressOnlyFromRawPointer(SGF, loc, lowering, args[0], C,
+                                         IsTake);
+
   if (!lowering.isLoadable() ||
       (!type.getASTType().isCOMExistentialType() &&
        !type.isBridgeableObjectType() && !type.is<BuiltinNativeObjectType>())) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                     "takeFromRawPointer result must be a single reference");
+                     "takeFromRawPointer result must have an object or interface "
+                     "pointer representation");
     return SGF.emitUndef(type);
   }
 
