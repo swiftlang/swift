@@ -546,3 +546,21 @@ func overloadRanking(
   let _: Int = overloaded { @called(atMostOnce) in }
   let _: String = overloaded { @called(exactlyOnce) in }
 }
+
+// MARK: - Existential conversions
+
+protocol ExistentialProto {}
+extension Int: ExistentialProto {}
+
+func existentialConversions(
+  atMostOnce: @escaping @called(atMostOnce) () -> Void,
+  makeInt: @escaping () -> Int
+) {
+  // Calling a function doesn't help if the function value itself lacks an
+  // invertible protocol that the existential requires.
+  let _: any ~Escapable = atMostOnce
+  // expected-error@-1 {{value of type '@called(atMostOnce) () -> Void' does not conform to specified type 'Copyable'}}
+
+  let _: any ExistentialProto = makeInt
+  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}}
+}

@@ -5528,6 +5528,18 @@ bool ConstraintSystem::repairFailures(
     if (convertTo->isTypeVariableOrMember() || convertTo->isAny())
       return false;
 
+    // A call won't help if the function value itself lacks an invertible
+    // protocol that the existential requires, like Copyable or Deinitable.
+    if (convertTo->isExistentialType() && !fnType->hasTypeVariable() &&
+        !fnType->hasTypeParameter() && !convertTo->hasTypeParameter()) {
+      for (auto ip : InvertibleProtocolSet::allKnown()) {
+        auto *proto = getASTContext().getProtocol(getKnownProtocolKind(ip));
+        if (checkConformance(convertTo, proto) &&
+            !checkConformance(fnType, proto))
+          return false;
+      }
+    }
+
     ConstraintKind matchKind;
     if (resultType->is<TypeVariableType>()) {
       matchKind = ConstraintKind::Equal;
