@@ -33,6 +33,16 @@ module NonTrivial {
   requires cplusplus
 }
 
+module Operators {
+  header "operators.h"
+  requires cplusplus
+}
+
+module OperatorsCxx23 {
+  header "operators-cxx23.h"
+  requires cplusplus23
+}
+
 module Overloads {
   header "overloads.h"
   requires cplusplus
