@@ -579,8 +579,8 @@ extension ExecutorJob {
   ///
   /// The returned ``UnsafeCurrentTask`` does not retain the task, and must
   /// not be used after the job has been run (e.g. using
-  /// ``runSynchronously(on:)``), as the task may have completed and been
-  /// destroyed by then
+  /// ``runSynchronously(on:)-(UnownedSerialExecutor)``), as the task may
+  /// have completed and been destroyed by then
   @export(implementation)
   public var unsafeCurrentTask: UnsafeCurrentTask? {
     @export(implementation)
@@ -599,8 +599,8 @@ extension UnownedJob {
   ///
   /// The returned ``UnsafeCurrentTask`` does not retain the task, and must
   /// not be used after the job has been run (e.g. using
-  /// ``runSynchronously(on:)``), as the task may have completed and been
-  /// destroyed by then
+  /// ``runSynchronously(on:)-(UnownedSerialExecutor)``), as the task may
+  /// have completed and been destroyed by then
   @export(implementation)
   public var unsafeCurrentTask: UnsafeCurrentTask? {
     @export(implementation)
