@@ -2042,6 +2042,17 @@ static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *
+getInitializeForeignReferenceSubclassOperation(ASTContext &C, Identifier Id) {
+  // <T> T -> ()
+  // constructs the base subobject of the self value
+  BuiltinFunctionBuilder builder(C);
+  auto genericParam = makeGenericParam(0);
+  builder.addParameter(genericParam);
+  builder.setResult(makeConcrete(TupleType::getEmpty(C)));
+  return builder.build(Id);
+}
+
 static ValueDecl *getMarkDependenceOperation(ASTContext &C, Identifier Id) {
   // <T, V> (T, V) -> T
   BuiltinFunctionBuilder builder(C, 2);
@@ -3500,6 +3511,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
+
+  case BuiltinValueKind::InitializeForeignReferenceSubclass:
+    return getInitializeForeignReferenceSubclassOperation(Context, Id);
 
   case BuiltinValueKind::MarkDependence:
     return getMarkDependenceOperation(Context, Id);

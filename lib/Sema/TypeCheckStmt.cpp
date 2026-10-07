@@ -41,6 +41,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -2595,6 +2596,11 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
 /// \returns true if an error occurred.
 static bool checkSuperInit(ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
+  // The chained initializer call may have been found before the body was
+  // type-checked.
+  if (auto selfApply = dyn_cast<SelfApplyExpr>(apply->getSemanticFn()))
+    apply = selfApply;
+
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
                         apply->getSemanticFn());
@@ -2608,8 +2614,20 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
       auto &ctx = fromCtor->getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
-          classDecl->isForeignReferenceType())
-        return false;
+          classDecl->isForeignReferenceType()) {
+        if (!importer::isUserProvidedForeignReferenceFactory(ctor))
+          return false;
+
+        // A static factory method allocates a new object, so it cannot
+        // construct the base subobject of this one.
+        auto loc = implicitlyGenerated ? fromCtor->getLoc()
+                                       : apply->getArgs()->getLoc();
+        ctx.Diags.diagnose(loc, diag::chain_foreign_reference_factory_init,
+                           implicitlyGenerated, ctor,
+                           classDecl->getDeclaredInterfaceType());
+        ctor->diagnose(diag::foreign_reference_factory_init_here, ctor);
+        return true;
+      }
     }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();

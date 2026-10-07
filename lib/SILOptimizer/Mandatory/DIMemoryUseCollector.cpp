@@ -1323,6 +1323,33 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
     addUse(property, DIUseKind::Load);
 }
 
+/// Whether \p self, loaded from the self box, has the base subobject of a Swift
+/// subclass of a C++ foreign reference type constructed in place by the
+/// `initializeForeignReferenceSubclass` builtin (emitted for `super.init`).
+///
+/// That builtin only borrows `self`, so SILGen then stores the same `self` back
+/// into the box, which reinitializes it just as storing the result of a
+/// `super.init` call would.
+static bool constructsForeignReferenceSubclassBase(SILValue self) {
+  SmallVector<SILValue, 4> worklist = {self};
+  while (!worklist.empty()) {
+    for (auto *use : worklist.pop_back_val()->getUses()) {
+      auto *user = use->getUser();
+      if (isa<UpcastInst>(user) || isa<UncheckedRefCastInst>(user) ||
+          isa<BeginBorrowInst>(user)) {
+        worklist.push_back(cast<SingleValueInstruction>(user));
+        continue;
+      }
+      auto *builtin = dyn_cast<BuiltinInst>(user);
+      if (builtin && use->getOperandNumber() == 0 &&
+          builtin->getBuiltinKind() ==
+              BuiltinValueKind::InitializeForeignReferenceSubclass)
+        return true;
+    }
+  }
+  return false;
+}
+
 /// collectClassSelfUses - Collect all the uses of a 'self' pointer in a class
 /// constructor.  The memory object has class type.
 void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
@@ -1396,7 +1423,8 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
           src = conversion.getConverted();
 
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == TheMemory.getUninitializedValue())
+          if (LI->getOperand() == TheMemory.getUninitializedValue() &&
+              !constructsForeignReferenceSubclassBase(LI))
             continue;
 
         // Any other store needs to be recorded.
@@ -1659,6 +1687,16 @@ void ElementUseCollector::collectClassSelfUses(
     if (isa<EndBorrowInst>(User) || isa<EndAccessInst>(User))
       continue;
 
+    // Storing `self` straight back into the self box after its base was
+    // constructed in place is not a use of it: it is the store that
+    // reinitializes the box after `super.init`.
+    if (auto *SI = dyn_cast<StoreInst>(User)) {
+      if (SI->getSrc() == Op->get() &&
+          SI->getDest() == TheMemory.getUninitializedValue() &&
+          constructsForeignReferenceSubclassBase(ClassPointer))
+        continue;
+    }
+
     // ref_element_addr P, #field lookups up a field.
     if (auto *REAI = dyn_cast<RefElementAddrInst>(User)) {
       // FIXME: This is a Sema bug and breaks resilience, we should not
@@ -1750,6 +1788,14 @@ void ElementUseCollector::collectClassSelfUses(
       if (auto builtinKind = builtin->getBuiltinKind()) {
         if (isFlowSensitiveSelfIsolation(*builtinKind)) {
           Kind = DIUseKind::FlowSensitiveSelfIsolation;
+        }
+        // The `initializeForeignReferenceSubclass` builtin constructs the C++
+        // base subobject of a foreign reference subclass. It stands in for
+        // `super.init`.
+        if (*builtinKind ==
+                BuiltinValueKind::InitializeForeignReferenceSubclass &&
+            Op->getOperandNumber() == 0) {
+          Kind = DIUseKind::SelfInit;
         }
       }
     }

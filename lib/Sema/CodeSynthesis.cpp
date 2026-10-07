@@ -35,6 +35,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
@@ -606,6 +607,10 @@ static bool hasNoArgumentConstructor(ClassDecl *decl) {
 
     auto ctor = dyn_cast<ConstructorDecl>(member);
     if (!ctor || ctor->isInvalid() || ctor->isUnavailable())
+      continue;
+
+    // A factory can't construct the base subobject of a subclass.
+    if (importer::isUserProvidedForeignReferenceFactory(ctor))
       continue;
 
     if (ctor->getParameters()->size() == 0)
