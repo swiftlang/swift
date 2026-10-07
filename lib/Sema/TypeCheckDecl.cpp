@@ -993,6 +993,14 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->isSemanticallyFinal())
     return false;
 
+  // So does '@objcDirect': the method has no method-list entry to swizzle, so
+  // inferring 'dynamic' would promise a dispatch it cannot perform. This runs
+  // after the explicit-'dynamic' test above, so writing both still reaches the
+  // diagnostic rather than being silently resolved here.
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
+    if (AFD->isObjCDirect())
+      return false;
+
   // Types are never 'dynamic'.
   if (isa<TypeDecl>(decl))
     return false;
@@ -1064,6 +1072,12 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
   if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
+    return false;
+
+  // '@objcDirect' is reached through its own symbol, so like 'final' it takes
+  // no vtable entry. Without this an '@objc @implementation' member would be
+  // rejected for needing one, which the class's fixed ObjC layout cannot add.
+  if (decl->isObjCDirect())
     return false;
 
   // Embedded Swift has no unspecialized generic code, so there is no single

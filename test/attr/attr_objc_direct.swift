@@ -20,7 +20,7 @@ class ObjCDirectClass: NSObject {
 
   @objc @objcDirect
   public func nonFinal() { return }
-  // expected-error@-2 {{'@objcDirect' methods must be 'final' to prevent overriding}}
+  // expected-note@-1 {{overridden declaration is here}}
 
   @objc @objcDirect
   public final func variadic(format: String, args: CVarArg...) { return }
@@ -123,6 +123,10 @@ class SubClass: ObjCDirectClass {
   @objc @objcDirect
   public override final func overridable() { return }
   // expected-error@-2 {{'@objcDirect' methods cannot override superclass methods}}
+
+  // The reverse direction, which the dropped 'final' requirement used to cover.
+  public override func nonFinal() { return }
+  // expected-error@-1 {{cannot override a method declared '@objcDirect'}}
 }
 
 @objc

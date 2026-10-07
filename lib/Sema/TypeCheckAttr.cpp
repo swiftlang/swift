@@ -2008,12 +2008,8 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
-  // Must be final (except for initializers, which can't be overridden the
-  // same way).
-  if (!isa<ConstructorDecl>(fn) && !fn->isFinal()) {
-    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_final);
-    return;
-  }
+  // No 'final' requirement; TypeCheckDeclOverride makes sure it is not
+  // overridden.
 
   // Required initializers must be inherited - incompatible with direct.
   if (auto *ctor = dyn_cast<ConstructorDecl>(fn)) {

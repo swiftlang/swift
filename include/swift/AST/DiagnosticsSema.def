@@ -2628,8 +2628,10 @@ ERROR(optional_attribute_missing_explicit_objc,none,
 ERROR(objcmembers_attribute_nonclass,none,
       "'@objcMembers' attribute can only be applied to a class", ())
 
-ERROR(objc_direct_not_final,none,
-      "'@objcDirect' methods must be 'final' to prevent overriding", ())
+ERROR(override_of_objc_direct,none,
+      "cannot override a method declared '@objcDirect'; a direct method has "
+      "no method-list entry, so an Objective-C caller would reach the "
+      "superclass implementation", ())
 ERROR(objc_direct_in_protocol,none,
       "'@objcDirect' cannot be applied to protocol requirements", ())
 ERROR(objc_direct_access_level,none,
