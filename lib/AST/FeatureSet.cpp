@@ -793,6 +793,7 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 }
 
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
+UNINTERESTING_FEATURE(BuiltinRelaxedFP)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

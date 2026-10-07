@@ -746,9 +746,12 @@ static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResI);
   }
   case BuiltinValueKind::FAdd:
+  case BuiltinValueKind::FAddRelaxed:
   case BuiltinValueKind::FDiv:
   case BuiltinValueKind::FMul:
-  case BuiltinValueKind::FSub: {
+  case BuiltinValueKind::FMulRelaxed:
+  case BuiltinValueKind::FSub:
+  case BuiltinValueKind::FSubRelaxed: {
     OperandValueArrayRef Args = BI->getArguments();
     auto *LHS = dyn_cast<FloatLiteralInst>(Args[0]);
     auto *RHS = dyn_cast<FloatLiteralInst>(Args[1]);
@@ -759,15 +762,18 @@ static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
     switch (ID) {
     default: llvm_unreachable("Not all cases are covered!");
     case BuiltinValueKind::FAdd:
+    case BuiltinValueKind::FAddRelaxed:
       LHSF.add(RHSF, APFloat::rmNearestTiesToEven);
       break;
     case BuiltinValueKind::FDiv:
       LHSF.divide(RHSF, APFloat::rmNearestTiesToEven);
       break;
     case BuiltinValueKind::FMul:
+    case BuiltinValueKind::FMulRelaxed:
       LHSF.multiply(RHSF, APFloat::rmNearestTiesToEven);
       break;
     case BuiltinValueKind::FSub:
+    case BuiltinValueKind::FSubRelaxed:
       LHSF.subtract(RHSF, APFloat::rmNearestTiesToEven);
       break;
     }
