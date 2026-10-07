@@ -555,6 +555,15 @@ static ValueDecl *getBinaryOperationWithOverflow(ASTContext &ctx,
                             _tuple(argType, _int(1)));
 }
 
+/// Build a declaration for a relaxed binary operation.
+static ValueDecl *getBinaryOperationRelaxed(ASTContext &ctx,
+                                            Identifier id,
+                                            Type argType) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(argType, argType),
+                            argType);
+}
+
 static ValueDecl *getUnaryOperation(ASTContext &ctx, Identifier id,
                                     Type argType) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(argType), argType);
@@ -2648,6 +2657,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_BINARY_OPERATION_RELAXED(id, name, _, attrs, overload) \
+   OverloadedBuiltinKind::overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #define BUILTIN_UNARY_OPERATION(id, name, attrs, overload) \
@@ -3295,22 +3306,27 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
-      return getBinaryOperation(Context, Id, Types[0]);
+    return getBinaryOperation(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      if (!Types.empty())
-        return nullptr;
-      return getPolymorphicBinaryOperation(Context, Id);
+    if (!Types.empty()) return nullptr;
+    return getPolymorphicBinaryOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      if (Types.size() != 1) return nullptr;
-      return getBinaryOperationWithOverflow(Context, Id, Types[0]);
+    if (Types.size() != 1) return nullptr;
+    return getBinaryOperationWithOverflow(Context, Id, Types[0]);
+    
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_OPERATION_RELAXED(id, name, _, attrs, overload)  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+    if (Types.size() != 1) return nullptr;
+    return getBinaryOperationRelaxed(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload)  case BuiltinValueKind::id:

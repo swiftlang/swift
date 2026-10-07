@@ -544,6 +544,19 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   // FIXME: We could generate the code to dynamically report the overflow if the
   // third argument is true. Now, we just ignore it.
 
+#define BUILTIN_BINARY_OPERATION_RELAXED(id, name, strictID, attrs, overload)  \
+  case BuiltinValueKind::id: {                                                 \
+    llvm::Value *lhs = args.claimNext();                                       \
+    llvm::Value *rhs = args.claimNext();                                       \
+    llvm::FastMathFlags fmf;                                                   \
+    fmf.setAllowContract();                                                    \
+    fmf.setAllowReassoc();                                                     \
+    fmf.setNoSignedZeros();                                                    \
+    llvm::FMFSource source(fmf);                                               \
+    llvm::Value *v = IGF.Builder.Create##strictID##FMF(lhs, rhs, source);      \
+    return out.add(v);                                                         \
+  }
+
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   case BuiltinValueKind::id:                                          \
     return emitCompareBuiltin(IGF, out, args, llvm::CmpInst::id);
