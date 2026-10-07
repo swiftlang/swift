@@ -1256,3 +1256,95 @@ public struct NCSubscriptBaseWrapper: ~Copyable {
     }
   }
 }
+
+// Switching over a noncopyable enum produced by a borrow accessor performs a
+// borrowing switch (https://github.com/swiftlang/swift/issues/92757).
+public enum NCEnum: ~Copyable {
+  case a(NC)
+  case b
+}
+
+public enum GenNCEnum<T>: ~Copyable {
+  case a(T)
+  case b
+}
+
+func borrowGeneric<T>(_ t: borrowing T) {}
+
+public struct NCEnumWrapper: ~Copyable {
+  var _e: NCEnum
+
+  subscript(i: Int) -> NCEnum {
+    borrow {
+      return _e
+    }
+  }
+
+  var e: NCEnum {
+    borrow {
+      return _e
+    }
+  }
+}
+
+public struct GenNCEnumWrapper<T>: ~Copyable {
+  var _e: GenNCEnum<T>
+
+  subscript(i: Int) -> GenNCEnum<T> {
+    borrow {
+      return _e
+    }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor21switchBorrowSubscriptyyAA13NCEnumWrapperVF :
+// CHECK:         [[F:%.*]] = function_ref @$s15borrow_accessor13NCEnumWrapperVyAA0C0OSicib :
+// CHECK:         [[RES:%.*]] = apply [[F]]({{.*}}) : {{.*}} -> @guaranteed NCEnum
+// CHECK:         [[COPY:%.*]] = copy_value [[RES]]
+// CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[MARK]]
+// CHECK:         [[FIXED:%.*]] = begin_borrow [fixed] [[BORROW]]
+// CHECK:         switch_enum [[FIXED]], case #NCEnum.a!enumelt: {{bb[0-9]+}}, case #NCEnum.b!enumelt: {{bb[0-9]+}}
+// CHECK-LABEL: } // end sil function '$s15borrow_accessor21switchBorrowSubscriptyyAA13NCEnumWrapperVF'
+func switchBorrowSubscript(_ w: borrowing NCEnumWrapper) {
+  switch w[0] {
+  case .a(let nc):
+    use(nc)
+  case .b:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor20switchBorrowPropertyyyAA13NCEnumWrapperVF :
+// CHECK:         [[F:%.*]] = function_ref @$s15borrow_accessor13NCEnumWrapperV1eAA0C0Ovb :
+// CHECK:         [[RES:%.*]] = apply [[F]]({{.*}}) : {{.*}} -> @guaranteed NCEnum
+// CHECK:         [[COPY:%.*]] = copy_value [[RES]]
+// CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[MARK]]
+// CHECK:         [[FIXED:%.*]] = begin_borrow [fixed] [[BORROW]]
+// CHECK:         switch_enum [[FIXED]], case #NCEnum.a!enumelt: {{bb[0-9]+}}, case #NCEnum.b!enumelt: {{bb[0-9]+}}
+// CHECK-LABEL: } // end sil function '$s15borrow_accessor20switchBorrowPropertyyyAA13NCEnumWrapperVF'
+func switchBorrowProperty(_ w: borrowing NCEnumWrapper) {
+  switch w.e {
+  case .a(let nc):
+    use(nc)
+  case .b:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor28switchBorrowGenericSubscriptyyAA16GenNCEnumWrapperVyxGlF :
+// CHECK:         [[F:%.*]] = function_ref @$s15borrow_accessor16GenNCEnumWrapperVyAA0cD0OyxGSicib :
+// CHECK:         [[RES:%.*]] = apply [[F]]<T>({{.*}}) : {{.*}} -> @guaranteed_address GenNCEnum<τ_0_0>
+// CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[RES]]
+// CHECK:         [[ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[MARK]]
+// CHECK:         switch_enum_addr [[ACCESS]], case #GenNCEnum.a!enumelt: {{bb[0-9]+}}, case #GenNCEnum.b!enumelt: {{bb[0-9]+}}
+// CHECK-LABEL: } // end sil function '$s15borrow_accessor28switchBorrowGenericSubscriptyyAA16GenNCEnumWrapperVyxGlF'
+func switchBorrowGenericSubscript<T>(_ w: borrowing GenNCEnumWrapper<T>) {
+  switch w[0] {
+  case .a(let t):
+    borrowGeneric(t)
+  case .b:
+    break
+  }
+}
