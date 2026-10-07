@@ -100,6 +100,9 @@ func testFunction(a: CallableReturningFunction) {
 // Arguments' type may not be variadic.
 // expected-error @+1 {{'@dynamicCallable' requires 'Invalid1' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
 @dynamicCallable
+// expected-note@+1 {{add 'dynamicallyCall(withArguments:)' method}} {{18-18=\n    func dynamicallyCall(withArguments arguments: [Any]) {\n        <#code#>\n    }\n}}
+// expected-note@+1 {{add 'dynamicallyCall(withKeywordArguments:)' method with 'Dictionary'}} {{18-18=\n    func dynamicallyCall(withKeywordArguments arguments: [String: Any]) {\n        <#code#>\n    }\n}}
+// expected-note@+1 {{add 'dynamicallyCall(withKeywordArguments:)' method with 'KeyValuePairs'}} {{18-18=\n    func dynamicallyCall(withKeywordArguments arguments: KeyValuePairs<String, Any>) {\n        <#code#>\n    }\n}}
 struct Invalid1 {
   func dynamicallyCall(withArguments arguments: [Int]...) -> Int {
     return 1
@@ -109,13 +112,20 @@ struct Invalid1 {
 // Keyword arguments' key type must be ExpressibleByStringLiteral.
 // expected-error @+1 {{'@dynamicCallable' requires 'Invalid2' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
 @dynamicCallable
-struct Invalid2 {
+struct Invalid2 { // expected-note {{add 'dynamicallyCall(withArguments:)' method}} expected-note {{add 'dynamicallyCall(withKeywordArguments:)' method with 'Dictionary'}} expected-note {{add 'dynamicallyCall(withKeywordArguments:)' method with 'KeyValuePairs'}}
   func dynamicallyCall(
     withKeywordArguments arguments: KeyValuePairs<Int, Int>
   ) -> Int {
     return 1
   }
 }
+
+// expected-error @+1 {{'@dynamicCallable' requires 'InvalidProtocol' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+@dynamicCallable
+// expected-note@+1 {{add 'dynamicallyCall(withArguments:)' method}} {{27-27=\n    func dynamicallyCall(withArguments arguments: [Any])\n}}
+// expected-note@+1 {{add 'dynamicallyCall(withKeywordArguments:)' method with 'Dictionary'}} {{27-27=\n    func dynamicallyCall(withKeywordArguments arguments: [String: Any])\n}}
+// expected-note@+1 {{add 'dynamicallyCall(withKeywordArguments:)' method with 'KeyValuePairs'}} {{27-27=\n    func dynamicallyCall(withKeywordArguments arguments: KeyValuePairs<String, Any>)\n}}
+protocol InvalidProtocol {}
 
 // Dynamic calls with keyword arguments require `dynamicallyCall(withKeywordArguments:)` to be defined.
 @dynamicCallable
@@ -149,7 +159,7 @@ func NotAllowedOnFunc() {}
 
 // expected-error @+1 {{'@dynamicCallable' requires 'InvalidBase' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
-class InvalidBase {}
+class InvalidBase {} // expected-note {{add 'dynamicallyCall(withArguments:)' method}} expected-note {{add 'dynamicallyCall(withKeywordArguments:)' method with 'Dictionary'}} expected-note {{add 'dynamicallyCall(withKeywordArguments:)' method with 'KeyValuePairs'}}
 
 class InvalidDerived : InvalidBase {
   func dynamicallyCall(withArguments arguments: [Int]) -> Int {
