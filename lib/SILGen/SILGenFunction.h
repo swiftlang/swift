@@ -2880,6 +2880,10 @@ public:
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
+  /// Emits a call to `__isRemoteActor(self)` and returns the unwrapped i1.
+  SILValue emitDistributedActorIsRemote(SILLocation Loc, SILValue selfValue,
+                                        Type selfTy);
+
   void emitDistributedIfRemoteBranch(SILLocation Loc, SILValue selfValue,
                                      Type selfTy, SILBasicBlock *isRemoteBB,
                                      SILBasicBlock *isLocalBB);
