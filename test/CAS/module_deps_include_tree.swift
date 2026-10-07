@@ -32,6 +32,17 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps commandLine > %t/deps.cmd
 // RUN: %FileCheck %s -check-prefix MAIN_CMD -input-file=%t/deps.cmd
 
+// Instance sharing must not change the results: query each batch's Clang
+// modules with one compiler instance (-no-parallel-scan), and compare against
+// one compiler instance per module. With include-tree, this also exercises the
+// CAS action controller being cloned for each name.
+// RUN: %empty-directory(%t/stats_shared_serial)
+// RUN: %empty-directory(%t/stats_no_sharing)
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_shared_serial.json -module-name deps -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas -auto-bridging-header-chaining -no-parallel-scan -stats-output-dir %t/stats_shared_serial
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_no_sharing.json -module-name deps -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas -auto-bridging-header-chaining -no-clang-scanner-instance-sharing -stats-output-dir %t/stats_no_sharing
+// RUN: diff %t/deps_shared_serial.json %t/deps_no_sharing.json
+// RUN: %{python} %utils/process-stats-dir.py --evaluate-delta 'NumDepScanFilesystemLookups == 0' %t/stats_no_sharing %t/stats_shared_serial
+
 // FS_ROOT_E-DAG: E.swiftinterface
 // FS_ROOT_E-DAG: SDKSettings.json
 
