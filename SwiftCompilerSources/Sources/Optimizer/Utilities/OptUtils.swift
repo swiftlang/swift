@@ -14,6 +14,18 @@ import AST
 import SIL
 import OptimizerBridging
 
+extension Value {
+  /// Infers a user-facing name for this value, such as `x` or `x.y`, along with the value that introduces the named
+  /// variable. See `VariableNameInferrer` in C++.
+  var inferredNameAndRoot: (name: String, root: Value)? {
+    let inferred = VariableNameInferrer_inferNameAndRoot(bridged)
+    guard let root = inferred.root.value else {
+      return nil
+    }
+    return (StringRef(bridged: inferred.name).string, root)
+  }
+}
+
 // Default to SIL.Type within the Optimizer module.
 typealias Type = SIL.`Type`
 

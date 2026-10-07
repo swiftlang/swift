@@ -30,6 +30,7 @@ swift_compiler_sources(Optimizer
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
   EmbeddedWitnessCallSpecialization.swift
+  ImplicitDestroyChecker.swift
   InitializeStaticGlobals.swift
   KillInvalidDebugValues.swift
   LetPropertyLowering.swift
