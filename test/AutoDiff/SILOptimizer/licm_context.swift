@@ -32,11 +32,11 @@ public extension Array where Element: Differentiable {
         let f = count;
         return ((),
                 { v in
-                    if v.base.count < f {
-                        v.base = [Element.TangentVector](repeating: .zero, count: f)
+                    if v.count < f {
+                      v.storage = .full([Element.TangentVector](repeating: .zero, count: f))
                     };
                     let d = v[x];
-                    v.base[x] = .zero;
+                    v[x] = .zero;
                     return d}
         )
     }
