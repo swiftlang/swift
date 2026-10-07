@@ -133,3 +133,4 @@ be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing `--reconfigure` to `build-script`.
+
