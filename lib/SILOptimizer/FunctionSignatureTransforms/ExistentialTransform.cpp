@@ -475,16 +475,20 @@ void ExistentialTransform::populateThunkBody() {
       case ExistentialRepresentation::Class: {
         // If the operand is not object type, we need an explicit load.
         SILValue OrigValue = OrigOperand;
+        // A guaranteed object argument can be opened and passed to the callee
+        // directly. A copy is not needed and would even be wrong if the callee
+        // returns a guaranteed value which depends on the argument.
+        bool NeedsCopy =
+            Builder.hasOwnership() && !OriginallyConsumed &&
+            OrigOperand->getOwnershipKind() != OwnershipKind::Guaranteed;
         if (!OrigOperand->getType().isObject()) {
           auto qual = LoadOwnershipQualifier::Take;
           if (Builder.hasOwnership() && !OriginallyConsumed) {
             qual = LoadOwnershipQualifier::Copy;
           }
           OrigValue = Builder.emitLoadValueOperation(Loc, OrigValue, qual);
-        } else {
-          if (Builder.hasOwnership() && !OriginallyConsumed) {
-            OrigValue = Builder.emitCopyValueOperation(Loc, OrigValue);
-          }
+        } else if (NeedsCopy) {
+          OrigValue = Builder.emitCopyValueOperation(Loc, OrigValue);
         }
 
         // OpenExistentialRef forwards ownership, so it does the right thing
@@ -514,7 +518,7 @@ void ExistentialTransform::populateThunkBody() {
           // do not need to do it then.
           //
           // TODO: This would be simpler if we had managed value/cleanup scopes.
-          if (Builder.hasOwnership() && !OriginallyConsumed) {
+          if (NeedsCopy) {
             Temps.push_back({SILValue(), archetypeValue});
           }
         }
