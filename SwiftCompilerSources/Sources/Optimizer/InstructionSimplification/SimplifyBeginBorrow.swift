@@ -40,8 +40,73 @@ extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
   }
 }
 
+/// Remove a borrow used by a single chain of function conversions ending in
+/// `convert_escape_to_noescape`. This exposes the closure definition to
+/// closure specialization pass, which can look through conversions but cannot
+/// look through `begin_borrow`.
+///
+/// ```
+///   %borrow = begin_borrow %owner
+///   %converted = convert_function %borrow ...
+///   %noescape = convert_escape_to_noescape %converted ...
+///   // ... uses and cleanup of %noescape ...
+///   end_borrow %borrow
+///   destroy_value %owner
+/// ```
+/// -->
+/// ```
+///   %converted = convert_function %owner ...
+///   %noescape = convert_escape_to_noescape %converted ...
+///   // ... unchanged uses and cleanup of %noescape ...
+///   destroy_value %converted
+/// ```
+private func tryReplaceBorrowOfNoEscapeConversion(beginBorrow: BeginBorrowInst,_ context: SimplifyContext) -> Bool {
+  let owner = beginBorrow.borrowedValue
+  // Only remove a lexical scope if the enclosing owner already preserves its lifetime constraints.
+  guard !beginBorrow.isLexical || owner.isLexical else {
+    return false
+  }
+
+  // If owner has other uses, these might become outside of lifetime after transformation.
+  let ownerHasOnlyBeginBorrowUse =
+    (owner.uses.ignoreDebugUses.singleUser(notOfType: DestroyValueInst.self) == beginBorrow)
+  // If owner does not have destroys, the `convert_function` would be leaked after transformation.
+  let ownerHasDestroys = !owner.uses.filter(usersOfType: DestroyValueInst.self).isEmpty
+
+  var value: SingleValueInstruction = beginBorrow
+  while let use = value.uses.ignoreDebugUses.ignore(usersOfType: EndBorrowInst.self).singleUse {
+    switch use.instruction {
+    case let convertFunction as ConvertFunctionInst:
+      guard ownerHasOnlyBeginBorrowUse,
+            ownerHasDestroys,
+            // Note: current implementation is not a true dominance analysis, and it also rejects
+            // repeated consumes. We rely on this behavior - see `keep_withConvert_repeatedConsume`
+            // test case in test/SILOptimizer/simplify_begin_borrow_convert_escape_to_noescape.sil
+            convertFunction.dominates(destroysOf: owner) else {
+        return false
+      }
+      value = convertFunction
+
+    case is ConvertEscapeToNoEscapeInst:
+      assert(use.ownership == .pointerEscape)
+      convertAllUsesToOwned(of: beginBorrow, context)
+      return true
+
+    default:
+      return false
+    }
+  }
+  return false
+}
+
 // See comments of `tryReplaceCopy` and `convertAllUsesToOwned`
 private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
+  // Run this before check against `findPointerEscapingUse` since
+  // `convert_escape_to_noescape` is a pointer-escaping use.
+  if tryReplaceBorrowOfNoEscapeConversion(beginBorrow: beginBorrow, context) {
+    return true
+  }
+
   if findPointerEscapingUse(of: beginBorrow.borrowedValue) {
     return false
   }
