@@ -1076,6 +1076,35 @@ bool SILType::hasCalledAtMostOnceSemantics() const {
   return false;
 }
 
+bool SILType::isImplicitlyDestroyable() const {
+  auto type = removingMoveOnlyWrapper();
+
+  // Every Copyable type is Deinitable.
+  if (!type.isMoveOnly())
+    return true;
+
+  // Conformance lookup doesn't understand lowered types, so check the
+  // elements of a tuple structurally.
+  if (auto tupleTy = type.getAs<TupleType>()) {
+    for (unsigned i : range(tupleTy->getNumElements())) {
+      if (!type.getTupleElementType(i).isImplicitlyDestroyable())
+        return false;
+    }
+    return true;
+  }
+
+  // Destroying a box doesn't destroy a value that was moved out of it, and
+  // the move-only checker makes any other destroy of the contents explicit.
+  if (type.is<SILBoxType>())
+    return true;
+
+  // Every function type is Deinitable.
+  if (type.is<SILFunctionType>())
+    return true;
+
+  return type.getASTType()->isDeinitable();
+}
+
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
   return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {

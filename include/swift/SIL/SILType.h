@@ -911,6 +911,12 @@ public:
   /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
   bool hasCalledAtMostOnceSemantics() const;
 
+  /// Returns false if a value of this type can't be destroyed implicitly, and
+  /// must instead be consumed on every path that doesn't end in
+  /// `unreachable`. That's true for a type that doesn't conform to
+  /// `Deinitable`, and for a tuple that contains one.
+  bool isImplicitlyDestroyable() const;
+
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {
     auto sd = getStructOrBoundGenericStruct();
