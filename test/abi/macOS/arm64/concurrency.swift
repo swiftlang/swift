@@ -420,8 +420,6 @@ Added: _$sSct5_taskBovpMV
 // Swift.UnsafeCurrentTask.init(Builtin.NativeObject) -> Swift.UnsafeCurrentTask
 Added: _$sSctySctBocfC
 
-// Swift.UnsafeCurrentTask.init(_AsyncTask) -> Swift.UnsafeCurrentTask
-Added: _$sSctyScts10_AsyncTaskVcfC
 // Swift.withUnsafeCurrentTaskNonsending<A>(body: nonisolated(nonsending) (Swift.UnsafeCurrentTask?) async throws -> A) async throws -> A
 Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlF
 Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlFTu

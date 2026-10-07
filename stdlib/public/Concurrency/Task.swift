@@ -850,7 +850,6 @@ public struct UnsafeCurrentTask {
   }
 
   // May only be created by the standard library.
-  @usableFromInline // Since 6.5
   @available(SwiftStdlib 5.1, *)
   internal init(_ asyncTask: _AsyncTask) {
     unsafe self._rawTask = asyncTask
@@ -859,8 +858,8 @@ public struct UnsafeCurrentTask {
   /// ABI-compat shim for the 6.4 `init(_ task: Builtin.NativeObject)`
   /// Inlined client code that must run on 6.4 runtimes (`_$sSctySctBocfC`)
   /// creates an `UnsafeCurrentTask` through this initializer
-  @usableFromInline // Since 6.4
-  @available(SwiftStdlib 5.1, *)
+  @usableFromInline
+  @available(SwiftStdlib 6.4, *)
   internal init(_ task: Builtin.NativeObject) {
     unsafe self.init(_AsyncTask(task))
   }
