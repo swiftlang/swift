@@ -32,6 +32,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:string-interpolation-conformance>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
+- <doc:dynamic-cast>
 - <doc:dynamic-exclusivity>
 - <doc:embedded-restrictions>
 - <doc:existential-type>
@@ -88,6 +89,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:region-isolation-cross-isolation-data-race>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
+- <doc:dynamic-cast>
 - <doc:dynamic-exclusivity>
 - <doc:embedded-restrictions>
 - <doc:existential-type>

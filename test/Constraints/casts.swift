@@ -513,7 +513,7 @@ do {
   let blockalias =  { (_: BA) in  }
   let derivedalias =  { (_: DA) in  }
 
-  let _ = block is ClosureType // expected-warning{{runtime conversion from '(C1_56297_Base) -> ()' to 'ClosureType' (aka '(C1_56297_Sub) -> ()') is not supported; 'is' test always fails}}
+  let _ = block is ClosureType // expected-warning{{runtime conversion from '(C1_56297_Base) -> ()' to 'ClosureType' (aka '(C1_56297_Sub) -> ()') is not supported; 'is' test always fails}}{{group-name=DynamicCast}}
   // expected-note@-1 {{consider using 'as' coercion instead}} {{17-19=as}}
   let _ = blockalias is (C1_56297_Sub) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(C1_56297_Base) -> ()') to '(C1_56297_Sub) -> Void' is not supported; 'is' test always fails}}
   // expected-note@-1 {{consider using 'as' coercion instead}} {{22-24=as}}
