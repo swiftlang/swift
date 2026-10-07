@@ -4238,9 +4238,13 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     // Move the debug_value to right after the markedAddress to ensure that we
     // do not actually change our liveness computation.
     //
-    // NOTE: The author is not sure if this can ever happen with SILGen output,
-    // but this is being put just to be safe.
-    di->moveAfter(markedAddress);
+    // Only do this if markedAddress is itself the initialization. Otherwise,
+    // moving the debug_value would place it before the real initialization,
+    // making the value live-in to the block. This happens when the debug_value
+    // belonged to a stacked [strict] mark that has already been checked and
+    // replaced by its operand.
+    if (addressBeginsInitialized(markedAddress))
+      di->moveAfter(markedAddress);
     liveness.updateForUse(di, TypeTreeLeafTypeRange(markedAddress),
                           false /*lifetime ending*/);
   }
