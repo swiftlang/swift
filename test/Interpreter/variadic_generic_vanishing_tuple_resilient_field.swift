@@ -27,13 +27,17 @@
 
 import vanishing_tuple_boxes
 
-struct Repeater<each Input> {
+struct Repeater<each T> {
   // Field 0: a resilient generic type parameterized by the nested Storage,
   // laid out before the pack tuple field. Storing it forces a runtime metadata
   // instantiation that binds the metadata pack.
   private var __storage: Box<Storage> = Box(Storage())
-  private var input: (repeat each Input)
-  init(_ input: repeat each Input) { self.input = (repeat each input) }
+  private var input: (repeat Input<each T>)
+  init(_ input: repeat each T) { self.input = (repeat Input(each input)) }
+}
+
+struct Input<T> {
+  init(_ input: T) {}
 }
 
 // The nested type captures the pack, so its accessor is what seeds the pack in
