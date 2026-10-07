@@ -1220,7 +1220,7 @@ extInfoJoinMeetImpl(Operation op,
       auto lhsThrownError = lhsInfo.getThrownError();
       auto rhsThrownError = rhsInfo.getThrownError();
       if (lhsThrownError && rhsThrownError) {
-        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
+        auto result = isLikelyExactMatch(lhsThrownError, rhsThrownError);
         if (result && *result)
           thrownError = lhsThrownError;
       }

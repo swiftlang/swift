@@ -301,7 +301,7 @@ do {
   }
 }
 
-// Test coverage for meet of typed throws, which is a bit special.
+// Test coverage for join and meet of typed throws.
 do {
 
   struct YourError: Error {}
@@ -309,9 +309,20 @@ do {
 
   func g<T>(_: T, _: T) {}
 
-  func f(x: @escaping (() throws(YourError) -> ()) -> (),
-         y: @escaping (() throws(MyError) -> ()) -> (),
-         z: @escaping (() throws -> ()) -> ()) {
+  func join(x: @escaping () throws(YourError) -> (),
+            y: @escaping () throws(MyError) -> (),
+            z: @escaping () throws -> ()) {
+    g(x, y)
+    g(y, x)
+    g(x, z)
+    g(z, x)
+    g(y, z)
+    g(z, y)
+  }
+
+  func meet(x: @escaping (() throws(YourError) -> ()) -> (),
+            y: @escaping (() throws(MyError) -> ()) -> (),
+            z: @escaping (() throws -> ()) -> ()) {
     g(x, y)
     g(y, x)
     g(x, z)
