@@ -417,6 +417,16 @@ using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
 ///
 ///     end_access %addr // %addr must be initialized here
 ///
+/// (4) mutate accessor.  Must be initialized at the end of the scope of the
+///     accessor's self argument: its enclosing modify access, or otherwise the
+///     scope of the address that self is marked on, e.g. (1) or (2).
+///
+///     (%yield, %token) = begin_apply ... -> @yields @inout Self
+///     %self = mark_unresolved_non_copyable_value %yield
+///     %addr = apply %mutate(%self) : $(@inout Self) -> @inout MOV
+///     ...
+///     end_apply %token // %addr must be initialized here
+///
 /// To enforce this requirement, function exiting instructions are treated as
 /// liveness uses of such addresses, ensuring that the address is initialized at
 /// that point.
@@ -504,6 +514,12 @@ static bool visitScopeEndsRequiringInit(
           visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
         }
         return true;
+      }
+      // Without an enclosing access, self is projected from a marked yield or
+      // inout argument whose scope ends are those of its marker.
+      if (auto *selfMark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+              stripAddressProjections(ai->getSelfArgument()))) {
+        return visitScopeEndsRequiringInit(selfMark, visit);
       }
       return false;
     }
