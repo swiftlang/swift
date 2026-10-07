@@ -753,7 +753,7 @@ enum swift_task_is_cancelled_flag : uint64_t {
   ///
   /// Without this flag, the check reports the cancellation that the code the
   /// task currently runs observes. Only the task itself observes its
-  /// cancellation scopes.
+  /// cancellation shields and cancellation scopes.
   swift_task_is_cancelled_flag_TaskOnly = 0x1,
 };
 

@@ -807,12 +807,13 @@ bool AsyncTask::isCancelledInCurrentContext() const {
 }
 
 std::optional<size_t> AsyncTask::getCancellationReasonInCurrentContext() const {
-  // Only the task itself can observe its scopes. For any other caller the
-  // scopes describe an unrelated point of execution and might be popped
-  // concurrently.
+  // Only the task itself can observe its shields and scopes. For any other
+  // caller they describe an unrelated point of execution and might be popped
+  // concurrently, so it observes the cancellation of the task itself, like
+  // `swift_task_is_cancelled_flag_TaskOnly`.
   if (this != swift_task_getCurrent()) {
     auto status = _private()._status().load(std::memory_order_relaxed);
-    if (status.isTaskCancelled() && !status.hasCancellationShield())
+    if (status.isTaskCancelled())
       return status.getCancellationReason();
     return std::nullopt;
   }

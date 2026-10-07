@@ -354,10 +354,13 @@ extension Task where Success == Never, Failure == Never {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public static var isCancelled: Bool {
     unsafe withUnsafeCurrentTask { task in
-      if #available(SwiftStdlib 6.4, *) {
-        unsafe task?._isCancelled(ignoreTaskCancellationShield: false) ?? false
+      guard let task = unsafe task else { return false }
+      // This getter is part of the stdlib, so `swift_task_isCancelledWithFlags`
+      // is available whenever the stdlib is deployed with it, even on an older OS.
+      if #available(StdlibDeploymentTarget 6.4, *) {
+        return unsafe _taskIsCancelledWithFlags(task._rawTask, flags: 0x0)
       } else {
-        unsafe task?.isCancelled ?? false
+        return unsafe _taskIsCancelled(task._rawTask)
       }
     }
   }
@@ -387,7 +390,13 @@ extension Task where Success == Never, Failure == Never {
   @export(implementation)
   public static var cancellationReason: CancellationError.Reason? {
     unsafe withUnsafeCurrentTask { task in
-      unsafe task?._contextualCancellationReason
+      // Unlike `UnsafeCurrentTask.cancellationReason`, take cancellation shields
+      // and cancellation scopes into account.
+      guard let task = unsafe task else { return nil }
+      let packed = unsafe _taskGetIsCancelledWithReasonWithFlags(task._rawTask, flags: 0)
+      guard packed & 1 != 0 else { return nil }
+      let raw = UInt8(truncatingIfNeeded: packed >> 1)
+      return CancellationError.Reason(_rawValue: raw) ?? .unspecified
     }
   }
 }

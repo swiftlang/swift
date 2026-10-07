@@ -593,8 +593,8 @@ public:
   /// cancellation, taking cancellation shields and cancellation scopes into
   /// account.
   ///
-  /// Only the task itself observes its cancellation scopes. For any other
-  /// caller this only takes cancellation shields into account.
+  /// Only the task itself observes its cancellation shields and cancellation
+  /// scopes. For any other caller this is the same as `isTaskCancelled`.
   bool isCancelledInCurrentContext() const;
 
   /// The reason of the cancellation that `isCancelledInCurrentContext`

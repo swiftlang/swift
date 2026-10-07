@@ -905,10 +905,14 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
-    if #available(SwiftStdlib 6.4, *) {
-      unsafe _isCancelled(ignoreTaskCancellationShield: true)
+    // This getter is part of the stdlib, so `swift_task_isCancelledWithFlags` is
+    // available whenever the stdlib is deployed with it, even on an older OS.
+    // `swift_task_isCancelled` would take shields and scopes into account.
+    if #available(StdlibDeploymentTarget 6.4, *) {
+      let taskOnly: UInt64 = 0x1
+      return unsafe _taskIsCancelledWithFlags(_rawTask, flags: taskOnly)
     } else {
-      unsafe _taskIsCancelled(_rawTask)
+      return unsafe _taskIsCancelled(_rawTask)
     }
   }
 
@@ -984,18 +988,6 @@ public struct UnsafeCurrentTask {
     // Packed encoding: bit 0 is the isCancelled flag; bits 1..3 carry the
     // `CancellationError.Reason` raw value. One runtime call returns both.
     let packed = unsafe _taskGetIsCancelledWithReason(_rawTask)
-    guard packed & 1 != 0 else { return nil }
-    let raw = UInt8(truncatingIfNeeded: packed >> 1)
-    return CancellationError.Reason(_rawValue: raw) ?? .unspecified
-  }
-
-  /// The reason for the cancellation that the code that the current task
-  /// runs observes, taking cancellation shields and cancellation scopes into
-  /// account, or `nil` if it doesn't observe a cancellation.
-  @available(StdlibDeploymentTarget 6.5, *)
-  @export(implementation)
-  internal var _contextualCancellationReason: CancellationError.Reason? {
-    let packed = unsafe _taskGetIsCancelledWithReasonWithFlags(_rawTask, flags: 0)
     guard packed & 1 != 0 else { return nil }
     let raw = UInt8(truncatingIfNeeded: packed >> 1)
     return CancellationError.Reason(_rawValue: raw) ?? .unspecified
@@ -1221,7 +1213,7 @@ internal func _taskGetIsCancelledWithReasonWithFlags(
 @usableFromInline
 internal func _taskIsCancelled(_ task: _AsyncTask) -> Bool
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 @_silgen_name("swift_task_isCancelledWithFlags")
 @usableFromInline
 internal func _taskIsCancelledWithFlags(_ task: _AsyncTask, flags: UInt64) -> Bool
