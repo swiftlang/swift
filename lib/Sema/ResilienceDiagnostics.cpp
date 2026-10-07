@@ -72,6 +72,15 @@ static bool isAccessedWithoutSymbol(const ValueDecl *decl) {
   if (decl->getEffectiveCodeGenerationModel() != CodeGenerationModel::Interface)
     return true;
 
+  // A function declared with '@_silgen_name' or '@_extern' and no body is
+  // defined elsewhere, such as in the runtime, so it isn't a symbol of this
+  // module.
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!func->hasBody() && (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
+                             func->getAttrs().hasAttribute<ExternAttr>()))
+      return true;
+  }
+
   // Enum cases are formed and matched directly.
   if (isa<EnumElementDecl>(decl))
     return true;

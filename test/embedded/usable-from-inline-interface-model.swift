@@ -172,3 +172,10 @@ public func genericAccessingMembers<T>(_ t: T) -> Int {
 // Unavailable code is never emitted.
 @_unavailableInEmbedded
 public func unavailableGeneric<T>(_ t: T) -> Int { internalHelper() }
+
+// Functions defined elsewhere, such as in the runtime, aren't symbols of this
+// module.
+@_silgen_name("some_runtime_function")
+func runtimeFunction() -> Int
+
+public func genericCallingRuntime<T>(_ t: T) -> Int { runtimeFunction() }
