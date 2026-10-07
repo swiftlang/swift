@@ -450,6 +450,37 @@ bb3:
   return %14 : $()
 }
 
+// A debug use in the default block requires the borrowed enum to remain alive across the
+// `switch_enum`.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_debug_use_after_switch :
+// CHECK:         [[BORROW:%.*]] = begin_borrow
+// CHECK:         switch_enum [[BORROW]] : $E
+// CHECK:       bb2
+// CHECK:         debug_value [[BORROW]] : $E, let, name "e"
+// CHECK:       } // end sil function 'dont_forward_borrow_with_debug_use_after_switch'
+sil [ossa] @dont_forward_borrow_with_debug_use_after_switch : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %6 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %6 : $String
+  br bb3
+
+bb2(%9 : @guaranteed $E):
+  debug_value %1 : $E, let, name "e"
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
 // The borrowed value is not owned, so there is nothing to gain.
 //
 // CHECK-LABEL: sil [ossa] @dont_forward_guaranteed_borrow :
