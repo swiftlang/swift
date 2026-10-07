@@ -39,6 +39,7 @@
 // RUN: %target-run %t/swift-base | %FileCheck %s --check-prefixes=CHECK,SWIFT-BASE
 
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_CxxImplementation
 
 #include <stdio.h>
