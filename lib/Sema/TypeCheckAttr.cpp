@@ -4051,12 +4051,18 @@ void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
 }
 
 void AttributeChecker::visitExportAttr(ExportAttr *attr) {
-  // @export cannot be combined with any of @inlinable, @usableFromInline,
-  // @_alwaysEmitIntoClient, or @_neverEmitIntoClient
+  // @export cannot be combined with any of @inlinable, @_alwaysEmitIntoClient,
+  // or @_neverEmitIntoClient. @export(implementation) cannot be combined with
+  // @usableFromInline either, but an @export(interface) declaration can be
+  // @usableFromInline, so that code clients emit can refer to its unique
+  // definition.
   if (auto other = D->getAttrs().getAttribute<InlinableAttr>())
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
-  if (auto other = D->getAttrs().getAttribute<UsableFromInlineAttr>())
-    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<UsableFromInlineAttr>()) {
+    if (attr->exportKind != ExportKind::Interface)
+      diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr,
+                            other);
+  }
   if (auto other = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>())
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
   if (auto other = D->getAttrs().getAttribute<NeverEmitIntoClientAttr>())

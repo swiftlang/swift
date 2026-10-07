@@ -48,18 +48,14 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   return true;
 }
 
-/// In Embedded Swift with the "interface" code generation model, return the
-/// declaration whose code clients emit themselves, if the given context is
-/// part of its body. That's a declaration with the "implementation" model,
-/// such as a generic function, that clients can use.
+/// In Embedded Swift, return the declaration whose code clients can emit
+/// themselves, if the given context is part of its body. That's any code
+/// without the "interface" code generation model, which cross-module
+/// optimization serializes.
 static const ValueDecl *getClientEmittedDecl(const DeclContext *DC) {
-  if (DC->getParentModule()->codeGenerationModel() !=
-      CodeGenerationModel::Interface)
-    return nullptr;
-
   const ValueDecl *decl = nullptr;
-  if (DC->getCodeGenerationModelOfCode(&decl) !=
-          CodeGenerationModel::Implementation ||
+  if (DC->getCodeGenerationModelOfCode(&decl) ==
+          CodeGenerationModel::Interface ||
       !decl)
     return nullptr;
 
@@ -69,9 +65,11 @@ static const ValueDecl *getClientEmittedDecl(const DeclContext *DC) {
 /// Whether code that clients emit can refer to the given declaration without
 /// a symbol.
 static bool isAccessedWithoutSymbol(const ValueDecl *decl) {
-  // Clients emit their own copies of declarations without a unique
-  // definition, such as generic ones, and their code is checked directly.
-  if (decl->hasNonUniqueDefinition())
+  // Clients can emit their own copies of declarations without the
+  // "interface" code generation model, and their code is checked directly.
+  // Only an "interface" declaration has a unique definition that clients
+  // must refer to by symbol.
+  if (decl->getEffectiveCodeGenerationModel() != CodeGenerationModel::Interface)
     return true;
 
   // Enum cases are formed and matched directly.
@@ -152,12 +150,13 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Embedded functions can reference non-public decls because their bodies
-  // can be serialized. However, this is not the case in the "interface" code
-  // generation model, so diagnose cases where this would happen and require
-  // @usableFromInline (or similar). To accommodate existing clients of
-  // using the "interface" code generation model, downgrade this to a warning
-  // unless we are also emitted a TBD file. There, we need to ensure that we
-  // know the full set of symbols ahead of time.
+  // can be serialized. However, a declaration with the "interface" code
+  // generation model, explicit or implied by its module, has a unique
+  // definition that clients refer to by symbol, so diagnose such references
+  // and require @usableFromInline (or similar). To accommodate existing
+  // clients, downgrade this to a warning unless we are also emitting a TBD
+  // file. There, we need to ensure that we know the full set of symbols
+  // ahead of time.
   if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
     // Code that is unavailable, such as '@_unavailableInEmbedded' code, is
     // never emitted.
