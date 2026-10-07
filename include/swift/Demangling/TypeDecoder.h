@@ -1184,9 +1184,13 @@ protected:
           flags.withNumParameters(parameters.size())
               .withParameterFlags(hasParamFlags)
               .withEscaping(
-                          Node->getKind() == NodeKind::FunctionType ||
-                          Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock);
+                  Node->getKind() == NodeKind::FunctionType ||
+                  Node->getKind() == NodeKind::EscapingAutoClosureType ||
+                  Node->getKind() == NodeKind::EscapingObjCBlock ||
+                  // Only escaping `@called` function types have their
+                  // own manglings.
+                  Node->getKind() == NodeKind::CalledOnceFunctionType ||
+                  Node->getKind() == NodeKind::CalledAtMostOnceFunctionType);
 
       // `@called` function types record their execution semantics as the
       // invertible protocols that they suppress.
