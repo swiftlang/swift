@@ -698,3 +698,111 @@ func captureRulesAtMostOnce(
   let _ = { @called(atMostOnce) [c] in c() } // Ok
   let _ = { [d] in _ = d } // Ok
 }
+
+// MARK: - Storage
+
+// Storage that can drop a value without calling it requires `Deinitable`.
+
+struct StoredPropertyStruct: ~Copyable {
+  let a: @called(exactlyOnce) () -> Void
+  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming struct 'StoredPropertyStruct' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  var b: @called(exactlyOnce) () -> Void // Only the first is diagnosed.
+  static let c: @called(exactlyOnce) () -> Void = { }
+  // expected-error@-1 {{static property 'c' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  let atMostOnce: @called(atMostOnce) () -> Void // Ok
+
+  // Computed properties and subscripts behave like functions.
+  var computed: @called(exactlyOnce) () -> Void { { } } // Ok
+  var getSet: @called(exactlyOnce) () -> Void { // Ok
+    get { { } }
+    set { newValue() }
+  }
+  subscript(i: Int) -> @called(exactlyOnce) () -> Void { { } } // Ok
+}
+
+class StoredPropertyClass {
+  var a: @called(exactlyOnce) () -> Void
+  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming class 'StoredPropertyClass' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  lazy var b: @called(exactlyOnce) () -> Void = { }
+  // expected-error@-1 {{lazy property 'b' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+
+  init(a: @escaping @called(exactlyOnce) () -> Void) {
+    self.a = a
+  }
+}
+
+actor StoredPropertyActor {
+  let a: @called(exactlyOnce) () -> Void
+  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming actor 'StoredPropertyActor' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+
+  init(a: @escaping @called(exactlyOnce) () -> Void) {
+    self.a = a
+  }
+}
+
+let globalExactlyOnce: @called(exactlyOnce) () -> Void = { }
+// expected-error@-1 {{global variable 'globalExactlyOnce' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+
+enum Payloads: ~Copyable {
+  case a(@called(exactlyOnce) () -> Void)
+  // expected-error@-1 {{associated value 'a' of 'Deinitable'-conforming enum 'Payloads' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  case b(Int, label: @called(exactlyOnce) () -> Void)
+}
+
+enum IndirectPayloads: ~Copyable {
+  indirect case a(@called(exactlyOnce) () -> Void)
+  // expected-error@-1 {{associated value 'a' of 'Deinitable'-conforming enum 'IndirectPayloads' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-2 {{noncopyable enum 'IndirectPayloads' cannot be marked indirect or have indirect cases yet}}
+}
+
+func tupleParameter(_: (@called(exactlyOnce) () -> Void, Int)) {}
+// expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+// expected-error@-2 {{parameter of noncopyable type '(@called(exactlyOnce) () -> Void, Int)' must specify ownership}}
+// expected-note@-3 {{add 'borrowing' for an immutable reference}}
+// expected-note@-4 {{add 'inout' for a mutable reference}}
+// expected-note@-5 {{add 'consuming' to take the value from the caller}}
+
+func tupleResult() -> (Int, @called(exactlyOnce) () -> Void) { fatalError() }
+// expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+
+func tupleStorage(_ f: @escaping @called(exactlyOnce) () -> Void) {
+  let _: (x: @called(exactlyOnce) () -> Void, y: Int)
+  // expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+  let _: ((Int, @called(exactlyOnce) () -> Void), Int)
+  // expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+  let _ = (f, 0)
+  // expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+  let _: (@called(exactlyOnce) () -> Void) = { } // Ok, not a tuple
+}
+
+func makeExactlyOnce() -> @called(exactlyOnce) () -> Void { { } }
+
+func asyncLetStorage() async {
+  async let f: @called(exactlyOnce) () -> Void = makeExactlyOnce()
+  // expected-error@-1 {{'async let' binding 'f' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  await f()
+}
+
+// Local variables and `inout` parameters keep the obligation with their scope
+// or with the caller.
+func allowedStorage(_ f: inout @called(exactlyOnce) () -> Void) {
+  let local: @called(exactlyOnce) () -> Void = { }
+  var localVar: @called(exactlyOnce) () -> Void = { }
+  localVar = { }
+  _ = local
+  _ = localVar
+}
+
+// MARK: - Property wrappers
+
+@propertyWrapper
+struct NCWrapper<T: ~Copyable>: ~Copyable {
+// expected-note@-1 {{required by generic struct 'NCWrapper' where 'T' = '@called(exactlyOnce) () -> Void'}}
+  var wrappedValue: T
+}
+
+struct WrappedStorage: ~Copyable {
+  @NCWrapper var wrapped: @called(exactlyOnce) () -> Void
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' cannot conform to 'Deinitable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+}
