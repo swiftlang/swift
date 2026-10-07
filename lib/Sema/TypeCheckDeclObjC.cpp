@@ -3815,6 +3815,7 @@ private:
     WrongType,
     WrongWritability,
     WrongRequiredAttr,
+    WrongDirectness,
     WrongForeignErrorConvention,
     WrongParameterOwnership,
     WrongSendability,
@@ -4287,6 +4288,18 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
+    // Directness has to agree, or the two sides disagree about the symbol: the
+    // header's callers would reference a direct symbol the implementation does
+    // not define, or vice versa.
+    //
+    // The requirement is imported Clang, so ask isObjCDirectDispatched(); the
+    // candidate is Swift, so ask for the attribute specifically.
+    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
+      auto candAFD = cast<AbstractFunctionDecl>(cand);
+      if (reqAFD->isObjCDirectDispatched() != candAFD->isObjCDirect())
+        return MatchOutcome::WrongDirectness;
+    }
+
     if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
       auto candAFD = cast<AbstractFunctionDecl>(cand);
       if (reqAFD->getForeignErrorConvention() !=
@@ -4698,6 +4711,23 @@ private:
       else
         diag.fixItRemove(cand->getAttrs().getAttribute<RequiredAttr>()
                              ->getLocation());
+      return;
+    }
+
+    case MatchOutcome::WrongDirectness: {
+      bool shouldBeDirect =
+          cast<AbstractFunctionDecl>(req)->isObjCDirectDispatched();
+
+      auto diag = diagnose(cand, diag::objc_implementation_directness_mismatch,
+                           cand, req, shouldBeDirect);
+
+      if (shouldBeDirect)
+        diag.fixItInsert(cand->getAttributeInsertionLoc(/*forModifier=*/false),
+                         "@objcDirect ");
+      else
+        diag.fixItRemove(cand->getAttrs()
+                             .getAttribute<ObjCDirectAttr>()
+                             ->getRangeWithAt());
       return;
     }
 

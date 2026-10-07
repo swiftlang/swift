@@ -2112,6 +2112,11 @@ ERROR(objc_implementation_required_attr_mismatch,none,
       "by the header",
       (const ValueDecl *, const ValueDecl *, bool))
 
+ERROR(objc_implementation_directness_mismatch,none,
+      "%kind0 should%select{ not|}2 be '@objcDirect' to match %kindonly1 "
+      "declared by the header",
+      (const ValueDecl *, const ValueDecl *, bool))
+
 ERROR(objc_implementation_candidate_has_error_convention,none,
       "%kind0 does not match the declaration in the header because it throws an "
       "error",
