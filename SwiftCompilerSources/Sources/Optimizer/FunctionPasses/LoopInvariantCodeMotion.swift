@@ -65,6 +65,7 @@ private struct MovableInstructions {
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var scopedInsts: [ScopedInstruction] = []
+  var stackAllocations: [AllocStackInst] = []
 }
 
 /// Analyzed instructions inside the currently processed loop.
@@ -80,11 +81,6 @@ private struct AnalyzedInstructions {
   // loop blocks that dominate all exiting and latch blocks
   var dominatingBlocks: BasicBlockSet
 
-  /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
-  var hasOtherMemReadingInsts: Bool {
-    !loopReadOnlyEffects.isEmpty
-  }
-  
   init (in loop: Loop, _ context: FunctionPassContext) {
     self.loopSideEffects = StackWithCount<Instruction>(context)
     self.loopReadOnlyEffects = StackWithCount<Instruction>(context)
@@ -138,7 +134,7 @@ private func analyzeInstructions(
         continue // We can ignore the side effects of FixLifetimes
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
-        continue // Don't set `hasOtherMemReadingInsts`
+        continue // Don't add to `loopReadOnlyEffects`
       case let storeInst as StoreInst:
         analyzedInstructions.stores.append(storeInst)
       case let beginAccessInst as BeginAccessInst:
@@ -163,26 +159,24 @@ private func collectProjectableAccessPathsAndSplitLoads(
   _ movableInstructions: inout MovableInstructions,
   _ context: FunctionPassContext
 ) {
-  if !analyzedInstructions.hasOtherMemReadingInsts {
-    for storeInst in analyzedInstructions.stores {
-      let accessPath = storeInst.destination.accessPath
-      if accessPath.isLoopInvariant(loop: loop),
-         analyzedInstructions.isOnlyLoadedAndStored(
-           accessPath: accessPath,
-           storeAddr: storeInst.destination,
-           context.aliasAnalysis
-         ),
-         !movableInstructions.loadAndStoreAccessPaths.contains(accessPath),
-         // This is not a requirement for functional correctness, but we don't want to
-         // _speculatively_ load and store the value (outside of the loop).
-         analyzedInstructions.storesCommonlyDominateExits(of: loop, storingTo: accessPath, context),
-         analyzedInstructions.splitLoads(
-           storeAddr: storeInst.destination,
-           accessPath: accessPath,
-           context
-         ) {
-        movableInstructions.loadAndStoreAccessPaths.append(accessPath)
-      }
+  for storeInst in analyzedInstructions.stores {
+    let accessPath = storeInst.destination.accessPath
+    if accessPath.isLoopInvariant(loop: loop),
+       analyzedInstructions.isOnlyLoadedAndStored(
+         accessPath: accessPath,
+         storeAddr: storeInst.destination,
+         context.aliasAnalysis
+       ),
+       !movableInstructions.loadAndStoreAccessPaths.contains(accessPath),
+       // This is not a requirement for functional correctness, but we don't want to
+       // _speculatively_ load and store the value (outside of the loop).
+       analyzedInstructions.storesCommonlyDominateExits(of: loop, storingTo: accessPath, context),
+       analyzedInstructions.splitLoads(
+         storeAddr: storeInst.destination,
+         accessPath: accessPath,
+         context
+       ) {
+      movableInstructions.loadAndStoreAccessPaths.append(accessPath)
     }
   }
 }
@@ -437,6 +431,8 @@ private func collectMovableInstructions(
         if !beginBorrowInst.isLexical && beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginBorrowInst)
         }
+      case let allocStackInst as AllocStackInst:
+        movableInstructions.stackAllocations.append(allocStackInst)
       case let fullApplySite as FullApplySite:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
@@ -472,6 +468,7 @@ private func collectMovableInstructions(
 /// - hoist of instructions that are guaranteed to be executed
 /// - sink
 /// - hoist with sink of scoped instructions
+/// - hoist of stack allocations, if nothing else moved
 private func optimizeLoop(
   loop: Loop,
   movableInstructions: inout MovableInstructions,
@@ -484,6 +481,12 @@ private func optimizeLoop(
   changed = movableInstructions.hoistAndSinkLoadsAndStores(outOf: loop, context)      || changed
   changed = movableInstructions.hoistInstructions(outOf: loop, context)               || changed
   changed = movableInstructions.hoistWithSinkScopedInstructions(outOf: loop, context) || changed
+
+  // Speculative store hoisting in `speculativelyHoistInstructions` can only hoist a conditional store to an `alloc_stack` that is still inside the loop.
+  // That's why we can hoist the remaining stack allocations only after the previous steps have converged.
+  if !changed {
+    changed = movableInstructions.hoistStackAllocations(outOf: loop, context)
+  }
 
   return changed
 }
@@ -507,6 +510,10 @@ private extension AnalyzedInstructions {
     storeAddr: Value,
     _ aliasAnalysis: AliasAnalysis
   ) -> Bool {
+    if loopReadOnlyEffects.contains(where: { $0.mayReadOrWrite(address: storeAddr, aliasAnalysis) }) {
+      return false
+    }
+
     if loopSideEffects.contains(where: { sideEffect in
       switch sideEffect {
       case let storeInst as StoreInst:
@@ -690,13 +697,14 @@ private extension AnalyzedInstructions {
         return false
       }
 
-      guard !loadInst.isDeleted, loadInst.operand.value.accessPath.contains(accessPath) else {
+      guard !loadInst.isDeleted,
+            let projectionPath = loadInst.operand.value.accessPath.getProjection(to: accessPath),
+            !projectionPath.isEmpty else {
         newLoads.push(loadInst)
         continue
       }
 
-      guard let projectionPath =  loadInst.operand.value.accessPath.getProjection(to: accessPath),
-            let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
+      guard let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
         newLoads.push(loadInst)
         return false
       }
@@ -757,8 +765,11 @@ private extension MovableInstructions {
     var changed = false
 
     for scopedInst in scopedInsts {
-      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
-        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
+      if let storeBorrowInst = scopedInst as? StoreBorrowInst,
+         loop.contains(block: storeBorrowInst.allocStack.parentBlock) {
+        guard storeBorrowInst.allocStack.hoist(outOf: loop, context) else {
+          continue
+        }
       }
 
       guard scopedInst.hoist(outOf: loop, context) else {
@@ -776,6 +787,17 @@ private extension MovableInstructions {
       }
       
       changed = true
+    }
+
+    return changed
+  }
+
+  /// Hoist stack allocations and sink their deallocations.
+  mutating func hoistStackAllocations(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
+    var changed = false
+
+    for allocStackInst in stackAllocations {
+      changed = allocStackInst.hoist(outOf: loop, context) || changed
     }
 
     return changed
@@ -848,14 +870,19 @@ private extension MovableInstructions {
     defer { cloner.deinitialize() }
     
     guard let initialAddr = (cloner.cloneRecursively(value: firstStore.destination) { srcAddr, cloner in
+      let addressDominatesPreheader = srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree)
+
       switch srcAddr {
       case is AllocStackInst, is BeginBorrowInst, is MarkDependenceInst:
-        return .stopCloning
+        // Use only as a base.
+        if !addressDominatesPreheader {
+          return .stopCloning
+        }
       default: break
       }
       
       // Clone projections until the address dominates preheader.
-      if srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree) {
+      if addressDominatesPreheader {
         cloner.recordFoldedValue(srcAddr, mappedTo: srcAddr)
         return .customValue(srcAddr)
       } else {
@@ -864,6 +891,34 @@ private extension MovableInstructions {
       }
     }) else {
       return false
+    }
+
+    if initialAddr is AllocStackInst {
+      var currentBlock: BasicBlock?
+      var currentVal: Value?
+
+      for inst in loadsAndStores {
+        let block = inst.parentBlock
+
+        if block != currentBlock {
+          currentBlock = block
+          currentVal = nil
+        }
+
+        if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
+          currentVal = storeInst.source
+          continue
+        }
+
+        guard let loadInst = inst as? LoadInst,
+              loadInst.loadsFrom(accessPath) else {
+          continue
+        }
+
+        if currentVal == nil {
+          return false
+        }
+      }
     }
 
     let ownership: LoadInst.LoadOwnership
@@ -996,21 +1051,34 @@ private extension MovableInstructions {
 
 private func hoistAllocAndDealloc(
   allocStackInst: AllocStackInst, outOf loop: Loop, _ context: FunctionPassContext
-) {
+) -> Bool {
+  guard loop.contains(block: allocStackInst.parentBlock), !loop.hasNoExitBlocks else {
+    return false
+  }
+
+  var liveRange = BasicBlockRange(begin: allocStackInst.parentBlock, context)
+  defer { liveRange.deinitialize() }
+  liveRange.insert(contentsOf: allocStackInst.deallocations.map { $0.parentBlock })
+
+  let deallocationsInLoop = allocStackInst.deallocations.filter { loop.contains(block: $0.parentBlock) }
+
+  log("Hoisting \(allocStackInst)")
   allocStackInst.move(before: loop.preheader!.terminator, context)
 
-  var sankFirst = false
-  for deallocStack in allocStackInst.deallocations {
-    if sankFirst {
-      context.erase(instruction: deallocStack)
-    } else {
-      sankFirst = deallocStack.sink(outOf: loop, context)
-    }
+  for deallocStack in deallocationsInLoop {
+    context.erase(instruction: deallocStack)
+  }
+
+  for exitBlock in loop.exitBlocks where !liveRange.contains(exitBlock.singlePredecessor!) {
+    let builder = Builder(before: exitBlock.instructions.first!, context)
+    builder.createDeallocStack(allocStackInst)
   }
 
   context.notifyInvalidatedStackNesting()
+
+  return true
 }
-  
+
 private extension Instruction {
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
@@ -1043,8 +1111,7 @@ private extension Instruction {
         hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
         return true
       } else if let allocStackInst = self as? AllocStackInst {
-        hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
-        return true
+        return hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
       } else {
         move(before: terminator, context)
       }
