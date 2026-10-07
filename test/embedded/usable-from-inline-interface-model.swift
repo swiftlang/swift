@@ -117,3 +117,47 @@ public struct HasStatic {
 }
 
 public var interfaceGlobal: Int = internalHelper() + privateHelper()
+
+// Clients access a struct's stored properties and form enum cases directly, so
+// they don't need symbols.
+@usableFromInline
+struct StoredAndComputed {
+  var stored: Int
+  var computed: Int { stored }
+  // expected-tbd-note@-1 {{property 'computed' is not '@usableFromInline' or public}}
+  // expected-warn-note@-2 {{property 'computed' is not '@usableFromInline' or public}}
+  // expected-warn-note@-3 {{getter for property 'computed' is not '@usableFromInline' or public}}
+
+  @usableFromInline init() { stored = 0 }
+}
+
+@usableFromInline
+enum Cases {
+  case one
+  case two(Int)
+}
+
+// A class's stored property can be dispatched through accessors.
+@usableFromInline
+final class StoredInClass {
+  var stored: Int = 0
+  // expected-tbd-note@-1 {{property 'stored' is not '@usableFromInline' or public}}
+  // expected-warn-note@-2 {{property 'stored' is not '@usableFromInline' or public}}
+  // expected-warn-note@-3 {{getter for property 'stored' is not '@usableFromInline' or public}}
+
+  @usableFromInline init() {}
+}
+
+public func genericAccessingMembers<T>(_ t: T) -> Int {
+  var s = StoredAndComputed()
+  s.stored = MemoryLayout<T>.size
+  let c = Cases.two(s.computed)
+  // expected-tbd-error@-1 {{property 'computed' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
+  // expected-warn-warning@-2 {{property 'computed' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
+  // expected-warn-warning@-3 {{getter for property 'computed' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
+  if case .two(let value) = c { return value + StoredInClass().stored }
+  // expected-tbd-error@-1 {{property 'stored' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
+  // expected-warn-warning@-2 {{property 'stored' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
+  // expected-warn-warning@-3 {{getter for property 'stored' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
+  return 0
+}

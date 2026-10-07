@@ -37,3 +37,27 @@ func usableFromInlineGeneric<T>(_ t: T) -> Int { helper(1) }
 public func callsUsableFromInlineGeneric<T>(_ t: T) -> Int {
   usableFromInlineGeneric(t)
 }
+
+// Clients access a struct's stored properties and form enum cases directly,
+// so those don't need to be '@usableFromInline'.
+@usableFromInline
+struct HasStoredProperty {
+  var stored: Int
+
+  @usableFromInline init(stored: Int) { self.stored = stored }
+}
+
+@usableFromInline
+enum HasCases {
+  case first
+  case second(Int)
+}
+
+public func genericUsingStoredAndCases<T>(_ t: T) -> Int {
+  var s = HasStoredProperty(stored: MemoryLayout<T>.size)
+  s.stored += 1
+  switch HasCases.second(s.stored) {
+  case .first: return 0
+  case .second(let value): return value
+  }
+}

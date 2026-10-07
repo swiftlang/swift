@@ -72,6 +72,26 @@ static const ValueDecl *getClientEmittedDecl(const DeclContext *DC) {
   return decl;
 }
 
+/// Whether code that clients emit can refer to the given declaration without
+/// a symbol, because they access it directly.
+static bool isAccessedWithoutSymbol(const ValueDecl *decl) {
+  // Enum cases are formed and matched directly.
+  if (isa<EnumElementDecl>(decl))
+    return true;
+
+  // So are a struct's stored properties, unless they have observers.
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl))
+    decl = accessor->getStorage();
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
+    return var->isInstanceMember() &&
+           isa_and_nonnull<StructDecl>(
+               var->getDeclContext()->getSelfNominalTypeDecl()) &&
+           var->getImplInfo().isSimpleStored();
+  }
+
+  return false;
+}
+
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
                                                  const ExportContext &where) {
@@ -146,7 +166,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // know the full set of symbols ahead of time.
   if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
     auto *clientEmittedDecl = getClientEmittedDecl(DC);
-    if (!clientEmittedDecl)
+    if (!clientEmittedDecl || isAccessedWithoutSymbol(D))
       return false;
 
     bool isError = Context.TypeCheckerOpts.IsEmittingTBD;
