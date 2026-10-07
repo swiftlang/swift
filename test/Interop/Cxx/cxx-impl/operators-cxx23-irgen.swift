@@ -5,7 +5,6 @@
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -Xcc -std=c++23 \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -disable-availability-checking \
 // RUN:   -I %S/Inputs \
 // RUN:   %s | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi
 

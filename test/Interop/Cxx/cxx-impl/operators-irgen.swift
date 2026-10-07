@@ -4,7 +4,7 @@
 // RUN: %target-swift-emit-ir \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -I %S/Inputs \
 // RUN:   %s | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi
 
