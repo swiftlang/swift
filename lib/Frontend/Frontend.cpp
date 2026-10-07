@@ -159,6 +159,11 @@ CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.LLVMBitcodeDiagnosticsPath;
 }
+std::string
+CompilerInvocation::getSARIFDiagnosticsPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.SARIFDiagnosticsPath;
+}
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
          "TBDPath only makes sense when the whole module can be seen");
