@@ -125,6 +125,9 @@ extension _StringGuts {
     return isFastUTF8 && _object.isASCII
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var isNFC: Bool { return _object.isNFC }
 

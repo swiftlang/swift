@@ -216,6 +216,9 @@ public func _float16ToStringImpl(
 // whose binary exponent is negative.  This means they are handled by
 // multiplying by a positive power of ten, which can be done exactly
 // with integer arithmetic due to the small range of Float16.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @available(SwiftStdlib 5.3, *)
 internal func _Float16ToASCII(
   value f: Float16,
@@ -432,6 +435,9 @@ internal func _float32ToStringImpl(
 // Buffer must be at least 20 bytes long and must be pre-filled
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func _Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
@@ -717,6 +723,9 @@ internal func _float64ToStringImpl(
 // Buffer must be at least 32 bytes long and must be pre-filled
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func _Float64ToASCII(
   value f: Float64,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>

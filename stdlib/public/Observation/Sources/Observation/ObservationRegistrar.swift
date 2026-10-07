@@ -15,14 +15,20 @@
 /// the ``Observation/Observable()`` macro to indicate observability of a type.
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar: Sendable {
-  private struct State: @unchecked Sendable {
-    private enum ObservationKind {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal struct State: @unchecked Sendable {
+    internal enum ObservationKind {
       case willSetTracking(@Sendable (AnyKeyPath) -> Void)
       case didSetTracking(@Sendable (AnyKeyPath) -> Void)
       case deinitTracking(@Sendable () -> Void)
     }
     
-    private struct Observation {
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
+    internal struct Observation {
       private var kind: ObservationKind
       internal var properties: Set<AnyKeyPath>
       
@@ -40,6 +46,9 @@ public struct ObservationRegistrar: Sendable {
         }
       }
 
+#if hasFeature(Embedded)
+      @usableFromInline
+#endif
       var didSetTracker: (@Sendable (AnyKeyPath) -> Void)? {
         switch kind {
         case .didSetTracking(let tracker):
@@ -130,6 +139,9 @@ public struct ObservationRegistrar: Sendable {
       return trackers
     }
     
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable (AnyKeyPath) -> Void] {
       var trackers = [@Sendable (AnyKeyPath) -> Void]()
       if let ids = lookups[keyPath] {
@@ -155,9 +167,15 @@ public struct ObservationRegistrar: Sendable {
     }
   }
   
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal struct Context: Sendable {
     private let state = _ManagedCriticalState(State())
     
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal var id: ObjectIdentifier { state.id }
     
     internal func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
@@ -185,6 +203,9 @@ public struct ObservationRegistrar: Sendable {
       }
     }
 
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     func startTrackingIfNeeded(_ tracking: UnsafeRawPointer) {
       state.withCriticalRegion { state in
         _ = state.trackingLists.insert(tracking)
@@ -233,6 +254,9 @@ public struct ObservationRegistrar: Sendable {
     }
   }
   
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var context: Context {
     return extent.context
   }

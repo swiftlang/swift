@@ -40,7 +40,10 @@ internal func writeChars(_ chars: UnsafeBufferPointer<UInt8>) {
 }
 
 extension StaticString {
-  fileprivate func writeToStandardOutput() {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal func writeToStandardOutput() {
     withUTF8Buffer {
       unsafe writeChars($0)
     }
@@ -48,7 +51,10 @@ extension StaticString {
 }
 
 extension String {
-  fileprivate mutating func writeToStandardOutput() {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal mutating func writeToStandardOutput() {
     withUTF8 {
       unsafe writeChars($0)
     }

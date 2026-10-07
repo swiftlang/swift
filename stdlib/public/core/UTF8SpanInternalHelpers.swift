@@ -171,6 +171,9 @@ extension UnsafeRawPointer {
 
   // Returns isASCII
   // TODO: return more values
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func _validateUTF8(
     limitedBy end: Int
   ) throws(UTF8.ValidationError) -> Bool {

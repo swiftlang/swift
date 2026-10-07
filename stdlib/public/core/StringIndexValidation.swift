@@ -201,6 +201,9 @@ extension _StringGuts {
   /// - have an encoding that matches this string,
   /// - are within the bounds of this string, and
   /// - are aligned on a scalar boundary.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func validateScalarRange(
     _ range: Range<String.Index>
   ) -> Range<String.Index> {
@@ -224,6 +227,9 @@ extension _StringGuts {
   /// - have an encoding that matches this string,
   /// - are within `start ..< end`, and
   /// - are aligned on a scalar boundary.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func validateScalarRange(
     _ range: Range<String.Index>,
     in bounds: Range<String.Index>
@@ -363,6 +369,9 @@ extension _StringGuts {
   /// was linked with Swift Stdlib version 5.7 or better. This is used to work
   /// around binary compatibility problems with existing apps that pass invalid
   /// indices to String APIs.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func validateScalarRange_5_7(
     _ range: Range<String.Index>
   ) -> Range<String.Index> {

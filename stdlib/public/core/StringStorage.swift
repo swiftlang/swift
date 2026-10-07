@@ -37,7 +37,10 @@ internal protocol _AbstractStringStorage {
 
 #endif
 
-private typealias _CountAndFlags = _StringObject.CountAndFlags
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
+internal typealias _CountAndFlags = _StringObject.CountAndFlags
 
 /*
 
@@ -275,12 +278,18 @@ fileprivate func _allocateStringStorage(
 // NOTE: older runtimes called this class _StringStorage. The two
 // must coexist without conflicting ObjC class names, so it was
 // renamed. The old name must not be used in the new runtime.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 final internal class __StringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
 #if _pointerBitWidth(_64)
   fileprivate var _capacityAndFlags: _CapacityAndFlags
   internal var _countAndFlags: _StringObject.CountAndFlags
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @inline(__always)
   internal var count: Int { _countAndFlags.count }
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
@@ -291,6 +300,9 @@ final internal class __StringStorage
   private var _countFlags: UInt16
   private var _capacityFlags: UInt16
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @inline(__always)
   internal var count: Int { _count }
 
@@ -307,9 +319,15 @@ final internal class __StringStorage
 #error("Unknown platform")
 #endif
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @inline(__always)
   final internal var isASCII: Bool { _countAndFlags.isASCII }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   final internal var asString: String {
     @_effects(readonly) @inline(__always)
     get { String(_StringGuts(self)) }
@@ -333,10 +351,13 @@ final internal class __StringStorage
 
 // Creation
 extension __StringStorage {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @_effects(releasenone)
-  private static func create(
+  internal static func create(
     codeUnitCapacity capacity: Int,
-    countAndFlags: _CountAndFlags,
+    countAndFlags: _StringObject.CountAndFlags,
     precalculatedUTF16Count utf16Len: Int? = nil
   ) -> __StringStorage {
     _internalInvariant(capacity >= countAndFlags.count)
@@ -484,6 +505,9 @@ extension __StringStorage {
     return hasBreadcrumbs && !hasOneCrumb
   }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var mutableStart: UnsafeMutablePointer<UInt8> {
     unsafe UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
@@ -493,6 +517,9 @@ extension __StringStorage {
      unsafe mutableStart + count
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var start: UnsafePointer<UInt8> {
      unsafe UnsafePointer(mutableStart)
@@ -504,11 +531,17 @@ extension __StringStorage {
   }
 
   // Point to the nul-terminator.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @inline(__always)
   internal final var terminator: UnsafeMutablePointer<UInt8> {
     unsafe mutableEnd
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var codeUnits: UnsafeBufferPointer<UInt8> {
     unsafe UnsafeBufferPointer(start: start, count: count)
@@ -558,14 +591,20 @@ extension __StringStorage {
   // NOTE: Callers who wish to mutate this storage should enforce nul-termination
   //
   // TODO: Refactoring or removing. Excluding the last byte is awkward.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @inline(__always)
-  private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
+  internal var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     unsafe UnsafeMutableBufferPointer(
       start: mutableEnd, count: unusedCapacity)
   }
 
   // The capacity available for appending. Note that this excludes the required
   // nul-terminator.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var unusedCapacity: Int { capacity &- count }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -608,6 +647,9 @@ extension __StringStorage {
 // Appending
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @_effects(releasenone)
   internal func _updateCountAndFlags(
     newCount: Int,
@@ -655,8 +697,11 @@ extension __StringStorage {
   }
 
   // Perform common post-append adjustments and invariant enforcement.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @_effects(releasenone)
-  private func _postAppendAdjust(
+  internal func _postAppendAdjust(
     appendedCount: Int, appendedIsASCII isASCII: Bool
   ) {
     let oldTerminator = unsafe self.terminator
@@ -716,6 +761,9 @@ extension __StringStorage {
 
   // Reposition a tail of this storage from src to dst. Returns the length of
   // the tail.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @_effects(releasenone)
   internal func _slideTail(
     src: UnsafeMutablePointer<UInt8>,
@@ -785,6 +833,9 @@ extension __StringStorage {
 // NOTE: older runtimes called this class _SharedStringStorage. The two
 // must coexist without conflicting ObjC class names, so it was
 // renamed. The old name must not be used in the new runtime.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @safe
 final internal class __SharedStringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {

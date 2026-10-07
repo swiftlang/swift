@@ -210,6 +210,18 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_DISTRIBUTE
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
 
+    # The TBD file, if any, describes the archive's symbols, so install it
+    # alongside the archive.
+    get_target_property(_distributed_tbd embedded-distributed-${mod}
+                        SWIFT_EMBEDDED_TBD_PATH)
+    if(_distributed_tbd)
+      swift_install_in_component(
+        FILES "${_distributed_tbd}"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "stdlib"
+        )
+    endif()
+
     set_property(TARGET embedded-distributed-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
     embedded_amend_archive_commands_on_darwin_host(embedded-distributed-${mod} ${triple})

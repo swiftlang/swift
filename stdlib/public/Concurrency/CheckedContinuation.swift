@@ -18,6 +18,9 @@ internal func logFailedCheck(_ message: UnsafeRawPointer)
 
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @available(SwiftStdlib 5.1, *)
 internal final class CheckedContinuationCanary: @unchecked Sendable {
   // The instance state is stored in tail-allocated raw memory, so that
@@ -25,7 +28,10 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 
   private init() { fatalError("must use create") }
 
-  private static func _create(continuation: UnsafeRawPointer, function: String)
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal static func _create(continuation: UnsafeRawPointer, function: String)
       -> CheckedContinuationCanary {
     let instance = unsafe Builtin.allocWithTailElems_1(CheckedContinuationCanary.self,
       1._builtinWordValue,
@@ -36,7 +42,10 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     return instance
   }
 
-  private var _continuationPtr: UnsafeMutablePointer<UnsafeRawPointer?> {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
+  internal var _continuationPtr: UnsafeMutablePointer<UnsafeRawPointer?> {
     return unsafe UnsafeMutablePointer<UnsafeRawPointer?>(
       Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
   }

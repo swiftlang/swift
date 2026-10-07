@@ -94,6 +94,9 @@ extension Unicode {
   /// boundary. The normalizer state has value semantics, so it is possible
   /// to copy and store and is inherently thread-safe.
   ///
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal struct _NFDNormalizer: Sendable {
 
     internal enum State {
@@ -110,6 +113,9 @@ extension Unicode {
 
     /// Creates a new normalizer.
     ///
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal init() { }
 
     /// Resume normalizing the text stream.
@@ -160,6 +166,9 @@ extension Unicode {
 
     // Intended ABI barrier for resume(consuming: inout some IteratorProtocol<Unicode.Scalar>).
     // when it becomes public.
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func resume(
       consuming nextFromSource: () -> Unicode.Scalar?
     ) -> Unicode.Scalar? {
@@ -194,6 +203,9 @@ extension Unicode {
     ///   print(scalar)
     /// }
     /// ```
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func flush() -> Unicode.Scalar? {
       _flush()?.scalar
     }

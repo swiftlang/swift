@@ -54,7 +54,10 @@ extension CollectionDifference {
 }
 
 // Error type allows the use of throw to unroll state on application failure
-private enum _ApplicationError : Error { case failed }
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
+internal enum _ApplicationError : Error { case failed }
 
 extension RangeReplaceableCollection {
   /// Applies the given difference to this collection.
@@ -203,12 +206,27 @@ extension BidirectionalCollection where Element: Equatable {
 /// │                                   └────┴────┴────┴────┴────┘│
 /// └─────────────────────────────────────────────────────────────┘
 /// ```
-@safe fileprivate struct DoubleKVector: ~Copyable {
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
+@safe internal struct DoubleKVector: ~Copyable {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   let buffer: UnsafeMutableBufferPointer<Int>
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   let forwardOffset: Int
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   let backwardOffset: Int
 #if INTERNAL_CHECKS_ENABLED
-  private let range: Int
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal let range: Int
 #endif
 
   /// Creates a new double k-vector.
@@ -231,14 +249,23 @@ extension BidirectionalCollection where Element: Equatable {
     unsafe buffer.deallocate()
   }
   
-  @inline(__always) fileprivate func forwardTransform(_ index: Int) -> Int {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
+  @inline(__always) internal func forwardTransform(_ index: Int) -> Int {
     forwardOffset &+ index
   }
 
-  @inline(__always) fileprivate func backwardTransform(_ index: Int) -> Int {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
+  @inline(__always) internal func backwardTransform(_ index: Int) -> Int {
     backwardOffset &+ index
   }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   subscript(forward index: Int) -> Int {
     get {
 #if INTERNAL_CHECKS_ENABLED
@@ -254,6 +281,9 @@ extension BidirectionalCollection where Element: Equatable {
     }
   }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   subscript(backward index: Int) -> Int {
     get {
 #if INTERNAL_CHECKS_ENABLED
@@ -271,48 +301,100 @@ extension BidirectionalCollection where Element: Equatable {
 }
 
 /// A two-dimensional region of a Myers diff algorithm edit graph.
-fileprivate struct EditGraphRect: Equatable {
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
+internal struct EditGraphRect: Equatable {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   var left: Int
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   var top: Int
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   var right: Int
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   var bottom: Int
+
+#if hasFeature(Embedded)
+  @inlinable
+#endif
+  init(left: Int, top: Int, right: Int, bottom: Int) {
+    self.left = left
+    self.top = top
+    self.right = right
+    self.bottom = bottom
+  }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var width: Int {
     right &- left
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var height: Int {
     bottom &- top
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var size: Int {
     width &+ height
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var delta: Int {
     width &- height
   }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var isEven: Bool {
     delta.isMultiple(of: 2)
   }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var isOdd: Bool {
     !delta.isMultiple(of: 2)
   }
   
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   var max: Int {
     (size &+ 1) / 2
   }
   
   /// Shrinks this box so that its bottom right corner is the top left corner of
   /// the given box.
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   func cropped(toTopLeftOf limit: EditGraphRect) -> EditGraphRect {
     .init(left: left, top: top, right: limit.left, bottom: limit.top)
   }
   
   /// Shrinks this box so that its top left corner is the bottom right corner of
   /// the given box.
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   func cropped(toBottomRightOf limit: EditGraphRect) -> EditGraphRect {
     .init(left: limit.right, top: limit.bottom, right: right, bottom: bottom)
   }
@@ -342,7 +424,10 @@ fileprivate struct EditGraphRect: Equatable {
   }
 }
 
-fileprivate struct LinearMyers: ~Copyable {
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
+internal struct LinearMyers: ~Copyable {
   var kVector: DoubleKVector
   
   /// Implements a refinement of the Myers diffing algorithm that uses
@@ -579,7 +664,10 @@ fileprivate struct LinearMyers: ~Copyable {
 }
 
 extension LinearMyers {
-  fileprivate init?(
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal init?(
     initialSize size: Int
   ) {
     guard size >= 0 else { return nil }

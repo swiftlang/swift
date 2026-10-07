@@ -504,6 +504,9 @@ extension _StringObject {
 
   // Whether we are native or shared, i.e. we have a backing class which
   // conforms to `_AbstractStringStorage`
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var hasStorage: Bool {
 #if os(Android) && arch(arm64)
@@ -514,6 +517,9 @@ extension _StringObject {
   }
 
   // Whether we are a mortal, native (tail-allocated) string
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var hasNativeStorage: Bool {
 #if os(Android) && arch(arm64)
@@ -532,6 +538,9 @@ extension _StringObject {
   }
 
   // Whether we are a mortal, shared string (managed by Swift runtime)
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   internal var hasSharedStorage: Bool { return hasStorage && !hasNativeStorage }
 }
 
@@ -546,10 +555,16 @@ extension _StringObject {
   }
 
   // Whether this string is shared, presupposing it is both large and fast
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var largeFastIsShared: Bool { return !largeFastIsTailAllocated }
 
   // Whether this string is a lazily-bridged NSString, presupposing it is large
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var largeIsCocoa: Bool {
     _internalInvariant(isLarge)
@@ -848,6 +863,9 @@ extension _StringObject.CountAndFlags {
       isNativelyStored: false,
       isTailAllocated: true)
   }
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal init(mortalCount: Int, isASCII: Bool) {
     self.init(
@@ -1142,6 +1160,9 @@ extension _StringObject {
     return _countAndFlags.isASCII
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var isNFC: Bool {
     if isSmall {

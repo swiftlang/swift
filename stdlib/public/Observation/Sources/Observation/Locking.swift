@@ -49,12 +49,21 @@ import Android
 #error("Unsupported platform")
 #endif
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal struct Lock {
   #if $Embedded
   // Opaque inline storage for the platform's mutex; the platform layer decides
   // what actually lives in these words.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias Primitive = [(EMBEDDED_SWIFT_MUTEX_NUM_WORDS) of UInt]
   #elseif canImport(Darwin.os.lock)
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias Primitive = os_unfair_lock
   #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
   #if os(FreeBSD) || os(OpenBSD)
@@ -62,18 +71,33 @@ internal struct Lock {
   // We should replace this with the appropriate API note in the platform
   // overlay.
   // https://github.com/swiftlang/swift/issues/81407
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias Primitive = pthread_mutex_t?
   #else
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias Primitive = pthread_mutex_t
   #endif
   #elseif canImport(WinSDK)
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias Primitive = SRWLOCK
   #elseif arch(wasm32)
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias Primitive = Int
   #else
   #error("Unsupported platform")
   #endif
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   typealias PlatformLock = UnsafeMutablePointer<Primitive>
   let platformLock: PlatformLock
 
@@ -81,7 +105,10 @@ internal struct Lock {
     self.platformLock = platformLock
   }
 
-  fileprivate static func initialize(_ platformLock: PlatformLock) {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal static func initialize(_ platformLock: PlatformLock) {
     #if $Embedded
     platformLock.initialize(to: .init(repeating: 0))
     _swift_mutex_init(UnsafeMutableRawPointer(platformLock), 0)
@@ -99,7 +126,10 @@ internal struct Lock {
     #endif
   }
 
-  fileprivate static func deinitialize(_ platformLock: PlatformLock) {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal static func deinitialize(_ platformLock: PlatformLock) {
     #if $Embedded
     _swift_mutex_destroy(UnsafeMutableRawPointer(platformLock))
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
@@ -109,7 +139,10 @@ internal struct Lock {
     platformLock.deinitialize(count: 1)
   }
 
-  fileprivate static func lock(_ platformLock: PlatformLock) {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal static func lock(_ platformLock: PlatformLock) {
     #if $Embedded
     _swift_mutex_lock(UnsafeMutableRawPointer(platformLock))
     #elseif canImport(Darwin.os.lock)
@@ -124,7 +157,10 @@ internal struct Lock {
     #endif
   }
 
-  fileprivate static func unlock(_ platformLock: PlatformLock) {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
+  internal static func unlock(_ platformLock: PlatformLock) {
     #if $Embedded
     _swift_mutex_unlock(UnsafeMutableRawPointer(platformLock))
     #elseif canImport(Darwin.os.lock)
@@ -151,10 +187,16 @@ internal struct Lock {
     platformLock.deallocate()
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   func lock() {
     Lock.lock(platformLock)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   func unlock() {
     Lock.unlock(platformLock)
   }
