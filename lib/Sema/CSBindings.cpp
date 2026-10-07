@@ -2379,18 +2379,52 @@ void BindingSet::promoteBindings() {
         }
       }
 
-      // Two cases where we prefer the subtype binding:
+      // Three cases where we prefer the subtype binding:
       //
-      // 1) If the subtype binding comes from a weaker form of conversion constraint,
-      // for example:
+      // 1) If the subtype binding is for a @convention(c) type, we prefer it always
+      // because conversion *to* @convention(c) only works with a closure literal
+      // known to have no captures; conversion *from* @convention(c) to an ordinary
+      // function type always succeeds.
+      auto isCFunctionType = [](Type t) -> bool {
+        if (auto *funcTy = t->getAs<FunctionType>()) {
+          return funcTy->getExtInfo().getRepresentation()
+            == FunctionType::Representation::CFunctionPointer;
+        }
+
+        return false;
+      };
+
+      bool isConversionToCFunction =
+          isCFunctionType(promotedSubtype->BindingType
+              ->lookThroughAllOptionalTypes());
+
+      if (isConversionToCFunction) {
+        promoteSubtypeBinding("@convention(c) conversion");
+        return;
+      }
+
+      // 2) If the subtype binding comes from a weaker form of conversion constraint,
+      // and we have a pointer conversion, for example:
       //
       //   Array<T> arg conv $T1
       //   $T1 conv UnsafePointer<T>
       //
       // We have to bind $T1 to UnsafePointer<T> and not Array<T>, because
       // conv constraints do not allow array-to-pointer conversions.
-      //
-      // 2) If we have something like this:
+      auto *first = promotedSupertype->getSource();
+      auto *second = promotedSubtype->getSource();
+      if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
+        bool isConversionToPointer = !!promotedSubtype->BindingType
+                ->lookThroughAllOptionalTypes()->getAnyPointerElementType();
+
+        // Case 1
+        if (isConversionToPointer) {
+          promoteSubtypeBinding("pointer conversion");
+          return;
+        }
+      }
+
+      // 3) If we have something like this:
       //
       //  S conv $T0
       //  $T0 bind any Sendable
@@ -2401,24 +2435,9 @@ void BindingSet::promoteBindings() {
       //
       // Note that for the other direction, any Sendable bind $T0, we already get a
       // supertype binding, and that will be what's preferred anyway.
-      auto *first = promotedSupertype->getSource();
-      auto *second = promotedSubtype->getSource();
-      if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
-        auto type = promotedSubtype->BindingType;
-        bool isConversionToPointer =
-            !!type->lookThroughAllOptionalTypes()->getAnyPointerElementType();
-
-        // Case 1
-        if (isConversionToPointer) {
-          promoteSubtypeBinding("pointer conversion");
-          return;
-        }
-
-        // Case 2
-        if (second->getKind() == ConstraintKind::Bind) {
-          promoteSubtypeBinding("bind");
-          return;
-        }
+      if (second->getKind() == ConstraintKind::Bind) {
+        promoteSubtypeBinding("bind");
+        return;
       }
     }
 
