@@ -107,13 +107,28 @@ internal func _jobGetFlags(_ job: Builtin.Job) -> Int
 @available(SwiftStdlib 6.4, *)
 @export(implementation)
 internal func _jobGetUnsafeCurrentTask(_ job: Builtin.Job) -> UnsafeCurrentTask? {
-  // The low 8 bits of the flags are the JobKind, and JobKind::Task is 0
-  guard _jobGetFlags(job) & 0xFF == 0 else {
+  let rawJob: Builtin.RawPointer = Builtin.reinterpretCast(job)
+  let rawTask: Builtin.RawPointer
+  // The low 8 bits of the flags are the JobKind
+  switch _jobGetFlags(job) & 0xFF {
+  case 0: // JobKind::Task
+    // An AsyncTask is a Job, so the job pointer is also the task pointer
+    rawTask = rawJob
+  case 197: // JobKind::TaskStealer
+    // An AsyncTaskStealer runs a task on its behalf and stores the task
+    // pointer right after the Job fields, see TaskPrivate.h
+#if _pointerBitWidth(_64)
+    let taskOffset = 8 * MemoryLayout<Int>.size
+#else
+    // The Job fields end at 9 words, the Task pointer is laid out in the
+    // Job's alignment tail padding rather than after sizeof(Job)
+    let taskOffset = 9 * MemoryLayout<Int>.size
+#endif
+    rawTask = unsafe UnsafeRawPointer(rawJob).load(
+      fromByteOffset: taskOffset, as: UnsafeRawPointer.self)._rawValue
+  default:
     return nil
   }
-  // An AsyncTask is a Job, so the job pointer is also the task pointer,
-  // use the Builtin.NativeObject initializer, as it is available since 6.4
-  let rawTask: Builtin.RawPointer = Builtin.reinterpretCast(job)
   let task: Builtin.NativeObject = Builtin.bridgeFromRawPointer(rawTask)
   return unsafe UnsafeCurrentTask(task)
 }
