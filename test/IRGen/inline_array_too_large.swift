@@ -12,6 +12,8 @@
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DARRAY  -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=ARRAY
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DSTRUCT -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=STRUCT
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DCLASS  -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CLASS
+// RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DCLASS_FIELD_OFFSET -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CLASS_FIELD_OFFSET
+// RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DSUBCLASS -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=SUBCLASS
 // RUN: not %target-swift-frontend -disable-availability-checking -primary-file %s -DTUPLE  -O -emit-ir -o /dev/null 2>&1 | %FileCheck %s --check-prefix=TUPLE
 
 #if ARRAY
@@ -42,6 +44,29 @@ class C {
 }
 func use() -> C { C() }
 // CLASS: error: type 'C' is too large to be represented
+
+#elseif CLASS_FIELD_OFFSET
+// A class whose last field starts past UINT32_MAX, so its field offset does not
+// fit in 32 bits either.
+class C3 {
+  var a = InlineArray<300000000, Int64>(repeating: 0)
+  var b = InlineArray<300000000, Int64>(repeating: 0)
+  var c = InlineArray<300000000, Int64>(repeating: 0)
+}
+func use() -> C3 { C3() }
+// CLASS_FIELD_OFFSET: error: type 'C3' is too large to be represented
+
+#elseif SUBCLASS
+// The superclass fits; the subclass's own field pushes the instance size past
+// UINT32_MAX.
+class Base {
+  var a = InlineArray<300000000, Int64>(repeating: 0)
+}
+class Derived: Base {
+  var b = InlineArray<300000000, Int64>(repeating: 0)
+}
+func use() -> Derived { Derived() }
+// SUBCLASS: error: type 'Derived' is too large to be represented
 
 #elseif TUPLE
 typealias T = (InlineArray<300000000, Int64>, InlineArray<300000000, Int64>)

@@ -12,6 +12,8 @@
 // REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
+// REQUIRES: rdar189403868
+
 // In Embedded Swift the distributed thunks of a '@Resolvable' stub '$Greeter'
 // only keep the remote branch and trap with 'fatalError()' if the stub is
 // local, so they do not call the stub body or suspend on a local call
