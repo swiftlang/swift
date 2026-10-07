@@ -7203,6 +7203,9 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
         if (name.isCompoundName() && isa<AbstractFunctionDecl>(vd) &&
             vd->getName() != name)
           continue;
+        // A member inherited from a base class belongs to another C++ class.
+        if (vd->getDeclContext()->getSelfNominalTypeDecl() != ty)
+          continue;
         results.insert(vd);
       }
     };
@@ -8748,6 +8751,34 @@ ValueDecl *ClangImporter::getForwardingSource(const ValueDecl *decl) {
 FuncDecl *
 ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
   return Impl.getOriginalForVirtualThunk(decl);
+}
+
+ValueDecl *ClangImporter::getOverriddenSuperclassMember(const ValueDecl *decl) {
+  const auto *classDecl = decl->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->getSuperclassDecl())
+    return nullptr;
+
+  const ValueDecl *original = decl;
+  if (const auto *thunk = dyn_cast<FuncDecl>(decl))
+    if (const auto *func = Impl.getOriginalForVirtualThunk(thunk))
+      original = func;
+  const auto *method =
+      dyn_cast_or_null<clang::CXXMethodDecl>(original->getClangDecl());
+  if (!method)
+    return nullptr;
+
+  // A method of a non-primary base, or of a base that is not a foreign
+  // reference type, is not a member of a Swift superclass.
+  for (const auto *overridden : method->overridden_methods()) {
+    auto *member = dyn_cast_or_null<ValueDecl>(importDeclDirectly(overridden));
+    if (!member)
+      continue;
+    const auto *memberClass = member->getDeclContext()->getSelfClassDecl();
+    if (memberClass &&
+        memberClass->isSuperclassOf(classDecl->getSuperclassDecl()))
+      return member;
+  }
+  return nullptr;
 }
 
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {

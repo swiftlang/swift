@@ -3776,7 +3776,10 @@ public:
       diagnoseUntypedThrows(FD, throwsLoc);
     }
 
-    if (!checkOverrides(FD)) {
+    // A @cxx implementation's `override` keyword is checked against its C++
+    // declaration when it is matched to the imported method.
+    if (!checkOverrides(FD) &&
+        !FD->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
