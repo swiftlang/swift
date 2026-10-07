@@ -55,8 +55,14 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result) && !vfs->makeAbsolute(result))
-      return result;
+    if (vfs->exists(result)) {
+      // A relative -resource-dir produces a relative path here, but the VFS
+      // overlay requires an absolute path for the file it redirects to.
+      // Only use this candidate if it can be resolved against the VFS's cwd.
+      std::error_code EC = vfs->makeAbsolute(result);
+      if (!EC)
+        return result;
+    }
   }
 
   StringRef SDKPath = Opts.getSDKPath();
@@ -72,8 +78,14 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result) && !vfs->makeAbsolute(result))
-      return result;
+    if (vfs->exists(result)) {
+      // The SDK fallback can also be relative when -sdk is relative. Resolve
+      // it against the VFS's cwd to obtain an absolute redirect target, and
+      // only use it if that succeeds.
+      std::error_code EC = vfs->makeAbsolute(result);
+      if (!EC)
+        return result;
+    }
   }
 
   return std::nullopt;
@@ -145,7 +157,7 @@ ClangImporter::createClangDriver(
 /// finding the include path for a specific library among a list of include
 /// paths.
 ///
-/// \return a path without dots (`../`, './').
+/// \return an absolute path without dots (`../`, './').
 static std::optional<Path> findFirstIncludeDir(
     const llvm::opt::InputArgList &args,
     const ArrayRef<const char *> expectedFileNames,
@@ -171,6 +183,8 @@ static std::optional<Path> findFirstIncludeDir(
     }
 
     if (allExpectedExist) {
+      // A relative SDK can produce relative include directories. The injected
+      // module map's virtual path must be absolute in the VFS overlay.
       if (vfs->makeAbsolute(dir))
         continue;
       // VFS does not allow mapping paths that contain `../` or `./`.

@@ -1369,10 +1369,6 @@ ClangImporter::computeClangImporterFileSystem(
   if (recipe.redirectedFiles.empty() && recipe.overridenFiles.empty())
     return baseFS;
 
-  // Set the working directory.
-  if (recipe.workingDirectory)
-    baseFS->setCurrentWorkingDirectory(*recipe.workingDirectory);
-
   if (!recipe.redirectedFiles.empty() && recipe.dumpClangDiagnostics) {
     llvm::errs() << "clang importer redirected file mappings:\n";
     for (const auto &mapping : recipe.redirectedFiles) {
@@ -1387,6 +1383,12 @@ ClangImporter::computeClangImporterFileSystem(
   auto overlayVFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
       std::move(baseFS));
   overlayVFS->pushOverlay(overridenVFS);
+
+  // Set the working directory on all layers before adding files, so relative
+  // paths are stored and looked up using the same working directory.
+  if (recipe.workingDirectory)
+    overlayVFS->setCurrentWorkingDirectory(*recipe.workingDirectory);
+
   for (const auto &file : recipe.overridenFiles) {
     if (recipe.dumpClangDiagnostics) {
       llvm::errs() << "clang importer overriding file '" << file.path
