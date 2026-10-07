@@ -63,31 +63,25 @@ static const ValueDecl *getClientEmittedDecl(const DeclContext *DC) {
       !decl)
     return nullptr;
 
-  // Clients can only emit code for declarations they can use.
-  if (!decl->getFormalAccessScope(/*useDC=*/nullptr,
-                                  /*treatUsableFromInlineAsPublic=*/true)
-           .isPublic())
-    return nullptr;
-
   return decl;
 }
 
 /// Whether code that clients emit can refer to the given declaration without
-/// a symbol, because they access it directly.
+/// a symbol.
 static bool isAccessedWithoutSymbol(const ValueDecl *decl) {
+  // Clients emit their own copies of declarations without a unique
+  // definition, such as generic ones, and their code is checked directly.
+  if (decl->hasNonUniqueDefinition())
+    return true;
+
   // Enum cases are formed and matched directly.
   if (isa<EnumElementDecl>(decl))
     return true;
 
-  // So are a struct's stored properties, unless they have observers.
-  if (auto *accessor = dyn_cast<AccessorDecl>(decl))
-    decl = accessor->getStorage();
-  if (auto *var = dyn_cast<VarDecl>(decl)) {
-    return var->isInstanceMember() &&
-           isa_and_nonnull<StructDecl>(
-               var->getDeclContext()->getSelfNominalTypeDecl()) &&
-           var->getImplInfo().isSimpleStored();
-  }
+  // So are stored properties, unless they have observers. Their synthesized
+  // accessors don't have a unique definition either.
+  if (auto *var = dyn_cast<VarDecl>(decl))
+    return var->isInstanceMember() && var->getImplInfo().isSimpleStored();
 
   return false;
 }
@@ -165,6 +159,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // unless we are also emitted a TBD file. There, we need to ensure that we
   // know the full set of symbols ahead of time.
   if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
+    // Code that is unavailable, such as '@_unavailableInEmbedded' code, is
+    // never emitted.
+    if (where.getAvailability().isUnavailable())
+      return false;
+
     auto *clientEmittedDecl = getClientEmittedDecl(DC);
     if (!clientEmittedDecl || isAccessedWithoutSymbol(D))
       return false;

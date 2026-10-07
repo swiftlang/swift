@@ -1,8 +1,9 @@
 // With the "interface" code generation model, clients emit their own copies
 // of generic code, but refer to everything else by symbol. So, as with
-// '@inlinable', code that clients emit can only refer to declarations that
-// are public or '@usableFromInline'. That's an error when emitting a TBD file,
-// which lists exactly those symbols, and a warning otherwise.
+// '@inlinable', code that clients emit can only refer to declarations with a
+// unique definition that are public or '@usableFromInline'. That's an error
+// when emitting a TBD file, which lists exactly those symbols, and a warning
+// otherwise.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-additional-prefix tbd- -parse-as-library -module-name Lib -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=interface -emit-tbd-path %t/Lib.tbd -tbd-install_name Lib
@@ -16,14 +17,14 @@
 // REQUIRES: VENDOR=apple
 
 func internalHelper() -> Int { 1 }
-// expected-tbd-note@-1 7{{global function 'internalHelper()' is not '@usableFromInline' or public}}
-// expected-warn-note@-2 7{{global function 'internalHelper()' is not '@usableFromInline' or public}}
+// expected-tbd-note@-1 8{{global function 'internalHelper()' is not '@usableFromInline' or public}}
+// expected-warn-note@-2 8{{global function 'internalHelper()' is not '@usableFromInline' or public}}
 
 @usableFromInline func usableFromInlineHelper() -> Int { 2 }
 
 private func privateHelper() -> Int { 3 }
-// expected-tbd-note@-1 {{global function 'privateHelper()' is not '@usableFromInline' or public}}
-// expected-warn-note@-2 {{global function 'privateHelper()' is not '@usableFromInline' or public}}
+// expected-tbd-note@-1 2{{global function 'privateHelper()' is not '@usableFromInline' or public}}
+// expected-warn-note@-2 2{{global function 'privateHelper()' is not '@usableFromInline' or public}}
 
 struct InternalType { init() {} }
 // expected-tbd-note@-1 {{struct 'InternalType' is not '@usableFromInline' or public}}
@@ -31,9 +32,14 @@ struct InternalType { init() {} }
 // expected-tbd-note@-3 {{initializer 'init()' is not '@usableFromInline' or public}}
 // expected-warn-note@-4 {{initializer 'init()' is not '@usableFromInline' or public}}
 
-func internalGeneric<T>(_ t: T) -> Int { internalHelper() }
-// expected-tbd-note@-1 {{global function 'internalGeneric' is not '@usableFromInline' or public}}
-// expected-warn-note@-2 {{global function 'internalGeneric' is not '@usableFromInline' or public}}
+// Clients emit their own copies of generic code, so it doesn't need to be
+// '@usableFromInline'. Instead, its own references are checked, even when only
+// internal code reaches it.
+func internalGeneric<T>(_ t: T) -> Int {
+  internalHelper()
+  // expected-tbd-error@-1 {{global function 'internalHelper()' is internal and cannot be referenced from global function 'internalGeneric'}}
+  // expected-warn-warning@-2 {{global function 'internalHelper()' is internal and cannot be referenced from global function 'internalGeneric'}}
+}
 
 // Clients emit generic code.
 public func publicGeneric<T>(_ t: T) -> Int {
@@ -45,8 +51,6 @@ public func publicGeneric<T>(_ t: T) -> Int {
   // expected-tbd-error@-1 {{global function 'privateHelper()' is private and cannot be referenced from global function 'publicGeneric'}}
   // expected-warn-warning@-2 {{global function 'privateHelper()' is private and cannot be referenced from global function 'publicGeneric'}}
   + internalGeneric(t)
-  // expected-tbd-error@-1 {{global function 'internalGeneric' is internal and cannot be referenced from global function 'publicGeneric'}}
-  // expected-warn-warning@-2 {{global function 'internalGeneric' is internal and cannot be referenced from global function 'publicGeneric'}}
 }
 
 // So does a '@usableFromInline' generic function.
@@ -85,10 +89,14 @@ extension Box where T == Int {
   public func concreteHelper() -> Int { internalHelper() }
 }
 
-// Clients don't emit non-generic code, or generic code they can't use.
+// Clients don't emit non-generic code.
 public func publicNonGeneric() -> Int { internalHelper() + privateHelper() }
 
-func internalGenericUsingPrivate<T>(_ t: T) -> Int { privateHelper() }
+func internalGenericUsingPrivate<T>(_ t: T) -> Int {
+  privateHelper()
+  // expected-tbd-error@-1 {{global function 'privateHelper()' is private and cannot be referenced from global function 'internalGenericUsingPrivate'}}
+  // expected-warn-warning@-2 {{global function 'privateHelper()' is private and cannot be referenced from global function 'internalGenericUsingPrivate'}}
+}
 
 // A generic function in a protocol extension.
 public protocol P {}
@@ -137,13 +145,10 @@ enum Cases {
   case two(Int)
 }
 
-// A class's stored property can be dispatched through accessors.
+// So are a class's stored properties.
 @usableFromInline
 final class StoredInClass {
   var stored: Int = 0
-  // expected-tbd-note@-1 {{property 'stored' is not '@usableFromInline' or public}}
-  // expected-warn-note@-2 {{property 'stored' is not '@usableFromInline' or public}}
-  // expected-warn-note@-3 {{getter for property 'stored' is not '@usableFromInline' or public}}
 
   @usableFromInline init() {}
 }
@@ -156,8 +161,9 @@ public func genericAccessingMembers<T>(_ t: T) -> Int {
   // expected-warn-warning@-2 {{property 'computed' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
   // expected-warn-warning@-3 {{getter for property 'computed' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
   if case .two(let value) = c { return value + StoredInClass().stored }
-  // expected-tbd-error@-1 {{property 'stored' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
-  // expected-warn-warning@-2 {{property 'stored' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
-  // expected-warn-warning@-3 {{getter for property 'stored' is internal and cannot be referenced from global function 'genericAccessingMembers'}}
   return 0
 }
+
+// Unavailable code is never emitted.
+@_unavailableInEmbedded
+public func unavailableGeneric<T>(_ t: T) -> Int { internalHelper() }
