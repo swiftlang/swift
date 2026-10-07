@@ -41,6 +41,8 @@
 #include "swift/FrontendTool/Dependencies.h"
 #include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/StringMap.h"
@@ -764,6 +766,55 @@ static swiftscan_macro_dependency_set_t *createMacroDependencySet(
   return set;
 }
 
+static bool isUnderPath(StringRef path, StringRef root) {
+  if (root.empty())
+    return false;
+  SmallString<256> normalizedRoot(root);
+  llvm::sys::path::remove_dots(normalizedRoot, /*remove_dot_dot=*/true);
+  return hasPrefix(llvm::sys::path::begin(path), llvm::sys::path::end(path),
+                   llvm::sys::path::begin(normalizedRoot),
+                   llvm::sys::path::end(normalizedRoot));
+}
+
+/// A Clang module is project-internal if the build system names it, or if
+/// its module map is under a user search path (-iquote or -I) in the source
+/// tree, and not in the SDK or a framework.
+static bool isIPIClangModule(const ASTContext &ctx, StringRef moduleName,
+                             StringRef moduleMapPath) {
+  if (llvm::is_contained(ctx.LangOpts.IPIClangModuleNames, moduleName))
+    return true;
+  if (moduleMapPath.empty())
+    return false;
+  auto &clangInstance = ctx.getClangModuleLoader()->getClangInstance();
+  const auto &opts = clangInstance.getHeaderSearchOpts();
+
+  SmallString<256> mapPath(moduleMapPath);
+  llvm::sys::path::remove_dots(mapPath, /*remove_dot_dot=*/true);
+  if (isUnderPath(mapPath, ctx.SearchPathOpts.getSDKPath()))
+    return false;
+
+  SmallString<256> workingDir(clangInstance.getFileSystemOpts().WorkingDir);
+  llvm::sys::path::remove_dots(workingDir, /*remove_dot_dot=*/true);
+  // Treat the working directory as the project's source root, unless it's
+  // unset or "/".
+  if (!workingDir.empty() && workingDir.str() != "/" &&
+      !isUnderPath(mapPath, workingDir))
+    return false;
+
+  // A framework's module map keeps its level, as with -F.
+  if (mapPath.str().contains(".framework/"))
+    return false;
+
+  // Clang finds a module map under a plain search path by module name (up to
+  // one folder down) or through an included header (at any depth).
+  return llvm::any_of(opts.UserEntries, [&](const auto &entry) {
+    bool isUserPath = entry.Group == clang::frontend::Quoted ||
+                      entry.Group == clang::frontend::Angled;
+    return isUserPath && !entry.IsFramework &&
+           isUnderPath(mapPath, entry.Path);
+  });
+}
+
 static swiftscan_dependency_graph_t generateFullDependencyGraph(
     const CompilerInstance &instance,
     const DepScanInMemoryDiagnosticCollector *diagnosticCollector,
@@ -933,7 +984,12 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     moduleInfo->details = getModuleDetails();
 
     // Set library level
-    switch (moduleDependencyInfo.getLibraryLevel()) {
+    auto libraryLevel = moduleDependencyInfo.getLibraryLevel();
+    if (clangDeps && isIPIClangModule(instance.getASTContext(),
+                                      moduleID.ModuleName,
+                                      clangDeps->moduleMapFile))
+      libraryLevel = LibraryLevel::IPI;
+    switch (libraryLevel) {
     case LibraryLevel::Other:
       moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
       break;
