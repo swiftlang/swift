@@ -268,6 +268,7 @@ struct ExactlyOnceStorage {
 
   let exactlyOnce: @called(exactlyOnce) () -> Void
   // expected-error@-1 {{stored property 'exactlyOnce' of 'Copyable'-conforming struct 'ExactlyOnceStorage' has non-Copyable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-2 {{stored property 'exactlyOnce' of 'Deinitable'-conforming struct 'ExactlyOnceStorage' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
 }
 
 func exactlyOnceArgumentConversions(fn: @escaping () -> Void, exactlyOnce: @called(exactlyOnce) () -> Void) {
@@ -563,4 +564,79 @@ func existentialConversions(
 
   let _: any ExistentialProto = makeInt
   // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}}
+}
+
+// MARK: - Generic arguments
+
+// A `@called(exactlyOnce)` function type isn't `Deinitable`, so it can't be a
+// generic argument unless the parameter suppresses `Deinitable`.
+
+struct NCBox<T: ~Copyable>: ~Copyable {
+  // expected-note@-1 {{required by generic struct 'NCBox' where 'T' = '@called(exactlyOnce) () -> Void'}}
+  var value: T
+}
+
+@available(SwiftStdlib 5.9, *)
+struct PackHolder<each T> {}
+
+@available(SwiftStdlib 5.9, *)
+func genericArgumentPack(
+  _: PackHolder<Int, @called(exactlyOnce) () -> Void>
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' does not conform to protocol 'Copyable'}}
+) {}
+
+func genericArgumentSpelled(
+  _: Optional<@called(exactlyOnce) () -> Void>,
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' does not conform to protocol 'Deinitable'}}
+  _: (@called(exactlyOnce) () -> Void)?,
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' does not conform to protocol 'Deinitable'}}
+  _: [@called(exactlyOnce) () -> Void],
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' does not conform to protocol 'Copyable'}}
+  _: [Int: @called(exactlyOnce) () -> Void],
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' does not conform to protocol 'Copyable'}}
+  _: consuming NCBox<@called(exactlyOnce) () -> Void>,
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' does not conform to protocol 'Deinitable'}}
+  _: consuming (@called(atMostOnce) () -> Void)?, // Ok
+  _: consuming NCBox<@called(atMostOnce) () -> Void> // Ok
+) {}
+
+func genericArgumentInferred(
+  exactlyOnce: @escaping @called(exactlyOnce) () -> Void,
+  atMostOnce: @escaping @called(atMostOnce) () -> Void
+) {
+  func genericNC<T: ~Copyable>(_: consuming T) {}
+  // expected-note@-1 2{{required by local function 'genericNC' where 'T' = '@called(exactlyOnce) () -> Void'}}
+  // expected-note@-2 {{required by local function 'genericNC' where 'T' = '@called(exactlyOnce) () -> ()'}}
+
+  genericNC(exactlyOnce)
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' cannot conform to 'Deinitable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  genericNC { @called(exactlyOnce) in }
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> ()' cannot conform to 'Deinitable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  genericNC(atMostOnce) // Ok
+
+  _ = NCBox(value: exactlyOnce)
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' cannot conform to 'Deinitable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  // FIXME: [deinitable] Optional's payload must be Deinitable.
+  let _: _? = exactlyOnce
+  let _: _? = atMostOnce // Ok
+
+  let _ = Optional.some(exactlyOnce)
+  // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' cannot conform to 'Deinitable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-3 {{required by generic enum 'Optional' where 'Wrapped' = '@called(exactlyOnce) () -> Void'}}
+
+  let _: any ~Copyable = exactlyOnce
+  // expected-error@-1 {{value of type '@called(exactlyOnce) () -> Void' does not conform to specified type 'Deinitable'}}
+  let _: any ~Copyable = atMostOnce // Ok
+
+  _ = { (f: @escaping @called(exactlyOnce) () -> Void) in
+    genericNC(f)
+    // expected-error@-1 {{type '@called(exactlyOnce) () -> Void' cannot conform to 'Deinitable'}}
+    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    return 0
+  }
 }
