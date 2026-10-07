@@ -936,6 +936,8 @@ static bool usesFeatureOnceFunctions(Decl *D) {
   return usesTypeMatching(D, hasCalled);
 }
 
+UNINTERESTING_FEATURE(TransferableProtocol)
+
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 UNINTERESTING_FEATURE(BuiltinRelaxedFP)
 
@@ -995,6 +997,13 @@ static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
     auto *proto = dyn_cast<ProtocolDecl>(decl);
     if (!proto || proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
       return true;
+  }
+
+  // Compilers without the Transferable protocol must not see it at all.
+  if (featureName == "TransferableProtocol") {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+      if (proto->isSpecificProtocol(KnownProtocolKind::Transferable))
+        return true;
   }
 
   return hasFeatureSuppressionAttribute(decl, featureName, true);
