@@ -801,7 +801,8 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
-  bool setupCASIfNeeded(ArrayRef<const char *> Args);
+  bool setupCASIfNeeded();
+  bool setupCompileJobBaseKeyIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
   void setupCachingDiagnosticsProcessorIfNeeded();
 

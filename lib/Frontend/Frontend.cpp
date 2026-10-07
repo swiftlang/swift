@@ -493,7 +493,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
+bool CompilerInstance::setupCASIfNeeded() {
   if (!getInvocation().requiresCAS())
     return false;
 
@@ -512,6 +512,13 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     }
     std::tie(CAS, ResultCache) = *MaybeDB;
   }
+  return false;
+}
+
+bool CompilerInstance::setupCompileJobBaseKeyIfNeeded(
+    ArrayRef<const char *> Args) {
+  if (!getInvocation().requiresCAS())
+    return false;
 
   // create baseline key.
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
@@ -590,13 +597,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
 
-  if (setupCASIfNeeded(Args)) {
+  if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
     return true;
   }
 
   setupDependencyTrackerIfNeeded();
-  setupOutputBackend();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -604,6 +610,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     Error = "Setting up virtual file system overlays failed";
     return true;
   }
+
+  // Compute the cache key after the CAS file system is set up so that a
+  // missing include tree is diagnosed with a better error message first.
+  if (setupCompileJobBaseKeyIfNeeded(Args)) {
+    Error = "Setting up compile job cache key failed";
+    return true;
+  }
+  setupOutputBackend();
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -665,8 +679,13 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
   Invocation = Invoke;
 
   setSharedCASInstances(CAS, Cache);
-  if (setupCASIfNeeded(Args)) {
+  if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
+    return true;
+  }
+
+  if (setupCompileJobBaseKeyIfNeeded(Args)) {
+    Error = "Setting up compile job cache key failed";
     return true;
   }
 
