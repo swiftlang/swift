@@ -197,6 +197,22 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
 }
 
+bool swift::isDistributedActorStubMember(const ValueDecl *member) {
+  if (!member)
+    return false;
+
+  auto *ext = dyn_cast<ExtensionDecl>(member->getDeclContext());
+  if (!ext || !isa_and_nonnull<ProtocolDecl>(ext->getExtendedNominal()))
+    return false;
+
+  auto *stubProto = member->getASTContext().get_DistributedActorStubDecl();
+  if (!stubProto)
+    return false;
+
+  auto sig = ext->getGenericSignature();
+  return sig && sig->requiresProtocol(ext->getSelfInterfaceType(), stubProto);
+}
+
 Identifier swift::getDistributedResolvableProtocolStubName(ProtocolDecl *proto) {
   if (!proto)
     return Identifier();

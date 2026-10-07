@@ -72,6 +72,10 @@ Type getDistributedActorIDType(NominalTypeDecl *actor);
 /// If `P` is a `@Resolvable protocol`, return the stub type `$P`.
 NominalTypeDecl *getDistributedResolvableProtocolStubDecl(ProtocolDecl *proto);
 
+/// Determine if \p member is declared in a "distributed actor stub"
+/// generated for a `@Resolvable` protocol.
+bool isDistributedActorStubMember(const ValueDecl *member);
+
 /// Synthesize the identifier `$<name>` of the `@Resolvable`-generated stub
 /// peer of the given distributed-actor protocol.
 Identifier getDistributedResolvableProtocolStubName(ProtocolDecl *proto);
