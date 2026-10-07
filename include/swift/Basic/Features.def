@@ -677,7 +677,8 @@ EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 
 /// Import C++ methods that are hard to use correctly under their original name
 /// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
-EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
+LANGUAGE_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, 0,
+                 "import unsafe C++ methods as '@unsafe(always)'")
 
 /// Handle lookup for llvm intrinsics like aarch64.neon.smull and .sqxtn
 LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")

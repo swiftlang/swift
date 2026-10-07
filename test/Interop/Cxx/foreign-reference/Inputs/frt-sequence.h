@@ -48,6 +48,8 @@ struct RawPtrIterContainer {
     size = 3;
   }
 
+  // expected-note@+2 {{'begin' and 'end' are assumed to return iterators}}
+  // expected-note@+2 {{'begin' and 'end' are assumed to return iterators}}
   const ImmortalNode *begin() const { return data; }
   const ImmortalNode *end() const { return data + size; }
   const ImmortalNode *operator[](int i) const { return &data[i]; }

@@ -4671,12 +4671,10 @@ namespace {
                  .Default(false);
     }
 
-    /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
-    ///
-    /// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, the method keeps its original
-    /// name and is marked '@unsafe(always)' here instead, and the renamed
-    /// spelling is imported a second time as a deprecated migration stub, which
-    /// is only '@unsafe'.
+    /// Mark \a swiftDecl, imported from \a clangDecl, as '@unsafe(always)' if
+    /// it is hard to use correctly, and import its old '__<name>Unsafe'
+    /// spelling a second time as a deprecated migration stub, which is only
+    /// '@unsafe'.
     void renameToUnsafeIfNeeded(
         const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
         const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
@@ -4702,12 +4700,6 @@ namespace {
                                 : DeclName(unsafeId);
       if (currentName == unsafeName)
         return;
-
-      if (!Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
-        swiftDecl->setName(unsafeName);
-        return;
-      }
 
       // Keeping the original name means every use has to be acknowledged.
       auto *unsafeAttr = swiftDecl->getAttrs().getAttribute<UnsafeAttr>();
