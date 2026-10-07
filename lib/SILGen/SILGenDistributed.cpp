@@ -82,19 +82,10 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
 /******************* COMMON (DISTRIBUTED) SIL PATTERNS ************************/
 /******************************************************************************/
 
-/// Emit the following branch SIL instruction:
-/// \verbatim
-/// if __isRemoteActor(self) {
-///   <isRemoteBB>
-/// } else {
-///   <isLocalBB>
-/// }
-/// \endverbatim
-void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
-                                                   SILValue selfValue,
-                                                   Type selfTy,
-                                                   SILBasicBlock *isRemoteBB,
-                                                   SILBasicBlock *isLocalBB) {
+/// Emit a call to `__isRemoteActor(self)` and return the unwrapped i1 result.
+SILValue SILGenFunction::emitDistributedActorIsRemote(SILLocation Loc,
+                                                      SILValue selfValue,
+                                                      Type selfTy) {
   ASTContext &ctx = getASTContext();
 
   SILValue isRemoteResultUnwrapped;
@@ -121,7 +112,24 @@ void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
         std::move(result).forwardAsSingleValue(*this, Loc);
     isRemoteResultUnwrapped = emitUnwrapIntegerResult(Loc, isRemoteResult);
   }
-  B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
+  return isRemoteResultUnwrapped;
+}
+
+/// Emit the following branch SIL instruction:
+/// \verbatim
+/// if __isRemoteActor(self) {
+///   <isRemoteBB>
+/// } else {
+///   <isLocalBB>
+/// }
+/// \endverbatim
+void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
+                                                   SILValue selfValue,
+                                                   Type selfTy,
+                                                   SILBasicBlock *isRemoteBB,
+                                                   SILBasicBlock *isLocalBB) {
+  SILValue isRemote = emitDistributedActorIsRemote(Loc, selfValue, selfTy);
+  B.createCondBranch(Loc, isRemote, isRemoteBB, isLocalBB);
 }
 
 // ==== ------------------------------------------------------------------------
