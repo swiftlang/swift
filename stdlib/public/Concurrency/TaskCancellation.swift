@@ -389,14 +389,16 @@ extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public static var cancellationReason: CancellationError.Reason? {
-    unsafe withUnsafeCurrentTask { task in
+    unsafe withUnsafeCurrentTask { task -> CancellationError.Reason? in
       // Unlike `UnsafeCurrentTask.cancellationReason`, take cancellation shields
       // and cancellation scopes into account.
       guard let task = unsafe task else { return nil }
       let packed = unsafe _taskGetIsCancelledWithReasonWithFlags(task._rawTask, flags: 0)
       guard packed & 1 != 0 else { return nil }
       let raw = UInt8(truncatingIfNeeded: packed >> 1)
-      return CancellationError.Reason(_rawValue: raw) ?? .unspecified
+      // `CancellationError` would refer to `Task.CancellationError()` here.
+      let reason: CancellationError.Reason? = .init(_rawValue: raw)
+      return reason ?? .unspecified
     }
   }
 }
