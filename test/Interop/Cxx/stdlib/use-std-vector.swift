@@ -230,4 +230,24 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
 }
 
 
+@available(SwiftStdlib 6.4, *)
+@inline(never)
+func genericIterableUnderestimatedCount<T: Iterable & ~Copyable>(_ s: borrowing T) -> Int where T.Element: ~Copyable {
+    return s.underestimatedCount
+}
+
+StdVectorTestSuite.test("VectorOfNonCopyable.underestimatedCount").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let v1 = makeVectorOfNonCopyable()
+    expectEqual(v1.underestimatedCount, 3)
+
+    let v2 : any Iterable & ~Copyable = makeVectorOfNonCopyable()
+    expectEqual(v2.underestimatedCount, 3)
+
+    var v3 = Vector()
+    fill(vector: &v3)
+    expectEqual(genericIterableUnderestimatedCount(v3), 3)
+}
+
 runAllTests()
