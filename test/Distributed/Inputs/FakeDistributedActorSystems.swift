@@ -605,7 +605,8 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
 // ==== CustomSerializationProtocol Transport ----------------------------------
 
-public protocol CustomSerializationProtocol {
+// Suppress Copyable like "new Codable" proposal's JSONCodable does
+public protocol CustomSerializationProtocol: ~Copyable {
   func toBytes() throws -> [UInt8]
   static func fromBytes(_ bytes: [UInt8]) throws -> Self
 }
