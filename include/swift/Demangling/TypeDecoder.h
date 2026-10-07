@@ -1188,12 +1188,16 @@ protected:
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
                           Node->getKind() == NodeKind::EscapingObjCBlock);
 
-      if (Node->getKind() == NodeKind::CalledOnceFunctionType)
-        extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::Once);
-      else if (Node->getKind() == NodeKind::CalledAtMostOnceFunctionType)
-        extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::AtMostOnce);
+      // `@called` function types record their execution semantics as the
+      // invertible protocols that they suppress.
+      if (Node->getKind() == NodeKind::CalledOnceFunctionType ||
+          Node->getKind() == NodeKind::CalledAtMostOnceFunctionType) {
+        auto inverted = extFlags.getInvertedProtocols();
+        inverted.insert(InvertibleProtocolKind::Copyable);
+        if (Node->getKind() == NodeKind::CalledOnceFunctionType)
+          inverted.insert(InvertibleProtocolKind::Deinitable);
+        extFlags = extFlags.withInvertedProtocols(inverted);
+      }
 
       auto result =
           decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,

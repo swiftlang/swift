@@ -1452,9 +1452,14 @@ getFunctionTypeFlags(CanFunctionType type) {
       // introduce it as necessary.
       break;
 
-    case InvertibleProtocolKind::Deinitable:
-      // The runtime doesn't know about Deinitable yet.
+    case InvertibleProtocolKind::Deinitable: {
+      // A @called(exactlyOnce) function type isn't Deinitable.
+      auto proto =
+          type->getASTContext().getProtocol(KnownProtocolKind::Deinitable);
+      if (proto && lookupConformance(type, proto).isInvalid())
+        InvertedProtocols.insert(invertibleKind);
       break;
+    }
     }
   }
 

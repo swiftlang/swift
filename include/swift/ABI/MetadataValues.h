@@ -1159,14 +1159,6 @@ struct TargetFunctionMetadataDifferentiabilityKind {
 using FunctionMetadataDifferentiabilityKind =
     TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
-/// Execution semantics for function type metadata.
-/// Duplicates `ExecutionSemantics` in AST/AttrKind.h, plus `None`.
-enum class FunctionMetadataExecutionSemantics : uint8_t {
-  None = 0,
-  AtMostOnce = 1,
-  Once = 2,
-};
-
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -1316,12 +1308,9 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    // Values for the enumerated execution semantics. Reserved; the compiler
-    // doesn't emit them yet.
-    ExecutionSemanticsMask = 0x00000060U, // two bits
-    ExecutionSemanticsShift = 5,
-
-    /// A InvertibleProtocolSet in the high bits.
+    /// A InvertibleProtocolSet in the high bits. A `@called(atMostOnce)`
+    /// function type suppresses Copyable, and a `@called(exactlyOnce)`
+    /// function type also suppresses Deinitable.
     InvertedProtocolshift = 16,
     InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
@@ -1362,13 +1351,6 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withExecutionSemantics(FunctionMetadataExecutionSemantics semantics) const {
-    return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~ExecutionSemanticsMask) |
-        (int_type(semantics) << ExecutionSemanticsShift));
-  }
-
-  const TargetExtendedFunctionTypeFlags<int_type>
   withInvertedProtocols(InvertibleProtocolSet inverted) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~InvertedProtocolMask) |
@@ -1387,11 +1369,6 @@ public:
 
   bool hasSendingResult() const {
     return bool(Data & HasSendingResult);
-  }
-
-  FunctionMetadataExecutionSemantics getExecutionSemantics() const {
-    return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
-                                              ExecutionSemanticsShift);
   }
 
   int_type getIntValue() const {
