@@ -287,12 +287,15 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         if (!witnessDecl)
           return;
 
-        // Witnesses with public linkage are listed with their declarations.
+        // Witnesses with public linkage are listed with their declarations,
+        // and those with shared linkage, such as synthesized accessors, are
+        // emitted into each module that uses them. Only hidden or private
+        // witnesses become public.
         SILDeclRef witnessRef(witnessDecl);
         auto linkage =
             effectiveLinkageForClassMember(witnessRef.getLinkage(ForDefinition),
                                            witnessRef.getSubclassScope());
-        if (!shouldSkipVisit(linkage))
+        if (linkage != SILLinkage::Hidden && linkage != SILLinkage::Private)
           return;
 
         // A declaration can witness requirements of several conformances.

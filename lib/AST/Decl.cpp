@@ -5506,6 +5506,17 @@ bool ValueDecl::isUsableFromInline() const {
       return true;
   }
 
+  // In Embedded Swift, clients that can use a type can destroy its values,
+  // which calls its deinit directly once devirtualized.
+  if (isa<DestructorDecl>(this) &&
+      getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *nominal = getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->getFormalAccess() >= AccessLevel::Public ||
+          nominal->isUsableFromInline())
+        return true;
+    }
+  }
+
   if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(this)) {
     if (auto *namingDecl = opaqueType->getNamingDecl()) {
       if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
