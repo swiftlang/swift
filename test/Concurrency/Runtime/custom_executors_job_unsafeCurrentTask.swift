@@ -15,6 +15,7 @@ import Synchronization
 
 let lastEnqueuedTask = Mutex<UnsafeCurrentTask?>(nil)
 
+@available(SwiftStdlib 6.5, *)
 final class ExecutorJobExecutor: SerialExecutor {
   public func enqueue(_ job: consuming ExecutorJob) {
     let task = job.unsafeCurrentTask
@@ -24,6 +25,7 @@ final class ExecutorJobExecutor: SerialExecutor {
   }
 }
 
+@available(SwiftStdlib 6.5, *)
 final class UnownedJobExecutor: SerialExecutor {
   public func enqueue(_ job: UnownedJob) {
     let task = job.unsafeCurrentTask
@@ -54,6 +56,10 @@ actor Custom {
 
 @main struct Main {
   static func main() async {
+    guard #available(SwiftStdlib 6.5, *) else {
+      fatalError("Requires the SwiftStdlib 6.5 runtime")
+    }
+
     for executor in [ExecutorJobExecutor() as any SerialExecutor, UnownedJobExecutor()] {
       let actor = Custom(executor: executor)
 

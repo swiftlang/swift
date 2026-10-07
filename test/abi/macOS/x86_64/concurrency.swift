@@ -549,11 +549,9 @@ Added: _swift_taskGroup_cancelAllWithFlags
 // Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
 Added: _swift_task_addCancellationHandlerWithReason
 
-// ExecutorJob.context became usable from inline, for the
+// ExecutorJob._context getter, used by the
 // @export(implementation) unsafeCurrentTask accessor (SE-0469)
-Added: _$ss11ExecutorJobV7contextBjvM
-Added: _$ss11ExecutorJobV7contextBjvg
-Added: _$ss11ExecutorJobV7contextBjvs
+Added: _$ss11ExecutorJobV8_contextBjvg
 
 // property descriptor for Swift.UnownedJob.unsafeCurrentTask : Swift.UnsafeCurrentTask?
 Added: _$sScJ17unsafeCurrentTaskSctSgvpMV

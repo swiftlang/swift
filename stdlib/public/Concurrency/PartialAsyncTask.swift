@@ -281,8 +281,14 @@ extension Job {
 @available(StdlibDeploymentTarget 5.9, *)
 @frozen
 public struct ExecutorJob: Sendable, ~Copyable {
-  @usableFromInline
   internal var context: Builtin.Job
+
+  // Workaround for inability to annotate stored property with availability
+  @available(StdlibDeploymentTarget 6.5, *)
+  @usableFromInline
+  internal var _context: Builtin.Job {
+    context
+  }
 
   @usableFromInline
   internal init(context: __owned Builtin.Job) {
@@ -570,7 +576,7 @@ extension ExecutorJob {
 }
 
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 extension ExecutorJob {
   /// The task this job represents, or `nil` if this job is not a task
   ///
@@ -585,12 +591,12 @@ extension ExecutorJob {
   public var unsafeCurrentTask: UnsafeCurrentTask? {
     @export(implementation)
     get {
-      unsafe _jobGetUnsafeCurrentTask(context)
+      unsafe _jobGetUnsafeCurrentTask(_context)
     }
   }
 }
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 extension UnownedJob {
   /// The task this job represents, or `nil` if this job is not a task
   ///
