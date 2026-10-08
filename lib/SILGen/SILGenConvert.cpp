@@ -810,8 +810,29 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
-  case ExistentialRepresentation::COM:
-    llvm_unreachable("COM interface projection is not implemented");
+  case ExistentialRepresentation::COM: {
+    assert(existentialTL.isLoadable());
+    if (!concreteFormalType->is<ArchetypeType>())
+      llvm_unreachable("native COM interface projection is not implemented");
+
+    auto loweredType = existentialTL.getLoweredType();
+    if (concreteFormalType->is<ExistentialArchetypeType>()) {
+      ManagedValue sub = F(SGFContext());
+      return B.createInitCOMExistentialRef(loc, sub, loweredType);
+    }
+
+    // Projection borrows the source and retains the destination interface.
+    // Keep any source cleanup, including an explicit copy or consumed value.
+    ManagedValue sub = F(SGFContext::AllowGuaranteedPlusZero);
+    SILValue projected;
+    if (sub.getType().isAddress())
+      projected = B.createInitCOMExistentialAddr(
+          loc, loweredType, concreteFormalType, sub.getValue(), conformances);
+    else
+      projected = B.createInitCOMExistentialValue(
+          loc, loweredType, concreteFormalType, sub.getValue(), conformances);
+    return emitManagedRValueWithCleanup(projected, existentialTL);
+  }
   case ExistentialRepresentation::Boxed: {
     // We defer allocation of the box to when the address is demanded.
     // Create a stack slot to hold the box once it's allocated.
