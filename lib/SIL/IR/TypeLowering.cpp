@@ -2427,6 +2427,18 @@ namespace {
       }
     }
 
+    // Once AddressLowering has run the value really is in memory, so it has
+    // to be destroyed in place: loading an address-only type is invalid there.
+    // Mirrors the lowered-addresses branch in emitCopyInto() above.
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createDestroyAddr(loc, addr);
+      } else {
+        LeafLoadableTypeLowering::emitDestroyAddress(B, loc, addr);
+      }
+    }
+
     // OpaqueValue store cannot be decoupled from a destroy because it is not
     // bitwise-movable.
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
