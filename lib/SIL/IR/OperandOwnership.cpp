@@ -397,6 +397,13 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 
 #undef OPERAND_OWNERSHIP
 
+OperandOwnership OperandOwnershipClassifier::visitInitCOMExistentialInst(
+    InitCOMExistentialInst *inst) {
+  return inst->getOperand()->getType().isAddress()
+             ? OperandOwnership::TrivialUse
+             : OperandOwnership::InstantaneousUse;
+}
+
 // Forwarding operations are conditionally either ForwardingConsumes or
 // GuaranteedForwarding, depending on the instruction's constant ownership
 // attribute.

@@ -869,6 +869,10 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool IndexAddrInst_isProjection() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray AllocExistentialBoxInst_getConformances() const;
   BRIDGED_INLINE BridgedCanType AllocExistentialBoxInst_getFormalConcreteType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray
+  InitCOMExistentialInst_getConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
+  InitCOMExistentialInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialRefInst_getConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialRefInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialAddrInst_getConformances() const;

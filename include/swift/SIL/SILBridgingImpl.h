@@ -1492,8 +1492,18 @@ BridgedCanType BridgedInstruction::AllocExistentialBoxInst_getFormalConcreteType
   return getAs<swift::AllocExistentialBoxInst>()->getFormalConcreteType();
 }
 
+BridgedConformanceArray
+BridgedInstruction::InitCOMExistentialInst_getConformances() const {
+  return {getAs<swift::InitCOMExistentialInst>()->getConformances()};
+}
+
 BridgedConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
   return {getAs<swift::InitExistentialRefInst>()->getConformances()};
+}
+
+BridgedCanType
+BridgedInstruction::InitCOMExistentialInst_getFormalConcreteType() const {
+  return getAs<swift::InitCOMExistentialInst>()->getFormalConcreteType();
 }
 
 BridgedCanType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType() const {

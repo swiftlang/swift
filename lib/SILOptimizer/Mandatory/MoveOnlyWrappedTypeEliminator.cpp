@@ -223,6 +223,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(ExplicitCopyAddr)
   NO_UPDATE_NEEDED(FixLifetime)
   NO_UPDATE_NEEDED(IgnoredUse)
+  NO_UPDATE_NEEDED(InitCOMExistential)
   NO_UPDATE_NEEDED(MarkDependence)
   NO_UPDATE_NEEDED(MarkDependenceAddr)
   NO_UPDATE_NEEDED(ObjCMethod)

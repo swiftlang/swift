@@ -1,0 +1,36 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -sil-print-types -enable-sil-verify-all -I %t -sil-move-only-type-eliminator %s | %FileCheck %s
+
+sil_stage raw
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+
+// Removing a source wrapper leaves the projection's independently owned
+// result unchanged. A borrowed source needs no cleanup.
+// CHECK-LABEL: sil [ossa] [opaque] @borrowed
+// CHECK: bb0([[SOURCE:%.*]] : @guaranteed $T):
+// CHECK-NEXT: [[RESULT:%.*]] = init_com_existential [[SOURCE]] : $T : $T, $any IItem
+// CHECK-NEXT: return [[RESULT]]
+sil [ossa] [opaque] @borrowed : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : @guaranteed $T):
+  %wrapped = copyable_to_moveonlywrapper [guaranteed] %value : $T
+  %result = init_com_existential %wrapped : $@moveOnly T : $T, $IItem
+  return %result : $IItem
+}
+
+// An owned source is still destroyed separately from the returned interface.
+// CHECK-LABEL: sil [ossa] [opaque] @owned
+// CHECK: bb0([[SOURCE:%.*]] : @owned $T):
+// CHECK-NEXT: [[RESULT:%.*]] = init_com_existential [[SOURCE]] : $T : $T, $any IItem
+// CHECK-NEXT: destroy_value [[SOURCE]] : $T
+// CHECK-NEXT: return [[RESULT]]
+sil [ossa] [opaque] @owned : $@convention(thin) <T: IItem> (@in T) -> @owned IItem {
+bb0(%value : @owned $T):
+  %wrapped = copyable_to_moveonlywrapper [owned] %value : $T
+  %result = init_com_existential %wrapped : $@moveOnly T : $T, $IItem
+  destroy_value %wrapped : $@moveOnly T
+  return %result : $IItem
+}

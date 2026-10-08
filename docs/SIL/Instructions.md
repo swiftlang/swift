@@ -4101,6 +4101,33 @@ associated with `%0`. The protocol conformances associated with this
 existential container are associated directly with the archetype
 `$@opened P`.
 
+### init_com_existential
+
+```
+sil-instruction ::= 'init_com_existential' sil-operand ':' sil-type ','
+                                          sil-type
+
+%1 = init_com_existential %0 : $*T : $T, $P
+%2 = init_com_existential %value : $T : $T, $P
+```
+
+Projects a COM interface from a borrowed value of a COM-constrained
+archetype. The first type is the operand's lowered type, the second is its
+formal concrete type, and the last is the destination COM existential
+type. The instruction carries the conformances to the destination's
+protocols, including any type-dependent operands needed by opened types.
+
+The source is an address in lowered-address SIL when its type is
+address-only. In opaque-value SIL, the source may instead be an SSA value;
+AddressLowering supplies its storage. The instruction neither consumes nor
+modifies the source storage.
+
+Projection uses the conformance's receiver adjustment and calls the
+resulting interface's `AddRef`. The result is independently owned and may
+have a different pointer value from the source. This instruction does not
+forward ownership or reference-counting identity. The foreign `AddRef` may
+have arbitrary side effects, including releasing other objects.
+
 ### init_existential_ref
 
 ```

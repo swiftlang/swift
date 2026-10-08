@@ -1415,6 +1415,7 @@ public:
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
+  void visitInitCOMExistentialInst(InitCOMExistentialInst *inst);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
   void visitDeinitExistentialValueInst(DeinitExistentialValueInst *i);
@@ -8569,6 +8570,11 @@ void IRGenSILFunction::visitInitExistentialMetatypeInst(
                                    i->getOperand()->getType(),
                                    i->getConformances());
   setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::visitInitCOMExistentialInst(
+    InitCOMExistentialInst *inst) {
+  llvm_unreachable("COM existential projection has not been lowered");
 }
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {

@@ -2285,6 +2285,15 @@ public:
         &getFunction()));
   }
 
+  InitCOMExistentialInst *
+  createInitCOMExistential(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, SILValue concrete,
+                           ArrayRef<ProtocolConformanceRef> conformances) {
+    return insert(InitCOMExistentialInst::create(
+        getSILDebugLocation(loc), existentialType, formalConcreteType, concrete,
+        conformances, &getFunction()));
+  }
+
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType, SILValue Concrete,

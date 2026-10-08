@@ -6782,6 +6782,31 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       break;
     }
+    case SILInstructionKind::InitCOMExistentialInst: {
+      CanType FormalConcreteTy;
+      SILType ExistentialTy;
+      SourceLoc TyLoc;
+
+      if (parseTypedValueRef(Val, B) ||
+          P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+          P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+          parseASTType(FormalConcreteTy, TyLoc) ||
+          P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+          parseSILType(ExistentialTy))
+        return true;
+
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+
+      ArrayRef<ProtocolConformanceRef> conformances =
+          ::collectExistentialConformances(P, FormalConcreteTy, TyLoc,
+                                           ExistentialTy.getASTType());
+
+      ResultVal = B.createInitCOMExistential(
+          InstLoc, ExistentialTy, FormalConcreteTy, Val, conformances);
+      break;
+    }
+
     case SILInstructionKind::InitExistentialRefInst: {
       CanType FormalConcreteTy;
       SILType ExistentialTy;

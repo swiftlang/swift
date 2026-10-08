@@ -5138,6 +5138,27 @@ public:
     verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
+  void checkInitCOMExistentialInst(InitCOMExistentialInst *inst) {
+    auto sourceType = inst->getOperand()->getType();
+    auto *archetype = sourceType.getASTType()->getAs<ArchetypeType>();
+    require(archetype && archetype->hasCOMInterfaceConstraint(),
+            "init_com_existential operand must be a COM-constrained archetype");
+    require(inst->getType().isObject() &&
+                inst->getType().getASTType().isCOMExistentialType(),
+            "init_com_existential result must be a COM existential value");
+    require(isLoweringOf(sourceType, inst->getFormalConcreteType()),
+            "init_com_existential operand must be a lowering of the formal "
+            "concrete type");
+    require(sourceType.isAddress() || !fnConv.useLoweredAddresses() ||
+                F.getTypeLowering(sourceType).isLoadable(),
+            "init_com_existential requires an address for an address-only "
+            "operand in lowered-address SIL");
+    checkExistentialProtocolConformances(inst->getType().getASTType(),
+                                         inst->getFormalConcreteType(),
+                                         inst->getConformances());
+    verifyLocalArchetype(inst, inst->getFormalConcreteType());
+  }
+
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getASTType()->isBridgeableObjectType(),

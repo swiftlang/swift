@@ -1,0 +1,35 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -sil-print-types -emit-sorted-sil -I %t -sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -I %t -emit-sib -module-name M %s -o %t/M.sib
+// RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -sil-print-types -emit-sorted-sil -I %t -module-name M -sil-verify-all %t/M.sib | %FileCheck %s
+
+sil_stage raw
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+
+// Borrowing an opaque value does not need a temporary address.
+// CHECK-LABEL: sil [ossa] [opaque] @borrowed
+// CHECK: bb0([[SOURCE:%.*]] : @guaranteed $T):
+// CHECK-NEXT: [[RESULT:%.*]] = init_com_existential [[SOURCE]] : $T : $T, $any IItem
+// CHECK-NEXT: return [[RESULT]] : $any IItem
+sil [ossa] [opaque] @borrowed : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : @guaranteed $T):
+  %result = init_com_existential %value : $T : $T, $IItem
+  return %result : $IItem
+}
+
+// Consuming the source after projection leaves the result independently owned.
+// CHECK-LABEL: sil [ossa] [opaque] @owned
+// CHECK: bb0([[SOURCE:%.*]] : @owned $T):
+// CHECK-NEXT: [[RESULT:%.*]] = init_com_existential [[SOURCE]] : $T : $T, $any IItem
+// CHECK-NEXT: destroy_value [[SOURCE]] : $T
+// CHECK-NEXT: return [[RESULT]] : $any IItem
+sil [ossa] [opaque] @owned : $@convention(thin) <T: IItem> (@in T) -> @owned IItem {
+bb0(%value : @owned $T):
+  %result = init_com_existential %value : $T : $T, $IItem
+  destroy_value %value : $T
+  return %result : $IItem
+}

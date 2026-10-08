@@ -142,6 +142,7 @@ private func registerSILClasses() {
   register(IndexAddrInst.self)
   register(IndexRawPointerInst.self)
   register(TailAddrInst.self)
+  register(InitCOMExistentialInst.self)
   register(InitExistentialRefInst.self)
   register(OpenExistentialRefInst.self)
   register(OpenCOMExistentialInst.self)
