@@ -9,8 +9,11 @@
 #     -f utils\windows-docker\Dockerfile utils
 #
 # The default base image targets Windows Server 2019 hosts. Pick another one
-# with --build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022;
-# hosts whose Windows build differs from the image need --isolation=hyperv.
+# with --build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022.
+# With process isolation (the default on Windows Server), the image should
+# match the host's Windows build, including the patch level: pass
+# --build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:10.0.<build>.<ubr>
+# (build-windows-toolchain.bat does this) or use --isolation=hyperv.
 #
 # The artifacts that build.ps1 downloads (pinned Swift toolchain, CMake,
 # Python, WiX, Android NDK, ...) are installed in C:\ArtifactCache, which is

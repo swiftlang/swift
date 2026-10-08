@@ -178,7 +178,19 @@ set "Utils=%SourceRoot%\swift\utils"
 docker version
 docker info
 
-docker build --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY -t %Image% -f "%Utils%\windows-docker\Dockerfile" "%Utils%" || (exit /b 1)
+:: Process isolation needs a base image that matches the host's Windows build,
+:: including the patch level; a mismatch can hang the container (for example
+:: in WMI calls). Use the servercore tag for the host build when it exists.
+set "BuildArgs="
+for /f %%v in ('powershell.exe -NoProfile -Command "$v = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'; '10.0.{0}.{1}' -f $v.CurrentBuild, $v.UBR"') do set "HostBuild=%%v"
+set "BaseImage=mcr.microsoft.com/windows/servercore:%HostBuild%"
+docker pull %BaseImage% && (
+  set "BuildArgs=--build-arg BASE_IMAGE=%BaseImage%"
+) || (
+  echo warning: %BaseImage% is not available; using the Dockerfile's default base image.
+)
+
+docker build %BuildArgs% --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY -t %Image% -f "%Utils%\windows-docker\Dockerfile" "%Utils%" || (exit /b 1)
 
 :: The build tree stays in the mounted SourceRoot so CI can collect artifacts.
 docker run --rm ^

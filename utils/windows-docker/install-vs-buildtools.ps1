@@ -39,7 +39,9 @@ function Write-InstallerLogs {
 }
 
 $Bootstrapper = Join-Path $env:TEMP "vs_buildtools.exe"
-Invoke-WebRequest $URL -OutFile $Bootstrapper -UseBasicParsing
+Write-Host "Downloading $URL"
+# Fail instead of hanging silently if the connection stalls.
+Invoke-WebRequest $URL -OutFile $Bootstrapper -UseBasicParsing -TimeoutSec 300
 
 $Arguments = @("--quiet", "--wait", "--norestart", "--nocache", "--installPath", $InstallPath)
 foreach ($Component in $Components) {
@@ -50,13 +52,14 @@ $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 $Process = Start-Process $Bootstrapper -ArgumentList $Arguments -PassThru
 # Cache the handle; without it ExitCode is not available after the process exits.
 $null = $Process.Handle
+Write-Host "Started vs_buildtools.exe (pid $($Process.Id))"
 
 while (-not $Process.WaitForExit(60000)) {
   $Latest = Get-ChildItem $env:TEMP -Filter "dd_*.log" | Sort-Object LastWriteTime | Select-Object -Last 1
-  $Memory = Get-CimInstance Win32_OperatingSystem
-  Write-Host ("[{0:hh\:mm\:ss}] {1}, {2:N1}/{3:N1} GB free memory" -f $Stopwatch.Elapsed,
-    $(if ($Latest) { $Latest.Name } else { "no installer log yet" }),
-    ($Memory.FreePhysicalMemory / 1MB), ($Memory.TotalVisibleMemorySize / 1MB))
+  # Avoid WMI (Get-CimInstance) here: it can hang in process-isolated
+  # containers whose base image does not match the host's Windows build.
+  Write-Host ("[{0:hh\:mm\:ss}] {1}" -f $Stopwatch.Elapsed,
+    $(if ($Latest) { $Latest.Name } else { "no installer log yet" }))
 
   if ($Stopwatch.Elapsed.TotalMinutes -ge $TimeoutMinutes) {
     Write-InstallerLogs
