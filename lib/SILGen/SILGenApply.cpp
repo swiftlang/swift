@@ -442,21 +442,19 @@ private:
             getSubstFormalInterfaceType(substFormalType, subs)),
         Substitutions(subs), Loc(l) {}
 
-  /// Only opened COM existentials dispatch through the foreign interface.
-  /// Generic receivers continue to use Swift witness tables.
-  bool isCOMExistentialMethod() const {
+  /// COM requirements dispatch through the foreign interface, including when
+  /// the receiver's interface adjustment is supplied as a generic argument.
+  bool isCOMMethod() const {
     if (kind != Kind::WitnessMethod)
       return false;
 
     auto *proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
-    auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
-    return proto->isCOMInterface() &&
-           selfType.subst(Substitutions)->is<ExistentialArchetypeType>();
+    return proto->isCOMInterface();
   }
 
   SILType getWitnessMethodType(SILType type) const {
     ASSERT(kind == Kind::WitnessMethod);
-    if (!isCOMExistentialMethod())
+    if (!isCOMMethod())
       return type;
 
     auto FTy = Lowering::adjustFunctionType(
@@ -630,7 +628,7 @@ public:
     case Kind::WitnessMethod:
       if (Constant.isForeign)
         return true;
-      return isCOMExistentialMethod();
+      return isCOMMethod();
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::DynamicMethod:
@@ -759,7 +757,7 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (isCOMExistentialMethod()) {
+      if (isCOMMethod()) {
         auto SILTy = constantInfo.getSILType();
         fn = SGF.B.createCOMMethod(Loc, borrowedSelf->getValue(), *constant,
                                    getWitnessMethodType(SILTy));
