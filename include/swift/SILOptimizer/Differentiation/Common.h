@@ -24,6 +24,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+#include "swift/AST/AutoDiff.h"
+#include <optional>
 
 namespace swift {
 
@@ -36,6 +38,39 @@ class ADContext;
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
+
+/// PR #93158's start selection: inspect the result-buffer operand, not the
+/// returned task handle. This query does not compute or modify activity.
+bool shouldDifferentiateAsyncLet(BuiltinInst *start,
+                                const DifferentiableActivityInfo &activity,
+                                const AutoDiffConfig &config);
+
+/// Bind an ordinary initializer VJP into the task's indirect result convention.
+/// Uses the ordinary AD reabstraction helper; the VJP keeps its native ABI.
+SILValue createAsyncLetVJPClosure(SILBuilder &builder, ADContext &context,
+                                 SILLocation loc, SILValue vjp);
+
+// A view of one selected child in the original SIL, not cached analysis state.
+// The original body is not rewritten while its derivative is generated.
+struct AsyncLetInfo {
+  BuiltinInst *start;
+  explicit AsyncLetInfo(BuiltinInst *start) : start(start) {}
+  PartialApplyInst *getInitializer() const;
+  bool isGet(SILInstruction *inst) const;
+  bool isResultAddress(SILInstruction *inst) const;
+
+  AllocStackInst *getBuffer() const;
+  IndexSubset *getParameterIndices() const;
+  // Compute the derivative type in the original parent's context, without
+  // looking up a witness or generating a derivative body.
+  CanSILFunctionType getSubstVJPType() const;
+  SILType getResultStorageType() const;
+  bool isInitializerInstruction(SILInstruction *inst) const;
+};
+
+std::optional<AsyncLetInfo>
+getAsyncLet(SILInstruction *inst, const DifferentiableActivityInfo &activity,
+            const AutoDiffConfig &config);
 
 /// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
 /// This is being used to print short debug messages within the AD pass.
