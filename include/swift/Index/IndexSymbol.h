@@ -45,7 +45,7 @@ inline SymbolPropertySet &operator|=(SymbolPropertySet &SKSet, SymbolProperty SK
 }
 
 struct IndexRelation {
-  const Decl *decl;
+  const Decl *decl = nullptr;
   SymbolInfo symInfo;
   SymbolRoleSet roles = SymbolRoleSet(0);
 
