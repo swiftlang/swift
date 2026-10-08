@@ -9114,6 +9114,54 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
 ERROR(pack_iteration_where_clause_not_supported, none,
       "'where' clause in pack iteration is not supported", ())
 
+//------------------------------------------------------------------------------
+// MARK: Scope Restrictions
+//------------------------------------------------------------------------------
+
+// TODO: support these cases!
+ERROR(scoped_unsupported_position, none,
+      "'@_scoped' is not supported here", ())
+ERROR(scoped_applied_repeatedly, none,
+      "scope restrictions cannot be specified more than once", ())
+ERROR(scoped_labeled, none,
+      "labeled scope restrictions are not supported", ())
+ERROR(scoped_multiple, none,
+      "multiple scope restrictions are not supported", ())
+ERROR(scoped_nonescapable_self, none,
+      "the scope of a non-escapable 'self' is not supported", ())
+ERROR(scoped_function_type_param, none,
+      "scopes named by function type parameters are not supported", ())
+ERROR(scoped_nonescapable_in_param_position, none,
+      "non-escapable type in this position is not supported when scope "
+      "restrictions are enabled", ())
+ERROR(scoped_nonescapable_param_context, none,
+      "non-escapable parameters are only supported in functions and "
+      "initializers when scope restrictions are enabled", ())
+ERROR(scoped_nonescapable_in_typealias, none,
+      "non-escapable type in a typealias is not supported when scope "
+      "restrictions are enabled", ())
+ERROR(scoped_nonescapable_in_generic_argument, none,
+      "non-escapable type in a generic argument is not supported when scope "
+      "restrictions are enabled", ())
+ERROR(scoped_elided_result, none,
+      "non-escapable result of a function with scope restrictions must have "
+      "its scope written with '@_scoped'", ())
+ERROR(scoped_param_scope_unsupported, none,
+      "the scope of %0 is not supported", (Identifier))
+
+ERROR(scoped_unknown_param, none,
+      "cannot find parameter %0 for scope restriction", (Identifier))
+ERROR(scoped_consuming_param, none,
+      "consumed parameters have no access scope", ())
+NOTE(scoped_consuming_param_here, none,
+     "%0 is consumed", (Identifier))
+NOTE(scoped_init_param_consuming_by_default, none,
+     "initializer parameters are 'consuming' by default", ())
+ERROR(scoped_self_no_access, none,
+      "'self' has no access scope here", ())
+ERROR(scoped_escapable_param, none,
+      "%0 has an escapable type, so it has no scope", (Identifier))
+
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Syntax

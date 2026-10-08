@@ -56,6 +56,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/RequirementMatch.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -4735,13 +4736,17 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
 
 void NominalType::Profile(llvm::FoldingSetNodeID &ID,
                           NominalTypeDecl *D, Type parent,
-                          ArrayRef<Type> genericArgs) {
+                          ArrayRef<Type> genericArgs,
+                          ArrayRef<ScopeRef> scopeArgs) {
   ID.AddPointer(D);
   ID.AddPointer(parent.getPointer());
   ID.AddInteger(genericArgs.size());
   for (Type arg : genericArgs) {
     ID.AddPointer(arg.getPointer());
   }
+  ID.AddInteger(scopeArgs.size());
+  for (ScopeRef scope : scopeArgs)
+    ID.AddInteger(scope.getOpaqueValue());
 }
 
 NominalType::NominalType(TypeKind theKind,
@@ -4749,20 +4754,34 @@ NominalType::NominalType(TypeKind theKind,
                          Type parent,
                          ArrayRef<Type> genericArgs,
                          const ASTContext *context,
-                         RecursiveTypeProperties properties)
+                         RecursiveTypeProperties properties,
+                         ArrayRef<ScopeRef> scopeArgs)
     : AnyGenericType(theDecl, parent, theKind, context, properties) {
   Bits.NominalType.GenericArgCount = genericArgs.size();
+  ASSERT(Bits.NominalType.GenericArgCount == genericArgs.size() &&
+         "Truncation");
   if (!genericArgs.empty()) {
     // Subtypes are required to provide storage for the generic arguments
     std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
                             getTrailingObjectsPointer());
+  }
+  Bits.NominalType.ScopeArgCount = scopeArgs.size();
+  ASSERT(Bits.NominalType.ScopeArgCount == scopeArgs.size() && "Truncation");
+  if (!scopeArgs.empty()) {
+    // Subtypes are required to provide storage for the scope arguments
+    std::uninitialized_copy(scopeArgs.begin(), scopeArgs.end(),
+                            getScopeArgsPointer());
   }
 }
 
 NominalType *NominalType::get(NominalTypeDecl *D,
                               Type parent,
                               ArrayRef<Type> genericArgs,
-                              const ASTContext &C) {
+                              const ASTContext &C,
+                              ArrayRef<ScopeRef> scopeArgs) {
+  ASSERT((scopeArgs.empty() || isa<EnumDecl>(D) || isa<StructDecl>(D)) &&
+         "only structs and enums can be non-escapable");
+
   switch (D->getKind()) {
   case DeclKind::Enum:
   case DeclKind::Struct:
@@ -4797,7 +4816,7 @@ NominalType *NominalType::get(NominalTypeDecl *D,
 #endif
 
   llvm::FoldingSetNodeID ID;
-  NominalType::Profile(ID, D, parent, genericArgs);
+  NominalType::Profile(ID, D, parent, genericArgs, scopeArgs);
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
@@ -4812,6 +4831,9 @@ NominalType *NominalType::get(NominalTypeDecl *D,
   if (auto *existingType =
           C.getImpl().getArena(arena).NominalTypes.lookup(ID, insertToken))
     return existingType;
+
+  ASSERT((scopeArgs.empty() || scopeArgs.size() == getNumScopeParams(D)) &&
+         "a scoped type must be saturated");
 
   bool isCanonical = !parent || parent->isCanonical();
   if (isCanonical) {
@@ -4830,15 +4852,17 @@ NominalType *NominalType::get(NominalTypeDecl *D,
     newType = new (mem) ClassType(
         theClass, parent, genericArgs, isCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(D)) {
-    auto sz = StructType::totalSizeToAlloc<Type>(genericArgs.size());
+    auto sz = StructType::totalSizeToAlloc<Type, ScopeRef>(genericArgs.size(),
+                                                           scopeArgs.size());
     auto mem = C.Allocate(sz, alignof(StructType), arena);
-    newType = new (mem) StructType(
-        theStruct, parent, genericArgs, isCanonical ? &C : nullptr, properties);
+    newType = new (mem) StructType(theStruct, parent, genericArgs, scopeArgs,
+                                   isCanonical ? &C : nullptr, properties);
   } else if (auto theEnum = dyn_cast<EnumDecl>(D)) {
-    auto sz = EnumType::totalSizeToAlloc<Type>(genericArgs.size());
+    auto sz = EnumType::totalSizeToAlloc<Type, ScopeRef>(genericArgs.size(),
+                                                         scopeArgs.size());
     auto mem = C.Allocate(sz, alignof(EnumType), arena);
-    newType = new (mem) EnumType(
-        theEnum, parent, genericArgs, isCanonical ? &C : nullptr, properties);
+    newType = new (mem) EnumType(theEnum, parent, genericArgs, scopeArgs,
+                                 isCanonical ? &C : nullptr, properties);
   } else {
     llvm_unreachable("Unhandled NominalTypeDecl");
   }
@@ -4861,9 +4885,9 @@ EnumType *EnumType::get(EnumDecl *D, Type parent,
 }
 
 EnumType::EnumType(EnumDecl *D, Type parent, ArrayRef<Type> args,
-                   const ASTContext *ctx,
+                   ArrayRef<ScopeRef> scopeArgs, const ASTContext *ctx,
                    RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Enum, D, parent, args, ctx, properties) {}
+  : NominalType(TypeKind::Enum, D, parent, args, ctx, properties, scopeArgs) {}
 
 CanStructType CanStructType::get(StructDecl *D, CanType parent,
                                  ArrayRef<CanType> args,
@@ -4879,9 +4903,10 @@ StructType *StructType::get(StructDecl *D, Type parent,
 }
 
 StructType::StructType(StructDecl *D, Type parent, ArrayRef<Type> args,
-                       const ASTContext *ctx,
+                       ArrayRef<ScopeRef> scopeArgs, const ASTContext *ctx,
                        RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Struct, D, parent, args, ctx, properties) {}
+  : NominalType(TypeKind::Struct, D, parent, args, ctx, properties,
+                scopeArgs) {}
 
 CanClassType CanClassType::get(ClassDecl *D, CanType parent,
                                ArrayRef<CanType> args,

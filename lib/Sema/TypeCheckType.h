@@ -781,6 +781,10 @@ bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
                               const TypeResolution &resolution);
 
+/// Fills in the scope arguments that a parameter's written type leaves
+/// unspecified with fresh scope parameters from the binding function type.
+Type fillElidedScopes(ParamDecl *param, Type ty);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPE_CHECK_TYPE_H */

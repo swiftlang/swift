@@ -52,6 +52,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
@@ -596,6 +597,9 @@ private:
   NeverNullType resolveASTFunctionType(FunctionTypeRepr *repr,
                                        TypeResolutionOptions options,
                                        TypeAttrSet *attrs);
+  Type resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr, Type ty);
+  std::optional<ScopeRef> resolveScope(AbstractFunctionDecl *fn,
+                                       ScopeDepth depth, ScopeDescriptor scope);
   SmallVector<AnyFunctionType::Param, 8>
   resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                TypeResolutionOptions options,
@@ -1413,6 +1417,15 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
     Type substTy = genericResolution.resolveType(tyR, silContext);
     if (!substTy || substTy->hasError())
       return true;
+
+    // TODO: Support elided scopes in generic arguments.
+    if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+        hasScopeUnsaturatedType(substTy)) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(tyR->getStartLoc(),
+                 diag::scoped_nonescapable_in_generic_argument);
+      return true;
+    }
 
     args.push_back(substTy);
   }
@@ -3866,14 +3879,18 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
-  // TODO: Lower the specifiers into a type scope application instead of
-  // dropping the attribute.
   if (auto scoped = claim<ScopedTypeAttr>(attrs)) {
-    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions) &&
-        !scoped->isInvalid()) {
-      diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
-               "@_scoped", false, Feature::ScopeRestrictions.getName());
-      scoped->setInvalid();
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+      if (!scoped->isInvalid()) {
+        diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
+                 "@_scoped", false, Feature::ScopeRestrictions.getName());
+        scoped->setInvalid();
+      }
+    } else if (scoped->isInvalid()) {
+      // An unsupported scope restriction was diagnosed.
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->hasError()) {
+      ty = resolveScopedType(scoped, repr, ty);
     }
   }
 
@@ -4534,10 +4551,378 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
   return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
+/// Whether a parameter is borrowed or mutated for the call rather than
+/// consumed, so that it has an access scope.
+static bool hasAccessScope(ParamDecl *param, AbstractFunctionDecl *fn) {
+  return getLoweredOwnership(param->getValueOwnership(), fn,
+                             param->isSelfParameter()) != ValueOwnership::Owned;
+}
+
+/// The name of the parameter a written scope refers to, if any: `&a` is an
+/// access to `a`, and the scope name `a` is the scope of the parameter `a`.
+static std::optional<Identifier>
+getReferencedParamName(ScopeDescriptor scope) {
+  if (scope.getSubject() != ScopeDescriptor::Subject::Name)
+    return std::nullopt;
+  if (scope.isAccess())
+    return scope.getAccessedValue();
+  // FIXME: Prefer explicitly named scopes here.
+  return scope.getScopeName().getIdentifier();
+}
+
+/// (For now) diagnoses a `@_scoped` within a function type that names one of
+/// its parameters.
+///
+/// We want to reject this until we decide what to do about it:
+/// ```
+/// func functionTypeParam(_ body: (_ x: MyRef) -> @_scoped(x) MyRef) {}
+/// ```
+/// ...since `x` might also be a parameter in the outer function.
+static void diagnoseScopeNamingOwnParam(ASTContext &ctx,
+                                        FunctionTypeRepr *repr) {
+  SmallVector<Identifier, 4> paramNames;
+  for (auto &elt : repr->getArgsTypeRepr()->getElements())
+    for (auto name : {elt.Name, elt.SecondName})
+      if (!name.empty())
+        paramNames.push_back(name);
+  if (paramNames.empty())
+    return;
+
+  repr->findIf([&](TypeRepr *nested) {
+    auto *attributed = dyn_cast<AttributedTypeRepr>(nested);
+    if (!attributed)
+      return false;
+    for (auto attr : attributed->getAttrs()) {
+      auto *scoped =
+          dyn_cast_or_null<ScopedTypeAttr>(attr.dyn_cast<TypeAttribute *>());
+      if (!scoped || scoped->isInvalid())
+        continue;
+      for (auto spec : scoped->getSpecifiers()) {
+        auto name = getReferencedParamName(spec.getScope());
+        if (name && llvm::is_contained(paramNames, *name)) {
+          ctx.Diags.diagnose(spec.getScope().getLoc(),
+                             diag::scoped_function_type_param);
+          scoped->setInvalid();
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+}
+
+/// The number of function types enclosing \p target within \p repr, or
+/// `nullopt` if it isn't in a supported position there.
+static std::optional<ScopeDepth>
+findFunctionTypeDepth(TypeRepr *repr, const TypeRepr *target,
+                      ScopeDepth depth) {
+  // Do this recursive dyn_cast so we don't accidentally walk into anything we
+  // didn't expect / can't handle.
+  if (repr == target)
+    return depth;
+  if (auto *attributed = dyn_cast<AttributedTypeRepr>(repr))
+    return findFunctionTypeDepth(attributed->getTypeRepr(), target, depth);
+  if (auto *specifier = dyn_cast<SpecifierTypeRepr>(repr))
+    return findFunctionTypeDepth(specifier->getBase(), target, depth);
+  if (auto *tuple = dyn_cast<TupleTypeRepr>(repr); tuple && tuple->isParenType())
+    return findFunctionTypeDepth(tuple->getElementType(0), target, depth);
+  if (auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr)) {
+    for (auto &elt : fnRepr->getArgsTypeRepr()->getElements())
+      if (auto found = findFunctionTypeDepth(elt.Type, target, depth.deeper()))
+        return found;
+    return findFunctionTypeDepth(fnRepr->getResultTypeRepr(), target,
+                                 depth.deeper());
+  }
+  // TODO: Support other positions. Generic arguments in particular can be
+  // substituted under function types without shifting their scope references.
+  return std::nullopt;
+}
+
+/// The number of function types enclosing \p target in \p fn's parameter and
+/// result types, or `nullopt` if it isn't in a supported position in them.
+static std::optional<ScopeDepth> findInSignature(AbstractFunctionDecl *fn,
+                                                 const TypeRepr *target) {
+  // This can't easily be tracked while resolving, because generic arguments and
+  // pack expansion patterns are resolved by separate `TypeResolver`s.
+  // TODO: Resolve scope names in a lexical environment of the binders being
+  // resolved instead, so the depth is the number of binders passed.
+  // TODO: If a repr was reused in multiple params, this would silently return
+  // the first one...
+  for (auto *param : *fn->getParameters())
+    if (auto *repr = param->getTypeRepr())
+      if (auto depth = findFunctionTypeDepth(repr, target, ScopeDepth::zero()))
+        return depth;
+  if (auto *func = dyn_cast<FuncDecl>(fn))
+    if (auto *repr = func->getResultTypeRepr())
+      return findFunctionTypeDepth(repr, target, ScopeDepth::zero());
+  return std::nullopt;
+}
+
+Type TypeResolver::resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr,
+                                     Type ty) {
+  // FIXME: Diagnose scope restrictions on types without scope parameters, such
+  // as escapable types.
+  auto *nominal = ty->getAs<NominalType>();
+  if (!nominal || getNumScopeParams(nominal->getDecl()) == 0)
+    return ty;
+
+  auto diagnoseUnsupported = [&](SourceLoc loc, Diag<> id) -> Type {
+    diagnose(loc, id);
+    attr->setInvalid();
+    return ErrorType::get(getASTContext());
+  };
+
+  auto *fn = dyn_cast<AbstractFunctionDecl>(getDeclContext());
+  std::optional<ScopeDepth> depth;
+  // TODO: Support accessors, whose parameters are consumed by default.
+  if (fn && !isa<AccessorDecl>(fn))
+    depth = findInSignature(fn, repr);
+  if (!depth)
+    return diagnoseUnsupported(attr->getAttrLoc(),
+                               diag::scoped_unsupported_position);
+
+  // Earlier stages, like requirement inference, resolve the same type reprs.
+  if (!inStage(TypeResolutionStage::Interface))
+    return ty;
+
+  if (nominal->hasScopeArgs())
+    return diagnoseUnsupported(attr->getAttrLoc(),
+                               diag::scoped_applied_repeatedly);
+
+  auto specifiers = attr->getSpecifiers();
+  if (specifiers.size() != 1)
+    return diagnoseUnsupported(specifiers[1].getScope().getLoc(),
+                               diag::scoped_multiple);
+  if (auto label = specifiers.front().getLabel())
+    return diagnoseUnsupported(label->Loc, diag::scoped_labeled);
+
+  auto written = specifiers.front().getScope();
+  // A static method's `self` is an escapable metatype.
+  if (written.getSubject() == ScopeDescriptor::Subject::Self &&
+      !written.isAccess() && !fn->isStatic()) {
+    auto *selfNominal = fn->getDeclContext()->getSelfNominalTypeDecl();
+    if (selfNominal &&
+        selfNominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always)
+      return diagnoseUnsupported(written.getLoc(),
+                                 diag::scoped_nonescapable_self);
+  }
+
+  auto &ctx = getASTContext();
+  auto scope = resolveScope(fn, *depth, written);
+  if (!scope) {
+    attr->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  return NominalType::get(nominal->getDecl(), nominal->getParent(),
+                          nominal->getGenericArgs(), ctx, *scope);
+}
+
+std::optional<ScopeRef>
+TypeResolver::resolveScope(AbstractFunctionDecl *fn, ScopeDepth depth,
+                           ScopeDescriptor scope) {
+  auto &ctx = getASTContext();
+
+  switch (scope.getSubject()) {
+  case ScopeDescriptor::Subject::Immortal:
+    return ScopeRef::forImmortal();
+
+  case ScopeDescriptor::Subject::Self: {
+    if (!fn->hasImplicitSelfDecl()) {
+      diagnose(scope.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
+      return std::nullopt;
+    }
+    if (!scope.isAccess()) {
+      diagnose(scope.getLoc(), diag::scoped_escapable_param, ctx.Id_self);
+      return std::nullopt;
+    }
+    if (fn->isStatic() || isa<ConstructorDecl>(fn)) {
+      diagnose(scope.getLoc(), diag::scoped_self_no_access);
+      return std::nullopt;
+    }
+    if (!hasAccessScope(fn->getImplicitSelfDecl(), fn)) {
+      diagnose(scope.getLoc(), diag::scoped_consuming_param);
+      diagnose(fn->getLoc(), diag::scoped_consuming_param_here, ctx.Id_self);
+      return std::nullopt;
+    }
+    // `self` is the parameter of the outer function type of a method.
+    return ScopeRef::forParam(depth.deeper(), /*index=*/0);
+  }
+
+  case ScopeDescriptor::Subject::Name: {
+    // FIXME: Doing params like this is a hack... better to introduce scopes explicitly.
+    auto name = *getReferencedParamName(scope);
+    auto *params = fn->getParameters();
+    auto found = llvm::find_if(*params, [&](ParamDecl *param) {
+      return param->getParameterName() == name;
+    });
+    if (found == params->end()) {
+      diagnose(scope.getLoc(), diag::scoped_unknown_param, name);
+      return std::nullopt;
+    }
+    auto *param = *found;
+
+    if (scope.isAccess()) {
+      if (!hasAccessScope(param, fn)) {
+        diagnose(scope.getLoc(), diag::scoped_consuming_param);
+        if (param->getValueOwnership() != ValueOwnership::Default) {
+          diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);
+        } else {
+          ASSERT(isa<ConstructorDecl>(fn) &&
+                 "only initializers consume parameters by default");
+          diagnose(param->getLoc(),
+                   diag::scoped_init_param_consuming_by_default);
+        }
+        return std::nullopt;
+      }
+      return ScopeRef::forParam(depth, found - params->begin());
+    }
+
+    // Does this make sense when values can have multiple scopes?
+    // TODO: Support forward references?
+    auto paramTy = param->getInterfaceType();
+    if (paramTy->hasError())
+      return std::nullopt;
+    if (fn->mapTypeIntoEnvironment(paramTy)->isEscapable()) {
+      diagnose(scope.getLoc(), diag::scoped_escapable_param, name);
+      return std::nullopt;
+    }
+    auto *paramNominal = paramTy->getAs<NominalType>();
+    auto paramScopes =
+        paramNominal ? paramNominal->getScopeArgs() : ArrayRef<ScopeRef>();
+    // TODO: Support the scopes of generic, imported, and conditionally
+    // non-escapable types.
+    if (paramScopes.empty()) {
+      diagnose(scope.getLoc(), diag::scoped_param_scope_unsupported, name);
+      return std::nullopt;
+    }
+    // FIXME: Support multiple scopes in types instead of blindly assuming
+    // exactly one for ~E.
+    // TODO: When that is supported, treat this as ambiguous.
+    ASSERT(paramScopes.size() == 1 &&
+           "a type has at most one scope parameter");
+    return paramScopes.front().shifted(depth);
+  }
+  }
+  llvm_unreachable("unhandled subject");
+}
+
+/// Fills in the scope arguments that \p ty leaves unspecified with fresh scope
+/// parameters starting after \p nextIndex.
+static Type fillScopeArgs(ASTContext &ctx, Type ty, unsigned &nextIndex) {
+  if (auto *nominal = ty->getAs<NominalType>()) {
+    if (nominal->hasScopeArgs() || getNumScopeParams(nominal->getDecl()) == 0)
+      return ty;
+    auto scope = ScopeRef::forParam(ScopeDepth::zero(), nextIndex++);
+    return NominalType::get(nominal->getDecl(), nominal->getParent(),
+                            nominal->getGenericArgs(), ctx, scope);
+  }
+
+  // The parameters of a function-typed parameter are bound by its own type.
+  if (auto *fnTy = ty->getAs<FunctionType>()) {
+    unsigned innerNextIndex = fnTy->getNumParams();
+    SmallVector<AnyFunctionType::Param, 4> params;
+    for (auto &param : fnTy->getParams())
+      params.push_back(param.withType(
+          fillScopeArgs(ctx, param.getPlainType(), innerNextIndex)));
+    std::optional<AnyFunctionType::ExtInfo> info;
+    if (fnTy->hasExtInfo())
+      info = fnTy->getExtInfo();
+    return FunctionType::get(params, fnTy->getYields(), fnTy->getResult(),
+                             info);
+  }
+
+  return ty;
+}
+
+namespace {
+/// Finds the first scope parameter of a function type that the parameter types
+/// being walked don't use.
+class NextScopeParamFinder : public TypeWalker {
+  ScopeDepth Depth = ScopeDepth::zero();
+
+public:
+  unsigned Next;
+
+  explicit NextScopeParamFinder(unsigned first) : Next(first) {}
+
+  Action walkToTypePre(Type ty) override {
+    if (isa<AnyFunctionType>(ty.getPointer())) {
+      Depth = Depth.deeper();
+      return Action::Continue;
+    }
+    auto *nominal = dyn_cast<NominalType>(ty.getPointer());
+    if (!nominal)
+      return Action::Continue;
+    for (auto scope : nominal->getScopeArgs())
+      if (scope.getKind() == ScopeRef::Kind::Param && scope.getDepth() == Depth)
+        Next = std::max(Next, scope.getIndex() + 1);
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type ty) override {
+    if (isa<AnyFunctionType>(ty.getPointer()))
+      Depth = Depth.shallower();
+    return Action::Continue;
+  }
+};
+} // end anonymous namespace
+
+/// The index of the first scope parameter of \p fn's function type that the
+/// parameters before \p param don't use.
+///
+/// Scope parameters after the access scopes are numbered by first occurrence.
+static unsigned getNextScopeParamIndex(AbstractFunctionDecl *fn,
+                                       ParamDecl *param) {
+  auto *params = fn->getParameters();
+  // TODO: Number scope parameters once per signature instead of rewalking the
+  // earlier parameters for each one.
+  NextScopeParamFinder finder(/*first=*/params->size());
+  for (auto *earlier : *params) {
+    if (earlier == param)
+      break;
+    // Type walks don't look through typealiases.
+    earlier->getInterfaceType()->getCanonicalType().walk(finder);
+  }
+  return finder.Next;
+}
+
+Type swift::fillElidedScopes(ParamDecl *param, Type ty) {
+  auto &ctx = param->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ScopeRestrictions))
+    return ty;
+  if (ty->hasError())
+    return ty;
+
+  auto loc = param->getTypeRepr()->getStartLoc();
+  auto diagnoseIfUnsaturated = [&](Type filled, Diag<> id) -> Type {
+    if (!hasScopeUnsaturatedType(filled))
+      return filled;
+    ctx.Diags.diagnose(loc, id);
+    return ErrorType::get(ctx);
+  };
+
+  auto *fn = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
+  // TODO: Support accessors, closures, subscripts, and enum elements.
+  if (!fn || isa<AccessorDecl>(fn))
+    return diagnoseIfUnsaturated(ty, diag::scoped_nonescapable_param_context);
+
+  unsigned nextIndex = getNextScopeParamIndex(fn, param);
+  // TODO: Fill in scope arguments in function results, generic arguments,
+  // tuples, and other structure.
+  return diagnoseIfUnsaturated(fillScopeArgs(ctx, ty, nextIndex),
+                               diag::scoped_nonescapable_in_param_position);
+}
+
 NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     TypeAttrSet *attrs) {
   auto &ctx = getASTContext();
+
+  // FIXME: Pick actual rules for shadowing or get rid of inferring scopes from
+  // param names.
+  if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions))
+    diagnoseScopeNamingOwnParam(ctx, repr);
 
   auto isolatedAttr = claim<IsolatedTypeAttr>(attrs);
 
@@ -4953,6 +5338,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   if (inStage(TypeResolutionStage::Interface)) {
+    // FIXME: With scope restrictions, this infers lifetime dependencies that
+    // conflict with the scopes written in the function type.
     if (auto const resolvedLifetimeDependence =
             LifetimeDependenceInfo::getFromAST(
                 repr, aft, lifetimeAttributes, getDeclContext(),
