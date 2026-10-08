@@ -32,3 +32,28 @@ public func caller() async -> Int {
 // Assembly without -mtail-call: no return_call Wasm instruction
 // NOTAIL-ASM: .functype
 // NOTAIL-ASM-NOT: return_call
+
+// Runtime entry declarations and calls must agree on the async context.
+// RUN: %target-swift-frontend %s -emit-ir -module-name test -disable-availability-checking -Xcc -mtail-call | %FileCheck %s --check-prefix=RUNTIME-ABI
+// RUN: %target-swift-frontend %s -emit-ir -module-name test -disable-availability-checking | %FileCheck %s --check-prefix=RUNTIME-ABI
+// RUN: %target-swift-frontend %s -S -module-name test -disable-availability-checking -Xcc -mtail-call | %FileCheck %s --check-prefix=RUNTIME-ABI-ASM
+
+public actor RuntimeABIActor {
+  public func update() {}
+}
+
+public func hopToActor(_ actor: RuntimeABIActor) async {
+  await actor.update()
+}
+
+public func awaitChild() async -> Int {
+  async let child = callee()
+  return await child
+}
+
+// RUNTIME-ABI-DAG: declare {{(swiftcc|swifttailcc)}} void @swift_task_switch(ptr swiftasync, ptr, i32, i32)
+// RUNTIME-ABI-DAG: declare {{(swiftcc|swifttailcc)}} void @swift_asyncLet_finish(ptr swiftasync, ptr, ptr, ptr, ptr)
+// RUNTIME-ABI-DAG: call {{(swiftcc|swifttailcc)}} void @swift_task_switch(ptr {{[^,]*}}swiftasync
+// RUNTIME-ABI-DAG: call {{(swiftcc|swifttailcc)}} void @swift_asyncLet_finish(ptr {{[^,]*}}swiftasync
+// RUNTIME-ABI-ASM-DAG: .functype swift_task_switch (i32, i32, i32, i32, i32, i32) -> ()
+// RUNTIME-ABI-ASM-DAG: .functype swift_asyncLet_finish (i32, i32, i32, i32, i32, i32, i32) -> ()
