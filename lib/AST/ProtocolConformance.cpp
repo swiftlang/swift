@@ -1304,10 +1304,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
     inverses.insert(InvertibleProtocolKind::Escapable);
 
   bool hasSuppressedConformances = false;
+  auto *classDecl = dyn_cast<ClassDecl>(this);
   for (auto ip : InvertibleProtocolSet::allKnown()) {
     if (!inverses.contains(ip) ||
-        (isa<ClassDecl>(this) &&
-         !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
+        (classDecl && !classDecl->canSuppressInvertible(ip))) {
       addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
     } else {
       hasSuppressedConformances = true;
