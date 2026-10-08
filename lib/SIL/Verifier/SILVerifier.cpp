@@ -5166,6 +5166,53 @@ public:
     verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
+  void checkInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *inst) {
+    auto sourceType = inst->getOperand()->getType();
+    auto *archetype = sourceType.getASTType()->getAs<ArchetypeType>();
+    require(archetype && archetype->hasCOMInterfaceConstraint(),
+            "init_com_existential_addr operand must be a COM-constrained "
+            "archetype");
+    require(inst->getType().isObject() &&
+                inst->getType().getASTType().isCOMExistentialType(),
+            "init_com_existential_addr result must be a COM existential value");
+    require(
+        isLoweringOf(sourceType, inst->getFormalConcreteType()),
+        "init_com_existential_addr operand must be a lowering of the formal "
+        "concrete type");
+    require(sourceType.isAddress(),
+            "init_com_existential_addr operand must be an address");
+    checkExistentialProtocolConformances(inst->getType().getASTType(),
+                                         inst->getFormalConcreteType(),
+                                         inst->getConformances());
+    verifyLocalArchetype(inst, inst->getFormalConcreteType());
+  }
+
+  void checkInitCOMExistentialValueInst(InitCOMExistentialValueInst *inst) {
+    auto sourceType = inst->getOperand()->getType();
+    auto *archetype = sourceType.getASTType()->getAs<ArchetypeType>();
+    require(archetype && archetype->hasCOMInterfaceConstraint(),
+            "init_com_existential_value operand must be a COM-constrained "
+            "archetype");
+    require(
+        inst->getType().isObject() &&
+            inst->getType().getASTType().isCOMExistentialType(),
+        "init_com_existential_value result must be a COM existential value");
+    require(
+        isLoweringOf(sourceType, inst->getFormalConcreteType()),
+        "init_com_existential_value operand must be a lowering of the formal "
+        "concrete type");
+    require(sourceType.isObject(),
+            "init_com_existential_value operand must be a value");
+    require(!fnConv.useLoweredAddresses() ||
+                F.getTypeLowering(sourceType).isLoadable(),
+            "init_com_existential_value requires a loadable operand in "
+            "lowered-address SIL");
+    checkExistentialProtocolConformances(inst->getType().getASTType(),
+                                         inst->getFormalConcreteType(),
+                                         inst->getConformances());
+    verifyLocalArchetype(inst, inst->getFormalConcreteType());
+  }
+
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getASTType()->isBridgeableObjectType(),

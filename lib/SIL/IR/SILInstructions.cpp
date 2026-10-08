@@ -2600,6 +2600,42 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
                                                 Conformances);
 }
 
+InitCOMExistentialAddrInst *InitCOMExistentialAddrInst::create(
+    SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
+    SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
+    SILFunction *F) {
+  checkExistentialPreconditions(ExistentialType, ConcreteType, Conformances);
+
+  SILModule &Mod = F->getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, *F, ConcreteType);
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+
+  void *Buffer = Mod.allocateInst(size, alignof(InitCOMExistentialAddrInst));
+  return ::new (Buffer)
+      InitCOMExistentialAddrInst(Loc, ExistentialType, ConcreteType, Instance,
+                                 TypeDependentOperands, Conformances);
+}
+
+InitCOMExistentialValueInst *InitCOMExistentialValueInst::create(
+    SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
+    SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
+    SILFunction *F) {
+  checkExistentialPreconditions(ExistentialType, ConcreteType, Conformances);
+
+  SILModule &Mod = F->getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, *F, ConcreteType);
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+
+  void *Buffer = Mod.allocateInst(size, alignof(InitCOMExistentialValueInst));
+  return ::new (Buffer)
+      InitCOMExistentialValueInst(Loc, ExistentialType, ConcreteType, Instance,
+                                  TypeDependentOperands, Conformances);
+}
+
 InitExistentialValueInst *InitExistentialValueInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,

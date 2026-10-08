@@ -1271,6 +1271,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
   case SILInstructionKind::InitExistentialRefInst: {
     SILValue operand;
     SILType Ty;
@@ -1295,6 +1297,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       conformances = IEOI.getConformances();
       break;
     }
+    case SILInstructionKind::InitCOMExistentialAddrInst: {
+      auto &IERI = cast<InitCOMExistentialAddrInst>(SI);
+      operand = IERI.getOperand();
+      Ty = IERI.getType();
+      FormalConcreteType = IERI.getFormalConcreteType();
+      conformances = IERI.getConformances();
+      break;
+    }
+
+    case SILInstructionKind::InitCOMExistentialValueInst: {
+      auto &IERI = cast<InitCOMExistentialValueInst>(SI);
+      operand = IERI.getOperand();
+      Ty = IERI.getType();
+      FormalConcreteType = IERI.getFormalConcreteType();
+      conformances = IERI.getConformances();
+      break;
+    }
+
     case SILInstructionKind::InitExistentialRefInst: {
       auto &IERI = cast<InitExistentialRefInst>(SI);
       operand = IERI.getOperand();

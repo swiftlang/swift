@@ -1100,6 +1100,32 @@ public protocol InitExistentialInstruction: Instruction {
 }
 
 final public
+class InitCOMExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var instance: Value { operand.value }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitCOMExistentialAddrInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitCOMExistentialAddrInst_getFormalConcreteType())
+  }
+}
+
+final public
+class InitCOMExistentialValueInst : SingleValueInstruction, UnaryInstruction {
+  public var instance: Value { operand.value }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitCOMExistentialValueInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitCOMExistentialValueInst_getFormalConcreteType())
+  }
+}
+
+final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var instance: Value { operand.value }
 

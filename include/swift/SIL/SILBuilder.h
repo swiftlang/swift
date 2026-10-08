@@ -2292,6 +2292,24 @@ public:
         &getFunction()));
   }
 
+  InitCOMExistentialAddrInst *
+  createInitCOMExistentialAddr(SILLocation loc, SILType existentialType,
+                               CanType formalConcreteType, SILValue concrete,
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+    return insert(InitCOMExistentialAddrInst::create(
+        getSILDebugLocation(loc), existentialType, formalConcreteType, concrete,
+        conformances, &getFunction()));
+  }
+
+  InitCOMExistentialValueInst *
+  createInitCOMExistentialValue(SILLocation loc, SILType existentialType,
+                                CanType formalConcreteType, SILValue concrete,
+                                ArrayRef<ProtocolConformanceRef> conformances) {
+    return insert(InitCOMExistentialValueInst::create(
+        getSILDebugLocation(loc), existentialType, formalConcreteType, concrete,
+        conformances, &getFunction()));
+  }
+
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType, SILValue Concrete,

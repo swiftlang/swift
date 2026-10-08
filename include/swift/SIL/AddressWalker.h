@@ -209,14 +209,14 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
         isa<AssignOrInitInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
-        isa<COMMethodInst>(user) || isa<SelectEnumAddrInst>(user) ||
-        isa<InjectEnumAddrInst>(user) || isa<IsUniqueInst>(user) ||
-        isa<ValueMetatypeInst>(user) || isa<DebugValueInst>(user) ||
-        isa<EndBorrowInst>(user) || isa<ExplicitCopyAddrInst>(user) ||
-        isa<DeallocStackInst>(user) || isa<InitBlockStorageHeaderInst>(user) ||
+        isa<InitCOMExistentialAddrInst>(user) || isa<COMMethodInst>(user) ||
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
+        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user) ||
+        isa<ExplicitCopyAddrInst>(user) || isa<DeallocStackInst>(user) ||
+        isa<InitBlockStorageHeaderInst>(user) ||
         isa<GetAsyncContinuationAddrInst>(user) ||
-        isa<ExistentialMetatypeInst>(user) ||
-        isa<DiagnoseInst>(user) ||
+        isa<ExistentialMetatypeInst>(user) || isa<DiagnoseInst>(user) ||
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||

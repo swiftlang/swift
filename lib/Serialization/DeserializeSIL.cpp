@@ -2323,6 +2323,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::AllocExistentialBoxInst: {
 
@@ -2358,6 +2360,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     case SILInstructionKind::InitExistentialMetatypeInst:
       ResultInst = Builder.createInitExistentialMetatype(Loc, operand, Ty,
                                                          ctxConformances);
+      break;
+    case SILInstructionKind::InitCOMExistentialAddrInst:
+      ResultInst = Builder.createInitCOMExistentialAddr(
+          Loc, Ty, ConcreteTy, operand, ctxConformances);
+      break;
+    case SILInstructionKind::InitCOMExistentialValueInst:
+      ResultInst = Builder.createInitCOMExistentialValue(
+          Loc, Ty, ConcreteTy, operand, ctxConformances);
       break;
     case SILInstructionKind::InitExistentialRefInst:
       ResultInst = Builder.createInitExistentialRef(Loc, Ty, ConcreteTy,
