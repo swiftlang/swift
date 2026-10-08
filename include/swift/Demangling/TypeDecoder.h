@@ -530,7 +530,7 @@ void decodeRequirement(
     if (!subjectType)
       return;
 
-    BuiltType constraintType;
+    BuiltType constraintType = BuiltType();
     if (child->getKind() ==
         Demangle::Node::Kind::DependentGenericConformanceRequirement) {
       constraintType = Builder.decodeMangledType(child->getChild(1));

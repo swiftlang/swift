@@ -3425,7 +3425,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // referenced is a move-only type.
 
   AbstractStorageDecl *storage = nullptr;
-  AccessSemantics accessSemantics;
+  AccessSemantics accessSemantics = AccessSemantics::Ordinary;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
     storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());

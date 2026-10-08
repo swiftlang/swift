@@ -777,8 +777,8 @@ SILInstruction *SILCombiner::legacyVisitBuiltinInst(BuiltinInst *I) {
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ true);
 
   // Optimize sub(ptrtoint(index_raw_pointer(v, x)), ptrtoint(v)) -> x.
-  BuiltinInst *Bytes2;
-  IndexRawPointerInst *Indexraw;
+  BuiltinInst *Bytes2 = nullptr;
+  IndexRawPointerInst *Indexraw = nullptr;
   if (I->getNumOperands() == 2 &&
       match(I, m_BuiltinInst(BuiltinValueKind::Sub,
                              m_BuiltinInst(BuiltinValueKind::PtrToInt,
