@@ -24,6 +24,7 @@ echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
 echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo set HOST_ARCH_NAME=%HOST_ARCH_NAME%>> %TEMP%\call-build.cmd
+echo set ARTIFACT_CACHE=%ARTIFACT_CACHE%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -47,6 +48,10 @@ md %BuildRoot%
 subst T: /d
 subst T: %BuildRoot% || (exit /b 1)
 set BuildRoot=T:
+
+:: Use the prepopulated artifact cache of the CI image, if any.
+set "ArtifactCache=%BuildRoot%\ArtifactCache"
+if defined ARTIFACT_CACHE set "ArtifactCache=%ARTIFACT_CACHE%"
 
 :: Identify the PackageRoot
 set PackageRoot=%BuildRoot%\artifacts
@@ -102,7 +107,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
-  -ArtifactCache %BuildRoot%\ArtifactCache ^
+  -ArtifactCache %ArtifactCache% ^
   -BuildRoot %BuildRoot% ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
