@@ -420,24 +420,30 @@ static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
   return true;
 }
 
+static bool isCompositionOperator(Expr *expr) {
+  auto nameMatches = [&](DeclName name) {
+    return name.isOperator() && name.getBaseName().getIdentifier().is("&");
+  };
+
+  if (auto overload = dyn_cast<OverloadedDeclRefExpr>(expr)) {
+    return llvm::any_of(overload->getDecls(), [=](auto *decl) -> bool {
+      return nameMatches(decl->getName());
+    });
+  }
+
+  if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+    return nameMatches(unresolved->getName().getFullName());
+  }
+
+  return false;
+}
+
 /// Checks whether this is a BinaryExpr with operator `&` and returns the
 /// BinaryExpr, if so.
 static BinaryExpr *getCompositionExpr(Expr *expr) {
-  if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-    // look at the name of the operator, if it is a '&' we can create the
-    // composition TypeExpr
-    auto fn = binaryExpr->getFn();
-    if (auto Overload = dyn_cast<OverloadedDeclRefExpr>(fn)) {
-      if (llvm::any_of(Overload->getDecls(), [](auto *decl) -> bool {
-            return decl->getBaseName() == "&";
-          }))
-        return binaryExpr;
-    } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
-      if (Decl->getName().isSimpleName() &&
-          Decl->getName().getBaseName() == "&")
-        return binaryExpr;
-    }
-  }
+  if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr))
+    if (isCompositionOperator(binaryExpr->getFn()))
+      return binaryExpr;
 
   return nullptr;
 }
@@ -1158,6 +1164,8 @@ class TypeExprSimplifier final {
   /// if it's been marked "valid" or if the current state of the AST disallows
   /// such simplification (see \c canSimplifyPlaceholderTypes above).
   bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
+
+  TypeExpr *getTypeOperand(Expr *E);
 
 public:
   static TypeExpr *simplify(Expr *E, DeclContext *DC,
@@ -1947,7 +1955,7 @@ TypeExpr *TypeExprSimplifier::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return nullptr;
   }
 
-  auto *TyExpr = dyn_cast<TypeExpr>(UDE->getBase());
+  auto *TyExpr = getTypeOperand(UDE->getBase());
   if (!TyExpr)
     return nullptr;
 
@@ -2269,6 +2277,25 @@ static bool isTildeOperator(Expr *expr) {
   return false;
 }
 
+/// Returns \p repr as the input of a function type, diagnosing missing
+/// parentheses the way the type parser does.
+static TupleTypeRepr *asFunctionInputRepr(ASTContext &ctx, TypeRepr *repr) {
+  if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(repr))
+    return TTyRepr;
+
+  if (repr->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
+    ctx.Diags.diagnose(repr->getStartLoc(), diag::function_type_no_parens)
+        .fixItReplace(repr->getStartLoc(), "()");
+    return TupleTypeRepr::createEmpty(ctx, repr->getSourceRange());
+  }
+
+  ctx.Diags.diagnose(repr->getStartLoc(), diag::function_type_no_parens)
+      .highlight(repr->getSourceRange())
+      .fixItInsert(repr->getStartLoc(), "(")
+      .fixItInsertAfter(repr->getEndLoc(), ")");
+  return TupleTypeRepr::create(ctx, {repr}, repr->getSourceRange());
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
@@ -2292,7 +2319,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   // Fold unresolved specializations.
   // The base is expected to already be a TypeExpr.
   if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
-    if (auto *te = dyn_cast<TypeExpr>(USE->getSubExpr())) {
+    if (auto *te = getTypeOperand(USE->getSubExpr())) {
       if (auto *declRefTR =
               dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
         return TypeExpr::createForSpecializedDecl(
@@ -2318,10 +2345,10 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     TypeExpr *TyExpr;
     SourceLoc QuestionLoc;
     if (auto *OOE = dyn_cast<OptionalEvaluationExpr>(E)) {
-      TyExpr = dyn_cast<TypeExpr>(OOE->getSubExpr());
+      TyExpr = getTypeOperand(OOE->getSubExpr());
       QuestionLoc = OOE->getLoc();
     } else {
-      TyExpr = dyn_cast<TypeExpr>(cast<BindOptionalExpr>(E)->getSubExpr());
+      TyExpr = getTypeOperand(cast<BindOptionalExpr>(E)->getSubExpr());
       QuestionLoc = cast<BindOptionalExpr>(E)->getQuestionLoc();
     }
     if (!TyExpr) return nullptr;
@@ -2342,7 +2369,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
 
   // Fold T! into an IUO type when T is a TypeExpr.
   if (auto *FVE = dyn_cast<ForceValueExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(FVE->getSubExpr());
+    auto *TyExpr = getTypeOperand(FVE->getSubExpr());
     if (!TyExpr) return nullptr;
 
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
@@ -2358,7 +2385,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
 
   // Fold (T) into a type T with parens around it.
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
+    auto *TyExpr = getTypeOperand(PE->getSubExpr());
     if (!TyExpr) return nullptr;
 
     TupleTypeReprElement InnerTypeRepr[] = { TyExpr->getTypeRepr() };
@@ -2413,7 +2440,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     if (AE->getElements().size() != 1)
       return nullptr;
 
-    auto *TyExpr = dyn_cast<TypeExpr>(AE->getElement(0));
+    auto *TyExpr = getTypeOperand(AE->getElement(0));
     if (!TyExpr)
       return nullptr;
 
@@ -2431,11 +2458,11 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     TypeRepr *keyTypeRepr, *valueTypeRepr;
 
     if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElement(0))) {
-      auto *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
+      auto *KeyTyExpr = getTypeOperand(EltTuple->getElement(0));
       if (!KeyTyExpr)
         return nullptr;
 
-      auto *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
+      auto *ValueTyExpr = getTypeOperand(EltTuple->getElement(1));
       if (!ValueTyExpr)
         return nullptr;
 
@@ -2467,41 +2494,22 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
     if (!AE->isFolded()) return nullptr;
 
-    auto diagnoseMissingParens = [](ASTContext &ctx, TypeRepr *tyR) {
-      if (tyR->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
-        ctx.Diags.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
-            .fixItReplace(tyR->getStartLoc(), "()");
-      } else {
-        ctx.Diags.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
-            .highlight(tyR->getSourceRange())
-            .fixItInsert(tyR->getStartLoc(), "(")
-            .fixItInsertAfter(tyR->getEndLoc(), ")");
-      }
-    };
-
     auto extractInputTypeRepr = [&](Expr *E) -> TupleTypeRepr * {
       if (!E)
         return nullptr;
-      if (auto *TyE = dyn_cast<TypeExpr>(E)) {
-        auto ArgRepr = TyE->getTypeRepr();
-        if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
-          return TTyRepr;
-        diagnoseMissingParens(Ctx, ArgRepr);
-        return TupleTypeRepr::create(Ctx, {ArgRepr}, ArgRepr->getSourceRange());
-      }
+
+      if (auto *TyE = dyn_cast<TypeExpr>(E))
+        return asFunctionInputRepr(Ctx, TyE->getTypeRepr());
+
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
           return TupleTypeRepr::createEmpty(Ctx, TE->getSourceRange());
 
       // When simplifying a type expr like "(P1 & P2) -> (P3 & P4) -> Int",
       // it may have been folded at the same time; recursively simplify it.
-      if (auto ArgsTypeExpr = simplifyTypeExpr(E)) {
-        auto ArgRepr = ArgsTypeExpr->getTypeRepr();
-        if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
-          return TTyRepr;
-        diagnoseMissingParens(Ctx, ArgRepr);
-        return TupleTypeRepr::create(Ctx, {ArgRepr}, ArgRepr->getSourceRange());
-      }
+      if (auto ArgsTypeExpr = simplifyTypeExpr(E))
+        return asFunctionInputRepr(Ctx, ArgsTypeExpr->getTypeRepr());
+
       return nullptr;
     };
 
@@ -2607,7 +2615,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
 
   // Fold a pack expansion expr into a TypeExpr when the pattern is a TypeExpr.
   if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
-    if (auto *pattern = dyn_cast<TypeExpr>(expansion->getPatternExpr())) {
+    if (auto *pattern = getTypeOperand(expansion->getPatternExpr())) {
       auto *repr = new (Ctx) PackExpansionTypeRepr(expansion->getStartLoc(),
                                                    pattern->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
@@ -2616,7 +2624,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
 
   // Fold a PackElementExpr into a TypeExpr when the element is a TypeExpr
   if (auto *element = dyn_cast<PackElementExpr>(E)) {
-    if (auto *refExpr = dyn_cast<TypeExpr>(element->getPackRefExpr())) {
+    if (auto *refExpr = getTypeOperand(element->getPackRefExpr())) {
       auto *repr = new (Ctx) PackElementTypeRepr(element->getStartLoc(),
                                                  refExpr->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
@@ -2624,6 +2632,10 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   }
 
   return nullptr;
+}
+
+TypeExpr *TypeExprSimplifier::getTypeOperand(Expr *E) {
+  return dyn_cast<TypeExpr>(E);
 }
 
 void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {

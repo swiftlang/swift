@@ -513,6 +513,9 @@ func complexSequence() {
 
 func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
 
+// An expression recovers the same way, so the metatype is that of '() -> ()'.
+let voidToVoid: (() -> ()).Type = (Void -> ()).self // expected-error {{single argument function types require parentheses}} {{36-40=()}}
+
 func takesOneArg<T>(_: T.Type) {}
 func takesTwoArgs<T>(_: T.Type, _: Int) {}
 
