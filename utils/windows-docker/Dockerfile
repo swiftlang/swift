@@ -42,6 +42,8 @@ RUN if (-not $env:HTTPS_PROXY) { exit 0 }; `
     }
 
 # Visual Studio Build Tools, with the components listed in docs/WindowsBuild.md.
+# For Visual Studio 2026 (whose default toolset is 14.5x), pass
+# --build-arg VS_BUILDTOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe.
 ARG VS_BUILDTOOLS_URL=https://aka.ms/vs/17/release/vs_buildtools.exe
 RUN Invoke-WebRequest $env:VS_BUILDTOOLS_URL -OutFile C:\vs_buildtools.exe -UseBasicParsing; `
     $Process = Start-Process C:\vs_buildtools.exe -Wait -PassThru -ArgumentList @( `
