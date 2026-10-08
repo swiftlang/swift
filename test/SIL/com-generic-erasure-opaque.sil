@@ -3,12 +3,18 @@
 // RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -sil-print-types -emit-sorted-sil -I %t -sil-verify-all %s | %FileCheck %s
 // RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -I %t -emit-sib -module-name M %s -o %t/M.sib
 // RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -sil-print-types -emit-sorted-sil -I %t -module-name M -sil-verify-all %t/M.sib | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -sil-print-types -emit-sorted-sil -I %t -sil-verify-all -address-lowering %s | %FileCheck %s --check-prefix=LOWERED
 
 sil_stage raw
 import Swift
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
 public protocol IItem {}
+
+// LOWERED-LABEL: sil [ossa] @borrowed
+// LOWERED: bb0([[SOURCE:%.*]] : $*T):
+// LOWERED-NEXT: [[RESULT:%.*]] = init_com_existential [[SOURCE]] : $*T : $T, $any IItem
+// LOWERED-NEXT: return [[RESULT]] : $any IItem
 
 // Borrowing an opaque value does not need a temporary address.
 // CHECK-LABEL: sil [ossa] [opaque] @borrowed
@@ -20,6 +26,12 @@ bb0(%value : @guaranteed $T):
   %result = init_com_existential %value : $T : $T, $IItem
   return %result : $IItem
 }
+
+// LOWERED-LABEL: sil [ossa] @owned
+// LOWERED: bb0([[SOURCE:%.*]] : $*T):
+// LOWERED-NEXT: [[RESULT:%.*]] = init_com_existential [[SOURCE]] : $*T : $T, $any IItem
+// LOWERED-NEXT: destroy_addr [[SOURCE]] : $*T
+// LOWERED-NEXT: return [[RESULT]] : $any IItem
 
 // Consuming the source after projection leaves the result independently owned.
 // CHECK-LABEL: sil [ossa] [opaque] @owned

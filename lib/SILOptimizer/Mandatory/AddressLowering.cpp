@@ -3711,6 +3711,11 @@ protected:
     emi->setOperand(opAddr);
   }
 
+  void visitInitCOMExistentialInst(InitCOMExistentialInst *projection) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    projection->setOperand(opAddr);
+  }
+
   void visitCOMMethodInst(COMMethodInst *method) {
     SILValue opAddr = addrMat.materializeAddress(use->get());
     method->setOperand(opAddr);
