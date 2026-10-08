@@ -72,6 +72,60 @@ final class CounterBox: @unchecked Sendable {
   let value = Atomic<Int>(0)
 }
 
+final class Trigger: Sendable {
+  let fired = Atomic<Bool>(false)
+  // Set once the code that fired the trigger observed the cancellation.
+  let observedCancellation = Atomic<Bool>(false)
+}
+
+// A clock whose `sleep` returns once the trigger fired.
+@available(StdlibDeploymentTarget 6.5, *)
+struct TriggeredClock: Clock, Identifiable {
+  typealias Instant = ContinuousClock.Instant
+  typealias Duration = Swift.Duration
+
+  let trigger: Trigger
+
+  var id: String { "triggered" }
+  var now: Instant { ContinuousClock.now }
+  var minimumResolution: Swift.Duration { .nanoseconds(1) }
+
+  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
+    // Busy wait so that the timer reacts right away once the trigger fired.
+    while !trigger.fired.load(ordering: .acquiring) {
+      try Task.checkCancellation()
+    }
+  }
+}
+
+// Creates `count` nested `async let` children and fires `trigger` while doing
+// so. Returns how many children never observed the cancellation.
+//
+// The children only check their cancellation once the parent observed the
+// cancellation of the scope.
+@available(StdlibDeploymentTarget 6.5, *)
+func spawnAsyncLetChildren(_ count: Int, firing trigger: Trigger, at fireCount: Int) async -> Int {
+  guard count > 0 else {
+    // All children exist. The trigger fired, so the timer cancels the scope.
+    while !Task.isCancelled {
+      await Task.yield()
+    }
+    trigger.observedCancellation.store(true, ordering: .releasing)
+    return 0
+  }
+  if count == fireCount {
+    trigger.fired.store(true, ordering: .releasing)
+  }
+  async let observedCancellation: Bool = {
+    while !trigger.observedCancellation.load(ordering: .acquiring) {
+      await Task.yield()
+    }
+    return Task.isCancelled
+  }()
+  let missed = await spawnAsyncLetChildren(count - 1, firing: trigger, at: fireCount)
+  return missed + (await observedCancellation ? 0 : 1)
+}
+
 @available(StdlibDeploymentTarget 6.5, *)
 struct ClassInstantClock: Clock, Identifiable {
   typealias Duration = Swift.Duration
@@ -375,6 +429,19 @@ struct ClassInstantClock: Clock, Identifiable {
       }.value
     }
 
+    // A child task added to a task group after `cancelAll(reason:)` inherits
+    // the reason of the group.
+    tests.test("task group child added after cancelAll inherits cancellationReason") {
+      await withTaskGroup(of: CancellationError.Reason?.self) { group in
+        group.cancelAll(reason: .deadlineExpired)
+        group.addTask {
+          return Task.cancellationReason
+        }
+        let childReason = await group.next() ?? nil
+        expectEqual(.deadlineExpired, childReason)
+      }
+    }
+
     // Detached tasks are unstructured; a detached task started inside
     // a cancelled parent must NOT inherit the parent's cancellation.
     // `Task.cancellationReason` on the detached task should be nil
@@ -675,6 +742,74 @@ struct ClassInstantClock: Clock, Identifiable {
         return Task.cancellationReason
       }
       expectEqual(nil, reason)
+    }
+
+    tests.test("async let children created while the deadline expires are cancelled") {
+      // The timer cancels the scope from another thread while we are creating
+      // `async let` children. Every child must observe the cancellation, no
+      // matter at which point of its creation the scope got cancelled.
+      var missed = 0
+      for _ in 0..<500 {
+        let trigger = Trigger()
+        missed += await withDeadline(in: .seconds(60), clock: TriggeredClock(trigger: trigger)) {
+          await spawnAsyncLetChildren(200, firing: trigger, at: 150)
+        }
+      }
+      expectEqual(0, missed)
+    }
+
+    tests.test("nested deadline inside an expired deadline is cancelled") {
+      // The inner deadline uses a different clock, so it creates its own scope.
+      await withDeadline(in: .seconds(-1)) {
+        await withDeadline(in: .seconds(60), clock: StringIdClock(id: "inner")) {
+          expectTrue(Task.isCancelled)
+          expectEqual(.deadlineExpired, Task.cancellationReason)
+
+          let start = ContinuousClock.now
+          try? await Task.sleep(for: .seconds(5))
+          expectLT(ContinuousClock.now - start, .seconds(2))
+        }
+      }
+    }
+
+    tests.test("deadline inside a shield is not subsumed by an outer deadline") {
+      // A shield prevents the cancellation of the outer deadline from reaching
+      // the code inside of it, so the code inside doesn't find the outer
+      // deadline and the inner deadline creates its own scope.
+      await withDeadline(in: .milliseconds(10)) {
+        await withTaskCancellationShield {
+          expectFalse(Task.hasActiveDeadline)
+          expectNil(Task.activeDeadline(for: ContinuousClock()))
+
+          await withDeadline(in: .milliseconds(100)) {
+            let start = ContinuousClock.now
+            try? await Task.sleep(for: .seconds(10))
+            expectLT(ContinuousClock.now - start, .seconds(5))
+            expectEqual(.deadlineExpired, Task.cancellationReason)
+          }
+        }
+      }
+    }
+
+    tests.test("child task inside a shield doesn't inherit the deadline") {
+      await withDeadline(in: .seconds(60)) {
+        await withTaskCancellationShield {
+          async let hasDeadline = Task.hasActiveDeadline
+          async let deadline = Task.activeDeadline(for: ContinuousClock())
+          expectFalse(await hasDeadline)
+          expectNil(await deadline)
+        }
+      }
+    }
+
+    tests.test("task group child doesn't inherit a deadline outside of its group") {
+      // The child belongs to its task group, which is outside of the deadline.
+      await withTaskGroup(of: Bool.self) { group in
+        await withDeadline(in: .seconds(60)) {
+          group.addTask { Task.hasActiveDeadline }
+          expectFalse(await group.next()!)
+        }
+      }
     }
 
     await runAllTestsAsync()

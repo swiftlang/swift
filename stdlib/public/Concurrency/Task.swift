@@ -865,6 +865,10 @@ public struct UnsafeCurrentTask {
   /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
+  /// Unlike the static ``Task/isCancelled-type.property`` property, this property doesn't reflect
+  /// a cancellation that only applies to a part of the task, such as an expired deadline of
+  /// ``withDeadline(in:tolerance:clock:operation:)``.
+  ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
   /// The instance property `task.isCancelled`
@@ -901,14 +905,19 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
-    if #available(SwiftStdlib 6.4, *) {
-      unsafe _isCancelled(ignoreTaskCancellationShield: true)
+    // This getter is part of the stdlib, so `swift_task_isCancelledWithFlags` is
+    // available whenever the stdlib is deployed with it, even on an older OS.
+    // `swift_task_isCancelled` would take shields and scopes into account.
+    if #available(StdlibDeploymentTarget 6.4, *) {
+      let taskOnly: UInt64 = 0x1
+      return unsafe _taskIsCancelledWithFlags(_rawTask, flags: taskOnly)
     } else {
-      unsafe _taskIsCancelled(_rawTask)
+      return unsafe _taskIsCancelled(_rawTask)
     }
   }
 
-  /// Check if the task is cancelled, optionally ignoring active cancellation shields.
+  /// Check if the task is cancelled, optionally only checking the task itself and
+  /// ignoring cancellation shields and cancellation scopes.
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
@@ -969,6 +978,10 @@ public struct UnsafeCurrentTask {
   /// Mirrors ``UnsafeCurrentTask/isCancelled``: once this returns non-nil it
   /// will consistently return the same value for the remaining life of the
   /// task. Not affected by cancellation shields.
+  ///
+  /// Unlike the static ``Task/cancellationReason`` property, this property doesn't reflect a
+  /// cancellation that only applies to a part of the task, such as an expired deadline of
+  /// ``withDeadline(in:tolerance:clock:operation:)``.
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public var cancellationReason: CancellationError.Reason? {
@@ -1188,12 +1201,19 @@ internal func _taskCancelWithFlags(_ task: _AsyncTask, _ flags: UInt)
 @usableFromInline
 internal func _taskGetIsCancelledWithReason(_ task: _AsyncTask) -> UInt
 
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_getIsCancelledWithReasonWithFlags")
+@usableFromInline
+internal func _taskGetIsCancelledWithReasonWithFlags(
+  _ task: _AsyncTask, flags: UInt64
+) -> UInt
+
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 internal func _taskIsCancelled(_ task: _AsyncTask) -> Bool
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 @_silgen_name("swift_task_isCancelledWithFlags")
 @usableFromInline
 internal func _taskIsCancelledWithFlags(_ task: _AsyncTask, flags: UInt64) -> Bool

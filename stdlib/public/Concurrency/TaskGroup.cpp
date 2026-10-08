@@ -413,12 +413,25 @@ protected:
 
   ResultTypeInfo successType;
 
+  /// Whether the group is cancelled, and the reason of its first
+  /// cancellation. This is the only place that stores the cancellation of the
+  /// group, so that the cancelled flag and the reason are always consistent.
+  ///
+  /// bit 0:          the cancelled flag;
+  /// bits 1-3:       the reason (same shape as swift_task_cancelWithFlags).
+  /// remaining bits: reserved for future use.
+  std::atomic<uint8_t> cancellation;
+
+  static constexpr uint8_t CancelledBit = 1;
+  static constexpr uint8_t ReasonMask = 0b111;
+
   explicit TaskGroupBase(ResultTypeInfo T, uint64_t initialStatus)
     : TaskGroupTaskStatusRecord(),
       status(initialStatus),
       waitQueue(nullptr),
       readyQueue(),
-      successType(T) {}
+      successType(T),
+      cancellation(0) {}
 
   TaskGroupBase(const TaskGroupBase &) = delete;
 
@@ -539,18 +552,25 @@ public:
   /// A waiting task MUST have been already enqueued in the `waitQueue`.
   TaskGroupStatus statusMarkWaitingAssumeRelease();
 
-  TaskGroupStatus statusAddPendingTaskAssumeRelaxed(bool unconditionally);
+  /// Add a pending task. Returns whether the group is cancelled.
+  bool statusAddPendingTask(bool unconditionally);
 
   /// Cancels the group and returns true if was already cancelled before.
   /// After this function returns, the group is guaranteed to be cancelled.
   ///
   /// Prefer calling cancelAll if the intent is to cancel the group and all of its children.
   ///
+  /// The first cancellation of the group decides its reason.
+  ///
   /// \return true, if the group was already cancelled before, and false if it wasn't cancelled before (but now is).
-  bool statusCancel();
+  bool statusCancel(size_t reason);
+
+  /// The reason of the first cancellation of the group. Only meaningful if
+  /// the group is cancelled.
+  size_t getCancellationReason() const;
 
   /// Cancel the group and all of its child tasks recursively.
-  /// This also sets the cancelled bit in the group status.
+  /// This also cancels the group itself.
   bool cancelAll(AsyncTask *task, size_t reason);
 };
 
@@ -572,12 +592,14 @@ static std::string to_string(TaskGroupBase::PollStatus status) {
 /// which may be touching the 'ready' bits; Only an "accumulating" task group maintains the 'ready' count,
 /// while all kinds of group use the 'pending' count (with varying width though).
 ///
+/// The cancellation of the group isn't part of its status, see
+/// `TaskGroupBase::cancellation`.
+///
 /// Accumulating group status:
-///     [1:cancelled][1:waiting][31:ready count][31:pending count]
+///     [1:reserved][1:waiting][31:ready count][31:pending count]
 /// Discarding group status:
-///     [1:cancelled][1:waiting][62:pending count]
+///     [1:reserved][1:waiting][62:pending count]
 struct TaskGroupStatus {
-  static const uint64_t cancelled               = 0b1000000000000000000000000000000000000000000000000000000000000000;
   static const uint64_t waiting                 = 0b0100000000000000000000000000000000000000000000000000000000000000;
 
   // 31 bits for ready tasks counter
@@ -604,10 +626,6 @@ struct TaskGroupStatus {
   }
 
   uint64_t status;
-
-  bool isCancelled() {
-    return (status & cancelled) > 0;
-  }
 
   bool hasWaitingTask() {
     return (status & waiting) > 0;
@@ -659,10 +677,6 @@ struct TaskGroupStatus {
     auto change = onePendingTask;
     change += group->isAccumulatingResults() ? oneReadyTask : 0;
     return TaskGroupStatus{status - change};
-  }
-
-  TaskGroupStatus asCancelled(bool cancel) {
-    return TaskGroupStatus{status | (cancel ? cancelled : 0)};
   }
 
   static void reportPendingTaskOverflow(TaskGroupBase* group, TaskGroupStatus status) {
@@ -723,12 +737,16 @@ struct TaskGroupStatus {
   ///     TaskGroupStatus{ C:{cancelled} W:{waiting task} R:{ready tasks} P:{pending tasks} {binary repr} }
   /// If discarding results:
   ///     TaskGroupStatus{ C:{cancelled} W:{waiting task} P:{pending tasks} {binary repr} }
+  ///
+  /// The cancelled flag is only printed if `group` is passed.
   std::string to_string(const TaskGroupBase* _Nullable group) {
     std::string str;
     str.append("TaskGroupStatus{ ");
-    str.append("C:"); // cancelled
-    str.append(isCancelled() ? "y" : "n");
-    str.append(" W:"); // has waiting task
+    if (group) {
+      str.append("C:"); // cancelled
+      str.append(group->isCancelled() ? "y " : "n ");
+    }
+    str.append("W:"); // has waiting task
     str.append(hasWaitingTask() ? "y" : "n");
     if (group && group->isAccumulatingResults()) {
       str.append(" R:"); // ready
@@ -786,8 +804,7 @@ void TaskGroupBase::runWaitingTask(PreparedWaitingTask prepared) {
 
 
 bool TaskGroupBase::isCancelled() const {
-  auto old = TaskGroupStatus{status.load(std::memory_order_relaxed)};
-  return old.isCancelled();
+  return cancellation.load(std::memory_order_relaxed) & CancelledBit;
 }
 
 TaskGroupStatus TaskGroupBase::statusLoadRelaxed() const {
@@ -847,7 +864,7 @@ TaskGroupStatus TaskGroupBase::statusMarkWaitingAssumeRelease() {
 /// so unconditionally.
 ///
 /// Returns *assumed* new status, including the just performed +1.
-TaskGroupStatus TaskGroupBase::statusAddPendingTaskAssumeRelaxed(bool unconditionally) {
+bool TaskGroupBase::statusAddPendingTask(bool unconditionally) {
   auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
                               std::memory_order_relaxed);
   auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
@@ -856,7 +873,12 @@ TaskGroupStatus TaskGroupBase::statusAddPendingTaskAssumeRelaxed(bool unconditio
     TaskGroupStatus::reportPendingTaskOverflow(this, s); // this will abort()
   }
 
-  if (!unconditionally && s.isCancelled()) {
+  // We check the cancellation after adding the pending task. If the group gets
+  // cancelled concurrently after this check, the new child task still starts
+  // out cancelled, since it observes the cancellation of the group when it is
+  // attached to the group (see `swift_taskGroup_attachChild`).
+  bool cancelled = isCancelled();
+  if (!unconditionally && cancelled) {
     // revert that add, it was meaningless
     auto o = status.fetch_sub(TaskGroupStatus::onePendingTask,
                               std::memory_order_relaxed);
@@ -865,7 +887,7 @@ TaskGroupStatus TaskGroupBase::statusAddPendingTaskAssumeRelaxed(bool unconditio
 
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "addPending, after: %s", s.to_string(this).c_str());
 
-  return s;
+  return cancelled;
 }
 
 TaskGroupStatus TaskGroupBase::statusRemoveWaitingRelease() {
@@ -876,16 +898,26 @@ TaskGroupStatus TaskGroupBase::statusRemoveWaitingRelease() {
   return TaskGroupStatus{old};
 }
 
-bool TaskGroupBase::statusCancel() {
-  /// The cancelled bit is always the same, the first one, between all task group implementations:
-  const uint64_t cancelled = TaskGroupStatus::cancelled;
-  auto old = status.fetch_or(cancelled, std::memory_order_relaxed);
-  SWIFT_TASK_GROUP_DEBUG_LOG(
-      this, "statusCancel %s",
-      TaskGroupStatus{old | cancelled}.to_string(this).c_str());
+bool TaskGroupBase::statusCancel(size_t reason) {
+  // The first cancellation of the group decides its reason.
+  auto oldCancellation = cancellation.load(std::memory_order_relaxed);
+  auto newCancellation = ((reason & ReasonMask) << 1) | CancelledBit;
+  while (!(oldCancellation & CancelledBit)) {
+    if (cancellation.compare_exchange_weak(oldCancellation, newCancellation,
+                                           std::memory_order_relaxed,
+                                           std::memory_order_relaxed)) {
+      SWIFT_TASK_GROUP_DEBUG_LOG(this, "statusCancel %s",
+                                 statusString().c_str());
+      return false;
+    }
+  }
 
-  // return if the status was already cancelled before we flipped it or not
-  return old & cancelled;
+  // The group was already cancelled before.
+  return true;
+}
+
+size_t TaskGroupBase::getCancellationReason() const {
+  return (cancellation.load(std::memory_order_relaxed) >> 1) & ReasonMask;
 }
 
 /******************************************************************************/
@@ -1145,14 +1177,15 @@ static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGro
   assert(record->getKind() == swift::TaskStatusRecordKind::TaskGroup);
 
   // ok, now that the group actually is initialized: attach it to the task
-  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
-    // If the task has already been cancelled, reflect that immediately in
-    // the group's status.
-    if (oldStatus.isCancelled()) {
-      impl->statusCancel();
-    }
-    return true;
-  });
+  addStatusRecordObservingCancellation(
+      swift_task_getCurrent(), record,
+      [&](std::optional<size_t> reason, ActiveTaskStatus &newStatus) {
+        // If the code that creates the group observes a cancellation of the
+        // task or of a scope, reflect that immediately in the group's status.
+        if (reason)
+          impl->statusCancel(*reason);
+        return true;
+      });
 }
 
 // =============================================================================
@@ -1252,8 +1285,12 @@ bool TaskGroup::isCancelled() {
   return asBaseImpl(this)->isCancelled();
 }
 
-bool TaskGroup::statusCancel() {
-  return asBaseImpl(this)->statusCancel();
+bool TaskGroup::statusCancel(size_t reason) {
+  return asBaseImpl(this)->statusCancel(reason);
+}
+
+size_t TaskGroup::getCancellationReason() {
+  return asBaseImpl(this)->getCancellationReason();
 }
 
 // =============================================================================
@@ -2252,7 +2289,7 @@ bool TaskGroupBase::cancelAll(AsyncTask *owningTask, size_t reason) {
   // done, any existing child tasks should already have been cancelled,
   // and cancellation should automatically flow to any new child tasks,
   // so there's nothing else for us to do.
-  auto wasCancelledBefore = statusCancel();
+  auto wasCancelledBefore = statusCancel(reason);
   if (wasCancelledBefore) {
     return false;
   }
@@ -2280,11 +2317,11 @@ static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
 SWIFT_CC(swift)
 static bool swift_taskGroup_addPendingImpl(TaskGroup *_group, bool unconditionally) {
   auto group = asBaseImpl(_group);
-  auto assumed = group->statusAddPendingTaskAssumeRelaxed(unconditionally);
+  bool cancelled = group->statusAddPendingTask(unconditionally);
   SWIFT_TASK_DEBUG_LOG("add pending %s to group(%p), tasks pending = %llu",
                        unconditionally ? "unconditionally" : "", group,
-                       assumed.pendingTasks(group));
-  return !assumed.isCancelled();
+                       group->statusLoadRelaxed().pendingTasks(group));
+  return !cancelled;
 }
 
 #define OVERRIDE_TASK_GROUP COMPATIBILITY_OVERRIDE
