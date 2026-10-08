@@ -7143,34 +7143,32 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   // Import the type of the underlying storage
   ImportDiagnosticAdder addImportDiag(Impl, decl, decl->getLocation());
-  auto storedUnderlyingType = Impl.importTypeIgnoreIUO(
+  auto storageType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Value, addImportDiag,
       isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs(), OTK_None);
 
-  if (!storedUnderlyingType)
+  if (!storageType)
     return nullptr;
 
-  storedUnderlyingType = storedUnderlyingType->lookThroughSingleOptionalType();
+  storageType = storageType->lookThroughSingleOptionalType();
 
   // If the type is Unmanaged, that is it is not CF ARC audited,
   // we will store the underlying type and leave it up to the use site
   // to determine whether to use this new_type, or an Unmanaged<CF...> type.
-  if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
+  if (auto genericType = storageType->getAs<BoundGenericType>()) {
     if (genericType->isUnmanaged()) {
       assert(genericType->getGenericArgs().size() == 1 && "other args?");
-      storedUnderlyingType = genericType->getGenericArgs()[0];
+      storageType = genericType->getGenericArgs()[0];
     }
   }
 
   // Find a bridged type, which may be different
-  auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
+  auto bridgedType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, addImportDiag,
       isInSystemModule(dc), Bridgeability::Full, ImportTypeAttrs(), OTK_None);
-  computedPropertyUnderlyingType =
-      computedPropertyUnderlyingType->lookThroughSingleOptionalType();
+  bridgedType = bridgedType->lookThroughSingleOptionalType();
 
-  bool isBridged =
-      !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
+  bool isBridged = !storageType->isEqual(bridgedType);
 
   // Determine the set of protocols to which the synthesized
   // type will conform.
@@ -7192,9 +7190,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   // Local function to add a known protocol only when the
   // underlying type conforms to it.
-  auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
-  if (auto existential =
-          computedPropertyUnderlyingType->getAs<ExistentialType>())
+  auto computedNominal = bridgedType->getAnyNominal();
+  if (auto existential = bridgedType->getAs<ExistentialType>())
     computedNominal = existential->getConstraintType()->getAnyNominal();
   auto transferKnown = [&](KnownProtocolKind kind) {
     if (!computedNominal)
@@ -7255,7 +7252,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
         case ClassDecl::ForeignKind::CFType:
           break;
         }
-      } else if (storedUnderlyingType->isObjCExistentialType()) {
+      } else if (storageType->isObjCExistentialType()) {
         hasObjCBridgeable = true;
       }
     }
@@ -7271,21 +7268,21 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
 
   if (!isBridged) {
-    // Simple, our stored type is equivalent to our computed
+    // Simple, our storage type is equivalent to our bridged
     // type.
-    synthesizer.makeStructRawValued(structDecl, storedUnderlyingType,
+    synthesizer.makeStructRawValued(structDecl, bridgedType,
                                     synthesizedProtocols, options);
   } else {
     // We need to make a stored rawValue or storage type, and a
     // computed one of bridged type.
     synthesizer.makeStructRawValuedWithBridge(
-        structDecl, storedUnderlyingType, computedPropertyUnderlyingType,
+        structDecl, storageType, bridgedType,
         synthesizedProtocols, options);
   }
 
   if (wantsObjCBridgeableTypealias) {
     ClangImporter::Implementation::addSynthesizedTypealias(
-        structDecl, ctx.Id_ObjectiveCType, storedUnderlyingType);
+        structDecl, ctx.Id_ObjectiveCType, storageType);
   }
 
   Impl.ImportedDecls[Impl.getImportedDeclsKey(decl, getVersion())] = structDecl;
