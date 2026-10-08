@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // https://github.com/apple/swift/issues/52448
 // Tests that, when synthesizing init(from:), we don't accidentally confuse
