@@ -4216,12 +4216,20 @@ private:
     if (ctx.LangOpts.DisableAvailabilityChecking)
       return std::nullopt;
 
-    // Member operators are imported unavailable in favor of synthesized Swift
-    // operators; that doesn't apply to the C++ operator.
     if (const auto *clangFD =
-            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl()))
+            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl())) {
+      // Member operators are imported unavailable in favor of synthesized Swift
+      // operators; that doesn't apply to the C++ operator.
       if (clangFD->isOverloadedOperator() && req->isUnavailable())
         return std::nullopt;
+
+      // A pure virtual method of a value type is imported unavailable, as it
+      // has no implementation to call. Implementing it is diagnosed as such
+      // once it matches.
+      if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD))
+        if (method->isPureVirtual() && req->isUnavailable())
+          return std::nullopt;
+    }
 
     std::optional<AvailabilityContext> baseRequirementAvailability;
 
