@@ -16,9 +16,9 @@
 # (build-windows-toolchain.bat does this) or use --isolation=hyperv.
 #
 # The artifacts that build.ps1 downloads (pinned Swift toolchain, CMake,
-# Python, WiX, Android NDK, ...) are installed in C:\ArtifactCache, which is
-# exported as ARTIFACT_CACHE. Pass it to build.ps1 with -ArtifactCache so that
-# builds in the container do not download anything.
+# Python, WiX, ...) are installed in C:\ArtifactCache, which is exported as
+# ARTIFACT_CACHE. Pass it to build.ps1 with -ArtifactCache so that builds in
+# the container do not download anything.
 #
 # Behind a proxy, add --build-arg HTTPS_PROXY=http://<host>:<port>.
 
@@ -98,7 +98,12 @@ RUN New-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem -Na
 # Install build.ps1's dependencies. The archives are deleted afterwards, which
 # works because build-dependencies.ps1 only installs what fails its probe; the
 # second run checks that nothing needs to be installed again.
-ARG BUILD_DEPENDENCIES_ARGS="-Test lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp -Android -IncludeSBoM -IncludeDS2"
+#
+# Docker commits a Windows layer by exporting and re-importing every file in it,
+# which takes tens of minutes for a layer of several GB. The default arguments
+# therefore only install what build-windows-toolchain.bat uses; add -Android
+# (Android NDK) or -IncludeDS2 (flex/bison) for builds that need them.
+ARG BUILD_DEPENDENCIES_ARGS="-Test lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp -IncludeSBoM"
 COPY build.ps1 build-dependencies.ps1 C:/Temp/swift/utils/
 RUN $Command = '& C:\Temp\swift\utils\build-dependencies.ps1 -ArtifactCache C:\ArtifactCache -BinaryCache C:\Temp\BinaryCache ' + $env:BUILD_DEPENDENCIES_ARGS; `
     Invoke-Expression $Command; `
@@ -108,11 +113,16 @@ RUN $Command = '& C:\Temp\swift\utils\build-dependencies.ps1 -ArtifactCache C:\A
     if ($LastExitCode -ne 0) { exit $LastExitCode }; `
     $Downloaded = @(Get-ChildItem C:\ArtifactCache -File); `
     if ($Downloaded) { throw ('Dependencies were installed again: ' + ($Downloaded.Name -join ', ')) }; `
-    Remove-Item C:\Temp -Recurse -Force
+    Remove-Item C:\Temp -Recurse -Force; `
+    Write-Host ('[{0:yyyy-MM-dd HH:mm:ss}] Dependencies installed. Committing the layer, which takes a while.' -f (Get-Date))
 
-RUN netsh.exe winhttp reset proxy | Out-Null; `
+# Remove the proxy settings, which only exist if HTTPS_PROXY is set. A failed
+# Remove-ItemProperty fails the step even with -ErrorAction Ignore, because
+# powershell.exe -Command exits with 1 when the last command failed.
+RUN if (-not $env:HTTPS_PROXY) { exit 0 }; `
+    netsh.exe winhttp reset proxy | Out-Null; `
     foreach ($Root in 'HKCU:', 'HKLM:') { `
-      Remove-ItemProperty ($Root + '\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections') DefaultConnectionSettings -ErrorAction Ignore `
+      Remove-ItemProperty ($Root + '\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections') DefaultConnectionSettings `
     }
 
 ENV ARTIFACT_CACHE=C:\ArtifactCache
