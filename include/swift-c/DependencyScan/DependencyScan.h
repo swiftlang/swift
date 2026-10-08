@@ -708,6 +708,21 @@ swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
                                              unsigned input_index,
                                              swiftscan_string_ref_t *error);
 
+/// Compute \c CacheKey for the outputs of multiple input files from a compiler
+/// invocation with command-line \c argc and \c argv. This is equivalent to
+/// calling \c swiftscan_cache_compute_key_from_input_index for each index in
+/// \c input_indices, but the command-line is only processed once. Return the
+/// \c CacheKey for each input in the same order as \c input_indices, which
+/// needs to be freed via `swiftscan_string_set_dispose`. If error happens,
+/// return nullptr and the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_cache_compute_keys_from_input_indices(swiftscan_cas_t cas, int argc,
+                                                const char **argv,
+                                                const unsigned *input_indices,
+                                                size_t num_inputs,
+                                                swiftscan_string_ref_t *error);
+
 /// Query the result of the compilation using the output cache key. \c globally
 /// suggests if the lookup should check remote cache if such operation exists.
 /// Returns the cached compilation of the result if found, or nullptr if output
