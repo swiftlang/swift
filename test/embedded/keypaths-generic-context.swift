@@ -89,33 +89,33 @@ public func opaque(_ x: Int) -> Int { x }
 // specialized accessor thunks.
 // CHECK-SIL-LABEL: sil {{.*}}@$e4kpgc10kpComputed{{.*}}Ttg5 :
 // CHECK-SIL:         keypath $WritableKeyPath<G<Int32>, Int32>, (root $G<Int32>;
-// CHECK-SIL-SAME:      getter @{{.*}}_Tg5 : $@convention(keypath_accessor_getter) (@in_guaranteed G<Int32>) -> @out Int32
-// CHECK-SIL-SAME:      setter @{{.*}}_Tg5 : $@convention(keypath_accessor_setter) (@in_guaranteed Int32, @inout G<Int32>) -> ())
+// CHECK-SIL-SAME:      getter @{{.*}}_TG5 : $@convention(keypath_accessor_getter) (@in_guaranteed G<Int32>) -> @out Int32
+// CHECK-SIL-SAME:      setter @{{.*}}_TG5 : $@convention(keypath_accessor_setter) (@in_guaranteed Int32, @inout G<Int32>) -> ())
 
 // Same for the chain, whose last component is the generic computed property.
 // CHECK-SIL-LABEL: sil {{.*}}@$e4kpgc7kpChain{{.*}}Ttg5 :
 // CHECK-SIL:         keypath $WritableKeyPath<Wrapper<Int32>, Int32>, (root $Wrapper<Int32>; stored_property #Wrapper.g : $G<Int32>;
-// CHECK-SIL-SAME:      getter @{{.*}}_Tg5 : $@convention(keypath_accessor_getter) (@in_guaranteed G<Int32>) -> @out Int32
-// CHECK-SIL-SAME:      setter @{{.*}}_Tg5 : $@convention(keypath_accessor_setter) (@in_guaranteed Int32, @inout G<Int32>) -> ())
+// CHECK-SIL-SAME:      getter @{{.*}}_TG5 : $@convention(keypath_accessor_getter) (@in_guaranteed G<Int32>) -> @out Int32
+// CHECK-SIL-SAME:      setter @{{.*}}_TG5 : $@convention(keypath_accessor_setter) (@in_guaranteed Int32, @inout G<Int32>) -> ())
 
 // A capturing component specializes its equals/hash thunks too, not just the
 // getter and setter. For `Pair` the captured index is already `Int`, so this
 // only passes if the thunks are specialized for the *pattern's* signature.
 // CHECK-SIL-LABEL: sil {{.*}}@$e4kpgc6kpPair{{.*}}s5Int32V_Tg5 :
 // CHECK-SIL:         keypath $WritableKeyPath<Pair<Int32>, Int32>, (root $Pair<Int32>;
-// CHECK-SIL-SAME:      getter @{{.*}}_Tg5 : $@convention(keypath_accessor_getter) (@in_guaranteed Pair<Int32>, @in_guaranteed Int) -> @out Int32
+// CHECK-SIL-SAME:      getter @{{.*}}_TG5 : $@convention(keypath_accessor_getter) (@in_guaranteed Pair<Int32>, @in_guaranteed Int) -> @out Int32
 // CHECK-SIL-SAME:      indices [%$0 : $Int : $Int]
-// CHECK-SIL-SAME:      indices_equals @{{.*}}_Tg5 : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool
-// CHECK-SIL-SAME:      indices_hash @{{.*}}_Tg5 : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int
+// CHECK-SIL-SAME:      indices_equals @{{.*}}_TG5 : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool
+// CHECK-SIL-SAME:      indices_hash @{{.*}}_TG5 : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int
 
 // For the generic subscript the captured value's own type is substituted too:
 // the index goes from `$τ_0_0 : $*τ_0_0` to `$Int : $*Int`.
 // CHECK-SIL-LABEL: sil {{.*}}@$e4kpgc5kpBox{{.*}}Si_Tg5 :
 // CHECK-SIL:         keypath $WritableKeyPath<Box, Int32>, (root $Box;
-// CHECK-SIL-SAME:      getter @{{.*}}_Tg5 : $@convention(keypath_accessor_getter) (@in_guaranteed Box, @in_guaranteed Int) -> @out Int32
+// CHECK-SIL-SAME:      getter @{{.*}}_TG5 : $@convention(keypath_accessor_getter) (@in_guaranteed Box, @in_guaranteed Int) -> @out Int32
 // CHECK-SIL-SAME:      indices [%$0 : $Int : $*Int]
-// CHECK-SIL-SAME:      indices_equals @{{.*}}_Tg5 : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool
-// CHECK-SIL-SAME:      indices_hash @{{.*}}_Tg5 : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int
+// CHECK-SIL-SAME:      indices_equals @{{.*}}_TG5 : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool
+// CHECK-SIL-SAME:      indices_hash @{{.*}}_TG5 : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int
 
 var g = G<Int32>(stored: 41)
 let kp = kpComputed(Int32.self)
