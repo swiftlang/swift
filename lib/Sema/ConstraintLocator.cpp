@@ -543,6 +543,24 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
 }
 
+bool ConstraintLocator::isAncestorOf(const ConstraintLocator *other) const {
+  if (getAnchor() != other->getAnchor())
+    return false;
+
+  auto path = getPath();
+  auto otherPath = other->getPath();
+  if (path.size() > otherPath.size())
+    return false;
+
+  for (auto [elt, otherElt] : llvm::zip(path, otherPath)) {
+    if (elt.getKind() != otherElt.getKind() ||
+        elt.getRawStorage() != otherElt.getRawStorage())
+      return false;
+  }
+
+  return true;
+}
+
 /// Determine whether given locator points to the subscript reference
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {

@@ -157,6 +157,8 @@ protocol Carrot: Veggie
 
 protocol CarrotCake: Carrot where Self.A: ~Copyable {} // expected-error {{'Self.A' required to be 'Copyable' but is marked with '~Copyable'}}
 
+protocol CarrotSoup: Veggie where Self.NeedsCopyable == any ~Copyable {} // expected-error {{no type for 'Self.NeedsCopyable' can satisfy both 'Self.NeedsCopyable == any ~Copyable' and 'Self.NeedsCopyable : Copyable'}}
+
 func ex1<Cucumber: ~Copyable, Potato>(_ nc: any Veggie<Cucumber>, c: any Veggie<Potato>) {
   reqC(nc.a()) // expected-error {{global function 'reqC' requires that 'Cucumber' conform to 'Copyable'}}
   reqC(c.a())

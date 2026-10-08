@@ -1095,6 +1095,14 @@ public:
     return builder.withRepresentation(rep).build();
   }
 
+  /// Helper method for changing the ClangTypeInfo.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withClangFunctionType for chaining.
+  [[nodiscard]]
+  ASTExtInfo withClangFunctionType(const clang::Type *type) const {
+    return builder.withClangFunctionType(type).build();
+  }
+
   /// Helper method for changing only the noEscape field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withNoEscape for chaining.

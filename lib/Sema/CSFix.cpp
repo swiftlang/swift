@@ -1797,6 +1797,22 @@ DropAsyncAttribute *DropAsyncAttribute::create(ConstraintSystem &cs,
       DropAsyncAttribute(cs, fromType, toType, locator);
 }
 
+bool AllowFunctionCTypeMismatch::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  FunctionCTypeMismatchFailure failure(solution, getFromType(), getToType(),
+                                       getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowFunctionCTypeMismatch *
+AllowFunctionCTypeMismatch::create(ConstraintSystem &cs,
+                                   FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowFunctionCTypeMismatch(cs, fromType, toType, locator);
+}
+
 bool IgnoreContextualType::diagnose(const Solution &solution,
                                     bool asNote) const {
   ContextualFailure failure(solution, getFromType(), getToType(), getLocator());

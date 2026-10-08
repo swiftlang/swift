@@ -7662,6 +7662,20 @@ bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
   return true;
 }
 
+bool FunctionCTypeMismatchFailure::diagnoseAsError() {
+  auto fromType = getFromType();
+  auto toType = getToType();
+
+  auto fromClangType =
+      fromType->castTo<FunctionType>()->getExtInfo().getClangTypeInfo();
+  auto toClangType =
+      toType->castTo<FunctionType>()->getExtInfo().getClangTypeInfo();
+  emitDiagnostic(diag::clang_function_type_mismatch, fromClangType.getType(),
+                toClangType.getType());
+
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();

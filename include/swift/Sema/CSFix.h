@@ -392,6 +392,10 @@ enum class FixKind : uint8_t {
   /// `async` attribute from the source function.
   DropAsyncAttribute,
 
+  /// Allow a mismatch between two function types that are otherwise
+  /// identical except for the Clang type attached to their representation.
+  AllowFunctionCTypeMismatch,
+
   /// Allow invalid pointer conversions for autoclosure result types as if the
   /// pointer type is a function parameter rather than an autoclosure result.
   AllowAutoClosurePointerConversion,
@@ -1161,6 +1165,36 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DropAsyncAttribute;
+  }
+};
+
+/// Two function types are identical except that they disagree about the
+/// Clang type attached to their representation (e.g. two `@convention(c)`
+/// function types with different `cType:` arguments).
+class AllowFunctionCTypeMismatch final : public ContextualMismatch {
+  AllowFunctionCTypeMismatch(ConstraintSystem &cs, FunctionType *fromType,
+                             FunctionType *toType,
+                             ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowFunctionCTypeMismatch,
+                           fromType, toType, locator) {
+    assert(fromType->getExtInfo().getClangTypeInfo() !=
+           toType->getExtInfo().getClangTypeInfo());
+  }
+
+public:
+  std::string getName() const override {
+    return "allow mismatched Clang function types";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowFunctionCTypeMismatch *create(ConstraintSystem &cs,
+                                            FunctionType *fromType,
+                                            FunctionType *toType,
+                                            ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowFunctionCTypeMismatch;
   }
 };
 

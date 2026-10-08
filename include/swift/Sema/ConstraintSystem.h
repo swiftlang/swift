@@ -2117,15 +2117,40 @@ public:
   /// for a particular location.
   bool hasFixFor(ConstraintLocator *locator,
                  std::optional<FixKind> expectedKind = std::nullopt) const {
-    return llvm::any_of(
-        Fixes, [&locator, &expectedKind](const ConstraintFix *fix) {
-          if (fix->getLocator() == locator) {
-            return !expectedKind || fix->getKind() == *expectedKind;
-          }
-          return false;
-        });
+    return hasFixMatching(expectedKind, [&](ConstraintLocator *fixLoc) {
+      return fixLoc == locator;
+    });
   }
 
+  /// Determine whether the constraint system already has a fix recorded for a
+  /// particular location or one of its ancestors; use when a problem might be
+  /// noticed at several different nesting levels and you know the outermost one
+  /// will be recorded first.
+  bool hasFixForAncestorOf(ConstraintLocator *locator,
+                           std::optional<FixKind> expectedKind =
+                              std::nullopt) const {
+    return hasFixMatching(expectedKind, [&](ConstraintLocator *fixLoc) {
+      if (fixLoc == locator)
+        return true;
+
+      ASSERT(!locator->isAncestorOf(fixLoc) &&
+             "fix recorded for a descendant locator before its ancestor");
+      return fixLoc->isAncestorOf(locator);
+    });
+  }
+
+private:
+  template <typename LocatorPredicate>
+  bool hasFixMatching(std::optional<FixKind> expectedKind,
+                      LocatorPredicate matchesLocator) const {
+    return llvm::any_of(Fixes, [&](const ConstraintFix *fix) {
+      if (expectedKind && fix->getKind() != *expectedKind)
+        return false;
+      return matchesLocator(fix->getLocator());
+    });
+  }
+
+public:
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
@@ -3160,6 +3185,19 @@ public:
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
+
+  /// Match the representation and clang type between two functions.
+  bool matchFunctionRepresentations(FunctionType *func1,
+                                    FunctionType *func2,
+                                    ConstraintKind kind,
+                                    ConstraintLocatorBuilder locator);
+
+  /// True if \p type1 and \p type2 are structurally identical except that,
+  /// somewhere in their structure, corresponding function types have different
+  /// \c @convention(_:cType:) arguments. In this situation the Swift types may
+  /// print identically, so we need to diagnose an error that shows the Clang
+  /// types instead.
+  bool onlyMismatchesInFunctionCTypes(Type type1, Type type2) const;
 
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
