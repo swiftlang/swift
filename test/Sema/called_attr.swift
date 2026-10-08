@@ -640,3 +640,61 @@ func genericArgumentInferred(
     return 0
   }
 }
+
+// MARK: - Captures
+
+// A closure owns its capture list entries and the captures that it consumes,
+// and only a `@called(exactlyOnce)` closure isn't `Deinitable`. So it's the
+// only kind of closure that can own a `@called(exactlyOnce)` value. Consuming
+// a capture in a closure that might run more than once is diagnosed after
+// type checking; see test/SIL/called_exactly_once.swift.
+func captureRules(
+  _ a: @escaping @called(exactlyOnce) () -> Void,
+  _ b: @escaping @called(exactlyOnce) () -> Void,
+  _ c: @escaping @called(exactlyOnce) () -> Void,
+  _ d: @escaping @called(exactlyOnce) () -> Void,
+  _ e: @escaping @called(exactlyOnce) () -> Void,
+  _ f: @escaping @called(exactlyOnce) () -> Void,
+  _ g: @escaping @called(exactlyOnce) () -> Void,
+  _ h: @escaping @called(exactlyOnce) () -> Void
+) {
+  func takesExactlyOnce(_: @called(exactlyOnce) () -> Void) {}
+  func takesAtMostOnce(_: @called(atMostOnce) () -> Void) {}
+
+  let _ = { @called(exactlyOnce) in a() } // Ok
+  takesExactlyOnce { b() } // Ok
+
+  takesAtMostOnce { c() }
+  // expected-error@-1 {{consumed capture 'c' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+
+  // Nested closures
+  let _ = { @called(exactlyOnce) in
+    let inner = { @called(exactlyOnce) in d() } // Ok
+    inner()
+  }
+  let _ = { @called(atMostOnce) in
+    let inner = { @called(exactlyOnce) in e() }
+    // expected-error@-1 {{consumed capture 'e' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+    inner()
+  }
+
+  // Capture lists
+  let _ = { [f] in f() }
+  // expected-error@-1 {{capture list entry 'f' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  let _ = { @called(atMostOnce) [g] in g() }
+  // expected-error@-1 {{capture list entry 'g' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  let _ = { @called(exactlyOnce) [h] in h() } // Ok
+}
+
+// A `@called(atMostOnce)` value is `Deinitable`, so any closure can own it.
+func captureRulesAtMostOnce(
+  _ a: @escaping @called(atMostOnce) () -> Void,
+  _ b: @escaping @called(atMostOnce) () -> Void,
+  _ c: @escaping @called(atMostOnce) () -> Void,
+  _ d: @escaping @called(atMostOnce) () -> Void
+) {
+  let _ = { @called(atMostOnce) in a() } // Ok
+  let _ = { @called(exactlyOnce) in b() } // Ok
+  let _ = { @called(atMostOnce) [c] in c() } // Ok
+  let _ = { [d] in _ = d } // Ok
+}
