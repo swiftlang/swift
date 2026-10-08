@@ -566,6 +566,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+  P.addPackTypeElimination();
 
   // Promote stack allocations to values and eliminate redundant
   // loads.
