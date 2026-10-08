@@ -66,7 +66,7 @@ do {
         ToolbarItem(placement: .primaryAction) {
           Button("Done") {
             MainActor.run {
-              // expected-error@-1 {{cannot pass function of type '@Sendable () async -> ()' to parameter expecting synchronous function type}}
+              // expected-error@-1 {{cannot pass function of type '@Sendable () async -> Void' to parameter expecting synchronous function type}}
               await dismiss()
               // expected-note@-1 {{'async' inferred from asynchronous operation used here}}
             }
