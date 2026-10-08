@@ -285,7 +285,26 @@ private struct UseCollector : AddressDefUseWalker {
       }
       return .continueWalk
 
-    case is LoadInst, is FixLifetimeInst, is DestroyAddrInst, is SwitchEnumAddrInst:
+    case let load as LoadInst:
+      // In non-OSSA, a `load` of a non-trivial value doesn't copy the value. Uses of the loaded value
+      // require that the memory location is alive, but those uses are not considered in the liverange:
+      // ```
+      //   copy_addr %src to [init] %allocStack
+      //   %x = load %allocStack
+      //   destroy_addr %src
+      //   strong_retain %x       // use-after-free if %allocStack is replaced by %src
+      //   destroy_addr %allocStack
+      // ```
+      // TODO: remove this check once OSSA is enabled throughout the pipeline.
+      if !load.parentFunction.hasOwnership && !copy.isTakeOfSource &&
+         !load.type.isTrivialNonPointer(in: load.parentFunction)
+      {
+        return .abortWalk
+      }
+      users.append(load)
+      return .continueWalk
+
+    case is FixLifetimeInst, is DestroyAddrInst, is SwitchEnumAddrInst:
       users.append(address.instruction)
       return .continueWalk
 
