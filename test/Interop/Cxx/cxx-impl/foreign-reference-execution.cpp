@@ -11,7 +11,7 @@
 // RUN:   -o %t/foreign-reference-execution-main.o
 // RUN: %target-interop-build-swift \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -Xfrontend -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -module-name ForeignReferenceExecutionMain \
 // RUN:   -parse-as-library \
 // RUN:   -I %S/Inputs \
@@ -22,6 +22,7 @@
 // RUN: %target-run %t/foreign-reference-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_CxxImplementation
 
 #include <stdio.h>
