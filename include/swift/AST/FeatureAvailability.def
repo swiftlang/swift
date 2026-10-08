@@ -94,6 +94,7 @@ FEATURE(DistributedActorResignRemoteID,                 (6, 5))
 FEATURE(EmbeddedDistributedSwift,                       (6, 5))
 FEATURE(DistributedAccessorIsolation,                   (6, 5))
 
+FEATURE(SplitContinuation,                              FUTURE)
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)

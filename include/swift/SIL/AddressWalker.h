@@ -261,6 +261,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       if (auto kind = builtin->getBuiltinKind()) {
         switch (*kind) {
         case BuiltinValueKind::TSanInoutAccess:
+        case BuiltinValueKind::GetSplitContinuationAddr:
         case BuiltinValueKind::ResumeThrowingContinuationReturning:
         case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
         case BuiltinValueKind::GenericAdd:

@@ -3732,9 +3732,10 @@ protected:
     case BuiltinValueKind::Id:
 #include "swift/AST/Builtins.def"
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+    case BuiltinValueKind::GetSplitContinuationAddr:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
-    case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::GetEnumTag: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
