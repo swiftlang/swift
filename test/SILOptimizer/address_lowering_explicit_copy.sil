@@ -1,0 +1,29 @@
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -sil-print-types -sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+
+// Preserve the explicit copy and leave the borrowed source untouched.
+// CHECK-LABEL: sil [ossa] @borrowed
+// CHECK: bb0([[RESULT:%.*]] : $*T, [[SOURCE:%.*]] : $*T):
+// CHECK-NEXT: explicit_copy_addr [[SOURCE]] to [init] [[RESULT]] : $*T
+// CHECK-NEXT: [[EMPTY:%.*]] = tuple ()
+// CHECK-NEXT: return [[EMPTY]] : $()
+sil [ossa] @borrowed : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%source : @guaranteed $T):
+  %copy = explicit_copy_value %source : $T
+  return %copy : $T
+}
+
+// Copying an owned value also leaves its original cleanup in place.
+// CHECK-LABEL: sil [ossa] @owned
+// CHECK: bb0([[RESULT:%.*]] : $*T, [[SOURCE:%.*]] : $*T):
+// CHECK-NEXT: explicit_copy_addr [[SOURCE]] to [init] [[RESULT]] : $*T
+// CHECK-NEXT: destroy_addr [[SOURCE]] : $*T
+// CHECK-NEXT: [[EMPTY:%.*]] = tuple ()
+// CHECK-NEXT: return [[EMPTY]] : $()
+sil [ossa] @owned : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%source : @owned $T):
+  %copy = explicit_copy_value %source : $T
+  destroy_value %source : $T
+  return %copy : $T
+}
