@@ -5,24 +5,29 @@
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: %if OS=macosx %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
-// RUN: %if OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
-// RUN: %if OS=macosx %{ test ! -s %t/extra.txt %}
-// RUN: %if OS=wasip1 %{ test ! -s %t/extra.txt %}
+// RUN: %if !swift_embedded_platform && OS=macosx %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if !swift_embedded_platform && OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if !swift_embedded_platform && OS=macosx %{ test ! -s %t/extra.txt %}
+// RUN: %if !swift_embedded_platform && OS=wasip1 %{ test ! -s %t/extra.txt %}
 
-// Linux has two valid dependency sets, because the embedded runtime calls
-// `arc4random_buf` when the C library provides it and `getrandom` when it
-// doesn't (glibc older than 2.36).
-//
 // Each list must stay sorted with no trailing blank line: GNU comm rejects
 // unsorted input, while the BSD comm on Darwin silently accepts it.
-// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_arc4random.txt %t/actual-dependencies.txt > %t/extra_arc4random.txt %}
-// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_getrandom.txt %t/actual-dependencies.txt > %t/extra_getrandom.txt %}
-// RUN: %if OS=linux-gnu %{ test ! -s %t/extra_arc4random.txt || test ! -s %t/extra_getrandom.txt %}
 
-// Runtime error reporting still uses the standard library's print.
-// Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
-// XFAIL: swift_embedded_platform
+// Without the Embedded Swift platform abstraction layer, Linux has two valid
+// dependency sets, because the embedded runtime calls `arc4random_buf` when the
+// C library provides it and `getrandom` when it doesn't (glibc older than
+// 2.36).
+// RUN: %if !swift_embedded_platform && OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_arc4random.txt %t/actual-dependencies.txt > %t/extra_arc4random.txt %}
+// RUN: %if !swift_embedded_platform && OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_getrandom.txt %t/actual-dependencies.txt > %t/extra_getrandom.txt %}
+// RUN: %if !swift_embedded_platform && OS=linux-gnu %{ test ! -s %t/extra_arc4random.txt || test ! -s %t/extra_getrandom.txt %}
+
+// With the abstraction layer, the dependencies on the C library (including
+// the source of randomness) are replaced by the hooks in EmbeddedPlatform.h,
+// so there is a single dependency set per platform.
+// RUN: %if swift_embedded_platform && OS=macosx %{ comm -13 %t/allowed-dependencies_macos_pal.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if swift_embedded_platform && OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_pal.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if swift_embedded_platform && OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi_pal.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if swift_embedded_platform %{ test ! -s %t/extra.txt %}
 
 //--- allowed-dependencies_macos.txt
 ___stack_chk_fail
@@ -71,6 +76,53 @@ __table_base
 arc4random_buf
 free
 posix_memalign
+putchar
+//--- allowed-dependencies_macos_pal.txt
+___stack_chk_fail
+___stack_chk_guard
+__swift_allocate
+__swift_deallocate
+__swift_generateRandom
+__swift_lockStandardOutput
+__swift_reportErrorAt
+__swift_typedAllocate
+__swift_typedDeallocate
+__swift_unlockStandardOutput
+__swift_writeToStandardOutput
+_memmove
+_memset
+_putchar
+//--- allowed-dependencies_linux_pal.txt
+__stack_chk_fail
+__stack_chk_guard
+_swift_allocate
+_swift_deallocate
+_swift_generateRandom
+_swift_lockStandardOutput
+_swift_reportErrorAt
+_swift_typedAllocate
+_swift_typedDeallocate
+_swift_unlockStandardOutput
+_swift_writeToStandardOutput
+memmove
+memset
+putchar
+//--- allowed-dependencies_wasi_pal.txt
+__indirect_function_table
+__memory_base
+__stack_chk_fail
+__stack_chk_guard
+__stack_pointer
+__table_base
+_swift_allocate
+_swift_deallocate
+_swift_generateRandom
+_swift_lockStandardOutput
+_swift_reportErrorAt
+_swift_typedAllocate
+_swift_typedDeallocate
+_swift_unlockStandardOutput
+_swift_writeToStandardOutput
 putchar
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o

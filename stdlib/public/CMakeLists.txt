@@ -149,7 +149,7 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
 
 option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
        "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
-       FALSE)
+       TRUE)
 
 set(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX "" CACHE STRING
     "If non-empty, embedded Swift target triples matching this regex are
