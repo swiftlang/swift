@@ -80,6 +80,9 @@ struct Rejections {
   Rejections &operator+=(int k);
   // Not imported into Swift.
   Rejections &operator=(const Rejections &other);
+  // Return rvalue references.
+  Rejections &&operator-=(int k);
+  Rejections &&operator+(int k) const;
 };
 
 struct Duplicate {

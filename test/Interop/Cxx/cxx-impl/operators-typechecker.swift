@@ -134,6 +134,16 @@ extension Rejections {
   // expected-error@+1{{could not find imported function 'operator=' matching instance method 'assign'; make sure you import the module or header that declares it}}
   @cxx(`operator=`) @implementation
   mutating func assign(_ other: Rejections) -> UnsafeMutablePointer<Rejections> { fatalError() }
+
+  // Rvalue reference results are not supported, even when the importer drops
+  // them.
+  // expected-error@+2{{instance method 'minusEquals' cannot implement C++ function 'operator-=' because rvalue reference parameters and return types are not yet supported}}
+  @cxx(`operator-=`) @implementation
+  mutating func minusEquals(_ k: Int32) {}
+
+  // expected-error@+2{{instance method 'plus' cannot implement C++ function 'operator+' because rvalue reference parameters and return types are not yet supported}}
+  @cxx(`operator+`) @implementation
+  func plus(_ k: Int32) -> UnsafeMutablePointer<Rejections> { fatalError() }
 }
 
 // Both spellings name the same C++ operator.
