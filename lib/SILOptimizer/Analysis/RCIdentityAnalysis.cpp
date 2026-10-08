@@ -51,6 +51,7 @@ static SILValue getRCIdentityPreservingCastOperand(SILValue V) {
   case ValueKind::InitExistentialRefInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::OpenCOMExistentialInst:
+  case ValueKind::InitCOMExistentialRefInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::ConvertFunctionInst:

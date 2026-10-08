@@ -242,6 +242,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenCOMExistentialInst:
+  case SILInstructionKind::InitCOMExistentialRefInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:

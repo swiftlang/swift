@@ -233,6 +233,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(OpenExistentialBox)
   NO_UPDATE_NEEDED(OpenExistentialRef)
   NO_UPDATE_NEEDED(OpenCOMExistential)
+  NO_UPDATE_NEEDED(InitCOMExistentialRef)
   NO_UPDATE_NEEDED(ProjectBox)
   NO_UPDATE_NEEDED(RefElementAddr)
   NO_UPDATE_NEEDED(RefToBridgeObject)

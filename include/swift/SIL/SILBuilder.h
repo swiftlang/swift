@@ -2245,6 +2245,20 @@ public:
     return insert(instruction);
   }
 
+  InitCOMExistentialRefInst *
+  createInitCOMExistentialRef(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createInitCOMExistentialRef(Loc, Operand, Ty,
+                                       Operand->getOwnershipKind());
+  }
+
+  InitCOMExistentialRefInst *
+  createInitCOMExistentialRef(SILLocation Loc, SILValue Operand, SILType Ty,
+                              ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(InitCOMExistentialRefInst::create(getSILDebugLocation(Loc),
+                                                    Operand, Ty, &getFunction(),
+                                                    forwardingOwnershipKind));
+  }
+
   OpenExistentialBoxInst *
   createOpenExistentialBox(SILLocation Loc, SILValue Operand, SILType Ty) {
     return insert(new (getModule()) OpenExistentialBoxInst(

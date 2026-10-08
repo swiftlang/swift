@@ -418,6 +418,7 @@ OperandOwnership OperandOwnershipClassifier::visitInitCOMExistentialValueInst(
   }
 FORWARDING_OWNERSHIP(OpenExistentialRef)
 FORWARDING_OWNERSHIP(OpenCOMExistential)
+FORWARDING_OWNERSHIP(InitCOMExistentialRef)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
 FORWARDING_OWNERSHIP(BridgeObjectToRef)

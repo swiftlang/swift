@@ -8439,6 +8439,28 @@ public:
   }
 };
 
+/// Erase an opened COM interface to an existential in its refinement chain.
+/// This preserves the interface pointer and forwards ownership unchanged.
+class InitCOMExistentialRefInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitCOMExistentialRefInst,
+          InitCOMExistentialRefInst,
+          OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  InitCOMExistentialRefInst(SILDebugLocation loc, SILValue operand,
+                            SILType type,
+                            ArrayRef<SILValue> typeDependentOperands,
+                            ValueOwnershipKind ownership)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            loc, operand, typeDependentOperands, type, ownership) {}
+
+  static InitCOMExistentialRefInst *create(SILDebugLocation loc,
+                                           SILValue operand, SILType type,
+                                           SILFunction *parent,
+                                           ValueOwnershipKind ownership);
+};
+
 /// Given an existential metatype,
 /// "opens" the existential by returning a pointer to a fresh
 /// archetype metatype T.Type, which also captures the (dynamic)
@@ -12233,6 +12255,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenCOMExistentialInst:
+  case SILInstructionKind::InitCOMExistentialRefInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:

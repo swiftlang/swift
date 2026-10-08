@@ -1149,6 +1149,11 @@ class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
+class InitCOMExistentialRefInst : SingleValueInstruction, UnaryInstruction {
+  public var instance: Value { operand.value }
+}
+
+final public
 class OpenCOMExistentialInst : SingleValueInstruction, UnaryInstruction {
   public var existential: Value { operand.value }
 

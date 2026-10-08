@@ -377,6 +377,9 @@ public:
   using SILBuilder::createOpenCOMExistential;
   ManagedValue createOpenCOMExistential(SILLocation loc, ManagedValue arg,
                                         SILType openedType);
+  using SILBuilder::createInitCOMExistentialRef;
+  ManagedValue createInitCOMExistentialRef(SILLocation loc, ManagedValue arg,
+                                           SILType openedType);
 
   using SILBuilder::createOpenExistentialValue;
   ManagedValue createOpenExistentialValue(SILLocation loc,

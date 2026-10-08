@@ -751,6 +751,8 @@ SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
       return false;
 
     auto layout = getASTType().getExistentialLayout();
+    if (layout.getCOMInterface())
+      return false;
 
     switch (layout.getKind()) {
     // A class-constrained composition uses ClassReference representation;
