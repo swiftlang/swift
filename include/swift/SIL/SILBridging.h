@@ -937,6 +937,8 @@ struct BridgedInstruction {
   PartialApplyInst_getExecutionSemantics() const;
   BRIDGED_INLINE bool PartialApplyInst_isOnStack() const;
   BRIDGED_INLINE bool PartialApplyInst_hasUnknownResultIsolation() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction
+  PartialApplyInst_getNonEscapingClosureConversion() const;
   BRIDGED_INLINE bool PartialApplyInst_isStackAllocationNested() const;
   BRIDGED_INLINE void PartialApplyInst_setStackAllocationIsNested(bool) const;
   BRIDGED_INLINE bool AllocStackInst_hasDynamicLifetime() const;
