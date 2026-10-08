@@ -9710,6 +9710,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
 
+    llvm::SaveAndRestore<SourceLoc> functionWhereClauseLoc(
+        FunctionWhereClauseWithoutReturnLoc,
+        FuncRetTy ? SourceLoc() : Tok.getLoc());
+
     Status |= parseFreestandingGenericWhereClause(FD);
     if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.

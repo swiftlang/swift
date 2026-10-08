@@ -1970,6 +1970,8 @@ ERROR(requires_comma,none,
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
+ERROR(where_clause_before_function_return_type,none,
+      "'where' clause must follow the function's return type", ())
 ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,

@@ -123,6 +123,10 @@ class Parser {
   bool EnableParameterizedNonisolated = true; // HACK: for closures
   std::vector<Token> SplitTokens;
 
+  /// The location of a trailing 'where' clause on a function that has no
+  /// return type, while that clause is being parsed.
+  SourceLoc FunctionWhereClauseWithoutReturnLoc;
+
 public:
   SourceManager &SourceMgr;
   DiagnosticEngine &Diags;
