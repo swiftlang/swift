@@ -3711,6 +3711,11 @@ protected:
     emi->setOperand(opAddr);
   }
 
+  void visitCOMMethodInst(COMMethodInst *method) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    method->setOperand(opAddr);
+  }
+
   void visitAddressOfBorrowBuiltinInst(BuiltinInst *bi, bool stackProtected) {
     SILValue value = bi->getOperand(0);
     SILValue addr = pass.valueStorageMap.getStorage(value).storageAddress;
