@@ -543,11 +543,10 @@ bb0(%0 : @owned $KlassPair):
 Address-only values are potentially unmovable when borrowed. This means
 that they cannot be forwarded with guaranteed ownership unless the
 forwarded value has the same representation as in the original value and
-can reuse the same storage. Non-destructive projection is allowed, such
-as `struct_extract`. Aggregation, such as
-`struct`, and destructive disaggregation, such as
-`switch_enum` is not allowed. This is an invariant for OSSA
-with opaque SIL values for these reasons:
+can reuse the same storage. Projection that does not modify the original
+value, such as `struct_extract` or `switch_enum`, is allowed.
+Aggregation, such as `struct`, is not allowed. This is an invariant for
+OSSA with opaque SIL values for these reasons:
 
 1. To avoid implicit semantic copies. For move-only values, this allows
 complete diagnostics. And in general, it makes it impossible for SIL
