@@ -406,15 +406,26 @@ bb4:
   return %8 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_copy_stack_allocation_with_dealloc_outside_loop :
-// CHECK:   = alloc_ref [stack]
-// CHECK: bb2:
-// CHECK:   dealloc_stack_ref
-// CHECK: bb3:
-// CHECK:   dealloc_stack_ref
-// CHECK-NEXT: tuple
-// CHECK-LABEL: } // end sil function 'dont_copy_stack_allocation_with_dealloc_outside_loop'
-sil [ossa] @dont_copy_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
+// Each iteration deallocates its own stack allocation when it exits the loop.
+//
+// CHECK-LABEL: sil [ossa] @unroll_stack_allocation_with_dealloc_outside_loop :
+// CHECK:         [[A0:%.*]] = alloc_ref [stack]
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]], [[LATCH0:bb[0-9]+]]
+// CHECK:       [[LATCH0]]:
+// CHECK-NEXT:    dealloc_ref [[A0]]
+// CHECK-NEXT:    dealloc_stack_ref [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_ref [stack]
+// CHECK:         dealloc_ref [[A1]]
+// CHECK-NEXT:    dealloc_stack_ref [[A1]]
+// CHECK-NEXT:    br [[MERGE:bb[0-9]+]]
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    dealloc_ref [[A0]]
+// CHECK-NEXT:    dealloc_stack_ref [[A0]]
+// CHECK-NEXT:    br [[MERGE]]
+// CHECK:       [[MERGE]]:
+// CHECK-NEXT:    tuple
+// CHECK-LABEL: } // end sil function 'unroll_stack_allocation_with_dealloc_outside_loop'
+sil [ossa] @unroll_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Int64, 0
  %1 = integer_literal $Builtin.Int64, 1
@@ -833,3 +844,968 @@ bb3:
   return %24 : $()
 }
 
+sil @pred : $@convention(thin) () -> Builtin.Int1
+sil @work : $@convention(thin) (Builtin.Word) -> ()
+sil @use_element : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// The exit condition in the header compares the induction variable before it
+// is incremented, and the body has an early exit. The header executes four
+// times and the body three times. The last iteration's header must exit
+// unconditionally, and every iteration of the body must keep its early exit.
+//
+// CHECK-LABEL: sil [ossa] @unroll_header_exit_with_early_exit :
+// CHECK:         [[P0:%.*]] = apply
+// CHECK-NEXT:    cond_br [[P0]],
+// CHECK:         builtin "cmp_eq_Word"
+// CHECK-NEXT:    br bb
+// CHECK:         [[P1:%.*]] = apply
+// CHECK-NEXT:    cond_br [[P1]],
+// CHECK:         [[P2:%.*]] = apply
+// CHECK-NEXT:    cond_br [[P2]],
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_header_exit_with_early_exit'
+sil [ossa] @unroll_header_exit_with_early_exit : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb4(%8 : $Builtin.Int1)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> Builtin.Int1
+  cond_br %10, bb5, bb6
+
+bb4(%12 : $Builtin.Int1):
+  return %12 : $Builtin.Int1
+
+bb5:
+  %14 = integer_literal $Builtin.Int1, 0
+  br bb4(%14 : $Builtin.Int1)
+
+bb6:
+  %16 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%16 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_header_exit_on_false_with_early_exit :
+// CHECK:         [[P0:%.*]] = apply
+// CHECK-NEXT:    cond_br [[P0]],
+// CHECK:         builtin "cmp_ne_Word"
+// CHECK-NEXT:    br bb
+// CHECK:         [[P1:%.*]] = apply
+// CHECK-NEXT:    cond_br [[P1]],
+// CHECK:         [[P2:%.*]] = apply
+// CHECK-NEXT:    cond_br [[P2]],
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_header_exit_on_false_with_early_exit'
+sil [ossa] @unroll_header_exit_on_false_with_early_exit : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_ne_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb3, bb2
+
+bb2:
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb4(%8 : $Builtin.Int1)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> Builtin.Int1
+  cond_br %10, bb5, bb6
+
+bb4(%12 : $Builtin.Int1):
+  return %12 : $Builtin.Int1
+
+bb5:
+  %14 = integer_literal $Builtin.Int1, 0
+  br bb4(%14 : $Builtin.Int1)
+
+bb6:
+  %16 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%16 : $Builtin.Word)
+}
+
+// The exit condition compares the induction variable before it is incremented,
+// after the body. The body executes for 0, 1 and 2.
+//
+// CHECK-LABEL: sil [ossa] @unroll_pre_increment_exit_after_body :
+// CHECK-COUNT-3: = apply
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_pre_increment_exit_after_body'
+sil [ossa] @unroll_pre_increment_exit_after_body : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = function_ref @work : $@convention(thin) (Builtin.Word) -> ()
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = apply %3(%5) : $@convention(thin) (Builtin.Word) -> ()
+  br bb2
+
+bb2:
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb4, bb3
+
+bb3:
+  %10 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%10 : $Builtin.Word)
+
+bb4:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// The exit comparing the induction variable with 5 is not checked on every
+// iteration, so it does not bound the trip count.
+//
+// CHECK-LABEL: sil [ossa] @dont_unroll_conditional_counted_exit :
+// CHECK:         apply
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'dont_unroll_conditional_counted_exit'
+sil [ossa] @dont_unroll_conditional_counted_exit : $@convention(thin) (Builtin.Word) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Word):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 5
+  %4 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %0 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb7, bb2
+
+bb2:
+  %9 = apply %4() : $@convention(thin) () -> Builtin.Int1
+  cond_br %9, bb3, bb5
+
+bb3:
+  %11 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %11, bb8, bb4
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %16 = builtin "add_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%16 : $Builtin.Word)
+
+bb7:
+  %18 = integer_literal $Builtin.Int1, -1
+  br bb9(%18 : $Builtin.Int1)
+
+bb8:
+  %20 = integer_literal $Builtin.Int1, 0
+  br bb9(%20 : $Builtin.Int1)
+
+bb9(%22 : $Builtin.Int1):
+  return %22 : $Builtin.Int1
+}
+
+// Loops over the elements of a pack are unrolled even if they exceed the cost
+// threshold, like dont_unroll_loop_exceeding_cost_threshold does.
+//
+// CHECK-LABEL: sil [ossa] @unroll_pack_loop_exceeding_cost_threshold :
+// CHECK-COUNT-3: dynamic_pack_index
+// CHECK-NOT:     dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_exceeding_cost_threshold'
+sil [ossa] @unroll_pack_loop_exceeding_cost_threshold : $@convention(thin) (@pack_guaranteed Pack{Int, Int64, Bool}) -> () {
+bb0(%0 : $*Pack{Int, Int64, Bool}):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @use_element : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %5 = function_ref @big_func : $@convention(thin) () -> Builtin.Int64
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = dynamic_pack_index %7 of $Pack{Int, Int64, Bool}
+  %9 = open_pack_element %8 of <each T> at <Pack{Int, Int64, Bool}>, shape $each T, id 1
+  %10 = pack_element_get %8 of %0 : $*Pack{Int, Int64, Bool} as $*@pack_element(1) each T
+  %11 = apply %4<@pack_element(1) each T>(%10) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %12 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %13 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %14 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %15 = apply %5() : $@convention(thin) () -> Builtin.Int64
+  %16 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %17 = builtin "cmp_eq_Word"(%16 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %17, bb3, bb2
+
+bb2:
+  br bb1(%16 : $Builtin.Word)
+
+bb3:
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_unroll_loop_exceeding_cost_threshold :
+// CHECK:         builtin "add_Word"
+// CHECK-NOT:     builtin "add_Word"
+// CHECK-LABEL: } // end sil function 'dont_unroll_loop_exceeding_cost_threshold'
+sil [ossa] @dont_unroll_loop_exceeding_cost_threshold : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @work : $@convention(thin) (Builtin.Word) -> ()
+  %4 = function_ref @big_func : $@convention(thin) () -> Builtin.Int64
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = apply %3(%6) : $@convention(thin) (Builtin.Word) -> ()
+  %8 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %9 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %10 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %11 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  %12 = builtin "add_Word"(%6 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %13 = builtin "cmp_eq_Word"(%12 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %13, bb3, bb2
+
+bb2:
+  br bb1(%12 : $Builtin.Word)
+
+bb3:
+  %16 = tuple ()
+  return %16 : $()
+}
+
+sil @use_int_addr : $@convention(thin) (@in_guaranteed Int) -> ()
+sil @pred_element : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+
+// CHECK-LABEL: sil [ossa] @unroll_alloc_stack_deallocated_in_other_block :
+// CHECK-COUNT-3: = alloc_stack $Int
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_alloc_stack_deallocated_in_other_block'
+sil [ossa] @unroll_alloc_stack_deallocated_in_other_block : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @use_int_addr : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = alloc_stack $Int
+  store %0 to [trivial] %7 : $*Int
+  %9 = apply %4(%7) : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb2
+
+bb2:
+  dealloc_stack %7 : $*Int
+  %12 = builtin "add_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %13 = builtin "cmp_eq_Word"(%12 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %13, bb4, bb3
+
+bb3:
+  br bb1(%12 : $Builtin.Word)
+
+bb4:
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// The early exit destroys and deallocates the alloc_stack, which the rest of
+// the loop body still uses. Each iteration destroys and deallocates its own
+// alloc_stack when it exits early.
+//
+// CHECK-LABEL: sil [ossa] @unroll_loop_with_destroy_in_exit_block :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_loop_with_destroy_in_exit_block'
+sil [ossa] @unroll_loop_with_destroy_in_exit_block : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %5 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = alloc_stack $Klass
+  %9 = copy_value %0 : $Klass
+  store %9 to [init] %8 : $*Klass
+  %11 = apply %5() : $@convention(thin) () -> Builtin.Int1
+  cond_br %11, bb2, bb3
+
+bb2:
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  br bb6
+
+bb3:
+  %16 = apply %4(%8) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  %19 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %20 = builtin "cmp_eq_Word"(%19 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %20, bb5, bb4
+
+bb4:
+  br bb1(%19 : $Builtin.Word)
+
+bb5:
+  br bb6
+
+bb6:
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_pack_loop_with_dealloc_in_exit_block :
+// CHECK:         [[A0:%.*]] = alloc_stack $@pack_element
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK:         dealloc_stack [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_stack $@pack_element
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK:         dealloc_stack [[A1]]
+// CHECK:         [[A2:%.*]] = alloc_stack $@pack_element
+// CHECK:         cond_br {{%.*}}, [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]:
+// CHECK:         dealloc_stack [[A2]]
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_with_dealloc_in_exit_block'
+sil [ossa] @unroll_pack_loop_with_dealloc_in_exit_block : $@convention(thin) (@pack_guaranteed Pack{Int, Int64, Bool}) -> Builtin.Int1 {
+bb0(%0 : $*Pack{Int, Int64, Bool}):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @pred_element : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  %9 = integer_literal $Builtin.Int1, -1
+  br bb4(%9 : $Builtin.Int1)
+
+bb3:
+  %11 = dynamic_pack_index %6 of $Pack{Int, Int64, Bool}
+  %12 = open_pack_element %11 of <each T> at <Pack{Int, Int64, Bool}>, shape $each T, id 2
+  %13 = alloc_stack $@pack_element(2) each T
+  %14 = pack_element_get %11 of %0 : $*Pack{Int, Int64, Bool} as $*@pack_element(2) each T
+  copy_addr %14 to [init] %13 : $*@pack_element(2) each T
+  %16 = apply %4<@pack_element(2) each T>(%13) : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  destroy_addr %13 : $*@pack_element(2) each T
+  cond_br %16, bb5, bb6
+
+bb4(%19 : $Builtin.Int1):
+  return %19 : $Builtin.Int1
+
+bb5:
+  %21 = integer_literal $Builtin.Int1, 0
+  dealloc_stack %13 : $*@pack_element(2) each T
+  br bb4(%21 : $Builtin.Int1)
+
+bb6:
+  dealloc_stack %13 : $*@pack_element(2) each T
+  %25 = builtin "add_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%25 : $Builtin.Word)
+}
+
+// The early exit destroys and deallocates the pack element, which the rest of
+// the loop body still uses. Each iteration destroys and deallocates its own
+// pack element when it exits early. The exit prefix also defines a value used
+// after it, which needs a phi now that each iteration has its own prefix.
+//
+// CHECK-LABEL: sil [ossa] @unroll_pack_loop_with_destroy_in_exit_block :
+// CHECK:         [[A0:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{[0-9]+}}) each T, let, name "x"
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK:         [[R0:%.*]] = apply
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]([[R0]])
+// CHECK:       [[TAIL]]([[PHI:%.*]] : $Builtin.Int1):
+// CHECK-NEXT:    br {{bb[0-9]+}}([[PHI]])
+// CHECK:         [[A1:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{[0-9]+}}) each T, let, name "x"
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK:         [[R1:%.*]] = apply
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]([[R1]])
+// CHECK:         [[A2:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{[0-9]+}}) each T, let, name "x"
+// CHECK:         cond_br {{%.*}}, [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]:
+// CHECK-NEXT:    destroy_addr [[A2]]
+// CHECK:         [[R2:%.*]] = apply
+// CHECK-NEXT:    dealloc_stack [[A2]]
+// CHECK-NEXT:    br [[TAIL]]([[R2]])
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_with_destroy_in_exit_block'
+sil [ossa] @unroll_pack_loop_with_destroy_in_exit_block : $@convention(thin) (@pack_guaranteed Pack{Int, Int64, Bool}) -> Builtin.Int1 {
+bb0(%0 : $*Pack{Int, Int64, Bool}):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @pred_element : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  %5 = function_ref @use_element : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = builtin "cmp_eq_Word"(%7 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb2, bb3
+
+bb2:
+  %10 = integer_literal $Builtin.Int1, -1
+  br bb4(%10 : $Builtin.Int1)
+
+bb3:
+  %12 = dynamic_pack_index %7 of $Pack{Int, Int64, Bool}
+  %13 = open_pack_element %12 of <each T> at <Pack{Int, Int64, Bool}>, shape $each T, id 2
+  %14 = alloc_stack [lexical] [var_decl] $@pack_element(2) each T, let, name "x"
+  %15 = pack_element_get %12 of %0 : $*Pack{Int, Int64, Bool} as $*@pack_element(2) each T
+  copy_addr %15 to [init] %14 : $*@pack_element(2) each T
+  %17 = apply %4<@pack_element(2) each T>(%14) : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1
+  cond_br %17, bb5, bb6
+
+bb4(%19 : $Builtin.Int1):
+  return %19 : $Builtin.Int1
+
+bb5:
+  destroy_addr %14 : $*@pack_element(2) each T
+  %22 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  %23 = apply %22() : $@convention(thin) () -> Builtin.Int1
+  dealloc_stack %14 : $*@pack_element(2) each T
+  br bb4(%23 : $Builtin.Int1)
+
+bb6:
+  %26 = apply %5<@pack_element(2) each T>(%14) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_addr %14 : $*@pack_element(2) each T
+  dealloc_stack %14 : $*@pack_element(2) each T
+  %28 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%28 : $Builtin.Word)
+}
+
+sil @make_error : $@convention(thin) () -> @owned any Error
+
+// The early exit destroys and deallocates the alloc_stack, then throws. Only
+// the exit prefix, up to the dealloc_stack, is cloned for each iteration. The
+// throw can't be duplicated, so the loop can only be unrolled because it stays
+// in the shared tail of the exit block.
+//
+// CHECK-LABEL: sil [ossa] @unroll_loop_with_throw_after_exit_prefix :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]
+// CHECK:       [[TAIL]]:
+// CHECK:         throw
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]
+// CHECK-NOT:     = alloc_stack
+// CHECK-NOT:     throw
+// CHECK-LABEL: } // end sil function 'unroll_loop_with_throw_after_exit_prefix'
+sil [ossa] @unroll_loop_with_throw_after_exit_prefix : $@convention(thin) (@guaranteed Klass) -> @error any Error {
+bb0(%0 : @guaranteed $Klass):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %5 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = alloc_stack $Klass
+  %9 = copy_value %0 : $Klass
+  store %9 to [init] %8 : $*Klass
+  %11 = apply %5() : $@convention(thin) () -> Builtin.Int1
+  cond_br %11, bb2, bb3
+
+bb2:
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  %15 = function_ref @make_error : $@convention(thin) () -> @owned any Error
+  %16 = apply %15() : $@convention(thin) () -> @owned any Error
+  throw %16 : $any Error
+
+bb3:
+  %18 = apply %4(%8) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  %21 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %22 = builtin "cmp_eq_Word"(%21 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %22, bb5, bb4
+
+bb4:
+  br bb1(%21 : $Builtin.Word)
+
+bb5:
+  %25 = tuple ()
+  return %25 : $()
+}
+
+// The early exit destroys and deallocates the alloc_stack from the loop, then
+// allocates another one, which is deallocated in a later block. Only the exit
+// prefix, up to the first dealloc_stack, is cloned for each iteration. The
+// second allocation can't be duplicated because it's deallocated outside the
+// exit block, so the loop can only be unrolled because it stays in the shared
+// tail of the exit block.
+//
+// CHECK-LABEL: sil [ossa] @unroll_loop_with_alloc_stack_after_exit_prefix :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    destroy_addr [[A0]]
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]
+// CHECK:       [[TAIL]]:
+// CHECK-NEXT:    [[I:%.*]] = alloc_stack $Int
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         cond_br {{%.*}}, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]:
+// CHECK-NEXT:    destroy_addr [[A1]]
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]
+// CHECK-NOT:     = alloc_stack
+// CHECK:         dealloc_stack [[I]]
+// CHECK-LABEL: } // end sil function 'unroll_loop_with_alloc_stack_after_exit_prefix'
+sil [ossa] @unroll_loop_with_alloc_stack_after_exit_prefix : $@convention(thin) (@guaranteed Klass, Int) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : $Int):
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = integer_literal $Builtin.Word, 2
+  %5 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %6 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  %7 = function_ref @use_int_addr : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%9 : $Builtin.Word):
+  %10 = alloc_stack $Klass
+  %11 = copy_value %0 : $Klass
+  store %11 to [init] %10 : $*Klass
+  %13 = apply %6() : $@convention(thin) () -> Builtin.Int1
+  cond_br %13, bb2, bb3
+
+bb2:
+  destroy_addr %10 : $*Klass
+  dealloc_stack %10 : $*Klass
+  %17 = alloc_stack $Int
+  store %1 to [trivial] %17 : $*Int
+  %19 = apply %7(%17) : $@convention(thin) (@in_guaranteed Int) -> ()
+  br bb6
+
+bb3:
+  %21 = apply %5(%10) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %10 : $*Klass
+  dealloc_stack %10 : $*Klass
+  %24 = builtin "add_Word"(%9 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Word
+  %25 = builtin "cmp_eq_Word"(%24 : $Builtin.Word, %4 : $Builtin.Word) : $Builtin.Int1
+  cond_br %25, bb5, bb4
+
+bb4:
+  br bb1(%24 : $Builtin.Word)
+
+bb5:
+  br bb7
+
+bb6:
+  dealloc_stack %17 : $*Int
+  br bb7
+
+bb7:
+  %31 = tuple ()
+  return %31 : $()
+}
+
+class SubKlass : Klass {}
+
+sil @get_opt_word : $@convention(thin) () -> Optional<Builtin.Word>
+sil @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+sil @get_klass : $@convention(thin) () -> @owned Klass
+sil @may_throw : $@convention(thin) () -> @error any Error
+
+// An early exit which isn't a cond_br can pass a terminator result to its exit
+// block. Cloning splits the exit edges, and the split block of each iteration
+// must forward that iteration's terminator result.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_with_trivial_payload :
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : $Builtin.Word):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : $Builtin.Word):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : $Builtin.Word):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_with_trivial_payload'
+sil [ossa] @unroll_switch_enum_exit_with_trivial_payload : $@convention(thin) () -> Optional<Builtin.Word> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_opt_word : $@convention(thin) () -> Optional<Builtin.Word>
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Builtin.Word>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Builtin.Word>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> Optional<Builtin.Word>
+  switch_enum %10 : $Optional<Builtin.Word>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%12 : $Optional<Builtin.Word>):
+  return %12 : $Optional<Builtin.Word>
+
+bb5(%14 : $Builtin.Word):
+  %15 = enum $Optional<Builtin.Word>, #Optional.some!enumelt, %14 : $Builtin.Word
+  br bb4(%15 : $Optional<Builtin.Word>)
+
+bb6:
+  %17 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%17 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_with_owned_payload :
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_with_owned_payload'
+sil [ossa] @unroll_switch_enum_exit_with_owned_payload : $@convention(thin) () -> @owned Optional<Klass> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Klass>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> @owned Optional<Klass>
+  switch_enum %10 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%12 : @owned $Optional<Klass>):
+  return %12 : $Optional<Klass>
+
+bb5(%14 : @owned $Klass):
+  %15 = enum $Optional<Klass>, #Optional.some!enumelt, %14 : $Klass
+  br bb4(%15 : $Optional<Klass>)
+
+bb6:
+  %17 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%17 : $Builtin.Word)
+}
+
+// Every iteration switches on the function argument. The payloads become
+// guaranteed phis, which need a borrowed_from with the argument as the
+// enclosing value.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_with_guaranteed_payload :
+// CHECK:         switch_enum %0, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br [[PHIBB:bb[0-9]+]]([[P0]])
+// CHECK:       [[PHIBB]]([[PHI:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    borrowed [[PHI]] from (%0)
+// CHECK:         switch_enum %0, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         switch_enum %0, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_with_guaranteed_payload'
+sil [ossa] @unroll_switch_enum_exit_with_guaranteed_payload : $@convention(thin) (@guaranteed Optional<Klass>) -> @owned Optional<Klass> {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Klass>)
+
+bb3:
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%11 : @owned $Optional<Klass>):
+  return %11 : $Optional<Klass>
+
+bb5(%13 : @guaranteed $Klass):
+  %14 = copy_value %13 : $Klass
+  %15 = enum $Optional<Klass>, #Optional.some!enumelt, %14 : $Klass
+  br bb4(%15 : $Optional<Klass>)
+
+bb6:
+  %17 = builtin "add_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%17 : $Builtin.Word)
+}
+
+// The switched value is borrowed inside the loop, and its borrow scope ends in
+// the exit block. The exit block needs phis for the owned value and its
+// reborrow, as well as the payload, and each iteration passes its own values
+// to them. The exit block follows the return block, after the blocks created
+// by splitting the exit edges.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_borrowed_in_loop :
+// CHECK:         [[V0:%[0-9]+]] = apply
+// CHECK-NEXT:    [[B0:%[0-9]+]] = begin_borrow [[V0]]
+// CHECK-NEXT:    switch_enum [[B0]], case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]], [[V0]], [[B0]])
+// CHECK:         return
+// CHECK:       bb{{[0-9]+}}([[P:%[0-9]+]] : @guaranteed $Klass, [[V:%[0-9]+]] : @owned $Optional<Klass>, [[R:%[0-9]+]] : @reborrow $Optional<Klass>):
+// CHECK-NEXT:    [[RB:%[0-9]+]] = borrowed [[R]] from ([[V]])
+// CHECK-NEXT:    [[PB:%[0-9]+]] = borrowed [[P]] from ([[R]])
+// CHECK-NEXT:    copy_value [[PB]]
+// CHECK-NEXT:    end_borrow [[RB]]
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK:         [[V1:%[0-9]+]] = apply
+// CHECK-NEXT:    [[B1:%[0-9]+]] = begin_borrow [[V1]]
+// CHECK-NEXT:    switch_enum [[B1]], case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]], [[V1]], [[B1]])
+// CHECK:         [[V2:%[0-9]+]] = apply
+// CHECK-NEXT:    [[B2:%[0-9]+]] = begin_borrow [[V2]]
+// CHECK-NEXT:    switch_enum [[B2]], case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]], [[V2]], [[B2]])
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_borrowed_in_loop'
+sil [ossa] @unroll_switch_enum_exit_borrowed_in_loop : $@convention(thin) () -> @owned Optional<Klass> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<Klass>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> @owned Optional<Klass>
+  %11 = begin_borrow %10 : $Optional<Klass>
+  switch_enum %11 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%13 : @owned $Optional<Klass>):
+  return %13 : $Optional<Klass>
+
+bb5(%15 : @guaranteed $Klass):
+  %16 = copy_value %15 : $Klass
+  end_borrow %11 : $Optional<Klass>
+  destroy_value %10 : $Optional<Klass>
+  %19 = enum $Optional<Klass>, #Optional.some!enumelt, %16 : $Klass
+  br bb4(%19 : $Optional<Klass>)
+
+bb6:
+  end_borrow %11 : $Optional<Klass>
+  destroy_value %10 : $Optional<Klass>
+  %23 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%23 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_checked_cast_br_exit :
+// CHECK:         checked_cast_br Klass in {{%.*}} to SubKlass, [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @owned $SubKlass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P0]])
+// CHECK:         checked_cast_br Klass in {{%.*}} to SubKlass, [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @owned $SubKlass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P1]])
+// CHECK:         checked_cast_br Klass in {{%.*}} to SubKlass, [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @owned $SubKlass):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[P2]])
+// CHECK-NOT:     checked_cast_br
+// CHECK-LABEL: } // end sil function 'unroll_checked_cast_br_exit'
+sil [ossa] @unroll_checked_cast_br_exit : $@convention(thin) () -> @owned Optional<SubKlass> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<SubKlass>, #Optional.none!enumelt
+  br bb4(%8 : $Optional<SubKlass>)
+
+bb3:
+  %10 = apply %3() : $@convention(thin) () -> @owned Klass
+  checked_cast_br Klass in %10 : $Klass to SubKlass, bb5, bb6
+
+bb4(%12 : @owned $Optional<SubKlass>):
+  return %12 : $Optional<SubKlass>
+
+bb5(%14 : @owned $SubKlass):
+  %15 = enum $Optional<SubKlass>, #Optional.some!enumelt, %14 : $SubKlass
+  br bb4(%15 : $Optional<SubKlass>)
+
+bb6(%17 : @owned $Klass):
+  destroy_value %17 : $Klass
+  %19 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%19 : $Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_try_apply_exit :
+// CHECK:         try_apply {{%.*}}() : {{.*}}, error [[EXIT0:bb[0-9]+]]
+// CHECK:       [[EXIT0]]([[E0:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[E0]])
+// CHECK:         try_apply {{%.*}}() : {{.*}}, error [[EXIT1:bb[0-9]+]]
+// CHECK:       [[EXIT1]]([[E1:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[E1]])
+// CHECK:         try_apply {{%.*}}() : {{.*}}, error [[EXIT2:bb[0-9]+]]
+// CHECK:       [[EXIT2]]([[E2:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:    br bb{{[0-9]+}}([[E2]])
+// CHECK-NOT:     try_apply
+// CHECK-LABEL: } // end sil function 'unroll_try_apply_exit'
+sil [ossa] @unroll_try_apply_exit : $@convention(thin) () -> @error any Error {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 3
+  %3 = function_ref @may_throw : $@convention(thin) () -> @error any Error
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = tuple ()
+  return %8 : $()
+
+bb3:
+  try_apply %3() : $@convention(thin) () -> @error any Error, normal bb5, error bb4
+
+bb4(%11 : @owned $any Error):
+  throw %11 : $any Error
+
+bb5(%13 : $()):
+  %14 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  br bb1(%14 : $Builtin.Word)
+}
+
+// The exit block takes the payload and deallocates the loop's stack
+// allocation, so it is an exit prefix. Each iteration has its own copy of the
+// prefix, including its argument.
+//
+// CHECK-LABEL: sil [ossa] @unroll_switch_enum_exit_prefix_with_payload :
+// CHECK:         [[A0:%.*]] = alloc_stack $Klass
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT0:bb[0-9]+]],
+// CHECK:       [[EXIT0]]([[P0:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    dealloc_stack [[A0]]
+// CHECK-NEXT:    br [[TAIL:bb[0-9]+]]([[P0]])
+// CHECK:         [[A1:%.*]] = alloc_stack $Klass
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT1:bb[0-9]+]],
+// CHECK:       [[EXIT1]]([[P1:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    dealloc_stack [[A1]]
+// CHECK-NEXT:    br [[TAIL]]([[P1]])
+// CHECK:         [[A2:%.*]] = alloc_stack $Klass
+// CHECK:         switch_enum {{%.*}}, case #Optional.some!enumelt: [[EXIT2:bb[0-9]+]],
+// CHECK:       [[EXIT2]]([[P2:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    dealloc_stack [[A2]]
+// CHECK-NEXT:    br [[TAIL]]([[P2]])
+// CHECK-NOT:     = alloc_stack
+// CHECK-LABEL: } // end sil function 'unroll_switch_enum_exit_prefix_with_payload'
+sil [ossa] @unroll_switch_enum_exit_prefix_with_payload : $@convention(thin) (@guaranteed Klass) -> @owned Optional<Klass> {
+bb0(%0 : @guaranteed $Klass):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = function_ref @get_opt_klass : $@convention(thin) () -> @owned Optional<Klass>
+  %5 = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%7 : $Builtin.Word):
+  %8 = builtin "cmp_eq_Word"(%7 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb2, bb3
+
+bb2:
+  %10 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb4(%10 : $Optional<Klass>)
+
+bb3:
+  %12 = alloc_stack $Klass
+  %13 = copy_value %0 : $Klass
+  store %13 to [init] %12 : $*Klass
+  %15 = apply %5(%12) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %12 : $*Klass
+  %17 = apply %4() : $@convention(thin) () -> @owned Optional<Klass>
+  switch_enum %17 : $Optional<Klass>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb4(%19 : @owned $Optional<Klass>):
+  return %19 : $Optional<Klass>
+
+bb5(%21 : @owned $Klass):
+  dealloc_stack %12 : $*Klass
+  %23 = enum $Optional<Klass>, #Optional.some!enumelt, %21 : $Klass
+  br bb4(%23 : $Optional<Klass>)
+
+bb6:
+  dealloc_stack %12 : $*Klass
+  %26 = builtin "add_Word"(%7 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  br bb1(%26 : $Builtin.Word)
+}
