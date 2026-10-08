@@ -1,0 +1,117 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=pack_pack_index | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil [ossa] @scalar_base : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK: scalar_pack_index 0
+// CHECK: scalar_pack_index 1
+// CHECK: scalar_pack_index 1
+// CHECK: scalar_pack_index 2
+// CHECK: scalar_pack_index 1
+// CHECK: scalar_pack_index 2
+// CHECK: scalar_pack_index 1
+// CHECK: scalar_pack_index 2
+// CHECK-LABEL: } // end sil function 'scalar_base'
+sil [ossa] @scalar_base : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %base0 = scalar_pack_index 0 of $Pack{Int, Float, Double}
+  %base1 = scalar_pack_index 1 of $Pack{Int, Float, Double}
+  %base2 = scalar_pack_index 0 of $Pack{Float, Double}
+  %base3 = scalar_pack_index 1 of $Pack{Float, Double}
+
+  %idx0 = pack_pack_index 0, %base0 of $Pack{Int, Float, Double}
+  %tok0 = open_pack_element %idx0 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 0
+  %stk0 = alloc_stack $@pack_element(0) each U
+  dealloc_stack %stk0
+
+  %idx1 = pack_pack_index 0, %base1 of $Pack{Int, Float, Double}
+  %tok1 = open_pack_element %idx1 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 1
+  %stk1 = alloc_stack $@pack_element(1) each U
+  dealloc_stack %stk1
+
+  %idx2 = pack_pack_index 1, %base2 of $Pack{Int, Float, Double}
+  %tok2 = open_pack_element %idx2 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 2
+  %stk2 = alloc_stack $@pack_element(2) each U
+  dealloc_stack %stk2
+
+  %idx3 = pack_pack_index 1, %base3 of $Pack{Int, Float, Double}
+  %tok3 = open_pack_element %idx3 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 3
+  %stk3 = alloc_stack $@pack_element(3) each U
+  dealloc_stack %stk3
+
+
+  %idx4 = pack_pack_index 1, %base2 of $Pack{repeat each T, Float, Double}
+  %tok4 = open_pack_element %idx4 of <each U> at <Pack{repeat each T, Float, Double}>, shape $each U, id 4
+  %stk4 = alloc_stack $@pack_element(4) each U
+  dealloc_stack %stk4
+
+  %idx5 = pack_pack_index 1, %base3 of $Pack{repeat each T, Float, Double}
+  %tok5 = open_pack_element %idx5 of <each U> at <Pack{repeat each T, Float, Double}>, shape $each U, id 5
+  %stk5 = alloc_stack $@pack_element(5) each U
+  dealloc_stack %stk5
+
+  // Simplification can handle chains of pack_pack_index.
+  %idx6 = pack_pack_index 1, %idx0 of $Pack{repeat each T, Int, Float, Double}
+  %tok6 = open_pack_element %idx6 of <each U> at <Pack{repeat each T, Int, Float, Double}>, shape $each U, id 6
+  %stk6 = alloc_stack $@pack_element(6) each U
+  dealloc_stack %stk6
+
+  %idx7 = pack_pack_index 1, %idx1 of $Pack{repeat each T, Int, Float, Double}
+  %tok7 = open_pack_element %idx7 of <each U> at <Pack{repeat each T, Int, Float, Double}>, shape $each U, id 7
+  %stk7 = alloc_stack $@pack_element(7) each U
+  dealloc_stack %stk7
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @dynamic_base : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK: scalar_pack_index 0
+// CHECK: scalar_pack_index 1
+// CHECK: scalar_pack_index 1
+// CHECK: scalar_pack_index 2
+// CHECK: dynamic_pack_index
+// CHECK: pack_pack_index
+// CHECK-LABEL: } // end sil function 'dynamic_base'
+sil [ossa] @dynamic_base : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %base0 = dynamic_pack_index %zero of $Pack{Int, Float, Double}
+  %base1 = dynamic_pack_index %one of $Pack{Int, Float, Double}
+  %base2 = dynamic_pack_index %zero of $Pack{Float, Double}
+  %base3 = dynamic_pack_index %one of $Pack{Float, Double}
+
+  %idx0 = pack_pack_index 0, %base0 of $Pack{Int, Float, Double}
+  %tok8 = open_pack_element %idx0 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 8
+  %stk8 = alloc_stack $@pack_element(8) each U
+  dealloc_stack %stk8
+
+  %idx2 = pack_pack_index 0, %base1 of $Pack{Int, Float, Double}
+  %tok9 = open_pack_element %idx2 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 9
+  %stk9 = alloc_stack $@pack_element(9) each U
+  dealloc_stack %stk9
+
+  %idx1 = pack_pack_index 1, %base2 of $Pack{Int, Float, Double}
+  %tok10 = open_pack_element %idx1 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 10
+  %stk10 = alloc_stack $@pack_element(10) each U
+  dealloc_stack %stk10
+
+  %idx3 = pack_pack_index 1, %base3 of $Pack{Int, Float, Double}
+  %tok11 = open_pack_element %idx3 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 11
+  %stk11 = alloc_stack $@pack_element(11) each U
+  dealloc_stack %stk11
+
+  %baseUnknown = dynamic_pack_index %0 of $Pack{Int, Float, Double}
+  %idxUnknown = pack_pack_index 0, %baseUnknown of $Pack{Int, Float, Double}
+  %tok12 = open_pack_element %idxUnknown of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 12
+  %stk12 = alloc_stack $@pack_element(12) each U
+  dealloc_stack %stk12
+
+  %result = tuple ()
+  return %result
+}

@@ -40,6 +40,7 @@ swift_compiler_sources(Optimizer
   SimplifyMarkDependence.swift
   SimplifyMoveValue.swift
   SimplifyOpenExistentialRef.swift
+  SimplifyPackIndex.swift
   SimplifyPartialApply.swift
   SimplifyPhiArgument.swift
   SimplifyPointerToAddress.swift
