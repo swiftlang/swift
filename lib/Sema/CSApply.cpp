@@ -5148,13 +5148,11 @@ namespace {
         return E;
       }
 
-      // Only what was written @objcDirect in Swift, not imported objc_direct.
-      // #selector says nothing about whether the result will be sent, and
-      // NSStringFromSelector(#selector(...)) on a direct method is correct --
-      // sel_registerName() never consults a method list. Imported callers
-      // predate the attribute and are not gated on the feature, so diagnosing
-      // them breaks working code. Clang rejects the @selector form on its side.
-      if (method->isObjCDirect()) {
+      // A direct method is absent from the class's Objective-C method list, so
+      // a selector naming it cannot resolve at runtime. Gated on the feature
+      // for now, to give existing sources time to be corrected.
+      if (ctx.LangOpts.hasFeature(Feature::ObjCDirect) &&
+          method->isObjCDirectDispatched()) {
         de.diagnose(E->getLoc(), diag::expr_selector_objc_direct, foundDecl)
             .highlight(subExpr->getSourceRange());
         de.diagnose(method, diag::note_objc_direct_no_selector);
