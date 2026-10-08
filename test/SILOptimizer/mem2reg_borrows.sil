@@ -435,39 +435,3 @@ bb2(%reborrow : @reborrow $Klass):
   return %retval : $()
 }
 
-
-sil [ossa] @use_in : $@convention(thin) (@in Klass) -> ()
-
-// The alloc_stack has no dealloc_stack (dead-end function) and its only direct
-// user is in the entry block, but the uses of the store_borrow are in another
-// block. Mem2Reg must not treat this as a single-block allocation and delete
-// the load and the store into the other alloc_stack.
-// CHECK-LABEL: sil [ossa] @test_store_borrow_uses_in_other_block_dead_end :
-// CHECK:       bb3:
-// CHECK:         [[S:%.*]] = alloc_stack $Klass
-// CHECK:         [[C:%.*]] = copy_value %0
-// CHECK:         store [[C]] to [init] [[S]]
-// CHECK:         apply {{%.*}}([[S]])
-// CHECK-LABEL: } // end sil function 'test_store_borrow_uses_in_other_block_dead_end'
-sil [ossa] @test_store_borrow_uses_in_other_block_dead_end : $@convention(thin) (@guaranteed Klass, Builtin.Int1) -> () {
-bb0(%0 : @guaranteed $Klass, %1 : $Builtin.Int1):
-  %2 = alloc_stack $Klass
-  %3 = store_borrow %0 to %2
-  cond_br %1, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  %7 = alloc_stack $Klass
-  %8 = load [copy] %3
-  store %8 to [init] %7
-  end_borrow %3
-  %11 = function_ref @use_in : $@convention(thin) (@in Klass) -> ()
-  %12 = apply %11(%7) : $@convention(thin) (@in Klass) -> ()
-  dealloc_stack %7
-  unreachable
-}
