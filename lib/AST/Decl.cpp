@@ -13761,6 +13761,10 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
         break;
 
       auto baseName = attachedTo->getBaseName();
+      // A subscript, constructor, or destructor has no identifier to
+      // prefix; there is nothing to introduce.
+      if (baseName.isSpecial())
+        break;
       std::string prefixedName;
       {
         llvm::raw_string_ostream out(prefixedName);
@@ -13778,6 +13782,10 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
         break;
 
       auto baseName = attachedTo->getBaseName();
+      // A subscript, constructor, or destructor has no identifier to
+      // suffix; there is nothing to introduce.
+      if (baseName.isSpecial())
+        break;
       std::string suffixedName;
       {
         llvm::raw_string_ostream out(suffixedName);
