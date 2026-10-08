@@ -660,6 +660,21 @@ static bool isEmbeddedExportedConformanceSpecialization(
   return SpecializedAttr::isExportedConformanceSpecialization(conformance);
 }
 
+/// Whether the witness table of \p conformance is a specialized witness table
+/// in non-embedded Swift, i.e. a witness table which is specialized for the
+/// concrete type arguments of a generic conformance. Other than the witness
+/// table of the generic conformance, such a table has no unique definition.
+/// Embedded Swift has its own rules for the linkage of witness tables.
+static bool
+isSpecializedWitnessTableConformance(const ProtocolConformance *conformance) {
+  if (conformance->getDeclContext()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded))
+    return false;
+  if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
+    conformance = inherited->getInheritedConformance();
+  return isa<SpecializedProtocolConformance>(conformance);
+}
+
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
@@ -931,6 +946,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // Unique: defined by the owning module, external elsewhere.
     if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+    // A specialized witness table is emitted in every module which needs it.
+    if (isSpecializedWitnessTableConformance(getProtocolConformance()))
+      return SILLinkage::Shared;
     LLVM_FALLTHROUGH;
   case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptorRecord:
@@ -1952,6 +1970,9 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     // separately linked library.
     if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
       return false;
+    if (isSpecializedWitnessTableConformance(getProtocolConformance()))
+      return true;
+
     if (auto context = getDeclContextForEmission()) {
       if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
               Feature::Embedded)) {
