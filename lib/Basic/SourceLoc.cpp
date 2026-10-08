@@ -519,20 +519,45 @@ SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   // If the cache is out-of-date, update it now.
   unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
   if (numBuffers != LocCache.numBuffersOriginal) {
-    LocCache.sortedBuffers.assign(std::begin(range(1, numBuffers + 1)),
-                                  std::end(range(1, numBuffers + 1)));
+    BufferIDRangeComparison rangeLess{this};
+    BufferIDSameRange sameRange{this};
+    auto &sortedBuffers = LocCache.sortedBuffers;
+
+    // Sort the IDs of the buffers added since the cache was last updated by
+    // source range. Among added buffers with the same source range, keep only
+    // the highest-numbered one; we want later alias buffers to be found
+    // first.
+    auto addedIDs = range(LocCache.numBuffersOriginal + 1, numBuffers + 1);
+    SmallVector<unsigned, 4> addedBuffers(addedIDs.begin(), addedIDs.end());
+    std::sort(addedBuffers.begin(), addedBuffers.end(), rangeLess);
+    addedBuffers.erase(
+        std::unique(addedBuffers.begin(), addedBuffers.end(), sameRange),
+        addedBuffers.end());
+
+    // Insert each added buffer into the cache in place rather than re-sorting
+    // the whole cache. Every added buffer is numbered higher than the buffers
+    // already in the cache, so it replaces any cached buffer with the same
+    // source range. The added buffers are sorted, so each one goes after the
+    // previous one.
+    auto searchStart = sortedBuffers.begin();
+    for (unsigned bufferID : addedBuffers) {
+      auto pos = std::lower_bound(searchStart, sortedBuffers.end(), bufferID,
+                                  rangeLess);
+      // Buffers that start at the same location but differ in length compare
+      // as equivalent, so look through all of them for one with the same
+      // range.
+      auto sameStart = pos;
+      while (sameStart != sortedBuffers.end() &&
+             !rangeLess(bufferID, *sameStart) &&
+             !sameRange(*sameStart, bufferID))
+        ++sameStart;
+      if (sameStart != sortedBuffers.end() && sameRange(*sameStart, bufferID))
+        *sameStart = bufferID;
+      else
+        pos = sortedBuffers.insert(pos, bufferID);
+      searchStart = pos;
+    }
     LocCache.numBuffersOriginal = numBuffers;
-
-    // Sort the buffer IDs by source range.
-    std::sort(LocCache.sortedBuffers.begin(), LocCache.sortedBuffers.end(),
-              BufferIDRangeComparison{this});
-
-    // Remove lower-numbered buffers with the same source ranges as higher-
-    // numbered buffers. We want later alias buffers to be found first.
-    auto newEnd =
-        std::unique(LocCache.sortedBuffers.begin(),
-                    LocCache.sortedBuffers.end(), BufferIDSameRange{this});
-    LocCache.sortedBuffers.erase(newEnd, LocCache.sortedBuffers.end());
 
     // Forget the last buffer we looked at; it might have been replaced.
     LocCache.lastBufferID = std::nullopt;
