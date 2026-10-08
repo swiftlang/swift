@@ -74,6 +74,8 @@ final class CounterBox: @unchecked Sendable {
 
 final class Trigger: Sendable {
   let fired = Atomic<Bool>(false)
+  // Set once the code that fired the trigger observed the cancellation.
+  let observedCancellation = Atomic<Bool>(false)
 }
 
 // A clock whose `sleep` returns once the trigger fired.
@@ -98,17 +100,25 @@ struct TriggeredClock: Clock, Identifiable {
 
 // Creates `count` nested `async let` children and fires `trigger` while doing
 // so. Returns how many children never observed the cancellation.
+//
+// The children only check their cancellation once the parent observed the
+// cancellation of the scope.
 @available(StdlibDeploymentTarget 6.5, *)
 func spawnAsyncLetChildren(_ count: Int, firing trigger: Trigger, at fireCount: Int) async -> Int {
-  guard count > 0 else { return 0 }
+  guard count > 0 else {
+    // All children exist. The trigger fired, so the timer cancels the scope.
+    while !Task.isCancelled {
+      await Task.yield()
+    }
+    trigger.observedCancellation.store(true, ordering: .releasing)
+    return 0
+  }
   if count == fireCount {
     trigger.fired.store(true, ordering: .releasing)
   }
   async let observedCancellation: Bool = {
-    // Wait up to 10ms for the cancellation.
-    for _ in 0..<10 {
-      if Task.isCancelled { return true }
-      try? await Task.sleep(for: .milliseconds(1))
+    while !trigger.observedCancellation.load(ordering: .acquiring) {
+      await Task.yield()
     }
     return Task.isCancelled
   }()
