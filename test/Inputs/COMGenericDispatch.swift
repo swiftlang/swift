@@ -26,3 +26,21 @@ public func edit<T: IClassItem>(_ value: borrowing T,
                                _ body: (inout Int32) throws -> Void) rethrows {
   try body(&value.value)
 }
+
+public enum ValueError: Error { case negative }
+
+extension IItem {
+  @inline(never)
+  public var nonnegative: Int32 {
+    get throws {
+      let result = value(0)
+      guard result >= 0 else { throw ValueError.negative }
+      return result
+    }
+  }
+}
+
+@inline(never)
+public func readNonnegative<T: IItem>(_ value: borrowing T) throws -> Int32 {
+  try value.nonnegative
+}
