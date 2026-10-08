@@ -140,6 +140,7 @@ void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
     ctx.addCleanup([staticBuildConfiguration] {
       swift_Basic_freeStaticBuildConfiguration(staticBuildConfiguration);
     });
+    ctx.getGlobalCache().StaticBuildConfiguration = staticBuildConfiguration;
   }
 
   return staticBuildConfiguration;
