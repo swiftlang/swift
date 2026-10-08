@@ -1027,6 +1027,9 @@ TypeResolver::resolveDependentMemberType(Type baseTy,
       if (concreteBase->hasError())
         return ErrorType::get(baseTy);
     }
+    // Fail when silenced instead of diagnosing or typo-correcting.
+    if (options.contains(TypeResolutionFlags::SilenceDiagnostics))
+      return ErrorType::get(ctx);
 
     // Resolve the base to a potential archetype.
     // Perform typo correction.
@@ -1066,13 +1069,19 @@ TypeResolver::resolveDependentMemberType(Type baseTy,
 
   if (auto concreteBase = genericSig->getConcreteType(baseTy)) {
     bool hasUnboundOpener = !!resolution.getUnboundTypeOpener();
+    // Fail when silenced instead of diagnosing and recovering.
+    bool silenced = options.contains(TypeResolutionFlags::SilenceDiagnostics);
     switch (TypeChecker::isUnsupportedMemberTypeAccess(concreteBase, concrete,
                                                        hasUnboundOpener)) {
     case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
+      if (silenced)
+        return ErrorType::get(ctx);
       diagnose(repr->getNameLoc(), diag::typealias_outside_of_protocol,
                repr->getNameRef(), concreteBase);
       break;
     case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
+      if (silenced)
+        return ErrorType::get(ctx);
       diagnose(repr->getNameLoc(), diag::assoc_type_outside_of_protocol,
                repr->getNameRef(), concreteBase);
       break;
@@ -1272,6 +1281,10 @@ namespace {
       if (argTy->hasError() || matcher.match(paramTy, argTy))
         return false;
 
+      // An invalid location means the caller doesn't want diagnostics.
+      if (loc.isInvalid())
+        return true;
+
       // If the parameter is a value, then we're trying to substitute a
       // non-value type like 'Int' or 'T' to our value.
       if (paramTy->isValueParameter()) {
@@ -1462,6 +1475,14 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
   return false;
 }
 
+/// Where to report problems with a type's generic arguments:
+/// Null loc for a silenced resolution, which diagnoses nothing.
+static SourceLoc getGenericArgumentDiagLoc(SourceLoc loc,
+                                           TypeResolutionOptions options) {
+  return options.contains(TypeResolutionFlags::SilenceDiagnostics) ? SourceLoc()
+                                                                   : loc;
+}
+
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -1521,7 +1542,8 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
     }
 
     if (TypeChecker::checkContextualRequirements(
-            decl, parentTy, loc, resolution.getGenericSignature()))
+            decl, parentTy, getGenericArgumentDiagLoc(loc, options),
+            resolution.getGenericSignature()))
       return type;
 
     return ErrorType::get(getASTContext());
@@ -1539,22 +1561,26 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
   // Parameterized protocol types have their own code path.
   if (auto *protoType = type->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
+    bool silenced = options.contains(TypeResolutionFlags::SilenceDiagnostics);
 
     auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
     if (assocTypes.empty()) {
-      diagnose(loc, diag::protocol_does_not_have_primary_assoc_type, protoType)
-          .fixItRemove(repr->getAngleBrackets());
-      if (!protoDecl->isImplicit())
-        diagnose(protoDecl, diag::decl_declared_here, protoDecl);
+      if (!silenced) {
+        diagnose(loc, diag::protocol_does_not_have_primary_assoc_type, protoType)
+            .fixItRemove(repr->getAngleBrackets());
+        if (!protoDecl->isImplicit())
+          diagnose(protoDecl, diag::decl_declared_here, protoDecl);
+      }
 
       return ErrorType::get(ctx);
     }
 
     // Make sure we have the right number of generic arguments.
     if (genericArgs.size() != assocTypes.size()) {
-      diagnose(loc, diag::parameterized_protocol_type_argument_count_mismatch,
-               protoType, genericArgs.size(), assocTypes.size(),
-               (genericArgs.size() < assocTypes.size()) ? 1 : 0);
+      if (!silenced)
+        diagnose(loc, diag::parameterized_protocol_type_argument_count_mismatch,
+                 protoType, genericArgs.size(), assocTypes.size(),
+                 (genericArgs.size() < assocTypes.size()) ? 1 : 0);
 
       return ErrorType::get(ctx);
     }
@@ -1641,7 +1667,8 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
 
   // Construct the substituted type.
   const auto result = resolution.applyUnboundGenericArguments(
-      decl, unboundType->getParent(), loc, args);
+      decl, unboundType->getParent(), getGenericArgumentDiagLoc(loc, options),
+      args);
 
   // Migration hack.
   bool isMutablePointer;
@@ -2287,13 +2314,14 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
-                                           const DeclContext *dc) {
+static bool diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
+                                            const DeclContext *dc,
+                                            TypeResolutionOptions options) {
   if (loc.isInvalid())
-    return;
+    return false;
 
   if (!typeDecl->isStdlibDecl())
-    return;
+    return false;
 
 
   ASTContext &ctx = typeDecl->getASTContext();
@@ -2302,20 +2330,23 @@ static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
     // Don't require this in the standard library or _Concurrency library.
     auto module = dc->getParentModule();
     if (module->isStdlibModule() || module->isConcurrencyModule())
-      return;
-  
-    ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature, nameString,
-                       featureName);
+      return false;
+
+    if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+      ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature,
+                         nameString, featureName);
+    return true;
   };
 
   if (nameString == "Cell" ||
       nameString == "ConstCell" ||
       nameString == "Volatile") {
     if (ctx.LangOpts.hasFeature(Feature::Cells))
-      return;
+      return false;
 
-    diag(Feature::Cells.getName());
+    return diag(Feature::Cells.getName());
   }
+  return false;
 }
 
 NeverNullType
@@ -2344,9 +2375,10 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   if (id.isSimpleName(ctx.Id_Self)) {
     if (auto *typeDC = DC->getInnermostTypeContext()) {
       if (typeDC->isMetatypeExtension()) {
-        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
           diagnose(repr->getLoc(), diag::metatype_extension_self);
-        repr->setInvalid();
+          repr->setInvalid();
+        }
         return ErrorType::get(ctx);
       }
     }
@@ -2396,10 +2428,11 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
     if (isa<AssociatedTypeDecl>(typeDecl)) {
       if (auto *typeDC = DC->getInnermostTypeContext()) {
         if (typeDC->isMetatypeExtension()) {
-          if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
             diagnose(repr->getLoc(), diag::metatype_extension_associated_type,
                      typeDecl->getName());
-          repr->setInvalid();
+            repr->setInvalid();
+          }
           return ErrorType::get(ctx);
         }
       }
@@ -2440,7 +2473,9 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
         diagnose(entry.getValueDecl(), diag::found_candidate);
     }
 
-    repr->setInvalid();
+    // Do not mark an undiagnosed repr invalid; a later pass may diagnose it.
+    if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+      repr->setInvalid();
     return ErrorType::get(ctx);
   }
 
@@ -2452,7 +2487,11 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    diagnoseExperimentalStdlibTypes(currentDecl, repr->getLoc(), DC);
+    // Fail when silenced instead of recovering with an experimental type.
+    if (diagnoseExperimentalStdlibTypes(currentDecl, repr->getLoc(), DC,
+                                        options) &&
+        options.contains(TypeResolutionFlags::SilenceDiagnostics))
+      return ErrorType::get(ctx);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2551,13 +2590,15 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
       return ErrorType::get(ctx);
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
-      diagnose(repr->getNameLoc(), diag::typealias_outside_of_protocol,
-               repr->getNameRef(), parentTy);
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::typealias_outside_of_protocol,
+                 repr->getNameRef(), parentTy);
       return ErrorType::get(ctx);
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
-      diagnose(repr->getNameLoc(), diag::assoc_type_outside_of_protocol,
-               repr->getNameRef(), parentTy);
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::assoc_type_outside_of_protocol,
+                 repr->getNameRef(), parentTy);
       return ErrorType::get(ctx);
     }
 
@@ -4814,14 +4855,20 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     thrownTy = resolveType(thrownTypeRepr, thrownTypeOptions);
     if (thrownTy->hasError()) {
       thrownTy = Type();
+    // An unbound generic (kept by silenced pattern resolution) has no
+    // substitutions for conditional requirements, so `checkConformance` cannot
+    // run.
     } else if (inStage(TypeResolutionStage::Interface) &&
-               !options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
+               !thrownTy->hasUnboundGenericType()) {
       auto thrownTyInContext = GenericEnvironment::mapTypeIntoEnvironment(
         resolution.getGenericSignature().getGenericEnvironment(), thrownTy);
       if (!checkConformance(thrownTyInContext, ctx.getErrorDecl())) {
-        diagnoseInvalid(
-            thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
-            thrownTy);
+        // Normally we diagnose and recover; when silenced, fail instead.
+        if (options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          thrownTy = ErrorType::get(ctx);
+        else
+          diagnoseInvalid(thrownTypeRepr, thrownTypeRepr->getLoc(),
+                          diag::thrown_type_not_error, thrownTy);
       }
     }
   } else if (repr->getThrowsLoc().isValid()) {
@@ -5580,15 +5627,17 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
         // TODO: Explicitly pass along whether in a 'shape' context.
         !options.contains(TypeResolutionFlags::SILMode)) {
       bool invalid = false;
+      bool silenced = options.contains(TypeResolutionFlags::SilenceDiagnostics);
       if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
-        diagnose(repr->getLoc(), diag::pack_reference_must_be_in_expansion,
-                 repr);
+        if (!silenced)
+          diagnose(repr->getLoc(), diag::pack_reference_must_be_in_expansion,
+                   repr);
         invalid = true;
       }
       if (!options.contains(TypeResolutionFlags::FromPackReference)) {
-        diagnose(repr->getLoc(), diag::pack_type_requires_keyword_each,
-                 repr)
-            .fixItInsert(repr->getLoc(), "each ");
+        if (!silenced)
+          diagnose(repr->getLoc(), diag::pack_type_requires_keyword_each, repr)
+              .fixItInsert(repr->getLoc(), "each ");
         invalid = true;
       }
       if (invalid) {
@@ -5656,9 +5705,11 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Deinitable) &&
         !getDeclContext()->getParentModule()->isStdlibModule() &&
         !canSuppressDeinitable(options, getDeclContext())) {
-      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+      // Only a diagnosed repr is marked invalid.
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
         diagnose(repr->getNameLoc(), diag::deinitable_reserved);
-      repr->setInvalid();
+        repr->setInvalid();
+      }
       return ErrorType::get(getASTContext());
     }
   }
@@ -5697,8 +5748,8 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       diagnose(repr->getNameLoc(), diag::cannot_find_type_in_scope,
                DeclNameRef(moduleName));
       diagnose(repr->getNameLoc(), diag::note_module_as_type, moduleName);
+      repr->setInvalid();
     }
-    repr->setInvalid();
     return ErrorType::get(getASTContext());
   }
 
@@ -6066,7 +6117,9 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
     // Make sure we can substitute the generic args.
     auto ty = resolution.applyUnboundGenericArguments(
         inlineArrayDecl,
-        /*parentTy=*/nullptr, repr->getStartLoc(), {countTy, eltTy});
+        /*parentTy=*/nullptr,
+        getGenericArgumentDiagLoc(repr->getStartLoc(), options),
+        {countTy, eltTy});
     if (ty->hasError())
       return ErrorType::get(ctx);
   }
@@ -6097,10 +6150,10 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 
     Type genericArgs[1] = {baseTy};
     auto arrayTy =
-        resolution.applyUnboundGenericArguments(arrayDecl,
-            /*parentTy=*/nullptr,
-                                                repr->getBrackets().Start,
-                                                genericArgs);
+        resolution.applyUnboundGenericArguments(
+            arrayDecl, /*parentTy=*/nullptr,
+            getGenericArgumentDiagLoc(repr->getBrackets().Start, options),
+            genericArgs);
     if (arrayTy->hasError()) {
       return ErrorType::get(ctx);
     }
@@ -6244,7 +6297,8 @@ TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
   }
 
   auto substTy = resolution.applyUnboundGenericArguments(
-          dictDecl, nullptr, repr->getStartLoc(), {keyTy, valueTy});
+      dictDecl, nullptr, getGenericArgumentDiagLoc(repr->getStartLoc(), options),
+      {keyTy, valueTy});
   if (substTy->hasError())
     return ErrorType::get(getASTContext());
 
@@ -6272,10 +6326,10 @@ NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
     // Check that we can validly substitute the baseTy into an Optional
     Type genericArgs[1] = {baseTy};
     auto substTy =
-        resolution.applyUnboundGenericArguments(ctx.getOptionalDecl(),
-                                                /*parentTy=*/nullptr,
-                                                repr->getQuestionLoc(),
-                                                genericArgs);
+        resolution.applyUnboundGenericArguments(
+            ctx.getOptionalDecl(), /*parentTy=*/nullptr,
+            getGenericArgumentDiagLoc(repr->getQuestionLoc(), options),
+            genericArgs);
     if (substTy->hasError()) {
       return ErrorType::get(ctx);
     }
@@ -6337,11 +6391,17 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     break;
   }
 
-  if (doDiag && !options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
-    // In language modes up to Swift 5, we allow `T!` in invalid position for
-    // compatibility and downgrade the error to a warning.
-    const auto languageModeForError = LanguageMode::v5;
+  // In language modes up to Swift 5, we allow `T!` in invalid position for
+  // compatibility and downgrade the error to a warning.
+  const auto languageModeForError = LanguageMode::v5;
 
+  // The unsilenced resolution reports an error and carries on, so that sibling
+  // nodes are still checked. A silenced resolution must fail and exit.
+  if (doDiag && options.contains(TypeResolutionFlags::SilenceDiagnostics) &&
+      ctx.isLanguageModeAtLeast(languageModeForError))
+    return ErrorType::get(ctx);
+
+  if (doDiag && !options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
     // If we are about to error, mark this node as invalid.
     // This is the only way to indicate that something went wrong without
     // supressing checking of sibling nodes.
@@ -6394,10 +6454,10 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Check that we can validly substitute the baseTy into an Optional
     Type genericArgs[1] = {baseTy};
     auto substTy =
-        resolution.applyUnboundGenericArguments(ctx.getOptionalDecl(),
-            /*parentTy=*/nullptr,
-                                                repr->getExclamationLoc(),
-                                                genericArgs);
+        resolution.applyUnboundGenericArguments(
+            ctx.getOptionalDecl(), /*parentTy=*/nullptr,
+            getGenericArgumentDiagLoc(repr->getExclamationLoc(), options),
+            genericArgs);
     if (substTy->hasError()) {
       return ErrorType::get(ctx);
     }
@@ -6425,8 +6485,8 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
 
   bool diagnosedRequirementFailure = false;
   auto substTy = resolution.applyUnboundGenericArguments(
-          arrayDecl, nullptr, repr->getStartLoc(), {element},
-          &diagnosedRequirementFailure);
+      arrayDecl, nullptr, getGenericArgumentDiagLoc(repr->getStartLoc(), options),
+      {element}, &diagnosedRequirementFailure);
   if (diagnosedRequirementFailure) {
     ASSERT(getASTContext().Diags.hadAnyError());
 
@@ -6750,6 +6810,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
   // If true, we cannot form a composition from these members.
   bool IsInvalid = false;
+  bool silenced = options.contains(TypeResolutionFlags::SilenceDiagnostics);
 
   std::function<void (SourceLoc, Type)> checkMember
       = [&](SourceLoc loc, Type ty) {
@@ -6771,8 +6832,9 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     assert(isa<ClassDecl>(ty->getAnyNominal()));
 
     if (SuperclassType && !SuperclassType->isEqual(ty)) {
-      diagnose(loc, diag::protocol_composition_one_class, ty,
-               SuperclassType);
+      if (!silenced)
+        diagnose(loc, diag::protocol_composition_one_class, ty,
+                 SuperclassType);
       IsInvalid = true;
       return;
     }
@@ -6809,14 +6871,16 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    diagnose(tyR->getStartLoc(),
-             diag::invalid_protocol_composition_member,
-             ty);
+    if (!silenced)
+      diagnose(tyR->getStartLoc(),
+               diag::invalid_protocol_composition_member,
+               ty);
     IsInvalid = true;
   }
 
   if (IsInvalid) {
-    repr->setInvalid();
+    if (!silenced)
+      repr->setInvalid();
     return ErrorType::get(getASTContext());
   }
 
@@ -6843,11 +6907,12 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
       if (layout.requiresClass()) {
         auto superclass = layout.explicitSuperclass;
-        diagnose(repr->getStartLoc(),
-                 diag::inverse_with_class_constraint,
-                 !superclass,
-                 getProtocolName(kp),
-                 superclass);
+        if (!silenced)
+          diagnose(repr->getStartLoc(),
+                   diag::inverse_with_class_constraint,
+                   !superclass,
+                   getProtocolName(kp),
+                   superclass);
         IsInvalid = true;
         break;
       }
@@ -6863,9 +6928,10 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
         if (proto == otherProto ||
             otherProto->inheritsFrom(proto)) {
-          diagnose(repr->getLoc(),
-                   diag::inverse_conflicts_explicit_composition,
-                   getProtocolName(kp));
+          if (!silenced)
+            diagnose(repr->getLoc(),
+                     diag::inverse_conflicts_explicit_composition,
+                     getProtocolName(kp));
           IsInvalid = true;
           break;
         }
@@ -6874,7 +6940,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   }
 
   if (IsInvalid) {
-    repr->setInvalid();
+    if (!silenced)
+      repr->setInvalid();
     return ErrorType::get(getASTContext());
   }
 
@@ -7036,6 +7103,8 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
 
   // Rewrap for diagnostic purposes.
   ty = wrapInExistential(ty);
+  if (options.contains(TypeResolutionFlags::SilenceDiagnostics))
+    return ErrorType::get(getASTContext());
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());
 }
