@@ -195,6 +195,8 @@ MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
      "Diagnose any '@const' entities which could not be simplified to a compile-time value")
 MODULE_PASS(ConformanceCheckOptimization, "conformance-check-optimization",
      "Build conformance entries in vtables for fast class conformance checks")
+MODULE_PASS(WitnessTableSpecialization, "witness-table-specialization",
+     "Creates specialized witness tables for existentials of specialized generic types")
 MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
      "Diagnose violations of Embedded Swift language restrictions")
 

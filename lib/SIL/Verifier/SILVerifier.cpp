@@ -8013,7 +8013,9 @@ void SILWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Witnesses must have witness_method representation.");
 
-    if (!mod.haveFunctionTypesBeenRewritten() &&
+    // Witnesses of a specialized witness table have a concrete self type and
+    // are therefore not ABI compatible with the requirement type.
+    if (!mod.haveFunctionTypesBeenRewritten() && !isSpecialized() &&
         !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement

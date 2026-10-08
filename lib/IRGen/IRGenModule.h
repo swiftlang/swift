@@ -1215,6 +1215,10 @@ public:
                               bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
+  /// Whether the specialized witness table \p wt can be emitted as a static
+  /// witness table, which is directly referenced.
+  bool canEmitStaticSpecializedWitnessTable(SILWitnessTable *wt);
+
   Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
@@ -1241,6 +1245,9 @@ private:
 
   llvm::DenseMap<const ProtocolConformance *,
                  std::unique_ptr<const ConformanceInfo>> Conformances;
+
+  /// Caches the results of canEmitStaticSpecializedWitnessTable.
+  llvm::DenseMap<SILWitnessTable *, bool> StaticSpecializedWitnessTables;
 
   friend class GenericContextScope;
   friend class LoweringModeScope;

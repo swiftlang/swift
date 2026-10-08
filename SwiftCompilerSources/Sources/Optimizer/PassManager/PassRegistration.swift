@@ -66,6 +66,7 @@ private func registerSwiftPasses() {
   registerPass(mandatoryAllocBoxToStack, { mandatoryAllocBoxToStack.run($0) })
   registerPass(mandatoryPerformanceOptimizations, { mandatoryPerformanceOptimizations.run($0) })
   registerPass(conformanceCheckOptimization, { conformanceCheckOptimization.run($0) })
+  registerPass(witnessTableSpecialization, { witnessTableSpecialization.run($0) })
   registerPass(diagnoseUnknownConstValues, { diagnoseUnknownConstValues.run($0)})
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })

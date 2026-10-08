@@ -1653,6 +1653,9 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       }
 
       // Otherwise, we'll need to derive it at instantiation time.
+      // A specialized witness table is never instantiated at runtime.
+      assert(!SILWT->isSpecialized() &&
+             "base protocol of specialized witness table must be constant");
       SpecializedBaseConformances.push_back({Table.size(), &conf});
 
       if (isRelative) {
@@ -1865,6 +1868,26 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
         }
         ProtocolConformance *assocConf = assocConfRef.getConcrete();
         llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf);
+        auto &schema = IGM.getOptions().PointerAuth
+                          .ProtocolAssociatedTypeWitnessTableAccessFunctions;
+        Table.addSignedPointer(witnessEntry, schema, requirement);
+        return;
+      }
+
+      if (SILWT->isSpecialized()) {
+        // A specialized witness table has no conditional conformances in its
+        // private area, which an associated conformance access function of the
+        // generic conformance would need. But all associated conformances are
+        // concrete and have a constant witness table, which the runtime can
+        // directly use (see swift_getAssociatedConformanceWitness).
+        ProtocolConformance *assocConf = associatedWitness.Witness.getConcrete();
+        llvm::Constant *witnessEntry =
+            IGM.getConformanceInfo(assocConf->getProtocol(), assocConf)
+                .tryGetConstantTable(IGM, assocConf->getType()->getCanonicalType());
+        assert(witnessEntry &&
+               "associated conformance of specialized witness table must be "
+               "constant");
+        assert(!isRelative && "specialized relative witness tables not supported");
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, requirement);
@@ -2643,6 +2666,101 @@ ProtocolInfo::create(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind) {
 // Provide a unique home for the ConformanceInfo vtable.
 void ConformanceInfo::anchor() {}
 
+/// Whether \p conformance has a witness table which can be referenced as a
+/// constant.
+static bool hasConstantWitnessTable(IRGenModule &IGM,
+                                    ProtocolConformance *conformance) {
+  return IGM.getConformanceInfo(conformance->getProtocol(), conformance)
+             .tryGetConstantTable(IGM,
+                                  conformance->getType()->getCanonicalType());
+}
+
+/// In Embedded Swift all specialized witness tables are emitted statically.
+/// In regular Swift, a specialized witness table is an optimization and it is
+/// only emitted if it doesn't need to be completed at runtime, because it's
+/// never instantiated by the runtime. If a specialized witness table cannot be
+/// emitted statically, the witness table of the conformance is instantiated at
+/// runtime from the generic witness table, like without specialization.
+bool IRGenModule::canEmitStaticSpecializedWitnessTable(SILWitnessTable *wt) {
+  assert(wt->isSpecialized());
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return true;
+
+  auto found = StaticSpecializedWitnessTables.find(wt);
+  if (found != StaticSpecializedWitnessTables.end())
+    return found->second;
+
+  // Be conservative in case of cycles.
+  StaticSpecializedWitnessTables[wt] = false;
+
+  auto check = [&]() -> bool {
+    if (IRGen.Opts.UseRelativeProtocolWitnessTables)
+      return false;
+
+    // The layout of a resilient witness table is not known.
+    auto *rootConformance = wt->getConformance()->getRootConformance();
+    if (isResilientConformance(rootConformance))
+      return false;
+
+    // The header of the witness table statically references the conformance
+    // descriptor (see DirectConformanceInfo::tryGetConstantTable).
+    if (getOptions().LazyInitializeProtocolConformances) {
+      const auto *MD = rootConformance->getDeclContext()->getParentModule();
+      if (!(MD == getSwiftModule() || MD->isStaticLibrary()))
+        return false;
+    }
+
+    if (!wt->getConditionalConformances().empty())
+      return false;
+
+    for (const SILWitnessTable::Entry &entry : wt->getEntries()) {
+      switch (entry.getKind()) {
+      case SILWitnessTable::Invalid:
+      case SILWitnessTable::AssociatedType:
+        break;
+
+      case SILWitnessTable::Method:
+        // An unspecialized witness would need the conditional conformances
+        // from the private area of the witness table.
+        if (auto *witness = entry.getMethodWitness().Witness) {
+          if (witness->getLoweredFunctionType()->isPolymorphic())
+            return false;
+        }
+        break;
+
+      case SILWitnessTable::BaseProtocol: {
+        // Base protocol entries are not resolved at runtime.
+        auto &baseEntry = entry.getBaseProtocolWitness();
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
+                baseEntry.Requirement))
+          break;
+        if (!hasConstantWitnessTable(*this, baseEntry.Witness))
+          return false;
+        break;
+      }
+
+      case SILWitnessTable::AssociatedConformance: {
+        // Associated conformance entries are emitted as direct references to
+        // the witness tables.
+        auto &assocEntry = entry.getAssociatedConformanceWitness();
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
+                assocEntry.Witness.getProtocol()))
+          break;
+        if (!assocEntry.Witness.isConcrete() ||
+            !hasConstantWitnessTable(*this, assocEntry.Witness.getConcrete()))
+          return false;
+        break;
+      }
+      }
+    }
+    return true;
+  };
+
+  bool result = check();
+  StaticSpecializedWitnessTables[wt] = result;
+  return result;
+}
+
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
 IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
@@ -2667,13 +2785,14 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   // Whether `wt` is the specialized witness table of `conf`. Specialized
   // witness tables are shared by conformances which only differ in type sugar.
-  auto isSpecializedTableOf = [](SILWitnessTable *wt,
-                                 const ProtocolConformance *conf) {
+  auto isSpecializedTableOf = [this](SILWitnessTable *wt,
+                                     const ProtocolConformance *conf) {
     auto canonical = [](const ProtocolConformance *c) {
       return const_cast<ProtocolConformance *>(c)->getCanonicalConformance();
     };
     return wt && wt->isSpecialized() &&
-           canonical(wt->getConformance()) == canonical(conf);
+           canonical(wt->getConformance()) == canonical(conf) &&
+           canEmitStaticSpecializedWitnessTable(wt);
   };
 
   auto *specConf = conformance;
@@ -2848,6 +2967,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
       return;
   }
 
+  // A specialized witness table which cannot be emitted statically is never
+  // referenced (see getConformanceInfo).
+  if (wt->isSpecialized() && !canEmitStaticSpecializedWitnessTable(wt))
+    return;
+
   // Ensure that relatively-referenced symbols for witness thunks are collocated
   // in the same LLVM module.
   IRGen.ensureRelativeSymbolCollocation(*wt);
@@ -2918,7 +3042,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     wtableBuilder.collectResilientWitnesses(resilientWitnesses);
   }
 
-  if (!Context.LangOpts.hasFeature(Feature::Embedded)) {
+  // The protocol conformance descriptor is emitted for the witness table of the
+  // generic conformance. A specialized witness table only refers to it.
+  if (!Context.LangOpts.hasFeature(Feature::Embedded) && !wt->isSpecialized()) {
     // Collect the information that will go into the protocol conformance
     // descriptor.
     unsigned tablePrivateSize = wt->getConditionalConformances().size();

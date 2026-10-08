@@ -754,6 +754,10 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
+  // Runs after serialization, because specialized witness tables are not
+  // serialized. The created specialized witness methods are optimized by the
+  // following low-level function passes.
+  P.addWitnessTableSpecialization();
   P.addDeadFunctionAndGlobalElimination();
   P.addReadOnlyGlobalVariablesPass();
   P.addDeadStoreElimination();
