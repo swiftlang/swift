@@ -3,6 +3,9 @@
 ; We need sed and awk, so Windows is out
 UNSUPPORTED: OS=windows-msvc
 
+; Debug builds exhaust the stack before the recursion limit is reached
+REQUIRES: tools-release
+
 RUN: swift-demangle < %S/Inputs/bigtype.txt 2>&1 > %t.check
 RUN: %diff -u %S/Inputs/bigtype-demangle.txt %t.check
 
