@@ -263,9 +263,10 @@ extension _RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func setCapacity(_ newCapacity: Int) {
+    let newCapacity = Swift.max(newCapacity, count)
     guard newCapacity != capacity else { return }
     let newStorage: UnsafeMutableBufferPointer<Element> = .allocate(
-      capacity: Swift.max(newCapacity, count))
+      capacity: newCapacity)
     let i = unsafe newStorage.moveInitialize(fromContentsOf: _items)
     _internalInvariant(i == count)
 
