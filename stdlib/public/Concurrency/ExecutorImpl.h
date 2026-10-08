@@ -27,13 +27,19 @@
 #if !defined(__swift__) && __has_feature(ptrauth_calls)
 #include <ptrauth.h>
 #endif
-#ifndef __ptrauth_objc_isa_pointer
-#define __ptrauth_objc_isa_pointer
-#endif
 
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+// This must match __ptrauth_swift_heap_object_metadata in
+// swift/Runtime/Config.h, which this header cannot include
+#if !defined(__swift__) && __has_feature(ptrauth_calls)
+#define __ptrauth_swift_heap_object_metadata                                   \
+  __ptrauth(ptrauth_key_process_independent_data, 1, 0x6AE1)
+#else
+#define __ptrauth_swift_heap_object_metadata
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,7 +98,7 @@ static inline int swift_priority_getBucketIndex(SwiftJobPriority priority) {
 /// Used by the Concurrency runtime to represent a job.  The `schedulerPrivate`
 /// field may be freely used by the executor implementation.
 typedef struct {
-  SwiftHeapMetadata const *__ptrauth_objc_isa_pointer _Nonnull metadata;
+  SwiftHeapMetadata const *__ptrauth_swift_heap_object_metadata _Nonnull metadata;
   uintptr_t refCounts;
   void * _Nullable schedulerPrivate[2];
   SwiftJobFlags flags;
@@ -129,7 +135,7 @@ void swift_job_dealloc(SwiftJob * _Nonnull job, void * _Nonnull ptr);
 
 /// Swift's refcounted objects start with this header
 typedef struct {
-  SwiftHeapMetadata const *__ptrauth_objc_isa_pointer _Nonnull metadata;
+  SwiftHeapMetadata const *__ptrauth_swift_heap_object_metadata _Nonnull metadata;
 } SwiftHeapObject;
 
 /// A reference to an executor consists of two words; the first is a pointer
