@@ -1,11 +1,12 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -verify-additional-prefix copytuples- -verify-ignore-unrelated
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature MoveOnlyClasses -verify-additional-prefix copytuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -verify-additional-prefix copytuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -enable-experimental-feature MoveOnlyClasses -verify-additional-prefix copytuples- -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_NondeinitableTypes
 // REQUIRES: swift_feature_MoveOnlyTuples
 // REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_CalledAttribute
 
 // The NondeinitableTypes feature lets structs, enums, generic parameters, and
 // associated types suppress `Deinitable`, so that the compiler's support for
@@ -15,6 +16,12 @@ struct ND: ~Copyable, ~Deinitable { // expected-note 3 {{struct 'ND' has '~Deini
   consuming func finish() {
     discard self // Ok, even without a deinit
   }
+
+  func peek() {}
+}
+
+struct NC: ~Copyable {
+  consuming func finish() {}
 }
 
 enum E: ~Copyable, ~Deinitable {
@@ -205,4 +212,33 @@ func sendable(_ s: consuming ExplicitlySendable) -> ExplicitlySendable {
 // A `~Deinitable` type is implicitly `Sendable` like any other.
 func implicitlySendable(_ nd: consuming ND) -> ND {
   requireSendable(nd)
+}
+
+// MARK: - Captures
+
+func closureCaptureLists(
+  _ nd1: consuming ND, _ nd2: consuming ND, _ nc: consuming NC
+) {
+  let _ = { [nd1] in nd1.peek() }
+  // expected-error@-1 {{capture list entry 'nd1' of 'Deinitable'-conforming closure has non-Deinitable type 'ND'}}
+  let _ = { @called(atMostOnce) [nd2] in nd2.finish() }
+  // expected-error@-1 {{capture list entry 'nd2' of 'Deinitable'-conforming closure has non-Deinitable type 'ND'}}
+  let _ = { [nc] in nc.finish() } // Ok
+}
+
+func closureConsumedCaptures(_ nd: consuming ND, _ nc: consuming NC) {
+  let _ = { @called(atMostOnce) in nd.finish() }
+  // expected-error@-1 {{consumed capture 'nd' of 'Deinitable'-conforming closure has non-Deinitable type 'ND'}}
+  let _ = { @called(atMostOnce) in nc.finish() } // Ok
+}
+
+// A borrowed capture stays with its owner.
+func closureBorrowedCaptures(_ nd: borrowing ND) {
+  func run(_ body: () -> Void) { body() }
+  run { nd.peek() } // Ok
+}
+
+func closureGenericCaptures<T: ~Copyable & ~Deinitable>(_ t: consuming T) {
+  let _ = { [t] in _ = t }
+  // expected-error@-1 {{capture list entry 't' of 'Deinitable'-conforming closure has non-Deinitable type 'T'}}
 }
