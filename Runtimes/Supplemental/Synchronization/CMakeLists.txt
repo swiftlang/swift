@@ -115,8 +115,14 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
 add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
-gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
-gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)
+gyb_expand(Atomics/AtomicIntegers.swift.gyb
+  Atomics/AtomicIntegers.swift
+  DEPENDS "${SwiftSynchronization_SWIFTC_SOURCE_DIR}/utils/SwiftAtomics.py"
+)
+gyb_expand(Atomics/AtomicStorage.swift.gyb
+  Atomics/AtomicStorage.swift
+  DEPENDS "${SwiftSynchronization_SWIFTC_SOURCE_DIR}/utils/SwiftAtomics.py"
+)
 
 add_library(swiftSynchronization
   Atomics/Atomic.swift
