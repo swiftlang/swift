@@ -291,6 +291,8 @@
 # utils
 /utils/*windows*                                              @compnerd
 /utils/availability-macros.def                                @swiftlang/standard-librarians
+/utils/build-dependencies-common.ps1                          @compnerd @charles-zablit
+/utils/build-dependencies.ps1                                 @compnerd @charles-zablit
 /utils/build.ps1                                              @compnerd
 /utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal @edymtt
 /utils/generate-xcode                                         @hamishknight
