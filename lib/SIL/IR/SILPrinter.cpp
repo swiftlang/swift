@@ -2868,6 +2868,18 @@ public:
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
     printConformances(AEI->getConformances());
   }
+  void visitInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *AEI) {
+    *this << getIDAndForcedPrintedType(AEI->getOperand()) << " : $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
+  }
+
+  void visitInitCOMExistentialValueInst(InitCOMExistentialValueInst *AEI) {
+    *this << getIDAndForcedPrintedType(AEI->getOperand()) << " : $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
+  }
+
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
     *this << getIDAndForcedPrintedType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();

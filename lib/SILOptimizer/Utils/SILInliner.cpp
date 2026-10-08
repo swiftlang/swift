@@ -1347,6 +1347,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::LoadInst:
