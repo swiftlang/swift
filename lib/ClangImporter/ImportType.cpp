@@ -37,6 +37,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
@@ -2853,22 +2854,30 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
     // HACK: Clang will crash while trying to instantiate this default arg.
     return false;
 
-  if (param->hasUninstantiatedDefaultArg() &&
-      isa<clang::CXXConstructorDecl>(functionDecl))
-    // HACK: Constructors of std::set have default arguments that rely on the
-    // comparator type being copyable.
-    return false;
-
-  clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;
   // Try to instantiate the default expression.
-  auto defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
-      clang::SourceLocation(), const_cast<clang::FunctionDecl *>(functionDecl),
-      const_cast<clang::ParmVarDecl *>(param));
+  clang::ExprResult defaultArgExprResult;
+  bool instantiationFailed;
+  {
+    auto &clangDiags = getClangSema().getDiagnostics();
+    bool prevSuppressAllDiagnostics = clangDiags.getSuppressAllDiagnostics();
+    clangDiags.setSuppressAllDiagnostics(true);
+    SWIFT_DEFER {
+      clangDiags.setSuppressAllDiagnostics(prevSuppressAllDiagnostics);
+    };
+    clang::DiagnosticErrorTrap errorTrap(clangDiags);
+    defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
+        clang::SourceLocation(),
+        const_cast<clang::FunctionDecl *>(functionDecl),
+        const_cast<clang::ParmVarDecl *>(param));
+    instantiationFailed =
+        !defaultArgExprResult.isUsable() || errorTrap.hasErrorOccurred();
+  }
   // If the default expression can't be instantiated, bail.
-  if (!defaultArgExprResult.isUsable())
+  if (instantiationFailed)
     return false;
 
-  defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
+  auto defaultArgExpr =
+      cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
 
   // If the type of this parameter is a view type, do not import the
   // default expression, since we cannot guarantee the lifetime of the
