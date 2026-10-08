@@ -300,28 +300,6 @@ public:
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 
-class MultiPayloadEnumDescriptorIterator
-    : public ReflectionSectionIteratorBase<MultiPayloadEnumDescriptorIterator,
-                                           MultiPayloadEnumDescriptor> {
-public:
-  MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-      : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum") {}
-
-  static std::optional<uint64_t>
-  getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
-    return MPER->getSizeInBytes();
-  }
-
-  static uint64_t getMinimumRecordSize() {
-    // MultiPayloadEnumDescriptor ends in a flexible `contents` array, so its
-    // sizeof only covers TypeName. getSizeInBytes() reads contents[0], so we
-    // need room for TypeName plus that first content word.
-    return sizeof(MultiPayloadEnumDescriptor) + sizeof(uint32_t);
-  }
-};
-using MultiPayloadEnumSection =
-    ReflectionSection<MultiPayloadEnumDescriptorIterator>;
-
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
@@ -332,7 +310,6 @@ struct ReflectionInfo {
   GenericSection TypeReference;
   GenericSection ReflectionString;
   GenericSection Conformance;
-  MultiPayloadEnumSection MultiPayloadEnum;
   llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames;
 };
 
@@ -582,10 +559,6 @@ public:
     /// Get the unsubstituted capture types for a closure context.
     ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
-    /// Get the multipayload enum projection information for a given TR
-    std::unique_ptr<MultiPayloadEnumDescriptorBase>
-    getMultiPayloadEnumDescriptor(const TypeRef *TR) override;
-
     const TypeRef *lookupTypeWitness(const std::string &MangledTypeName,
                                      const std::string &Member,
                                      StringRef Protocol);
@@ -607,8 +580,6 @@ public:
 
     /// Load unsubstituted field types for a nominal type.
     RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
-
-    RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
 
     void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
 
@@ -674,8 +645,7 @@ public:
 
   public:
     ///
-    /// Dumping typerefs, field declarations, builtin types, captures,
-    /// multi-payload enums
+    /// Dumping typerefs, field declarations, builtin types, captures
     ///
     void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
                      bool printTypeName = false);
@@ -684,7 +654,6 @@ public:
     void dumpFieldSection(std::ostream &stream);
     void dumpBuiltinTypeSection(std::ostream &stream);
     void dumpCaptureSection(std::ostream &stream);
-    void dumpMultiPayloadEnumSection(std::ostream &stream);
 
     template <template <typename Runtime> class ObjCInteropKind,
               unsigned PointerSize>
@@ -924,10 +893,6 @@ public:
       stream << "CONFORMANCES:\n";
       stream << "=============\n";
       dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
-      stream << "\n";
-      stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
-      stream << "===============================\n";
-      dumpMultiPayloadEnumSection(stream);
       stream << "\n";
     }
   };
@@ -1803,16 +1768,9 @@ public:
     return RDF.getClosureContextInfo(CD);
   }
 
-  /// Get the multipayload enum projection information for a given TR
-  std::unique_ptr<MultiPayloadEnumDescriptorBase>
-  getMultiPayloadEnumDescriptor(const TypeRef *TR);
-
 private:
   /// Get the primitive type lowering for a builtin type.
   RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
-
-  RemoteRef<MultiPayloadEnumDescriptor>
-  getMultiPayloadEnumInfo(const TypeRef *TR);
 
   std::optional<uint64_t> multiPayloadEnumPointerMask;
 
@@ -1843,6 +1801,7 @@ public:
     }
     return multiPayloadEnumPointerMask.value();
   }
+
   FieldTypeCollectionResult
   collectFieldTypes(std::optional<std::string> forMangledTypeName) {
     return RDF.collectFieldTypes(forMangledTypeName);
