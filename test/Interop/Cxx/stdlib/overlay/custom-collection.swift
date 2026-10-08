@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
 //
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import CustomSequence
