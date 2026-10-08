@@ -4162,6 +4162,25 @@ sil-instruction ::= 'init_existential_ref' sil-operand ':' sil-type ','
 Creates a class existential container of type `$P` containing a
 reference to the class instance `%0`.
 
+### init_com_existential_ref
+
+```
+sil-instruction ::= 'init_com_existential_ref' sil-operand 'to' sil-type
+
+%1 = init_com_existential_ref %0 : $@opened(0, IExtended) Self to $IItem
+```
+
+Erases a loadable opened COM interface to an existential whose constraints
+are implied by the opened interface. In particular, the destination COM
+interface must belong to the source interface's refinement chain.
+
+This instruction forwards the interface pointer and its ownership without
+adjusting or retaining it. It carries no conformance witnesses: refinement
+uses the same interface address point. A type-dependent operand keeps the
+opened archetype definition alive. Use `init_com_existential_addr` or
+`init_com_existential_value` to project an independently owned interface
+from a borrowed generic value.
+
 ### open_existential_ref
 
 ```

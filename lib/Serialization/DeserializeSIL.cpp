@@ -4039,6 +4039,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         decodeValueOwnership(Attr));
     break;
   }
+  case SILInstructionKind::InitCOMExistentialRefInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createInitCOMExistentialRef(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        decodeValueOwnership(Attr));
+    break;
+  }
   case SILInstructionKind::UncheckedRefCastInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");

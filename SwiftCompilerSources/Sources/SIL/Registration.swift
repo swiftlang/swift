@@ -147,6 +147,7 @@ private func registerSILClasses() {
   register(InitExistentialRefInst.self)
   register(OpenExistentialRefInst.self)
   register(OpenCOMExistentialInst.self)
+  register(InitCOMExistentialRefInst.self)
   register(InitExistentialValueInst.self)
   register(DeinitExistentialValueInst.self)
   register(OpenExistentialValueInst.self)

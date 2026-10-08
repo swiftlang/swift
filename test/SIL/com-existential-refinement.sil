@@ -1,0 +1,90 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -module-name M -enable-experimental-com-interop -I %t -sil-print-types -emit-sorted-sil -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name M -enable-experimental-com-interop -I %t -emit-sib %s -o %t/M.sib
+// RUN: %target-sil-opt -module-name M -enable-experimental-com-interop -I %t -sil-print-types -emit-sorted-sil -enable-sil-verify-all %t/M.sib | %FileCheck %s
+// RUN: %target-sil-opt -module-name M -enable-experimental-com-interop -I %t -sil-print-types -emit-sorted-sil -enable-sil-verify-all -mandatory-inlining %s | %FileCheck %s --check-prefix=INLINE
+// RUN: %target-sil-opt -module-name M -enable-experimental-com-interop -I %t -enable-sil-verify-all -ownership-model-eliminator %s -o /dev/null
+// RUN: %target-sil-opt -module-name M -enable-experimental-com-interop -I %t -test-runner %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=FORWARD
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IExtended: IItem {}
+
+// CHECK-LABEL: sil [ossa] @refine
+// CHECK: [[OPEN:%.*]] = open_com_existential %0
+// CHECK: [[RESULT:%.*]] = init_com_existential_ref [[OPEN]] : $@opened({{.*}}, any IExtended) Self
+// CHECK-SAME: type-defs: [[OPEN]]
+// CHECK: return [[RESULT]]
+// FORWARD-LABEL: refine: forwarding_def_use_test
+// FORWARD: USE: operand #0 of return
+// FORWARD-LABEL: refine: forwarding_use_def_test
+// FORWARD: INTRODUCER: %0 = argument of bb0 : $any IExtended
+sil [ossa] @refine : $@convention(thin) (@owned IExtended) -> @owned IItem {
+bb0(%value : @owned $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(1, IExtended) Self
+  %result = init_com_existential_ref %open : $@opened(1, IExtended) Self to $IItem
+  specify_test "forwarding_def_use_test %value"
+  specify_test "forwarding_use_def_test %result"
+  return %result : $IItem
+}
+
+// Refinement can also forward a borrowed interface. Copying the refined value
+// is a separate ownership operation.
+// CHECK-LABEL: sil [ossa] @refine_borrowed
+// CHECK: [[OPEN:%.*]] = open_com_existential %0
+// CHECK: [[RESULT:%.*]] = init_com_existential_ref [[OPEN]]
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[RESULT]]
+// CHECK-NEXT: return [[COPY]]
+sil [ossa] @refine_borrowed : $@convention(thin) (@guaranteed IExtended) -> @owned IItem {
+bb0(%value : @guaranteed $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(2, IExtended) Self
+  %result = init_com_existential_ref %open : $@opened(2, IExtended) Self to $IItem
+  %copy = copy_value %result : $IItem
+  return %copy : $IItem
+}
+
+// INLINE-LABEL: sil [ossa] @inline_refinement
+// INLINE-NOT: apply
+// INLINE: [[OPEN:%.*]] = open_com_existential
+// INLINE: [[RESULT:%.*]] = init_com_existential_ref [[OPEN]]
+// INLINE-NOT: apply
+// INLINE: return [[RESULT]]
+sil [ossa] @inline_refinement : $@convention(thin) (@owned IExtended) -> @owned IItem {
+bb0(%value : @owned $IExtended):
+  %fn = function_ref @transparent_refinement : $@convention(thin) (@owned IExtended) -> @owned IItem
+  %result = apply %fn(%value) : $@convention(thin) (@owned IExtended) -> @owned IItem
+  return %result : $IItem
+}
+
+sil [transparent] [ossa] @transparent_refinement : $@convention(thin) (@owned IExtended) -> @owned IItem {
+bb0(%value : @owned $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(3, IExtended) Self
+  %result = init_com_existential_ref %open : $@opened(3, IExtended) Self to $IItem
+  return %result : $IItem
+}
+
+// Refinement preserves marker constraints already present on the source.
+// CHECK-LABEL: sil [ossa] @refine_sendable
+// CHECK: init_com_existential_ref {{%.*}} : $@opened({{.*}}, any IExtended & Sendable) Self to $any IItem & Sendable
+sil [ossa] @refine_sendable : $@convention(thin) (@owned IExtended & Sendable) -> @owned IItem & Sendable {
+bb0(%value : @owned $IExtended & Sendable):
+  %open = open_com_existential %value : $IExtended & Sendable to $@opened(5, IExtended & Sendable) Self
+  %result = init_com_existential_ref %open : $@opened(5, IExtended & Sendable) Self to $IItem & Sendable
+  return %result : $IItem & Sendable
+}
+
+// Explicit forwarding ownership must survive serialization.
+// CHECK-LABEL: sil [ossa] @refine_undef
+// CHECK: init_com_existential_ref undef : $@opened({{.*}}, any IExtended) Self to $any IItem, forwarding: @owned
+sil [ossa] @refine_undef : $@convention(thin) (@guaranteed IExtended) -> @owned IItem {
+bb0(%value : @guaranteed $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(4, IExtended) Self
+  %result = init_com_existential_ref undef : $@opened(4, IExtended) Self to $IItem, forwarding: @owned
+  fix_lifetime %open : $@opened(4, IExtended) Self
+  return %result : $IItem
+}

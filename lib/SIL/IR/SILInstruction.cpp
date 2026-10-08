@@ -870,6 +870,10 @@ namespace {
       return true;
     }
 
+    bool visitInitCOMExistentialRefInst(InitCOMExistentialRefInst *RHS) {
+      return true;
+    }
+
     bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
       auto *lhs = cast<AddressToPointerInst>(LHS);
       return lhs->needsStackProtection() == RHS->needsStackProtection();

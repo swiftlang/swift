@@ -2655,6 +2655,21 @@ InitExistentialValueInst *InitExistentialValueInst::create(
                                 TypeDependentOperands, Conformances);
 }
 
+InitCOMExistentialRefInst *
+InitCOMExistentialRefInst::create(SILDebugLocation loc, SILValue operand,
+                                  SILType type, SILFunction *parent,
+                                  ValueOwnershipKind ownership) {
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, *parent,
+                               operand->getType().getASTType());
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
+  void *buffer = parent->getModule().allocateInst(
+      size, alignof(InitCOMExistentialRefInst));
+  return ::new (buffer) InitCOMExistentialRefInst(
+      loc, operand, type, typeDependentOperands, ownership);
+}
+
 InitExistentialRefInst *InitExistentialRefInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,

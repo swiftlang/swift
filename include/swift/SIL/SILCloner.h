@@ -2089,6 +2089,19 @@ SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
                     : ValueOwnershipKind(OwnershipKind::None)));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitCOMExistentialRefInst(
+    InitCOMExistentialRefInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createInitCOMExistentialRef(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAddressToPointerInst(AddressToPointerInst *Inst) {

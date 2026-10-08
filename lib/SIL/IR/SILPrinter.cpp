@@ -2844,6 +2844,10 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
     printForwardingOwnershipKind(OI, OI->getOperand());
   }
+  void visitInitCOMExistentialRefInst(InitCOMExistentialRefInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
+  }
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }

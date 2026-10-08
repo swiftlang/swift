@@ -1441,6 +1441,7 @@ public:
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitOpenCOMExistentialInst(OpenCOMExistentialInst *i);
+  void visitInitCOMExistentialRefInst(InitCOMExistentialRefInst *i);
   void visitOpenExistentialValueInst(OpenExistentialValueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
@@ -8649,6 +8650,12 @@ void IRGenSILFunction::visitInitCOMExistentialValueInst(
     InitCOMExistentialValueInst *inst) {
   auto *object = getLoweredSingletonExplosion(inst->getOperand());
   emitInitCOMExistential(inst, object, inst->getFormalConcreteType());
+}
+
+void IRGenSILFunction::visitInitCOMExistentialRefInst(
+    InitCOMExistentialRefInst *inst) {
+  Explosion instance = getLoweredExplosion(inst->getOperand());
+  setLoweredExplosion(inst, instance);
 }
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
