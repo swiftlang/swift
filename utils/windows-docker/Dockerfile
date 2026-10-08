@@ -45,21 +45,18 @@ RUN if (-not $env:HTTPS_PROXY) { exit 0 }; `
 # For Visual Studio 2026 (whose default toolset is 14.5x), pass
 # --build-arg VS_BUILDTOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe.
 ARG VS_BUILDTOOLS_URL=https://aka.ms/vs/17/release/vs_buildtools.exe
-RUN Invoke-WebRequest $env:VS_BUILDTOOLS_URL -OutFile C:\vs_buildtools.exe -UseBasicParsing; `
-    $Process = Start-Process C:\vs_buildtools.exe -Wait -PassThru -ArgumentList @( `
-      '--quiet', '--wait', '--norestart', '--nocache', `
-      '--installPath', 'C:\BuildTools', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ARM64', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.ATL', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.ATL.ARM64', `
-      '--add', 'Microsoft.VisualStudio.Component.Windows10SDK', `
-      '--add', 'Microsoft.VisualStudio.Component.Windows11SDK.22621', `
-      '--add', 'Microsoft.VisualStudio.Component.VC.CMake.Project'); `
-    if ($Process.ExitCode -notin 0, 3010) { throw ('vs_buildtools.exe exited with code ' + $Process.ExitCode) }; `
-    Remove-Item C:\vs_buildtools.exe, 'C:\ProgramData\Package Cache' -Recurse -Force -ErrorAction Ignore; `
+COPY windows-docker/install-vs-buildtools.ps1 C:/Temp/
+RUN & C:\Temp\install-vs-buildtools.ps1 -URL $env:VS_BUILDTOOLS_URL -InstallPath C:\BuildTools -Components @( `
+      'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', `
+      'Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
+      'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64', `
+      'Microsoft.VisualStudio.Component.VC.14.44.17.14.ARM64', `
+      'Microsoft.VisualStudio.Component.VC.ATL', `
+      'Microsoft.VisualStudio.Component.VC.ATL.ARM64', `
+      'Microsoft.VisualStudio.Component.Windows10SDK', `
+      'Microsoft.VisualStudio.Component.Windows11SDK.22621', `
+      'Microsoft.VisualStudio.Component.VC.CMake.Project'); `
+    Remove-Item C:\Temp\install-vs-buildtools.ps1; `
     regsvr32.exe /s 'C:\BuildTools\DIA SDK\bin\amd64\msdia140.dll'
 
 # Git for Windows. build.ps1 also puts its usr\bin on PATH for the Unix tools

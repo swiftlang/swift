@@ -174,6 +174,10 @@ setlocal enableextensions enabledelayedexpansion
 set "Image=swift-windows-ci:local"
 set "Utils=%SourceRoot%\swift\utils"
 
+:: CI only keeps the console log, so record the Docker host configuration.
+docker version
+docker info
+
 docker build --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY -t %Image% -f "%Utils%\windows-docker\Dockerfile" "%Utils%" || (exit /b 1)
 
 :: The build tree stays in the mounted SourceRoot so CI can collect artifacts.
