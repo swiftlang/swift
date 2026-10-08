@@ -39,6 +39,14 @@ internal extension S1 {
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "Conformance",
+// CHECK-NEXT:   "name": "Deinitable",
+// CHECK-NEXT:   "printedName": "Deinitable",
+// CHECK-NEXT:   "usr": "s:s10DeinitableP",
+// CHECK-NEXT:   "mangledName": "$ss10DeinitableP",
+// CHECK-NEXT:   "isMarkerProtocol": true
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "kind": "Conformance",
 // CHECK-NEXT:   "name": "Escapable",
 // CHECK-NEXT:   "printedName": "Escapable",
 // CHECK-NEXT:   "usr": "s:s9EscapableP",

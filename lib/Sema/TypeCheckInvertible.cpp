@@ -137,6 +137,19 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
 
   bool hasExplicitInverse = inverses.contains(ip);
 
+  // If Copyable implies Deinitable, then `~Deinitable` requires `~Copyable`.
+  if (ip == InvertibleProtocolKind::Copyable &&
+      ctx.LangOpts.hasFeature(Feature::NondeinitableTypes) &&
+      isa<StructDecl, EnumDecl>(nominalDecl) &&
+      inverses.contains(InvertibleProtocolKind::Deinitable) &&
+      !hasExplicitInverse &&
+      InverseRequirement::copyableImpliesDeinitable(ctx)) {
+    ctx.Diags.diagnose(nominalDecl->getLoc(),
+                       diag::deinitable_nominal_inverse_requires_noncopyable,
+                       nominalDecl);
+    return;
+  }
+
   bool hasUnconditionalConformance = conformance.isAbstract();
   SourceLoc conformanceLoc = nominalDecl->getLoc();
 
@@ -217,11 +230,14 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
     }
   }
 
-  // All classes can store noncopyable/nonescaping values.
-  if (isa<ClassDecl>(nominalDecl))
+  // All classes can store noncopyable/nonescaping values, but a class destroys
+  // its stored properties implicitly, so they must be Deinitable.
+  if (isa<ClassDecl>(nominalDecl) && ip != InvertibleProtocolKind::Deinitable)
     return;
 
-  bool canAddInverse = !hasExplicitInverse && !hasUnconditionalConformance;
+  // Nothing can suppress Deinitable yet.
+  bool canAddInverse = !hasExplicitInverse && !hasUnconditionalConformance &&
+                       ip != InvertibleProtocolKind::Deinitable;
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (ip == InvertibleProtocolKind::Copyable) {
@@ -263,6 +279,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
         if (type->isEscapable())
           return false;
         break;
+      case InvertibleProtocolKind::Deinitable:
+        if (type->isDeinitable())
+          return false;
+        break;
       }
 
       storage->diagnose(diag::inverse_type_member_in_conforming_type,
@@ -295,6 +315,12 @@ void swift::checkEscapableConformance(DeclContext *dc,
                                       ProtocolConformanceRef conformance) {
   checkInvertibleConformanceCommon(dc, conformance,
                                    InvertibleProtocolKind::Escapable);
+}
+
+void swift::checkDeinitableConformance(DeclContext *dc,
+                                       ProtocolConformanceRef conformance) {
+  checkInvertibleConformanceCommon(dc, conformance,
+                                   InvertibleProtocolKind::Deinitable);
 }
 
 void swift::checkCopyableConformance(DeclContext *dc,
@@ -358,4 +384,26 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 
   assert(!isa<ProtocolDecl>(nominal) || !isa<BuiltinTupleDecl>(nominal));
   return false;
+}
+
+bool swift::diagnoseUnsupportedTupleElement(Type eltTy, SourceLoc loc,
+                                           ASTContext &ctx) {
+  // Tuples with noncopyable elements aren't supported yet.
+  if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+    if (eltTy->isNoncopyable()) {
+      ctx.Diags.diagnose(loc, diag::tuple_move_only_not_supported, eltTy);
+      return true;
+    }
+
+    // If Copyable implies Deinitable, then a Copyable element is Deinitable.
+    if (InverseRequirement::copyableImpliesDeinitable(ctx))
+      return false;
+  }
+
+  // A tuple destroys its elements implicitly, so they must be Deinitable.
+  if (eltTy->isDeinitable())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::tuple_nondeinitable_element, eltTy);
+  return true;
 }

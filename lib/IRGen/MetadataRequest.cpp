@@ -1451,6 +1451,10 @@ getFunctionTypeFlags(CanFunctionType type) {
       // already in the normal function type flags. The runtime will
       // introduce it as necessary.
       break;
+
+    case InvertibleProtocolKind::Deinitable:
+      // The runtime doesn't know about Deinitable yet.
+      break;
     }
   }
 

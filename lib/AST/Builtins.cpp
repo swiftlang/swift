@@ -3037,6 +3037,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Copyable);
   if (Id == Context.Id_Escapable)
     return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Escapable);
+  if (Id == Context.Id_Deinitable)
+    return Context.synthesizeInvertibleProtocolDecl(
+        InvertibleProtocolKind::Deinitable);
 
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);

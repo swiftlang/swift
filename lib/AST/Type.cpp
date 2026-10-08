@@ -4455,7 +4455,10 @@ Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
 ///
 /// Note: This includes the inverse of all current invertible protocols.
 Type ProtocolCompositionType::theUnconstrainedAnyType(const ASTContext &C) {
-  return ProtocolCompositionType::get(C, {}, InvertibleProtocolSet::allKnown(),
+  // Nothing can suppress Deinitable yet.
+  auto inverses = InvertibleProtocolSet::allKnown();
+  inverses.remove(InvertibleProtocolKind::Deinitable);
+  return ProtocolCompositionType::get(C, {}, inverses,
                                       /*HasExplicitAnyObject=*/false);
 }
 

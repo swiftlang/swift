@@ -2782,6 +2782,10 @@ void CompletionLookup::getInvertedTypeCompletions() {
   Kind = LookupKind::Type;
 
   auto addCompletion = [&](InvertibleProtocolKind invertableKind) {
+    // Source code can't refer to Deinitable yet.
+    if (invertableKind == InvertibleProtocolKind::Deinitable)
+      return;
+
     auto *P = Ctx.getProtocol(getKnownProtocolKind(invertableKind));
     if (!P)
       return;

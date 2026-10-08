@@ -31,7 +31,7 @@ sil @$sSS15_invariantCheckyyF : $@convention(method) (@guaranteed String) -> ()
 sil [transparent] [thunk] [ossa] @$s2s24step_5depth1fSSx_SiSSxXEtlFSSxXEfU_SS_TG5 : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String
 sil [ossa] @$s2s26callerSSyFS2SXEfU_ : $@convention(thin) @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>
 
-// CHECK: sil shared [noinline] [ossa] @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi0_zlySSIsgno_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
+// CHECK: sil shared [noinline] [ossa] @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi1_zRi0_zlySSIsgno_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
 // CHECK: bb0(%0 : @guaranteed $String, %1 : $Int, %2 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>):
 // CHECK:   // function_ref specialized closure #1 in step<A>(_:depth:f:)
 // CHECK:   %3 = function_ref @$s2s24step_5depth1fSSx_SiSSxXEtlFSSxXEfU_SS_TG5 : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %4
@@ -62,7 +62,7 @@ sil [ossa] @$s2s26callerSSyFS2SXEfU_ : $@convention(thin) @substituted <τ_0_0> 
 // CHECK:   end_borrow %6 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // id: %21
 // CHECK:   destroy_value %5 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // id: %22
 // CHECK:   return %18 : $String                            // id: %23
-// CHECK: } // end sil function '$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi0_zlySSIsgno_Tf1nnc_n'
+// CHECK: } // end sil function '$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi1_zRi0_zlySSIsgno_Tf1nnc_n'
 
 // specialized rec<A>(_:depth:f:)
 sil shared [noinline] [ossa] @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
@@ -105,7 +105,7 @@ bb0(%0 : @guaranteed $String, %1 : $Int, %2 : @guaranteed $@noescape @callee_gua
 // CHECK:   // function_ref specialized rec<A>(_:depth:f:)
 // CHECK:   %14 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String
 // CHECK:   // function_ref specialized rec<A>(_:depth:f:)
-// CHECK:   %15 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi0_zlySSIsgno_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %16
+// CHECK:   %15 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi1_zRi0_zlySSIsgno_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %16
 // CHECK:   %16 = apply %15(%0, %10, %2) : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %18
 // CHECK:   destroy_value %13 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // id: %17
 // CHECK:   return %16 : $String                            // id: %18

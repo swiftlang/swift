@@ -436,6 +436,10 @@ public:
   /// Suppress printing of @c in favor of @_cdecl.
   bool SuppressCAttribute = false;
 
+  /// Suppress printing of Deinitable and ~Deinitable in the inheritance
+  /// clauses of protocols.
+  bool SuppressDeinitableProtocol = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

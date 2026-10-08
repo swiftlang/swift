@@ -665,6 +665,34 @@ static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDeinitableProtocol(Decl *decl) {
+  auto *proto = dyn_cast<ProtocolDecl>(decl);
+  if (!proto)
+    return false;
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+    return true;
+
+  // The printer never prints Sendable's inverses.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    return false;
+
+  // Copyable inherits Deinitable, and a protocol may suppress it.
+  InheritedTypes inherited(proto);
+  return llvm::any_of(inherited.getIndices(), [&](unsigned i) {
+    auto type = inherited.getResolvedType(i);
+    if (!type)
+      return false;
+    if (auto *inheritedProto = type->getAs<ProtocolType>())
+      if (inheritedProto->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::Deinitable))
+        return true;
+    if (auto *pct = type->getCanonicalType()->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(InvertibleProtocolKind::Deinitable);
+    return false;
+  });
+}
+
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
 UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
 
@@ -795,6 +823,51 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 UNINTERESTING_FEATURE(BuiltinRelaxedFP)
 
+static bool usesFeatureNondeinitableTypes(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  // A struct or enum that suppresses Deinitable, or an extension of one.
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    nominal = ext->getExtendedNominal();
+  if (nominal) {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void)getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject);
+    if (inverses.contains(InvertibleProtocolKind::Deinitable))
+      return true;
+  }
+
+  // A generic signature that suppresses Deinitable.
+  if (auto *genericContext = decl->getAsGenericContext()) {
+    if (auto sig = genericContext->getGenericSignature()) {
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      sig->getRequirementsWithInverses(reqs, inverses);
+      for (auto inverse : inverses) {
+        if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+          return true;
+      }
+    }
+  }
+
+  // A protocol with an associated type that suppresses Deinitable.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    proto->getRequirementSignature().getRequirementsWithInverses(proto, reqs,
+                                                                 inverses);
+    for (auto inverse : inverses) {
+      if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
@@ -833,6 +906,13 @@ static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused"
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  // Compilers without the Deinitable protocol must not see it at all.
+  if (featureName == "DeinitableProtocol") {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+      if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+        return true;
+  }
+
   return hasFeatureSuppressionAttribute(decl, featureName, true);
 }
 

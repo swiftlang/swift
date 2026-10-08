@@ -6972,6 +6972,9 @@ namespace {
         case InvertibleProtocolKind::Escapable:
           printFlag("inverse_escapable");
           break;
+        case InvertibleProtocolKind::Deinitable:
+          printFlag("inverse_deinitable");
+          break;
         }
       }
 
