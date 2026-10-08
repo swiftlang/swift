@@ -41,6 +41,17 @@ if defined PYTHON_HOME path !Path!;!PYTHON_HOME:"=!
 cd %~dp0\..\..
 set SourceRoot=%CD%
 
+:: Build the CI image and rerun this script in it.
+if defined SWIFT_CI_IN_CONTAINER goto :InContainer
+
+:: `call` cannot be used with `||` inside a parenthesized block: the exit code
+:: is lost.
+call :CloneRepositories || (exit /b 1)
+call :BuildInContainer || (exit /b 1)
+goto :end
+
+:InContainer
+
 :: Identify the BuildRoot
 set BuildRoot=%SourceRoot%\build
 
@@ -153,6 +164,30 @@ set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
 
 call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "!ghprbCommentBody!"
+
+goto :eof
+endlocal
+
+:BuildInContainer
+setlocal enableextensions enabledelayedexpansion
+
+set "Image=swift-windows-ci:local"
+set "Utils=%SourceRoot%\swift\utils"
+
+docker build --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY -t %Image% -f "%Utils%\windows-docker\Dockerfile" "%Utils%" || (exit /b 1)
+
+:: The build tree stays in the mounted SourceRoot so CI can collect artifacts.
+docker run --rm ^
+  -v "%SourceRoot%:C:\Source" ^
+  -e SWIFT_CI_IN_CONTAINER=1 ^
+  -e SKIP_UPDATE_CHECKOUT=1 ^
+  -e SKIP_TESTS ^
+  -e INCLUDE_PACKAGING ^
+  -e WINDOWS_SDKS ^
+  -e HOST_ARCH_NAME ^
+  -e DEBUG_INFO ^
+  -e TOOLCHAIN_VERSION ^
+  %Image% cmd.exe /c C:\Source\swift\utils\build-windows-toolchain.bat || (exit /b 1)
 
 goto :eof
 endlocal
