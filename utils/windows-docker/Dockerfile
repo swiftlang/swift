@@ -44,20 +44,17 @@ RUN if (-not $env:HTTPS_PROXY) { exit 0 }; `
       Set-ItemProperty $Key DefaultConnectionSettings $Settings `
     }
 
-# Visual Studio Build Tools, with the components listed in docs/WindowsBuild.md.
-# For Visual Studio 2026 (whose default toolset is 14.5x), pass
-# --build-arg VS_BUILDTOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe.
-ARG VS_BUILDTOOLS_URL=https://aka.ms/vs/17/release/vs_buildtools.exe
+# Visual Studio 2026 Build Tools. VC.Tools.* install the latest MSVC toolset,
+# which is deliberately not pinned. For Visual Studio 2022, pass
+# --build-arg VS_BUILDTOOLS_URL=https://aka.ms/vs/17/release/vs_buildtools.exe.
+ARG VS_BUILDTOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe
 COPY windows-docker/install-vs-buildtools.ps1 C:/Temp/
 RUN & C:\Temp\install-vs-buildtools.ps1 -URL $env:VS_BUILDTOOLS_URL -InstallPath C:\BuildTools -Components @( `
       'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', `
       'Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
-      'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64', `
-      'Microsoft.VisualStudio.Component.VC.14.44.17.14.ARM64', `
       'Microsoft.VisualStudio.Component.VC.ATL', `
       'Microsoft.VisualStudio.Component.VC.ATL.ARM64', `
-      'Microsoft.VisualStudio.Component.Windows10SDK', `
-      'Microsoft.VisualStudio.Component.Windows11SDK.22621', `
+      'Microsoft.VisualStudio.Component.Windows11SDK.26100', `
       'Microsoft.VisualStudio.Component.VC.CMake.Project'); `
     Remove-Item C:\Temp\install-vs-buildtools.ps1; `
     regsvr32.exe /s 'C:\BuildTools\DIA SDK\bin\amd64\msdia140.dll'
