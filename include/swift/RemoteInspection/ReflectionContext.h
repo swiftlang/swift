@@ -2162,7 +2162,7 @@ private:
 
         Info.ChildTasks.push_back(ChildTask);
 
-        swift::JobFlags ChildJobFlags(AsyncTaskObj->Flags);
+        swift::JobFlags ChildJobFlags(ChildTaskObj->Flags);
         if (ChildJobFlags.task_isChildTask()) {
           if (asyncTaskSize == 0)
             return {std::string("target async task size unknown, unable to "
