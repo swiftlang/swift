@@ -1478,15 +1478,20 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
     file = &TheBuiltinModule->getMainFile(FileUnitKind::Builtin);
   }
 
-  // No need to form an inheritance clause; invertible protocols do not
-  // implicitly inherit from other invertible protocols.
+  ArrayRef<InheritedEntry> inherited;
+  if (ip == InvertibleProtocolKind::Copyable) {
+    auto *deinitable =
+        synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Deinitable);
+    InheritedEntry entry(
+        TypeLoc::withoutLoc(deinitable->getDeclaredInterfaceType()));
+    inherited = AllocateCopy(llvm::ArrayRef(entry));
+  }
+
   auto identifier = getIdentifier(getProtocolName(getKnownProtocolKind(ip)));
-  ProtocolDecl *protocol = new (*this) ProtocolDecl(file,
-                                                  SourceLoc(), SourceLoc(),
-                                                  identifier,
-                                                  /*primaryAssocTypes=*/{},
-                                                  /*inherited=*/{},
-                                                  /*whereClause=*/nullptr);
+  ProtocolDecl *protocol =
+      new (*this) ProtocolDecl(file, SourceLoc(), SourceLoc(), identifier,
+                               /*primaryAssocTypes=*/{}, inherited,
+                               /*whereClause=*/nullptr);
   protocol->setImplicit(true);
 
   // @_marker
@@ -1676,6 +1681,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   case KnownProtocolKind::Copyable:
   case KnownProtocolKind::Escapable:
+  case KnownProtocolKind::Deinitable:
     // If there's no stdlib, do qualified lookup in the Builtin module,
     // which will trigger the correct synthesis of the protocols in that module.
     M = getStdlibModule();
@@ -7853,6 +7859,9 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
     buildFakeExtension(proto);
 
   if (auto *proto = getProtocol(KnownProtocolKind::Escapable))
+    buildFakeExtension(proto);
+
+  if (auto *proto = getProtocol(KnownProtocolKind::Deinitable))
     buildFakeExtension(proto);
 
   if (auto *proto = getProtocol(KnownProtocolKind::BitwiseCopyable))

@@ -85,6 +85,14 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -110,6 +118,14 @@
         "mangledName": "$s4cake2P2P",
         "moduleName": "cake",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Escapable",
@@ -138,6 +154,14 @@
         "moduleName": "cake",
         "genericSig": "<Self : cake.P1, Self : cake.P2>",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Escapable",
@@ -261,6 +285,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -356,6 +388,14 @@
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
             "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
             "isMarkerProtocol": true
           },
           {
@@ -615,6 +655,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -839,6 +887,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Equatable",
             "printedName": "Equatable",
             "usr": "s:SQ",
@@ -1025,6 +1081,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -1166,6 +1230,14 @@
         "mangledName": "$s4cake21ProWithAssociatedTypeP",
         "moduleName": "cake",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Escapable",
@@ -1337,6 +1409,14 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -1415,6 +1495,14 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -1477,6 +1565,14 @@
         "moduleName": "cake",
         "genericSig": "<Self : cake.PSuper>",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Escapable",
@@ -1605,6 +1701,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -1657,6 +1761,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
@@ -1685,6 +1797,14 @@
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
             "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
             "isMarkerProtocol": true
           },
           {
@@ -1758,6 +1878,14 @@
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
             "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
             "isMarkerProtocol": true
           },
           {
@@ -1860,6 +1988,14 @@
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
             "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
             "isMarkerProtocol": true
           },
           {
@@ -2069,6 +2205,14 @@
             "printedName": "Decodable",
             "usr": "s:Se",
             "mangledName": "$sSe"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Deinitable",
+            "printedName": "Deinitable",
+            "usr": "s:s10DeinitableP",
+            "mangledName": "$ss10DeinitableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",

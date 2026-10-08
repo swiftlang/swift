@@ -36,6 +36,7 @@ struct Basic: P1 {
 // CHECK-LABEL: StructDecl name=Recur
 // CHECK-NEXT: (builtin_conformance type="Recur" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Recur" protocol="Escapable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="Recur" protocol="Deinitable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="Recur" protocol="P2"
 // CHECK-NEXT:   (assoc_type req="A" type="Recur")
 // CHECK-NEXT:   (assoc_type req="B" type="Recur")
@@ -57,6 +58,7 @@ struct Recur: P2 {
 // CHECK-LABEL: StructDecl name=NonRecur
 // CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Escapable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Deinitable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="NonRecur" protocol="P2"
 // CHECK-NEXT:   (assoc_type req="A" type="Recur")
 // CHECK-NEXT:   (assoc_type req="B" type="Recur")
@@ -137,6 +139,7 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-LABEL: ClassDecl name=Sub
 // CHECK-NEXT: (builtin_conformance type="Sub" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Sub" protocol="Escapable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="Sub" protocol="Deinitable"{{.*}})
 // CHECK-NEXT: (inherited_conformance type="Sub" protocol="P2"
 // CHECK-NEXT:   (specialized_conformance type="Super<NonRecur, Recur>" protocol="P2"
 // CHECK-NEXT:     (substitution_map generic_signature=<T, U where T : P2, U : P2>
@@ -190,6 +193,7 @@ class Sub: Super<NonRecur, Recur> {}
 // CHECK-LABEL: StructDecl name=RecurGeneric
 // CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Escapable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Deinitable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="RecurGeneric<T>" protocol="P3"
 // CHECK-NEXT:   (assoc_type req="A" type="RecurGeneric<T>")
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Copyable"
@@ -205,6 +209,7 @@ struct RecurGeneric<T: P3>: P3 {
 // CHECK-LABEL: StructDecl name=Specialize
 // CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Escapable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Deinitable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="Specialize" protocol="P3"
 // CHECK-NEXT:   (assoc_type req="A" type="RecurGeneric<Specialize>")
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Copyable"

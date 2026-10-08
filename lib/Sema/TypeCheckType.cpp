@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
@@ -5578,10 +5579,46 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
   return result->hasError() ? ErrorType::get(ctx) : result;
 }
 
+/// Returns true if a reference to Deinitable in the given position is part of
+/// a `~Deinitable` that the NondeinitableTypes feature allows: in the
+/// inheritance clause of a struct or an enum, or on a generic parameter or an
+/// associated type.
+static bool canSuppressDeinitable(TypeResolutionOptions options,
+                                  DeclContext *dc) {
+  if (!dc->getASTContext().LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  if (!options.is(TypeResolverContext::Inverted))
+    return false;
+
+  switch (options.getBaseContext()) {
+  case TypeResolverContext::Inherited:
+    return isa<StructDecl>(dc) || isa<EnumDecl>(dc);
+  case TypeResolverContext::GenericParameterInherited:
+  case TypeResolverContext::AssociatedTypeInherited:
+  case TypeResolverContext::GenericRequirement:
+    return true;
+  default:
+    return false;
+  }
+}
+
 NeverNullType
 TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                      TypeResolutionOptions options) {
   Type result = resolveDeclRefTypeReprRec(repr, options);
+
+  // The compiler reserves Deinitable for its own use.
+  if (auto *protoTy = result->getAs<ProtocolType>()) {
+    if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Deinitable) &&
+        !getDeclContext()->getParentModule()->isStdlibModule() &&
+        !canSuppressDeinitable(options, getDeclContext())) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::deinitable_reserved);
+      repr->setInvalid();
+      return ErrorType::get(getASTContext());
+    }
+  }
 
   // Diagnose an error if generic arguments are missing.
   if (result->is<UnboundGenericType>() && !repr->hasGenericArgList() &&
@@ -6523,28 +6560,12 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
-  std::optional<unsigned> moveOnlyElementIndex = std::nullopt;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     auto ty = resolveType(tyR, elementOptions);
     if (ty->hasError()) {
       hadError = true;
-    }
-    // Tuples with move-only elements aren't yet supported.
-    // Track the presence of a noncopyable field for diagnostic purposes only.
-    // We don't need to re-diagnose if a tuple contains another tuple, though,
-    // since we should've diagnosed the inner tuple already.
-    // FIXME: This won't diagnose if the type contains unbound generics
-    if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
-        !options.contains(TypeResolutionFlags::SILMode) &&
-        inStage(TypeResolutionStage::Interface) &&
-        !moveOnlyElementIndex.has_value() && !ty->hasUnboundGenericType() &&
-        !ty->hasTypeVariable() && !isa<TupleTypeRepr>(tyR)) {
-      auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
-          resolution.getGenericSignature().getGenericEnvironment(), ty);
-      if (!contextTy->hasError() && contextTy->isNoncopyable())
-        moveOnlyElementIndex = i;
     }
 
     auto eltName = repr->getElementName(i);
@@ -6594,12 +6615,28 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !elements[0].getType()->is<PackExpansionType>())
       return elements[0].getType();
   }
-  
-  if (moveOnlyElementIndex.has_value()) {
-    auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
-    auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
-    assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
-    diagnose(loc, diag::tuple_move_only_not_supported, noncopyableTy);
+
+  // Diagnose the first element that a tuple can't contain. A nested tuple
+  // was already diagnosed when it was resolved.
+  // FIXME: This won't diagnose if the type contains unbound generics
+  if (!options.contains(TypeResolutionFlags::SILMode) &&
+      inStage(TypeResolutionStage::Interface)) {
+    auto *genericEnv = resolution.getGenericSignature().getGenericEnvironment();
+    for (unsigned i : indices(elements)) {
+      auto *tyR = repr->getElementType(i);
+      auto ty = elements[i].getType();
+      if (ty->hasUnboundGenericType() || ty->hasTypeVariable() ||
+          isa<TupleTypeRepr>(tyR))
+        continue;
+
+      auto contextTy =
+          GenericEnvironment::mapTypeIntoEnvironment(genericEnv, ty);
+      if (contextTy->hasError())
+        continue;
+
+      if (diagnoseUnsupportedTupleElement(contextTy, tyR->getLoc(), ctx))
+        break;
+    }
   }
 
   return TupleType::get(elements, ctx);
@@ -6774,6 +6811,13 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
       auto *proto = getASTContext().getProtocol(kp);
       for (auto *otherProto : layout.getProtocols()) {
+        // If Copyable implies Deinitable, then applyInverses() explains that
+        // `~Deinitable` also requires `~Copyable`.
+        if (ip == InvertibleProtocolKind::Deinitable &&
+            otherProto->isSpecificProtocol(KnownProtocolKind::Copyable) &&
+            InverseRequirement::copyableImpliesDeinitable(getASTContext()))
+          continue;
+
         if (proto == otherProto ||
             otherProto->inheritsFrom(proto)) {
           diagnose(repr->getLoc(),

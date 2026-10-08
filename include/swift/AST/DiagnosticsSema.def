@@ -3082,6 +3082,21 @@ ERROR(inferred_opaque_type,none,
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
+ERROR(deinitable_reserved,none,
+      "'Deinitable' is reserved for use by the compiler", ())
+ERROR(deinitable_inverse_requires_noncopyable,none,
+      "%0 cannot suppress 'Deinitable' without also suppressing 'Copyable'",
+      (Type))
+ERROR(deinitable_nominal_inverse_requires_noncopyable,none,
+      "%kind0 cannot suppress 'Deinitable' without also suppressing "
+      "'Copyable'", (const ValueDecl *))
+ERROR(nondeinitable_storage,none,
+      "%select{global variable|static property|lazy property|"
+      "'async let' binding}0 %1 cannot have non-Deinitable type %2",
+      (unsigned, DeclName, Type))
+ERROR(deinitable_illegal_deinit,none,
+      "deinitializer cannot be declared in %kind0, which suppresses "
+      "'Deinitable'", (const ValueDecl *))
 
 // Extensions
 GROUPED_ERROR(non_nominal_extension,NominalTypes,none,
@@ -6928,8 +6943,8 @@ ERROR(tuple_pack_element_label,none,
       ())
 ERROR(tuple_move_only_not_supported,none,
       "tuple with noncopyable element type %0 is not supported", (Type))
-ERROR(tuple_containing_move_only_not_supported,none,
-      "type %0 containing noncopyable element is not supported", (Type))
+ERROR(tuple_nondeinitable_element,none,
+      "tuple cannot contain non-Deinitable element type %0", (Type))
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())

@@ -409,6 +409,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
       if (isCopyableFunctionType(functionType))
         return synthesizeConformance();
       break;
+    case KnownProtocolKind::Deinitable:
+      // All function types can be destroyed implicitly.
+      return synthesizeConformance();
     case KnownProtocolKind::BitwiseCopyable:
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();
@@ -482,6 +485,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
+    case KnownProtocolKind::Deinitable:
     case KnownProtocolKind::BitwiseCopyable:
     case KnownProtocolKind::SendableMetatype:
       return ProtocolConformanceRef(
@@ -505,7 +509,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::SendableMetatype:
     case KnownProtocolKind::Copyable:
-    case KnownProtocolKind::Escapable: {
+    case KnownProtocolKind::Escapable:
+    case KnownProtocolKind::Deinitable: {
       ASTContext &ctx = protocol->getASTContext();
 
       // FixedArray is Sendable, Copyable, or Escapable if its element type is.
@@ -1025,6 +1030,16 @@ bool TypeBase::isEscapable() {
   if (!Bits.TypeBase.ComputedInvertibleConformances)
     computeInvertibleConformances();
   return Bits.TypeBase.IsEscapable;
+}
+
+bool TypeBase::isDeinitable() {
+  Type type(this);
+  if (auto *pet = type->getAs<PackExpansionType>())
+    type = pet->getPatternType();
+  auto canType = type->getReferenceStorageReferent()
+                     ->getWithoutSpecifierType()
+                     ->getCanonicalType();
+  return conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
 }
 
 bool TypeBase::isEscapable(GenericSignature sig) {

@@ -14,18 +14,19 @@
 // REQUIRES: asserts
 
 // FIXME: CHECK_NESTED use to deserialize only 4 decls,
-//        and CHECK_NON_NESTED only 3. My guess is that the two new
-//        decls deserialized are Copyable & Escapable, since they get
-//        synthesized into the Builtin module when missing?? Or, it has to
-//        do with the new Copyable/Escapable requirements on the extensions.
+//        and CHECK_NON_NESTED only 3. My guess is that the three new
+//        decls deserialized are Copyable, Escapable, and Deinitable, since
+//        they get synthesized into the Builtin module when missing?? Or, it
+//        has to do with the new Copyable/Escapable requirements on the
+//        extensions.
 //        rdar://124555449
 
 // CHECK_NESTED-LABEL: Statistics
-// CHECK_NESTED: 6 Serialization - # of decls deserialized
+// CHECK_NESTED: 7 Serialization - # of decls deserialized
 // outer struct, inner struct, extension, func + self param
 
 // CHECK_NON_NESTED-LABEL: Statistics
-// CHECK_NON_NESTED: 5 Serialization - # of decls deserialized
+// CHECK_NON_NESTED: 6 Serialization - # of decls deserialized
 // struct, extension, func + self param
 
 import def_xref_extensions

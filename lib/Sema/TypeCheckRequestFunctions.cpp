@@ -78,7 +78,12 @@ InheritedTypeResult InheritedTypeRequest::evaluate(
   if (auto *typeRepr = inheritedEntry.getTypeRepr()) {
     // Check for suppressed inferrable conformances.
     if (auto itr = dyn_cast<InverseTypeRepr>(typeRepr)) {
-      Type inheritedTy = resolution->resolveType(itr->getConstraint());
+      // Resolve the constraint the same way as in a composition, so that
+      // checks for suppressible protocols see the same context.
+      auto inverted = resolution->withOptions(
+          resolution->getOptions().withoutContext(true).withContext(
+              TypeResolverContext::Inverted));
+      Type inheritedTy = inverted.resolveType(itr->getConstraint());
       return InheritedTypeResult::forSuppressed(inheritedTy, itr);
     }
     inheritedType = resolution->resolveType(typeRepr);

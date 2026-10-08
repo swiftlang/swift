@@ -622,6 +622,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 /// Allow use of the @unsafe(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
 
+/// The Deinitable invertible protocol, which Copyable inherits
+SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
@@ -671,6 +674,10 @@ EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 
 /// Allow use of `@called(...)` on function types.
 EXPERIMENTAL_FEATURE(CalledAttribute, false)
+
+/// Allow structs, enums, and generic parameters to suppress `Deinitable`, for
+/// testing the compiler's support for `~Deinitable` types.
+EXPERIMENTAL_FEATURE(NondeinitableTypes, false)
 
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)

@@ -2159,6 +2159,16 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (!genericSig->requiresProtocol(ir.subject, ir.protocol))
       continue;
 
+    // If Copyable implies Deinitable, then applyInverses() already diagnosed a
+    // `~Deinitable` without `~Copyable`.
+    if (ir.getKind() == InvertibleProtocolKind::Deinitable &&
+        InverseRequirement::copyableImpliesDeinitable(ctx)) {
+      if (auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable)) {
+        if (genericSig->requiresProtocol(ir.subject, copyable))
+          continue;
+      }
+    }
+
     // We didn't diagnose this as an error for associated types prior to
     // SuppressedAssociatedTypesWithDefaults.
     //
@@ -2574,6 +2584,33 @@ public:
     llvm_unreachable("hidden layout declarations are not type checked");
   }
 
+  /// Nothing consumes the value of a global, a static property, a lazy
+  /// property, or an `async let` binding explicitly, so its type must be
+  /// Deinitable.
+  static void checkNondeinitableStorage(VarDecl *VD) {
+    if (VD->isImplicit() || !VD->hasInterfaceType())
+      return;
+
+    enum : unsigned { Global, Static, Lazy, AsyncLet };
+    std::optional<unsigned> kind;
+    if (VD->isAsyncLet())
+      kind = AsyncLet;
+    else if (VD->getAttrs().hasAttribute<LazyAttr>())
+      kind = Lazy;
+    else if (VD->hasStorage() && VD->isStatic())
+      kind = Static;
+    else if (VD->hasStorage() && VD->getDeclContext()->isModuleScopeContext())
+      kind = Global;
+    if (!kind)
+      return;
+
+    auto type = VD->getTypeInContext();
+    if (type->hasError() || type->isDeinitable())
+      return;
+
+    VD->diagnose(diag::nondeinitable_storage, *kind, VD->getName(), type);
+  }
+
   void visitBoundVariable(VarDecl *VD) {
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
@@ -2633,6 +2670,8 @@ public:
         }
       }
     }
+
+    checkNondeinitableStorage(VD);
 
     TypeChecker::checkDeclAttributes(VD);
 
@@ -4359,6 +4398,13 @@ public:
                              DD->getDeclContext()->getImplementedObjCContext());
       if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
+      }
+
+      // A `~Deinitable` type cannot have a user-defined deinit.
+      if (nom && isa<StructDecl, EnumDecl>(nom) &&
+          nom->canConformTo(InvertibleProtocolKind::Deinitable) ==
+              TypeDecl::CanBeInvertible::Never) {
+        DD->diagnose(diag::deinitable_illegal_deinit, nom);
       }
 
       // Temporarily ban deinit on noncopyable enums, unless the experimental
