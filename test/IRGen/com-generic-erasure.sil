@@ -1,0 +1,59 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IExtended: IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000003")
+public protocol IOther {}
+
+// Load the source reference and apply the signed adjustment for the selected
+// interface chain, then retain the projected interface for the owned result.
+// CHECK-LABEL: define{{.*}} @erase_other(
+// CHECK-SAME: ptr {{.*}}[[SOURCE:%[^,) ]+]], ptr {{.*}}, i{{32|64}} %T.IExtended, i{{32|64}} [[ADJUSTMENT:%T.IOther]])
+// CHECK: [[OBJECT:%.*]] = load ptr, ptr [[SOURCE]]
+// CHECK: [[INTERFACE:%.*]] = getelementptr inbounds i8, ptr [[OBJECT]], i{{32|64}} [[ADJUSTMENT]]
+// CHECK: [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 1
+// CHECK: [[ADDREF:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[ADDREF]](ptr [[INTERFACE]])
+// CHECK-NOT: call
+// CHECK: ret ptr [[INTERFACE]]
+sil [ossa] @erase_other : $@convention(thin) <T where T: IExtended, T: IOther> (@in_guaranteed T) -> @owned IOther {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $IOther
+  return %result : $IOther
+}
+
+// Refinements reuse the adjustment for the interface that defines the ABI.
+// CHECK-LABEL: define{{.*}} @erase_base(
+// CHECK-SAME: i{{32|64}} [[DERIVED:%T.IExtended]])
+// CHECK: getelementptr inbounds i8, ptr {{%.*}}, i{{32|64}} [[DERIVED]]
+// CHECK: ret ptr
+sil [ossa] @erase_base : $@convention(thin) <T: IExtended> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $IItem
+  return %result : $IItem
+}
+
+// Specialization can expose a loadable opened interface. Its adjustment is
+// zero, but projecting a borrowed source still retains the result.
+// CHECK-LABEL: define{{.*}} @opened(
+// CHECK-SAME: ptr {{.*}}[[VALUE:%[^,) ]+]])
+// CHECK: [[INTERFACE:%.*]] = getelementptr inbounds i8, ptr [[VALUE]], i{{32|64}} 0
+// CHECK: [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 1
+// CHECK: [[ADDREF:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[ADDREF]](ptr [[INTERFACE]])
+// CHECK: ret ptr [[INTERFACE]]
+sil [ossa] @opened : $@convention(thin) (@guaranteed IExtended) -> @owned IItem {
+bb0(%value : @guaranteed $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(1, IExtended) Self
+  %result = init_com_existential %open : $@opened(1, IExtended) Self : $@opened(1, IExtended) Self, $IItem
+  return %result : $IItem
+}
