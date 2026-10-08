@@ -4842,7 +4842,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       SWIFT_DEFER {
         Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
       };
-      Printer << " " << tok::kw_yield << " (";
+      Printer << " yields (";
 
       for (auto [idx, yield] : llvm::enumerate(yields)) {
         if (idx > 0)
@@ -4862,6 +4862,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
         printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
       }
+      Printer << ")";
     }
 
     Type ResultTy = decl->getResultInterfaceType();
