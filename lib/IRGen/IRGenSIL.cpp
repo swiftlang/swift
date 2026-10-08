@@ -8598,6 +8598,11 @@ void IRGenSILFunction::visitInitCOMExistentialInst(
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   Explosion instance = getLoweredExplosion(i->getOperand());
+  if (i->getType().getASTType().isCOMExistentialType()) {
+    // Refinement preserves the opened interface's address point and ownership.
+    setLoweredExplosion(i, instance);
+    return;
+  }
   Explosion result;
   emitClassExistentialContainer(*this,
                                result, i->getType(),

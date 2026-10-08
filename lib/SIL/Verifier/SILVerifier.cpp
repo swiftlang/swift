@@ -5161,12 +5161,21 @@ public:
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
-    require(concreteType.getASTType()->isBridgeableObjectType(),
-            "init_existential_ref operand must be a class instance");
-    require(IEI->getType().canUseExistentialRepresentation(
-                                     ExistentialRepresentation::Class,
-                                     IEI->getFormalConcreteType()),
-            "init_existential_ref must be used with a class existential type");
+    if (IEI->getType().getASTType().isCOMExistentialType()) {
+      auto *opened =
+          concreteType.getASTType()->getAs<ExistentialArchetypeType>();
+      require(concreteType.isObject() && opened &&
+                  opened->hasCOMInterfaceConstraint(),
+              "init_existential_ref COM operand must be an opened interface "
+              "value");
+    } else {
+      require(concreteType.getASTType()->isBridgeableObjectType(),
+              "init_existential_ref operand must be a class instance");
+      require(
+          IEI->getType().canUseExistentialRepresentation(
+              ExistentialRepresentation::Class, IEI->getFormalConcreteType()),
+          "init_existential_ref must be used with a class existential type");
+    }
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
     

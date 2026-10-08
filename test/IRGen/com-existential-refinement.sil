@@ -1,0 +1,23 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IExtended: IItem {}
+
+// CHECK-LABEL: define{{.*}} @refine(
+// CHECK-SAME: ptr {{.*}}[[VALUE:%[^,) ]+]])
+// CHECK-NOT: call
+// CHECK-NOT: getelementptr
+// CHECK: ret ptr [[VALUE]]
+sil [ossa] @refine : $@convention(thin) (@owned IExtended) -> @owned IItem {
+bb0(%value : @owned $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(1, IExtended) Self
+  %result = init_existential_ref %open : $@opened(1, IExtended) Self : $@opened(1, IExtended) Self, $IItem
+  return %result : $IItem
+}

@@ -1,0 +1,39 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -sil-print-types -emit-sorted-sil -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -emit-sib -module-name M %s -o %t/M.sib
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -sil-print-types -emit-sorted-sil -module-name M -enable-sil-verify-all %t/M.sib | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IExtended: IItem {}
+
+// CHECK-LABEL: sil [ossa] @refine
+// CHECK: [[OPEN:%.*]] = open_com_existential %0
+// CHECK: [[RESULT:%.*]] = init_existential_ref [[OPEN]] : $@opened({{.*}}, any IExtended) Self
+// CHECK-NEXT: return [[RESULT]]
+sil [ossa] @refine : $@convention(thin) (@owned IExtended) -> @owned IItem {
+bb0(%value : @owned $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(1, IExtended) Self
+  %result = init_existential_ref %open : $@opened(1, IExtended) Self : $@opened(1, IExtended) Self, $IItem
+  return %result : $IItem
+}
+
+// Refinement can also forward a borrowed interface. Copying the refined value
+// is a separate ownership operation.
+// CHECK-LABEL: sil [ossa] @refine_borrowed
+// CHECK: [[OPEN:%.*]] = open_com_existential %0
+// CHECK: [[RESULT:%.*]] = init_existential_ref [[OPEN]]
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[RESULT]]
+// CHECK-NEXT: return [[COPY]]
+sil [ossa] @refine_borrowed : $@convention(thin) (@guaranteed IExtended) -> @owned IItem {
+bb0(%value : @guaranteed $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(2, IExtended) Self
+  %result = init_existential_ref %open : $@opened(2, IExtended) Self : $@opened(2, IExtended) Self, $IItem
+  %copy = copy_value %result : $IItem
+  return %copy : $IItem
+}

@@ -2308,7 +2308,9 @@ public:
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances,
                            ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(FormalConcreteType->isBridgeableObjectType());
+    ASSERT(FormalConcreteType->isBridgeableObjectType() ||
+           ExistentialType.canUseExistentialRepresentation(
+               ExistentialRepresentation::COM));
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), forwardingOwnershipKind));

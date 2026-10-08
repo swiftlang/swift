@@ -4144,6 +4144,12 @@ sil-instruction ::= 'init_existential_ref' sil-operand ':' sil-type ','
 Creates a class existential container of type `$P` containing a
 reference to the class instance `%0`.
 
+For COM existentials, the operand must be a loadable opened COM interface
+and the destination must belong to its refinement chain. The instruction
+forwards the interface pointer and its ownership without adjusting or
+retaining it. Use `init_com_existential` to project an independently owned
+interface from a borrowed generic value.
+
 ### open_existential_ref
 
 ```
