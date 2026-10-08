@@ -3530,17 +3530,16 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
     case AccessorKind::YieldingMutate:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-      // Read, modify, and addressors yield a borrowable reference.
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      // Read, modify, borrow, mutate, and addressors yield a borrowable
+      // reference.
       return true;
     case AccessorKind::Init:
     case AccessorKind::Set:
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       llvm_unreachable("should not be involved in a read");
-    case AccessorKind::Borrow:
-      llvm_unreachable("borrow accessor is not yet implemented");
-    case AccessorKind::Mutate:
-      llvm_unreachable("mutate accessor is not yet implemented");
     }
     llvm_unreachable("switch not covered?");
     
