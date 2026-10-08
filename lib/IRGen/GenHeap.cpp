@@ -1500,12 +1500,11 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
 
   // Only output the filepath in debug mode. It is going to leak into the
   // executable. This is the same behavior as asserts.
-  bool shouldOptimize = IGM.IRGen.Opts.shouldOptimize();
-  auto filename = shouldOptimize
+  auto filename = IGM.IRGen.Opts.shouldOptimize()
                       ? IGM.getAddrOfGlobalString("")
                       : IGM.getAddrOfGlobalString(loc.filename);
-  auto filenameLength = llvm::ConstantInt::get(
-      IGM.Int32Ty, shouldOptimize ? 0 : loc.filename.size());
+  auto filenameLength =
+      llvm::ConstantInt::get(IGM.Int32Ty, loc.filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call = Builder.CreateCall(
       IGM.getIsEscapingClosureAtFileLocationFunctionPointer(),
