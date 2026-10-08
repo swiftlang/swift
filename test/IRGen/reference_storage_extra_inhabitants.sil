@@ -31,3 +31,18 @@ bb4:                                              // Preds: bb3 bb1
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11
 }
+
+// The value witnesses must agree with the inline code above: null is a valid
+// payload, so extra inhabitant indices are offset by one.
+// CHECK-LABEL: define internal i32 @"$s35reference_storage_extra_inhabitants1SVwet"
+// CHECK:       is-invalid-pointer:
+// CHECK-NEXT:    [[NONNULL:%.*]] = icmp ne [[WORD]] [[VAL:%.*]], 0
+// CHECK-NEXT:    br i1 [[NONNULL]], label %is-nonnull-pointer, label %is-valid-pointer
+// CHECK:       is-nonnull-pointer:
+// CHECK-NEXT:    sub [[WORD]] [[VAL]], 1
+
+// CHECK-LABEL: define internal void @"$s35reference_storage_extra_inhabitants1SVwst"
+// CHECK:         %value.uu = getelementptr
+// CHECK-NEXT:    [[IDX:%.*]] = zext i32 {{%.*}} to [[WORD]]
+// CHECK-NEXT:    [[STORED:%.*]] = add [[WORD]] [[IDX]], 1
+// CHECK-NEXT:    store [[WORD]] [[STORED]], ptr %value.uu
