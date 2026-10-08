@@ -5468,7 +5468,15 @@ public:
 
   /// Is this call dispatched through a distributed thunk?
   bool callsDistributedThunk() const {
-    return callee.getMethodName().isDistributedThunk();
+    if (callee.getMethodName().isDistributedThunk())
+      return true;
+    // A witness method callee still names the requirement; it is redirected
+    // to the requirement's distributed thunk only when the callee value is
+    // emitted (see Callee::getFnValue).
+    if (callee.kind == Callee::Kind::WitnessMethod)
+      if (auto *func = callee.getMethodName().getFuncDecl())
+        return SGF.shouldReplaceConstantForApplyWithDistributedThunk(func);
+    return false;
   }
 
   /// Sets a flag that indicates whether this call be treated as being 
