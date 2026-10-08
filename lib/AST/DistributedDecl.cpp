@@ -539,6 +539,8 @@ swift::getDistributedSerializationRequirements(
 
   auto layout = serialReqType->getExistentialLayout();
   for (auto p : layout.getProtocols()) {
+    if (p->getInvertibleProtocolKind())
+      continue;
     requirementProtos.insert(p);
   }
 
