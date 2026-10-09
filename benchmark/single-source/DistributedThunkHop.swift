@@ -128,6 +128,7 @@ final class NonsendingSystem: DistributedActorSystem, @unchecked Sendable {
     where Act: DistributedActor, Act.ID == ActorID, Err: Error {}
 }
 
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 struct NopEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
   mutating func recordGenericSubstitution<T>(_ t: T.Type) throws {}
