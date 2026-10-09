@@ -3977,10 +3977,11 @@ private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
             bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
-    // An @in_cxx argument is consumed, so it cannot borrow a variable's storage
-    // in place; materialize a temporary the caller destroys instead.
-    if (isAddressable && ParamInfos.front().getConvention() ==
-                             ParameterConvention::Indirect_In_CXX)
+    // An @in_cxx argument needs a copy. Opaque SIL also represents indirect
+    // parameters as values until address lowering.
+    if (isAddressable && (ParamInfos.front().getConvention() ==
+                              ParameterConvention::Indirect_In_CXX ||
+                          !SGF.silConv.isSILIndirect(ParamInfos.front())))
       isAddressable = false;
 
     if (isAddressable) {

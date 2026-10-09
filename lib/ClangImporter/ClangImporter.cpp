@@ -9131,6 +9131,9 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(desc.decl);
   if (!cxxDecl)
     return nullptr;
+  if (desc.ctx.LangOpts.hasFeature(Feature::CxxSwiftValueTypes) &&
+      isSwiftStringType(cxxDecl))
+    return desc.ctx.getStringDecl();
   if (!isSwiftClassType(cxxDecl))
     return nullptr;
 

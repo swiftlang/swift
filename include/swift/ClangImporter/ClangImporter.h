@@ -971,6 +971,9 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 const clang::CXXConstructorDecl *
 findCopyConstructor(const clang::CXXRecordDecl *decl);
 
+/// Whether \p decl is a generated inline-storage Swift String wrapper.
+bool isSwiftStringType(const clang::CXXRecordDecl *decl);
+
 /// Whether \p decl is a non-trivial C++ record.
 inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {
   return decl->hasNonTrivialCopyConstructor() ||
