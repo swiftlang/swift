@@ -6197,6 +6197,11 @@ static bool sendableConformanceRequiresNonisolated(NominalTypeDecl *nominal) {
       return true;
   }
 
+  // `@globalActor` implies a conformance to `GlobalActor`, which inherits
+  // `SendableMetatype`.
+  if (nominal->getAttrs().hasAttribute<GlobalActorAttr>())
+    return true;
+
   // Check for member or extension macros that define conformances to
   // SendableMetatype-inheriting protocols.
   bool requiresNonisolated = false;

@@ -156,3 +156,28 @@ func |><T, U>(value: T, transform: (T) -> U) -> U {
 func concurrentFunc() async {}
 
 nonisolated func nonisolatedFunc() {}
+
+// The file default isolates a global actor type like any other type, so
+// `shared` has to be explicitly nonisolated to witness `GlobalActor`.
+@globalActor
+#if EXPLICIT
+@MainActor
+#endif
+struct SomeGlobalActor {
+  actor MyActor { }
+
+  nonisolated static let shared = MyActor()
+}
+
+@SomeGlobalActor
+func someActorFunc() {}
+
+@SomeGlobalActor
+func someActorAsyncFunc() {}
+
+#if EXPLICIT
+@MainActor
+#endif
+extension SomeGlobalActor {
+  static func helper() {}
+}
