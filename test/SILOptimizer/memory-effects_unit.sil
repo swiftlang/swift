@@ -1396,6 +1396,20 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
   return %r : $()
 }
 
+// CHECK-LABEL: @test_readnone_llvm_intrinsic
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %3 = builtin "int_cttz_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int1)
+// CHECK-NEXT:      %1 = argument of bb0 : $*Int
+// CHECK-NEXT:    r=0,w=0
+sil @test_readnone_llvm_intrinsic : $@convention(thin) (Builtin.Int64, @inout_aliasable Int) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $*Int):
+  specify_test "memory_effects"
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "int_cttz_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int1) : $Builtin.Int64
+  %4 = load %1 : $*Int
+  return %3 : $Builtin.Int64
+}
+
 // CHECK-LABEL: @test_builtin_zeroInitializer
 // CHECK:       PAIR #0.
 // CHECK-NEXT:      %2 = builtin "zeroInitializer"(%1 : $*C)
