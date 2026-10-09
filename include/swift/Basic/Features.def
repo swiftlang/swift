@@ -441,6 +441,9 @@ EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
+/// Make Swift class instance members const in the generated C++ bindings.
+EXPERIMENTAL_FEATURE(GenerateConstClassMembersInCXX, true)
+
 /// Enable reference bindings.
 EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 
