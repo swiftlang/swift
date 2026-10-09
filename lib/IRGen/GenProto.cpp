@@ -28,15 +28,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -47,11 +48,12 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/shims/Metadata.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "CallEmission.h"
 #include "ConformanceDescription.h"
@@ -3908,6 +3910,30 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
                                       /*onHeapPacks=*/!NoEscape);
 }
 
+namespace {
+llvm::Constant *getOrCreateCOMClassID(IRGenModule &IGM, ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  ASSERT(info && info->isImplementation() && info->getImplementationID());
+
+  IRGenMangler decorator(IGM.Context);
+  std::string label =
+      (Twine("CLSID_") + decorator.mangleNominalTypeDescriptor(CD)).str();
+
+  if (auto GV = IGM.getModule()->getNamedGlobal(label))
+    return GV;
+
+  auto *initializer = IGM.getCOMIdentityConstant(*info->getImplementationID());
+  llvm::GlobalVariable *GV = new llvm::GlobalVariable(
+      *IGM.getModule(), initializer->getType(),
+      /*isConstant=*/true, llvm::GlobalVariable::LinkOnceODRLinkage,
+      initializer, label);
+  GV->setVisibility(llvm::GlobalVariable::HiddenVisibility);
+  GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+  GV->setAlignment(llvm::Align(4));
+  return GV;
+}
+} // namespace
+
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         ProtocolConformanceRef conformance) {
@@ -3967,6 +3993,30 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
     return emitWitnessTablePackRef(IGF, pack, conformance.getPack());
   } else {
     concreteConformance = conformance.getConcrete();
+
+    if (auto *BPC = dyn_cast<BuiltinProtocolConformance>(concreteConformance)) {
+      assert(BPC->getBuiltinConformanceKind() ==
+                 BuiltinConformanceKind::COMIdentityMetatype &&
+             "unexpected builtin conformance requiring runtime evidence");
+      auto *metatype = BPC->getType()->castTo<AnyMetatypeType>();
+      if (proto->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+        auto *interface = metatype->getInstanceType()
+                              ->getExistentialLayout()
+                              .getCOMInterface();
+        ASSERT(interface &&
+               "COMInterface metatype conformance without a COM interface");
+        auto *descriptor = IGF.IGM.getAddrOfProtocolDescriptor(interface);
+        auto *offset = llvm::ConstantInt::get(
+            IGF.IGM.IntPtrTy, sizeof(_SwiftProtocolDescriptorHeader));
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(IGF.IGM.Int8Ty,
+                                                            descriptor, offset);
+      } else if (proto->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+        auto *CD = metatype->getInstanceType()->getClassOrBoundGenericClass();
+        ASSERT(CD && "COMActivatable metatype conformance without a class");
+        return getOrCreateCOMClassID(IGF.IGM, CD);
+      }
+      llvm_unreachable("unexpected COM identity protocol");
+    }
   }
   assert(concreteConformance->getProtocol() == proto);
 

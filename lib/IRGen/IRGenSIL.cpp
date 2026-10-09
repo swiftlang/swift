@@ -24,6 +24,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
@@ -4016,6 +4017,36 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
+  if (auto *witness = dyn_cast<WitnessMethodInst>(i->getCallee())) {
+    auto *protocol =
+        cast<ProtocolDecl>(witness->getMember().getDecl()->getDeclContext());
+
+    if (protocol->isCOMIdentity()) {
+      auto kind =
+          classifyCOMIdentityRequirement(witness->getMember().getDecl());
+      ASSERT(kind && "unsupported COM identity requirement");
+
+      switch (*kind) {
+      case COMIdentityRequirementKind::InterfaceID:
+      case COMIdentityRequirementKind::ActivationID: {
+        auto *identity = emitWitnessTableRef(*this, witness->getLookupType(),
+                                             witness->getConformance());
+
+        auto RTy = i->getType();
+        auto &TI = cast<LoadableTypeInfo>(getTypeInfo(RTy));
+        Explosion result;
+        TI.loadAsCopy(*this,
+                      Address(identity, TI.getStorageType(), Alignment(4)),
+                      result);
+        setLoweredExplosion(i, result);
+        return;
+      }
+      }
+
+      llvm_unreachable("unhandled COM identity requirement");
+    }
+  }
+
   visitFullApplySite(i);
 }
 
@@ -8904,6 +8935,26 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
   PrettyStackTraceSILDeclRef entry("lowering use of witness method", member);
+
+  auto *protocol = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+  if (protocol->isCOMIdentity()) {
+    auto kind = classifyCOMIdentityRequirement(member.getDecl());
+    ASSERT(kind && "unsupported COM identity requirement");
+
+    switch (*kind) {
+    case COMIdentityRequirementKind::InterfaceID:
+    case COMIdentityRequirementKind::ActivationID: {
+      for (auto *use : i->getUses())
+        assert(isa<ApplyInst>(use->getUser()) &&
+               "COM identity witness must be applied directly");
+      Explosion empty;
+      setLoweredExplosion(i, empty);
+      return;
+    }
+    }
+
+    llvm_unreachable("unhandled COM identity requirement");
+  }
 
   auto fnType = IGM.getSILTypes().getConstantFunctionType(
       IGM.getMaximalTypeExpansionContext(), member);
