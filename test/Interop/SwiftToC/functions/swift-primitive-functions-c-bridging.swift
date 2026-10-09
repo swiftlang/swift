@@ -8,7 +8,7 @@
 // CHECK-NEXT: SWIFT_EXTERN bool $s9Functions16passThroughCBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN char $s9Functions16passThroughCCharys4Int8VADF(char x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN char16_t $s9Functions18passThroughCChar16ys6UInt16VADF(char16_t x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN char32_t $s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF(char32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN char32_t $s9Functions18passThroughCChar32ys6UInt32VADF(char32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN double $s9Functions18passThroughCDoubleyS2dF(double x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN float $s9Functions17passThroughCFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN int $s9Functions15passThroughCIntys5Int32VADF(int x) SWIFT_NOEXCEPT SWIFT_CALL;
