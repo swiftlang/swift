@@ -1336,7 +1336,16 @@ public:
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
   /// Whether this declaration predates the introduction of concurrency.
+  ///
+  /// An inferred `@preconcurrency` is only seen if the actor isolation has
+  /// already been computed; use \c preconcurrencyIncludingInferred() when the
+  /// answer must not depend on that.
   bool preconcurrency() const;
+
+  /// Like \c preconcurrency(), but computes the actor isolation first, so an
+  /// inferred `@preconcurrency` is always seen. This can be cyclic if called
+  /// while computing the isolation or interface type of this declaration.
+  bool preconcurrencyIncludingInferred() const;
 
   /// Query whether this declaration was explicitly declared to be safe or
   /// unsafe.
