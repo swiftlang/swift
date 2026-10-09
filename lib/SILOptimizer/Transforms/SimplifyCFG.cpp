@@ -3071,7 +3071,7 @@ bool ArgumentSplitter::createNewArguments() {
 
   // Only handle struct and tuple type.
   SILType Ty = Arg->getType();
-  if (!Ty.getStructOrBoundGenericStruct() && !Ty.is<TupleType>())
+  if (!Ty.getStructDecl() && !Ty.is<TupleType>())
     return false;
 
   // Get the first level projection for the struct or tuple type.
@@ -3237,7 +3237,7 @@ static bool splitBBArguments(SILFunction &Fn) {
       SILType ArgTy = Arg->getType();
 
       if (!ArgTy.isObject() ||
-          (!ArgTy.is<TupleType>() && !ArgTy.getStructOrBoundGenericStruct())) {
+          (!ArgTy.is<TupleType>() && !ArgTy.getStructDecl())) {
         continue;
       }
 

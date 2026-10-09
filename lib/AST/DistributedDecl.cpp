@@ -933,7 +933,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     auto argumentTy = argumentParam->getInterfaceType();
     auto argumentInContextTy = mapTypeIntoEnvironment(argumentTy);
     if (argumentInContextTy->getAnyNominal() == C.getRemoteCallArgumentDecl()) {
-      auto argGenericParams = argumentInContextTy->getStructOrBoundGenericStruct()
+      auto argGenericParams = argumentInContextTy->getStructDecl()
           ->getGenericParams()->getParams();
       if (argGenericParams.size() != 1) {
         return false;

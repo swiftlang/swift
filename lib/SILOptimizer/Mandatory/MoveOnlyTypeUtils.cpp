@@ -16,7 +16,7 @@ using namespace swift;
 using namespace swift::siloptimizer;
 
 static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
-  auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
+  auto structDecl = ktypeTy.getStructDecl();
   if (!structDecl || structDecl->hasUnreferenceableStorage())
     return nullptr;
   return structDecl;

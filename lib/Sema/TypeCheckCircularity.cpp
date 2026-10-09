@@ -312,7 +312,7 @@ bool CircularityChecker::addMember(CanType parentType, ValueDecl *member,
 
   if (isa<TupleType>(memberType)) {
     // Ok, visit tuples.
-  } else if (memberType.getStructOrBoundGenericStruct()) {
+  } else if (memberType.getStructDecl()) {
     // Ok, visit structs.
     // TODO: skip non-generic types in different modules?
   } else if (auto E = memberType.getEnumDecl()) {

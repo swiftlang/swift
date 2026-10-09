@@ -2593,7 +2593,7 @@ private:
 
   void visitStructType(StructType *ST,
                        std::optional<OptionalTypeKind> optionalKind) {
-    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ST->getStructDecl();
 
     // Handle known type names.
     if (printIfKnownSimpleType(SD, optionalKind))
@@ -2629,7 +2629,7 @@ private:
 
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
-    const StructDecl *SD = ty->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ty->getStructDecl();
     if (ty->isMarkerExistential()) {
       ty = ctx.getAnyObjectType();
     } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {

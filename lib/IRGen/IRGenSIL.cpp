@@ -7010,7 +7010,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   if (Decl) {
     Type Ty = Decl->getTypeInContext();
     if (Ty->getClassOrBoundGenericClass() ||
-        Ty->getStructOrBoundGenericStruct())
+        Ty->getStructDecl())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));
   }
   emitDebugInfoAfterAllocStack(i, type, DbgTy, addr.getAddress());

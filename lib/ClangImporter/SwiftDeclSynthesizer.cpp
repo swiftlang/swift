@@ -1169,7 +1169,7 @@ static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
                                             VarDecl *anonymousFieldDecl) {
   auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
   auto anonymousFieldTypeDecl =
-      anonymousFieldType->getStructOrBoundGenericStruct();
+      anonymousFieldType->getStructDecl();
 
   for (auto decl :
        anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {

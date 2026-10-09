@@ -2024,7 +2024,7 @@ SILValue AddressMaterialization::materializeStructExtract(
     SILInstruction *extractInst, SILValue elementValue, unsigned fieldIdx) {
   auto structVal = extractInst->getOperand(0);
   SILValue srcAddr = pass.getMaterializedAddress(structVal);
-  auto *structType = structVal->getType().getStructOrBoundGenericStruct();
+  auto *structType = structVal->getType().getStructDecl();
   auto *varDecl = structType->getStoredProperties()[fieldIdx];
   return projectionBuilder.createStructElementAddr(
       pass.genLoc(), srcAddr, varDecl,

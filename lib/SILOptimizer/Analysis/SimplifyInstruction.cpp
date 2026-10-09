@@ -421,7 +421,7 @@ SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
   // downstream CSE/SILCombine optimizations.
   // Note: redundant metatype instructions are already handled by CSE.
   if (isa<TupleType>(instanceType)
-      || instanceType.getStructOrBoundGenericStruct()
+      || instanceType.getStructDecl()
       || instanceType.getEnumDecl()) {
     for (SILArgument *argument : MI->getFunction()->getArguments()) {
       if (argument->getType().getASTType() == metaType &&

@@ -437,7 +437,7 @@ private:
           materializeAdjointIndirect(val.getAggregateElement(idx), eltBuf, loc);
         }
       } else if (auto *structDecl =
-                     val.getSwiftType()->getStructOrBoundGenericStruct()) {
+                     val.getSwiftType()->getStructDecl()) {
         auto fieldIt = structDecl->getStoredProperties().begin();
         for (unsigned i = 0; fieldIt != structDecl->getStoredProperties().end();
              ++fieldIt, ++i) {
@@ -1415,7 +1415,7 @@ public:
 #ifndef NDEBUG
         auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
         assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
-        assert(tangentVectorTy->getStructOrBoundGenericStruct());
+        assert(tangentVectorTy->getStructDecl());
 #endif
 
         // Accumulate adjoints for the fields of the `struct` operand.
@@ -1585,7 +1585,7 @@ public:
       auto tangentVectorSILTy =
           SILType::getPrimitiveObjectType(tangentVectorTy);
       auto *tangentVectorDecl =
-          tangentVectorTy->getStructOrBoundGenericStruct();
+          tangentVectorTy->getStructDecl();
       // Accumulate adjoint for the `ref_element_addr` operand.
       SmallVector<AdjointValue, 8> eltVals;
       for (auto *field : tangentVectorDecl->getStoredProperties()) {
@@ -3451,7 +3451,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
                          pullback.getLoweredFunctionType(),
                          TypeExpansionContext::minimal());
   auto tangentVectorTy = tangentVectorSILTy.getASTType();
-  auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
+  auto *tangentVectorDecl = tangentVectorTy->getStructDecl();
 
   // Look up the corresponding field in the tangent space.
   auto *origField = cast<VarDecl>(accessor->getStorage());
@@ -3831,7 +3831,7 @@ AdjointValue PullbackCloner::Implementation::accumulateAdjointsDirect(
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
         }
-      } else if (lhsTy->getStructOrBoundGenericStruct()) {
+      } else if (lhsTy->getStructDecl()) {
         auto elts =
             builder.createDestructureStruct(lhsVal.getLoc(), lhsValCopy);
         llvm::for_each(elts->getResults(),
@@ -4019,7 +4019,7 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   auto eltTanSILType = remapType(SILType::getPrimitiveAddressType(eltTanType));
   // Get `function_ref` and generic signature of
   // `Array.TangentVector.subscript.getter`.
-  auto *arrayTanStructDecl = arrayTanType->getStructOrBoundGenericStruct();
+  auto *arrayTanStructDecl = arrayTanType->getStructDecl();
   auto subscriptLookup =
       arrayTanStructDecl->lookupDirect(DeclBaseName::createSubscript());
   SubscriptDecl *subscriptDecl = nullptr;

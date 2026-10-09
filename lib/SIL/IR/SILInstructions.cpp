@@ -1908,7 +1908,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBaseWithTrailingOperands(
       Elems, Loc, Ty, forwardingOwnershipKind)
 {
-  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
+  assert(!Ty.getStructDecl()->hasUnreferenceableStorage());
 }
 
 BorrowedFromInst *BorrowedFromInst::create(SILDebugLocation DebugLoc, SILValue borrowedValue,
@@ -3929,7 +3929,7 @@ DestructureStructInst::create(const SILFunction &F, SILDebugLocation Loc,
                               ValueOwnershipKind forwardingOwnershipKind) {
   auto &M = F.getModule();
 
-  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+  assert(Operand->getType().getStructDecl() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;

@@ -255,8 +255,8 @@ public:
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  StructDecl *getStructOrBoundGenericStruct() const {
-    return getASTType().getStructOrBoundGenericStruct();
+  StructDecl *getStructDecl() const {
+    return getASTType().getStructDecl();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
@@ -913,7 +913,7 @@ public:
 
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {
-    auto sd = getStructOrBoundGenericStruct();
+    auto sd = getStructDecl();
 
     if (!sd) {
       return nullptr;

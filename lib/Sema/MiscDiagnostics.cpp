@@ -1096,7 +1096,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           auto d = Ctx.Diags.diagnose(DRE->getLoc(),
                               diag::bitcasting_to_change_pointer_kind,
                               fromTy, toTy,
-                              toTy->getStructOrBoundGenericStruct()->getName());
+                              toTy->getStructDecl()->getName());
           if (subExpr) {
             StringRef before, after;
             switch (toPTK) {

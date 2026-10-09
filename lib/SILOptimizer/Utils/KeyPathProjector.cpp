@@ -45,7 +45,7 @@ public:
     }
     
     bool isStruct() override {
-        return root->getType().getStructOrBoundGenericStruct() != nullptr;
+        return root->getType().getStructDecl() != nullptr;
     }
 private:
     SILValue root;
@@ -68,7 +68,7 @@ protected:
     
     bool isStruct() override {
         auto type = component.getComponentType();
-        return type.getStructOrBoundGenericStruct() != nullptr;
+        return type.getStructDecl() != nullptr;
     }
     
     ~ComponentProjector() override {};
@@ -611,7 +611,7 @@ public:
   bool isStruct() override {
     auto components = keyPath->getPattern()->getComponents();
     auto resultType = components.back().getComponentType();
-    return resultType.getStructOrBoundGenericStruct() != nullptr;
+    return resultType.getStructDecl() != nullptr;
   }
   
 private:

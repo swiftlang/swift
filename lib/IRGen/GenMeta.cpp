@@ -3181,7 +3181,7 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
   case TypeKind::Struct:
   case TypeKind::BoundGenericStruct:
     emitSpecializedGenericStructMetadata(IGM, type,
-                                         *type.getStructOrBoundGenericStruct());
+                                         *type.getStructDecl());
     break;
   case TypeKind::Enum:
   case TypeKind::BoundGenericEnum:
@@ -3415,7 +3415,7 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
       Feature::LayoutStringValueWitnessesInstantiation) &&
       IGM.getOptions().EnableLayoutStringValueWitnesses);
 
-  auto *target = T.getStructOrBoundGenericStruct();
+  auto *target = T.getStructDecl();
 
   llvm::Value *fieldVector =
       emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
@@ -3660,7 +3660,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+    if (T.getStructDecl()->hasValueTypeDestructor()) {
       rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                           IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
     } else {
@@ -3670,7 +3670,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
       rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+  } else if (T.getStructDecl()->hasValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }
@@ -5821,9 +5821,9 @@ void irgen::emitLazySpecializedValueMetadata(IRGenModule &IGM,
     emitLazyTupleMetadata(IGM, valueTy);
   } else if (isa<FunctionType>(valueTy)) {
     emitLazyFunctionMetadata(IGM, valueTy);
-  } else if (valueTy->getStructOrBoundGenericStruct()) {
+  } else if (valueTy->getStructDecl()) {
     emitSpecializedGenericStructMetadata(IGM, valueTy,
-                                         *valueTy.getStructOrBoundGenericStruct());
+                                         *valueTy.getStructDecl());
   } else if (auto enumTy = valueTy->getEnumDecl()) {
     emitSpecializedGenericEnumMetadata(IGM, valueTy, *enumTy);
   } else if (valueTy->isAnyExistentialType()) {

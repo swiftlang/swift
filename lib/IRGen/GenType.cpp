@@ -3487,7 +3487,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     if (tuple->getNumElements() == 1)
       return t.getTupleElementType(0);
 
-  if (auto structDecl = t.getStructOrBoundGenericStruct()) {
+  if (auto structDecl = t.getStructDecl()) {
     // If the struct has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (IGM.isResilient(structDecl, expansion))

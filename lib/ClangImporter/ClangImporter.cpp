@@ -480,7 +480,7 @@ bool importer::isBoolOrBoolEnumType(Type ty) {
     return true;
 
   // Check if this is a C++ enum with an underlying type of "bool".
-  if (auto *SD = ty->getStructOrBoundGenericStruct()) {
+  if (auto *SD = ty->getStructDecl()) {
     if (auto *clangD = SD->getClangDecl()) {
       if (auto *ED = dyn_cast<clang::EnumDecl>(clangD)) {
         if (ED->getIntegerType()->isBooleanType())

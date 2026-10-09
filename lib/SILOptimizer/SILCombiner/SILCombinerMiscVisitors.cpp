@@ -795,7 +795,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
       IEAI->getElement(), IEAI->getFunction());
-  auto *structDecl = elemType.getStructOrBoundGenericStruct();
+  auto *structDecl = elemType.getStructDecl();
 
   // We cannot create a struct when it has unreferenceable storage.
   if (elemType.isEmpty(*IEAI->getFunction()) && structDecl &&

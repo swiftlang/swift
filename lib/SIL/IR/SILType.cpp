@@ -111,7 +111,7 @@ void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
   StringRef nominalKind = "none";
   if (getClassOrBoundGenericClass())
     nominalKind = "class";
-  else if (getStructOrBoundGenericStruct())
+  else if (getStructDecl())
     nominalKind = "struct";
   else if (getEnumDecl())
     nominalKind = "enum";
@@ -331,7 +331,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     return true;
   }
 
-  if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
+  if (StructDecl *structDecl = getStructDecl()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
     SILModule &module = F.getModule();
@@ -648,7 +648,7 @@ bool SILType::isHeapObjectReferenceType() const {
 }
 
 bool SILType::aggregateHasUnreferenceableStorage() const {
-  if (auto s = getStructOrBoundGenericStruct()) {
+  if (auto s = getStructDecl()) {
     return s->hasUnreferenceableStorage();
   }
   // Tuples with pack expansions don't *actually* have unreferenceable
@@ -1178,7 +1178,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     }
   }
 
-  if (auto structDecl = getStructOrBoundGenericStruct()) {
+  if (auto structDecl = getStructDecl()) {
     // If the struct has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (structDecl->isResilient(M.getSwiftModule(), expansion)) {
@@ -1493,7 +1493,7 @@ Type SILType::getRawLayoutSubstitutedLikeType() const {
   if (rawLayout->getSizeAndAlignment())
     return Type();
 
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   auto likeType = rawLayout->getResolvedLikeType(structDecl);
   auto astT = getASTType();
   auto subs = astT->getContextSubstitutionMap();
@@ -1509,7 +1509,7 @@ Type SILType::getRawLayoutSubstitutedCountType() const {
   if (rawLayout->getSizeAndAlignment() || rawLayout->getScalarLikeType())
     return Type();
 
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   auto countType = rawLayout->getResolvedCountType(structDecl);
   auto astT = getASTType();
   auto subs = astT->getContextSubstitutionMap();

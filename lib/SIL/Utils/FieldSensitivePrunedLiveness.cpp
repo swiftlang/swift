@@ -43,7 +43,7 @@ static llvm::cl::opt<bool> EmitLogging(
 // We can only analyze components of structs whose storage is fully accessible
 // from Swift.
 static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
-  auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
+  auto structDecl = ktypeTy.getStructDecl();
   if (!structDecl || structDecl->hasUnreferenceableStorage())
     return nullptr;
   return structDecl;
@@ -508,7 +508,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
                         [&](unsigned index) { return bv[index]; });
   };
 
-  if (auto *structDecl = type.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = type.getStructDecl()) {
     unsigned start = startEltOffset;
     for (auto *varDecl : structDecl->getStoredProperties()) {
       auto nextType = type.getFieldType(varDecl, fn);

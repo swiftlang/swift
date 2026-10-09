@@ -618,7 +618,7 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   auto parentTanType =
       baseType->getAutoDiffTangentSpace(LookUpConformanceInModule())
           ->getType();
-  auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
+  auto *parentTanStruct = parentTanType->getStructDecl();
   // Error if parent `TangentVector` is not a struct.
   if (!parentTanStruct) {
     return TangentPropertyInfo(

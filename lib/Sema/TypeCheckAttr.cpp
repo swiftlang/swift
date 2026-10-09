@@ -716,7 +716,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     }
 
     // Types who are marked @_staticExclusiveOnly cannot have mutating functions.
-    if (auto SD = contextTy->getStructOrBoundGenericStruct()) {
+    if (auto SD = contextTy->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           attrModifier == SelfAccessKind::Mutating) {
         diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_mutating,

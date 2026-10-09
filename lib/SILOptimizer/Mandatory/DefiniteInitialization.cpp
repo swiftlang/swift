@@ -1628,7 +1628,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     else
       selfTy = TheMemory.getASTType();
 
-    StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
+    StructDecl *theStruct = selfTy->getStructDecl();
     assert(theStruct);
 
     diagnose(Module, Use.Inst->getLoc(),
@@ -1995,7 +1995,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
         diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
         if (!HasSuggestedNoArgSelfInit && FullyUninitialized) {
           auto *maybeStruct =
-              TheMemory.getASTType().getStructOrBoundGenericStruct();
+              TheMemory.getASTType().getStructDecl();
           maybeSuggestNoArgSelfInit(Module, Inst->getLoc(), maybeStruct);
           HasSuggestedNoArgSelfInit = true;
         }
@@ -2304,7 +2304,7 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
 
   if (TheMemory.isCrossModuleStructInitSelf() && TheMemory.hasDummyElement()) {
     Type selfTy = TheMemory.getASTType();
-    const StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
+    const StructDecl *theStruct = selfTy->getStructDecl();
     assert(theStruct);
 
     bool fullyUnitialized;

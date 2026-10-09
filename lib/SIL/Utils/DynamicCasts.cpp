@@ -240,7 +240,7 @@ classifyDynamicCastFromProtocol(ModuleDecl *M, CanType source, CanType target,
       !isa<ArchetypeType>(target) &&
       !mayBridgeToObjectiveC(M, target)) {
     assert((target.getEnumDecl() ||
-            target.getStructOrBoundGenericStruct() ||
+            target.getStructDecl() ||
             isa<TupleType>(target) ||
             isa<SILFunctionType>(target) ||
             isa<FunctionType>(target) ||
@@ -679,8 +679,8 @@ swift::classifyDynamicCast(SILFunction *function,
       return classifyClassHierarchyCast(source, target);
 
     // Different structs cannot be cast to each other.
-    if (source.getStructOrBoundGenericStruct() &&
-        target.getStructOrBoundGenericStruct() &&
+    if (source.getStructDecl() &&
+        target.getStructDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
@@ -824,7 +824,7 @@ swift::classifyDynamicCast(SILFunction *function,
         !isa<ArchetypeType>(target) &&
         mustBridgeToSwiftValueBox(M, target)) {
       assert((target.getEnumDecl() ||
-              target.getStructOrBoundGenericStruct() ||
+              target.getStructDecl() ||
               isa<TupleType>(target) ||
               isa<SILFunctionType>(target) ||
               isa<FunctionType>(target) ||
@@ -864,7 +864,7 @@ swift::classifyDynamicCast(SILFunction *function,
       !isa<ArchetypeType>(source) &&
       mustBridgeToSwiftValueBox(M, source)) {
       assert((source.getEnumDecl() ||
-              source.getStructOrBoundGenericStruct() ||
+              source.getStructDecl() ||
               isa<TupleType>(source) ||
               isa<SILFunctionType>(source) ||
               isa<FunctionType>(source) ||

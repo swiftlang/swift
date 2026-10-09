@@ -317,7 +317,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
 void Projection::getFirstLevelProjections(
     SILType Ty, SILModule &Mod, TypeExpansionContext context,
     llvm::SmallVectorImpl<Projection> &Out) {
-  if (auto *S = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *S = Ty.getStructDecl()) {
     unsigned Count = 0;
     for (auto *VDecl : S->getStoredProperties()) {
       (void) VDecl;
@@ -861,7 +861,7 @@ NullablePtr<SingleValueInstruction>
 Projection::createAggFromFirstLevelProjections(
     SILBuilder &B, SILLocation Loc, SILType BaseType,
     ArrayRef<SILValue> Values) {
-  if (BaseType.getStructOrBoundGenericStruct()) {
+  if (BaseType.getStructDecl()) {
     return B.createStruct(Loc, BaseType, Values);
   }
 
@@ -1084,7 +1084,7 @@ void ProjectionTreeNode::createNextLevelChildren(ProjectionTree &Tree,
     return;
   }
 
-  if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *SD = Ty.getStructDecl()) {
     LLVM_DEBUG(llvm::dbgs() << "        Found a struct!\n");
     createNextLevelChildrenForStruct(Tree, context, SD);
     return;
@@ -1108,7 +1108,7 @@ createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
 
   SILType Ty = getType();
 
-  if (Ty.getStructOrBoundGenericStruct()) {
+  if (Ty.getStructDecl()) {
     return B.createStruct(Loc, Ty, Args);
   }
 

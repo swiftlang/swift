@@ -2736,7 +2736,7 @@ public:
     }
 
     // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
-    if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = VD->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>()) {
         auto isProtocolContext = isa<ProtocolDecl>(DC);
 
@@ -4548,7 +4548,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     // @_staticExclusiveOnly types cannot be passed as 'inout', only as either
     // a borrow or as consuming.
-    if (auto SD = param->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = param->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           param->isInOut()) {
         SD->getASTContext().Diags.diagnoseWithNotes(

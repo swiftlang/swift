@@ -380,7 +380,7 @@ deriveEquatable_eq(
     generatedIdentifier = C.Id_derived_enum_equals;
     isDerivedEnumEquals = true;
   } else {
-    assert(selfIfaceTy->getStructOrBoundGenericStruct());
+    assert(selfIfaceTy->getStructDecl());
     generatedIdentifier = C.Id_derived_struct_equals;
   }
 

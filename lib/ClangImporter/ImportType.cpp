@@ -3893,7 +3893,7 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
+  if (type->getStructDecl() ||
       type->getEnumDecl()) {
     auto nominal = type->getAnyNominal();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);

@@ -1407,7 +1407,7 @@ bool swift::visitProductLeafAccessPathNodes(
         auto *elementNode = node->getChild(index);
         worklist.push_back({silType.getTupleElementType(index), elementNode});
       }
-    } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
+    } else if (auto *decl = silType.getStructDecl()) {
       if (decl->isResilient(tec.getContext()->getParentModule(),
                             tec.getResilienceExpansion())) {
         visitor(AccessPath::PathNode(node), silType);

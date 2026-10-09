@@ -4418,7 +4418,7 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
   if (auto ED = instanceTy->getEnumDecl()) {
     idc = ED;
   }
-  else if (auto SD = instanceTy->getStructOrBoundGenericStruct()) {
+  else if (auto SD = instanceTy->getStructDecl()) {
     // Did ClangImporter add OptionSet to this struct?
     for (auto protoAttr :
             SD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {

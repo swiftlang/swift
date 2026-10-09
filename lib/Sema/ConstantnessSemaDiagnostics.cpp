@@ -79,7 +79,7 @@ static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDec
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
   paramType = param->getTypeInContext();
-  structDecl = paramType->getStructOrBoundGenericStruct();
+  structDecl = paramType->getStructDecl();
   if (!structDecl)
     return false;
   return isAtomicOrderingDecl(structDecl);

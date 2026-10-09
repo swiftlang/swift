@@ -1876,7 +1876,7 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
   // This is a loop because we want to handle types that wrap integer types,
   // like ObjCBool (which may be Bool or Int8).
   while (!value->getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    auto structDecl = value->getType().getStructDecl();
     assert(structDecl && "value for error result wasn't of struct type!");
     assert(structDecl->getStoredProperties().size() == 1);
     auto property = structDecl->getStoredProperties()[0];
@@ -1896,7 +1896,7 @@ SILValue SILGenFunction::emitWrapIntegerLiteral(SILLocation loc,
   
   // Or wrap a value in a struct, potentially multiple times to handle types
   // that wrap integer types like ObjCBool (which may be Bool or Int8).
-  auto structDecl = ty.getStructOrBoundGenericStruct();
+  auto structDecl = ty.getStructDecl();
   assert(structDecl && "value for error result wasn't of struct type!");
   assert(structDecl->getStoredProperties().size() == 1);
   auto property = structDecl->getStoredProperties()[0];

@@ -2698,7 +2698,7 @@ RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
 static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation loc) {
   SILValue v = array;
   SILType storageType;
-  while (auto *sd = v->getType().getStructOrBoundGenericStruct()) {
+  while (auto *sd = v->getType().getStructDecl()) {
     ASSERT(sd->getStoredProperties().size() == 1 &&
            "Array or its internal structs should have exactly one stored property");
     auto *se = SGF.getBuilder().createStructExtract(loc, v, v->getType().getFieldDecl(0));

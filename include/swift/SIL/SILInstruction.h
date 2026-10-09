@@ -6972,7 +6972,7 @@ public:
   }
 
   StructDecl *getStructDecl() const {
-    auto s = getType().getStructOrBoundGenericStruct();
+    auto s = getType().getStructDecl();
     assert(s && "A struct should always have a StructDecl associated with it");
     return s;
   }
@@ -12366,7 +12366,7 @@ public:
          ValueOwnershipKind forwardingOwnershipKind);
 
   StructDecl *getStructDecl() const {
-    return getOperand()->getType().getStructOrBoundGenericStruct();
+    return getOperand()->getType().getStructDecl();
   }
 
   static bool classof(SILNodePointer node) {

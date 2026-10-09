@@ -87,7 +87,7 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
     return typeMapping.getKnownSIMDTypeInfo(t, ctx) ? KnownTypeKind::KnownSIMD
                                                     : KnownTypeKind::Unknown;
 
-  if (auto *structDecl = t->getStructOrBoundGenericStruct())
+  if (auto *structDecl = t->getStructDecl())
     typeDecl = structDecl;
   else
     return KnownTypeKind::Unknown;
@@ -518,7 +518,7 @@ public:
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
     auto arg = args.front();
-    if (const auto *structDecl = arg->getStructOrBoundGenericStruct();
+    if (const auto *structDecl = arg->getStructDecl();
         structDecl && structDecl->getClangDecl()) {
       ClangTypeHandler handler(structDecl->getClangDecl());
       if (!handler.isRepresentable())

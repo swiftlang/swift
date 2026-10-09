@@ -818,9 +818,9 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   if (source.isAnyExistentialType() || target.isAnyExistentialType() ||
       source->is<ArchetypeType>() || target->is<ArchetypeType>() ||
       (source.getClassOrBoundGenericClass() &&
-       !target.getStructOrBoundGenericStruct()) ||
+       !target.getStructDecl()) ||
       (target.getClassOrBoundGenericClass() &&
-       !source.getStructOrBoundGenericStruct()))
+       !source.getStructDecl()))
     return nullptr;
 
   // Casts involving non-bound generic types cannot be optimized.

@@ -651,7 +651,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     // For a struct stored property, we may know the fixed offset of the field,
     // or we may need to fetch it out of the type's metadata at instantiation
     // time.
-    if (auto theStruct = loweredBaseTy.getStructOrBoundGenericStruct()) {
+    if (auto theStruct = loweredBaseTy.getStructDecl()) {
       if (auto offset = emitPhysicalStructMemberFixedOffset(IGM,
                                                             loweredBaseTy,
                                                             property)) {
@@ -942,7 +942,7 @@ emitKeyPathComponent(IRGenModule &IGM,
                                  superClassTy->getWithoutSpecifierType());
         }
       }
-      if (auto struc = baseTy->getStructOrBoundGenericStruct()) {
+      if (auto struc = baseTy->getStructDecl()) {
         // Scan the stored properties of the struct to find the index. We should
         // only ever use a struct field as a uniquing key from inside the
         // struct's own module, so this is OK.
@@ -1536,7 +1536,7 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
     auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
     layout.isLet = property->isLet();
 
-    if (rootTy->getStructOrBoundGenericStruct()) {
+    if (rootTy->getStructDecl()) {
       layout.kind = StaticKeyPathComponentLayout::Kind::StructOrTuple;
       auto *fixedOffset =
           emitPhysicalStructMemberFixedOffset(IGM, rootSILTy, property);

@@ -2612,7 +2612,7 @@ VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
   if (!getImpl().OptionalTanValueDecl) {
     // TODO: Maybe it would be better to have getters / setters here that we
     // can call and hide this implementation detail?
-    StructDecl *optStructDecl = optionalTanType.getStructOrBoundGenericStruct();
+    StructDecl *optStructDecl = optionalTanType.getStructDecl();
     assert(optStructDecl && "Unexpected type of Optional.TangentVector");
 
     ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();

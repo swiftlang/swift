@@ -1167,7 +1167,7 @@ public:
 
   /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
-  StructDecl *getStructOrBoundGenericStruct();
+  StructDecl *getStructDecl();
   
   /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
@@ -8713,11 +8713,11 @@ inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
   return nullptr;
 }
 
-inline StructDecl *TypeBase::getStructOrBoundGenericStruct() {
-  return getCanonicalType().getStructOrBoundGenericStruct();
+inline StructDecl *TypeBase::getStructDecl() {
+  return getCanonicalType().getStructDecl();
 }
 
-inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
+inline StructDecl *CanType::getStructDecl() const {
   if (auto structTy = dyn_cast<StructType>(*this))
     return structTy->getDecl();
 

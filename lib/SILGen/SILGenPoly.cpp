@@ -618,10 +618,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // - upcasts for collections
-  if (outputSubstType->getStructOrBoundGenericStruct() &&
-      inputSubstType->getStructOrBoundGenericStruct()) {
-    auto *inputStruct = inputSubstType->getStructOrBoundGenericStruct();
-    auto *outputStruct = outputSubstType->getStructOrBoundGenericStruct();
+  if (outputSubstType->getStructDecl() &&
+      inputSubstType->getStructDecl()) {
+    auto *inputStruct = inputSubstType->getStructDecl();
+    auto *outputStruct = outputSubstType->getStructDecl();
 
     // Attempt collection upcast only if input and output declarations match.
     if (inputStruct == outputStruct) {

@@ -1701,7 +1701,7 @@ namespace {
     void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
@@ -1895,7 +1895,7 @@ namespace {
     void lowerChildren(TypeConverter &TC,
                        SmallVectorImpl<Child> &children) const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
 
       for (auto prop : structDecl->getStoredProperties()) {
@@ -3600,7 +3600,7 @@ bool TypeConverter::visitAggregateLeaves(
            isa<PackExpansionType>(ty) ||
            isa<BuiltinFixedArrayType>(ty) ||
            ty.getEnumDecl() ||
-           ty.getStructOrBoundGenericStruct();
+           ty.getStructDecl();
   };
   insertIntoWorklist(substType, origType, nullptr, std::nullopt);
   while (!worklist.empty()) {
@@ -3641,7 +3641,7 @@ bool TypeConverter::visitAggregateLeaves(
       } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
         insertIntoWorklist(array->getElementType(),
                            AbstractionPattern::getOpaque(), field, index);
-      } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+      } else if (auto *decl = ty.getStructDecl()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
@@ -5945,7 +5945,7 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
                                      SILType Ty,
                                      TypeExpansionContext expansion) {
-  if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = Ty.getStructDecl()) {
     assert(
         !structDecl->isResilient(&TC.M, expansion.getResilienceExpansion()) &&
         " FSO should not be trying to explode resilient (ie address-only) "

@@ -3920,7 +3920,7 @@ public:
   }
   
   void checkStructInst(StructInst *SI) {
-    auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
+    auto *structDecl = SI->getType().getStructDecl();
     require(structDecl, "StructInst must return a struct");
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
@@ -4336,7 +4336,7 @@ public:
             "cannot struct_extract from address");
     require(EI->getType().isObject(),
             "result of struct_extract cannot be address");
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "must struct_extract from struct");
     require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
@@ -4391,7 +4391,7 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     require(operandTy.isAddress(),
             "must derive struct_element_addr from address");
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "struct_element_addr operand must be struct address");
     require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
@@ -4467,7 +4467,7 @@ public:
 
   void checkDestructureStructInst(DestructureStructInst *DSI) {
     SILType operandTy = DSI->getOperand()->getType();
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "must struct_extract from struct");
     require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");

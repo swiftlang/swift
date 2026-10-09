@@ -1089,7 +1089,7 @@ bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(
   // here, but not if the instance type is a struct/enum.
   if (auto IT = getType(Base)->getAs<MetatypeType>()) {
     auto InstanceType = IT->getInstanceType();
-    if (InstanceType->getStructOrBoundGenericStruct() ||
+    if (InstanceType->getStructDecl() ||
         InstanceType->getEnumDecl())
       return false;
   }

@@ -12913,7 +12913,7 @@ void FuncDecl::setHasTopLevelLocalContextCaptures(bool hasCaptures) {
 }
 
 Type TypeBase::getSwiftNewtypeUnderlyingType() {
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   if (!structDecl)
     return {};
 

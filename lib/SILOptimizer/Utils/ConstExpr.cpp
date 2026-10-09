@@ -1691,7 +1691,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     // If a struct with no stored properties is created, no initialization is
     // needed. Hence, create a empty aggregate as the initial value.
     CanType structType = asi->getElementType().getASTType();
-    StructDecl *structDecl = structType.getStructOrBoundGenericStruct();
+    StructDecl *structDecl = structType.getStructDecl();
 
     if (structDecl && structDecl->getStoredProperties().empty()) {
       createMemoryObject(asi, SymbolicValue::getAggregate(
