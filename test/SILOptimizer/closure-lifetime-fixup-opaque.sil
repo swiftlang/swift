@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -closure-lifetime-fixup %s | %FileCheck %s
+
+// With opaque values, an @in_guaranteed capture of a generic value is an
+// object, not an address. SILGen copies it with a copy_value for the escaping
+// closure, and ClosureLifetimeFixup borrows that copy for the on-stack closure.
+// There is no alloc_stack to deallocate. This test runs ClosureLifetimeFixup
+// directly on that SIL, so it does not depend on where address lowering sits in
+// the pipeline.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil [ossa] @closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// The captured copy is not removed when the original is destroyed while the
+// closure is still in use: the closure keeps its own copy, and ends the borrow
+// and destroys the copy after its last use.
+// CHECK-LABEL: sil [ossa] {{.*}}@test_owned_source_destroyed_early :
+// CHECK:         [[COPY:%[^,]+]] = copy_value %0 : $T
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]] : $T
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>([[BORROW]])
+// CHECK:         destroy_value %0 : $T
+// CHECK:         apply {{%[^,]+}}([[CLOSURE]])
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         end_borrow [[BORROW]] : $T
+// CHECK:         destroy_value [[COPY]] : $T
+// CHECK-NOT:     dealloc_stack
+// CHECK:       } // end sil function 'test_owned_source_destroyed_early'
+sil [ossa] @test_owned_source_destroyed_early : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  %f = function_ref @closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %c = copy_value %0 : $T
+  %pa = partial_apply [callee_guaranteed] %f<T>(%c) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  destroy_value %0 : $T
+  %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %cvt : $@noescape @callee_guaranteed () -> ()
+  destroy_value %pa : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
