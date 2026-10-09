@@ -296,6 +296,12 @@ public:
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
 
+  /// Import a visible, complete, explicitly declared class specialization.
+  /// This does not create or complete a specialization.
+  virtual NominalTypeDecl *lookupCXXClassTemplateSpecialization(
+      const clang::ClassTemplateDecl *decl,
+      ArrayRef<clang::TemplateArgument> arguments) = 0;
+
   virtual ConcreteDeclRef
   getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
                                        ValueDecl *decl) = 0;

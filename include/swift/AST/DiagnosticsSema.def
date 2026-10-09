@@ -4325,6 +4325,17 @@ ERROR(cxx_class_instantiation_failed,none,
       "couldn't instantiate a C++ class template",
       ())
 
+ERROR(cxx_class_template_requires_concrete_arguments,none,
+      "C++ class template %0 requires explicit concrete type arguments",
+      (Type))
+ERROR(cxx_class_template_argument_not_supported,none,
+      "type %0 cannot be used to name a C++ class template specialization",
+      (Type))
+ERROR(cxx_class_template_specialization_not_found,none,
+      "no complete, visible, explicitly declared C++ specialization of %0 "
+      "matches these type arguments",
+      (Identifier))
+
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",
         (Identifier))

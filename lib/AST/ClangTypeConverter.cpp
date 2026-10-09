@@ -953,6 +953,58 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
   return (it != ReversedExportMap.end() ? it->second : nullptr);
 }
 
+clang::QualType ClangTypeConverter::convertClassTemplateArgument(Type type) {
+  type = type->getCanonicalType();
+  if (type->hasTypeParameter() || type->hasArchetype() ||
+      type->hasTypeVariableOrPlaceholder())
+    return {};
+
+  if (auto tuple = type->getAs<TupleType>())
+    return tuple->getNumElements() == 0 ? ClangASTContext.VoidTy
+                                        : clang::QualType();
+
+  auto *nominal = type->getAnyNominal();
+  if (!nominal)
+    return {};
+
+  // Reference types need a spelling that distinguishes the C++ class from a
+  // pointer to it. Do not use the parameter conversion for this purpose.
+  if (type->isForeignReferenceType())
+    return {};
+  if (auto *decl = dyn_cast_or_null<clang::TagDecl>(nominal->getClangDecl()))
+    return ClangASTContext.getCanonicalTagType(decl);
+
+  if (!nominal->isStdlibDecl())
+    return {};
+
+  if (auto pointer = type->getAs<BoundGenericType>()) {
+    auto kind = classifyPointer(pointer);
+    if (!kind || (*kind != PointerKind::UnsafePointer &&
+                  *kind != PointerKind::UnsafeMutablePointer))
+      return {};
+    auto pointee = convertClassTemplateArgument(pointer->getGenericArgs()[0]);
+    if (pointee.isNull())
+      return {};
+    if (*kind == PointerKind::UnsafePointer)
+      pointee = pointee.withConst();
+    return ClangASTContext.getPointerType(pointee);
+  }
+
+  if (auto structure = type->getAs<StructType>()) {
+    if (nominal->getName().is("UnsafeMutableRawPointer"))
+      return ClangASTContext.VoidPtrTy;
+    if (nominal->getName().is("UnsafeRawPointer"))
+      return ClangASTContext.getPointerType(ClangASTContext.VoidTy.withConst());
+
+    // Use the established inverse mapping for scalar types. A cached bridge
+    // to an Objective-C or pointer type must not become a template argument.
+    auto scalar = reverseBuiltinTypeMapping(structure);
+    if (!scalar.isNull() && scalar->isBuiltinType())
+      return ClangASTContext.getCanonicalType(scalar);
+  }
+  return {};
+}
+
 clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
   auto withCache = [&](auto conversion) {
     auto cached = Cache.find(type);

@@ -431,6 +431,10 @@ public:
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
 
+  NominalTypeDecl *lookupCXXClassTemplateSpecialization(
+      const clang::ClassTemplateDecl *decl,
+      ArrayRef<clang::TemplateArgument> arguments) override;
+
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 

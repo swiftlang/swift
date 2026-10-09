@@ -124,6 +124,7 @@ private:
   /// imported from Clang, and a handful of builtin Swift types (e.g., integers
   /// and floats).
   clang::QualType convertTemplateArgument(Type type);
+  clang::QualType convertClassTemplateArgument(Type type);
 
   clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
 

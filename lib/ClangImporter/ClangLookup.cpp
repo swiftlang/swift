@@ -62,6 +62,40 @@
 
 using namespace swift;
 
+NominalTypeDecl *ClangImporter::lookupCXXClassTemplateSpecialization(
+    const clang::ClassTemplateDecl *decl,
+    ArrayRef<clang::TemplateArgument> arguments) {
+  if (!decl->getDeclContext()->isFileContext() ||
+      !llvm::all_of(*decl->getTemplateParameters(), [](auto *param) {
+        auto *typeParam = dyn_cast<clang::TemplateTypeParmDecl>(param);
+        return typeParam && !typeParam->isParameterPack();
+      }))
+    return nullptr;
+
+  void *insertPos = nullptr;
+  auto *specialization =
+      const_cast<clang::ClassTemplateDecl *>(decl)->findSpecialization(
+          arguments, insertPos);
+  if (!specialization || !Impl.isVisibleClangEntry(specialization))
+    return nullptr;
+
+  // An implicitly instantiated definition may have been completed by an
+  // earlier Swift lookup. Restrict this prototype to explicit C++ declarations
+  // so naming a specialization does not depend on Swift declaration order.
+  if (!specialization->isExplicitInstantiationOrSpecialization())
+    return nullptr;
+
+  auto *definition = specialization->getDefinition();
+  if (!definition || definition->isInvalidDecl() ||
+      !Impl.isVisibleClangEntry(definition))
+    return nullptr;
+
+  // Reuse the nominal type imported for signatures and aliases. In particular,
+  // do not set TemplateInstantiationType: this is not a Swift generic type.
+  return dyn_cast_or_null<NominalTypeDecl>(
+      Impl.importDecl(definition, Impl.CurrentVersion));
+}
+
 namespace {
 /// Collects name lookup results into the given tiny vector, for use in the
 /// various ClangImporter lookup routines.
