@@ -2221,6 +2221,45 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     return markedValue->getFunction()->getASTContext();
   }
 
+  /// Classify \p op, whose user takes or copies the marked memory, as a consume
+  /// of \p leafRange. A copy of a noncopyable value must really be a take, so
+  /// a copy is recorded as one that the dataflow converts to a take once it
+  /// knows that it is a last use.
+  void recordConsumeOfMarkedMemory(Operand *op, TypeTreeLeafTypeRange leafRange,
+                                   bool isTake) {
+    auto *user = op->getUser();
+    if (markedValue->getCheckKind() ==
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
+      if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found mark must check [nocopy] use of escaping box: "
+                   << *user);
+        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
+            markedValue);
+        return;
+      }
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found mark must check [nocopy] error: " << *user);
+      diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, user);
+      return;
+    }
+
+    // Whether we take or copy, this is going to be a consuming operation. Make
+    // sure to check if we semantically destructure.
+    checkForPartialMutation(
+        useState, diagnosticEmitter, PartialMutation::Kind::Consume, user,
+        op->get()->getType(), leafRange, PartialMutation::consume());
+
+    if (isTake) {
+      LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
+      useState.recordTakeUse(user, leafRange);
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "Found copy: " << *user);
+      useState.recordCopyUse(user, leafRange);
+    }
+  }
+
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
     BitfieldRef<SSAPrunedLiveness>::StackState state(liveness,
@@ -2442,41 +2481,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         continue;
       }
 
-      if (markedValue->getCheckKind() ==
-          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
-        if (isa<ProjectBoxInst>(
-                stripAccessMarkers(markedValue->getOperand()))) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Found mark must check [nocopy] use of escaping box: "
-                     << *user);
-          diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
-              markedValue);
-          continue;
-        }
-
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Found mark must check [nocopy] error: " << *user);
-        diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
-        continue;
-      }
-
       // TODO: Add borrow checking here like below.
 
       // If we have a copy_addr, we are either going to have a take or a
       // copy... in either case, this copy_addr /is/ going to be a consuming
-      // operation. Make sure to check if we semantically destructure.
-      checkForPartialMutation(useState, diagnosticEmitter,
-                              PartialMutation::Kind::Consume, op->getUser(),
-                              op->get()->getType(), leafRange,
-                              PartialMutation::consume());
-
-      if (copyAddr->isTakeOfSrc()) {
-        LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
-        useState.recordTakeUse(user, leafRange);
-      } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found copy: " << *user);
-        useState.recordCopyUse(user, leafRange);
-      }
+      // operation.
+      recordConsumeOfMarkedMemory(op, leafRange, copyAddr->isTakeOfSrc());
     }
     return true;
   }
@@ -2515,6 +2525,28 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
           break;
         }
       }
+      return true;
+    }
+
+    // SILGen emits a Builtin.reinterpretCast of a noncopyable value as a load
+    // whose value is bit cast. That copies the bits out of the memory, so
+    // classify the load like the copy_addr that the address-only form of the
+    // cast uses: as a consume. Neither the borrow to destructure transform nor
+    // the canonicalizer could do this, since they cannot see through an
+    // unchecked_bitwise_cast (a PointerEscape).
+    if (llvm::any_of(li->getUses(), [](Operand *use) {
+          return isa<UncheckedBitwiseCastInst>(use->getUser());
+        })) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      for (auto leafRange : leafRanges)
+        recordConsumeOfMarkedMemory(op, leafRange,
+                                    qualifier == LoadOwnershipQualifier::Take);
       return true;
     }
 
