@@ -488,8 +488,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
-  /// - SeeAlso: `Task.isCancelled`
-  /// - SeeAlso: `TaskGroup.isCancelled`
+  /// - SeeAlso: ``Task/isCancelled-type.property``
+  /// - SeeAlso: ``TaskGroup/isCancelled``
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
@@ -502,8 +502,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// `Task.cancellationReason` from inside those tasks). First-cancel-wins
   /// on the reason for each child task individually.
   ///
-  /// - SeeAlso: `cancelAll()`
-  /// - SeeAlso: `CancellationError.Reason`
+  /// - SeeAlso: ``TaskGroup/cancelAll()``
+  /// - SeeAlso: ``CancellationError/Reason``
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
@@ -518,13 +518,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
   ///
-  /// ### Interaction with task cancellation shields
+  /// ### Interaction with Task Cancellation Shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// reading `isCancelled` on a cancelled task returns `false`.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -763,7 +762,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - Throws: The error thrown by the next child task that completes.
   ///
-  /// - SeeAlso: `nextResult()`
+  /// - SeeAlso: ``nextResult()``
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
@@ -823,7 +822,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   or a `Result.failure` value
   ///   containing the error that the child task threw.
   ///
-  /// - SeeAlso: `next()`
+  /// - SeeAlso: ``next()``
   @export(implementation)
   public nonisolated(nonsending) mutating func nextResult() async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
@@ -862,8 +861,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
-  /// - SeeAlso: `Task.isCancelled`
-  /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
+  /// - SeeAlso: ``Task/isCancelled-type.property``
+  /// - SeeAlso: ``ThrowingTaskGroup/isCancelled``
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
@@ -886,13 +885,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
   ///
-  /// ### Interaction with task cancellation shields
+  /// ### Interaction with Task Cancellation Shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// reading `isCancelled` on a cancelled task returns `false`.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -933,7 +931,7 @@ extension TaskGroup: AsyncSequence {
   ///     group.addTask { 2 }
   ///     for await r in group { print(r) }
   ///
-  /// - SeeAlso: `TaskGroup.next()`
+  /// - SeeAlso: ``TaskGroup/next()``
   @available(SwiftStdlib 5.1, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
@@ -958,7 +956,7 @@ extension TaskGroup: AsyncSequence {
     /// this iterator is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
-    /// see `TaskGroup.next()`.
+    /// see ``TaskGroup/next()``.
     ///
     /// - Returns: The value returned by the next child task that completes,
     ///   or `nil` if there are no remaining child tasks,
@@ -980,7 +978,7 @@ extension TaskGroup: AsyncSequence {
     /// this iterator is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
-    /// see `TaskGroup.next()`.
+    /// see ``TaskGroup/next()``.
     ///
     /// - Returns: The value returned by the next child task that completes,
     ///   or `nil` if there are no remaining child tasks,
@@ -1043,7 +1041,7 @@ extension ThrowingTaskGroup: AsyncSequence {
   ///     // Assuming the child tasks complete in order, this prints "2".
   ///     for try await r in group { print(r) }
   ///
-  /// - SeeAlso: `ThrowingTaskGroup.next()`
+  /// - SeeAlso: ``ThrowingTaskGroup/next()``
   @available(SwiftStdlib 5.1, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
