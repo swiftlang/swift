@@ -674,7 +674,7 @@ public:
 
     // If this is a delegating initializer, collect uses specially.
     if (IsSelfOfNonDelegatingInitializer &&
-        TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr) {
+        TheMemory.getASTType()->getClassDecl() != nullptr) {
       assert(!TheMemory.isDerivedClassSelfOnly() &&
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
@@ -1327,7 +1327,7 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
 /// constructor.  The memory object has class type.
 void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
   assert(IsSelfOfNonDelegatingInitializer &&
-         TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr);
+         TheMemory.getASTType()->getClassDecl() != nullptr);
 
   // For efficiency of lookup below, compute a mapping of the local ivars in the
   // class to their element number.
@@ -2155,7 +2155,7 @@ static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
     return true;
 
   return MemoryInfo.isNonDelegatingInit() &&
-         MemoryInfo.getASTType()->getClassOrBoundGenericClass() != nullptr &&
+         MemoryInfo.getASTType()->getClassDecl() != nullptr &&
          MemoryInfo.isDerivedClassSelfOnly();
 }
 

@@ -79,7 +79,7 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
                                 : KnownTypeKind::Known;
   }
   if (auto *classType = dyn_cast<ClassType>(tPtr)) {
-    return (classType->getClassOrBoundGenericClass()->hasClangNode())
+    return (classType->getClassDecl()->hasClangNode())
                ? KnownTypeKind::Known
                : KnownTypeKind::Unknown;
   }
@@ -305,7 +305,7 @@ public:
     bool hasSwiftSuperClass = false;
     if (auto superClass = ty->getExistentialLayout()
           .getExplicitSuperclassOrProtocolSuperclass()) {
-      auto *CD = superClass->getClassOrBoundGenericClass();
+      auto *CD = superClass->getClassDecl();
       hasSwiftSuperClass = !CD->isObjC();
     }
     if (ty->isObjCExistentialType() && !hasSwiftSuperClass) {
@@ -1243,7 +1243,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       namePrinter();
       return;
     }
-    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = type->getClassDecl()) {
       if (classDecl->hasClangNode()) {
         if (isInOut)
           os << '&';
@@ -1621,7 +1621,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       printGenericReturnSequence(os, gtpt, printCallToCFunc);
       return;
     }
-    if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = resultTy->getClassDecl()) {
       if (classDecl->hasClangNode()) {
         assert(!isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
         os << "return ";
@@ -1681,7 +1681,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   auto nonOptResultType = resultTy->getOptionalObjectType();
   if (!nonOptResultType)
     nonOptResultType = resultTy;
-  if (auto *classDecl = nonOptResultType->getClassOrBoundGenericClass();
+  if (auto *classDecl = nonOptResultType->getClassDecl();
       (classDecl && isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) ||
       nonOptResultType->isObjCExistentialType()) {
     assert(!classDecl || classDecl->hasClangNode());
@@ -2052,7 +2052,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(
   // *_Nullable`.
   Type unwrapped = resultTy->lookThroughSingleOptionalType();
 
-  if (auto *classDecl = unwrapped->getClassOrBoundGenericClass()) {
+  if (auto *classDecl = unwrapped->getClassDecl()) {
     if (classDecl->hasClangNode()) {
       if (isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) {
         os << " NS_RETURNS_RETAINED";

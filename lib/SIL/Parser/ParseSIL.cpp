@@ -8304,7 +8304,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
   } else {
     if (SILParser(P).parseSILType(specializedClassTy))
       return true;
-    theClass = specializedClassTy.getClassOrBoundGenericClass();
+    theClass = specializedClassTy.getClassDecl();
     if (!theClass) {
       return true;
     }

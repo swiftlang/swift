@@ -523,7 +523,7 @@ public:
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
     if (!result->IsBridgedError &&
-        typeResult->getClassOrBoundGenericClass()) {
+        typeResult->getClassDecl()) {
       auto pointerval = Reader.readResolvedPointerValue(payloadAddress);
       if (!pointerval)
         return getFailure<OpenedExistential>();
@@ -549,7 +549,7 @@ public:
     // address returned is the class instance itself and not the address
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
-    if (typeResult->getClassOrBoundGenericClass()) {
+    if (typeResult->getClassDecl()) {
       auto pointerval = Reader.readResolvedPointerValue(payloadAddress);
       if (!pointerval)
         return getFailure<OpenedExistential>();

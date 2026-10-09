@@ -109,7 +109,7 @@ void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
   printFlag("isAggregate", isAggregate());
   printFlag("isOrHasEnum", isOrHasEnum());
   StringRef nominalKind = "none";
-  if (getClassOrBoundGenericClass())
+  if (getClassDecl())
     nominalKind = "class";
   else if (getStructDecl())
     nominalKind = "struct";
@@ -527,10 +527,10 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
 
   // If this type is not a class type, then we propagate "move only"-ness to the
   // field. Example:
-  if (!getClassOrBoundGenericClass() && isMoveOnlyWrapped())
+  if (!getClassDecl() && isMoveOnlyWrapped())
     loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
-  if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
+  if (isAddress() || getClassDecl() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
     return SILType::getPrimitiveObjectType(loweredTy);

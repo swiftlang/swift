@@ -1519,13 +1519,13 @@ void IRGenerator::emitLazyDefinitions() {
 
     while (!LazyClassMetadata.empty()) {
       CanType classType = LazyClassMetadata.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      CurrentIGMPtr IGM = getGenModule(classType->getClassDecl());
       emitLazyClassMetadata(*IGM.get(), classType);
     }
 
     while (!LazySpecializedClassMetadata.empty()) {
       CanType classType = LazySpecializedClassMetadata.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      CurrentIGMPtr IGM = getGenModule(classType->getClassDecl());
       emitLazySpecializedClassMetadata(*IGM.get(), classType);
     }
 
@@ -5056,9 +5056,9 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
 llvm::Constant *
 IRGenModule::getAddrOfCanonicalSpecializedGenericMetaclassObject(
     CanType concreteType, ForDefinition_t forDefinition) {
-  auto *theClass = concreteType->getClassOrBoundGenericClass();
+  auto *theClass = concreteType->getClassDecl();
   assert(theClass && "only classes have metaclasses");
-  assert(concreteType->getClassOrBoundGenericClass()->isGenericContext());
+  assert(concreteType->getClassDecl()->isGenericContext());
 
   auto entity =
       LinkEntity::forSpecializedGenericSwiftMetaclassStub(concreteType);
@@ -5404,7 +5404,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
                 concreteType)
           : (isObjCImpl
                 ? LinkEntity::forObjCClass(
-                      concreteType->getClassOrBoundGenericClass())
+                      concreteType->getClassDecl())
                 : LinkEntity::forTypeMetadata(
                       concreteType, TypeMetadataAddress::FullMetadata));
 
@@ -5428,7 +5428,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     var->setSection(section);
 
   if (getOptions().VirtualFunctionElimination) {
-    if (auto classDecl = concreteType->getClassOrBoundGenericClass()) {
+    if (auto classDecl = concreteType->getClassDecl()) {
       addVTableTypeMetadata(classDecl, var, vtableEntries);
     }
   }
@@ -5540,7 +5540,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
   } else if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
-    if (concreteType->getClassOrBoundGenericClass() && !foreign) {
+    if (concreteType->getClassDecl() && !foreign) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
     } else {
       adjustmentIndex = MetadataAdjustmentIndex::ValueType;
@@ -5609,7 +5609,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   switch (canonicality) {
   case TypeMetadataCanonicality::Canonical: {
-    auto classDecl = concreteType->getClassOrBoundGenericClass();
+    auto classDecl = concreteType->getClassDecl();
     if (classDecl && classDecl->getObjCImplementationDecl()) {
       entity = LinkEntity::forObjCClass(classDecl);
     } else {

@@ -87,7 +87,7 @@ Size ClassLayout::getInstanceStart() const {
 
 void ClassLayout::collectAllStoredPropertyTypes(
     IRGenModule &IGM, SILType classType, SmallVectorImpl<SILType> &fieldTypes) {
-  auto *classDecl = classType.getClassOrBoundGenericClass();
+  auto *classDecl = classType.getClassDecl();
   // ClassLayout::AllStoredProperties for a class is populated to
   // include its ancestors' properties only when the class includes a
   // generic parameter and fully specialized (which is the same

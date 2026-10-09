@@ -525,7 +525,7 @@ llvm::Constant *
 irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                       CanType type,
                                       bool allowDynamicUninitialized) {
-  auto theDecl = type->getClassOrBoundGenericClass();
+  auto theDecl = type->getClassDecl();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
@@ -1013,7 +1013,7 @@ bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
   //
   // TODO: On platforms without ObjC interop, we can do direct access to
   // Swift metadata without a runtime call at all.
-  if (auto classDecl = type.getClassOrBoundGenericClass()) {
+  if (auto classDecl = type.getClassDecl()) {
     if (!hasKnownSwiftMetadata(IGM, classDecl))
       return true;
     if (classDecl->isGenericContext() &&
@@ -2105,7 +2105,7 @@ namespace {
       if (auto *PCT =
               type->getConstraintType()->getAs<ProtocolCompositionType>()) {
         auto constraintTy = PCT->withoutMarkerProtocols();
-        if (constraintTy->getClassOrBoundGenericClass()) {
+        if (constraintTy->getClassDecl()) {
           auto response = IGF.emitTypeMetadataRef(
               constraintTy->getCanonicalType(), request);
           return setLocal(type, response);
@@ -2759,7 +2759,7 @@ emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
     return;
   }
   initializedTypes.insert(theType);
-  auto *classDecl = theType->getClassOrBoundGenericClass();
+  auto *classDecl = theType->getClassDecl();
   assert(classDecl);
   if (classDecl->isGenericContext()) {
     llvm::Function *accessor =
@@ -2803,7 +2803,7 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
     auto parameter = requirement.getTypeParameter();
     auto noncanonicalArgument = parameter.subst(substitutions);
     auto argument = noncanonicalArgument->getCanonicalType();
-    if (argument->getClassOrBoundGenericClass()) {
+    if (argument->getClassDecl()) {
       emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
           IGF, argument, initializedTypes);
     }
@@ -3124,7 +3124,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
         return;
       }
       // Need to materialize the base class, if any.
-      if (comp->getMembers().front()->getClassOrBoundGenericClass()) {
+      if (comp->getMembers().front()->getClassDecl()) {
         visit(CanType(comp->getMembers().front()));
         numMembers -= 1;
       }

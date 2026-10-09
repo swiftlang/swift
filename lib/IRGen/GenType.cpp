@@ -3456,7 +3456,7 @@ void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
                                            IRGenFunction::DynamicSelfKind kind) {
   assert(!SelfValue && "already have local self metadata");
   SelfValue = value;
-  assert(selfClass->getClassOrBoundGenericClass()
+  assert(selfClass->getClassDecl()
          && "self type not a class?");
   SelfTypeIsExact = isExactSelfClass;
   SelfType = selfClass;

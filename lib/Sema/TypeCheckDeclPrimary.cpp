@@ -459,7 +459,7 @@ static void checkInheritanceClause(
     // If this is a class type, it may be the superclass. We end up here when
     // the inherited type is either itself a class, or when it is a subclass
     // existential via the existential type path above.
-    if (inheritedTy->getClassOrBoundGenericClass()) {
+    if (inheritedTy->getClassDecl()) {
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
@@ -3580,7 +3580,7 @@ public:
       });
 
     if (auto superclassTy = CD->getSuperclass()) {
-      ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+      ClassDecl *Super = superclassTy->getClassDecl();
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {

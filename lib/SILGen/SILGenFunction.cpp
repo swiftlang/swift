@@ -2013,7 +2013,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   auto metatypeTy = MetatypeType::get(selfTy);
 
   SILValue selfMetatype;
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     selfMetatype = B.createValueMetatype(loc, getLoweredType(metatypeTy),
                                          selfValue).getValue();
   } else {

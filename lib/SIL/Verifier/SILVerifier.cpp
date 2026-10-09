@@ -2129,7 +2129,7 @@ public:
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
-    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+    require(AI->isObjC() || AI->getType().getClassDecl(),
             "alloc_ref must allocate class");
     checkAllocRefBase(AI);
   }
@@ -2661,7 +2661,7 @@ public:
           return true;
         if (t.getASTType() == t.getASTContext().TheNativeObjectType)
           return true;
-        if (auto clazz = t.getClassOrBoundGenericClass())
+        if (auto clazz = t.getClassDecl())
           // Must be a class defined in Swift.
           return clazz->hasKnownSwiftImplementation();
         return false;
@@ -2719,7 +2719,7 @@ public:
       require(arguments.size() == 1,
               "default-actor builtin can only operate on a single object");
       auto argType = arguments[0]->getType().getASTType();
-      auto argClass = argType.getClassOrBoundGenericClass();
+      auto argClass = argType.getClassDecl();
       require((argClass && argClass->isRootDefaultActor(M,
                                         F.getResilienceExpansion())) ||
               isa<BuiltinNativeObjectType>(argType),
@@ -3666,7 +3666,7 @@ public:
     require(MU->getFunction()->getFunctionStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getClassOrBoundGenericClass() ||
+            Src->getType().getClassDecl() ||
             Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     requireSameType(Src->getType(), MU->getType(),
@@ -4204,7 +4204,7 @@ public:
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
-    auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
+    auto *cd = DI->getOperand()->getType().getClassDecl();
     require(cd, "Operand of dealloc_ref must be of class type");
 
     require(!checkResilience(cd, F),
@@ -4213,13 +4213,13 @@ public:
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
             "First operand of dealloc_partial_ref must be object");
-    auto class1 = DPRI->getInstance()->getType().getClassOrBoundGenericClass();
+    auto class1 = DPRI->getInstance()->getType().getClassDecl();
     require(class1,
             "First operand of dealloc_partial_ref must be of class type");
     require(DPRI->getMetatype()->getType().is<MetatypeType>(),
             "Second operand of dealloc_partial_ref must be a metatype");
     auto class2 = DPRI->getMetatype()->getType().castTo<MetatypeType>()
-        ->getInstanceType()->getClassOrBoundGenericClass();
+        ->getInstanceType()->getClassDecl();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     require(class2->isSuperclassOf(class1),
@@ -4432,7 +4432,7 @@ public:
     require(EI->getField()->hasStorage(),
             "cannot get address of computed property with ref_element_addr");
     SILType operandTy = EI->getOperand()->getType();
-    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    ClassDecl *cd = operandTy.getClassDecl();
     require(cd, "ref_element_addr operand must be a class instance");
     require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
@@ -4457,7 +4457,7 @@ public:
     require(RTAI->getType().isAddress(),
             "result of ref_tail_addr must be lvalue");
     SILType operandTy = RTAI->getOperand()->getType();
-    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    ClassDecl *cd = operandTy.getClassDecl();
     require(cd, "ref_tail_addr operand must be a class instance");
     require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
@@ -4760,7 +4760,7 @@ public:
     auto decl = CMI->getMember().getDecl();
     auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
-    require(methodClass->getClassOrBoundGenericClass(),
+    require(methodClass->getClassDecl(),
             "super_method must look up a class method");
 
     // The method ought to appear in the class vtable.
@@ -4786,7 +4786,7 @@ public:
     if (auto metatypeType = dyn_cast<MetatypeType>(operandInstanceType))
       operandInstanceType = metatypeType.getInstanceType();
 
-    if (operandInstanceType.getClassOrBoundGenericClass()) {
+    if (operandInstanceType.getClassDecl()) {
       auto overrideTy =
           TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
       requireSameType(
@@ -4865,7 +4865,7 @@ public:
     auto decl = member.getDecl();
     auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
-    require(methodClass->getClassOrBoundGenericClass(),
+    require(methodClass->getClassDecl(),
             "objc_super_method must look up a class method");
   }
 
@@ -5302,9 +5302,9 @@ public:
     }
 
     if (isExact) {
-      require(fromCanTy.getClassOrBoundGenericClass(),
+      require(fromCanTy.getClassDecl(),
               "downcast operand must be a class type");
-      require(toCanTy.getClassOrBoundGenericClass(),
+      require(toCanTy.getClassDecl(),
               "downcast must convert to a class type");
       require(fromCanTy->isBindableToSuperclassOf(toCanTy),
               "downcast must convert to a subclass");
@@ -5537,7 +5537,7 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      auto instClass = instTy->getClassOrBoundGenericClass();
+      auto instClass = instTy->getClassDecl();
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
       
@@ -5571,7 +5571,7 @@ public:
           FromTy.getASTType().getOptionalObjectType());
     }
 
-    auto ToClass = ToTy.getClassOrBoundGenericClass();
+    auto ToClass = ToTy.getClassDecl();
     require(ToClass,
             "upcast must convert a class instance to a class type");
       if (ToClass->isTypeErasedGenericClass()) {
@@ -6309,7 +6309,7 @@ public:
             "objc_protocol must be applied to an @objc protocol");
     auto classTy = OPI->getType();
     require(classTy.isObject(), "objc_protocol must produce a value");
-    auto classDecl = classTy.getClassOrBoundGenericClass();
+    auto classDecl = classTy.getClassDecl();
     require(classDecl, "objc_protocol must produce a class instance");
     require(classDecl->getName() == F.getASTContext().Id_Protocol,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");

@@ -1190,7 +1190,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
       if (langOpts.hasFeature(Feature::Embedded)) {
         return IGM.EmbeddedExistentialsMetadataStructTy;
       }
-      if (getType().getClassOrBoundGenericClass())
+      if (getType().getClassDecl())
         return IGM.FullHeapMetadataStructTy;
       else
         return IGM.FullTypeMetadataStructTy;
@@ -1596,7 +1596,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return (getDecl()->isWeakImported(module) || getDecl()->isStatic());
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
-    return getType()->getClassOrBoundGenericClass()->isWeakImported(module);
+    return getType()->getClassDecl()->isWeakImported(module);
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
@@ -1726,7 +1726,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getDecl()->getDeclContext();
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
-    return getType()->getClassOrBoundGenericClass()->getDeclContext();
+    return getType()->getClassDecl()->getDeclContext();
 
   case Kind::SILFunction:
   case Kind::DynamicallyReplaceableFunctionVariable:

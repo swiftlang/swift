@@ -2842,7 +2842,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     // SILGen ensures that this is unconditionally initialized, so we
     // don't need to track it specially.
     if (!TheMemory.isDelegatingInit()) {
-      auto classDecl = TheMemory.getASTType().getClassOrBoundGenericClass();
+      auto classDecl = TheMemory.getASTType().getClassDecl();
       if (classDecl && classDecl->isRootDefaultActor()) {
           emitDefaultActorDestroy(B, Loc, Pointer);
       }

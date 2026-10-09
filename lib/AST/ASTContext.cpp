@@ -4594,7 +4594,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // evaluator cycle to determine the init kind for actors, which are final.
     if (Ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
       if (wantDynamicSelf)
-        if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+        if (auto *classDecl = selfTy->getClassDecl())
           if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
             isDynamicSelf = true;
     }
@@ -7126,7 +7126,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
 }
 
 bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
-  auto clazz = t->getClassOrBoundGenericClass();
+  auto clazz = t->getClassDecl();
   if (!clazz)
     return false;
 

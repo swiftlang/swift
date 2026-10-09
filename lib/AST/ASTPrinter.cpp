@@ -4879,7 +4879,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext());
       if (proto && Options.TransformContext) {
         auto BaseType = Options.TransformContext->getBaseType();
-        if (BaseType->getClassOrBoundGenericClass()) {
+        if (BaseType->getClassDecl()) {
           ResultTy = ResultTy.transformRec(
             [&](TypeBase *t) -> std::optional<Type> {
               if (isa<DependentMemberType>(t))
@@ -5118,7 +5118,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     // printing onto a class.
     bool isClassContext;
     if (CurrentType) {
-      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+      isClassContext = CurrentType->getClassDecl() != nullptr;
     } else {
       const DeclContext *dc = decl->getDeclContext();
       isClassContext = dc->getSelfClassDecl() != nullptr;

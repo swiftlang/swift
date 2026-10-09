@@ -3672,7 +3672,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
     if (auto selfType = baseType->getAs<DynamicSelfType>())
       baseType = selfType->getSelfType()->getCanonicalType();
-    auto baseClass = baseType->getClassOrBoundGenericClass();
+    auto baseClass = baseType->getClassDecl();
 
     if (baseClass != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)

@@ -1514,7 +1514,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (!elementObj)
     return Type();
 
-  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  auto elementClass = elementObj->getClassDecl();
   if (!elementClass)
     return Type();
 

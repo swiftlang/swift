@@ -486,7 +486,7 @@ public:
     return isTypeErasedGenericClassTypeImpl(*this);
   }
 
-  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
+  ClassDecl *getClassDecl() const; // in Types.h
   StructDecl *getStructDecl() const; // in Types.h
   EnumDecl *getEnumDecl() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h

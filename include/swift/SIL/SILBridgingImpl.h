@@ -3789,7 +3789,7 @@ BridgedVTable BridgedContext::createSpecializedVTable(BridgedType classType,
   }
   swift::SILType classTy = classType.unbridged();
   return {swift::SILVTable::create(*context->getModule(),
-                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   classTy.getClassDecl(), classTy,
                                    serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                    entries)};
 }

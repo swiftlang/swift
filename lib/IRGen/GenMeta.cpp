@@ -3191,7 +3191,7 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
     emitSpecializedGenericClassMetadata(IGM, type,
-                                        *type.getClassOrBoundGenericClass());
+                                        *type.getClassDecl());
     break;
   default:
     llvm_unreachable(
@@ -5730,7 +5730,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   auto &fragileLayout =
       classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
 
-  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+  ClassDecl *classDecl = classType.getClassDecl();
   auto strategy = IGM.getClassMetadataStrategy(classDecl);
   assert(strategy == ClassMetadataStrategy::FixedOrUpdate ||
          strategy == ClassMetadataStrategy::Fixed);
@@ -5765,7 +5765,7 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   // module; importing modules reference them as external symbols rather than
   // lazily emitting their own copy.
   if (IGM.isEmbeddedWithExistentials()) {
-    if (auto *classDecl = classTy->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = classTy->getClassDecl()) {
       if (classDecl->getEffectiveCodeGenerationModel()
               == CodeGenerationModel::Interface)
         return;
@@ -5786,7 +5786,7 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   }
 
   if (hasEmbeddedWithExistentials) {
-    emitEmbeddedClassMetadata(IGM, classTy->getClassOrBoundGenericClass());
+    emitEmbeddedClassMetadata(IGM, classTy->getClassDecl());
     return;
   }
 
@@ -5795,7 +5795,7 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
     context, "emitting lazy class metadata for", classTy);
 
   SILType classType = SILType::getPrimitiveObjectType(classTy);
-  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+  ClassDecl *classDecl = classType.getClassDecl();
   SILVTable *vtable = IGM.getSILModule().lookUpVTable(classDecl);
   emitEmbeddedVTable(IGM, classTy, vtable);
 }

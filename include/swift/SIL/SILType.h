@@ -250,8 +250,8 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  ClassDecl *getClassOrBoundGenericClass() const {
-    return getASTType().getClassOrBoundGenericClass();
+  ClassDecl *getClassDecl() const {
+    return getASTType().getClassDecl();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
@@ -520,9 +520,9 @@ public:
 
   static bool isClassOrClassMetatype(Type t) {
     if (auto *meta = t->getAs<AnyMetatypeType>()) {
-      return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
+      return bool(meta->getInstanceType()->getClassDecl());
     } else {
-      return bool(t->getClassOrBoundGenericClass());
+      return bool(t->getClassDecl());
     }
   }
 

@@ -468,7 +468,7 @@ bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
 }
 
 static RuntimeEffect metadataEffect(SILType ty) {
-  ClassDecl *cl = ty.getClassOrBoundGenericClass();
+  ClassDecl *cl = ty.getClassDecl();
   if (cl && !cl->hasKnownSwiftImplementation())
     return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
   return RuntimeEffect::MetaData;
@@ -907,7 +907,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
         impactType = SILType::getPrimitiveObjectType(CanType(instTy));
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
-      auto *cl = instTy->getClassOrBoundGenericClass();
+      auto *cl = instTy->getClassDecl();
       bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
                               cl->isForeign());
       if (isForeign || instTy->isAnyObject())
@@ -936,7 +936,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
           return RuntimeEffect::MetaData | RuntimeEffect::Existential;
         }
       }
-      auto *cl = opType.getClassOrBoundGenericClass();
+      auto *cl = opType.getClassDecl();
       bool usesObjCModel =
           cl && cl->getObjectModel() == ReferenceCounting::ObjC;
       if (usesObjCModel)

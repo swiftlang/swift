@@ -1715,7 +1715,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // ISwiftObject can recover a native object that does not itself conform to
   // the source interface. Its class, including a final class, is determined
   // by the runtime query rather than by a Swift protocol conformance.
-  if (fromType->isCOMExistentialType() && toType->getClassOrBoundGenericClass())
+  if (fromType->isCOMExistentialType() && toType->getClassDecl())
     return CheckedCastKind::ValueCast;
 
   auto checkElementCast = [&](Type fromElt, Type toElt,
@@ -2079,13 +2079,13 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       // Ok, we are casting between class-like things. Let's see if we have
       // explicit superclass bounds.
       Type toSuperclass;
-      if (toType->getClassOrBoundGenericClass())
+      if (toType->getClassDecl())
         toSuperclass = toType;
       else
         toSuperclass = toType->getSuperclass();
 
       Type fromSuperclass;
-      if (fromType->getClassOrBoundGenericClass())
+      if (fromType->getClassDecl())
         fromSuperclass = fromType;
       else
         fromSuperclass = fromType->getSuperclass();
@@ -2175,7 +2175,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // The runtime doesn't support casts to CF types and always lets them succeed.
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
-  auto clazz = toType->getClassOrBoundGenericClass();
+  auto clazz = toType->getClassDecl();
   if (clazz && clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
@@ -2184,7 +2184,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
   if (clazz && clazz->isTypeErasedGenericClass()) {
-    if (fromType->getClassOrBoundGenericClass() == clazz)
+    if (fromType->getClassDecl() == clazz)
       return CheckedCastKind::ValueCast;
   }
 

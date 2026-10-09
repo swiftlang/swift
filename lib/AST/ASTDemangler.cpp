@@ -899,7 +899,7 @@ Type ASTBuilder::createProtocolCompositionType(
   std::vector<Type> members;
   for (auto protocol : protocols)
     members.push_back(protocol->getDeclaredInterfaceType());
-  if (superclass && superclass->getClassOrBoundGenericClass())
+  if (superclass && superclass->getClassDecl())
     members.push_back(superclass);
 
   // FIXME: move-only generics
@@ -1102,7 +1102,7 @@ Type ASTBuilder::createConstrainedExistentialType(
             protoTy, /*allowAnchoredMatch=*/false));
         continue;
       }
-      ASSERT(member->getClassOrBoundGenericClass());
+      ASSERT(member->getClassDecl());
       addMember(member);
     }
   }

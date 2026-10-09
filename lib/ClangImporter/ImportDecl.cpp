@@ -6390,7 +6390,7 @@ namespace {
         if (!nsObjectTy)
           return nullptr;
         const ClassDecl *nsObjectDecl =
-          nsObjectTy->getClassOrBoundGenericClass();
+          nsObjectTy->getClassDecl();
 
         auto result = createFakeClass(Impl.SwiftContext.Id_Protocol,
                                           /* cacheResult */ false,
@@ -10707,7 +10707,7 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
               LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)));
         continue;
       }
-      if (inheritedType->getClassOrBoundGenericClass()) {
+      if (inheritedType->getClassDecl()) {
         requirements.push_back(
             Requirement(RequirementKind::Superclass, paramType, inheritedType));
         continue;

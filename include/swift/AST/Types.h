@@ -1163,7 +1163,7 @@ public:
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
-  ClassDecl *getClassOrBoundGenericClass() const;
+  ClassDecl *getClassDecl() const;
 
   /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
@@ -8699,11 +8699,11 @@ inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
   return isArchetypeOrExistential && !T.isAnyClassReferenceType();
 }
 
-inline ClassDecl *TypeBase::getClassOrBoundGenericClass() const {
-  return getCanonicalType().getClassOrBoundGenericClass();
+inline ClassDecl *TypeBase::getClassDecl() const {
+  return getCanonicalType().getClassDecl();
 }
 
-inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
+inline ClassDecl *CanType::getClassDecl() const {
   if (auto classTy = dyn_cast<ClassType>(*this))
     return classTy->getDecl();
 

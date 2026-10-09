@@ -1875,7 +1875,7 @@ static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
     if (auto *refCast = dyn_cast<UncheckedRefCastInst>(inst)) {
       // An unchecked_ref_cast on a safe objc_method apply behaves like the
       // optional (it is null if the optional was null).
-      if (refCast->getType().getClassOrBoundGenericClass() &&
+      if (refCast->getType().getClassDecl() &&
           std::find(objCApplies.begin(), objCApplies.end(),
                     refCast->getOperand()) != objCApplies.end())
         optionalPayloads.push_back(refCast);
@@ -2063,7 +2063,7 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
   auto optional = SEI->getOperand();
   auto optionalPayloadType = optional->getType().getOptionalObjectType();
   if (!optionalPayloadType ||
-      !optionalPayloadType.getClassOrBoundGenericClass())
+      !optionalPayloadType.getClassDecl())
     return false;
 
   if (SEI->getNumCases() != 2)

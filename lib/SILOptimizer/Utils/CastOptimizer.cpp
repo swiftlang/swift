@@ -817,9 +817,9 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   // and that one of the types is a class and another one is a struct.
   if (source.isAnyExistentialType() || target.isAnyExistentialType() ||
       source->is<ArchetypeType>() || target->is<ArchetypeType>() ||
-      (source.getClassOrBoundGenericClass() &&
+      (source.getClassDecl() &&
        !target.getStructDecl()) ||
-      (target.getClassOrBoundGenericClass() &&
+      (target.getClassDecl() &&
        !source.getStructDecl()))
     return nullptr;
 

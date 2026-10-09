@@ -193,7 +193,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       RequirementKind kind;
       if (constraintType->isConstraintType())
         kind = RequirementKind::Conformance;
-      else if (constraintType->getClassOrBoundGenericClass())
+      else if (constraintType->getClassDecl())
         kind = RequirementKind::Superclass;
       else {
         // Error out if the constraint type isn't a class or existential type.
@@ -1287,7 +1287,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   case RequirementReprKind::TypeConstraint: {
     Type subject = resolution->resolveType(reqRepr.getSubjectRepr());
     Type constraint = resolution->resolveType(reqRepr.getConstraintRepr());
-    return Requirement(constraint->getClassOrBoundGenericClass()
+    return Requirement(constraint->getClassDecl()
                          ? RequirementKind::Superclass
                          : RequirementKind::Conformance,
                        subject, constraint);

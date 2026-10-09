@@ -305,7 +305,7 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
   if (isUseful(value, dependentVariableIndex))
     return;
   if (value->getType().isAddress() ||
-      value->getType().getClassOrBoundGenericClass()) {
+      value->getType().getClassDecl()) {
     propagateUsefulThroughAddress(value, dependentVariableIndex);
     return;
   }
@@ -398,7 +398,7 @@ void DifferentiableActivityInfo::propagateUseful(
 void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     SILValue value, unsigned dependentVariableIndex) {
   assert(value->getType().isAddress() ||
-         value->getType().getClassOrBoundGenericClass());
+         value->getType().getClassDecl());
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;

@@ -278,7 +278,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SILType loweredTy = IGF.IGM.getLoweredType(boundTy);
     std::optional<uint64_t> descriptor;
-    if (boundTy->getClassOrBoundGenericClass()) {
+    if (boundTy->getClassDecl()) {
       // For a class, describe the heap object.
       auto &classTI = IGF.IGM.getTypeInfo(loweredTy).as<ClassTypeInfo>();
       auto &classLayout = classTI.getClassLayout(

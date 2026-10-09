@@ -8177,7 +8177,7 @@ class RefTailAddrInst
 
 public:
   ClassDecl *getClassDecl() const {
-    auto s = getOperand()->getType().getClassOrBoundGenericClass();
+    auto s = getOperand()->getType().getClassDecl();
     assert(s);
     return s;
   }

@@ -1297,7 +1297,7 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
   case ScalarKind::ObjCReference: {
-    if (auto *classDecl = representative.getClassOrBoundGenericClass()) {
+    if (auto *classDecl = representative.getClassDecl()) {
       if (!classDecl->hasClangNode()) {
         B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
                       size);

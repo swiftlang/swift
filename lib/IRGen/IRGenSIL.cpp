@@ -2646,7 +2646,7 @@ static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
   // Specify the exact Self type if we know it, either because the class
   // is final, or because the function we're emitting is a method with the
   // [exact_self_class] attribute set on it during the SIL pipeline.
-  bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
+  bool isExact = selfTy->getClassDecl()->isFinal()
     || IGF.CurSILFn->isExactSelfClass();
 
   IGF.setDynamicSelfMetadata(selfTy, isExact, value, selfKind);
@@ -3514,7 +3514,7 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
 
   Explosion e;
 
-  if (instanceTy.getClassOrBoundGenericClass()) {
+  if (instanceTy.getClassDecl()) {
     e.add(emitDynamicTypeOfHeapObject(*this,
                            getClassBaseValue(*this, i->getOperand()),
                            metaTy->getRepresentation(), instanceTy));
@@ -7009,7 +7009,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 
   if (Decl) {
     Type Ty = Decl->getTypeInContext();
-    if (Ty->getClassOrBoundGenericClass() ||
+    if (Ty->getClassDecl() ||
         Ty->getStructDecl())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));
   }
@@ -8133,7 +8133,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   llvm::Value *taggedRef = nullptr;
   llvm::Value *boBits = nullptr;
 
-  ClassDecl *Cl = i->getType().getClassOrBoundGenericClass();
+  ClassDecl *Cl = i->getType().getClassDecl();
   if (IGM.TargetInfo.hasObjCTaggedPointers() &&
       (!Cl || !isKnownNotTaggedPointer(IGM, Cl))) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
@@ -9083,7 +9083,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     // Load the superclass of the static type of the 'self' value.
     llvm::Value *superMetadata;
     auto instanceTy = CanType(baseType.getASTType()->getMetatypeInstanceType());
-    if (!IGM.hasResilientMetadata(instanceTy.getClassOrBoundGenericClass(),
+    if (!IGM.hasResilientMetadata(instanceTy.getClassDecl(),
                                   ResilienceExpansion::Maximal)) {
       // It's still possible that the static type of 'self' is not resilient, in
       // which case we can assume its superclass.

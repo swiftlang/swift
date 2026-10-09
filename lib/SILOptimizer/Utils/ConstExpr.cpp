@@ -1170,7 +1170,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                  ->getSelfInstanceType(
                      callee->getModule(),
                      apply->getFunction()->getTypeExpansionContext())
-                 ->getClassOrBoundGenericClass() &&
+                 ->getClassDecl() &&
              "class methods are not supported");
   if (calleeFnType->getInvocationGenericSignature()) {
     // Get the substitution map of the call.  This maps from the callee's space

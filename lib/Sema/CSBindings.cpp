@@ -2219,7 +2219,7 @@ static bool isSupertypeEligibleForPromotionWhenHacksAreOn(Type t) {
     if (archetypeTy->getSuperclass())
       return false;
 
-  auto *classDecl = t->getClassOrBoundGenericClass();
+  auto *classDecl = t->getClassDecl();
   if (classDecl && classDecl->getSuperclassDecl())
     return false;
 

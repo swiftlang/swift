@@ -776,12 +776,12 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 static Type getBaseTypeForMember(const ValueDecl *OtherVD,
                                  Type BaseTy) {
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
-    if (BaseTy->getClassOrBoundGenericClass()) {
+    if (BaseTy->getClassDecl()) {
       if (auto Conformance = lookupConformance(BaseTy, Proto)) {
         auto *Superclass = Conformance.getConcrete()
                                ->getRootConformance()
                                ->getType()
-                               ->getClassOrBoundGenericClass();
+                               ->getClassDecl();
         return BaseTy->getSuperclassForDecl(Superclass);
       }
     }

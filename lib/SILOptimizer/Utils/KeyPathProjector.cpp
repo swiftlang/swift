@@ -133,7 +133,7 @@ public:
         insertEndAccess(beginAccess, builder);
         
         // Handle the case where the storedProperty is in a super class.
-        while (Ref->getType().getClassOrBoundGenericClass() !=
+        while (Ref->getType().getClassDecl() !=
                storedProperty->getDeclContext()) {
           SILType superCl = Ref->getType().getSuperclass();
           ASSERT(superCl && "the property should be in the decl or in a superclass of it");

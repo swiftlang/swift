@@ -3611,7 +3611,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootTy->getClassOrBoundGenericClass()) {
+      } else if (rootTy->getClassDecl()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       } else {
         keyPathClass = ctx.getWritableKeyPathDecl();
@@ -3709,7 +3709,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   CanType currentRoot = rootTy;
 
   for (const auto &comp : components) {
-    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+    bool rootIsClass = (bool)currentRoot->getClassDecl();
 
     switch (comp.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {

@@ -265,7 +265,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
 
   // We can only create an address projection from an object, unless we have a
   // class.
-  if (BaseTy.getClassOrBoundGenericClass() || !BaseTy.isAddress())
+  if (BaseTy.getClassDecl() || !BaseTy.isAddress())
     return nullptr;
 
   // Ok, we now know that the type of Base and the type represented by the base
@@ -347,7 +347,7 @@ void Projection::getFirstLevelProjections(
     return;
   }
 
-  if (auto *C = Ty.getClassOrBoundGenericClass()) {
+  if (auto *C = Ty.getClassDecl()) {
     unsigned Count = 0;
     for (auto *VDecl : C->getStoredProperties()) {
       (void) VDecl;
@@ -711,7 +711,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     //
     // The worklist would never be empty in this case !.
     //
-    if (Ty.getClassOrBoundGenericClass()) {
+    if (Ty.getClassDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
       Paths.push_back(PP);
       continue;
@@ -775,7 +775,7 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
 
     // There is at least one projection path that leads to a type with
     // reference semantics.
-    if (Ty.getClassOrBoundGenericClass()) {
+    if (Ty.getClassDecl()) {
       Paths.push_back(PP);
       continue;
     }

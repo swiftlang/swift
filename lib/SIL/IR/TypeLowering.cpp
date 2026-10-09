@@ -5229,7 +5229,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           //
           // However, only do this if its a 'let'; if the capture is
           // mutable, we're going to be capturing a box or an address.
-          if (captureType->getClassOrBoundGenericClass() &&
+          if (captureType->getClassDecl() &&
               capturedVar->isLet()) {
             // If we've already captured the same value already, just merge
             // flags.

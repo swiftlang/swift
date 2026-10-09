@@ -433,7 +433,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
 
   auto members = type.getMembers();
   if (!members.empty() &&
-      (members[0].getClassOrBoundGenericClass() ||
+      (members[0].getClassDecl() ||
        isa<UnboundGenericType>(members[0]))) {
     explicitSuperclass = members[0];
     members = members.slice(1);
@@ -1251,7 +1251,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
             existentialType->getConstraintType().getPointer())
       return Type(this);
 
-    if (newConstraintType->getClassOrBoundGenericClass())
+    if (newConstraintType->getClassDecl())
       return newConstraintType;
 
     return ExistentialType::get(newConstraintType);
@@ -1614,7 +1614,7 @@ Type TypeBase::withCovariantResultType() {
     resultType = objectType;
   }
 
-  ASSERT(resultType->getClassOrBoundGenericClass());
+  ASSERT(resultType->getClassDecl());
   resultType = DynamicSelfType::get(resultType, getASTContext());
 
   // Rebuild the inner function type.
@@ -2334,7 +2334,7 @@ CanType TypeBase::getMinimalCanonicalType() const {
       }
 
       const auto MinimalTy = PCT->getMinimalCanonicalType();
-      if (MinimalTy->getClassOrBoundGenericClass()) {
+      if (MinimalTy->getClassDecl()) {
         return MinimalTy;
       }
 
@@ -2348,7 +2348,7 @@ CanType TypeBase::getMinimalCanonicalType() const {
       }
 
       const auto MinimalTy = PCT->getMinimalCanonicalType();
-      if (MinimalTy->getClassOrBoundGenericClass()) {
+      if (MinimalTy->getClassDecl()) {
         return MetatypeType::get(MinimalTy);
       }
 
@@ -2630,7 +2630,7 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
 }
 
 bool TypeBase::mayHaveSuperclass() {
-  if (getClassOrBoundGenericClass())
+  if (getClassDecl())
     return true;
 
   if (auto archetype = getAs<ArchetypeType>())
@@ -2718,7 +2718,7 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
   // the potential subtype must be a class, superclass-bounded archetype,
   // or subclass existential involving an imported class and @objc
   // protocol.
-  if (!getClassOrBoundGenericClass() ||
+  if (!getClassDecl() ||
       !(ty->mayHaveSuperclass() ||
         (ty->isObjCExistentialType() &&
          ty->getSuperclass() &&
@@ -2727,7 +2727,7 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
 
   SmallPtrSet<ClassDecl *, 8> seen;
   do {
-    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+    if (auto *classDecl = ty->getClassDecl())
       if (!seen.insert(classDecl).second)
         return false;
     if (ty->isEqual(this))
@@ -3188,7 +3188,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty) {
 
   SmallPtrSet<ClassDecl *, 8> seen;
   do {
-    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+    if (auto *classDecl = ty->getClassDecl())
       if (!seen.insert(classDecl).second)
         return false;
     if (isBindableTo(ty))
@@ -3323,7 +3323,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Object;
 
   // @objc classes.
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;
   }
@@ -3767,8 +3767,8 @@ static bool isABICompatibleEvenAddingOptional(CanType t1, CanType t2) {
   // Class metatypes are ABI-compatible even under optionality change.
   if (auto metaTy1 = dyn_cast<MetatypeType>(t1)) {
     if (auto metaTy2 = dyn_cast<MetatypeType>(t2)) {
-      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
-          metaTy2.getInstanceType().getClassOrBoundGenericClass()) {
+      if (metaTy1.getInstanceType().getClassDecl() &&
+          metaTy2.getInstanceType().getClassDecl()) {
         return true;
       }
     }
@@ -4219,7 +4219,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -4291,7 +4291,7 @@ PackArchetypeType::get(const ASTContext &Ctx,
                        Type InterfaceType, Type ShapeType,
                        SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                        Type Superclass, LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -4955,7 +4955,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   if (isForeignReferenceType())
     return lookThroughAllOptionalTypes()
-                   ->getClassOrBoundGenericClass()
+                   ->getClassDecl()
                    ->hasRefCountingAnnotations()
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
@@ -5264,7 +5264,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 }
 
 bool TypeBase::isForeignReferenceType() {
-  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassDecl())
     return classDecl->isForeignReferenceType();
   return false;
 }
@@ -5358,7 +5358,7 @@ bool CanType::isErrorExistentialType() const {
 }
 
 bool CanType::isForeignReferenceType() {
-  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassDecl())
     return classDecl->isForeignReferenceType();
   return false;
 }

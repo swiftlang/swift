@@ -672,7 +672,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       break;
     }
 
-    auto *classDecl = baseTy->getClassOrBoundGenericClass();
+    auto *classDecl = baseTy->getClassDecl();
     auto loweredClassTy = loweredBaseTy;
 
     // Recover class decl from superclass constraint
@@ -681,7 +681,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       auto archetype = dyn_cast<ArchetypeType>(ty);
       if (archetype && archetype->requiresClass()) {
         auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
-        classDecl = superClassTy->getClassOrBoundGenericClass();
+        classDecl = superClassTy->getClassDecl();
         loweredClassTy =
             IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                superClassTy->getWithoutSpecifierType());
@@ -692,13 +692,13 @@ emitKeyPathComponent(IRGenModule &IGM,
     // or we may need to fetch it at instantiation time. Depending on the
     // ObjC-ness and resilience of the class hierarchy, there might be a few
     // different ways we need to go about this.
-    if (loweredClassTy.getClassOrBoundGenericClass()) {
+    if (loweredClassTy.getClassDecl()) {
 
       // Use the property's class type to determine the field access.
       auto propertyBaseDecl = property->getDeclContext()->getSelfClassDecl();
       auto currentBaseTy =
           loweredClassTy.getASTType()->getSuperclassForDecl(propertyBaseDecl);
-      assert(currentBaseTy->getClassOrBoundGenericClass() == propertyBaseDecl);
+      assert(currentBaseTy->getClassDecl() == propertyBaseDecl);
       loweredClassTy =
           IGM.getLoweredType(AbstractionPattern::getOpaque(), currentBaseTy);
 
@@ -745,7 +745,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         //
         // SILGen emits the descriptor as a computed property in this case.
         auto fieldOffset = getClassFieldOffsetOffset(
-            IGM, loweredClassTy.getClassOrBoundGenericClass(), property);
+            IGM, loweredClassTy.getClassDecl(), property);
         fields.addInt32(fieldOffset.getValue());
         break;
       }
@@ -928,7 +928,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       // the property.
       auto property = id.getProperty();
       idKind = KeyPathComponentHeader::StoredPropertyIndex;
-      auto *classDecl = baseTy->getClassOrBoundGenericClass();
+      auto *classDecl = baseTy->getClassDecl();
       auto loweredClassTy = loweredBaseTy;
       // Recover class decl from superclass constraint
       if (!classDecl && genericEnv) {
@@ -936,7 +936,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         auto archetype = dyn_cast<ArchetypeType>(ty);
         if (archetype && archetype->requiresClass()) {
           auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
-          classDecl = superClassTy->getClassOrBoundGenericClass();
+          classDecl = superClassTy->getClassDecl();
           loweredClassTy =
               IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                  superClassTy->getWithoutSpecifierType());
@@ -1544,7 +1544,7 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
              "embedded stored-property key path must have a fixed offset");
       layout.offset = static_cast<uint32_t>(
           cast<llvm::ConstantInt>(fixedOffset)->getValue().getZExtValue());
-    } else if (rootTy->getClassOrBoundGenericClass()) {
+    } else if (rootTy->getClassDecl()) {
       layout.kind = StaticKeyPathComponentLayout::Kind::Class;
       auto *fixedOffset = tryEmitConstantClassFragilePhysicalMemberOffset(
           IGM, rootSILTy, property);

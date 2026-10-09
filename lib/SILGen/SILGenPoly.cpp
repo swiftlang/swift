@@ -456,7 +456,7 @@ RValue Transform::transform(RValue &&input,
 // Single @objc protocol value metatypes can be converted to the ObjC
 // Protocol class type.
 static bool isProtocolClass(Type t) {
-  auto classDecl = t->getClassOrBoundGenericClass();
+  auto classDecl = t->getClassDecl();
   if (!classDecl)
     return false;
 
@@ -593,10 +593,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - casts for classes
-  if (outputSubstType->getClassOrBoundGenericClass() &&
-      inputSubstType->getClassOrBoundGenericClass()) {
-    auto class1 = inputSubstType->getClassOrBoundGenericClass();
-    auto class2 = outputSubstType->getClassOrBoundGenericClass();
+  if (outputSubstType->getClassDecl() &&
+      inputSubstType->getClassDecl()) {
+    auto class1 = inputSubstType->getClassDecl();
+    auto class2 = outputSubstType->getClassDecl();
 
     // CF <-> Objective-C via toll-free bridging.
     if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
@@ -649,7 +649,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - upcasts from an archetype
-  if (outputSubstType->getClassOrBoundGenericClass()) {
+  if (outputSubstType->getClassDecl()) {
     if (auto archetypeType = dyn_cast<ArchetypeType>(inputSubstType)) {
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
@@ -2953,8 +2953,8 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
   if (innerASTTy == outerASTTy) {
     return innerValue;
   }
-  if (innerASTTy->getClassOrBoundGenericClass()
-      && outerASTTy->getClassOrBoundGenericClass()) {
+  if (innerASTTy->getClassDecl()
+      && outerASTTy->getClassDecl()) {
     if (outerASTTy->isExactSuperclassOf(innerASTTy)) {
       return SGF.B.createUpcast(loc, innerValue, outerType);
     } else if (innerASTTy->isExactSuperclassOf(outerASTTy)) {
@@ -6741,7 +6741,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     auto *classDecl = thunkFnTy->getParameters()
                           .back()
                           .getInterfaceType()
-                          ->getClassOrBoundGenericClass();
+                          ->getClassDecl();
     assert(classDecl && "Expected last argument to have class type");
     auto classMetatype = MetatypeType::get(
         classDecl->getDeclaredInterfaceType(), MetatypeRepresentation::Thick);
