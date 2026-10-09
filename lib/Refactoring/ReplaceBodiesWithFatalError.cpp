@@ -24,16 +24,16 @@ class FindAllSubDecls : public SourceEntityWalker {
 public:
   FindAllSubDecls(SmallPtrSetImpl<Decl *> &found) : Found(found) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange range) override {
     // Record this Decl, and skip its contents if we've already touched it.
     if (!Found.insert(D).second)
-      return false;
+      return Action::SkipNode();
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
       ASD->visitParsedAccessors(
           [&](AccessorDecl *accessor) { Found.insert(accessor); });
     }
-    return true;
+    return Action::Continue();
   }
 };
 } // namespace

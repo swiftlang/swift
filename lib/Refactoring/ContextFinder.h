@@ -58,11 +58,15 @@ public:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    return contains(D);
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    return Action::VisitNodeIf(contains(D));
   }
-  bool walkToStmtPre(Stmt *S) override { return contains(S); }
-  bool walkToExprPre(Expr *E) override { return contains(E); }
+  PreWalkAction walkToStmtPre(Stmt *S) override {
+    return Action::VisitNodeIf(contains(S));
+  }
+  PreWalkAction walkToExprPre(Expr *E) override {
+    return Action::VisitNodeIf(contains(E));
+  }
   void resolve() { walk(SF); }
   ArrayRef<ASTNode> getContexts() const { return llvm::ArrayRef(AllContexts); }
 };
