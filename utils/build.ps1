@@ -4270,7 +4270,7 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
     # swiftc invocation, it cannot keep Android.sdk as -sdk and the NDK as
     # -sysroot, so these SDK resources must be copied into the static tree.
     Copy-Directory "$DynamicResources\shims\*" "$StaticResources\shims"
-    foreach ($File in ("libcxxshim.h", "libcxxshim.modulemap", "libcxxstdlibshim.h")) {
+    foreach ($File in ("libcxxshim.h", "libcxxshim.modulemap", "libcxxstdlibshim.h", "libcxxexceptionshim.h")) {
       Copy-File "$DynamicResources\android\$File" "$StaticResources\android\$File"
     }
 
