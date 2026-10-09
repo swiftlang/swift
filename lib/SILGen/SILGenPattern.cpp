@@ -2420,8 +2420,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
     if (src.getType().isAddressOnly(SGF.F) &&
-        src.getOwnershipKind() == OwnershipKind::Guaranteed) {
-      // If it's an opaque value with guaranteed ownership, we need to copy.
+        src.getOwnershipKind() == OwnershipKind::Guaranteed &&
+        !src.getType().isMoveOnly()) {
+      // A noncopyable subject cannot be copied, so switch on the borrow.
       src = src.copy(SGF, PatternMatchStmt);
     }
 
