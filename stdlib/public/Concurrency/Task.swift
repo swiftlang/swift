@@ -850,10 +850,18 @@ public struct UnsafeCurrentTask {
   }
 
   // May only be created by the standard library.
-  @usableFromInline // Since 6.4
   @available(SwiftStdlib 5.1, *)
   internal init(_ asyncTask: _AsyncTask) {
     unsafe self._rawTask = asyncTask
+  }
+
+  /// ABI-compat shim for the 6.4 `init(_ task: Builtin.NativeObject)`
+  /// Inlined client code that must run on 6.4 runtimes (`_$sSctySctBocfC`)
+  /// creates an `UnsafeCurrentTask` through this initializer
+  @usableFromInline
+  @available(SwiftStdlib 6.4, *)
+  internal init(_ task: Builtin.NativeObject) {
+    unsafe self.init(_AsyncTask(task))
   }
 
   /// A Boolean value that indicates whether the current task was canceled.
@@ -1078,10 +1086,6 @@ internal struct _AsyncTask {
 @_silgen_name("swift_task_getCurrent")
 @usableFromInline
 internal func _getCurrentAsyncTask() -> _AsyncTask?
-
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_getJobFlags")
-func getJobFlags(_ task: Builtin.NativeObject) -> JobFlags
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobal")
