@@ -1471,6 +1471,25 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
       Diags.diagnose(SourceLoc(), diag::serialization_load_failed, "Swift");
   }
 
+  auto identifier = getIdentifier(getProtocolName(getKnownProtocolKind(ip)));
+
+  // A stdlib that was built from source serializes the protocols that were
+  // synthesized into it. Use the deserialized protocol instead of synthesizing
+  // a duplicate, so that references to the protocol in the Builtin module
+  // (from modules built without the stdlib) and in the stdlib resolve to the
+  // same declaration.
+  if (stdlib) {
+    SmallVector<ValueDecl *, 1> results;
+    stdlib->lookupValue(identifier, NLKind::QualifiedLookup,
+                        ModuleLookupFlags::ExcludeMacroExpansions, results);
+    for (auto *result : results) {
+      if (auto *protocol = dyn_cast<ProtocolDecl>(result)) {
+        getImpl().InvertibleProtocolDecls[index] = protocol;
+        return protocol;
+      }
+    }
+  }
+
   FileUnit *file = nullptr;
   if (stdlib) {
     file = &stdlib->getFiles()[0]->getOrCreateSynthesizedFile();
@@ -1487,7 +1506,6 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
     inherited = AllocateCopy(llvm::ArrayRef(entry));
   }
 
-  auto identifier = getIdentifier(getProtocolName(getKnownProtocolKind(ip)));
   ProtocolDecl *protocol =
       new (*this) ProtocolDecl(file, SourceLoc(), SourceLoc(), identifier,
                                /*primaryAssocTypes=*/{}, inherited,
