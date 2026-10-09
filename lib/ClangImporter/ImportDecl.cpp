@@ -5370,7 +5370,7 @@ namespace {
       // If the declaration we attached the 'objc' attribute to is within a
       // type, record it in the type.
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
-        if (auto tyDecl = contextTy->getNominalOrBoundGenericNominal()) {
+        if (auto tyDecl = contextTy->getNominalDecl()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (name)
               tyDecl->recordObjCMethod(method, *name);

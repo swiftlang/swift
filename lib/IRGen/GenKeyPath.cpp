@@ -1431,7 +1431,7 @@ static NominalTypeDecl *pickStaticKeyPathClass(IRGenModule &IGM,
                                                KeyPathInst *KPI) {
   auto silTy = KPI->getStaticInstanceClassType();
   assert(silTy && "caller should have checked canEmitStaticKeyPathInstance");
-  auto *nominal = silTy.getNominalOrBoundGenericNominal();
+  auto *nominal = silTy.getNominalDecl();
   assert(nominal && "static key path type must be a nominal class");
   return nominal;
 }

@@ -5708,7 +5708,7 @@ static std::optional<DiagnosticBehavior>
 getConcurrencyDiagnosticBehaviorLimitRec(
     Type type, DeclContext *declCtx,
     llvm::SmallPtrSetImpl<NominalTypeDecl *> &visited) {
-  if (auto *nomDecl = type->getNominalOrBoundGenericNominal()) {
+  if (auto *nomDecl = type->getNominalDecl()) {
     // If we have already seen this type, treat it as having no limit.
     if (!visited.insert(nomDecl).second)
       return std::nullopt;

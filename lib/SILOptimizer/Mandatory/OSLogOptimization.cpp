@@ -238,7 +238,7 @@ static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   if (silType.is<BuiltinIntegerType>()) {
     return true;
   }
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = silType.getNominalDecl();
   return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
 }
 

@@ -2424,7 +2424,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();
-  if (!underlyingBaseType->getNominalOrBoundGenericNominal())
+  if (!underlyingBaseType->getNominalDecl())
     return nullptr;
 
   if (!underlyingBaseType->getOptionalObjectType())

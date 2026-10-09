@@ -301,7 +301,7 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    auto *nominalDecl = BaseType.getNominalOrBoundGenericNominal();
+    auto *nominalDecl = BaseType.getNominalDecl();
     assert(nominalDecl && "This should only be called with a nominal type");
     return getIndexedField(nominalDecl, getIndex());
   }

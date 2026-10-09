@@ -731,8 +731,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
               false};
     }
   }
-  NominalTypeDecl *srcNominal = srcTy.getNominalOrBoundGenericNominal();
-  NominalTypeDecl *destNominal = destTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *srcNominal = srcTy.getNominalDecl();
+  NominalTypeDecl *destNominal = destTy.getNominalDecl();
   if (srcNominal && srcNominal == destNominal &&
       !layoutIsTypeDependent(srcNominal) &&
       srcTy.isObject() && destTy.isObject()) {

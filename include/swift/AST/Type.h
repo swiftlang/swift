@@ -489,7 +489,7 @@ public:
   ClassDecl *getClassDecl() const; // in Types.h
   StructDecl *getStructDecl() const; // in Types.h
   EnumDecl *getEnumDecl() const; // in Types.h
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  NominalTypeDecl *getNominalDecl() const; // in Types.h
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;

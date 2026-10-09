@@ -880,7 +880,7 @@ bool CrossModuleOptimization::canSerializeType(CanType type) {
   bool success = !type.findIf(
      [this](Type rawSubType) {
        CanType subType = rawSubType->getCanonicalType();
-       if (auto nominal = subType->getNominalOrBoundGenericNominal()) {
+       if (auto nominal = subType->getNominalDecl()) {
          return !canSerializeDecl(nominal);
        }
        // Types that might not have nominal include Builtin types (e.g. Builtin.Int64),
@@ -1276,7 +1276,7 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
   if (!typesHandled.insert(type.getPointer()).second)
     return;
 
-  if (NominalTypeDecl *NT = type->getNominalOrBoundGenericNominal()) {
+  if (NominalTypeDecl *NT = type->getNominalDecl()) {
     makeDeclUsableFromInline(NT);
   }
 
@@ -1284,7 +1284,7 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
   type.visit([this](Type rawSubType) {
     CanType subType = rawSubType->getCanonicalType();
     if (typesHandled.insert(subType.getPointer()).second) {
-      if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
+      if (NominalTypeDecl *subNT = subType->getNominalDecl()) {
         makeDeclUsableFromInline(subNT);
       }
     }

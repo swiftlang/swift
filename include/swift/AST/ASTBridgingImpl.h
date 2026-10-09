@@ -760,8 +760,8 @@ bool BridgedASTType::isUnsafeMutableRawBufferPointerType() const {
   return unbridged()->isUnsafeMutableRawBufferPointer();
 }
 
-OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
-  return {unbridged()->getNominalOrBoundGenericNominal()};
+OptionalBridgedDeclObj BridgedASTType::getNominalDecl() const {
+  return {unbridged()->getNominalDecl()};
 }
 
 BridgedASTType::TraitResult BridgedASTType::canBeClass() const {

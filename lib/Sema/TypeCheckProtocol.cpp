@@ -6266,7 +6266,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // missing things in the actor that don't help users diagnose the root problem.
   // Instead, we want to suggest adding the typealias.
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-    auto nominal = T->getNominalOrBoundGenericNominal();
+    auto nominal = T->getNominalDecl();
     if (!nominal)
       return;
 

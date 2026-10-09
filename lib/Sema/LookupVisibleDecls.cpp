@@ -878,7 +878,7 @@ public:
       bool shouldSubst = (Reason != DeclVisibilityKind::DynamicLookup &&
                           !BaseTy->isAnyObject() && !BaseTy->hasTypeVariable() &&
                           !BaseTy->hasUnboundGenericType() &&
-                          (BaseTy->getNominalOrBoundGenericNominal() ||
+                          (BaseTy->getNominalDecl() ||
                            BaseTy->is<ArchetypeType>()) &&
                           VD->getDeclContext()->isTypeContext());
 

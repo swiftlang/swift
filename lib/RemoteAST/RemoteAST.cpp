@@ -123,7 +123,7 @@ public:
       return Result<uint64_t>::emplaceFailure(Failure::DependentArgument);
 
     // Split into cases.
-    if (auto typeDecl = type->getNominalOrBoundGenericNominal()) {
+    if (auto typeDecl = type->getNominalDecl()) {
       return getOffsetOfField(type, typeDecl, optMetadata, memberName);
     } else if (auto tupleType = type->getAs<TupleType>()) {
       return getOffsetOfTupleElement(tupleType, optMetadata, memberName);

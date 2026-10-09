@@ -1501,7 +1501,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   // A move-only-with-deinit type cannot be SROA.
   //
   // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
-  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
+  if (auto *nominalTy = ty.getNominalDecl()) {
     if (nominalTy->hasValueTypeDestructor())
       return false;
   }

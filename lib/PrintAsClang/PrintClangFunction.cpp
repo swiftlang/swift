@@ -402,14 +402,14 @@ public:
   ClangRepresentation
   visitEnumType(EnumType *ET, std::optional<OptionalTypeKind> optionalKind,
                 bool isInOutParam) {
-    return visitValueType(ET, ET->getNominalOrBoundGenericNominal(),
+    return visitValueType(ET, ET->getNominalDecl(),
                           optionalKind, isInOutParam);
   }
 
   ClangRepresentation
   visitStructType(StructType *ST, std::optional<OptionalTypeKind> optionalKind,
                   bool isInOutParam) {
-    return visitValueType(ST, ST->getNominalOrBoundGenericNominal(),
+    return visitValueType(ST, ST->getNominalDecl(),
                           optionalKind, isInOutParam);
   }
 
@@ -648,7 +648,7 @@ static void addABIRecordToTypeEncoding(llvm::raw_ostream &typeEncodingOS,
                                        ASTContext &ctx) {
   auto info = typeMapping.getKnownSIMDTypeInfo(t, ctx);
   if (!info)
-    info = typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+    info = typeMapping.getKnownCTypeInfo(t->getNominalDecl());
   assert(info);
   typeEncodingOS << '_';
   for (char c : info->name) {
@@ -696,7 +696,7 @@ static bool isOptionalObjCExistential(Type ty) {
 static bool isOptionalForeignReferenceType(Type ty) {
   if (auto obj = ty->getOptionalObjectType()) {
     if (const auto *cd =
-            dyn_cast_or_null<ClassDecl>(obj->getNominalOrBoundGenericNominal()))
+            dyn_cast_or_null<ClassDecl>(obj->getNominalDecl()))
       return cd->isForeignReferenceType() ||
              cd->getForeignClassKind() == ClassDecl::ForeignKind::CFType;
   }
@@ -764,7 +764,7 @@ static bool printDirectReturnOrParamCType(
           typeMapping.getKnownSIMDTypeInfo(t, emittedModule->getASTContext());
       if (!info)
         info =
-            typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+            typeMapping.getKnownCTypeInfo(t->getNominalDecl());
       os << "  " << info->name;
       if (info->canBeNullable)
         os << " _Nullable";
@@ -853,7 +853,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   llvm::SmallPtrSet<const ParamDecl *, 4> movedParams;
   for (const auto *param : consumedParams) {
     const auto *nominal =
-        param->getInterfaceType()->getNominalOrBoundGenericNominal();
+        param->getInterfaceType()->getNominalDecl();
     if (!nominal || nominal->canBeCopyable())
       continue;
     // Moving out of a parameter needs a move-only C++ class; moving out of
@@ -1255,7 +1255,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       return;
     }
 
-    if (auto *decl = type->getNominalOrBoundGenericNominal()) {
+    if (auto *decl = type->getNominalDecl()) {
       if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
         if (!directTypeEncoding.empty()) {
           ClangSyntaxPrinter(moduleContext->getASTContext(), os).printBaseName(moduleContext);
@@ -1634,7 +1634,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           [&]() { printCallToCFunc(/*additionalParam=*/std::nullopt); });
       return;
     }
-    if (auto *decl = resultTy->getNominalOrBoundGenericNominal();
+    if (auto *decl = resultTy->getNominalDecl();
         decl && !resultTy->isObjCExistentialType() &&
         !isOptionalObjCExistential(resultTy)) {
       auto valueTypeReturnThunker = [&](StringRef resultPointerName) {
@@ -1917,9 +1917,9 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     Type type) {
   if (auto optionalObjectType = type->getOptionalObjectType()) {
     if (const auto *nominal =
-            optionalObjectType->getNominalOrBoundGenericNominal()) {
+            optionalObjectType->getNominalDecl()) {
       if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
-              optionalObjectType->getNominalOrBoundGenericNominal())) {
+              optionalObjectType->getNominalDecl())) {
         return typeInfo->canBeNullable;
       }
       if (const auto *cd = dyn_cast<ClassDecl>(nominal))

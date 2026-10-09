@@ -4486,7 +4486,7 @@ public:
                 "destructure with none ownership kind operand and non-none "
                 "ownership kind result?!");
       }
-      if (operandTy.getNominalOrBoundGenericNominal()
+      if (operandTy.getNominalDecl()
           ->hasValueTypeDestructor()) {
         require(
           isa<DropDeinitInst>(lookThroughOwnershipInsts(DSI->getOperand())),
@@ -7115,7 +7115,7 @@ public:
             "drop_deinit only allowed for move-only types");
     // A ~Deinitable type has no deinit, and `discard self` is how its values'
     // lifetimes end.
-    auto *nominal = type.getNominalOrBoundGenericNominal();
+    auto *nominal = type.getNominalDecl();
     bool hasDeinit = nominal->hasValueTypeDestructor();
     require(hasDeinit ||
                 nominal->canConformTo(InvertibleProtocolKind::Deinitable) ==

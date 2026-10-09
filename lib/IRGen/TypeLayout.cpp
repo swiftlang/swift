@@ -2021,7 +2021,7 @@ void AlignedGroupEntry::assignWithTake(IRGenFunction &IGF, Address dest,
   // If the type has a deinit, the value being overwritten in the destination
   // must be destroyed via that deinit; elementwise assignment would skip it.
   // Destroy the old value first, then take-initialize.
-  if (auto *nominal = ty.getNominalOrBoundGenericNominal();
+  if (auto *nominal = ty.getNominalDecl();
       nominal && nominal->getValueTypeDestructor()) {
     destroy(IGF, dest);
     initWithTake(IGF, dest, src);

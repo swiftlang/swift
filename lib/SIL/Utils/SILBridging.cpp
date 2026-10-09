@@ -909,7 +909,7 @@ void BridgedContext::addSpecializedDeinit(BridgedType nominalType,
                                           BridgedFunction deinitFunc) const {
   swift::SILType nominalTy = nominalType.unbridged();
   swift::SILMoveOnlyDeinit::create(*context->getModule(),
-                                   nominalTy.getNominalOrBoundGenericNominal(),
+                                   nominalTy.getNominalDecl(),
                                    nominalTy, swift::IsNotSerialized,
                                    deinitFunc.getFunction());
 }

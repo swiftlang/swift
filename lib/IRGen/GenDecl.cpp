@@ -1419,7 +1419,7 @@ void IRGenerator::emitLazyDefinitions() {
       TypeMetadataCanonicality canonicality;
       std::tie(theType, canonicality) =
           LazySpecializedTypeMetadataRecords.pop_back_val();
-      auto *nominal = theType->getNominalOrBoundGenericNominal();
+      auto *nominal = theType->getNominalDecl();
       CurrentIGMPtr IGMPtr = getGenModule(nominal->getDeclContext());
       auto &IGM = *IGMPtr.get();
       // A new canonical prespecialized metadata changes both the type
@@ -1531,7 +1531,7 @@ void IRGenerator::emitLazyDefinitions() {
 
     while(!LazySpecializedValueMetadata.empty()) {
       CanType valueType = LazySpecializedValueMetadata.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(valueType->getNominalOrBoundGenericNominal());
+      CurrentIGMPtr IGM = getGenModule(valueType->getNominalDecl());
       emitLazySpecializedValueMetadata(*IGM.get(), valueType);
     }
   }
@@ -5115,7 +5115,7 @@ llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
-  NominalTypeDecl *Nominal = type->getNominalOrBoundGenericNominal();
+  NominalTypeDecl *Nominal = type->getNominalDecl();
   IRGen.noteUseOfTypeMetadata(Nominal);
 
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);

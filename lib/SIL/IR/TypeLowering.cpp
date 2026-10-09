@@ -1882,7 +1882,7 @@ namespace {
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
       // A value type with a deinit cannot be memberwise destroyed.
-      if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
+      if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
           emitDestroyValue(B, loc, aggValue);
           return;

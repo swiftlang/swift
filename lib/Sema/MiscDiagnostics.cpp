@@ -977,7 +977,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       BNK_Double,
     };
     BitcastableNumberKind getBitcastableNumberKind(Type t) const {
-      auto decl = t->getNominalOrBoundGenericNominal();
+      auto decl = t->getNominalDecl();
 #define MATCH_DECL(type) \
       if (decl == Ctx.get##type##Decl()) \
         return BNK_##type;

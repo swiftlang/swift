@@ -3889,7 +3889,7 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   return llvm::any_of(decls, [&](const TypeDecl *decl) {
     if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
       auto ty = alias->getUnderlyingType();
-      decl = ty->getNominalOrBoundGenericNominal();
+      decl = ty->getNominalDecl();
       if (decl == nullptr || ty->is<ExistentialType>())
         return false;
     }

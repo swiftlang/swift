@@ -2584,7 +2584,7 @@ void ASTContext::loadObjCMethods(
 
 ConstructorDecl *ASTContext::getOptionalTanInitDecl(CanType optionalTanType) {
   if (!getImpl().OptionalTanInitDecl) {
-    auto *optionalTanDecl = optionalTanType.getNominalOrBoundGenericNominal();
+    auto *optionalTanDecl = optionalTanType.getNominalDecl();
     // Look up the `Optional<T>.TangentVector.init` declaration.
     auto initLookup =
       optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());

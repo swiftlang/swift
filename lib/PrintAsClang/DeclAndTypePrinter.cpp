@@ -673,8 +673,8 @@ private:
             Type objectType;
             OptionalTypeKind optKind;
             std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-                paramType->getNominalOrBoundGenericNominal(), paramType);
-            auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+                paramType->getNominalDecl(), paramType);
+            auto objectTypeDecl = objectType->getNominalDecl();
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
             if (isTriviallyCopyable(objectTypeDecl, optKind)) {
@@ -686,7 +686,7 @@ private:
             } else {
               bool isOptional = false;
               if (!objectTypeDecl) {
-                objectTypeDecl = paramType->getNominalOrBoundGenericNominal();
+                objectTypeDecl = paramType->getNominalDecl();
                 isOptional = true;
               }
               outOfLineOS << "    return swift::";
@@ -840,7 +840,7 @@ private:
                       DeclAndTypePrinter::getObjectTypeAndOptionality(
                           ED, paramType);
                   auto objectTypeDecl =
-                      objectType->getNominalOrBoundGenericNominal();
+                      objectType->getNominalDecl();
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (isTriviallyCopyable(objectTypeDecl, optKind)) {
@@ -856,7 +856,7 @@ private:
                                    "&op, sizeof(op));\n";
                   } else {
                     objectTypeDecl =
-                        paramType->getNominalOrBoundGenericNominal();
+                        paramType->getNominalDecl();
                     outOfLineOS << "    alignas(";
                     owningPrinter.printTypeName(
                         outOfLineOS, paramType,
@@ -2204,7 +2204,7 @@ private:
         copyTy = unwrappedTy;
       }
 
-      auto nominal = copyTy->getNominalOrBoundGenericNominal();
+      auto nominal = copyTy->getNominalDecl();
       if (isa_and_nonnull<StructDecl>(nominal)) {
         if (copyTy->isArray() ||
             copyTy->isDictionary() ||

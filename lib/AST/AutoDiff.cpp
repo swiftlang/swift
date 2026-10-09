@@ -494,7 +494,7 @@ CanType TangentSpace::getCanonicalType() const {
 
 NominalTypeDecl *TangentSpace::getNominal() const {
   assert(isTangentVector());
-  return getTangentVector()->getNominalOrBoundGenericNominal();
+  return getTangentVector()->getNominalDecl();
 }
 
 const char DerivativeFunctionTypeError::ID = '\0';

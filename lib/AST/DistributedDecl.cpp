@@ -1495,7 +1495,7 @@ swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
   if (actorOrSystem->isDistributedActor()) {
     if (auto systemTy =
             getConcreteReplacementForProtocolActorSystemType(actorOrSystem)) {
-      system = systemTy->getNominalOrBoundGenericNominal();
+      system = systemTy->getNominalDecl();
     }
   }
 
@@ -1623,7 +1623,7 @@ FuncDecl *swift::getMakeInvocationEncoderOnDistributedActorSystem(
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
   assert(systemTy && "No specific ActorSystem type found!");
 
-  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  auto systemNominal = systemTy->getNominalDecl();
   assert(systemNominal && "No system nominal type found!");
 
   for (auto result :

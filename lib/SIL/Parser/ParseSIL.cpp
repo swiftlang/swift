@@ -8425,7 +8425,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   if (parser.Tok.is(tok::sil_dollar)) {
     if (SILParser(parser).parseSILType(specializedNominalTy))
       return true;
-    theNominalDecl = specializedNominalTy.getNominalOrBoundGenericNominal();
+    theNominalDecl = specializedNominalTy.getNominalDecl();
     if (!theNominalDecl)
       return true;
   } else {

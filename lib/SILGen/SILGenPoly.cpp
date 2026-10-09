@@ -699,7 +699,7 @@ ManagedValue Transform::transform(ManagedValue v,
     auto inputLoweredTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
                                              inputSubstType);
     // FIXME: Gross workaround for incorrect opaque type erasure
-    if (loweredTy.getNominalOrBoundGenericNominal() &&
+    if (loweredTy.getNominalDecl() &&
         inputLoweredTy.is<OpaqueTypeArchetypeType>()) {
       // Woohoo!
       inputSubstType = loweredTy.getASTType();

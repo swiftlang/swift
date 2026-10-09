@@ -1369,7 +1369,7 @@ public:
 
   /// If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
-  NominalTypeDecl *getNominalOrBoundGenericNominal();
+  NominalTypeDecl *getNominalDecl();
 
   /// If this is a nominal type, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
@@ -8741,17 +8741,17 @@ inline EnumDecl *CanType::getEnumDecl() const {
   return nullptr;
 }
 
-inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
-  return getCanonicalType().getNominalOrBoundGenericNominal();
+inline NominalTypeDecl *TypeBase::getNominalDecl() {
+  return getCanonicalType().getNominalDecl();
 }
 
-inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
+inline NominalTypeDecl *CanType::getNominalDecl() const {
   if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
-    return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+    return Ty->getConstraintType()->getNominalDecl();
   if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
-    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
+    return Ty->getBaseType()->getNominalDecl();
   return nullptr;
 }
 

@@ -115,7 +115,7 @@ void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
     nominalKind = "struct";
   else if (getEnumDecl())
     nominalKind = "enum";
-  else if (getNominalOrBoundGenericNominal())
+  else if (getNominalDecl())
     nominalKind = "other";
   OS << "  nominalKind: " << nominalKind << "\n";
   printOptionalSILType("optionalObjectType", getOptionalObjectType());
@@ -501,7 +501,7 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
 }
 
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
-  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
   return getIndexedField(decl, fieldIndex);
 }
@@ -552,13 +552,13 @@ SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const 
 }
 
 StringRef SILType::getFieldName(intptr_t fieldIndex) const {
-  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *decl = getNominalDecl();
   VarDecl *field = getIndexedField(decl, fieldIndex);
   return field->getName().str();
 }
 
 unsigned SILType::getNumNominalFields() const {
-  auto *nominal = getNominalOrBoundGenericNominal();
+  auto *nominal = getNominalDecl();
   assert(nominal && "expected nominal type");
   return getNumFieldsInNominal(nominal);
 }
@@ -1319,7 +1319,7 @@ bool SILType::isMoveOnly(bool orWrapped) const {
 bool SILType::isValueTypeWithDeinit() const {
   // Do not look inside an aggregate type that has a user-deinit, for which
   // memberwise-destruction is not equivalent to aggregate destruction.
-  if (auto *nominal = getNominalOrBoundGenericNominal()) {
+  if (auto *nominal = getNominalDecl()) {
     return nominal->hasValueTypeDestructor();
   }
   return false;
@@ -1355,7 +1355,7 @@ static bool nominalIsMarkedAsImmortal(NominalTypeDecl *nominal) {
 }
 
 bool SILType::isMarkedAsImmortal() const {
-  NominalTypeDecl *nominal = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominal = getNominalDecl();
   if (!nominal)
     return false;
 
@@ -1387,7 +1387,7 @@ bool SILType::isAddressableForDeps(SILModule &M,
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
-  auto *nominal = getNominalOrBoundGenericNominal();
+  auto *nominal = getNominalDecl();
   if (!nominal)
     return -1;
 

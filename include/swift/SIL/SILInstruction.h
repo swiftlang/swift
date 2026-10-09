@@ -8074,7 +8074,7 @@ public:
 
   NominalTypeDecl *getParentDecl() const {
     auto s =
-        ParentTy::getOperand(0)->getType().getNominalOrBoundGenericNominal();
+        ParentTy::getOperand(0)->getType().getNominalDecl();
     assert(s);
     return s;
   }

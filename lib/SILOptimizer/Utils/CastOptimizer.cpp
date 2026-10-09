@@ -502,13 +502,13 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     return std::nullopt;
   SmallVector<ValueDecl *, 2> results;
   modDecl->lookupMember(results,
-                        sourceFormalType.getNominalOrBoundGenericNominal(),
+                        sourceFormalType.getNominalDecl(),
                         ctx.Id_bridgeToObjectiveC,
                         Identifier());
   ArrayRef<ValueDecl *> resultsRef(results);
   if (resultsRef.empty()) {
     mod->lookupMember(
-        results, sourceFormalType.getNominalOrBoundGenericNominal(),
+        results, sourceFormalType.getNominalDecl(),
         ctx.Id_bridgeToObjectiveC, Identifier());
     resultsRef = results;
   }

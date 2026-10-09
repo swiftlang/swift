@@ -420,7 +420,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_CXX:
       if (!isSelfParameter) return;
-      if (type->getNominalOrBoundGenericNominal()) {
+      if (type->getNominalDecl()) {
         considerNewTypeSource(IsExact,
                               MetadataSource::Kind::GenericLValueMetadata,
                               type, paramIndex);

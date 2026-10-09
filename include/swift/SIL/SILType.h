@@ -282,8 +282,8 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getASTType().getNominalOrBoundGenericNominal();
+  NominalTypeDecl *getNominalDecl() const {
+    return getASTType().getNominalDecl();
   }
 
   /// If this type maps to a Swift class, check if that class is a foreign
@@ -488,7 +488,7 @@ public:
   }
 
   bool isSensitive() const {
-    if (auto *nom = getNominalOrBoundGenericNominal())
+    if (auto *nom = getNominalDecl())
       return nom->getAttrs().hasAttribute<SensitiveAttr>();
     return false;
   }

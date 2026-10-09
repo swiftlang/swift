@@ -783,7 +783,7 @@ static void collectAdditionalExtensionRequirements(
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
     type = typealias->getUnderlyingType();
-    nominal = type->getNominalOrBoundGenericNominal();
+    nominal = type->getNominalDecl();
     if (!nominal && type->is<TupleType>())
       nominal = type->getASTContext().getBuiltinTupleDecl();
   }

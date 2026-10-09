@@ -784,7 +784,7 @@ bool DebugValueInst::isExprTypeValid() const {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
       auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
       if (!FieldParent ||
-          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+          RunningType.getNominalDecl() != FieldParent)
         return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
