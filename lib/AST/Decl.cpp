@@ -7411,6 +7411,17 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
   return false;
 }
 
+bool ClassDecl::canSuppressInvertible(InvertibleProtocolKind ip) const {
+  switch (ip) {
+  case InvertibleProtocolKind::Copyable:
+    return getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses);
+  case InvertibleProtocolKind::Escapable:
+  case InvertibleProtocolKind::Deinitable:
+    return false;
+  }
+  llvm_unreachable("unhandled InvertibleProtocolKind");
+}
+
 bool ClassDecl::inheritsSuperclassInitializers() const {
   // If there's no superclass, there's nothing to inherit.
   if (!getSuperclassDecl())

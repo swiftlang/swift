@@ -3479,9 +3479,7 @@ public:
     (void) getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
 
     for (auto ip : inverses) {
-      // Allow ~Copyable when MoveOnlyClasses is enabled
-      if (ip == InvertibleProtocolKind::Copyable
-          && ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
+      if (decl->canSuppressInvertible(ip))
         continue;
 
       ctx.Diags.diagnose(decl->getLoc(),
