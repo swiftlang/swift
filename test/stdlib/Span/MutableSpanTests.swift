@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature Lifetimes)
 
 // REQUIRES: executable_test
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
@@ -779,7 +779,23 @@ suite.test("init(ofOne:) integer")
   expectEqual(span.count, 1)
   span[0] += 1
 
+  expectEqual(span[0], 43)
   expectEqual(value, 43)
+}
+
+suite.test("init(ofOne:) integer, returned")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  @_lifetime(&v)
+  func spanify(_ v: inout Int) -> MutableSpan<Int> {
+    MutableSpan(ofOne: &v)
+  }
+
+  var i = 98
+  var span = spanify(&i)
+  expectEqual(span.count, 1)
+  span[0] += 1
+  expectEqual(span[0], 99)
+  expectEqual(i, 99)
 }
 
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
