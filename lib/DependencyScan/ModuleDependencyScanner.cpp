@@ -2511,6 +2511,11 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
         swiftArgs.push_back(value->str());
       };
       forwardOption("-sysroot", searchPathOpts.getSysRoot());
+      forwardOption("-windows-sdk-root", searchPathOpts.getWinSDKRoot());
+      forwardOption("-windows-sdk-version", searchPathOpts.getWinSDKVersion());
+      forwardOption("-visualc-tools-root", searchPathOpts.getVCToolsRoot());
+      forwardOption("-visualc-tools-version",
+                    searchPathOpts.getVCToolsVersion());
       if (!searchPathOpts.RuntimeResourcePath.empty())
         forwardOption("-resource-dir", searchPathOpts.RuntimeResourcePath);
     }
