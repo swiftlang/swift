@@ -22,6 +22,8 @@
 #define SWIFT_BACKTRACING_DARWIN_H
 #ifdef __APPLE__
 
+#include <TargetConditionals.h>
+
 #include <mach/mach.h>
 
 #if TARGET_OS_OSX

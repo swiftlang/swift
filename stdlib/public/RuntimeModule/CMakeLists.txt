@@ -142,20 +142,39 @@ else()
   set(ios_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}")
 endif()
 
+# Force the minimum tvOS deployment target to 18.0
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS VERSION_LESS "18.0")
+  set(tvos_deployment_target "18.0")
+else()
+  set(tvos_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}")
+endif()
+
+# Force the minimum watchOS deployment target to 11.0
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS VERSION_LESS "11.0")
+  set(watchos_deployment_target "11.0")
+else()
+  set(watchos_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}")
+endif()
+
+# Force the minimum visionOS deployment target to 2.0
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS VERSION_LESS "2.0")
+  set(xros_deployment_target "2.0")
+else()
+  set(xros_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS}")
+endif()
+
 # Generate BacktracingDT 6.2
+# The non-macOS versions are placeholders until we know which release this
+# will ship in.
 set(backtracing_availability_osx "26.0")
-set(backtracing_availability_ios "26.0")
 if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY)
   if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
     set(backtracing_availability_osx "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
   endif()
-  if(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS VERSION_LESS "26.0")
-    set(backtracing_availability_ios "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}")
-  endif()
 endif()
 
 set(backtracing_availability)
-list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS ${backtracing_availability_osx}, iOS ${backtracing_availability_ios}")
+list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS ${backtracing_availability_osx}, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999")
 
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${runtime_sources}
@@ -175,6 +194,9 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
 
   DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
   DEPLOYMENT_VERSION_IOS ${ios_deployment_target}
+  DEPLOYMENT_VERSION_TVOS ${tvos_deployment_target}
+  DEPLOYMENT_VERSION_WATCHOS ${watchos_deployment_target}
+  DEPLOYMENT_VERSION_XROS ${xros_deployment_target}
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
@@ -188,7 +210,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
 
-  TARGET_SDKS OSX IOS IOS_SIMULATOR LINUX LINUX_STATIC WINDOWS
+  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR XROS XROS_SIMULATOR LINUX LINUX_STATIC WINDOWS
 )
 
 if(SWIFT_ENABLE_BACKTRACING)
