@@ -3071,8 +3071,9 @@ sil [ossa] @test_partial_apply_1_addronly_heap : $<T> () -> () {
 // CHECK:         apply [[GET]]<T>([[STACK]])
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowT
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW]]<T>([[STACK]])
-// CHECK:         apply [[CLOSURE]]()
-// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[STACK]]
+// CHECK:         apply [[DEPENDENCY]]()
+// CHECK:         destroy_value [[DEPENDENCY]]
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]
 // CHECK-LABEL: } // end sil function 'test_partial_apply_2_addronly_stack'
