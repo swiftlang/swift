@@ -628,7 +628,8 @@ private:
 
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
-      ClangSyntaxPrinter(elementDecl->getASTContext(), nameOS).printIdentifier(elementDecl->getNameStr());
+      ClangSyntaxPrinter(elementDecl->getASTContext(), nameOS)
+          .printBaseName(elementDecl);
       name[0] = std::toupper(name[0]);
 
       clangFuncPrinter.printCustomCxxFunction(
@@ -922,8 +923,11 @@ private:
           llvm::interleave(
               elementTagMapping, os,
               [&](const auto &pair) {
-                os << "\n    ";
-                syntaxPrinter.printIdentifier(pair.first->getNameStr());
+                os << "\n";
+                syntaxPrinter.printSwiftNameCommentIfNeeded(pair.first,
+                                                            /*indent=*/"    ");
+                os << "    ";
+                syntaxPrinter.printBaseName(pair.first);
                 syntaxPrinter.printSymbolUSRAttribute(pair.first);
               },
               ",");
@@ -939,10 +943,11 @@ private:
           os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"  "
              << "// allow use of inline static data member\n";
           for (const auto &pair : elementTagMapping) {
+            auto caseName = cxx_translation::getNameForCxx(pair.first);
             // Printing struct
-            printStruct(pair.first->getNameStr(), pair.first, pair.second);
+            printStruct(caseName, pair.first, pair.second);
             // Printing `is` function
-            printIsFunction(pair.first->getNameStr(), ED);
+            printIsFunction(caseName, ED);
             if (pair.first->hasAssociatedValues()) {
               // Printing `get` function
               printGetFunction(pair.first);
@@ -974,7 +979,7 @@ private:
                  << cxx_synthesis::getCxxImplNamespaceName();
               os << "::" << pair.second.globalVariableName
                  << ") return cases::";
-              syntaxPrinter.printIdentifier(pair.first->getNameStr());
+              syntaxPrinter.printBaseName(pair.first);
               os << ";\n";
             }
             os << "    return cases::" << resilientUnknownDefaultCaseName
@@ -983,7 +988,7 @@ private:
             os << "    switch (_getEnumTag()) {\n";
             for (const auto &pair : elementTagMapping) {
               os << "      case " << pair.second.tag << ": return cases::";
-              syntaxPrinter.printIdentifier(pair.first->getNameStr());
+              syntaxPrinter.printBaseName(pair.first);
               os << ";\n";
             }
             // TODO: change to Swift's fatalError when it's available in C++
@@ -1305,6 +1310,13 @@ private:
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
+      // For an accessor, the name exposed to C++ is derived from the name of
+      // the storage it accesses.
+      const ValueDecl *namedDecl = AFD;
+      if (const auto *accessor = dyn_cast<AccessorDecl>(AFD))
+        namedDecl = accessor->getStorage();
+      ClangSyntaxPrinter(AFD->getASTContext(), os)
+          .printSwiftNameCommentIfNeeded(namedDecl, /*indent=*/"  ");
       DeclAndTypeClangFunctionPrinter declPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
@@ -1578,8 +1590,7 @@ private:
         Type objTy;
         std::tie(objTy, kind) =
             getObjectTypeAndOptionality(param, param->getInterfaceType());
-        StringRef paramName =
-            param->getName().empty() ? "" : param->getName().str();
+        std::string paramName = ClangSyntaxPrinter::getParameterName(FD, param);
         print(objTy, kind, paramName, IsFunctionParam);
         ++index;
       });
@@ -1811,6 +1822,8 @@ private:
       FuncDecl *FD, const FunctionSwiftABIInformation &funcABI) {
     assert(outputLang == OutputLanguageMode::Cxx);
     printDocumentationComment(FD);
+    ClangSyntaxPrinter(FD->getASTContext(), os)
+        .printSwiftNameCommentIfNeeded(FD);
 
     std::optional<ForeignAsyncConvention> asyncConvention =
         FD->getForeignAsyncConvention();
@@ -2068,6 +2081,15 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       if (FD->getDeclContext()->isTypeContext())
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
+
+      // A Swift operator function whose spelling is not a valid C++ operator
+      // has no name in C++; skip it instead of emitting a nameless function.
+      if (FD->isOperator() && cxx_translation::getNameForCxx(FD).empty()) {
+        owningPrinter.getCxxDeclEmissionScope()
+            .additionalUnrepresentableDeclarations.insert(
+                {FD, "the operator can not be represented as a C++ operator"});
+        return;
+      }
 
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
