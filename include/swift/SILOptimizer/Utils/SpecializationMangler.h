@@ -66,6 +66,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     BoxToStack = 4,
     InOutToOut = 5,
     ClosurePropPreviousArg = 6, // the same closure as a previous `ClosureProp` argument
+    DifferentiableFunctionProp = 7,
 
     First_Option = 0,
     Last_Option = 31,
@@ -113,6 +114,7 @@ public:
 
   void setArgumentClosureProp(unsigned OrigArgIdx, SILInstruction *closure);
   void setArgumentClosurePropPreviousArg(unsigned OrigArgIdx, unsigned otherArgIdx);
+  void setArgumentDifferentiableFunctionProp(unsigned OrigArgIdx, SILInstruction *differentiableFunction);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
   void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
@@ -132,6 +134,7 @@ public:
 private:
   void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);
+  void mangleDifferentiableFunctionProp(SILInstruction *Inst);
   void mangleArgument(ArgInfo argInfo);
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };

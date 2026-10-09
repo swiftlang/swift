@@ -1662,6 +1662,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Buffer << 'C' << node->getChild(idx++)->getIndex();
       break;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      Buffer << 'a';
+      break;
     case FunctionSigSpecializationParamKind::BoxToValue:
       Buffer << 'i';
       break;
