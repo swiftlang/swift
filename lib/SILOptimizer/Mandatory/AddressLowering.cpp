@@ -3857,6 +3857,18 @@ protected:
     markRewritten(copyInst, destAddr);
   }
 
+  // Explicitly copy from an opaque source operand.
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *copyInst) {
+    SILValue srcVal = copyInst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    AddressMaterialization addrMat(pass, copyInst, builder);
+    SILValue destAddr = addrMat.materializeAddress(copyInst);
+    builder.createExplicitCopyAddr(copyInst->getLoc(), srcAddr, destAddr,
+                                   IsNotTake, IsInitialization);
+    markRewritten(copyInst, destAddr);
+  }
+
   void visitDebugValueInst(DebugValueInst *debugInst) {
     SILValue srcVal = use->get();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
