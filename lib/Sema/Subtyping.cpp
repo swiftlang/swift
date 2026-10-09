@@ -1195,23 +1195,31 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
     }
 
+    // The join has the more restrictive execution semantics.
     if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
-      // Form a tuple; its @called(atMostOnce) iff both components are
-      // @called(atMostOnce).
+      // Form a tuple; it's noncopyable iff either component is noncopyable.
       SmallVector<TupleTypeElt, 2> elts;
       elts.push_back(lhsExecutionSemanticsDep);
       elts.push_back(rhsExecutionSemanticsDep);
       executionSemanticsDep =
-          TupleType::get(elts, lhsSendableDep->getASTContext());
+          TupleType::get(elts, lhsExecutionSemanticsDep->getASTContext());
     } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
       if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = rhsInfo.getExecutionSemantics();
+      else
         executionSemanticsDep = lhsExecutionSemanticsDep;
     } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
       if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = lhsInfo.getExecutionSemantics();
+      else
         executionSemanticsDep = rhsExecutionSemanticsDep;
-    } else if (lhsInfo.hasCalledAtMostOnceSemantics() &&
-               rhsInfo.hasCalledAtMostOnceSemantics()) {
-      executionSemantics = lhsInfo.getExecutionSemantics();
+    } else {
+      // The join suppresses the invertible protocols that either side does.
+      auto inverses =
+          getSuppressedInvertibleProtocols(lhsInfo.getExecutionSemantics());
+      inverses.insertAll(
+          getSuppressedInvertibleProtocols(rhsInfo.getExecutionSemantics()));
+      executionSemantics = getExecutionSemanticsSuppressing(inverses);
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
@@ -1250,24 +1258,24 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
     }
 
+    // The meet has the less restrictive execution semantics.
     if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
-      // We cannot represent the meet of two @called(atMostOnce)-dependent
+      // We cannot represent the meet of two execution semantics dependent
       // types.
       return std::nullopt;
     } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
       if (rhsInfo.hasCalledAtMostOnceSemantics())
-        executionSemantics = rhsInfo.getExecutionSemantics();
-      else
         executionSemanticsDep = lhsExecutionSemanticsDep;
     } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
       if (lhsInfo.hasCalledAtMostOnceSemantics())
-        executionSemantics = lhsInfo.getExecutionSemantics();
-      else
         executionSemanticsDep = rhsExecutionSemanticsDep;
-    } else if (lhsInfo.hasCalledAtMostOnceSemantics()) {
-      executionSemantics = lhsInfo.getExecutionSemantics();
     } else {
-      executionSemantics = rhsInfo.getExecutionSemantics();
+      // The meet suppresses the invertible protocols that both sides do.
+      auto inverses =
+          getSuppressedInvertibleProtocols(lhsInfo.getExecutionSemantics());
+      inverses.intersect(
+          getSuppressedInvertibleProtocols(rhsInfo.getExecutionSemantics()));
+      executionSemantics = getExecutionSemanticsSuppressing(inverses);
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();

@@ -939,14 +939,14 @@ case TypeKind::Id:
           }
         }
 
-        // Transform the @called(atMostOnce) dependent type if present.
+        // Transform the execution semantics dependent type if present.
         if (auto executionSemanticsDep =
                 origExtInfo.getExecutionSemanticsDependentType()) {
           auto [newExecutionSemanticsDep, executionSemantics] =
               asDerived().transformExecutionSemanticsDependentType(
                   executionSemanticsDep);
           if (!newExecutionSemanticsDep) {
-            // If we're no longer @called(atMostOnce) dependent, update the
+            // If we're no longer execution semantics dependent, update the
             // execution semantics.
             extInfo = extInfo->withExecutionSemanticsDependentType(Type());
             extInfo = extInfo->withExecutionSemantics(executionSemantics);

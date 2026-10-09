@@ -2940,7 +2940,7 @@ ConstraintSystem::matchFunctionExecutionSemantics(
     return SolutionKind::Unsolved;
   };
 
-  // First check to see if we have any @called(atMostOnce) dependent function
+  // First check to see if we have any execution semantics dependent function
   // types, if any of them still have unresolved type variables we need to wait
   // until they're fully resolved.
   auto dep1 = func1->getExecutionSemanticsDependentType();
@@ -2956,15 +2956,25 @@ ConstraintSystem::matchFunctionExecutionSemantics(
       return formUnsolved();
   }
 
-  // Sendability is given by either the sendability of the dependent type if
-  // present, otherwise it's given by the function itself.
-  auto func1HasCalledAtMostOnceSemantics =
-      dep1 ? dep1->isNoncopyable() : func1->hasCalledAtMostOnceSemantics();
-  auto func2HasCalledAtMostOnceSemantics =
-      dep2 ? dep2->isNoncopyable() : func2->hasCalledAtMostOnceSemantics();
+  // The execution semantics are given by the invertible protocols that the
+  // dependent type suppresses if present, otherwise by the function itself.
+  auto getInverses = [](FunctionType *func, Type dep) {
+    if (!dep)
+      return getSuppressedInvertibleProtocols(func->getExecutionSemantics());
 
-  if (func1HasCalledAtMostOnceSemantics != func2HasCalledAtMostOnceSemantics) {
-    if (func1HasCalledAtMostOnceSemantics || kind < ConstraintKind::Subtype) {
+    InvertibleProtocolSet inverses;
+    if (dep->isNoncopyable())
+      inverses.insert(InvertibleProtocolKind::Copyable);
+    if (!dep->isDeinitable())
+      inverses.insert(InvertibleProtocolKind::Deinitable);
+    return inverses;
+  };
+  auto inverses1 = getInverses(func1, dep1);
+  auto inverses2 = getInverses(func2, dep2);
+
+  if (inverses1 != inverses2) {
+    // A conversion can suppress more invertible protocols, but never fewer.
+    if (kind < ConstraintKind::Subtype || !(inverses1 - inverses2).empty()) {
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
@@ -2974,7 +2984,12 @@ ConstraintSystem::matchFunctionExecutionSemantics(
         return SolutionKind::Error;
     }
 
-    increaseScore(SK_FunctionConversion, locator);
+    // Score each invertible protocol that differs, so that overload
+    // resolution prefers the closest execution semantics.
+    auto difference = (inverses1 - inverses2);
+    difference.insertAll(inverses2 - inverses1);
+    increaseScore(SK_FunctionConversion, locator,
+                  std::distance(difference.begin(), difference.end()));
   }
 
   return SolutionKind::Solved;
@@ -5512,6 +5527,18 @@ bool ConstraintSystem::repairFailures(
     // going on e.g. problem with escapiness).
     if (convertTo->isTypeVariableOrMember() || convertTo->isAny())
       return false;
+
+    // A call won't help if the function value itself lacks an invertible
+    // protocol that the existential requires, like Copyable or Deinitable.
+    if (convertTo->isExistentialType() && !fnType->hasTypeVariable() &&
+        !fnType->hasTypeParameter() && !convertTo->hasTypeParameter()) {
+      for (auto ip : InvertibleProtocolSet::allKnown()) {
+        auto *proto = getASTContext().getProtocol(getKnownProtocolKind(ip));
+        if (checkConformance(convertTo, proto) &&
+            !checkConformance(fnType, proto))
+          return false;
+      }
+    }
 
     ConstraintKind matchKind;
     if (resultType->is<TypeVariableType>()) {
@@ -12595,7 +12622,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
-    // Infer `@called(atMostOnce)` from the contextual type.
+    // Infer execution semantics from the contextual type.
     if (!closureExtInfo.hasCalledAtMostOnceSemantics()) {
       if (auto executionSemanticsTy =
               contextualFnType->getExecutionSemanticsDependentType()) {

@@ -63,6 +63,10 @@ class FindCapturedVars : public ASTWalker {
   /// The values that have consuming uses in the closure.
   llvm::SmallPtrSet<ValueDecl *, 1> ConsumedValues;
 
+  /// The values whose consumed captures were diagnosed because this closure
+  /// can't own them.
+  llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedOwnedCaptures;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
@@ -70,17 +74,21 @@ class FindCapturedVars : public ASTWalker {
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
   bool NoEscape, ObjC, HasCalledAtMostOnceSemantics;
+  /// Whether this function can be destroyed without running, which is true
+  /// for every function except a @called(exactlyOnce) closure.
+  bool IsDeinitable;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
                    bool ObjC, bool IsGenericFunction,
-                   bool HasCalledAtMostOnceSemantics)
+                   bool HasCalledAtMostOnceSemantics, bool IsDeinitable = true)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
         NoEscape(NoEscape), ObjC(ObjC),
         HasCalledAtMostOnceSemantics(HasCalledAtMostOnceSemantics),
-        HasGenericParamCaptures(IsGenericFunction) {}
+        IsDeinitable(IsDeinitable), HasGenericParamCaptures(IsGenericFunction) {
+  }
 
   CaptureInfo getCaptureInfo() const {
     DynamicSelfType *dynamicSelfToRecord = nullptr;
@@ -260,6 +268,8 @@ public:
       capture = CapturedValue(VD, flags, existing.getLoc());
       Captures[entryNumber-1] = capture;
     }
+
+    checkOwnedCapture(capture);
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
@@ -441,6 +451,29 @@ public:
     }
 
     return Action::SkipNode(DRE);
+  }
+
+  /// A closure owns the captures that it consumes, and destroying a closure
+  /// destroys what it owns. Therefore a closure that can be destroyed without
+  /// running can't own a non-Deinitable value.
+  void checkOwnedCapture(const CapturedValue &capture) {
+    if (!IsDeinitable || !capture.isConsumed())
+      return;
+
+    // Capture list entries are diagnosed where they're declared.
+    auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+    if (!var || !var->hasInterfaceType() || var->isCaptureList())
+      return;
+
+    auto type = var->getTypeInContext();
+    if (type->hasError() || type->isDeinitable())
+      return;
+
+    if (DiagnosedOwnedCaptures.insert(var).second) {
+      Context.Diags.diagnose(capture.getLoc(),
+                             diag::deinitable_closure_nondeinitable_capture,
+                             /*captureList=*/0, var, type);
+    }
   }
 
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
@@ -1049,7 +1082,7 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
   bool hasCalledAtMostOnceSemantics = fnType->hasCalledAtMostOnceSemantics();
   FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
                           /*isObjC=*/false, /*isGeneric=*/false,
-                          hasCalledAtMostOnceSemantics);
+                          hasCalledAtMostOnceSemantics, fnType->isDeinitable());
   body->walk(finder);
 
   finder.checkType(type, ACE->getLoc());

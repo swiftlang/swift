@@ -2700,9 +2700,9 @@ ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
       "'CalledAttribute' is enabled",
       ())
-ERROR(sending_capture_decl_requires_called_once,none,
-      "'sending' capture may only be declared in a '@called(atMostOnce)' "
-      "closure",
+ERROR(sending_capture_decl_requires_called_closure,none,
+      "'sending' capture may only be declared in a '@called(atMostOnce)' or "
+      "'@called(exactlyOnce)' closure",
       ())
 
 // Alignment attribute
@@ -6943,6 +6943,10 @@ ERROR(tuple_pack_element_label,none,
       ())
 ERROR(tuple_move_only_not_supported,none,
       "tuple with noncopyable element type %0 is not supported", (Type))
+ERROR(deinitable_closure_nondeinitable_capture,none,
+      "%select{consumed capture|capture list entry}0 %1 of "
+      "'Deinitable'-conforming closure has non-Deinitable type %2",
+      (unsigned, const ValueDecl *, Type))
 ERROR(tuple_nondeinitable_element,none,
       "tuple cannot contain non-Deinitable element type %0", (Type))
 ERROR(vararg_not_allowed,none,

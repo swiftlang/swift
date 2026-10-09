@@ -154,6 +154,31 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   applyAdjustment(TypeAdjustment::NonsendableToSendable);
   applyAdjustment(TypeAdjustment::ExecutionSemanticsToPlain);
 
+  // When both sides have execution semantics, the witness can still differ
+  // from the requirement in the same ways that are allowed by function
+  // conversion rules.
+  if (auto *reqtFnType = reqtType->getAs<FunctionType>()) {
+    if (auto *witnessFnType = witnessType->getAs<FunctionType>()) {
+      auto reqtSemantics = reqtFnType->getExecutionSemantics();
+      auto witnessSemantics = witnessFnType->getExecutionSemantics();
+      if (reqtSemantics && witnessSemantics &&
+          reqtSemantics != witnessSemantics) {
+        switch (variance) {
+        case VarianceKind::None:
+          break;
+        case VarianceKind::Covariant:
+          if (canConvertExecutionSemantics(witnessSemantics, reqtSemantics))
+            reqtType = reqtFnType->withExecutionSemantics(witnessSemantics);
+          break;
+        case VarianceKind::Contravariant:
+          if (canConvertExecutionSemantics(reqtSemantics, witnessSemantics))
+            witnessType = witnessFnType->withExecutionSemantics(reqtSemantics);
+          break;
+        }
+      }
+    }
+  }
+
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.

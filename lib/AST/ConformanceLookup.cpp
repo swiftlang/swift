@@ -333,6 +333,15 @@ static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
   return true;
 }
 
+/// Whether the given function type conforms to Deinitable.
+static bool isDeinitableFunctionType(EitherFunctionType eitherFnTy) {
+  // An exactly-once value must be called, so it can't be destroyed implicitly.
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
+    return !fnTy->isCalledOnce();
+
+  return !cast<const SILFunctionType *>(eitherFnTy)->isCalledOnce();
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -410,8 +419,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
         return synthesizeConformance();
       break;
     case KnownProtocolKind::Deinitable:
-      // All function types can be destroyed implicitly.
-      return synthesizeConformance();
+      if (isDeinitableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     case KnownProtocolKind::BitwiseCopyable:
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();
