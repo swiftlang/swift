@@ -349,6 +349,12 @@ if(NOT SWIFT_HOST_SDKROOT)
   set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 endif()
 
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  file(TO_CMAKE_PATH
+       "${WindowsSdkDir}/Include/${WindowsSDKVersion}/module.modulemap"
+       SWIFT_WINDOWS_MODULE_MAP)
+endif()
+
 set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
 

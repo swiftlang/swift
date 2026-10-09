@@ -1,8 +1,8 @@
-//===--- WinSDK_Shared.modulemap ------------------------------------------===//
+//===--- WinRT.modulemap -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-module _GUIDDef {
-  header "guiddef.h"
-  export *
-}
-
-module WinAPIFamily {
-  header "winapifamily.h"
+module WinSDK.WinRT [system] {
+  // The shim breaks the unavoidable Windows.h/roapi.h dependency across the
+  // UM and WinRT SDK directories without assigning either header to two
+  // modules.
+  header "SwiftWinRT.h"
   export *
 }

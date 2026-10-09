@@ -11,8 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import ucrt // Clang module
-// Extra clang module that's split out from ucrt:
+// Extra Clang modules that are split out from ucrt to break cycles:
 @_exported import _complex
+@_exported import _fenv
+@_exported import _float
+@_exported import _malloc
+@_exported import _stdlib
 
 @available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
 public let M_PI = Double.pi

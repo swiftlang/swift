@@ -33,6 +33,9 @@ endif()
 function(generate_windows_vfs_overlay)
   file(TO_CMAKE_PATH ${VCToolsInstallDir} VCToolsInstallDir)
   file(TO_CMAKE_PATH ${UniversalCRTSdkDir} UniversalCRTSdkDir)
+  file(TO_CMAKE_PATH ${WindowsSdkDir} WindowsSdkDir)
+  string(REGEX REPLACE "[/\\\\]+$" "" WindowsSDKVersion
+         "${WindowsSDKVersion}")
   configure_file("${PROJECT_SOURCE_DIR}/cmake/WindowsVFS.yaml.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
                  @ONLY)
@@ -41,6 +44,8 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
   generate_windows_vfs_overlay()
   file(TO_CMAKE_PATH "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
        SWIFT_WINDOWS_VFS_OVERLAY)
+  set(SWIFT_WINDOWS_MODULE_MAP
+      "${WindowsSdkDir}/Include/${WindowsSDKVersion}/module.modulemap")
 endif()
 
 #

@@ -14,8 +14,16 @@
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json Swift > %t/Swift.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json _Builtin_float > %t/SwiftBuiltinFloat.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stddef > %t/_Builtin_stddef.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_limits > %t/_Builtin_limits.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdbool > %t/_Builtin_stdbool.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdarg > %t/_Builtin_stdarg.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_iso646 > %t/_Builtin_iso646.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_float > %t/_Builtin_float.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:corecrt > %t/corecrt.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_corecrt_terminate > %t/_corecrt_terminate.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:std_config > %t/std_config.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_float > %t/_float.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_fenv > %t/_fenv.cmd
@@ -23,6 +31,7 @@
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_malloc > %t/_malloc.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_intrinsics > %t/_Builtin_intrinsics.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:ucrt > %t/ucrt.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_inttypes > %t/_Builtin_inttypes.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:std > %t/std.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:_complex > %t/_complex.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftOverlayShims > %t/SwiftOverlayShims.cmd
@@ -34,7 +43,14 @@
 // RUN: %swift_frontend_plain @%t/SAL.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/vcruntime.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_Builtin_stddef.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_limits.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_stdbool.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_stdarg.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_iso646.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_float.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/corecrt.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_corecrt_terminate.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/std_config.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_float.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_fenv.cmd 2>&1
@@ -43,7 +59,9 @@
 // RUN: %swift_frontend_plain @%t/_Builtin_intrinsics.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/Swift.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/SwiftBuiltinFloat.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/ucrt.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/_Builtin_inttypes.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/std.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_complex.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/SwiftOverlayShims.cmd 2>&1
@@ -51,4 +69,3 @@
 
 //--- Test.swift
 import CRT
-

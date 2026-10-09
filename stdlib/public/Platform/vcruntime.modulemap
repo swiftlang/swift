@@ -10,25 +10,35 @@
 //
 //===----------------------------------------------------------------------===//
 
-module _visualc_intrinsics [system] [extern_c] {
+module _visualc_intrinsics [system] {
   explicit module arm {
     requires armv7
     header "armintr.h"
-
-    explicit module neon {
-      requires neon
-      header "arm_neon.h"
-    }
+    export *
   }
 
   explicit module aarch64 {
     requires aarch64
-    header "arm64intr.h"
+
+    explicit module intrinsics {
+      header "arm64intr.h"
+      export *
+    }
 
     explicit module neon {
       requires neon
       header "arm64_neon.h"
+      export *
     }
+  }
+
+  // arm_neon.h is the public entry point for both the historical ARM32
+  // implementation and current ARM64 toolsets, where it includes
+  // arm64_neon.h.
+  explicit module neon {
+    requires neon
+    header "arm_neon.h"
+    export *
   }
 
   explicit module intel {
@@ -39,47 +49,46 @@ module _visualc_intrinsics [system] [extern_c] {
 
     explicit module mmx {
       header "mmintrin.h"
+      export *
     }
 
     explicit module sse {
-      export mmx
       header "xmmintrin.h"
+      export *
     }
 
     explicit module sse2 {
-      export sse
       header "emmintrin.h"
+      export *
     }
 
     explicit module sse3 {
-      export sse2
       header "pmmintrin.h"
+      export *
     }
 
     explicit module ssse3 {
-      export sse3
       header "tmmintrin.h"
+      export *
     }
 
     explicit module sse4_1 {
-      export ssse3
       header "smmintrin.h"
+      export *
     }
 
     explicit module sse4_2 {
-      export sse4_1
       header "nmmintrin.h"
+      export *
     }
 
     explicit module sse4a {
-      export sse3
       header "ammintrin.h"
+      export *
     }
-
     explicit module aes_pclmul {
       header "wmmintrin.h"
-      export aes
-      export pclmul
+      export *
     }
   }
 }
@@ -95,10 +104,8 @@ module SAL [system] {
 }
 
 module vcruntime [system] {
-  use SAL
-  export SAL
-
   header "vcruntime.h"
+  export *
 
   module iso646 {
     header "iso646.h"
@@ -106,13 +113,10 @@ module vcruntime [system] {
   }
 
   module limits {
-    header "limits.h"
-    export *
-  }
-
-  module setjmp {
-    header "setjmp.h"
-    export *
+    // Clang's _Builtin_limits module owns the modular limits declarations and
+    // includes the toolset header as needed. Keep the latter textual to avoid
+    // exposing a second Swift-visible copy of constants such as LONG_MAX.
+    textual header "limits.h"
   }
 
   module stdarg {
@@ -122,7 +126,7 @@ module vcruntime [system] {
 
   module stdbool {
     header "stdbool.h"
-    export  *
+    export *
   }
 
   module stdint {
@@ -139,12 +143,28 @@ module vcruntime [system] {
     header "vadefs.h"
     export *
   }
+
+  // setjmp.h includes vcruntime.h for its ABI and SAL definitions. Keep it in
+  // a submodule so that include resolves through the parent module instead of
+  // depending on the order in which the fused module headers are parsed.
+  module setjmp {
+    header "setjmp.h"
+    export *
+  }
 }
 
 module std_config [system] {
-  header "crtdefs.h"
-  header "crtversion.h"
   export *
+
+  module definitions {
+    header "crtdefs.h"
+    export *
+  }
+
+  module version {
+    header "crtversion.h"
+    export *
+  }
 }
 
 module std [system] {
@@ -153,7 +173,6 @@ module std [system] {
   module compat {
     module cassert {
       textual header "cassert"
-      export *
     }
 
     module ccomplex {
