@@ -183,10 +183,17 @@ llvm::opt::InputArgList
 ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
                                const SearchPathOptions &SearchPathOpts,
                                clang::driver::Driver &clangDriver) {
-  // Flags passed to Swift with `-Xcc` might affect include paths.
+  // Flags passed to Swift with `-Xcc` might affect include paths. In a direct
+  // cc1 module build those are cc1 arguments, so use the driver arguments the
+  // module was scanned with instead, when the scanner provided them.
+  const auto &driverLevelArgs =
+      ClangImporterOpts.DirectClangCC1ModuleBuild &&
+              !ClangImporterOpts.DirectCC1DriverArgs.empty()
+          ? ClangImporterOpts.DirectCC1DriverArgs
+          : ClangImporterOpts.ExtraArgs;
   std::vector<const char *> clangArgs;
-  clangArgs.reserve(ClangImporterOpts.ExtraArgs.size());
-  for (const auto &each : ClangImporterOpts.ExtraArgs) {
+  clangArgs.reserve(driverLevelArgs.size());
+  for (const auto &each : driverLevelArgs) {
     clangArgs.push_back(each.c_str());
   }
   llvm::opt::InputArgList clangDriverArgs =

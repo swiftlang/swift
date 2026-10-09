@@ -2275,6 +2275,37 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   if (ScanASTContext.LangOpts.EnableCXXInterop)
     swiftArgs.push_back("-cxx-interoperability-mode=default");
 
+  // The frontend rebuilds ClangImporter's injected file system from the Clang
+  // driver arguments, the sysroot and the resource directory, but this command
+  // gives Clang only cc1 arguments. Whenever the scan injected files, forward
+  // what it used, so that the frontend finds the same system libraries (for
+  // example a libstdc++ located with '--gcc-toolchain'). Caching builds read
+  // an include tree instead.
+  auto *clangImporter =
+      static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
+  const auto &fileMapping = clangImporter->getClangFileMapping();
+  if (!ScanASTContext.CASOpts.EnableCaching &&
+      (!fileMapping.redirectedFiles.empty() ||
+       !fileMapping.overridenFiles.empty())) {
+    for (const auto &arg : ScanASTContext.ClangImporterOpts.ExtraArgs) {
+      swiftArgs.push_back("-direct-clang-cc1-driver-arg");
+      swiftArgs.push_back(arg);
+    }
+    const auto &searchPathOpts = ScanASTContext.SearchPathOpts;
+    auto forwardOption = [&](StringRef option, std::optional<StringRef> value) {
+      if (!value)
+        return;
+      swiftArgs.push_back(option.str());
+      swiftArgs.push_back(value->str());
+    };
+    forwardOption("-sysroot", searchPathOpts.getSysRoot());
+    const auto &resourceDir = searchPathOpts.RuntimeResourcePath;
+    if (!resourceDir.empty()) {
+      swiftArgs.push_back("-resource-dir");
+      swiftArgs.push_back(resourceDir);
+    }
+  }
+
   // Add args reported by the scanner.
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);

@@ -1274,6 +1274,12 @@ def direct_clang_cc1_module_build :
   Flag<["-"], "direct-clang-cc1-module-build">,
   HelpText<"Use the specified -Xcc options to build a PCM by using Clang frontend directly, bypassing the Clang driver">;
 
+def direct_clang_cc1_driver_arg :
+  Separate<["-"], "direct-clang-cc1-driver-arg">, MetaVarName<"<arg>">,
+  HelpText<"In a direct Clang cc1 module build, a Clang driver argument the "
+           "module was scanned with, used to find the system libraries whose "
+           "module maps the Clang importer injects">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,

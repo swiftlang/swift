@@ -2416,6 +2416,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ForceObjCMsgSendClassSelectorStubs = std::nullopt;
 
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
+  for (const Arg *A : Args.filtered(OPT_direct_clang_cc1_driver_arg))
+    Opts.DirectCC1DriverArgs.push_back(A->getValue());
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
