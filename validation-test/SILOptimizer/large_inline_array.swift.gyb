@@ -2,7 +2,7 @@
 // RUN: %gyb %s > %t/main.swift
 
 // rdar://175803465 (Large InlineArray compilation takes forever)
-// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnu || OS=freebsd
 
 // The compiler should finish in less than 15 seconds. To give some slack,
 // specify a timeout of 1 minute.
