@@ -665,6 +665,8 @@ extension DistributedActorSystem {
   }
 
   @available(SwiftStdlib 5.7, *)
+  @diagnose(IsolatedConformances, as: ignored,
+            reason: "https://github.com/swiftlang/swift/issues/93084")
   internal nonisolated(nonsending) func _executeDistributedTargetImpl<Act>(
     on actor: Act,
     target: RemoteCallTarget,
