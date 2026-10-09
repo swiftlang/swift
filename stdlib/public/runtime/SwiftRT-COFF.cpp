@@ -54,7 +54,6 @@ DECLARE_SWIFT_SECTION(sw5bltn)
 DECLARE_SWIFT_SECTION(sw5cptr)
 DECLARE_SWIFT_SECTION(sw5acfn)
 DECLARE_SWIFT_SECTION(sw5ratt)
-DECLARE_SWIFT_SECTION(sw5test)
 }
 
 namespace {
@@ -65,6 +64,7 @@ static void swift_image_constructor() {
 #define SWIFT_SECTION_RANGE(name)                                              \
   { reinterpret_cast<uintptr_t>(&__start_##name) + sizeof(__start_##name),     \
     reinterpret_cast<uintptr_t>(&__stop_##name) - reinterpret_cast<uintptr_t>(&__start_##name) - sizeof(__start_##name) }
+#define SWIFT_RESERVED_BUT_UNUSED_SECTION_RANGE(name) { 0, 0 }
 
   ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
@@ -87,10 +87,11 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(sw5cptr),
       SWIFT_SECTION_RANGE(sw5acfn),
       SWIFT_SECTION_RANGE(sw5ratt),
-      SWIFT_SECTION_RANGE(sw5test),
+      SWIFT_RESERVED_BUT_UNUSED_SECTION_RANGE(sw5test),
   };
 
 #undef SWIFT_SECTION_RANGE
+#undef SWIFT_RESERVED_BUT_UNUSED_SECTION_RANGE
 
   swift_addNewDSOImage(&sections);
 }
