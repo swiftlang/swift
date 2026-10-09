@@ -1,7 +1,8 @@
 // RUN: rm -f %t.*
 
 // Check that when a driver is run with -serialize-diagnostics, it picks a .dia location and passes it to the frontend.
-// RUN: %target-swiftc_driver -typecheck %s -enable-bridging-pch -serialize-diagnostics -import-objc-header %S/Inputs/bad-bridging-header.h -driver-print-jobs 2>&1 -diagnostic-style llvm | %FileCheck -check-prefix=CHECK-ARG %s
+// An explicit module build would fail scanning the bad header before planning the PCH job.
+// RUN: %target-swiftc_driver -no-explicit-module-build -typecheck %s -enable-bridging-pch -serialize-diagnostics -import-objc-header %S/Inputs/bad-bridging-header.h -driver-print-jobs 2>&1 -diagnostic-style llvm | %FileCheck -check-prefix=CHECK-ARG %s
 // CHECK-ARG: -serialize-diagnostics-path
 
 // Check that when a frontend is run in -emit-pch mode with -serialize-diagnostics-path, the diagnostics -- both textual and serialized -- reflect the error.
