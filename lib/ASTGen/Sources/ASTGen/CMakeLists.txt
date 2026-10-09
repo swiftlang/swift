@@ -5,9 +5,9 @@ set(ASTGEN_SARIF_SOURCES)
 if(SWIFT_BUILD_SARIF)
   list(APPEND ASTGEN_SARIF_SOURCES SARIFDiagnostics.swift)
   list(APPEND ASTGEN_SARIF_DEPENDENCIES
-    _CompilerSARIF
-    _CompilerSARIFRecords
-    _CompilerImmutableJSON)
+    SARIF
+    SARIFRecords
+    ImmutableJSON)
 endif()
 
 add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
