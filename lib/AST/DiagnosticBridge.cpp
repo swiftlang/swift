@@ -136,7 +136,7 @@ llvm::Expected<std::string>
 DiagnosticBridge::takeQueuedDiagnosticsAsSARIF(StringRef compilerVersion) {
   // The queue is consumed whether or not rendering succeeds, so release it on
   // every path out of here; the destructor asserts nothing is left unflushed.
-  auto consumeQueue = llvm::make_scope_exit([&] { clearQueuedDiagnostics(); });
+  llvm::scope_exit consumeQueue([&] { clearQueuedDiagnostics(); });
 
 #if !SWIFT_BUILD_SARIF
   return llvm::createStringError(
