@@ -96,6 +96,7 @@ add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
       ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WINDOWS
+    SWIFT_MODULE_DEPENDS_WINDOWS _Builtin_float
     INSTALL_IN_COMPONENT sdk-overlay)
 
 foreach(sdk ${SWIFT_SDKS})
@@ -570,11 +571,15 @@ add_dependencies(sdk-overlay emscriptenlibc_modulemap)
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
       ucrt.modulemap
+      SwiftUCRT.h
+      SwiftWinRT.h
       WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
-      winsdk_um.modulemap
-      winsdk_shared.modulemap
+      winrt.modulemap
+      winsdk.modulemap
+      um.modulemap
+      shared.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
 endif()
