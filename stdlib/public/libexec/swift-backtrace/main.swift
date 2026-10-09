@@ -59,6 +59,10 @@ internal struct SwiftBacktrace {
     case stdout
     case stderr
     case file
+    #if os(Windows)
+    case console
+    case eventLog
+    #endif
   }
 
   enum Symbolication {
@@ -115,7 +119,18 @@ internal struct SwiftBacktrace {
 
   static var outputStream: CFileStream? = nil
 
+  #if os(Windows)
+  static var eventLogText: String? = nil
+  #endif
+
   static func write(_ string: String, flush: Bool = false) {
+    #if os(Windows)
+    if eventLogText != nil {
+      eventLogText!.append(string)
+      return
+    }
+    #endif
+
     precondition(outputStream != nil, "Output stream must be set before calling write")
     var stream = outputStream!
 
@@ -126,6 +141,14 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
+    #if os(Windows)
+    if eventLogText != nil {
+      eventLogText!.append(string)
+      eventLogText!.append("\n")
+      return
+    }
+    #endif
+
     precondition(outputStream != nil, "Output stream must be set before calling writeln")
     var stream = outputStream!
 
@@ -188,6 +211,10 @@ Generate a backtrace for the parent process.
 
 --output-to <stream>    Set which output stream to use.  Options are "stdout"
 -o <stream>             and "stderr".  The default is "stdout".
+
+                        On Windows, you may also specify "console", which
+                        behaves like "stderr", or "eventlog", which writes
+                        the backtrace to the Application event log.
 
                         Alternatively, you may specify a file path here.  If
                         the path points to a directory, a unique filename will
@@ -392,6 +419,12 @@ Generate a backtrace for the parent process.
               args.outputTo = .stdout
             case "stderr":
               args.outputTo = .stderr
+            #if os(Windows)
+            case "console":
+              args.outputTo = .console
+            case "eventlog":
+              args.outputTo = .eventLog
+            #endif
             default:
               args.outputTo = .file
               args.outputPath = v
@@ -591,6 +624,14 @@ Generate a backtrace for the parent process.
         outputStream = standardOutput
       case .stderr:
         outputStream = standardError
+      #if os(Windows)
+      case .console:
+        outputStream = standardError
+      case .eventLog:
+        outputStream = standardError
+        eventLogText = ""
+        args.interactive = false
+      #endif
       case .file:
         if isDir(args.outputPath) {
           // If the output path is a directory, generate a filename
@@ -746,6 +787,15 @@ Generate a backtrace for the parent process.
         backtraceFormatter.writeCrashLog(now: now.iso8601)
     }
 
+    #if os(Windows)
+    if let eventLogText {
+      if !reportToEventLog(eventLogText, source: "Swift Backtrace") {
+        print("swift-backtrace: unable to write to the event log",
+              to: &standardError)
+      }
+    }
+    #endif
+
     #if os(anyAppleOS)
     // On Darwin, if Developer Mode is turned off, or we can't tell if it's
     // on or not, disable interactivity
@@ -781,6 +831,18 @@ Generate a backtrace for the parent process.
         }
       }
     }
+
+    #if os(Windows)
+    // If the console was created just for us, keep it open so that the
+    // backtrace can be read.
+    if args.outputTo == .console && !args.interactive {
+      var pid: DWORD = 0
+      if GetConsoleProcessList(&pid, 1) == 1 {
+        _ = waitForKey("Press any key to close this window",
+                       timeout: args.timeout)
+      }
+    }
+    #endif
   }
 
   // Parse the command line arguments; we can't use swift-argument-parser
