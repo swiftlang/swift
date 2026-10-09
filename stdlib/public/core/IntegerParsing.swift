@@ -265,7 +265,7 @@ extension FixedWidthInteger {
   ///     10.
   @export(implementation)
   @inlinable
-  @available(SwiftStdlib 6.0, *)
+  @available(SwiftStdlib 6.2, *)
   public init?(_ codeUnits: borrowing UTF8Span, radix: Int = 10) {
     let result = unsafe codeUnits.span.withUnsafeBufferPointer { codeUnits in
       unsafe _parseIntegerDigits(ascii: codeUnits, radix: radix)
