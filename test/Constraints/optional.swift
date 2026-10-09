@@ -663,3 +663,26 @@ do {
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
 }
+
+// We accidentally allowed optional unwrapping with a non-optional in some cases
+do {
+  struct Entity {
+    var children: [SubEntity] = []
+  }
+
+  struct SubEntity {
+    var property: String?
+  }
+
+  func f1(children: [SubEntity]) -> Int {
+    return children.compactMap { $0?.property?.count }.reduce(0, +)
+  }
+
+  func f2(children: [[SubEntity]]) -> Int {
+    return children.reduce([], +).compactMap { $0?.property?.count }.reduce(0, +)  // no error
+  }
+
+  func f3(entities: [Entity]) -> Int {
+    return entities.map { $0.children }.reduce([], +).compactMap { $0?.property?.count }.reduce(0, +)  // no error
+  }
+}
