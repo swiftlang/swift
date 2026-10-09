@@ -86,8 +86,13 @@ struct ASTContext::GlobalCache {
   > conformanceIsolationErrors;
 
   /// The static build configuration. This points to an instance of the Swift
-  /// StaticBuildConfigurationStorage.
+  /// StaticBuildConfigurationStorage. It is created from LangOptions on first
+  /// use; see ASTContext::invalidateStaticBuildConfiguration().
   void *StaticBuildConfiguration = nullptr;
+
+  /// Whether a cleanup that frees StaticBuildConfiguration has been
+  /// registered with the ASTContext.
+  bool StaticBuildConfigurationCleanupRegistered = false;
 };
 
 } // end namespace 

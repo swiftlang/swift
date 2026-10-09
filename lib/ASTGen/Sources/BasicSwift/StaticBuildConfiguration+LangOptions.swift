@@ -170,9 +170,9 @@ public func createStaticBuildConfiguration(
   return UnsafeMutableRawPointer(storage)
 }
 
-/// Free the given static build configuration.
+/// Free the given static build configuration. Does nothing if it is null.
 @_cdecl("swift_Basic_freeStaticBuildConfiguration")
-public func freeStaticBuildConfiguration(pointer: UnsafeMutableRawPointer) {
-  pointer.assumingMemoryBound(to: StaticBuildConfigurationStorage.self)
+public func freeStaticBuildConfiguration(pointer: UnsafeMutableRawPointer?) {
+  pointer?.assumingMemoryBound(to: StaticBuildConfigurationStorage.self)
     .deinitialize(count: 1).deallocate()
 }

@@ -133,15 +133,24 @@ BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
 
 void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
   ASTContext &ctx = cContext.unbridged();
-  void *staticBuildConfiguration = ctx.getGlobalCache().StaticBuildConfiguration;
-  if (!staticBuildConfiguration) {
-    staticBuildConfiguration =
+  auto &cache = ctx.getGlobalCache();
+  if (!cache.StaticBuildConfiguration) {
+    if (!cache.StaticBuildConfigurationCleanupRegistered) {
+      ctx.addCleanup([&cache] {
+        swift_Basic_freeStaticBuildConfiguration(
+            cache.StaticBuildConfiguration);
+      });
+      cache.StaticBuildConfigurationCleanupRegistered = true;
+    }
+    cache.StaticBuildConfiguration =
         swift_Basic_createStaticBuildConfiguration(ctx.LangOpts);
-    ctx.addCleanup([staticBuildConfiguration] {
-      swift_Basic_freeStaticBuildConfiguration(staticBuildConfiguration);
-    });
-    ctx.getGlobalCache().StaticBuildConfiguration = staticBuildConfiguration;
   }
 
-  return staticBuildConfiguration;
+  return cache.StaticBuildConfiguration;
+}
+
+void ASTContext::invalidateStaticBuildConfiguration() {
+  auto &cache = getGlobalCache();
+  swift_Basic_freeStaticBuildConfiguration(cache.StaticBuildConfiguration);
+  cache.StaticBuildConfiguration = nullptr;
 }
