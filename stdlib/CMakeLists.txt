@@ -209,7 +209,8 @@ function(swift_create_stdlib_targets name variant define_all_alias)
 endfunction()
 
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
-   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+   AND "${SWIFT_THREADING_PACKAGE}" STREQUAL "none")
   message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
 endif()
 
