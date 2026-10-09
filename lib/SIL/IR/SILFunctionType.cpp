@@ -4110,6 +4110,16 @@ public:
 
     // Otherwise, the return type had better be a retainable object pointer.
     auto resultType = Method->getReturnType();
+    // A record holding strong ARC references (e.g. an ObjC struct vended
+    // through a C++-guarded protocol method) imports as a directly-returned
+    // loadable value. Take ownership of it, mirroring
+    // CFunctionTypeConventions for CXX records; without this, emitting ObjC
+    // metadata for the importing protocol trips the retainable-result
+    // assertion below.
+    if (!resultType->isObjCRetainableType() && !isCFTypedef(tl, resultType) &&
+        isa<clang::RecordType>(resultType->getUnqualifiedDesugaredType()))
+      return ResultConvention::Owned;
+
     assert(resultType->isObjCRetainableType() || isCFTypedef(tl, resultType));
 
     // If it's retainable for the purposes of ObjC ARC, we can trust
