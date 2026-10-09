@@ -1874,11 +1874,11 @@ namespace {
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
-      // A requirement of a protocol to which the metatype conforms applies
+      // A member of a protocol to which the metatype conforms applies
       // to the metatype value, unlike an unbound instance reference `P.x`.
       bool isMetatypeConformanceMember = false;
       if (!baseIsInstance && member->isInstanceMember()) {
-        if (auto *PD = dyn_cast<ProtocolDecl>(member->getDeclContext())) {
+        if (auto *PD = member->getDeclContext()->getSelfProtocolDecl()) {
           auto conformance =
               cs.lookupConformance(cs.getType(base)->getRValueType(), PD);
 
@@ -1894,8 +1894,8 @@ namespace {
       const bool isUnboundInstanceMember =
           (!baseIsInstance && member->isInstanceMember() &&
            !isMetatypeExtMember && !isMetatypeConformanceMember);
-      const bool needsCurryThunk =
-          shouldBuildCurryThunk(choice, baseIsInstance);
+      const bool needsCurryThunk = shouldBuildCurryThunk(
+          choice, baseIsInstance || isMetatypeConformanceMember);
 
       // The formal type of the 'self' value for the member's declaration.
       Type containerTy = getBaseType(refTy->castTo<FunctionType>());

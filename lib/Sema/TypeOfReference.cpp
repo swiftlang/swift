@@ -1997,6 +1997,15 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     }
   }
 
+  bool isMetatypeConformanceMember = false;
+  if (value->isInstanceMember() && baseRValueTy->is<AnyMetatypeType>()) {
+    if (auto *protocol = outerDC->getSelfProtocolDecl()) {
+      auto conformance = lookupConformance(baseRValueTy, protocol);
+      isMetatypeConformanceMember =
+          conformance && !conformance.hasMissingConformance();
+    }
+  }
+
   Type baseOpenedTy = baseObjTy;
 
   // If we are looking at a member of an existential, open the existential.
@@ -2024,10 +2033,9 @@ ConstraintSystem::getTypeOfMemberReferencePre(
                                   preparedOverload);
         }
       }
-    } else if (outerDC->isMetatypeExtension()) {
-      // Metatype extension members do not require existential opening.
-      // The member belongs to the protocol metatype itself, not a
-      // conforming type.
+    } else if (outerDC->isMetatypeExtension() || isMetatypeConformanceMember) {
+      // These members belong to the metatype itself. They do not require
+      // opening an existential to access a conforming instance.
     } else {
       // Open the existential.
       auto openedArchetype =
@@ -2061,16 +2069,9 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
 
-    // A requirement of a metatype conformance binds Self to the metatype
-    // rather than to its instance type.
-    Type selfBase = baseOpenedTy;
-    if (value->isInstanceMember() && baseRValueTy->is<AnyMetatypeType>()) {
-      if (auto *PD = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
-        auto conformance = lookupConformance(baseRValueTy, PD);
-        if (conformance && !conformance.hasMissingConformance())
-          selfBase = baseRValueTy;
-      }
-    }
+    // A member of a metatype conformance binds Self to the metatype rather
+    // than to its instance type, including members of protocol extensions.
+    Type selfBase = isMetatypeConformanceMember ? baseRValueTy : baseOpenedTy;
 
     addConstraint(ConstraintKind::Bind, selfBase, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,

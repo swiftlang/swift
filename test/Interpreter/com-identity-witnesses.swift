@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-build-swift-dylib(%t/%target-library-name(COM)) -emit-module-path %t/COM.swiftmodule -module-name COM -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft %S/../Inputs/COM.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(COM)) -emit-module-path %t/COM.swiftmodule -module-name COM -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft %S/../Inputs/COM.swift %t/COMExtensions.swift
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Identities)) -emit-module-path %t/Identities.swiftmodule -module-name Identities -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft -I %t -L %t -lCOM %target-rpath(%t) %t/Identities.swift
 // RUN: %target-build-swift %t/main.swift -o %t/test -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft -Xfrontend -sil-verify-all -I %t -L %t -lCOM -lIdentities %target-rpath(%t)
 // RUN: %target-codesign %t/test %t/%target-library-name(COM) %t/%target-library-name(Identities)
@@ -12,6 +12,17 @@
 // UNSUPPORTED: use_os_stdlib
 
 // CHECK: identities match
+
+//--- COMExtensions.swift
+extension COMInterface {
+  public var identity: IID { IID }
+  public func getIdentity() -> IID { IID }
+}
+
+extension COMActivatable {
+  public var identity: CLSID { CLSID }
+  public func getIdentity() -> CLSID { CLSID }
+}
 
 //--- Identities.swift
 @com(interface: "10203040-5060-7080-90a0-b0c0d0e0f001")
@@ -89,4 +100,17 @@ check(DerivedWidget.CLSID, 0x12345678, 0x9abc, 0xdef0,
       [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0])
 check(activationID(DerivedWidget.self), 0x12345678, 0x9abc, 0xdef0,
       [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0])
+check(IWidget.identity, 0x10203040, 0x5060, 0x7080,
+      [0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0, 0x01])
+check(Widget.getIdentity(), 0x01020304, 0x0506, 0x0708,
+      [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10])
+let getIID: () -> IID = IWidget.getIdentity
+check(getIID(), 0x10203040, 0x5060, 0x7080,
+      [0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0, 0x01])
+let getCLSID: () -> CLSID = Widget.getIdentity
+check(getCLSID(), 0x01020304, 0x0506, 0x0708,
+      [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10])
+let type: Widget.Type = DerivedWidget.self
+check(type.identity, 0x01020304, 0x0506, 0x0708,
+      [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10])
 print("identities match")

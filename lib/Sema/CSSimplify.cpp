@@ -182,10 +182,10 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
         baseTy->getRValueType()->is<AnyMetatypeType>()) {
       if (decl->getDeclContext()->isMetatypeExtension())
         return true;
-      // A requirement of a protocol to which the metatype conforms takes
+      // A member of a protocol to which the metatype conforms takes
       // the metatype as self. A missing conformance denotes an unbound
       // reference such as `Q.f`.
-      if (auto *PD = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (auto *PD = decl->getDeclContext()->getSelfProtocolDecl()) {
         auto conformance = lookupConformance(baseTy->getRValueType(), PD,
                                              /*allowMissing=*/true);
         if (conformance && !conformance.hasMissingConformance())
@@ -10692,7 +10692,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
-  // Protocol requirements found through a metatype conformance are viable
+  // Protocol members found through a metatype conformance are viable
   // directly on the metatype base.
   llvm::SmallPtrSet<ValueDecl *, 2> metatypeConformanceMembers;
 
@@ -10824,7 +10824,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
           return;
         }
 
-        // This requirement was found through a conformance of the metatype, so
+        // This member was found through a conformance of the metatype, so
         // do not perform the usual adjustment to the instance type.
         if (metatypeConformanceMembers.count(decl)) {
           result.addViable(candidate);
@@ -11092,7 +11092,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                                 /*isBridged=*/false,
                                 /*isUnwrappedOptional=*/false));
 
-  // Instance requirements of identity protocols apply to the conforming
+  // Instance members of identity protocols apply to the conforming
   // metatype itself, rather than to instances of the interface or class.
   if (ctx.LangOpts.EnableCOMInterop && baseObjTy->is<AnyMetatypeType>()) {
     for (auto kind :
