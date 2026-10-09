@@ -14,9 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PluginLoader.h"
@@ -215,6 +217,24 @@ void ModuleDependencyInfo::addModuleImport(
                   alreadyAddedModules, sourceManager, sourceLocation);
 }
 
+/// Extract the plugin module name from `#externalMacro(module:type:)` syntax
+/// without evaluating `MacroDecl::getDefinition()`, which would type-check the
+/// definition before imports are resolved.
+static std::optional<Identifier>
+getExternalMacroPluginModuleName(MacroDecl *macro) {
+  auto *expansion = dyn_cast_or_null<MacroExpansionExpr>(macro->definition);
+  if (!expansion ||
+      !expansion->getMacroName().getBaseIdentifier().is("externalMacro"))
+    return std::nullopt;
+  auto *args = expansion->getArgs();
+  if (!args || args->empty() || !args->getLabel(0).is("module"))
+    return std::nullopt;
+  auto *moduleName = dyn_cast<StringLiteralExpr>(args->getExpr(0));
+  if (!moduleName || moduleName->getValue().empty())
+    return std::nullopt;
+  return macro->getASTContext().getIdentifier(moduleName->getValue());
+}
+
 void ModuleDependencyInfo::addModuleImports(
     const SourceFile &sourceFile, llvm::StringSet<> &alreadyAddedModules,
     const SourceManager *sourceManager) {
@@ -251,16 +271,14 @@ void ModuleDependencyInfo::addModuleImports(
           importDecl->isTestable())
         addTestableImport(realPath);
     } else if (auto macroDecl = dyn_cast<MacroDecl>(decl)) {
-      auto macroDef = macroDecl->getDefinition();
-      auto &ctx = macroDecl->getASTContext();
-      if (macroDef.kind != MacroDefinition::Kind::External)
+      auto pluginModule = getExternalMacroPluginModuleName(macroDecl);
+      if (!pluginModule)
         continue;
-      auto external = macroDef.getExternalMacro();
-      PluginLoader &loader = ctx.getPluginLoader();
-      auto &entry = loader.lookupPluginByModuleName(external.moduleName);
+      PluginLoader &loader = macroDecl->getASTContext().getPluginLoader();
+      auto &entry = loader.lookupPluginByModuleName(*pluginModule);
       if (entry.libraryPath.empty() && entry.executablePath.empty())
         continue;
-      addMacroDependency(external.moduleName.str(), entry.libraryPath,
+      addMacroDependency(pluginModule->str(), entry.libraryPath,
                          entry.executablePath);
     }
   }
