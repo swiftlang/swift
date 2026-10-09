@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/stats-events)
 // RUN: %empty-directory(%t/stats-entities)
-// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-events %s -profile-stats-events -Xfrontend -fine-grained-timers
+// The globs below expect one compile's stats; an explicit module build adds the scan's and module jobs'.
+// RUN: %target-swiftc_driver -no-explicit-module-build -o %t/main -module-name main -stats-output-dir %t/stats-events %s -profile-stats-events -Xfrontend -fine-grained-timers
 // %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-entities %s -profile-stats-entities -Xfrontend -fine-grained-timers
 
 // Need to use %long-tmp because in Windows the * may expand to a path longer

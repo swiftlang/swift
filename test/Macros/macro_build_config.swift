@@ -4,7 +4,8 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
 
 // Execution testing
-// RUN: %target-build-swift -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -Xfrontend -emit-dependencies-path -Xfrontend %t/main.d -Xfrontend -emit-reference-dependencies-path -Xfrontend %t/main.swiftdeps -DDEBUG
+// The dependency scan of an explicit module build would reject the output flags passed with -Xfrontend.
+// RUN: %target-build-swift -no-explicit-module-build -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -Xfrontend -emit-dependencies-path -Xfrontend %t/main.d -Xfrontend -emit-reference-dependencies-path -Xfrontend %t/main.swiftdeps -DDEBUG
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
