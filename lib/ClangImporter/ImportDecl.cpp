@@ -1748,14 +1748,14 @@ namespace {
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
-        options -= MakeStructRawValuedFlags::IsLet;
+        options -= MakeStructRawValuedFlags::ReadOnly;
         options -= MakeStructRawValuedFlags::IsImplicit;
 
         synthesizer.makeStructRawValued(structDecl, underlyingType,
                                         {KnownProtocolKind::RawRepresentable,
                                          KnownProtocolKind::Equatable,
                                          KnownProtocolKind::Hashable},
-                                        options, /*setterAccess=*/access);
+                                        options);
 
         result = structDecl;
         break;
@@ -1847,10 +1847,10 @@ namespace {
           // Create the _nsError initializer.
           //   public init(_nsError error: NSError)
           VarDecl *members[1] = {nsErrorProp};
-          auto nsErrorInit =
-              synthesizer.createValueConstructor(errorWrapper, members,
-                                                 /*wantCtorParamNames=*/true,
-                                                 /*wantBody=*/true);
+          auto nsErrorInit = synthesizer.createValueConstructor(
+              errorWrapper, members,
+              {ValueConstructorFlags::WantParamNames,
+               ValueConstructorFlags::WantBody});
           errorWrapper->addMember(nsErrorInit);
 
           // Add the domain error member.
@@ -2758,10 +2758,10 @@ namespace {
 
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
-          auto valueCtor =
-              synthesizer.createValueConstructor(result, member,
-                                                 /*want param names*/ true,
-                                                 /*wantBody=*/true);
+          auto valueCtor = synthesizer.createValueConstructor(
+              result, member,
+              {ValueConstructorFlags::WantParamNames,
+               ValueConstructorFlags::WantBody});
 
           if (isNonEscapable)
             markReturnsUnsafeNonescapable(valueCtor);
@@ -2856,10 +2856,12 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
+        ValueConstructorOptions valueCtorOptions =
+            ValueConstructorFlags::WantParamNames;
+        if (hasUnreferenceableStorage)
+          valueCtorOptions |= ValueConstructorFlags::WantBody;
         auto valueCtor = synthesizer.createValueConstructor(
-            result, members,
-            /*want param names*/ true,
-            /*want body*/ hasUnreferenceableStorage);
+            result, members, valueCtorOptions);
         if (!hasUnreferenceableStorage)
           valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
 
@@ -7264,13 +7266,13 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     }
   }
 
+  auto options = getDefaultMakeStructRawValuedOptions();
+  if (unlabeledCtor)
+    options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
+
   if (!isBridged) {
     // Simple, our stored type is equivalent to our computed
     // type.
-    auto options = getDefaultMakeStructRawValuedOptions();
-    if (unlabeledCtor)
-      options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
-
     synthesizer.makeStructRawValued(structDecl, storedUnderlyingType,
                                     synthesizedProtocols, options);
   } else {
@@ -7278,8 +7280,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     // computed one of bridged type.
     synthesizer.makeStructRawValuedWithBridge(
         structDecl, storedUnderlyingType, computedPropertyUnderlyingType,
-        synthesizedProtocols,
-        /*makeUnlabeledValueInit=*/unlabeledCtor);
+        synthesizedProtocols, options);
   }
 
   if (wantsObjCBridgeableTypealias) {

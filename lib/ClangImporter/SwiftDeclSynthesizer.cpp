@@ -296,12 +296,12 @@ bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
          found->second->isUnicodeScalar();
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                const clang::APValue &value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              const clang::APValue &value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   // Create the integer literal value.
   Expr *expr = nullptr;
   switch (value.getKind()) {
@@ -394,12 +394,12 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                         access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                StringRef value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              StringRef value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   ASTContext &ctx = ImporterImpl.SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
@@ -483,12 +483,12 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   return createSingleReturnBody(ctx, expr);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                Expr *valueExpr,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   auto &C = ImporterImpl.SwiftContext;
 
   VarDecl *var = nullptr;
@@ -674,8 +674,10 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
 ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
     NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
-    bool wantCtorParamNames, bool wantBody) {
+    ValueConstructorOptions options) {
   auto &context = ImporterImpl.SwiftContext;
+  bool wantCtorParamNames =
+      options.contains(ValueConstructorFlags::WantParamNames);
 
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
@@ -729,7 +731,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
-  if (wantBody) {
+  if (options.contains(ValueConstructorFlags::WantBody)) {
     auto memberMemory =
         context.AllocateUninitialized<uintptr_t>(members.size() + 1);
     memberMemory[0] = members.size();
@@ -794,12 +796,11 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
     StructDecl *structDecl, VarDecl *computedRawValue, VarDecl *storedRawValue,
-    bool wantLabel, bool wantBody) {
+    ValueConstructorOptions options) {
   auto init = createValueConstructor(structDecl, computedRawValue,
-                                     /*wantCtorParamNames=*/wantLabel,
-                                     /*wantBody=*/false);
+                                     options - ValueConstructorFlags::WantBody);
   // Insert our custom init body
-  if (wantBody) {
+  if (options.contains(ValueConstructorFlags::WantBody)) {
     init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
                              storedRawValue);
   }
@@ -853,7 +854,7 @@ VarDecl *SwiftDeclSynthesizer::createSmartPtrBridgingProperty(
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    bool makeUnlabeledValueInit) {
+    MakeStructRawValuedOptions options) {
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
@@ -891,15 +892,15 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
       /*InitExpr*/ nullptr, structDecl);
 
   auto init =
-      createRawValueBridgingConstructor(structDecl, computedVar, storedVar,
-                                        /*wantLabel*/ true,
-                                        /*wantBody*/ true);
+      createRawValueBridgingConstructor(
+          structDecl, computedVar, storedVar,
+          {ValueConstructorFlags::WantParamNames,
+           ValueConstructorFlags::WantBody});
 
   ConstructorDecl *unlabeledCtor = nullptr;
-  if (makeUnlabeledValueInit)
+  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
     unlabeledCtor = createRawValueBridgingConstructor(
-        structDecl, computedVar, storedVar,
-        /*wantLabel*/ false, /*wantBody*/ true);
+        structDecl, computedVar, storedVar, ValueConstructorFlags::WantBody);
 
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
@@ -917,7 +918,7 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
 void SwiftDeclSynthesizer::makeStructRawValued(
     StructDecl *structDecl, Type underlyingType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    MakeStructRawValuedOptions options, AccessLevel setterAccess) {
+    MakeStructRawValuedOptions options) {
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
@@ -926,26 +927,30 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   // Create a variable to store the underlying value.
   VarDecl *var;
   PatternBindingDecl *patternBinding;
-  auto introducer = (options.contains(MakeStructRawValuedFlags::IsLet)
-                         ? VarDecl::Introducer::Let
-                         : VarDecl::Introducer::Var);
+  bool isReadOnly = options.contains(MakeStructRawValuedFlags::ReadOnly);
   std::tie(var, patternBinding) = createVarWithPattern(
-      structDecl, ctx.Id_rawValue, underlyingType, introducer,
+      structDecl, ctx.Id_rawValue, underlyingType,
+      isReadOnly ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
-      structDecl->getFormalAccess(), setterAccess);
+      structDecl->getFormalAccess(),
+      isReadOnly ? AccessLevel::Private : structDecl->getFormalAccess());
 
   assert(var->hasStorage());
 
   // Create constructors to initialize that value from a value of the
   // underlying type.
-  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
-    structDecl->addMember(createValueConstructor(structDecl, var,
-                                                 /*wantCtorParamNames=*/false,
-                                                 /*wantBody=*/true));
+  ConstructorDecl *unlabeledInit = nullptr;
+  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
+    unlabeledInit = createValueConstructor(
+        structDecl, var, ValueConstructorFlags::WantBody);
+  }
 
-  auto *initRawValue = createValueConstructor(structDecl, var,
-                                              /*wantCtorParamNames=*/true,
-                                              /*wantBody=*/true);
+  auto *initRawValue = createValueConstructor(
+      structDecl, var,
+      {ValueConstructorFlags::WantParamNames, ValueConstructorFlags::WantBody});
+
+  if (unlabeledInit)
+    structDecl->addMember(unlabeledInit);
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
