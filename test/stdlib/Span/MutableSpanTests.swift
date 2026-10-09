@@ -748,7 +748,7 @@ suite.test("MutableSpan from UnsafeMutableBufferPointer")
   expectTrue(b.elementsEqual((0..<capacity).reversed()))
 }
 
-suite.test("MutableSpan init(ofOne:)")
+suite.test("init(ofOne:)")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
@@ -770,7 +770,7 @@ suite.test("MutableSpan init(ofOne:)")
   }
 }
 
-suite.test("MutableSpan init(ofOne:) integer")
+suite.test("init(ofOne:) integer")
 .xfail(.always("https://github.com/swiftlang/swift/issues/92562"))
 .require(.minimumStdlib(.stdlib_6_5)).code {
   var value = 42
@@ -786,7 +786,7 @@ private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
 
-suite.test("MutableSpan Sendability")
+suite.test("Sendability")
 .require(.stdlib_6_2).code {
   let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
   defer { buffer.deallocate() }
