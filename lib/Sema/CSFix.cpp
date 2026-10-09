@@ -66,6 +66,10 @@ void ConstraintFix::print(llvm::raw_ostream &Out) const {
   getLocator()->dump(&CS.getASTContext().SourceMgr, Out);
 }
 
+bool ConstraintFix::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+  return false;
+}
+
 void ConstraintFix::dump() const {print(llvm::errs()); }
 
 std::string ForceDowncast::getName() const {
@@ -106,6 +110,11 @@ bool UnwrapOptionalBase::diagnose(const Solution &solution, bool asNote) const {
   MemberAccessOnOptionalBaseFailure failure(solution, getLocator(), MemberName,
                                             MemberBaseType, resultIsOptional);
   return failure.diagnose(asNote);
+}
+
+bool UnwrapOptionalBase::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::create(ConstraintSystem &cs,
@@ -165,6 +174,11 @@ FixImpact TreatRValueAsLValue::assessImpact(ConstraintSystem &cs,
   return impact;
 }
 
+bool TreatRValueAsLValue::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+    return diagnose(*commonFixes.front().first);
+}
+
 TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
@@ -216,6 +230,11 @@ bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
                                                     getToType(), getFromType(),
                                                     getLocator());
   return failure.diagnose(asNote);
+}
+
+bool TreatArrayLiteralAsDictionary::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 TreatArrayLiteralAsDictionary *
@@ -859,6 +878,10 @@ bool RemoveUnwrap::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool RemoveUnwrap::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) RemoveUnwrap(cs, baseType, locator);
@@ -880,6 +903,11 @@ bool UsePropertyWrapper::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool UsePropertyWrapper::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
                                                VarDecl *wrapped,
                                                bool usingProjection,
@@ -896,6 +924,10 @@ bool UseWrappedValue::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool UseWrappedValue::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
                                          VarDecl *propertyWrapper, Type base,
                                          Type wrapper,
@@ -907,6 +939,11 @@ UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
 bool AllowInvalidPropertyWrapperType::diagnose(const Solution &solution, bool asNote) const {
   InvalidPropertyWrapperType failure(solution, wrapperType, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool AllowInvalidPropertyWrapperType::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 AllowInvalidPropertyWrapperType *
@@ -1145,6 +1182,11 @@ bool AddMissingArguments::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool AddMissingArguments::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs,
                             ArrayRef<SynthesizedArg> synthesizedArgs,
@@ -1159,6 +1201,11 @@ bool RemoveExtraneousArguments::diagnose(const Solution &solution,
   ExtraneousArgumentsFailure failure(solution, ContextualType,
                                      getExtraArguments(), getLocator());
   return failure.diagnose(asNote);
+}
+
+bool RemoveExtraneousArguments::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 bool RemoveExtraneousArguments::isMinMaxNameShadowing(
@@ -1231,6 +1278,11 @@ bool AllowInaccessibleMember::diagnose(const Solution &solution,
                                        bool asNote) const {
   InaccessibleMemberFailure failure(solution, getMember(), getLocator());
   return failure.diagnose(asNote);
+}
+
+bool AllowInaccessibleMember::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 AllowInaccessibleMember *
@@ -1642,6 +1694,11 @@ bool DefaultGenericArgument::diagnose(const Solution &solution,
   return coalesceAndDiagnose(solution, {}, asNote);
 }
 
+bool DefaultGenericArgument::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 DefaultGenericArgument *
 DefaultGenericArgument::create(ConstraintSystem &cs, GenericTypeParamType *param,
                                ConstraintLocator *locator) {
@@ -1974,17 +2031,15 @@ bool UseRawValue::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool UseRawValue::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 UseRawValue *UseRawValue::create(ConstraintSystem &cs, Type rawReprType,
                                  Type expectedType,
                                  ConstraintLocator *locator) {
   return new (cs.getAllocator())
       UseRawValue(cs, rawReprType, expectedType, locator);
-}
-
-unsigned AllowArgumentMismatch::getParamIdx() const {
-  const auto *locator = getLocator();
-  auto elt = locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
-  return elt.getParamIdx();
 }
 
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
@@ -1997,6 +2052,28 @@ bool AllowArgumentMismatch::diagnose(const Solution &solution,
   return failure.value().diagnose(asNote);
 }
 
+bool AllowArgumentMismatch::diagnoseForAmbiguity(
+  CommonFixesArray commonFixes) const {
+
+  SmallVector<ArgumentMismatchFailure, 4> diagnostics;
+  for (auto commonFix : commonFixes) {
+    auto currentFix = commonFix.second->getAs<AllowArgumentMismatch>();
+    std::optional<ArgumentMismatchFailure> failure =
+      ArgumentMismatchFailure::create(*commonFix.first,
+                                      currentFix->getFromType(),
+                                      currentFix->getToType(),
+                                      currentFix->getLocator());
+    if (failure.has_value())
+      diagnostics.emplace_back(std::move(failure.value()));
+  }
+
+  if (diagnostics.size() > 1)
+    return diagnostics[0].diagnoseForAmbiguity(diagnostics);
+  if (diagnostics.size() == 1)
+    return diagnostics[0].diagnoseAsError();
+  return false;
+}
+
 AllowArgumentMismatch *
 AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
                               Type paramType, ConstraintLocator *locator) {
@@ -2007,6 +2084,11 @@ AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
 bool RemoveInvalidCall::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousCallFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool RemoveInvalidCall::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
@@ -2024,6 +2106,11 @@ bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
   if (failure.has_value())
     return failure.value().diagnose(asNote);
   return false;
+}
+
+bool TreatEphemeralAsNonEphemeral::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return ContextualMismatch::diagnoseForAmbiguity(commonFixes);
 }
 
 TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
@@ -2050,6 +2137,11 @@ bool AllowSendingMismatch::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool AllowSendingMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
                                                    Type srcType, Type dstType,
                                                    ConstraintLocator *locator) {
@@ -2065,6 +2157,11 @@ bool SpecifyBaseTypeForContextualMember::diagnose(const Solution &solution,
   MissingContextualBaseInMemberRefFailure failure(solution, MemberName,
                                                   getLocator());
   return failure.diagnose(asNote);
+}
+
+bool SpecifyBaseTypeForContextualMember::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
@@ -2095,6 +2192,11 @@ bool SpecifyClosureParameterType::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool SpecifyClosureParameterType::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 SpecifyClosureParameterType *
 SpecifyClosureParameterType::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
@@ -2105,6 +2207,11 @@ bool SpecifyClosureReturnType::diagnose(const Solution &solution,
                                         bool asNote) const {
   UnableToInferClosureReturnType failure(solution, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool SpecifyClosureReturnType::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 SpecifyClosureReturnType *
@@ -2216,6 +2323,11 @@ bool SpecifyKeyPathRootType::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool SpecifyKeyPathRootType::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 bool UnwrapOptionalBaseKeyPathApplication::diagnose(const Solution &solution,
                                                     bool asNote) const {
   MissingOptionalUnwrapKeyPathFailure failure(solution, getFromType(),
@@ -2282,6 +2394,11 @@ bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
   return diag.diagnose(asNote);
 }
 
+bool IgnoreInvalidResultBuilderBody::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 IgnoreInvalidResultBuilderBody *
 IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
                                        ConstraintLocator *locator) {
@@ -2296,6 +2413,11 @@ bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
   return diag.diagnose(asNote);
 }
 
+bool IgnoreInvalidASTNode::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
                                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
@@ -2305,6 +2427,11 @@ bool IgnoreInvalidPatternInExpr::diagnose(const Solution &solution,
                                           bool asNote) const {
   InvalidPatternInExprFailure failure(solution, P, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool IgnoreInvalidPatternInExpr::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 IgnoreInvalidPatternInExpr *
@@ -2320,6 +2447,11 @@ bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool SpecifyContextualTypeForNil::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 SpecifyContextualTypeForNil *
 SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
@@ -2330,6 +2462,11 @@ bool IgnoreInvalidPlaceholder::diagnose(const Solution &solution,
                                         bool asNote) const {
   InvalidPlaceholderFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool IgnoreInvalidPlaceholder::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 IgnoreInvalidPlaceholder *
@@ -2344,6 +2481,11 @@ bool SpecifyTypeForPlaceholder::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool SpecifyTypeForPlaceholder::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 SpecifyTypeForPlaceholder *
 SpecifyTypeForPlaceholder::create(ConstraintSystem &cs,
                                   ConstraintLocator *locator) {
@@ -2354,6 +2496,11 @@ bool AllowRefToInvalidDecl::diagnose(const Solution &solution,
                                      bool asNote) const {
   ReferenceToInvalidDeclaration failure(solution, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool AllowRefToInvalidDecl::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 AllowRefToInvalidDecl *
@@ -2381,6 +2528,11 @@ bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
   // that means we couldn't infer the pattern. We don't have a diagnostic to
   // emit here, the failure should be diagnosed by the fix for expression.
   return false;
+}
+
+bool IgnoreUnresolvedPatternVar::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 IgnoreUnresolvedPatternVar *
@@ -2638,6 +2790,11 @@ bool AllowInvalidStaticMemberRefOnProtocolMetatype::diagnose(
   return failure.diagnose(asNote);
 }
 
+bool AllowInvalidStaticMemberRefOnProtocolMetatype::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 AllowInvalidStaticMemberRefOnProtocolMetatype *
 AllowInvalidStaticMemberRefOnProtocolMetatype::create(
     ConstraintSystem &cs, ConstraintLocator *locator) {
@@ -2718,6 +2875,11 @@ bool RenameConflictingPatternVariables::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool RenameConflictingPatternVariables::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 RenameConflictingPatternVariables *
 RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
                                           ArrayRef<VarDecl *> conflicts,
@@ -2733,6 +2895,11 @@ bool MacroMissingPound::diagnose(const Solution &solution,
                                                  bool asNote) const {
   AddMissingMacroPound failure(solution, macro, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool MacroMissingPound::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 MacroMissingPound *
@@ -2775,6 +2942,11 @@ bool AllowValueExpansionWithoutPackReferences::diagnose(
   return failure.diagnose(asNote);
 }
 
+bool AllowValueExpansionWithoutPackReferences::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 AllowValueExpansionWithoutPackReferences *
 AllowValueExpansionWithoutPackReferences::create(ConstraintSystem &cs,
                                                  ConstraintLocator *locator) {
@@ -2789,6 +2961,11 @@ bool IgnoreMissingEachKeyword::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool IgnoreMissingEachKeyword::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 IgnoreMissingEachKeyword *
 IgnoreMissingEachKeyword::create(ConstraintSystem &cs, Type valuePackTy,
                                  ConstraintLocator *locator) {
@@ -2801,6 +2978,11 @@ bool AllowInvalidMemberReferenceInInitAccessor::diagnose(
   InvalidMemberReferenceWithinInitAccessor failure(solution, MemberName,
                                                    getLocator());
   return failure.diagnose(asNote);
+}
+
+bool AllowInvalidMemberReferenceInInitAccessor::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 AllowInvalidMemberReferenceInInitAccessor *
@@ -2818,6 +3000,11 @@ bool AllowConcreteTypeSpecialization::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool AllowConcreteTypeSpecialization::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 AllowConcreteTypeSpecialization *AllowConcreteTypeSpecialization::create(
     ConstraintSystem &cs, Type concreteTy, ValueDecl *decl,
     ConstraintLocator *locator, FixBehavior fixBehavior) {
@@ -2830,6 +3017,11 @@ bool AllowFunctionSpecialization::diagnose(const Solution &solution,
   InvalidFunctionSpecialization failure(solution, Decl, getLocator(),
                                         fixBehavior);
   return failure.diagnose(asNote);
+}
+
+bool AllowFunctionSpecialization::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 AllowFunctionSpecialization *
@@ -2848,6 +3040,11 @@ bool IgnoreOutOfPlaceThenStmt::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool IgnoreOutOfPlaceThenStmt::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 IgnoreOutOfPlaceThenStmt *
 IgnoreOutOfPlaceThenStmt::create(ConstraintSystem &cs,
                                  ConstraintLocator *locator) {
@@ -2859,6 +3056,11 @@ bool IgnoreGenericSpecializationArityMismatch::diagnose(
   InvalidTypeSpecializationArity failure(solution, D, NumParams, NumArgs,
                                          HasParameterPack, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool IgnoreGenericSpecializationArityMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 IgnoreGenericSpecializationArityMismatch *
@@ -2913,6 +3115,11 @@ bool TooManyDynamicMemberLookups::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool TooManyDynamicMemberLookups::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
+}
+
 IgnoreIsolatedConformance *
 IgnoreIsolatedConformance::create(ConstraintSystem &cs,
                                   ConstraintLocator *locator,
@@ -2925,6 +3132,11 @@ bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
                                          bool asNote) const {
   DisallowedIsolatedConformance failure(solution, conformance, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool IgnoreIsolatedConformance::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  return diagnose(*commonFixes.front().first);
 }
 
 IgnoreClassRequirementForDynamicMemberLookup *
