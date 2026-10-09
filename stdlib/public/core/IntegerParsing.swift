@@ -161,7 +161,76 @@ extension FixedWidthInteger {
 }
 
 //===----------------------------------------------------------------------===//
-// Old entry points preserved for ABI compatibility.
+// MARK: - Parsing from Unicode buffers
+//===----------------------------------------------------------------------===//
+
+extension FixedWidthInteger {
+  /// Creates a new integer value from the given sequence of Unicode code units
+  /// and radix.
+  ///
+  /// The string passed as `codeUnits` may begin with a plus or minus sign
+  /// character (`+` or `-`), followed by one or more numeric digits (`0-9`) or
+  /// letters (`a-z` or `A-Z`). Parsing of the string is case insensitive.
+  ///
+  ///     let x = Int([UInt8(ascii: "1"), UInt8(ascii: "2"), UInt8(ascii: "3")])
+  ///     // x == 123
+  ///
+  ///     let y = Int("-123".utf8, radix: 8)
+  ///     // y == -83
+  ///     let y = Int("+123".utf8, radix: 8)
+  ///     // y == +83
+  ///
+  ///     let z = Int("07b".utf8, radix: 16)
+  ///     // z == 123
+  ///
+  /// If `codeUnits` is in an invalid format or contains characters that are out
+  /// of bounds for the given `radix`, or if the value it denotes in the given
+  /// `radix` is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     Int(" 100".utf8)                     // Includes whitespace
+  ///     Int("21-50".utf8)                    // Invalid format
+  ///     Int("ff6600".utf8)                   // Characters out of bounds
+  ///     Int("zzzzzzzzzzzzz".utf8, radix: 36) // Out of range
+  ///
+  /// - Parameters:
+  ///   - codeUnits: The ASCII representation of a number in the radix passed as
+  ///     `radix`.
+  ///   - encoding: The encoding with which to interpret `codeUnits`.
+  ///   - radix: The radix, or base, to use for converting `text` to an integer
+  ///     value. `radix` must be in the range `2...36`. The default is 10.
+  @export(implementation)
+  @inlinable
+  @available(SwiftStdlib 6.0, *)
+  public init?<Encoding: Unicode.Encoding>(
+    _ codeUnits: some Sequence<Encoding.CodeUnit>,
+    as encoding: Encoding.Type,
+    radix: Int = 10
+  ) {
+    func parseSlowPath() -> Self? {
+      guard let string = String(validating: codeUnits, as: encoding) else {
+        return nil
+      }
+      return Self(string, radix: radix)
+    }
+
+    let result: Self? = switch encoding {
+    case UTF8.self, ASCII.self:
+      unsafe codeUnits.withContiguousStorageIfAvailable { codeUnits in
+        unsafe _parseIntegerDigits(ascii: codeUnits, radix: radix) as Self
+      } ?? parseSlowPath()
+    default:
+      parseSlowPath()
+    }
+    guard let result else {
+      return nil
+    }
+    self = result
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Old entry points preserved for ABI compatibility.
 //===----------------------------------------------------------------------===//
 
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
