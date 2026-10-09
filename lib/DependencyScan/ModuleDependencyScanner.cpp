@@ -181,6 +181,47 @@ std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
   return outputPath.str().str();
 }
 
+/// Parses \p sourceFile without reporting its errors. The compile job reports
+/// them, along with the semantic errors that a failed scan would hide, and the
+/// parser still recovers the file's imports. Warnings that parsing produces,
+/// such as those from evaluating `#if canImport`, are still reported.
+static void parseWithoutReportingErrors(SourceFile &sourceFile,
+                                        DiagnosticEngine &diags) {
+  /// Forwards diagnostics, except errors and the notes attached to them.
+  class ErrorDroppingConsumer : public DiagnosticConsumer {
+    ArrayRef<DiagnosticConsumer *> forwardTo;
+    bool droppingNotes = false;
+
+  public:
+    explicit ErrorDroppingConsumer(ArrayRef<DiagnosticConsumer *> forwardTo)
+        : forwardTo(forwardTo) {}
+
+    void handleDiagnostic(SourceManager &SM,
+                          const DiagnosticInfo &info) override {
+      if (info.Kind == DiagnosticKind::Error) {
+        droppingNotes = true;
+        return;
+      }
+      if (info.Kind == DiagnosticKind::Note && droppingNotes)
+        return;
+      droppingNotes = false;
+      for (auto *consumer : forwardTo)
+        consumer->handleDiagnostic(SM, info);
+    }
+  };
+
+  bool hadErrorBefore = diags.hadAnyError();
+  auto consumers = diags.takeConsumers();
+  ErrorDroppingConsumer filter(consumers);
+  diags.addConsumer(filter);
+  (void)sourceFile.getTopLevelItems();
+  diags.removeConsumer(filter);
+  for (auto *consumer : consumers)
+    diags.addConsumer(*consumer);
+  if (!hadErrorBefore)
+    diags.resetHadAnyError();
+}
+
 /// The clang system VFS overlay created by ClangImporter (see
 /// ClangImporter::getClangSystemOverlayFile) is a virtual in-memory file that
 /// does not exist on disk, so exclude it from any list of paths that is
@@ -765,11 +806,13 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
   // Add source-specified `import` dependencies
   {
+    auto &diags = mainModule->getASTContext().Diags;
     for (auto fileUnit : mainModule->getFiles()) {
       auto sourceFile = dyn_cast<SourceFile>(fileUnit);
       if (!sourceFile)
         continue;
 
+      parseWithoutReportingErrors(*sourceFile, diags);
       mainDependencies.addModuleImports(*sourceFile, alreadyAddedModules,
                                         &ScanASTContext.SourceMgr);
     }
