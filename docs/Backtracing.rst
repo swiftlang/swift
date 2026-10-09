@@ -104,6 +104,13 @@ follows:
 |                 |         | directory, the backtracer will generate unique   |
 |                 |         | filenames within that directory.  Otherwise it   |
 |                 |         | is assumed to be a filename.                     |
+|                 |         |                                                  |
+|                 |         | On Windows, ``eventlog`` writes the backtrace to |
+|                 |         | the Application event log; this is the default   |
+|                 |         | for programs without a console.  ``console``     |
+|                 |         | behaves like ``stderr``, except that if the      |
+|                 |         | program has no console, the backtracer is given  |
+|                 |         | a new console window.                            |
 +-----------------+---------+--------------------------------------------------+
 | symbolicate     | full    | Options are ``full``, ``fast``, or ``off``.      |
 |                 |         | Full means to look up source locations and       |

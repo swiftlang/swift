@@ -255,3 +255,80 @@ struct CFileStream: TextOutputStream {
 
 var standardOutput = CFileStream(fp: stdout)
 var standardError = CFileStream(fp: stderr)
+
+#if os(Windows)
+/// Write `text` to the Application event log as one or more error events.
+///
+/// ReportEventW() limits each string to 31,839 characters, so long text is
+/// split at line boundaries into numbered parts.
+internal func reportToEventLog(_ text: String, source: String) -> Bool {
+  let maxChunkLength = 31_000
+
+  var chunks: [String] = []
+  var chunk = ""
+  var chunkLength = 0
+  for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+    var line = Substring(line)
+    while true {
+      let lineLength = line.utf16.count + 2
+      if chunkLength + lineLength <= maxChunkLength {
+        chunk += line
+        chunk += "\r\n"
+        chunkLength += lineLength
+        break
+      }
+      if chunkLength > 0 {
+        chunks.append(chunk)
+        chunk = ""
+        chunkLength = 0
+        continue
+      }
+      let prefix = line.prefix(maxChunkLength / 2)
+      chunks.append(String(prefix))
+      line = line.dropFirst(prefix.count)
+    }
+  }
+  if chunkLength > 0 {
+    chunks.append(chunk)
+  }
+
+  let hEventLog = source.withCString(encodedAs: UTF16.self) {
+    RegisterEventSourceW(nil, $0)
+  }
+  guard let hEventLog else {
+    return false
+  }
+  defer {
+    _ = DeregisterEventSource(hEventLog)
+  }
+
+  var succeeded = true
+  for (ndx, chunk) in chunks.enumerated() {
+    let message: String
+    if chunks.count > 1 {
+      message = "(\(ndx + 1)/\(chunks.count))\r\n\(chunk)"
+    } else {
+      message = chunk
+    }
+
+    let reported = message.withCString(encodedAs: UTF16.self) {
+      pwszMessage in
+      var strings: [LPCWSTR?] = [pwszMessage]
+      return ReportEventW(hEventLog,
+                          WORD(EVENTLOG_ERROR_TYPE),
+                          0,
+                          1,
+                          nil,
+                          1,
+                          0,
+                          &strings,
+                          nil)
+    }
+    if !reported {
+      succeeded = false
+    }
+  }
+
+  return succeeded
+}
+#endif
