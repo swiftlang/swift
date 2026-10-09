@@ -5580,7 +5580,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
 
-    // Generic functions can't currently have Sendable or @called(atMostOnce)
+    // Generic functions can't currently have Sendable or execution semantics
     // dependence.
     ASSERT(!info->getSendableDependentType());
     ASSERT(!info->getExecutionSemanticsDependentType());

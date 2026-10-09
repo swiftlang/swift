@@ -3892,9 +3892,9 @@ public:
   /// variables if present.
   Type getSendableDependentType() const;
 
-  /// A dependent type that determines whether the function is
-  /// @called(atMostOnce). This is only used within the constraint system, and
-  /// will contain type variables if present.
+  /// A dependent type that determines whether the function has exactly-once or
+  /// at-most-once execution semantics. This is only used within the constraint
+  /// system, and will contain type variables if present.
   Type getExecutionSemanticsDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
