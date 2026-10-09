@@ -113,6 +113,7 @@ sil [ossa] @getT : $@convention(thin) <T> () -> @out T
 sil [ossa] @getKlass : $@convention(thin) () -> (@owned Klass)
 sil [ossa] @borrowKlass : $(@in_guaranteed Klass) -> ()
 sil [ossa] @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @borrowTU : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
 sil [ossa] @borrowMoveOnlyT : $@convention(thin) <T> (@in_guaranteed @moveOnly T) -> ()
 sil [ossa] @getPair : $@convention(thin) <T> () -> @out Pair<T>
 sil [ossa] @getOwned : $@convention(thin) <T : AnyObject> () -> (@owned T)
@@ -3071,8 +3072,9 @@ sil [ossa] @test_partial_apply_1_addronly_heap : $<T> () -> () {
 // CHECK:         apply [[GET]]<T>([[STACK]])
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowT
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW]]<T>([[STACK]])
-// CHECK:         apply [[CLOSURE]]()
-// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[STACK]]
+// CHECK:         apply [[DEPENDENCY]]()
+// CHECK:         destroy_value [[DEPENDENCY]]
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]
 // CHECK-LABEL: } // end sil function 'test_partial_apply_2_addronly_stack'
@@ -3151,6 +3153,54 @@ bb0(%c : @owned $Klass):
   %callee = function_ref @test_partial_apply_5_indexing_callee : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
   %closure = partial_apply [callee_guaranteed] %callee(%c) : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
   destroy_value %closure : $@callee_guaranteed (@inout Int) -> (@out Int)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// An on-stack closure that captures borrowed address-only arguments is
+// dependent on each argument's storage, in a chain.
+// CHECK-LABEL: sil [ossa] @test_partial_apply_6_addronly_stack_borrowed_arguments : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[T:%[^,]+]] : $*T, [[U:%[^,]+]] : $*U):
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @borrowTU
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[CALLEE]]<T, U>([[T]], [[U]])
+// CHECK:         [[DEPENDENCY_U:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[U]]
+// CHECK:         [[DEPENDENCY_T:%[^,]+]] = mark_dependence [nonescaping] [[DEPENDENCY_U]] : {{.*}} on [[T]]
+// CHECK:         apply [[DEPENDENCY_T]]()
+// CHECK:         destroy_value [[DEPENDENCY_T]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_6_addronly_stack_borrowed_arguments'
+sil [ossa] @test_partial_apply_6_addronly_stack_borrowed_arguments : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
+bb0(%t : @guaranteed $T, %u : @guaranteed $U):
+  %callee = function_ref @borrowTU : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  %borrow_t = begin_borrow %t : $T
+  %borrow_u = begin_borrow %u : $U
+  %closure = partial_apply [on_stack] [callee_guaranteed] %callee<T, U>(%borrow_t, %borrow_u) : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  apply %closure() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  end_borrow %borrow_u : $U
+  end_borrow %borrow_t : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Uses of the closure, such as a conversion, go through the dependence.
+// CHECK-LABEL: sil [ossa] @test_partial_apply_7_addronly_stack_converted : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[T:%[^,]+]] : $*T):
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @borrowT
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[CALLEE]]<T>([[T]])
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[T]]
+// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
+// CHECK:         apply [[CONVERTED]]()
+// CHECK:         destroy_value [[CONVERTED]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_7_addronly_stack_converted'
+sil [ossa] @test_partial_apply_7_addronly_stack_converted : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%t : @guaranteed $T):
+  %callee = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %borrow_t = begin_borrow %t : $T
+  %closure = partial_apply [on_stack] [callee_guaranteed] %callee<T>(%borrow_t) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %converted = convert_function %closure : $@noescape @callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  apply %converted() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %converted : $@noescape @callee_guaranteed () -> ()
+  end_borrow %borrow_t : $T
   %retval = tuple ()
   return %retval : $()
 }

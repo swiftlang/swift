@@ -1,10 +1,11 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -closure-lifetime-fixup %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -closure-lifetime-fixup -sil-disable-copy-elimination-of-copyable-closure-capture=true %s | %FileCheck %s --check-prefix=NOELIM
 
 // With opaque values, an @in_guaranteed capture of a generic value is an
 // object, not an address. SILGen copies it with a copy_value for the escaping
 // closure, and ClosureLifetimeFixup borrows that copy for the on-stack closure.
-// There is no alloc_stack to deallocate. This test runs ClosureLifetimeFixup
-// directly on that SIL, so it does not depend on where address lowering sits in
+// There is no alloc_stack to deallocate. These tests run ClosureLifetimeFixup
+// directly on that SIL, so they do not depend on where address lowering sits in
 // the pipeline.
 
 sil_stage raw
@@ -13,7 +14,10 @@ import Builtin
 import Swift
 
 sil [ossa] @closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @closure2 : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+sil [ossa] @closure_out : $@convention(thin) <T> (@in_guaranteed T) -> @out (T, T)
 sil [ossa] @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+sil [ossa] @use_out : $@convention(thin) <T> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T
 
 // The captured copy is not removed when the original is destroyed while the
 // closure is still in use: the closure keeps its own copy, and ends the borrow
@@ -36,6 +40,152 @@ bb0(%0 : @owned $T):
   %pa = partial_apply [callee_guaranteed] %f<T>(%c) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   destroy_value %0 : $T
+  %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %cvt : $@noescape @callee_guaranteed () -> ()
+  destroy_value %pa : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// What SILGen emits for `doit { (value, value) }` with a generic `value`. A
+// guaranteed function argument is live throughout the function, so the closure
+// borrows it directly.
+// CHECK-LABEL: sil [ossa] {{.*}}@test_guaranteed_argument :
+// CHECK-NOT:     copy_value
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow %0 : $Value
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<Value>([[BORROW]])
+// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[CLOSURE]]
+// CHECK:         apply {{%[^,]+}}<(Value, Value)>([[CONVERTED]])
+// CHECK:         destroy_value [[CONVERTED]]
+// CHECK:         end_borrow [[BORROW]] : $Value
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'test_guaranteed_argument'
+sil [ossa] @test_guaranteed_argument : $@convention(thin) <Value> (@in_guaranteed Value) -> (@out Value, @out Value) {
+bb0(%0 : @guaranteed $Value):
+  %f = function_ref @closure_out : $@convention(thin) <T> (@in_guaranteed T) -> @out (T, T)
+  %c = copy_value %0 : $Value
+  %pa = partial_apply [callee_guaranteed] %f<Value>(%c) : $@convention(thin) <T> (@in_guaranteed T) -> @out (T, T)
+  %conv = convert_function %pa : $@callee_guaranteed () -> @out (Value, Value) to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <(Value, Value)>
+  %cvt = convert_escape_to_noescape [not_guaranteed] %conv : $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <(Value, Value)> to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <(Value, Value)>
+  %u = function_ref @use_out : $@convention(thin) <T> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T
+  %res = apply %u<(Value, Value)>(%cvt) : $@convention(thin) <T> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T
+  destroy_value %cvt : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <(Value, Value)>
+  destroy_value %conv : $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <(Value, Value)>
+  (%a, %b) = destructure_tuple %res : $(Value, Value)
+  %out = tuple (%a : $Value, %b : $Value)
+  return %out : $(Value, Value)
+}
+
+// An owned value that is live until after the closure's last use is borrowed
+// in place, and the copy is removed.
+// CHECK-LABEL: sil [ossa] {{.*}}@test_owned_source_live :
+// CHECK-NOT:     copy_value
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow %0 : $T
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>([[BORROW]])
+// CHECK:         apply {{%[^,]+}}([[CLOSURE]])
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         end_borrow [[BORROW]] : $T
+// CHECK:         destroy_value %0 : $T
+// CHECK:       } // end sil function 'test_owned_source_live'
+//
+// With copy elimination of Copyable captures disabled, the copy stays.
+// NOELIM-LABEL: sil [ossa] {{.*}}@test_owned_source_live :
+// NOELIM:         [[COPY:%[^,]+]] = copy_value %0 : $T
+// NOELIM:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]] : $T
+// NOELIM:         partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>([[BORROW]])
+// NOELIM:         end_borrow [[BORROW]] : $T
+// NOELIM:         destroy_value [[COPY]] : $T
+// NOELIM:         destroy_value %0 : $T
+// NOELIM:       } // end sil function 'test_owned_source_live'
+sil [ossa] @test_owned_source_live : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  %f = function_ref @closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %c = copy_value %0 : $T
+  %pa = partial_apply [callee_guaranteed] %f<T>(%c) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %cvt : $@noescape @callee_guaranteed () -> ()
+  destroy_value %pa : $@callee_guaranteed () -> ()
+  destroy_value %0 : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// A borrowed value is live only for its borrow scope. If the scope ends before
+// the closure's last use, the closure keeps its copy.
+// CHECK-LABEL: sil [ossa] {{.*}}@test_borrow_scope_ends_early :
+// CHECK:         [[SCOPE:%[^,]+]] = begin_borrow %0 : $T
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[SCOPE]] : $T
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]] : $T
+// CHECK:         partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>([[BORROW]])
+// CHECK:         end_borrow [[SCOPE]] : $T
+// CHECK:         end_borrow [[BORROW]] : $T
+// CHECK:         destroy_value [[COPY]] : $T
+// CHECK:       } // end sil function 'test_borrow_scope_ends_early'
+sil [ossa] @test_borrow_scope_ends_early : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %f = function_ref @closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %b = begin_borrow %0 : $T
+  %c = copy_value %b : $T
+  %pa = partial_apply [callee_guaranteed] %f<T>(%c) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  end_borrow %b : $T
+  %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %cvt : $@noescape @callee_guaranteed () -> ()
+  destroy_value %pa : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// If the borrow scope covers the closure's lifetime, the closure borrows it.
+// CHECK-LABEL: sil [ossa] {{.*}}@test_borrow_scope_live :
+// CHECK-NOT:     copy_value
+// CHECK:         [[SCOPE:%[^,]+]] = begin_borrow %0 : $T
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[SCOPE]] : $T
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>([[BORROW]])
+// CHECK:         apply {{%[^,]+}}([[CLOSURE]])
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         end_borrow [[BORROW]] : $T
+// CHECK:         end_borrow [[SCOPE]] : $T
+// CHECK:       } // end sil function 'test_borrow_scope_live'
+sil [ossa] @test_borrow_scope_live : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %f = function_ref @closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %b = begin_borrow %0 : $T
+  %c = copy_value %b : $T
+  %pa = partial_apply [callee_guaranteed] %f<T>(%c) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %cvt : $@noescape @callee_guaranteed () -> ()
+  destroy_value %pa : $@callee_guaranteed () -> ()
+  end_borrow %b : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// Each capture is decided on its own: the guaranteed argument is borrowed in
+// place, and the owned value that dies early keeps its copy.
+// CHECK-LABEL: sil [ossa] {{.*}}@test_two_captures :
+// CHECK:         [[COPY:%[^,]+]] = copy_value %1 : $U
+// CHECK:         [[BORROW_T:%[^,]+]] = begin_borrow %0 : $T
+// CHECK:         [[BORROW_U:%[^,]+]] = begin_borrow [[COPY]] : $U
+// CHECK:         partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T, U>([[BORROW_T]], [[BORROW_U]])
+// CHECK:         end_borrow [[BORROW_T]] : $T
+// CHECK:         end_borrow [[BORROW_U]] : $U
+// CHECK:         destroy_value [[COPY]] : $U
+// CHECK:       } // end sil function 'test_two_captures'
+sil [ossa] @test_two_captures : $@convention(thin) <T, U> (@in_guaranteed T, @in U) -> () {
+bb0(%0 : @guaranteed $T, %1 : @owned $U):
+  %f = function_ref @closure2 : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  %c0 = copy_value %0 : $T
+  %c1 = copy_value %1 : $U
+  %pa = partial_apply [callee_guaranteed] %f<T, U>(%c0, %c1) : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  destroy_value %1 : $U
   %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
   apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
   destroy_value %cvt : $@noescape @callee_guaranteed () -> ()

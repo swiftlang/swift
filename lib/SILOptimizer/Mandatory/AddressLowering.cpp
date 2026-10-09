@@ -2386,6 +2386,18 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(argValue);
     assert(storage.isRewritten && "arg source should be rewritten");
     operand->set(storage.storageAddress);
+    // An on-stack closure now captures the argument's storage. Mark the closure
+    // dependent on it, as ClosureLifetimeFixup does for address captures.
+    auto *pai = dyn_cast<PartialApplyInst>(apply.getInstruction());
+    if (pai && pai->isOnStack()) {
+      SmallVector<Operand *, 4> closureUses(pai->getUses());
+      auto *mdi = pass.getBuilder(std::next(pai->getIterator()))
+                      .createMarkDependence(callLoc, pai,
+                                            storage.storageAddress,
+                                            MarkDependenceKind::NonEscaping);
+      for (auto *use : closureUses)
+        use->set(mdi);
+    }
     return;
   }
   // Allocate temporary storage for a loadable operand.
