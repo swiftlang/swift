@@ -135,28 +135,24 @@ else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
 endif()
 
-# Force the minimum iOS deployment target to 18.0
 if(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS VERSION_LESS "18.0")
   set(ios_deployment_target "18.0")
 else()
   set(ios_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}")
 endif()
 
-# Force the minimum tvOS deployment target to 18.0
 if(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS VERSION_LESS "18.0")
   set(tvos_deployment_target "18.0")
 else()
   set(tvos_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}")
 endif()
 
-# Force the minimum watchOS deployment target to 11.0
 if(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS VERSION_LESS "11.0")
   set(watchos_deployment_target "11.0")
 else()
   set(watchos_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}")
 endif()
 
-# Force the minimum visionOS deployment target to 2.0
 if(SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS VERSION_LESS "2.0")
   set(xros_deployment_target "2.0")
 else()
@@ -164,8 +160,6 @@ else()
 endif()
 
 # Generate BacktracingDT 6.2
-# The non-macOS versions are placeholders until we know which release this
-# will ship in.
 set(backtracing_availability_osx "26.0")
 if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY)
   if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")

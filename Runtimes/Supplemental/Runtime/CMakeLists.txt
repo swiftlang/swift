@@ -92,9 +92,6 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
 # Generate BacktracingDT 6.2
-# The non-macOS versions are placeholders until we know which release this
-# will ship in.  CMAKE_OSX_DEPLOYMENT_TARGET is the deployment target for
-# whichever Apple platform we're building, so only use it for macOS.
 set(backtracingdt62_macos_version "26.0")
 if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_OSX_DEPLOYMENT_TARGET AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "26.0")
   set(backtracingdt62_macos_version "${CMAKE_OSX_DEPLOYMENT_TARGET}")
