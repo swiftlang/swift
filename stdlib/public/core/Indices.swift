@@ -145,5 +145,8 @@ extension Collection where Indices == DefaultIndices<Self> {
   }
 }
 
+extension DefaultIndices: BitwiseCopyable
+  where Elements: BitwiseCopyable, Elements.Index: BitwiseCopyable { }
+
 extension DefaultIndices: Sendable
   where Elements: Sendable, Elements.Index: Sendable { }

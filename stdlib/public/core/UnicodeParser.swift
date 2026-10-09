@@ -60,4 +60,6 @@ extension Unicode {
   public typealias Parser = _UnicodeParser
 }
 
+extension Unicode.ParseResult: BitwiseCopyable where T: BitwiseCopyable {}
+
 extension Unicode.ParseResult: Sendable where T: Sendable { }
