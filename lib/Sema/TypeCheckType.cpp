@@ -2287,6 +2287,37 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
+static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
+                                           const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  auto nameString = typeDecl->getName().str();
+  auto diag = [&](StringRef featureName) {
+    // Don't require this in the standard library or _Concurrency library.
+    auto module = dc->getParentModule();
+    if (module->isStdlibModule() || module->isConcurrencyModule())
+      return;
+  
+    ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature, nameString,
+                       featureName);
+  };
+
+  if (nameString == "Cell" ||
+      nameString == "ConstCell" ||
+      nameString == "Volatile") {
+    if (ctx.LangOpts.hasFeature(Feature::Cells))
+      return;
+
+    diag(Feature::Cells.getName());
+  }
+}
+
 NeverNullType
 TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                               TypeResolutionOptions options) {
@@ -2420,6 +2451,8 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseExperimentalStdlibTypes(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;

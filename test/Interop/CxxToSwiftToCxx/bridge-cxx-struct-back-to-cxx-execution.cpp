@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters -enable-experimental-feature RawLayout
 
 // RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
@@ -16,6 +16,7 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_Reparenting
 // REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_RawLayout
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 //--- header.h
