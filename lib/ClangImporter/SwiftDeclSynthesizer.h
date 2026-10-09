@@ -27,8 +27,8 @@ enum class MakeStructRawValuedFlags {
   /// whether to also create an unlabeled init
   MakeUnlabeledValueInit = 0x01,
 
-  /// whether the raw value should be a let
-  IsLet = 0x02,
+  /// whether the raw value should be read-only (`let` or no/private setter)
+  ReadOnly = 0x02,
 
   /// whether to mark the rawValue as implicit
   IsImplicit = 0x04,
@@ -38,10 +38,20 @@ using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
 inline MakeStructRawValuedOptions getDefaultMakeStructRawValuedOptions() {
   MakeStructRawValuedOptions opts;
   opts -= MakeStructRawValuedFlags::MakeUnlabeledValueInit; // default off
-  opts |= MakeStructRawValuedFlags::IsLet;                  // default on
+  opts |= MakeStructRawValuedFlags::ReadOnly;               // default on
   opts |= MakeStructRawValuedFlags::IsImplicit;             // default on
   return opts;
 }
+
+enum class ValueConstructorFlags {
+  /// If present, arguments should be labeled.
+  WantParamNames = 0x01,
+
+  /// If present, a synthesized AST body should be attached (otherwise the
+  /// implementation will be synthesized by SILGen).
+  WantBody = 0x02,
+};
+using ValueConstructorOptions = OptionSet<ValueConstructorFlags>;
 
 inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
   return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
@@ -94,10 +104,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            const clang::APValue &value,
-                            ConstantConvertKind convertKind, bool isStatic,
-                            ClangNode ClangN, AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          const clang::APValue &value,
+                          ConstantConvertKind convertKind, bool isStatic,
+                          ClangNode ClangN, AccessLevel access);
 
   /// Create a new named constant with the given value.
   ///
@@ -108,10 +118,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            StringRef value, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN,
-                            AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          StringRef value, ConstantConvertKind convertKind,
+                          bool isStatic, ClangNode ClangN,
+                          AccessLevel access);
 
   /// Create a new named constant using the given expression.
   ///
@@ -122,10 +132,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            Expr *valueExpr, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN,
-                            AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          Expr *valueExpr, ConstantConvertKind convertKind,
+                          bool isStatic, ClangNode ClangN,
+                          AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
   ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
@@ -133,15 +143,12 @@ public:
   /// Create a constructor that initializes a struct from its members.
   ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
                                           ArrayRef<VarDecl *> members,
-                                          bool wantCtorParamNames,
-                                          bool wantBody);
+                                          ValueConstructorOptions options);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
-  ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,
-                                                     VarDecl *computedRawValue,
-                                                     VarDecl *storedRawValue,
-                                                     bool wantLabel,
-                                                     bool wantBody);
+  ConstructorDecl *createRawValueBridgingConstructor(
+      StructDecl *structDecl, VarDecl *computedRawValue,
+      VarDecl *storedRawValue, ValueConstructorOptions options);
 
   /// Create a constructor that initializes a class from a smart pointer.
   VarDecl *createSmartPtrBridgingProperty(FuncDecl *bridgingFunction);
@@ -162,25 +169,23 @@ public:
   void makeStructRawValuedWithBridge(
       StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-      bool makeUnlabeledValueInit = false);
+      MakeStructRawValuedOptions options =
+         getDefaultMakeStructRawValuedOptions());
 
   /// Make a struct declaration into a raw-value-backed struct
   ///
   /// \param structDecl the struct to make a raw value for
   /// \param underlyingType the type of the raw value
   /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
-  /// \param setterAccess the access level of the raw value's setter
   ///
   /// This will perform most of the work involved in making a new Swift struct
   /// be backed by a raw value. This will populated derived protocols and
   /// synthesized protocols, add the new variable and pattern bindings, and
   /// create the inits parameterized over a raw value
-  ///
   void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
                            ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
                            MakeStructRawValuedOptions options =
-                               getDefaultMakeStructRawValuedOptions(),
-                           AccessLevel setterAccess = AccessLevel::Private);
+                               getDefaultMakeStructRawValuedOptions());
 
   /// Build the union field getter and setter.
   ///
