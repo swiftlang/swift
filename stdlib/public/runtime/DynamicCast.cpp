@@ -2362,7 +2362,8 @@ static DynamicCastResult tryCastToExtendedExistential(
     SubstGenericParametersFromMetadata substitutions(destExistentialShape,
                                                      allGenericArgsVec.data());
     // Verify the requirements in the requirement signature against the
-    // arguments from the source value.
+    // arguments from the source value. The leading generalization parameters
+    // never record inverses, so don't check them for Copyable and Escapable.
     ConformanceExecutionContext context;
     auto requirementSig = destExistentialShape->getRequirementSignature();
     auto error = swift::_checkGenericRequirements(
@@ -2378,7 +2379,8 @@ static DynamicCastResult tryCastToExtendedExistential(
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
         },
-        &context);
+        &context, /*numParamsExemptFromInvertibleChecks=*/
+        destExistentialShape->getNumGenSigParams());
     if (error)
       return DynamicCastResult::Failure;
 
