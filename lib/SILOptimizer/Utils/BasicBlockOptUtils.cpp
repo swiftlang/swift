@@ -131,8 +131,16 @@ void BasicBlockCloner::updateSSAAfterCloning() {
 
       SmallVector<UseWrapper, 16> useList;
       // Collect the uses of the value.
-      for (auto *use : inst->getUses())
+      for (auto *use : inst->getUses()) {
+        SILInstruction *user = use->getUser();
+        assert(user && "Missing user");
+
+        // Ignore uses in the same basic block.
+        if (user->getParent() == origBB)
+          continue;
+
         useList.push_back(UseWrapper(use));
+      }
 
       ssaUpdater.initialize(inst->getFunction(), inst->getType(),
                             inst->getOwnershipKind());
@@ -143,17 +151,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
         continue;
 
       // Update all the uses.
-      for (auto useWrapper : useList) {
-        Operand *use = useWrapper; // unwrap
-        SILInstruction *user = use->getUser();
-        assert(user && "Missing user");
-
-        // Ignore uses in the same basic block.
-        if (user->getParent() == origBB)
-          continue;
-
-        ssaUpdater.rewriteUse(*use);
-      }
+      ssaUpdater.rewriteUses(useList);
     }
   }
   for (SILBasicBlock *b : blocksWithNewPhiArgs) {

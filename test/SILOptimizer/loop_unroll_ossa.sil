@@ -833,3 +833,39 @@ bb3:
   return %24 : $()
 }
 
+
+sil [ossa] @getWrapperStruct : $@convention(thin) () -> @owned WrapperStruct
+
+// The debug_value of %w in bb3 is after the loop, which consumes %w, so it must
+// be killed.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_after_consume :
+// CHECK-NOT:     @owned $WrapperStruct
+// CHECK:         debug_value undef : $WrapperStruct, let, name "self"
+// CHECK-LABEL: } // end sil function 'debug_use_after_consume'
+sil [ossa] @debug_use_after_consume : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int1, 1
+  br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %f = function_ref @getWrapperStruct : $@convention(thin) () -> @owned WrapperStruct
+  %w = apply %f() : $@convention(thin) () -> @owned WrapperStruct
+  %val = destructure_struct %w : $WrapperStruct
+  destroy_value %val : $Klass
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+  debug_value %w : $WrapperStruct, let, name "self"
+  %9 = tuple ()
+  return %9 : $()
+}
