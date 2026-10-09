@@ -748,6 +748,23 @@ suite.test("MutableSpan from UnsafeMutableBufferPointer")
   expectTrue(b.elementsEqual((0..<capacity).reversed()))
 }
 
+suite.test("write to a local through an opaque `inout MutableSpan`")
+.require(.minimumStdlib(.stdlib_6_2)).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  // Guard against https://github.com/swiftlang/swift/issues/92562 regressing.
+  @inline(never)
+  func update(_ span: inout MutableSpan<Int>) {
+    span[0] += 1
+  }
+
+  var array: InlineArray = [42]
+  var span = array.mutableSpan
+  update(&span)
+  _ = consume span
+  expectEqual(array[0], 43)
+}
+
 suite.test("init(ofOne:)")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
