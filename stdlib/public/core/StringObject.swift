@@ -978,7 +978,7 @@ extension _StringObject {
     }
     if largeIsCocoa {
       return unsafe withCocoaObject {
-        unsafe stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+        unsafe stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked.0
       }
     }
 #endif
