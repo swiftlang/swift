@@ -1711,6 +1711,7 @@ namespace  {
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
+    UNINTERESTING_ATTR(ObjCDirect)
     UNINTERESTING_ATTR(ObjCImplementation)
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
@@ -2288,6 +2289,25 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   AttributeOverrideChecker attrChecker(base, override);
   for (auto attr : base->getAttrs()) {
     attrChecker.visit(attr);
+  }
+
+  // Directness cannot be checked by the visitor above, which only sees
+  // attributes the base literally carries: an imported Clang 'objc_direct'
+  // base has no Swift attribute, and an implicitly-@objc base has no ObjCAttr.
+  // Both are cases where an '@objcDirect' override has to be rejected.
+  if (auto *baseFunc = dyn_cast<AbstractFunctionDecl>(base)) {
+    auto *overrideFunc = cast<AbstractFunctionDecl>(override);
+    if (baseFunc->isObjCDirectDispatched()) {
+      // The ObjC entry point resolves its callee with a static function_ref, so
+      // an Objective-C caller invoking the direct symbol on a subclass instance
+      // would silently run the base implementation. Clang rejects overriding a
+      // direct method on its side for the same reason.
+      ctx.Diags.diagnose(override, diag::override_of_objc_direct);
+      ctx.Diags.diagnose(base, diag::overridden_here);
+    } else if (overrideFunc->isObjCDirect()) {
+      ctx.Diags.diagnose(override, diag::objc_direct_override);
+      ctx.Diags.diagnose(base, diag::overridden_here);
+    }
   }
 
   return false;
