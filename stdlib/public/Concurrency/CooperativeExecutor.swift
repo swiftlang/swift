@@ -157,8 +157,9 @@ struct WaitQueue {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
+@_spi(CooperativeExecutor)
 @available(StdlibDeploymentTarget 6.3, *)
-final class CooperativeExecutor: Executor, @unchecked Sendable {
+public final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var suspendingWaitQueue = WaitQueue(clock: .suspending)
