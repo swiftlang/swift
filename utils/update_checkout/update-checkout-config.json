@@ -200,7 +200,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.5.0",
-                "swift-subprocess": "1.0.0",
+                "swift-subprocess": "1.0.1",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         },
@@ -994,7 +994,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.5.0",
-                "swift-subprocess": "1.0.0",
+                "swift-subprocess": "1.0.1",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         },
@@ -1057,7 +1057,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.5.0",
-                "swift-subprocess": "1.0.0",
+                "swift-subprocess": "1.0.1",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         }
