@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple -solver-disable-diagnose-valid-salvage -verify-additional-prefix nosalvage-
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple -DBOGUS_OVERLOAD -solver-disable-diagnose-valid-salvage -verify-additional-prefix nosalvage-
+
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple -DBOGUS_OVERLOAD -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
 
 class A {}
 class B: A {}
@@ -331,3 +335,75 @@ do {
     g(z, y)
   }
 }
+
+// Regression tests reduced from projects.
+do {
+  func perform(b: Bool, fn: @escaping (() -> ()) -> ()) {
+    let _ = b ? fn : { $0() }
+  }
+}
+
+do {
+  struct URL {
+    var pathExtension: String
+  }
+
+  func f() throws -> (x: [[String: String]], y: [String]) {
+    fatalError()
+  }
+
+  func g(urls: [URL?]?) -> (x: [[String: String]], y: [String]) {
+    return urls.map { payload in
+      payload.compactMap {
+        $0
+      }.filter {
+        $0.pathExtension == ""
+      }.map { _ in
+        do {
+          return try f()
+        } catch {
+          return (x: [], y: [""])
+        }
+      }.reduce(([[String: String]](), [String]())) { partialResult, added in
+        (x: partialResult.x + added.x, y: partialResult.y + added.y)
+      }
+    }.defaulting(to: (x: [], y: []))
+  }
+}
+
+extension Optional {
+  func defaulting<T>(to defaultValue: T) -> T {
+    fatalError()
+  }
+}
+
+do {
+  let c: C? = nil
+  let int = 0
+  let str = ""
+
+  func takesAny(_: Any) {}
+
+  // expected-salvage-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  takesAny([
+      "a": c?.x ?? str,
+      // expected-nosalvage-warning@-1 {{expression implicitly coerced from 'Any?' to 'Any'}}
+      // expected-nosalvage-note@-2 {{provide a default value to avoid this warning}}
+      // expected-nosalvage-note@-3 {{force-unwrap the value to avoid this warning}}
+      // expected-nosalvage-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+      "b": c?.y ?? str,
+      "c": int,
+      "d": str
+  ])
+
+  class C {
+      var x: Bool = false
+      var y: Bool = false
+  }
+}
+
+#if BOGUS_OVERLOAD
+func ??<I, O>(input: I?, _ perform: (valid: (I) -> O, nil: () -> O)) -> O {
+  fatalError()
+}
+#endif

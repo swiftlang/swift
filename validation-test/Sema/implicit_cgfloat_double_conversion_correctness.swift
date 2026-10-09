@@ -102,6 +102,18 @@ extension CGFloat {
   static let y: Double = 0
 }
 
+func testMinMax() {
+  func f1(x: CGFloat) -> Double? {
+    // FIXME: Broken with -solver-enable-promote-supertypes
+    return max(0, min(1, x))
+    // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  }
+
+  func f2(x: Double) -> CGFloat? {
+    return max(0, min(1, x))
+  }
+}
+
 // FIXME: This is all completely broken.
 func testLeadingDotAmbiguity() {
   func f1(_: CGFloat, _: CGFloat) {}
@@ -225,4 +237,39 @@ func test_unapplied_3(_ blobs: [Blob]) {
 
   let _: CGFloat = blobs.map { $0.circumference }.reduce(0, +)
   let _: CGFloat = blobs.map { $0.circumference }.reduce(0.0, +)
+}
+
+// FIXME: These are broken
+func f1(_ value: Double) -> Double { return value }
+// expected-note@-1 {{found this candidate}}
+func f1(_ value: CGFloat) -> CGFloat { return value }
+// expected-note@-1 {{found this candidate}}
+
+func f2(_ value: UInt) -> UInt { return value }
+func f2(_ value: Double) -> Double { return value }
+// expected-note@-1 {{found this candidate}}
+func f2(_ value: CGFloat) -> CGFloat { return value }
+// expected-note@-1 {{found this candidate}}
+
+func g(_: Double, _: Double) {}
+func g(_: CGFloat, _: CGFloat) {}
+
+func testAmbiguousOverloads(x: UInt, y: CGFloat, z: Double) {
+  g(y, f1(CGFloat(x)))
+  g(z, f1(CGFloat(x))) // expected-error {{ambiguous use of 'f1'}}
+  g(y, f1(Double(x)))
+  g(z, f1(Double(x)))
+  g(y, f1(y))
+  g(z, f1(z))
+  g(y, f1(z))
+  g(z, f1(y))
+
+  g(y, f2(CGFloat(x)))
+  g(z, f2(CGFloat(x))) // expected-error {{ambiguous use of 'f2'}}
+  g(y, f2(Double(x)))
+  g(z, f2(Double(x)))
+  g(y, f2(y))
+  g(z, f2(z))
+  g(y, f2(z))
+  g(z, f2(y))
 }
