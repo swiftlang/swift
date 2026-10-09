@@ -42,10 +42,10 @@ extension IsolatedObjCClass: Sendable {}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
 // expected-warning@-3:1 {{conformance to 'Sendable' must occur in the same source file as class 'IsolatedObjCClass'; use '@unchecked Sendable' for retroactive conformance; this will be an error in a future Swift language mode}}
 
+// InheritsObjCIsolation's superclass (IsolatedObjCBase) is @MainActor and
+// therefore Sendable. The conformance is inherited, so no retroactive or
+// cross-file warnings fire.
 extension InheritsObjCIsolation: Sendable {}
-// expected-warning@-1:1 {{extension declares a conformance of imported type 'InheritsObjCIsolation' to imported protocol 'Sendable'; this will not behave correctly if the owners of 'IsolatedObjC' introduce this conformance in the future}}
-// expected-note@-2 {{add '@retroactive' to silence this warning}}
-// expected-warning@-3:1 {{conformance to 'Sendable' must occur in the same source file as class 'InheritsObjCIsolation'; use '@unchecked Sendable' for retroactive conformance; this will be an error in a future Swift language mode}}
 
 // Clang imported + implied is totally ignored, not sure this is correct but its the existing behavior.
 extension RefinedObjCClass: RefinesSendable {}
