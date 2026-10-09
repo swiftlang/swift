@@ -1,9 +1,11 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -verify-additional-prefix copytuples- -verify-ignore-unrelated
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature MoveOnlyClasses -verify-additional-prefix copytuples- -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_NondeinitableTypes
 // REQUIRES: swift_feature_MoveOnlyTuples
+// REQUIRES: swift_feature_MoveOnlyClasses
 
 // The NondeinitableTypes feature lets structs, enums, generic parameters, and
 // associated types suppress `Deinitable`, so that the compiler's support for
@@ -89,6 +91,7 @@ protocol P: ~Copyable, ~Deinitable {} // expected-error {{'Deinitable' is reserv
 func existential(_: any ~Copyable & ~Deinitable) {} // expected-error {{'Deinitable' is reserved for use by the compiler}}
 class C: ~Deinitable {} // expected-error {{'Deinitable' is reserved for use by the compiler}}
 // expected-error@-1 {{classes cannot be '~Deinitable'}}
+struct HoldsC { var c: C } // Ok, the inverse doesn't suppress anything
 func requiring<T: Deinitable>(_: T) {} // expected-error {{'Deinitable' is reserved for use by the compiler}}
 
 // Containment
