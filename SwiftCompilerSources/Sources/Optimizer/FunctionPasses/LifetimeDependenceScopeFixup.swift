@@ -1146,6 +1146,12 @@ internal struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   mutating func escapingDependence(on operand: Operand) -> WalkResult {
     log(">>> Escaping dependence: \(operand)")
     _ = visitor(operand.instruction)
+    // Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping partial_apply converted by
+    // convert_escape_to_noescape. If ClosureLifetimeFixup will promote it to partial_apply [on_stack], then resume the
+    // walk at the non-escaping closure.
+    if let pai = operand.instruction as? PartialApplyInst, let cvt = pai.nonEscapingClosureConversion {
+      return walkDownUses(of: cvt, using: operand)
+    }
     // Make a best-effort attempt to extend the access scope regardless of escapes. It is possible that some mandatory
     // pass between scope fixup and diagnostics will make it possible for the LifetimeDependenceDefUseWalker to analyze
     // this use.

@@ -1767,6 +1767,15 @@ bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
          swift::SILFunctionTypeIsolation::forUnknown();
 }
 
+OptionalBridgedInstruction
+BridgedInstruction::PartialApplyInst_getNonEscapingClosureConversion() const {
+  auto *cvt =
+      swift::getNonEscapingClosureConversion(getAs<swift::PartialApplyInst>());
+  if (!cvt)
+    return {nullptr};
+  return {cvt->asSILNode()};
+}
+
 bool BridgedInstruction::PartialApplyInst_isStackAllocationNested() const {
   return getAs<swift::PartialApplyInst>()->isStackAllocationNested();
 }
