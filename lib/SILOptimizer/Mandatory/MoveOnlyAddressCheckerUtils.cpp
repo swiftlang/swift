@@ -541,6 +541,23 @@ static bool isCopyableValue(SILValue value) {
   return true;
 }
 
+/// Returns true if \p li's value is only bit cast and destroyed. SILGen emits
+/// this for a `Builtin.reinterpretCast` of a noncopyable value: the
+/// unchecked_bitwise_cast only reads the bits, and its Unowned result is
+/// immediately copied.
+static bool isOnlyBitwiseCastAndDestroyed(LoadInst *li) {
+  bool foundCast = false;
+  for (auto *use : li->getUses()) {
+    if (isa<UncheckedBitwiseCastInst>(use->getUser())) {
+      foundCast = true;
+      continue;
+    }
+    if (!isa<DestroyValueInst>(use->getUser()))
+      return false;
+  }
+  return foundCast;
+}
+
 //===----------------------------------------------------------------------===//
 //                   MARK: Find Candidate Mark Must Checks
 //===----------------------------------------------------------------------===//
@@ -2507,6 +2524,48 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         case LoadOwnershipQualifier::Trivial:
           useState.recordLivenessUse(user, leafRange);
           break;
+        }
+      }
+      return true;
+    }
+
+    // Neither the borrow to destructure transform nor the canonicalizer can see
+    // through an unchecked_bitwise_cast (a PointerEscape). Classify the load
+    // like the copy_addr that the address-only form of the cast uses: as a
+    // consume of the loaded value.
+    if (isOnlyBitwiseCastAndDestroyed(li)) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      for (auto leafRange : leafRanges) {
+        if (markedValue->getCheckKind() ==
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
+          if (isa<ProjectBoxInst>(
+                  stripAccessMarkers(markedValue->getOperand()))) {
+            diagnosticEmitter
+                .emitAddressEscapingClosureCaptureLoadedAndConsumed(
+                    markedValue);
+            continue;
+          }
+          diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, li);
+          continue;
+        }
+
+        checkForPartialMutation(useState, diagnosticEmitter,
+                                PartialMutation::Kind::Consume, op->getUser(),
+                                op->get()->getType(), leafRange,
+                                PartialMutation::consume());
+
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+          LLVM_DEBUG(llvm::dbgs() << "Found bitwise cast take: " << *user);
+          useState.recordTakeUse(user, leafRange);
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found bitwise cast copy: " << *user);
+          useState.recordCopyUse(user, leafRange);
         }
       }
       return true;
