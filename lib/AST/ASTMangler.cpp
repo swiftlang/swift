@@ -5036,6 +5036,7 @@ void ASTMangler::appendMacroExpansionContext(
   }
 
   SourceManager &sourceMgr = Context.SourceMgr;
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
 
   auto appendMacroExpansionLoc = [&]() {
     appendIdentifier(origDC->getParentModule()->getName().str());
@@ -5043,11 +5044,10 @@ void ASTMangler::appendMacroExpansionContext(
     auto *SF = origDC->getParentSourceFile();
     appendIdentifier(llvm::sys::path::filename(SF->getFilename()), /*allowRawIdentifiers=*/false);
 
-    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
+    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc, bufferID);
     appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));
   };
 
-  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
   auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
   if (!generatedSourceInfo) {
     return appendMacroExpansionLoc();
