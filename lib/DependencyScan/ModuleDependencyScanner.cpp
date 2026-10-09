@@ -2299,6 +2299,11 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
       swiftArgs.push_back(value->str());
     };
     forwardOption("-sysroot", searchPathOpts.getSysRoot());
+    // The Windows SDK and Visual C++ tools hold the injected module maps.
+    forwardOption("-windows-sdk-root", searchPathOpts.getWinSDKRoot());
+    forwardOption("-windows-sdk-version", searchPathOpts.getWinSDKVersion());
+    forwardOption("-visualc-tools-root", searchPathOpts.getVCToolsRoot());
+    forwardOption("-visualc-tools-version", searchPathOpts.getVCToolsVersion());
     const auto &resourceDir = searchPathOpts.RuntimeResourcePath;
     if (!resourceDir.empty()) {
       swiftArgs.push_back("-resource-dir");
