@@ -9490,14 +9490,31 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
   // we must conservatively reject them.
   if (auto subs = declRef.getSubstitutions()) {
     // For protocol member calls, the Self conformance is used for witness
-    // dispatch and doesn't escape to another context, so we skip it.
-    Type selfInterfaceType;
+    // dispatch and doesn't escape to another context, so we skip it. Find it
+    // by its requirement, not by its type, so other conformances of the same
+    // type are still checked
+    std::optional<unsigned> selfConformanceIndex;
     if (auto *calleeProto =
             declRef.getDecl()->getDeclContext()->getSelfProtocolDecl()) {
-      selfInterfaceType = calleeProto->getSelfInterfaceType();
+      auto selfInterfaceType = calleeProto->getSelfInterfaceType();
+      unsigned index = 0;
+      for (auto req : subs.getGenericSignature().getRequirements()) {
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+        if (req.getProtocolDecl() == calleeProto &&
+            req.getFirstType()->isEqual(selfInterfaceType)) {
+          selfConformanceIndex = index;
+          break;
+        }
+        ++index;
+      }
     }
 
-    for (auto conf : subs.getConformances()) {
+    for (auto [index, conf] : llvm::enumerate(subs.getConformances())) {
+      // Skip the Self conformance; it is diagnosed already in other ways
+      if (index == selfConformanceIndex)
+        continue;
+
       // We're only checking abstract conformances here; concrete ones
       // were checked above already.
       if (!conf.isAbstract())
@@ -9506,14 +9523,6 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
       auto *abstract = conf.getAbstract();
       auto *proto = abstract->getProtocol();
       Type conformingType = abstract->getType();
-
-      // Skip Self conformances; these should be diagnosed already in other ways
-      if (selfInterfaceType) {
-        if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
-          if (archetype->getInterfaceType()->isEqual(selfInterfaceType))
-            continue;
-        }
-      }
 
       // Marker protocols have no requirements and can never be isolated.
       if (proto->isMarkerProtocol())
@@ -9525,12 +9534,13 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
           proto->inheritsFrom(sendableMetatypeProto))
         continue;
 
-      // If the conforming type is Sendable, its conformances cannot be
-      // isolated — isolated conformances require non-Sendable types.
+      // If the conforming type is SendableMetatype, or is derived from a type
+      // parameter that is, its conformances cannot be isolated. This is the
+      // same rule conformance checking uses to reject isolated conformances
       if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
-        if (archetype->isSendableType()) {
+        if (archetype->isSendableType() ||
+            !archetype->mayHaveIsolatedConformance())
           continue;
-        }
       }
 
       // Get the name of the generic type parameter for the diagnostic.
