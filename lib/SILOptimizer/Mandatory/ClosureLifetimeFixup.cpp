@@ -1038,6 +1038,52 @@ static SILValue tryRewriteToPartialApplyStack(
   return closureOp;
 }
 
+/// Returns true if \p user is the mark_dependence of a withoutActuallyEscaping
+/// expression (see getWithoutActuallyEscapingDependence):
+///
+///   %ne   = convert_escape_to_noescape %p
+///   %copy = copy_value %ne
+///   %esc  = partial_apply %withoutActuallyEscapingThunk(%copy)
+///   %md   = mark_dependence %esc on %ne
+///   ...
+///   %e    = destroy_not_escaped_closure %md
+///   cond_fail %e
+///   destroy_value %ne
+///
+/// The nonescaping closure is not used after the destroy_value, so it can
+/// become a partial_apply [stack] whose lifetime ends there. This requires
+/// every destroy_value to follow a verification.
+static bool isWithoutActuallyEscapingDependence(SILInstruction *user) {
+  auto *mark = dyn_cast<MarkDependenceInst>(user);
+  if (!mark)
+    return false;
+  SILValue escaping = mark->getValue();
+  if (auto *convert = dyn_cast<ConvertFunctionInst>(escaping))
+    escaping = convert->getOperand();
+  auto *thunk = dyn_cast<PartialApplyInst>(escaping);
+  SmallVector<DestroyNotEscapedClosureInst *, 2> verifications;
+  if (!thunk ||
+      getWithoutActuallyEscapingDependence(thunk, &verifications) != mark)
+    return false;
+
+  for (auto *consume : mark->getBase()->getConsumingUses()) {
+    auto *destroy = dyn_cast<DestroyValueInst>(consume->getUser());
+    if (!destroy)
+      return false;
+    bool followsVerification = false;
+    for (auto ii = destroy->getIterator(), ie = destroy->getParent()->begin();
+         ii != ie;) {
+      if (llvm::is_contained(verifications, &*--ii)) {
+        followsVerification = true;
+        break;
+      }
+    }
+    if (!followsVerification)
+      return false;
+  }
+  return true;
+}
+
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *cvt, DominanceAnalysis *dominanceAnalysis,
     DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
@@ -1050,14 +1096,18 @@ static bool tryExtendLifetimeToLastUse(
   if (!singleUser)
     return false;
 
-  // Handle apply instructions and startAsyncLet.
+  // Handle apply instructions, startAsyncLet, and withoutActuallyEscaping.
   BuiltinInst *startAsyncLet = nullptr;
+  bool isWithoutActuallyEscaping = false;
   if (FullApplySite::isa(singleUser)) {
     // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
     if (isa<BeginApplyInst>(singleUser))
       return false;
   } else if ((startAsyncLet = isBuiltinInst(singleUser,
                             BuiltinValueKind::StartAsyncLetWithLocalBuffer))) {
+    // continue
+  } else if ((isWithoutActuallyEscaping =
+                  isWithoutActuallyEscapingDependence(singleUser))) {
     // continue
   } else if (!isa<BeginBorrowInst>(singleUser)) {
     return false;
@@ -1096,6 +1146,12 @@ static bool tryExtendLifetimeToLastUse(
   // and are forwarded through the escape -> no-escape conversion into the
   // callee that consumed the value.
   if (cvt->getType().hasCalledAtMostOnceSemantics())
+    return false;
+
+  // The lifetime extension below needs a closure user with a well-defined end
+  // of use. Let the caller extend the lifetime to the end of the function
+  // instead.
+  if (isWithoutActuallyEscaping)
     return false;
 
   // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and

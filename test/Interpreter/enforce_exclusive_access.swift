@@ -364,6 +364,57 @@ ExclusiveAccessTestSuite.test("withoutActuallyEscapingConflict") {
   }
 }
 
+// A closure literal passed directly to withoutActuallyEscaping is nonescaping,
+// but its captures must still be dynamically enforced.
+ExclusiveAccessTestSuite.test("withoutActuallyEscapingClosureLiteralConflict") {
+  var localVal = 0
+  withoutActuallyEscaping({ localVal = 3 }) {
+    expectCrashLater()
+    modifyAndPerform(&localVal, closure: $0)
+  }
+}
+
+func performNoescape(_ closure: () -> Void) {
+  closure()
+}
+
+ExclusiveAccessTestSuite.test("withoutActuallyEscapingNestedClosureLiteralConflict") {
+  var localVal = 0
+  performNoescape {
+    withoutActuallyEscaping({ localVal = 3 }) {
+      expectCrashLater()
+      modifyAndPerform(&localVal, closure: $0)
+    }
+  }
+}
+
+ExclusiveAccessTestSuite.test("withoutActuallyEscapingDeeplyNestedClosureLiteralConflict") {
+  var localVal = 0
+  performNoescape {
+    performNoescape {
+      withoutActuallyEscaping({ localVal = 3 }) {
+        expectCrashLater()
+        modifyAndPerform(&localVal, closure: $0)
+      }
+    }
+  }
+}
+
+ExclusiveAccessTestSuite.test("withoutActuallyEscapingRecursiveLocalFunctionConflict") {
+  var localVal = 0
+  func local(_ n: Int) {
+    if n > 0 {
+      local(n - 1)
+      return
+    }
+    withoutActuallyEscaping({ localVal = 3 }) {
+      expectCrashLater()
+      modifyAndPerform(&localVal, closure: $0)
+    }
+  }
+  local(1)
+}
+
 ExclusiveAccessTestSuite.test("directlyAppliedConflict") {
   var localVal = 0
   let nestedModify = { localVal = 3 }

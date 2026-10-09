@@ -472,3 +472,59 @@ func trySimpleNonescapingClosure() {
     bar.hello() // OK
   }
 }
+
+// A closure literal passed directly to withoutActuallyEscaping becomes a stack
+// closure whose lifetime ends after the verification on all paths
+// (https://github.com/swiftlang/swift/issues/93107).
+func useInt(_ x: Int) {}
+
+struct WithoutActuallyEscapingError: Error {}
+
+// CHECK-LABEL: sil hidden @$s22closure_lifetime_fixup37withoutActuallyEscapingClosureLiteralyySbKF :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%.*}}({{%.*}}) : $@convention(thin) (@inout_aliasable Int) -> ()
+// CHECK:         [[THUNK:%.*]] = function_ref @$sIg_Ieg_TR :
+// CHECK:         [[ESCAPING:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CLOSURE]])
+// CHECK:         [[MD:%.*]] = mark_dependence [[ESCAPING]] : $@callee_guaranteed () -> () on [[CLOSURE]]
+// CHECK:         try_apply {{%.*}}([[MD]], %0) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{%.*}} : $()):
+// CHECK-NEXT:    [[IS_ESCAPING:%.*]] = destroy_not_escaped_closure [[MD]]
+// CHECK-NEXT:    cond_fail [[IS_ESCAPING]]
+// CHECK-NEXT:    dealloc_stack [[CLOSURE]]
+// CHECK:       [[ERROR]]({{%.*}} : $any Error):
+// CHECK-NEXT:    [[IS_ESCAPING:%.*]] = destroy_not_escaped_closure [[MD]]
+// CHECK-NEXT:    cond_fail [[IS_ESCAPING]]
+// CHECK-NEXT:    dealloc_stack [[CLOSURE]]
+// CHECK:       } // end sil function '$s22closure_lifetime_fixup37withoutActuallyEscapingClosureLiteralyySbKF'
+func withoutActuallyEscapingClosureLiteral(_ flag: Bool) throws {
+  var x = 0
+  try withoutActuallyEscaping({ x += 1 }) { escapable in
+    escapable()
+    if flag { throw WithoutActuallyEscapingError() }
+  }
+  useInt(x)
+}
+
+struct WithoutActuallyEscapingNoncopyable: ~Copyable {
+  var value = 0
+}
+
+func borrowWithoutActuallyEscapingNoncopyable(
+  _ x: borrowing WithoutActuallyEscapingNoncopyable
+) {}
+
+// A borrowed noncopyable parameter cannot be captured by an escaping closure,
+// but it can be captured by a stack closure.
+// CHECK-LABEL: sil hidden @$s22closure_lifetime_fixup42withoutActuallyEscapingBorrowedNoncopyable
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%.*}}(%0)
+// CHECK:         [[IS_ESCAPING:%.*]] = destroy_not_escaped_closure
+// CHECK-NEXT:    cond_fail [[IS_ESCAPING]]
+// CHECK-NEXT:    dealloc_stack [[CLOSURE]]
+// CHECK:       } // end sil function '$s22closure_lifetime_fixup42withoutActuallyEscapingBorrowedNoncopyable
+func withoutActuallyEscapingBorrowedNoncopyable(
+  _ x: borrowing WithoutActuallyEscapingNoncopyable
+) {
+  withoutActuallyEscaping({ borrowWithoutActuallyEscapingNoncopyable(x) }) {
+    escapable in
+    escapable()
+  }
+}

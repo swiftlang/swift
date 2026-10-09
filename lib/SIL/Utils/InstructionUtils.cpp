@@ -448,6 +448,37 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
+MarkDependenceInst *swift::getWithoutActuallyEscapingDependence(
+    PartialApplyInst *thunk,
+    SmallVectorImpl<DestroyNotEscapedClosureInst *> *verifications) {
+  auto *thunkFunction = thunk->getReferencedFunctionOrNull();
+  if (!thunkFunction || !thunkFunction->isWithoutActuallyEscapingThunk())
+    return nullptr;
+
+  // SILGen converts away function type substitutions before marking the
+  // dependence.
+  SingleValueInstruction *escaping = thunk;
+  if (auto *convert = thunk->getSingleUserOfType<ConvertFunctionInst>())
+    escaping = convert;
+  auto *mark = escaping->getSingleUserOfType<MarkDependenceInst>();
+  if (!mark || mark->getValue() != escaping)
+    return nullptr;
+
+  bool isVerified = false;
+  for (auto *use : mark->getUses()) {
+    auto *verification =
+        dyn_cast<DestroyNotEscapedClosureInst>(use->getUser());
+    if (!verification ||
+        verification->getVerificationType() !=
+            DestroyNotEscapedClosureInst::WithoutActuallyEscaping)
+      continue;
+    isVerified = true;
+    if (verifications)
+      verifications->push_back(verification);
+  }
+  return isVerified ? mark : nullptr;
+}
+
 bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
   bool usedByAssignOrInit = false;
   for (Operand *Op : PAI->getUses()) {

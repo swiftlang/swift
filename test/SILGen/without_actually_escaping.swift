@@ -141,3 +141,27 @@ public func withoutActuallyEscapingCFunction(function: (@convention(c) () -> Voi
     print(pointer)
   }
 }
+
+// A closure literal passed directly to withoutActuallyEscaping is noescape, so
+// it captures 'x' by address rather than in a box
+// (https://github.com/swiftlang/swift/issues/93107).
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping0A30ActuallyEscapingClosureLiteralyyF : $@convention(thin) () -> () {
+// CHECK:         [[BOX:%.*]] = alloc_box ${ var Int }, var, name "x"
+// CHECK:         [[ADDR:%.*]] = project_box {{%.*}} : ${ var Int }, 0
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref @$s25without_actually_escaping0A30ActuallyEscapingClosureLiteralyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]([[ADDR]])
+// CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
+// CHECK:         [[COPY:%.*]] = copy_value [[NOESCAPE]]
+// CHECK:         [[THUNK:%.*]] = function_ref @$sIg_Ieg_TR :
+// CHECK:         [[ESCAPING:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[COPY]])
+// CHECK:         [[MD:%.*]] = mark_dependence [[ESCAPING]] : $@callee_guaranteed () -> () on [[NOESCAPE]]
+// CHECK:         [[IS_ESCAPING:%.*]] = destroy_not_escaped_closure [[MD]]
+// CHECK-NEXT:    cond_fail [[IS_ESCAPING]] : $Builtin.Int1, "non-escaping closure has escaped"
+// CHECK-NEXT:    destroy_value [[NOESCAPE]]
+// CHECK:       } // end sil function '$s25without_actually_escaping0A30ActuallyEscapingClosureLiteralyyF'
+func withoutActuallyEscapingClosureLiteral() {
+  var x = 0
+  withoutActuallyEscaping({ x += 1 }) { escapable in
+    escapable()
+  }
+}

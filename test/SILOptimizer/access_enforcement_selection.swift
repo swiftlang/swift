@@ -138,3 +138,41 @@ func testRecursiveLocalCapture(i: inout Int64) {
   }
   local1()
 }
+
+// A closure passed directly to withoutActuallyEscaping is non-escaping, but
+// escapes through the escaping copy, so the variable is dynamically enforced
+// from that point on (https://github.com/swiftlang/swift/issues/93107).
+func modifyAndPerform(_ x: inout Int, _ closure: () -> Void) {}
+
+public func withoutActuallyEscapingCapture() {
+  var x = 3
+  withoutActuallyEscaping({ x = 4 }) { escapable in
+    modifyAndPerform(&x, escapable)
+  }
+}
+// CHECK-LABEL: sil private @$s28access_enforcement_selection30withoutActuallyEscapingCaptureyyFyyXEfU_ :
+// CHECK:         begin_access [modify] [dynamic]
+// CHECK-LABEL: } // end sil function '$s28access_enforcement_selection30withoutActuallyEscapingCaptureyyFyyXEfU_'
+// CHECK-LABEL: sil private @$s28access_enforcement_selection30withoutActuallyEscapingCaptureyyFyyycXEfU0_ :
+// CHECK:         begin_access [modify] [dynamic]
+// CHECK-LABEL: } // end sil function '$s28access_enforcement_selection30withoutActuallyEscapingCaptureyyFyyycXEfU0_'
+
+// Also when the variable is captured through another non-escaping closure.
+public func withoutActuallyEscapingNestedCapture() {
+  var x = 3
+  _ = takeClosure {
+    withoutActuallyEscaping({ x = 4 }) { escapable in
+      modifyAndPerform(&x, escapable)
+    }
+    return x
+  }
+}
+// CHECK-LABEL: sil private @$s28access_enforcement_selection36withoutActuallyEscapingNestedCaptureyyFSiyXEfU_ :
+// CHECK:         begin_access [read] [dynamic]
+// CHECK-LABEL: } // end sil function '$s28access_enforcement_selection36withoutActuallyEscapingNestedCaptureyyFSiyXEfU_'
+// CHECK-LABEL: sil private @$s28access_enforcement_selection36withoutActuallyEscapingNestedCaptureyyFSiyXEfU_yyXEfU_ :
+// CHECK:         begin_access [modify] [dynamic]
+// CHECK-LABEL: } // end sil function '$s28access_enforcement_selection36withoutActuallyEscapingNestedCaptureyyFSiyXEfU_yyXEfU_'
+// CHECK-LABEL: sil private @$s28access_enforcement_selection36withoutActuallyEscapingNestedCaptureyyFSiyXEfU_yyycXEfU0_ :
+// CHECK:         begin_access [modify] [dynamic]
+// CHECK-LABEL: } // end sil function '$s28access_enforcement_selection36withoutActuallyEscapingNestedCaptureyyFSiyXEfU_yyycXEfU0_'

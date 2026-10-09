@@ -110,3 +110,30 @@ func letEscapeThrowTypedBad(f: () throws(HomeworkError) -> () -> ()) throws(MyEr
   return try withoutActuallyEscaping(f) { return try $0() }
   // expected-error@-1{{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
 }
+
+// A closure literal passed directly to withoutActuallyEscaping is noescape
+// (https://github.com/swiftlang/swift/issues/93107).
+class ImplicitSelfInClosureLiteral {
+  var x = 0
+
+  func increment() {
+    withoutActuallyEscaping({ x += 1 }) { escapable in
+      escapable()
+    }
+  }
+
+  func incrementWithCaptureList() {
+    withoutActuallyEscaping({ [x] in _ = x }) { escapable in
+      escapable()
+    }
+  }
+
+  func escapingVariable() {
+    let increment: () -> Void = { x += 1 } // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-1 {{reference 'self.' explicitly}}
+    // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+    withoutActuallyEscaping(increment) { escapable in
+      escapable()
+    }
+  }
+}
