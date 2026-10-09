@@ -45,10 +45,6 @@ func note(_ label: String, _ viaIs: Bool, _ viaAs: Bool) {
 
 /// Generic source and target: the address-only path, which is what `test_only`
 /// now covers.
-
-// Without this, generic specialization asserts in Opaque Values mode
-// TODO: Root-cause the bug and remove this workaround
-@_semantics("optimize.sil.specialize.generic.never")
 func check<S, T>(_ x: S, _: T.Type, _ label: String) {
   note(label, x is T, (x as? T) != nil)
 }
