@@ -749,7 +749,7 @@ suite.test("MutableSpan from UnsafeMutableBufferPointer")
 }
 
 suite.test("MutableSpan init(ofOne:)")
-.require(.stdlib_6_5).code {
+.require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var inline: InlineArray<5, UInt8> = [UInt8.zero, 1, 2, 3, 4]
@@ -772,7 +772,7 @@ suite.test("MutableSpan init(ofOne:)")
 
 suite.test("MutableSpan init(ofOne:) integer")
 .xfail(.always("https://github.com/swiftlang/swift/issues/92562"))
-.require(.stdlib_6_5).code {
+.require(.minimumStdlib(.stdlib_6_5)).code {
   var value = 42
 
   var span = MutableSpan(ofOne: &value)

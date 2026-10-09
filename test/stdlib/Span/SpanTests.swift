@@ -679,7 +679,7 @@ suite.test("initialize from raw memory")
 }
 
 suite.test("Span init(ofOne:)")
-.require(.stdlib_6_5).code {
+.require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let inline: InlineArray<5, UInt8> = [UInt8.zero, 1, 2, 3, 4]
@@ -703,7 +703,7 @@ private struct NCInt: ~Copyable {
 }
 
 suite.test("Span init(ofOne:) with noncopyable Element")
-.require(.stdlib_6_5).code {
+.require(.minimumStdlib(.stdlib_6_5)).code {
   let nc = NCInt(42)
   let span = Span(ofOne: nc)
   expectEqual(span.count, 1)
