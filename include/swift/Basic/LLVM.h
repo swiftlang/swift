@@ -57,6 +57,7 @@ namespace llvm {
   // Other common classes.
   class raw_ostream;
   class APInt;
+  class APSInt;
   class APFloat;
 #if SWIFT_LLVM_ODR_SAFE
   template <typename Fn> class function_ref;
@@ -96,6 +97,7 @@ namespace swift {
   // Other common classes.
   using llvm::APFloat;
   using llvm::APInt;
+  using llvm::APSInt;
 #if SWIFT_LLVM_ODR_SAFE
   using llvm::function_ref;
 #endif

@@ -19,3 +19,8 @@ protocol Superproto {
 }
 class MyLittleCFType : _CFObject {
 }
+struct Matrix {
+  init()
+  init(elems: ((CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt)))
+  var elems: ((CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt))
+}

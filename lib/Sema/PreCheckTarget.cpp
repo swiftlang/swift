@@ -641,8 +641,16 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
       auto accessLevel =
           first->getFormalAccessScope().accessLevelForDiagnostics();
-      Context.Diags.diagnose(Loc, diag::candidate_inaccessible, first,
-                             accessLevel);
+      if (accessLevel == AccessLevel::Internal
+            && first->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
+        // This is a modern C array projection with no matching legacy
+        // projection.
+        Context.Diags.diagnose(Loc, diag::candidate_inaccessible_c_array,
+                               first);
+      } else {
+        Context.Diags.diagnose(Loc, diag::candidate_inaccessible, first,
+                               accessLevel);
+      }
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.

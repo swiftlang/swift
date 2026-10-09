@@ -24,6 +24,8 @@ class MyLittleCFType : _CFObject {
 }
 struct Matrix {
   init()
-  init(elems: ((CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt)))
-  var elems: ((CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt), (CInt, CInt, CInt, CInt))
+  @available(PLATFORM 26.0.0, *)
+  init(elems: [4 of [4 of CInt]])
+  @available(PLATFORM 26.0.0, *)
+  var elems: [4 of [4 of CInt]]
 }

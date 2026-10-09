@@ -953,7 +953,12 @@ SIMPLE_DECL_ATTR(yield_once, Coroutine,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   180)
 
-LAST_DECL_ATTR(Coroutine)
+DECL_ATTR(_cArrayProjection, CArrayProjection,
+  OnAnyClangDecl,
+  UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  181)
+
+LAST_DECL_ATTR(CArrayProjection)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

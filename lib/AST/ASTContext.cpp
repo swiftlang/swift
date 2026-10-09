@@ -76,6 +76,7 @@
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/Type.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
@@ -4129,6 +4130,15 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 
   ctx.getImpl().IntegerTypes.insert(intType, insertToken);
   return intType;
+}
+
+IntegerType *IntegerType::get(const APSInt &value, const ASTContext &ctx) {
+  bool isNegative = value.isNegative();
+
+  SmallString<16> countBuf;
+  (isNegative ? -value : value).toStringUnsigned(countBuf);
+
+  return IntegerType::get(countBuf, isNegative, ctx);
 }
 
 HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,

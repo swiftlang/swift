@@ -508,6 +508,8 @@ public:
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 
+  const CArrayProjection VisibleCArrayProjection;
+
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
 
@@ -943,7 +945,8 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version,
+                 CArrayProjection>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
@@ -977,6 +980,15 @@ public:
       if (alt == altDecl)
         return;
     vec.push_back(altDecl);
+  }
+
+  /// The maximum access level a declaration can have while still being
+  /// usable from the given C array projection, given whether it needs a
+  /// counterpart in the other projection to be fully available.
+  AccessLevel getMaxAccessLevel(CArrayProjection projection, bool needsBoth) {
+    if (needsBoth && VisibleCArrayProjection != projection)
+      return AccessLevel::Internal;
+    return AccessLevel::Open;
   }
 
 private:
@@ -2194,6 +2206,22 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
+
+/// Returns \c true if \p type will be imported as a different type when
+/// \c Feature::ModernImportedCArrays is enabled.
+bool hasLegacyCArrayType(clang::QualType type);
+
+/// Returns \c true if \p type will be imported as a different type when
+/// \c Feature::ModernImportedCArrays is enabled \em and that type is actually
+/// importable (not too large). Usually \c computeLegacyCArrayType() detects
+/// this condition, but there's an edge case where we need to compute it from
+/// the clang type.
+bool hasImportableLegacyCArrayType(clang::QualType type);
+
+/// If \p modernType is the modern type of an imported fixed-size C array
+/// ( \c InlineArray ), compute the legacy tuple type that would be used
+/// when \c Feature::ModernImportedCArrays is not enabled.
+ImportedType computeLegacyCArrayType(ImportedType modernType);
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
