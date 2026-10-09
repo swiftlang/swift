@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DWORD=i%target-ptrsize
 
 sil_stage canonical
 
@@ -43,6 +43,7 @@ bb4:                                              // Preds: bb3 bb1
 
 // CHECK-LABEL: define internal void @"$s35reference_storage_extra_inhabitants1SVwst"
 // CHECK:         %value.uu = getelementptr
-// CHECK-NEXT:    [[IDX:%.*]] = zext i32 {{%.*}} to [[WORD]]
-// CHECK-NEXT:    [[STORED:%.*]] = add [[WORD]] [[IDX]], 1
+// CHECK-64-NEXT:    [[IDX:%.*]] = zext i32 {{%.*}} to [[WORD]]
+// CHECK-64-NEXT:    [[STORED:%.*]] = add [[WORD]] [[IDX]], 1
+// CHECK-32-NEXT:    [[STORED:%.*]] = add [[WORD]] {{%.*}}, 1
 // CHECK-NEXT:    store [[WORD]] [[STORED]], ptr %value.uu
