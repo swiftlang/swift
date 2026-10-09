@@ -3426,6 +3426,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
         Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
       }
+      $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
+      $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
+      foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
+        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+      }
 
       # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
       # already lives in $CompilerCache\bin and is what repl_swift.exe is linked

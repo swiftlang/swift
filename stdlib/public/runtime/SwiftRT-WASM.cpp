@@ -102,6 +102,7 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_replac2),
       SWIFT_SECTION_RANGE(swift5_builtin),
       SWIFT_SECTION_RANGE(swift5_capture),
+      {0, 0}, // unused_mpenum
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
       SWIFT_SECTION_RANGE(swift5_runtime_attributes),
       SWIFT_SECTION_RANGE(swift5_tests),
