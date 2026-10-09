@@ -3093,27 +3093,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Synthesizes the Microsoft COM model's \c static \c var \c CLSID member on a
-/// \c @com class. The GUID is read from the class's own \c COMAttr. Rootless
-/// models retian the implementation identity without introducing this
-/// Microsoft-specific API.
-class SynthesizeCOMCLSIDRequest
-    : public SimpleRequest<SynthesizeCOMCLSIDRequest, VarDecl *(ClassDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  VarDecl *evaluate(Evaluator &evaluator, ClassDecl *decl) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool,

@@ -23,6 +23,9 @@ public protocol IRefinedWidget: IWidget {}
 @com(implementation: "01020304-0506-0708-090a-0b0c0d0e0f10")
 public class Widget: IWidget {}
 
+@com(implementation: "12345678-9abc-def0-1234-56789abcdef0")
+public class DerivedWidget: Widget {}
+
 @inline(never)
 public func interfaceID<Identity: COMInterface>(_ type: Identity) -> IID {
   type.IID
@@ -82,4 +85,8 @@ check(activationIDKeyPath(Widget.self), 0x01020304, 0x0506, 0x0708,
       [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10])
 check(localInterfaceID(IWidget.self), 0x10203040, 0x5060, 0x7080,
       [0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0, 0x01])
+check(DerivedWidget.CLSID, 0x12345678, 0x9abc, 0xdef0,
+      [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0])
+check(activationID(DerivedWidget.self), 0x12345678, 0x9abc, 0xdef0,
+      [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0])
 print("identities match")

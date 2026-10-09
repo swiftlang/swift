@@ -1874,11 +1874,26 @@ namespace {
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
+      // A requirement of a protocol to which the metatype conforms applies
+      // to the metatype value, unlike an unbound instance reference `P.x`.
+      bool isMetatypeConformanceMember = false;
+      if (!baseIsInstance && member->isInstanceMember()) {
+        if (auto *PD = dyn_cast<ProtocolDecl>(member->getDeclContext())) {
+          auto conformance =
+              cs.lookupConformance(cs.getType(base)->getRValueType(), PD);
+
+          // A missing conformance represents the ordinary unbound-reference
+          // case.
+          isMetatypeConformanceMember =
+              conformance && !conformance.hasMissingConformance();
+        }
+      }
+
       const bool isMetatypeExtMember =
           member->getDeclContext()->isMetatypeExtension();
       const bool isUnboundInstanceMember =
           (!baseIsInstance && member->isInstanceMember() &&
-           !isMetatypeExtMember);
+           !isMetatypeExtMember && !isMetatypeConformanceMember);
       const bool needsCurryThunk =
           shouldBuildCurryThunk(choice, baseIsInstance);
 

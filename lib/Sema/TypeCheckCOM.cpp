@@ -209,22 +209,6 @@ VarDecl *synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &ASTContext,
   return property;
 }
 
-/// Synthesize \c static \c var \c CLSID: \c GUID on a \c @com class.
-VarDecl *synthesizeCLSIDProperty(ClassDecl *CD, ASTContext &ASTContext,
-                                 StringRef value) {
-  VarDecl *property =
-      generateIDAccessor(ASTContext, /*DC=*/CD, /*decl=*/CD,
-                         /*identifier=*/ASTContext.Id_CLSID, value,
-                         /*isStatic=*/true, /*aeic=*/false);
-  if (!property)
-    return nullptr;
-
-  PatternBindingDecl *binding = PatternBindingDeclBuilder(property);
-  CD->addMember(property);
-  CD->addMember(binding);
-  return property;
-}
-
 /// Recover the synthesized `IID` accessor for an imported or swiftinterface
 /// `@com` protocol: it lives in the deserialized metatype extension, so find it
 /// by name lookup rather than re-synthesizing.
@@ -236,17 +220,6 @@ VarDecl *lookupCOMInterfaceID(ProtocolDecl *PD) {
     if (auto *ext = dyn_cast<ExtensionDecl>(prop->getDeclContext()))
       if (ext->isMetatypeExtension())
         return prop;
-  }
-  return nullptr;
-}
-
-/// Recover the synthesized `CLSID` accessor for an imported or swiftinterface
-/// `@com` class.
-VarDecl *lookupCOMImplementationID(ClassDecl *CD) {
-  for (auto *ref : CD->lookupDirect(CD->getASTContext().Id_CLSID)) {
-    auto *prop = dyn_cast<VarDecl>(ref);
-    if (prop && prop->getDeclContext() == CD)
-      return prop;
   }
   return nullptr;
 }
@@ -803,28 +776,5 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   if (!PD->isInSwiftSourceFile())
     return ::com::lookupCOMInterfaceID(PD);
   return ::com::synthesizeIIDProperty(PD, ASTContext, info->getInterfaceID());
-}
-
-VarDecl *SynthesizeCOMCLSIDRequest::evaluate(Evaluator &evaluator,
-                                             ClassDecl *CD) const {
-  auto &ASTContext = CD->getASTContext();
-
-  // CLSID is the Microsoft model's spelling and activation surface. Other
-  // models may consume the implementation UUID through their own policy, but
-  // must not acquire a synthetic Microsoft-named member.
-  if (ASTContext.LangOpts.COMModel != LangOptions::COMInteropModel::Microsoft)
-    return nullptr;
-
-  auto *info = CD->getCOMDeclInfo();
-  if (!info)
-    return nullptr;
-  auto implementationID = info->getImplementationID();
-  if (!implementationID)
-    return nullptr;
-  // Synthesize only for a source-file class; recover the imported member by
-  // name lookup (see SynthesizeCOMInterfaceIDRequest).
-  if (!CD->isInSwiftSourceFile())
-    return ::com::lookupCOMImplementationID(CD);
-  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *implementationID);
 }
 }

@@ -11,7 +11,7 @@ protocol IWidget: IUnknown { }
 
 let _: GUID = IWidget.IID
 
-// --- Form 2: @com(implementation: "...") on a class synthesizes static var CLSID
+// --- A class implementation ID is available through its metatype conformance
 
 @com(implementation: "20000000-0000-0000-0000-000000000002")
 class Widget: IWidget { }
@@ -23,7 +23,7 @@ let _: GUID = Widget.CLSID
 let _ = Widget.IID // expected-error {{type 'Widget' has no member 'IID'}}
 let _ = IWidget.CLSID // expected-error {{type 'any IWidget' has no member 'CLSID'}}
 
-// --- Form 3: bare @com on a class does not synthesize CLSID
+// --- Bare @com does not provide an activation identity
 
 @com
 class BareWidget { }
@@ -40,3 +40,12 @@ let _ = ConcreteWidget.CLSID // expected-error {{type 'ConcreteWidget' has no me
 
 let _: GUID = IUnknown.IID
 let _: GUID = ISwiftObject.IID
+
+// Activation identity belongs to the declaring class, not its subclasses.
+class UnidentifiedSubclass: Widget {}
+let _ = UnidentifiedSubclass.CLSID
+// expected-error@-1 {{type 'UnidentifiedSubclass' has no member 'CLSID'}}
+
+@com(implementation: "30000000-0000-0000-0000-000000000003")
+class IdentifiedSubclass: Widget {}
+let _: CLSID = IdentifiedSubclass.CLSID
