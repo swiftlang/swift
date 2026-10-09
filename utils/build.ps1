@@ -137,6 +137,11 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
+.PARAMETER KeepGoing
+Keep building and testing after a build step or a build target fails, then
+report every failure and exit with an error at the end. This lets a single CI
+run surface all of the failures instead of only the first one.
+
 .PARAMETER DependenciesOnly
 Download and verify the build and test dependencies selected by the other
 parameters, then exit without building.
@@ -236,6 +241,7 @@ param
   [string] $FoundationTestConfiguration = "debug",
 
   [switch] $Summary,
+  [switch] $KeepGoing,
   [switch] $DependenciesOnly
 )
 
@@ -942,8 +948,25 @@ function Invoke-BuildStep {
   }
 
   Record-OperationTime $Platform $Name {
-    & $Name $Platform @SplatArgs
+    if ($KeepGoing) {
+      try {
+        & $Name $Platform @SplatArgs
+      } catch {
+        Add-KeepGoingFailure "$Name ($($Platform.OS) $($Platform.Architecture.LLVMName))" $_
+      }
+    } else {
+      & $Name $Platform @SplatArgs
+    }
   }
+}
+
+# Failures recorded with -KeepGoing, reported at the end of the build.
+$KeepGoingFailures = [System.Collections.Generic.List[string]]::new()
+
+function Add-KeepGoingFailure([string] $What, [System.Management.Automation.ErrorRecord] $ErrorRecord) {
+  Write-Host -ForegroundColor Red "Error: ${What}: $ErrorRecord"
+  Write-Host -ForegroundColor Red "-KeepGoing is set, continuing."
+  $KeepGoingFailures.Add("${What}: $ErrorRecord")
 }
 
 enum Project {
@@ -2278,10 +2301,17 @@ function Build-CMakeProject {
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
+      try {
+        if ($Target -eq "default") {
+          Invoke-Program $CMakeBin --build $Bin
+        } else {
+          Invoke-Program $CMakeBin --build $Bin --target $Target
+        }
+      } catch {
+        # Build the remaining targets, for example check-lldb after check-swift
+        # fails.
+        if (-not $KeepGoing) { throw }
+        Add-KeepGoingFailure "Building '$Target' in '$Bin'" $_
       }
     }
 
@@ -6052,6 +6082,10 @@ if ($IncludeSBoM) {
       Copy-File $ToolchainIdentifier-sbom.cyclone.xml $Stage
     }
   }
+}
+
+if ($KeepGoingFailures.Count -gt 0) {
+  throw "$($KeepGoingFailures.Count) failure(s) with -KeepGoing:`n  $($KeepGoingFailures -join "`n  ")"
 }
 
 # Custom exception printing for more detailed exception information

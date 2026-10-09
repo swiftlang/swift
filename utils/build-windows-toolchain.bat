@@ -126,6 +126,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %TestArg% ^
   %SBoMArg% ^
   %DebugInfoArg% ^
+  -KeepGoing ^
   -Summary || (exit /b 1)
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
