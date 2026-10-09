@@ -9578,7 +9578,8 @@ swift::extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc) {
 
 CustomAttr *importer::getRefCountedPtrAttr(Decl *decl) {
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    if (attr->getTypeRepr()->isSimpleUnqualifiedIdentifier("_refCountedPtr"))
+    auto *typeRepr = attr->getTypeRepr();
+    if (typeRepr && typeRepr->isSimpleUnqualifiedIdentifier("_refCountedPtr"))
       return attr;
   }
 
