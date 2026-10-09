@@ -2005,7 +2005,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
-        && !targetType.getEnumOrBoundGenericEnum()) {
+        && !targetType.getEnumDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
 

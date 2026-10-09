@@ -878,7 +878,7 @@ The \texttt{TypeVisitor} preserves information if it receives a sugared type; fo
 \item \texttt{getAnyNominal()} returns the nominal type declaration of \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
 \item \texttt{getNominalOrBoundGenericNominal()} returns the nominal type declaration of a \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
 \item \texttt{getStructOrBoundGenericStruct()} returns the type declaration of a \texttt{StructType} or \texttt{BoundGenericStructType}, or \texttt{nullptr}.
-\item \texttt{getEnumOrBoundGenericEnum()} returns the enum declaration of an \texttt{EnumType} or \texttt{BoundGenericEnumType}, or \texttt{nullptr}.
+\item \texttt{getEnumDecl()} returns the enum declaration of an \texttt{EnumType} or \texttt{BoundGenericEnumType}, or \texttt{nullptr}.
 \item \texttt{getClassOrBoundGenericClass()} returns the class declaration of a \texttt{ClassType} or \texttt{BoundGenericClassType}, or \texttt{nullptr}.
 \item \texttt{getNominalParent()} returns the parent type stored by an \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
 \end{itemize}

@@ -102,7 +102,7 @@ uint32_t TypeConverter::getTypeSubElementCount(SILType type,
     return number;
   }
 
-  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = type.getEnumDecl()) {
     unsigned numElements = 0;
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
@@ -536,7 +536,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
     return;
   }
 
-  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = type.getEnumDecl()) {
     struct ElementRecord {
       EnumElementDecl *element;
       unsigned start;

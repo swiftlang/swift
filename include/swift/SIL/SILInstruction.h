@@ -7479,7 +7479,7 @@ public:
   }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
+    auto *E = getOperand()->getType().getEnumDecl();
     assert(E && "Operand of unchecked_enum_data must be of enum type");
     return E;
   }
@@ -7601,7 +7601,7 @@ public:
   }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getEnum()->getType().getEnumOrBoundGenericEnum();
+    auto *E = getEnum()->getType().getEnumDecl();
     assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
                 " type");
     return E;
@@ -7795,7 +7795,7 @@ public:
     auto enumValue = getEnumOperand();
     SILType enumType = enumValue->getType();
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     if (!enumType.isEffectivelyExhaustiveEnumType(this->getFunction())) {
@@ -11338,7 +11338,7 @@ public:
     if (!enumType.isEffectivelyExhaustiveEnumType(f))
       return nullptr;
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
@@ -11362,7 +11362,7 @@ public:
   getUniqueCaseForDestination(SILBasicBlock *block) {
     SILValue value = getOperand();
     SILType enumType = value->getType();
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
     (void)decl;
 

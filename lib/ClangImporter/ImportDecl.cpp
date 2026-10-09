@@ -5117,7 +5117,7 @@ namespace {
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
             if (decl->getType()->isEnumeralType()) {
-              if (type->getEnumOrBoundGenericEnum()) {
+              if (type->getEnumDecl()) {
                 // When importing as an enum, also apply implicit force unwrap
                 convertKind = ConstantConvertKind::ConstructionWithUnwrap;
               } else {

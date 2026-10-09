@@ -258,7 +258,7 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_closure);
     return;
   }
-  if (EnumDecl *enumDecl = exprType->getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *enumDecl = exprType->getEnumDecl()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_enum_case,
                    enumDecl->getName());
     return;

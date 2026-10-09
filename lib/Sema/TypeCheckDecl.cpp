@@ -272,7 +272,7 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
     return false;
 
-  auto *inherited = decl->getRawType()->getEnumOrBoundGenericEnum();
+  auto *inherited = decl->getRawType()->getEnumDecl();
   if (!inherited)
     return false;
 

@@ -376,7 +376,7 @@ deriveEquatable_eq(
   bool isDerivedEnumEquals = false;
   if (parentDC->getParentModule()->isResilient()) {
     generatedIdentifier = C.Id_EqualsOperator;
-  } else if (selfIfaceTy->getEnumOrBoundGenericEnum()) {
+  } else if (selfIfaceTy->getEnumDecl()) {
     generatedIdentifier = C.Id_derived_enum_equals;
     isDerivedEnumEquals = true;
   } else {

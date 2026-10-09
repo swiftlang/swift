@@ -1090,7 +1090,7 @@ bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(
   if (auto IT = getType(Base)->getAs<MetatypeType>()) {
     auto InstanceType = IT->getInstanceType();
     if (InstanceType->getStructOrBoundGenericStruct() ||
-        InstanceType->getEnumOrBoundGenericEnum())
+        InstanceType->getEnumDecl())
       return false;
   }
 

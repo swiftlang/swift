@@ -1661,7 +1661,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // strategy for it. Just call the vwt function. Otherwise, we know that this
     // is at least an enum and can optimize away some of the cost of getEnumTag.
     if (!ty.is<ArchetypeType>()) {
-      assert(ty.getEnumOrBoundGenericEnum() && "expected enum type in "
+      assert(ty.getEnumDecl() && "expected enum type in "
              "getEnumTag builtin!");
 
       auto &strategy = getEnumImplStrategy(IGF.IGM, ty);

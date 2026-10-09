@@ -3948,7 +3948,7 @@ public:
   }
 
   void checkEnumInst(EnumInst *UI) {
-    EnumDecl *ud = UI->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getType().getEnumDecl();
     require(ud, "EnumInst must return an enum");
     require(UI->getElement()->getParentEnum() == ud,
             "EnumInst case must be a case of the result enum type");
@@ -3970,7 +3970,7 @@ public:
   }
 
   void checkInitEnumDataAddrInst(InitEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
@@ -3992,7 +3992,7 @@ public:
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
@@ -4014,7 +4014,7 @@ public:
   }
 
   void checkUncheckedEnumDataAddrInst(UncheckedEnumDataAddrInstBase *UI) {
-    EnumDecl *ud = UI->getEnum()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getEnum()->getType().getEnumDecl();
     require(ud, "instruction must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "instruction case must be a case of the enum operand type");
@@ -4058,7 +4058,7 @@ public:
               || IUAI->getOperand()->getType().is<BoundGenericEnumType>(),
             "InjectEnumAddrInst must take an enum operand");
     require(IUAI->getElement()->getParentEnum()
-              == IUAI->getOperand()->getType().getEnumOrBoundGenericEnum(),
+              == IUAI->getOperand()->getType().getEnumDecl(),
             "InjectEnumAddrInst case must be a case of the enum operand type");
     require(IUAI->getOperand()->getType().isAddress(),
             "InjectEnumAddrInst must take an address operand");
@@ -5853,7 +5853,7 @@ public:
 
   void checkSelectEnumCases(SelectEnumOperation SEO) {
     EnumDecl *eDecl =
-        SEO.getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+        SEO.getEnumOperand()->getType().getEnumDecl();
     require(eDecl, "select_enum operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -5956,7 +5956,7 @@ public:
             "switch_enum operand must be an object");
 
     SILType uTy = switchEnum->getOperand()->getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
+    EnumDecl *uDecl = uTy.getEnumDecl();
     require(uDecl, "switch_enum operand is not an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -6067,7 +6067,7 @@ public:
             "switch_enum_addr operand must be an address");
 
     SILType uTy = SOI->getOperand()->getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
+    EnumDecl *uDecl = uTy.getEnumDecl();
     require(uDecl, "switch_enum_addr operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify

@@ -5881,7 +5881,7 @@ void IRGenSILFunction::visitUncheckedBorrowEnumDataAddrInst(
   // If we know the project operation is nondestructive, then we can do the
   // projection in place without using the scratch space.
   if (!UncheckedEnumDataAddrInstBase::isDestructive(
-                                     enumTy.getEnumOrBoundGenericEnum(),
+                                     enumTy.getEnumDecl(),
                                      this->CurSILFn)) {
     dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
                                                         enumTy, enumAddr,

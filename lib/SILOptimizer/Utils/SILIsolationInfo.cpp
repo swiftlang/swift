@@ -960,7 +960,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
       // Handle a switch_enum from a global-actor-isolated type.
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
-            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
+            swi->getOperand()->getType().getEnumDecl();
         return SILIsolationInfo::getGlobalActorIsolated(arg, enumDecl);
       }
 

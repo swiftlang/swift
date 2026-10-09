@@ -315,7 +315,7 @@ bool CircularityChecker::addMember(CanType parentType, ValueDecl *member,
   } else if (memberType.getStructOrBoundGenericStruct()) {
     // Ok, visit structs.
     // TODO: skip non-generic types in different modules?
-  } else if (auto E = memberType.getEnumOrBoundGenericEnum()) {
+  } else if (auto E = memberType.getEnumDecl()) {
     // Ok, visit non-indirect enums.
     if (E->isIndirect()) return false;
     // TODO: skip non-generic types in different modules?

@@ -1219,7 +1219,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (userValue->getType().getEnumOrBoundGenericEnum() ||
+  if (userValue->getType().getEnumDecl() ||
       userValue->getType().isExistentialType()) {
     storage.initializes = true;
   }
@@ -4342,7 +4342,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
   bool borrowed = enumVal->getOwnershipKind() == OwnershipKind::Guaranteed;
   bool borrowIntoScratch =
       borrowed && UncheckedEnumDataAddrInstBase::isDestructive(
-                      enumVal->getType().getEnumOrBoundGenericEnum(),
+                      enumVal->getType().getEnumDecl(),
                       pass.function);
 
   BeginAccessInst *access = nullptr;

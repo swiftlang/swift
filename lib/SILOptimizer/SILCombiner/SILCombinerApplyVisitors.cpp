@@ -1631,7 +1631,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (genericArgs.size() != 1)
     return false;
   auto ty = genericArgs[0]->getCanonicalType();
-  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+  if (ty->getStructOrBoundGenericStruct() || ty->getEnumDecl() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
       isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||

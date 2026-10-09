@@ -3186,7 +3186,7 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
   case TypeKind::Enum:
   case TypeKind::BoundGenericEnum:
     emitSpecializedGenericEnumMetadata(IGM, type,
-                                       *type.getEnumOrBoundGenericEnum());
+                                       *type.getEnumDecl());
     break;
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
@@ -5824,7 +5824,7 @@ void irgen::emitLazySpecializedValueMetadata(IRGenModule &IGM,
   } else if (valueTy->getStructOrBoundGenericStruct()) {
     emitSpecializedGenericStructMetadata(IGM, valueTy,
                                          *valueTy.getStructOrBoundGenericStruct());
-  } else if (auto enumTy = valueTy->getEnumOrBoundGenericEnum()) {
+  } else if (auto enumTy = valueTy->getEnumDecl()) {
     emitSpecializedGenericEnumMetadata(IGM, valueTy, *enumTy);
   } else if (valueTy->isAnyExistentialType()) {
     emitLazyExistentialMetadata(IGM, valueTy);

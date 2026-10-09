@@ -547,7 +547,7 @@ bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
     return true;
   }
 
-  if (EnumDecl *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *enumDecl = type.getEnumDecl()) {
     // An enum is trivial if _any_ case is trivial.
     for (EnumElementDecl *caseDecl : enumDecl->getAllElements()) {
       if (!caseDecl->hasAssociatedValues())

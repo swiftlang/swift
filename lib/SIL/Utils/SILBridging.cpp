@@ -610,7 +610,7 @@ convertCases(SILType enumTy, const void * _Nullable enumCases, SwiftInt numEnumC
   llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
                                     (unsigned)numEnumCases);
   llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
-  swift::EnumDecl *enumDecl = enumTy.getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = enumTy.getEnumDecl();
   for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
     mappedElements[elemWithIndex.index()] = elemWithIndex.value();
   }

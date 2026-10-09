@@ -309,8 +309,8 @@ public:
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
     assert(isValid());
     assert(getKind() == ProjectionKind::Enum);
-    assert(BaseType.getEnumOrBoundGenericEnum() && "Expected enum type");
-    auto Iter = BaseType.getEnumOrBoundGenericEnum()->getAllElements().begin();
+    assert(BaseType.getEnumDecl() && "Expected enum type");
+    auto Iter = BaseType.getEnumDecl()->getAllElements().begin();
     std::advance(Iter, getIndex());
     return *Iter;
   }

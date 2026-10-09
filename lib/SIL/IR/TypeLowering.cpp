@@ -3599,7 +3599,7 @@ bool TypeConverter::visitAggregateLeaves(
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
            isa<BuiltinFixedArrayType>(ty) ||
-           ty.getEnumOrBoundGenericEnum() ||
+           ty.getEnumDecl() ||
            ty.getStructOrBoundGenericStruct();
   };
   insertIntoWorklist(substType, origType, nullptr, std::nullopt);
@@ -3656,7 +3656,7 @@ bool TypeConverter::visitAggregateLeaves(
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              std::nullopt);
         }
-      } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
+      } else if (auto *decl = ty.getEnumDecl()) {
         auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
@@ -5833,7 +5833,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
     TypeExpansionContext context, SILType enumType, EnumElementDecl *elt) {
 
-  auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
+  auto *enumDecl = enumType.getEnumDecl();
 
   assert(elt->getDeclContext() == enumDecl);
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
@@ -5979,7 +5979,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     return;
   }
 
-  if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = Ty.getEnumDecl()) {
     if (enumDecl->isIndirect()) {
       return;
     }

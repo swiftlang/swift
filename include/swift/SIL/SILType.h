@@ -260,14 +260,14 @@ public:
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getASTType().getEnumOrBoundGenericEnum();
+  EnumDecl *getEnumDecl() const {
+    return getASTType().getEnumDecl();
   }
   
   /// Returns true if this type is an enum or contains an enum.
   bool isOrHasEnum() const {
     return getASTType().findIf([](Type ty) {
-      return ty->getEnumOrBoundGenericEnum() != nullptr;
+      return ty->getEnumDecl() != nullptr;
     });
   }
 

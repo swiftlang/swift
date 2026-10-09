@@ -287,7 +287,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   }
   case ProjectionKind::Enum: {
     if (UncheckedEnumDataAddrInstBase::isDestructive(
-                                            BaseTy.getEnumOrBoundGenericEnum(),
+                                            BaseTy.getEnumDecl(),
                                             &B.getFunction())) {
       return B.createUncheckedTakeEnumDataAddr(Loc, Base,
                                                getEnumElementDecl(BaseTy));

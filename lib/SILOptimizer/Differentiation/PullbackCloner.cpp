@@ -2002,7 +2002,7 @@ public:
 
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
-    if (ei->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+    if (ei->getType().getEnumDecl() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unsupported enum type in PullbackCloner: " << *ei);
       getContext().emitNondifferentiabilityError(
@@ -2039,7 +2039,7 @@ public:
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
-    if (origEnum->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+    if (origEnum->getType().getEnumDecl() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unsupported enum type in PullbackCloner: " << *inject);
       getContext().emitNondifferentiabilityError(
@@ -2173,7 +2173,7 @@ public:
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
-    if (enumTy.getASTType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+    if (enumTy.getASTType().getEnumDecl() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unhandled instruction in PullbackCloner: " << *utedai);
       getContext().emitNondifferentiabilityError(
@@ -2352,7 +2352,7 @@ bool PullbackCloner::Implementation::run() {
       //
       // Do not diagnose `Optional`-typed values, which will have special-case
       // differentiation support.
-      if (type.getEnumOrBoundGenericEnum()) {
+      if (type.getEnumDecl()) {
         if (!type.getASTType()->isOptional()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);

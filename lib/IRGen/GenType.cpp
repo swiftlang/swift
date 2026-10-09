@@ -3523,7 +3523,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     return SILType();
   }
 
-  if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = t.getEnumDecl()) {
     // If the enum has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (IGM.isResilient(enumDecl, expansion))

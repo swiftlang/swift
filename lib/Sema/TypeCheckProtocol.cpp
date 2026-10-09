@@ -6301,7 +6301,7 @@ void swift::diagnoseConformanceFailure(Type T,
 
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
-  if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = T->getEnumDecl()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         enumDecl->hasRawType() &&
         !enumDecl->getRawType()->is<ErrorType>()) {

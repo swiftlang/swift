@@ -864,7 +864,7 @@ ValueWitnessFlags getValueWitnessFlags(IRGenModule &IGM,
     flags = flags.withIncomplete(true);
   }
 
-  if (concreteType.getEnumOrBoundGenericEnum())
+  if (concreteType.getEnumDecl())
     flags = flags.withEnumWitnesses(true);
 
   return flags;
@@ -1252,7 +1252,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::GetEnumTagSinglePayload: {
     if (boundGenericCharacteristics)
       if (auto *enumDecl = boundGenericCharacteristics->concreteType
-                               .getEnumOrBoundGenericEnum())
+                               .getEnumDecl())
         if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
           return addFunction(IGM.getGetMultiPayloadEnumTagSinglePayloadFn());
     goto standard;
@@ -1260,14 +1260,14 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::StoreEnumTagSinglePayload: {
     if (boundGenericCharacteristics)
       if (auto *enumDecl = boundGenericCharacteristics->concreteType
-                               .getEnumOrBoundGenericEnum())
+                               .getEnumDecl())
         if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
           return addFunction(IGM.getStoreMultiPayloadEnumTagSinglePayloadFn());
     goto standard;
   }
 
   case ValueWitness::GetEnumTag: {
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
 
     if (layoutStringsEnabled(IGM) &&
         concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
@@ -1291,7 +1291,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     goto standard;
   }
   case ValueWitness::DestructiveInjectEnumTag: {
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
     if (layoutStringsEnabled(IGM) &&
         concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
@@ -1315,7 +1315,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     goto standard;
   }
   case ValueWitness::DestructiveProjectEnumData:
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
     goto standard;
   }
   llvm_unreachable("bad value witness kind");

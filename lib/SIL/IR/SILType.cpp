@@ -113,7 +113,7 @@ void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
     nominalKind = "class";
   else if (getStructOrBoundGenericStruct())
     nominalKind = "struct";
-  else if (getEnumOrBoundGenericEnum())
+  else if (getEnumDecl())
     nominalKind = "enum";
   else if (getNominalOrBoundGenericNominal())
     nominalKind = "other";
@@ -565,7 +565,7 @@ unsigned SILType::getNumNominalFields() const {
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                                     TypeExpansionContext context) const {
-  assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
+  assert(elt->getDeclContext() == getEnumDecl());
   assert(elt->hasAssociatedValues());
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
@@ -603,7 +603,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
 }
 
 EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
-  EnumDecl *enumDecl = getEnumOrBoundGenericEnum();
+  EnumDecl *enumDecl = getEnumDecl();
   for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
     if ((int)elemWithIndex.index() == caseIndex)
       return elemWithIndex.value();
@@ -1135,7 +1135,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
 }
 
 bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
-  EnumDecl *decl = getEnumOrBoundGenericEnum();
+  EnumDecl *decl = getEnumDecl();
   assert(decl && "Called for a non enum type");
 
   // Since unavailable enum elements cannot be referenced in canonical SIL,
@@ -1216,7 +1216,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     return SILType();
   }
 
-  if (auto enumDecl = getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = getEnumDecl()) {
     // If the enum has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (enumDecl->isResilient(M.getSwiftModule(), expansion)) {
@@ -1412,7 +1412,7 @@ intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
 }
 
 intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
-  auto *enumDecl = getEnumOrBoundGenericEnum();
+  auto *enumDecl = getEnumDecl();
   if (!enumDecl)
     return -1;
 

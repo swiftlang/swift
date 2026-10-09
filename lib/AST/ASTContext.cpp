@@ -2619,7 +2619,7 @@ VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
     assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
     VarDecl *wrappedValueVar = properties[0];
 
-    assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
+    assert(wrappedValueVar->getTypeInContext()->getEnumDecl() ==
            getOptionalDecl() && "Unexpected type of Optional.TangentVector");
 
     getImpl().OptionalTanValueDecl = wrappedValueVar;

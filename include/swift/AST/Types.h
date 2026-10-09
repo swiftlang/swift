@@ -1171,7 +1171,7 @@ public:
   
   /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
-  EnumDecl *getEnumOrBoundGenericEnum();
+  EnumDecl *getEnumDecl();
 
   /// If this is a class, check if this class is a foreign reference type.
   bool isForeignReferenceType();
@@ -8727,11 +8727,11 @@ inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
   return nullptr;
 }
 
-inline EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
-  return getCanonicalType().getEnumOrBoundGenericEnum();
+inline EnumDecl *TypeBase::getEnumDecl() {
+  return getCanonicalType().getEnumDecl();
 }
 
-inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
+inline EnumDecl *CanType::getEnumDecl() const {
   if (auto enumTy = dyn_cast<EnumType>(*this))
     return enumTy->getDecl();
 
