@@ -346,3 +346,71 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> (), %1 : $*Builtin.Int64):
   %8 = tuple ()
   return %8 : $()
 }
+
+sil @waeClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+sil @waeBody : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+
+sil shared [transparent] [reabstraction_thunk] [without_actually_escaping] [ossa] @waeThunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// A captured argument that escapes through a withoutActuallyEscaping
+// expression requires dynamic enforcement.
+//
+// CHECK-LABEL: sil private [ossa] @withoutActuallyEscapingArgument : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+// CHECK: begin_access [modify] [dynamic] %0 : $*Builtin.Int64
+// CHECK-LABEL: } // end sil function 'withoutActuallyEscapingArgument'
+sil private [ossa] @withoutActuallyEscapingArgument : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %1 = function_ref @waeClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %3 = convert_escape_to_noescape [not_guaranteed] %2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = copy_value %3 : $@noescape @callee_guaranteed () -> ()
+  %5 = function_ref @waeThunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = mark_dependence %6 : $@callee_guaranteed () -> () on %3 : $@noescape @callee_guaranteed () -> ()
+  %8 = function_ref @waeBody : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %10 = destroy_not_escaped_closure %7 : $@callee_guaranteed () -> ()
+  cond_fail %10 : $Builtin.Int1, "non-escaping closure has escaped"
+  destroy_value %3 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %2 : $@callee_guaranteed () -> ()
+  %14 = integer_literal $Builtin.Int64, 3
+  %15 = begin_access [modify] [unknown] %0 : $*Builtin.Int64
+  assign %14 to %15 : $*Builtin.Int64
+  end_access %15 : $*Builtin.Int64
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// Bridging to a noescape block uses the same thunk, but is not a
+// withoutActuallyEscaping expression.
+//
+// CHECK-LABEL: sil private [ossa] @withoutActuallyEscapingObjCArgument : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+// CHECK: begin_access [modify] [static] %0 : $*Builtin.Int64
+// CHECK-LABEL: } // end sil function 'withoutActuallyEscapingObjCArgument'
+sil private [ossa] @withoutActuallyEscapingObjCArgument : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %1 = function_ref @waeClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %3 = convert_escape_to_noescape [not_guaranteed] %2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = copy_value %3 : $@noescape @callee_guaranteed () -> ()
+  %5 = function_ref @waeThunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = mark_dependence %6 : $@callee_guaranteed () -> () on %3 : $@noescape @callee_guaranteed () -> ()
+  %8 = function_ref @waeBody : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %10 = destroy_not_escaped_closure [objc] %7 : $@callee_guaranteed () -> ()
+  cond_fail %10 : $Builtin.Int1, "non-escaping closure has escaped"
+  destroy_value %3 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %2 : $@callee_guaranteed () -> ()
+  %14 = integer_literal $Builtin.Int64, 3
+  %15 = begin_access [modify] [unknown] %0 : $*Builtin.Int64
+  assign %14 to %15 : $*Builtin.Int64
+  end_access %15 : $*Builtin.Int64
+  %18 = tuple ()
+  return %18 : $()
+}

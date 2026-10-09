@@ -161,6 +161,25 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
+/// If \p thunk is the partial_apply of a withoutActuallyEscaping thunk that
+/// SILGen emits for a withoutActuallyEscaping expression, returns the
+/// mark_dependence that ties the temporarily escaping closure to the
+/// nonescaping one, and collects the destroy_not_escaped_closure instructions
+/// that verify that it did not escape:
+///
+///   %copy = copy_value %noescape
+///   %esc  = partial_apply %withoutActuallyEscapingThunk(%copy)
+///   %md   = mark_dependence %esc on %noescape
+///   ...
+///   %e    = destroy_not_escaped_closure %md
+///   cond_fail %e
+///
+/// Bridging a closure to a noescape block uses the same thunk, but is verified
+/// by destroy_not_escaped_closure [objc]. Returns null in that case.
+MarkDependenceInst *getWithoutActuallyEscapingDependence(
+    PartialApplyInst *thunk,
+    SmallVectorImpl<DestroyNotEscapedClosureInst *> *verifications = nullptr);
+
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.
 bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);

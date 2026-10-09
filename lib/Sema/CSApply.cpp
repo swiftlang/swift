@@ -8469,6 +8469,19 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         assert(args->size() == 2 && "should have two arguments");
         auto *nonescaping = args->getExpr(0);
         auto *body = args->getExpr(1);
+
+        // A closure literal passed directly as the first argument is only
+        // ever used through the temporarily-escaping copy, so it can be
+        // noescape, just as if it were passed to a noescape parameter.
+        if (auto nonescapingFnTy =
+                cs.getType(nonescaping)->getAs<FunctionType>()) {
+          if (!nonescapingFnTy->isNoEscape())
+            applyTypeToClosureExpr(
+                cs, nonescaping,
+                nonescapingFnTy->withExtInfo(
+                    nonescapingFnTy->getExtInfo().withNoEscape()));
+        }
+
         auto bodyTy = cs.getType(body)->getWithoutSpecifierType();
         auto bodyFnTy = bodyTy->castTo<FunctionType>();
         auto resultType = bodyFnTy->getResult();

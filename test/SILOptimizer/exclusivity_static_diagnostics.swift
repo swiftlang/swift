@@ -654,3 +654,15 @@ struct TestStruct {
     }
   }
 }
+
+// A closure literal passed directly to withoutActuallyEscaping is noescape, so
+// conflicting accesses within it are diagnosed statically
+// (https://github.com/swiftlang/swift/issues/93107).
+func callsTakesInoutAndNoEscapeClosureWithoutActuallyEscaping() {
+  var local = 5
+  takesInoutAndNoEscapeClosure(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    withoutActuallyEscaping({ local = 8 }) { e in // expected-note {{conflicting access is here}}
+      e()
+    }
+  }
+}

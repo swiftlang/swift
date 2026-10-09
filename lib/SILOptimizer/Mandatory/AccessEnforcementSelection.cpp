@@ -146,7 +146,122 @@ public:
     return llvm::is_contained(dynamicArgs, arg->getIndex());
   }
 };
+
+// Find closure captures that escape through a withoutActuallyEscaping
+// expression.
+//
+// withoutActuallyEscaping turns a non-escaping closure into an escaping one
+// that static diagnostics cannot follow. A variable captured by such a closure,
+// directly or through other non-escaping closures, must therefore be treated
+// as escaping from that point on, as if it was captured by an escaping closure.
+//
+// Unlike DynamicCaptures, this information flows from closures to the scopes
+// that reference them, so closures are analyzed first. Local functions can be
+// recursive, so the analysis is repeated until nothing changes.
+class WithoutActuallyEscapingCaptures {
+  // The inout_aliasable closure arguments that escape.
+  llvm::DenseSet<SILArgument *> escapingArgs;
+
+public:
+  /// Record which inout_aliasable arguments of \p F escape, given what is
+  /// known about the closures that \p F references. Returns true if a new
+  /// escaping argument was found.
+  bool analyze(SILFunction *F);
+
+  bool isEscaping(SILFunctionArgument *arg) const {
+    return escapingArgs.count(arg);
+  }
+
+  /// Returns the instruction at which the variable captured by \p capture
+  /// escapes, or null if it does not escape.
+  SILInstruction *getEscapePoint(AddressCapture capture) const;
+};
 } // anonymous namespace
+
+/// Returns the withoutActuallyEscaping thunk that captures the non-escaping
+/// \p closure in a withoutActuallyEscaping expression, if any. This follows
+/// the same uses as SelectEnforcement::updateCapture.
+static PartialApplyInst *
+findWithoutActuallyEscapingThunk(PartialApplyInst *closure) {
+  SmallVector<SingleValueInstruction *, 8> worklist;
+  worklist.push_back(closure);
+  while (!worklist.empty()) {
+    auto *value = worklist.pop_back_val();
+    for (auto *use : value->getUses()) {
+      auto *user = use->getUser();
+      if (auto *pa = dyn_cast<PartialApplyInst>(user)) {
+        if (getWithoutActuallyEscapingDependence(pa))
+          return pa;
+        worklist.push_back(pa);
+        continue;
+      }
+      switch (user->getKind()) {
+      case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+      case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::ConvertFunctionInst:
+      case SILInstructionKind::BeginBorrowInst:
+      case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::EnumInst:
+      case SILInstructionKind::StructInst:
+      case SILInstructionKind::TupleInst:
+        worklist.push_back(cast<SingleValueInstruction>(user));
+        break;
+      default:
+        break;
+      }
+    }
+  }
+  return nullptr;
+}
+
+SILInstruction *
+WithoutActuallyEscapingCaptures::getEscapePoint(AddressCapture capture) const {
+  if (auto *pa = dyn_cast<PartialApplyInst>(capture.site.getInstruction())) {
+    if (auto *thunk = findWithoutActuallyEscapingThunk(pa))
+      return thunk;
+  }
+  // The variable escapes within the closure.
+  auto *callee = capture.site.getCalleeFunction();
+  if (callee && !callee->empty() &&
+      escapingArgs.count(callee->getArgument(capture.calleeArgIdx)))
+    return capture.site.getInstruction();
+  return nullptr;
+}
+
+bool WithoutActuallyEscapingCaptures::analyze(SILFunction *F) {
+  if (F->empty() || F->wasDeserializedCanonical())
+    return false;
+
+  bool changed = false;
+  for (SILArgument *arg : F->getArguments()) {
+    if (cast<SILFunctionArgument>(arg)->getArgumentConvention() !=
+        SILArgumentConvention::Indirect_InoutAliasable)
+      continue;
+
+    SmallVector<SILValue, 4> worklist;
+    worklist.push_back(arg);
+    while (!worklist.empty() && !escapingArgs.count(arg)) {
+      for (auto *use : worklist.pop_back_val()->getUses()) {
+        auto *user = use->getUser();
+        if (isa<MarkUnresolvedNonCopyableValueInst>(user) ||
+            isa<MoveOnlyWrapperToCopyableAddrInst>(user) ||
+            isa<CopyableToMoveOnlyWrapperAddrInst>(user)) {
+          worklist.push_back(cast<SingleValueInstruction>(user));
+          continue;
+        }
+        if (!ApplySite::isa(user))
+          continue;
+        AddressCapture capture(*use);
+        if (capture.isValid() && getEscapePoint(capture)) {
+          escapingArgs.insert(arg);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+  return changed;
+}
 
 namespace {
 class SelectEnforcement {
@@ -154,6 +269,8 @@ class SelectEnforcement {
   // arguments in this module. Parent scopes are processed before the closures
   // they reference.
   DynamicCaptures &dynamicCaptures;
+
+  const WithoutActuallyEscapingCaptures &withoutActuallyEscapingCaptures;
 
   AllocBoxInst *Box;
 
@@ -194,8 +311,10 @@ class SelectEnforcement {
   SmallVector<SILBasicBlock*, 8> Worklist;
 
 public:
-  SelectEnforcement(DynamicCaptures &dc, AllocBoxInst *box)
-      : dynamicCaptures(dc), Box(box) {}
+  SelectEnforcement(DynamicCaptures &dc,
+                    const WithoutActuallyEscapingCaptures &waec,
+                    AllocBoxInst *box)
+      : dynamicCaptures(dc), withoutActuallyEscapingCaptures(waec), Box(box) {}
 
   void run();
 
@@ -205,7 +324,8 @@ private:
   void analyzeProjection(SingleValueInstruction *project);
 
   /// Note that the given instruction is a use of the box (or a use of
-  /// a projection from it) in which the address escapes.
+  /// a projection from it) in which the address escapes, or the point at
+  /// which a capture of the address escapes through withoutActuallyEscaping.
   void noteEscapingUse(SILInstruction *inst);
 
   void propagateEscapes();
@@ -311,9 +431,14 @@ void SelectEnforcement::analyzeProjection(SingleValueInstruction *projection) {
     // Handle both partial applies and directly applied non-escaping closures.
     if (ApplySite::isa(user)) {
       AddressCapture capture(*use);
-      if (capture.isValid())
+      if (capture.isValid()) {
         Captures.emplace_back(capture);
-      else
+        // A capture that escapes through withoutActuallyEscaping escapes the
+        // box, so that later accesses, including the closure's, are dynamic.
+        if (auto *escape =
+                withoutActuallyEscapingCaptures.getEscapePoint(capture))
+          noteEscapingUse(escape);
+      } else
         // Only full apply sites can have non-inout_aliasable address arguments,
         // but those aren't actually captures.
         assert(FullApplySite::isa(user));
@@ -605,6 +730,11 @@ class AccessEnforcementSelection : public SILModuleTransform {
   // they reference.
   std::unique_ptr<DynamicCaptures> dynamicCaptures;
 
+  // Track the closure arguments that escape through withoutActuallyEscaping.
+  // Closures are processed before the parent scopes that reference them.
+  std::unique_ptr<WithoutActuallyEscapingCaptures>
+      withoutActuallyEscapingCaptures;
+
 #ifndef NDEBUG
   // Per-function book-keeping to verify that a box is processed before all of
   // its accesses and captures are seen.
@@ -629,6 +759,18 @@ void AccessEnforcementSelection::run() {
 
   dynamicCaptures = std::make_unique<DynamicCaptures>();
   SWIFT_DEFER { dynamicCaptures.reset(); };
+
+  withoutActuallyEscapingCaptures =
+      std::make_unique<WithoutActuallyEscapingCaptures>();
+  SWIFT_DEFER { withoutActuallyEscapingCaptures.reset(); };
+  bool changed;
+  do {
+    changed = false;
+    for (SILFunction *function :
+         llvm::reverse(closureOrder.getTopDownFunctions())) {
+      changed |= withoutActuallyEscapingCaptures->analyze(function);
+    }
+  } while (changed);
 
   for (SILFunction *function : closureOrder.getTopDownFunctions()) {
     this->processFunction(function);
@@ -659,7 +801,9 @@ processFunction(SILFunction *F) {
       // may still have captures that require dynamic enforcement because the
       // box has escaped prior to the capture.
       if (auto box = dyn_cast<AllocBoxInst>(inst)) {
-        SelectEnforcement(*dynamicCaptures, box).run();
+        SelectEnforcement(*dynamicCaptures, *withoutActuallyEscapingCaptures,
+                          box)
+            .run();
         assert(handledBoxes.insert(box).second);
 
       } else if (auto access = dyn_cast<BeginAccessInst>(inst))
@@ -732,7 +876,8 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
       return SourceAccess::getStaticAccess();
 
     case SILArgumentConvention::Indirect_InoutAliasable:
-      if (dynamicCaptures->isDynamic(arg))
+      if (dynamicCaptures->isDynamic(arg) ||
+          withoutActuallyEscapingCaptures->isEscaping(arg))
         return SourceAccess::getDynamicAccess();
 
       return SourceAccess::getStaticAccess();
