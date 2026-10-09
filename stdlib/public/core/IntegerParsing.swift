@@ -168,9 +168,9 @@ extension FixedWidthInteger {
   /// Creates a new integer value from the given sequence of Unicode code units
   /// and radix.
   ///
-  /// The string passed as `codeUnits` may begin with a plus or minus sign
+  /// The sequence passed as `codeUnits` may begin with a plus or minus sign
   /// character (`+` or `-`), followed by one or more numeric digits (`0-9`) or
-  /// letters (`a-z` or `A-Z`). Parsing of the string is case insensitive.
+  /// letters (`a-z` or `A-Z`). Parsing of the sequence is case insensitive.
   ///
   ///     let x = Int([UInt8(ascii: "1"), UInt8(ascii: "2"), UInt8(ascii: "3")])
   ///     // x == 123
@@ -197,8 +197,9 @@ extension FixedWidthInteger {
   ///   - codeUnits: The ASCII representation of a number in the radix passed as
   ///     `radix`.
   ///   - encoding: The encoding with which to interpret `codeUnits`.
-  ///   - radix: The radix, or base, to use for converting `text` to an integer
-  ///     value. `radix` must be in the range `2...36`. The default is 10.
+  ///   - radix: The radix, or base, to use for converting `codeUnits` to an
+  ///     integer value. `radix` must be in the range `2...36`. The default is
+  ///     10.
   @export(implementation)
   @inlinable
   @available(SwiftStdlib 6.0, *)
@@ -221,6 +222,53 @@ extension FixedWidthInteger {
       } ?? parseSlowPath()
     default:
       parseSlowPath()
+    }
+    guard let result else {
+      return nil
+    }
+    self = result
+  }
+
+  /// Creates a new integer value from the given span of UTF-8 code units and
+  /// radix.
+  ///
+  /// The span passed as `codeUnits` may begin with a plus or minus sign
+  /// character (`+` or `-`), followed by one or more numeric digits (`0-9`) or
+  /// letters (`a-z` or `A-Z`). Parsing of the span is case insensitive.
+  ///
+  ///     let x = Int("123".utf8Span)
+  ///     // x == 123
+  ///
+  ///     let y = Int("-123".utf8Span, radix: 8)
+  ///     // y == -83
+  ///     let y = Int("+123".utf8Span, radix: 8)
+  ///     // y == +83
+  ///
+  ///     let z = Int("07b".utf8Span, radix: 16)
+  ///     // z == 123
+  ///
+  /// If `codeUnits` is in an invalid format or contains characters that are out
+  /// of bounds for the given `radix`, or if the value it denotes in the given
+  /// `radix` is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     Int(" 100".utf8Span)                     // Includes whitespace
+  ///     Int("21-50".utf8Span)                    // Invalid format
+  ///     Int("ff6600".utf8Span)                   // Characters out of bounds
+  ///     Int("zzzzzzzzzzzzz".utf8Span, radix: 36) // Out of range
+  ///
+  /// - Parameters:
+  ///   - codeUnits: The ASCII representation of a number in the radix passed as
+  ///     `radix`.
+  ///   - radix: The radix, or base, to use for converting `codeUnits` to an
+  ///     integer value. `radix` must be in the range `2...36`. The default is
+  ///     10.
+  @export(implementation)
+  @inlinable
+  @available(SwiftStdlib 6.0, *)
+  public init?(_ codeUnits: borrowing UTF8Span, radix: Int = 10) {
+    let result = unsafe codeUnits.span.withUnsafeBufferPointer { codeUnits in
+      unsafe _parseIntegerDigits(ascii: codeUnits, radix: radix)
     }
     guard let result else {
       return nil
