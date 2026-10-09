@@ -1247,6 +1247,20 @@ public:
   }
 };
 
+// The inlinable ExecutorJob.unsafeCurrentTask accessor (ExecutorBridge.swift)
+// relies on the stealer's kind and on the Task pointer's offset. On 32-bit the
+// Task pointer is laid out in Job's alignment tail padding, so it is not at
+// sizeof(Job)
+static_assert(static_cast<size_t>(JobKind::TaskStealer) == 197,
+              "JobKind::TaskStealer is inlined into clients and must not change");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+static_assert(offsetof(AsyncTaskStealer, Task) ==
+                  (sizeof(void *) == 8 ? 8 : 9) * sizeof(void *),
+              "AsyncTaskStealer::Task offset is inlined into clients "
+              "(ExecutorBridge.swift) and must not change");
+#pragma clang diagnostic pop
+
 /// When this task has a valid dependent on executor record, and
 /// is holding the TaskStatusLock, this function will determine
 /// and return the Job (either the Task itself or a fresh stealer)
