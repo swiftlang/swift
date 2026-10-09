@@ -1,0 +1,2 @@
+RUN: %swift-demangle 's1aLlfMf' | %FileCheck %s
+CHECK: $s1aLlfMf ---> $s1aLlfMf
