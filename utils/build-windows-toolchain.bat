@@ -53,7 +53,11 @@ goto :end
 :InContainer
 
 :: Identify the BuildRoot
-set BuildRoot=%SourceRoot%\build
+:: Build in the container's own storage rather than in the SourceRoot bind
+:: mount. The on-disk CAS memory-maps its database files, and on the bind mount
+:: a database written by one process fails to reopen in the next one with
+:: "database: bad magic", which breaks the CAS tests.
+set BuildRoot=C:\Build
 
 md %BuildRoot%
 subst T: /d
@@ -127,7 +131,9 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %SBoMArg% ^
   %DebugInfoArg% ^
   -KeepGoing ^
-  -Summary || (exit /b 1)
+  -Summary
+set "BuildExitCode=%errorlevel%"
+if not "%BuildExitCode%"=="0" goto :ExportArtifacts
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
 :: CI can upload the archive to the Swift debug-symbols server.
@@ -135,13 +141,20 @@ if not "%DEBUG_INFO%"=="" (
   powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0CreateSymStore.ps1 ^
     -Search "%BuildRoot%\bin" ^
     -SymbolStore "%BuildRoot%\symstore" ^
-    -Destination "%PackageRoot%\swift-windows-symbols.zip" || (exit /b 1)
+    -Destination "%PackageRoot%\swift-windows-symbols.zip"
 )
+if not "%DEBUG_INFO%"=="" set "BuildExitCode=%errorlevel%"
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
 
-goto :end
+:ExportArtifacts
+:: CI collects the artifacts from the SourceRoot, which is the only directory
+:: shared with the host. Export them even when the build failed.
+robocopy "%PackageRoot%" "%SourceRoot%\build\artifacts" /E /NFL /NDL /NP
+:: robocopy exit codes below 8 mean success.
+if %errorlevel% geq 8 (exit /b 1)
+exit /b %BuildExitCode%
 endlocal
 
 :CloneRepositories
@@ -193,8 +206,11 @@ docker pull %BaseImage% && (
 
 docker build %BuildArgs% --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY -t %Image% -f "%Utils%\windows-docker\Dockerfile" "%Utils%" || (exit /b 1)
 
-:: The build tree stays in the mounted SourceRoot so CI can collect artifacts.
+:: The build tree is in the container's storage, which is 20GB by default; the
+:: toolchain build and tests need far more. Only the artifacts are copied back
+:: to the mounted SourceRoot.
 docker run --rm ^
+  --storage-opt size=512GB ^
   -v "%SourceRoot%:C:\Source" ^
   -e SWIFT_CI_IN_CONTAINER=1 ^
   -e SKIP_UPDATE_CHECKOUT=1 ^
