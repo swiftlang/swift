@@ -13,6 +13,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
@@ -293,6 +294,14 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()) {}
 
+/// Record how a scan query ended on its statistics reporter, as the frontend
+/// does for its own process. Otherwise the reporter counts the query as a
+/// failed process, even when the scan succeeded.
+static void noteScanExitStatus(CompilerInstance &instance, bool failed) {
+  if (auto *stats = instance.getStatsReporter())
+    stats->noteCurrentProcessExitStatus(failed ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
                                         StringRef WorkingDirectory) {
@@ -315,6 +324,9 @@ DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
   // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr =
       performModuleScan(*ScanningService, cache, *QueryContext);
+  noteScanExitStatus(*ScanInstance,
+                     DependenciesOrErr.getError() ||
+                         ScanInstance->getASTContext().hadError());
 
   if (DependenciesOrErr.getError())
     return generateHollowDiagnosticOutput(
@@ -345,6 +357,9 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
   // Execute the pre-scanning action, retrieving the in-memory result
   auto DependenciesOrErr =
       performModulePrescan(*ScanningService, cache, *QueryContext);
+  noteScanExitStatus(*ScanInstance,
+                     DependenciesOrErr.getError() ||
+                         ScanInstance->getASTContext().hadError());
 
   if (DependenciesOrErr.getError())
     return generateHollowDiagnosticOutputImportSet(
