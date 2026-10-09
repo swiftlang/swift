@@ -137,6 +137,14 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
+.PARAMETER SerialBuild
+Run every build step one after the other, instead of running independent steps
+in parallel. Helpful when debugging the build.
+
+.PARAMETER BuildLane
+For internal use: run the build steps of a parallel build lane, written to this
+file by Start-BuildLane, and exit.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -231,8 +239,23 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [switch] $SerialBuild,
+  [string] $BuildLane = ""
 )
+
+# The parameters that a parallel build lane re-runs this script with.
+$BuildScript = $PSCommandPath
+$BuildLaneParameters = @{}
+foreach ($Parameter in $PSBoundParameters.GetEnumerator()) {
+  $Value = $Parameter.Value
+  if ($Value -is [IO.FileSystemInfo]) {
+    $Value = $Value.ToString()
+  } elseif ($Value -is [Management.Automation.SwitchParameter]) {
+    $Value = $Value.IsPresent
+  }
+  $BuildLaneParameters[$Parameter.Key] = $Value
+}
 
 ## Prepare the build environment.
 
@@ -484,7 +507,9 @@ $PythonModules = @{
   "psutil" = @{
     Version = "6.1.0";
     SHA256 = @{
-      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      # psutil-6.1.0-cp37-abi3-win_amd64.whl; there is no ARM64 wheel, so
+      # ARM64 builds the sdist.
+      AMD64 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
       ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     };
     Dependencies = @();
@@ -711,6 +736,7 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
+$BuildStopwatch = $null
 
 function Add-TimingData {
   param
@@ -799,7 +825,8 @@ function Write-Summary {
 
   $TotalTime = [TimeSpan]::Zero
   foreach ($Entry in $TimingData) {
-    if (-not $Entry.Parent) {
+    # Steps that ran in parallel overlap the others.
+    if (-not $Entry.Parent -and -not $Entry.PSObject.Properties["InParallel"]) {
       $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
     }
   }
@@ -819,6 +846,130 @@ function Write-Summary {
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
+  if ($BuildStopwatch) {
+    Write-Host ("Wall clock time: {0:hh\:mm\:ss\.ff}" -f $BuildStopwatch.Elapsed)
+  }
+}
+
+function ConvertTo-TimingRecord([PSCustomObject] $Entry) {
+  [PSCustomObject]@{
+    Arch = $Entry.Arch
+    Platform = $Entry.Platform
+    BuildStep = $Entry."Build Step"
+    Seconds = $Entry."Elapsed Time".TotalSeconds
+    Children = @($Entry.Children | ForEach-Object { ConvertTo-TimingRecord $_ })
+  }
+}
+
+function Import-TimingRecord([PSCustomObject] $Record, [PSCustomObject] $Parent) {
+  $Entry = [PSCustomObject]@{
+    Arch = $Record.Arch
+    Platform = $Record.Platform
+    "Build Step" = $Record.BuildStep
+    "Elapsed Time" = [TimeSpan]::FromSeconds($Record.Seconds)
+    Parent = $Parent
+    Children = @()
+  }
+  if ($Parent) {
+    $Parent.Children += $Entry
+  }
+  $TimingData.Add($Entry)
+  foreach ($Child in $Record.Children) {
+    Import-TimingRecord $Child $Entry | Out-Null
+  }
+  return $Entry
+}
+
+$BuildLanes = @{}
+
+# Runs the build steps in $Body in another instance of this script, in parallel
+# with the steps that follow, until Wait-BuildLane. $Body runs in a fresh
+# script scope: it can use what this script computes from its parameters, but
+# not the caller's local variables. Its output is printed when it is waited on.
+function Start-BuildLane([string] $Name, [ScriptBlock] $Body) {
+  if ($SerialBuild) {
+    & $Body
+    return
+  }
+
+  $Directory = Join-Path $BinaryCache "lanes"
+  New-Item -ItemType Directory -Force $Directory | Out-Null
+  $Lane = @{
+    Name = $Name;
+    Script = Join-Path $Directory "$Name.ps1";
+    Log = Join-Path $Directory "$Name.log";
+    ErrorLog = Join-Path $Directory "$Name.err.log";
+    Timing = Join-Path $Directory "$Name.timing.json";
+  }
+  Remove-Item -Force -ErrorAction Ignore $Lane.Log, $Lane.ErrorLog, $Lane.Timing
+  Set-Content -Path $Lane.Script -Value $Body.ToString()
+
+  $Parameters = $BuildLaneParameters.Clone()
+  $Parameters.BuildLane = $Lane.Script
+  $ParametersFile = Join-Path $Directory "$Name.parameters.xml"
+  $Parameters | Export-Clixml -Path $ParametersFile
+  $Runner = Join-Path $Directory "$Name.run.ps1"
+  Set-Content -Path $Runner -Value @"
+`$Parameters = Import-Clixml -Path '$ParametersFile'
+& '$BuildScript' @Parameters
+exit `$LASTEXITCODE
+"@
+
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Starting build lane '$Name' ..."
+  $Lane.Process = Start-Process -PassThru -NoNewWindow `
+    -FilePath (Get-Process -Id $PID).Path `
+    -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$Runner`"" `
+    -RedirectStandardOutput $Lane.Log -RedirectStandardError $Lane.ErrorLog
+  # Windows PowerShell only reports the exit code of a process whose handle
+  # was opened before it exited.
+  $null = $Lane.Process.Handle
+  $script:BuildLanes[$Name] = $Lane
+}
+
+function Wait-BuildLane([string] $Name) {
+  if (-not $BuildLanes.ContainsKey($Name)) { return }
+
+  $Lane = $BuildLanes[$Name]
+  $Lane.Process.WaitForExit()
+  $Elapsed = $Lane.Process.ExitTime - $Lane.Process.StartTime
+  $script:BuildLanes.Remove($Name)
+
+  # CI only keeps the console output.
+  Write-Host -ForegroundColor Cyan "----- Output of build lane '$Name' -----"
+  Get-Content -Path $Lane.Log, $Lane.ErrorLog -ErrorAction Ignore | ForEach-Object { Write-Host $_ }
+  Write-Host -ForegroundColor Cyan "----- End of build lane '$Name' ($Elapsed) -----"
+
+  if ($Summary -and (Test-Path $Lane.Timing)) {
+    $Entry = [PSCustomObject]@{
+      Arch = $HostPlatform.Architecture.LLVMName
+      Platform = $HostPlatform.OS.ToString()
+      "Build Step" = "Build lane '$Name' (in parallel)"
+      "Elapsed Time" = $Elapsed
+      Parent = $null
+      Children = @()
+      InParallel = $true
+    }
+    $TimingData.Add($Entry)
+    # Windows PowerShell's ConvertFrom-Json does not enumerate arrays.
+    foreach ($Record in (Get-Content -Raw $Lane.Timing | ConvertFrom-Json)) {
+      Import-TimingRecord $Record $Entry | Out-Null
+    }
+  }
+
+  if ($Lane.Process.ExitCode -ne 0) {
+    throw "Build lane '$Name' failed with exit code $($Lane.Process.ExitCode)."
+  }
+}
+
+function Stop-BuildLanes {
+  foreach ($Lane in @($BuildLanes.Values)) {
+    if (-not $Lane.Process.HasExited) {
+      & taskkill /T /F /PID $Lane.Process.Id 2>&1 | Out-Null
+    }
+    Write-Host -ForegroundColor Red "----- Output of stopped build lane '$($Lane.Name)' -----"
+    Get-Content -Path $Lane.Log, $Lane.ErrorLog -ErrorAction Ignore | ForEach-Object { Write-Host $_ }
+  }
+  $script:BuildLanes.Clear()
 }
 
 function Get-AndroidNDK {
@@ -1909,8 +2060,10 @@ function Get-Dependencies {
 
 function Get-PinnedToolchainToolsDir() {
   $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+  # The pinned toolchain only bootstraps the build, so use its faster
+  # no-asserts compilers.
   return [IO.Path]::Combine("$ArtifactCache\toolchains", $ToolchainArtifact,
-    "LocalApp", "Programs", "Swift", "Toolchains", "$PinnedVersion+Asserts",
+    "LocalApp", "Programs", "Swift", "Toolchains", "$PinnedVersion+NoAsserts",
     "usr", "bin")
 }
 
@@ -2184,7 +2337,12 @@ function Build-CMakeProject {
     [switch] $AddAndroidCMakeEnv = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
-    [string[]] $BuildTargets = @()
+    [string[]] $BuildTargets = @(),
+    # Build all of BuildTargets in one build tool invocation instead of one at
+    # a time. Only for targets that do not have to be built in order.
+    [switch] $BatchTargets = $false,
+    # Reuse the configuration of an existing build tree.
+    [switch] $SkipConfigure = $false
   )
 
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
@@ -2593,15 +2751,22 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$CMakeBin $cmakeGenerateArgs"
-    Invoke-Program $CMakeBin @cmakeGenerateArgs
+    if (-not $SkipConfigure) {
+      Write-Host "$CMakeBin $cmakeGenerateArgs"
+      Invoke-Program $CMakeBin @cmakeGenerateArgs
+    }
 
     # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
+    if ($BatchTargets -and $BuildTargets.Length -gt 0) {
+      $Targets = $BuildTargets | ForEach-Object { if ($_ -eq "default") { "all" } else { $_ } }
+      Invoke-Program $CMakeBin --build $Bin --target @Targets
+    } else {
+      foreach ($Target in $BuildTargets) {
+        if ($Target -eq "default") {
+          Invoke-Program $CMakeBin --build $Bin
+        } else {
+          Invoke-Program $CMakeBin --build $Bin --target $Target
+        }
       }
     }
 
@@ -2812,10 +2977,12 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Assembler $Assemblers.Host `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
+    -BatchTargets `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
       CLANG_ENABLE_LIBXML2 = "NO";
+      CLANG_INCLUDE_TESTS = "NO";
       LLDB_ENABLE_LIBXML2 = "NO";
       LLDB_ENABLE_PYTHON = "NO";
       LLDB_INCLUDE_TESTS = "NO";
@@ -2826,6 +2993,9 @@ function Build-BuildTools([Hashtable] $Platform) {
       LLVM_ENABLE_PROJECTS = "clang;clang-tools-extra;lldb";
       LLVM_EXTERNAL_PROJECTS = "swift";
       LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
+      LLVM_INCLUDE_BENCHMARKS = "NO";
+      LLVM_INCLUDE_EXAMPLES = "NO";
+      LLVM_INCLUDE_TESTS = "NO";
       SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
       SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
       SWIFT_BUILD_HOST_DISPATCH = "NO";
@@ -3387,7 +3557,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [ScriptBlock] $BeforeLLDBTests = $null) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
@@ -3408,7 +3578,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
-      $Targets += @("SwiftCompilerPlugin", "check-swift")
+      # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
+      # need it, so it is built before check-swift starts.
+      $Targets += @("SwiftCompilerPlugin")
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
@@ -3473,7 +3645,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Defines       = $TestingDefines
     }
 
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
+    Build-CMakeProject @BuildCMakeArgs -BatchTargets -BuildTargets @(
       "swift-frontend",
       "sourcekitd-test",
       "swift-refactor",
@@ -3543,13 +3715,26 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    # The build tree is already configured with these arguments above. The
+    # LLDB tests' C++ dependencies run no swift-frontend, so they build along
+    # with the stdlib, which mostly waits for single swift-frontend jobs.
+    $StdlibTargets = @("swift-test-stdlib")
+    if ($LLDBTargets) {
+      $StdlibTargets += @("lldb", "liblldb", "lldb-server", "lldb-dap", "lldb-test", "lldb-unit-test-deps")
+    }
+    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BatchTargets -BuildTargets $StdlibTargets
+    if ($Targets) {
+      Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BatchTargets -BuildTargets $Targets
+    }
+    if ($TestSwift) {
+      Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets @("check-swift")
+    }
 
     if ($LLDBTargets) {
+      if ($BeforeLLDBTests) { & $BeforeLLDBTests }
       Invoke-IsolatingEnvVars {
         $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+        Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $LLDBTargets
       }
     }
   }
@@ -5034,8 +5219,12 @@ function Build-Driver([Hashtable] $Platform,
                       [string]    $SwiftSDK,
                       [string]    $LLVM_DIR,
                       [string]    $Clang_DIR,
-                      [string]    $Swift_DIR) {
-  Build-CMakeProject `
+                      [string]    $Swift_DIR,
+                      # Build the driver without makeOptions, which needs the
+                      # Stage2 compilers, and do not install it.
+                      [switch]    $BuildOnly) {
+  $BuildArgs = if ($BuildOnly) { @{ BuildTargets = @("default") } } else { @{} }
+  Build-CMakeProject @BuildArgs `
     -Src $SourceCache\swift-driver `
     -Bin (Get-ProjectBinaryCache $Platform Driver) `
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
@@ -5056,7 +5245,7 @@ function Build-Driver([Hashtable] $Platform,
       } else {
         "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
       };
-      SWIFT_DRIVER_BUILD_TOOLS = "YES";
+      SWIFT_DRIVER_BUILD_TOOLS = if ($BuildOnly) { "NO" } else { "YES" };
       LLVM_DIR = $LLVM_DIR;
       Clang_DIR = $Clang_DIR;
       Swift_DIR = $Swift_DIR;
@@ -5895,6 +6084,19 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
 
 try {
 
+$BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
+
+if ($BuildLane) {
+  . $BuildLane
+  if ($Summary) {
+    @($TimingData | Where-Object { -not $_.Parent } | ForEach-Object { ConvertTo-TimingRecord $_ }) |
+      ConvertTo-Json -Depth 32 | Set-Content -Path ([IO.Path]::ChangeExtension($BuildLane, ".timing.json"))
+    # The main build prints the summary.
+    $Summary = $false
+  }
+  exit 0
+}
+
 Get-Dependencies
 
 if ($Clean) {
@@ -5934,16 +6136,21 @@ if ($Toolchain) {
     }
   }
 
-  # ── Build Tools ───────────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $BuildPlatform
-  Invoke-BuildStep Build-BuildTools $BuildPlatform
 
   # ── Early Swift Driver ────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
-  Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
+  # The build tools do not need it, so it builds in parallel with them.
+  Start-BuildLane "early-swift-driver" {
+    Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
+    Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
+  }
+
+  # ── Build Tools ───────────────────────────────────────────────────────────
+  Invoke-BuildStep Build-BuildTools $BuildPlatform
 
   # ── Stage1 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
+  Wait-BuildLane "early-swift-driver"
   Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
     Assembler       = $Assemblers.Host;
@@ -5979,6 +6186,87 @@ if ($Toolchain) {
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
+
+  # ── Stage2 Toolchain ──────────────────────────────────────────────────────
+  # The tools are built by the Stage1 compilers. The ones that do not need
+  # swift-syntax from Stage2 build in parallel with it. Their builds mostly
+  # compile one Swift module at a time, so they barely slow Stage2 down.
+  Start-BuildLane "toolchain-tools" {
+    Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
+    Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-LLBuild $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    # Stage2 installs swift-driver.exe too, so the driver is installed after
+    # Stage2, below.
+    Invoke-BuildStep Build-Driver $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    } -BuildOnly
+    Invoke-BuildStep Build-ASN1 $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Crypto $HostPlatform @{
+      Assembler = $Assemblers.Stage1;
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Collections $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Certificates $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-System $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Subprocess $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Build $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Markdown $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
+    Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-SymbolKit $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-DocC $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Inspect $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+  }
+
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
     Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
@@ -5991,8 +6279,11 @@ if ($Toolchain) {
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
 
   # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
-  Get-SelectedSDKBuilds | ForEach-Object {
-    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+  # These are mostly CMake configure time, which runs on one core.
+  Start-BuildLane "compiler-rt" {
+    Get-SelectedSDKBuilds | ForEach-Object {
+      Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+    }
   }
 
   # ── Stage2 Compiler Macros ────────────────────────────────────────────────
@@ -6007,20 +6298,8 @@ if ($Toolchain) {
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
 
-  # ── Stage2 Toolchain ──────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
-  Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-LLBuild $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
+  # ── Stage2 Toolchain, continued ───────────────────────────────────────────
+  Wait-BuildLane "toolchain-tools"
   Invoke-BuildStep Build-Driver $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
@@ -6029,75 +6308,22 @@ if ($Toolchain) {
     Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
     Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
   }
-  Invoke-BuildStep Build-ASN1 $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Crypto $HostPlatform @{
-    Assembler = $Assemblers.Stage1;
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Collections $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Certificates $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-System $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Subprocess $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Build $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
   Invoke-BuildStep Build-PackageManager $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-Markdown $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
   Invoke-BuildStep Build-Format $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
-  Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-SymbolKit $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-DocC $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-Inspect $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
+  Wait-BuildLane "compiler-rt"
 
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
 
@@ -6155,7 +6381,9 @@ if ($Windows) {
 
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
-    if ($Build.LinkModes.contains("dynamic")) {
+    # The toolchain build already built the host's dynamic SDK.
+    $BuiltWithToolchain = $Toolchain -and $Build -eq $HostPlatform
+    if ($Build.LinkModes.contains("dynamic") -and -not $BuiltWithToolchain) {
       Invoke-BuildStep Build-SDK $Build -Context @{
         SDKIdentifier        = "Windows";
         Variant              = "Dynamic";
@@ -6204,27 +6432,6 @@ if ($Windows) {
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
   }
 
-  $RebuiltHostDynamicRuntime = @(
-    $WindowsSDKBuilds | Where-Object {
-      $_ -eq $HostPlatform -and $_.LinkModes.Contains("dynamic")
-    }
-  ).Count -gt 0
-  # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
-  # copies after the final runtime image is in place.
-  if ($Toolchain -and $RebuiltHostDynamicRuntime) {
-    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
-      ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
-      RuntimeLocation = $HostRuntimeBin;
-    }
-    if ($IncludeNoAsserts) {
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
-        ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
-        RuntimeLocation = $HostRuntimeBin;
-      }
-    }
-  }
 }
 
 if ($Android) {
@@ -6322,13 +6529,24 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+    # The dispatch and Foundation tests do not use the Stage2 build tree, so
+    # they run in parallel with the compiler tests, but finish before the LLDB
+    # tests, which are sensitive to load.
+    # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
+    # functions hardcode their platform needs.
+    Start-BuildLane "package-tests" {
+      if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
+      if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
+    }
+    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests @{
+      BeforeLLDBTests = { Wait-BuildLane "package-tests" };
+    }
+    Wait-BuildLane "package-tests"
+  } else {
+    if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
+    if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
   }
 
-  # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
-  # functions hardcode their platform needs.
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
   if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
   if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
   if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
@@ -6375,6 +6593,8 @@ if ($IncludeSBoM) {
 
 # Custom exception printing for more detailed exception information
 } catch {
+  Stop-BuildLanes
+
   function Write-ErrorLines($Text, $Indent = 0) {
     $IndentString = " " * $Indent
     $Text.Replace("`r", "") -split "`n" | ForEach-Object {
