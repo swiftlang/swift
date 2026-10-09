@@ -367,6 +367,18 @@ suite.test("append repeating negative count")
   }
 }
 
+suite.test("append repeating overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+
+  var a = Allocation(byteCount: 16)
+  a.initialize {
+    $0.append(0)
+    expectCrashLater()
+    $0.append(repeating: 1, count: 8, as: UInt16.self)
+  }
+}
+
 suite.test("append repeating with ByteOrder")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { expectTrue(false); return }

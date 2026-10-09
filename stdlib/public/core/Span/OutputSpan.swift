@@ -34,12 +34,11 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 
   @export(implementation)
   deinit {
-    if _count > 0 {
+    if count > 0 {
       unsafe _start().withMemoryRebound(
-        to: Element.self, capacity: _count
+        to: Element.self, capacity: count
       ) {
-        [ workaround = _count ] in
-        _ = unsafe $0.deinitialize(count: workaround)
+        _ = unsafe $0.deinitialize(count: count)
       }
     }
   }
@@ -73,7 +72,7 @@ extension OutputSpan where Element: ~Copyable {
   @unsafe
   internal func _tail() -> UnsafeMutableRawPointer {
     // NOTE: `_pointer` must be known to be not-nil.
-    unsafe _start().advanced(by: _count &* MemoryLayout<Element>.stride)
+    unsafe _start().advanced(by: count &* MemoryLayout<Element>.stride)
   }
 }
 
@@ -85,20 +84,25 @@ extension OutputSpan where Element: ~Copyable {
   @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 
+  @export(implementation) @inline(always)
+  internal func _nnCapacity() -> Int { _assumeNonNegative(capacity) }
+
   /// The number of additional elements that can be added to this span.
   @export(implementation)
   @_transparent
-  public var freeCapacity: Int { capacity &- _count }
+  public var freeCapacity: Int {
+    _assumeNonNegative(_nnCapacity() &- count)
+  }
 
   /// A Boolean value indicating whether the span is empty.
   @export(implementation)
   @_transparent
-  public var isEmpty: Bool { _count == 0 }
+  public var isEmpty: Bool { count == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @export(implementation)
   @_transparent
-  public var isFull: Bool { _count == capacity }
+  public var isFull: Bool { count == _nnCapacity() }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -297,7 +301,7 @@ extension OutputSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
-    _precondition(_count < capacity, "OutputSpan capacity overflow")
+    _precondition(count < _nnCapacity(), "OutputSpan capacity overflow")
     unsafe _tail().initializeMemory(as: Element.self, to: value)
     _count &+= 1
   }
@@ -328,7 +332,8 @@ extension OutputSpan where Element: ~Copyable {
   @_lifetime(self: copy self)
   public mutating func removeLast(_ n: Int) {
     _precondition(n >= 0, "Can't remove a negative number of elements")
-    _precondition(n <= _count, "OutputSpan underflow")
+    _precondition(n <= count, "OutputSpan underflow")
+    guard count > 0 else { return }
     _count &-= n
     unsafe _tail().withMemoryRebound(to: Element.self, capacity: n) {
       _ = unsafe $0.deinitialize(count: n)
@@ -341,8 +346,8 @@ extension OutputSpan where Element: ~Copyable {
   @_lifetime(self: copy self)
   public mutating func removeAll() {
     guard count > 0 else { return }
-    _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _count) {
-      unsafe $0.deinitialize(count: _count)
+    unsafe _start().withMemoryRebound(to: Element.self, capacity: count) {
+      _ = unsafe $0.deinitialize(count: count)
     }
     _count = 0
   }
@@ -362,7 +367,9 @@ extension OutputSpan {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
+    _precondition(count >= 0, "Can't append a negative number of values")
     _precondition(count <= freeCapacity, "OutputSpan capacity overflow")
+    guard count > 0 else { return }
     unsafe _tail().initializeMemory(
       as: Element.self, repeating: repeatedValue, count: count
     )
@@ -379,11 +386,7 @@ extension OutputSpan where Element: ~Copyable {
   public var span: Span<Element> {
     @_lifetime(borrow self)
     borrowing get {
-      let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
-      let span = unsafe Span(
-        _unchecked: pointer._unsafelyUnwrappedUnchecked,
-        count: _count
-      )
+      let span = unsafe Span<Element>(_unchecked: _pointer, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -394,11 +397,7 @@ extension OutputSpan where Element: ~Copyable {
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
-      let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
-      let span = unsafe MutableSpan(
-        _unchecked: pointer._unsafelyUnwrappedUnchecked,
-        count: _count
-      )
+      let span = unsafe MutableSpan<Element>(_unchecked: _pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
@@ -443,12 +442,12 @@ extension OutputSpan where Element: ~Copyable {
     ) throws(E) -> R
   ) throws(E) -> R {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: _pointer, count: capacity &* MemoryLayout<Element>.stride
+      start: _pointer, count: _nnCapacity() &* MemoryLayout<Element>.stride
     )
-    var initializedCount = _count
+    var initializedCount = count
     defer {
       _precondition(
-        0 <= initializedCount && initializedCount <= capacity,
+        UInt(bitPattern: initializedCount) <= UInt(bitPattern: _nnCapacity()),
         "OutputSpan capacity overflow"
       )
       self._count = initializedCount
@@ -484,11 +483,11 @@ extension OutputSpan where Element: ~Copyable {
     for buffer: UnsafeMutableBufferPointer<Element>
   ) -> Int {
     _precondition(
-      unsafe UnsafeMutableRawPointer(buffer.baseAddress) == self._pointer
-      && buffer.count == self.capacity,
+      unsafe UnsafeMutableRawPointer(buffer.baseAddress) == _pointer
+      && buffer.count == _nnCapacity(),
       "OutputSpan identity mismatch"
     )
-    let count = self._count
+    let count = self.count
     discard self
     return count
   }
