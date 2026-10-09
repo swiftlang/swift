@@ -79,6 +79,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
     nextSpan(maxCount: Int.max)
   }
 
+  @inlinable
   public var count: Int {
     return Int(self.end - self.current)
   }
@@ -107,4 +108,20 @@ extension CxxIterable where Element: ~Copyable, Self: ~Copyable {
     let iterator = CxxBorrowingIterator<Self>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
     return iterator
   }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension CxxIterable where Element: ~Copyable, Self: ~Copyable, RawIterator: UnsafeCxxRandomAccessIterator {
+  @inlinable
+  public var underestimatedCount: Int {
+    return Int(__endUnsafe() - __beginUnsafe())
+  }
+}
+
+// Ambiguity breaker for types that conform to both `CxxIterable` and `CxxRandomAccessCollection`
+
+@available(SwiftStdlib 6.4, *)
+extension CxxRandomAccessCollection where Self: CxxIterable {
+  @inlinable
+  public var underestimatedCount: Int { self.count }
 }
