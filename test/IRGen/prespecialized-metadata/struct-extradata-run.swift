@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %clang -c -std=c++17 -v %target-cc-options %target-threading-opt -g -O0 -isysroot %sdk %S/Inputs/extraDataFields.cpp -o %t/extraDataFields.o -I %swift-include-dir -I %swift_src_root/include/ -I %swift_src_root/stdlib/public/SwiftShims/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %swift-include-dir/../lib/swift/macosx -I %swift_obj_root/include
 
-// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsNoTrailingFlags -target %module-target-future -Xfrontend -disable-generic-metadata-prespecialization -emit-module-path %t/ExtraDataFieldsNoTrailingFlags.swiftmodule -o %t/%target-library-name(ExtraDataFieldsNoTrailingFlags)
-// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsTrailingFlags -target %module-target-future -Xfrontend -prespecialize-generic-metadata -emit-module-path %t/ExtraDataFieldsTrailingFlags.swiftmodule -o %t/%target-library-name(ExtraDataFieldsTrailingFlags)
+// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsNoTrailingFlags -target %module-target-future -Xfrontend -disable-generic-metadata-prespecialization -emit-module-path %t/ExtraDataFieldsNoTrailingFlags.swiftmodule -o %t/%target-library-name(ExtraDataFieldsNoTrailingFlags) -Xlinker -install_name -Xlinker @executable_path/%target-library-name(ExtraDataFieldsNoTrailingFlags)
+// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsTrailingFlags -target %module-target-future -Xfrontend -prespecialize-generic-metadata -emit-module-path %t/ExtraDataFieldsTrailingFlags.swiftmodule -o %t/%target-library-name(ExtraDataFieldsTrailingFlags) -Xlinker -install_name -Xlinker @executable_path/%target-library-name(ExtraDataFieldsTrailingFlags)
 // RUN: %target-build-swift -v %mcp_opt %s %t/extraDataFields.o -import-objc-header %S/Inputs/extraDataFields.h -Xfrontend -disable-generic-metadata-prespecialization -target %module-target-future -lc++ -L %swift-include-dir/../lib/swift/macosx -sdk %sdk -o %t/main -I %t -L %t -lExtraDataFieldsTrailingFlags -lExtraDataFieldsNoTrailingFlags -module-name main
 
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(ExtraDataFieldsNoTrailingFlags) %t/%target-library-name(ExtraDataFieldsTrailingFlags) | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
