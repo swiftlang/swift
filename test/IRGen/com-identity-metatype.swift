@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop -com-interop-model=microsoft %S/../Inputs/COM.swift
-// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -I %t -emit-ir %s | %FileCheck %s --implicit-check-not=WidgetC5CLSID
+// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -I %t -emit-ir %s | %FileCheck %s --implicit-check-not=WidgetC5CLSID --implicit-check-not=IWidgetPAA3IID
 // RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -I %t -emit-ir -O %s -o %t/optimized.ll
 
 @com(interface: "10203040-5060-7080-90a0-b0c0d0e0f001")
@@ -42,3 +42,7 @@ func activation() -> CLSID { activationID(Widget.self) }
 // CHECK-LABEL: define{{.*}} swiftcc {{.*}}@"$s{{.*}}16directActivation
 // CHECK: load i32, ptr @"CLSID_{{.*}}6WidgetCMn"
 func directActivation() -> CLSID { Widget.CLSID }
+
+// CHECK-LABEL: define{{.*}} swiftcc {{.*}}@"$s{{.*}}15directInterface
+// CHECK: load i32, ptr getelementptr inbounds (i8, ptr @"{{.*}}7IWidgetMp", i{{32|64}} 24)
+func directInterface() -> IID { IWidget.IID }

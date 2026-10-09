@@ -11092,20 +11092,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                                 /*isBridged=*/false,
                                 /*isUnwrappedOptional=*/false));
 
-  // Instance requirements of an identity protocol apply to the conforming
-  // metatype itself, rather than to instances of the class.
+  // Instance requirements of identity protocols apply to the conforming
+  // metatype itself, rather than to instances of the interface or class.
   if (ctx.LangOpts.EnableCOMInterop && baseObjTy->is<AnyMetatypeType>()) {
-    if (auto *protocol = ctx.getProtocol(KnownProtocolKind::COMActivatable)) {
+    for (auto kind :
+         {KnownProtocolKind::COMInterface, KnownProtocolKind::COMActivatable}) {
+      auto *protocol = ctx.getProtocol(kind);
+      if (!protocol)
+        continue;
       auto conformance = lookupConformance(baseObjTy, protocol);
-      if (conformance && !conformance.hasMissingConformance()) {
-        SmallVector<ValueDecl *, 4> members;
-        DC->lookupQualified(protocol, DeclNameRef(lookupName.getFullName()),
-                            SourceLoc(), NLFlags::QualifiedDefault, members);
-        for (auto *member : members) {
-          metatypeConformanceMembers.insert(member);
-          addChoice(getOverloadChoice(member, /*isBridged=*/false,
-                                      /*isUnwrappedOptional=*/false));
-        }
+      if (!conformance || conformance.hasMissingConformance())
+        continue;
+      SmallVector<ValueDecl *, 4> members;
+      DC->lookupQualified(protocol, DeclNameRef(lookupName.getFullName()),
+                          SourceLoc(), NLFlags::QualifiedDefault, members);
+      for (auto *member : members) {
+        metatypeConformanceMembers.insert(member);
+        addChoice(getOverloadChoice(member, /*isBridged=*/false,
+                                    /*isUnwrappedOptional=*/false));
       }
     }
   }

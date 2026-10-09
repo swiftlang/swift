@@ -3072,27 +3072,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Synthesizes the implicit metatype extension carrying \c var \c IID for a
-/// \c @com protocol.  The GUID is read from the protocol's own \c COMAttr, so
-/// the property is re-derived in modules importing a binary \c .swiftmodule.
-class SynthesizeCOMInterfaceIDRequest
-    : public SimpleRequest<SynthesizeCOMInterfaceIDRequest,
-                           VarDecl *(ProtocolDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  VarDecl *evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool,

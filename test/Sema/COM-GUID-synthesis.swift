@@ -4,7 +4,7 @@
 
 import COM
 
-// --- Form 1: @com(interface: "...") on a protocol synthesizes IID in extension P.Protocol
+// --- An interface ID is available through its metatype conformance
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
 protocol IWidget: IUnknown { }
@@ -18,7 +18,7 @@ class Widget: IWidget { }
 
 let _: GUID = Widget.CLSID
 
-// --- IID is not synthesized for classes; CLSID is not on protocols
+// --- Classes have no interface identity; interfaces have no activation identity
 
 let _ = Widget.IID // expected-error {{type 'Widget' has no member 'IID'}}
 let _ = IWidget.CLSID // expected-error {{type 'any IWidget' has no member 'CLSID'}}
@@ -49,3 +49,9 @@ let _ = UnidentifiedSubclass.CLSID
 @com(implementation: "30000000-0000-0000-0000-000000000003")
 class IdentifiedSubclass: Widget {}
 let _: CLSID = IdentifiedSubclass.CLSID
+
+// An interface conformance does not imply a metatype identity conformance.
+func generic<Interface: IUnknown>(_: Interface.Type) {
+  _ = Interface.IID
+  // expected-error@-1 {{type 'Interface' has no member 'IID'}}
+}

@@ -3163,17 +3163,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     (void)nominal->getDistributedActorSystemProperty();
   }
 
-  // Synthesize a @com protocol's IID so it is always present in
-  // getAllMembers/getABIMembers, not only when name lookup forces it.
-  // For imported types the request finds the deserialized member.
-  if (ctx.LangOpts.EnableCOMInterop) {
-    if (auto *PD = dyn_cast_or_null<ProtocolDecl>(nominal)) {
-      if (PD->isCOMInterface())
-        (void)evaluateOrDefault(ctx.evaluator,
-                                SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
-    }
-  }
-
   // Expand synthesized member macros.
   auto *mutableDecl = const_cast<Decl *>(idc->getDecl());
   (void)evaluateOrDefault(
