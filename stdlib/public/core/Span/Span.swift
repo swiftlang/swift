@@ -194,7 +194,9 @@ extension Span where Element: ~Copyable {
     self = unsafe _overrideLifetime(span, borrowing: pointer)
   }
 
-  /// Create a span over the single value passed as a parameter.
+  /// Create a span over a single value.
+  ///
+  /// The span has a `count` of 1, and borrows `value`.
   ///
   /// - Parameters:
   ///   - value: a value to be borrowed by the span

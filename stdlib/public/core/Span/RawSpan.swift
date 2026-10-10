@@ -357,11 +357,10 @@ extension RawSpan {
     unsafe self = Self.init(unsafeElements: span)
   }
 
-  /// Create a span over the bytes of the single value
-  /// passed as a parameter.
+  /// Create a span over the bytes of a single value.
   ///
-  /// The `RawSpan` created by this initializer will have a `byteCount`
-  /// of `MemoryLayout<Element>.size` bytes.
+  /// The span has a `byteCount` of `MemoryLayout<Element>.size`,
+  /// and borrows `value`.
   ///
   /// - Parameters:
   ///   - value: a value to be borrowed by the span

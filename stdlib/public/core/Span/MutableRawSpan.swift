@@ -183,12 +183,11 @@ extension MutableRawSpan {
     self = unsafe Self.init(unsafeElements: elements)
   }
 
-  /// Create a mutable span over the bytes of the single value
-  /// passed as a parameter.
+  /// Create a mutable span over the bytes of a single value.
   ///
-  /// The `MutableRawSpan` created by this initializer will represent a
-  /// mutation of `value`. It will have a `byteCount` of
-  /// `MemoryLayout<Element>.size` bytes.
+  /// The span has a `byteCount` of `MemoryLayout<Element>.size`. Writes
+  /// through the span modify `value`, which is exclusively accessed while
+  /// the span exists.
   ///
   /// - Parameters:
   ///   - value: a value to be mutated through the span
