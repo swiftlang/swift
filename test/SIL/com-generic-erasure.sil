@@ -1,0 +1,97 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -emit-sib -module-name M %s -o %t/M.sib
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -module-name M -enable-sil-verify-all %t/M.sib | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all -onone-simplification -simplify-instruction=destroy_value %s | %FileCheck %s --check-prefix=DESTROY
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all -simplification -simplify-instruction=destroy_value %s | %FileCheck %s --check-prefix=DESTROY
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all -mandatory-inlining %s | %FileCheck %s --check-prefix=INLINE
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all -simplification -simplify-instruction=release_value %s | %FileCheck %s --check-prefix=RELEASE
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -compute-side-effects %s | %FileCheck %s --check-prefix=EFFECTS
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all -dce %s | %FileCheck %s --check-prefix=DESTROY
+// RUN: %target-sil-opt -enable-experimental-com-interop -sil-print-types -emit-sorted-sil -I %t -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IExtended: IItem {}
+
+// Borrowing the address produces an independent owned interface value.
+// CHECK-LABEL: sil [ossa] @erase
+// CHECK: init_com_existential %0 : $*T : $T, $any IItem
+// CHECK: return
+// EFFECTS-LABEL: sil [ossa] @erase
+// EFFECTS: [%0: read {{.*}}, write {{.*}}, copy {{.*}}, destroy {{.*}}]
+// EFFECTS-NEXT: [global: read,write,copy,destroy,allocate,deinit_barrier]
+sil [ossa] @erase : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $IItem
+  return %result : $IItem
+}
+
+// Destroying the interface result must not destroy the borrowed source or
+// remove the foreign AddRef operation that creates the result.
+// DESTROY-LABEL: sil [ossa] @discard
+// DESTROY: [[RESULT:%.*]] = init_com_existential %0 : $*T : $T, $any IItem
+// DESTROY: destroy_value [[RESULT]]
+// DESTROY-NOT: destroy_addr
+// DESTROY: fix_lifetime %0
+// DESTROY: return
+sil [ossa] @discard : $@convention(thin) <T: IItem> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $IItem
+  destroy_value %result : $IItem
+  fix_lifetime %value : $*T
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// Cloning preserves the borrowed operand and independently owned result.
+// INLINE-LABEL: sil [ossa] @inline_erasure
+// INLINE-NOT: apply
+// INLINE: init_com_existential %0 : $*T : $T, $any IItem
+// INLINE-NOT: apply
+// INLINE: return
+sil [ossa] @inline_erasure : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : $*T):
+  %fn = function_ref @transparent_erasure : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem
+  %result = apply %fn<T>(%value) : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem
+  return %result : $IItem
+}
+
+sil [transparent] [ossa] @transparent_erasure : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $IItem
+  return %result : $IItem
+}
+
+// The same restriction applies after ownership lowering: the release belongs
+// to the projected interface, not to the borrowed address.
+// RELEASE-LABEL: sil @release_erasure
+// RELEASE: [[RESULT:%.*]] = init_com_existential %0 : $*T : $T, $any IItem
+// RELEASE: release_value [[RESULT]] : $any IItem
+// RELEASE: fix_lifetime %0
+sil @release_erasure : $@convention(thin) <T: IItem> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $IItem
+  release_value %result : $IItem
+  fix_lifetime %value : $*T
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// Specialization can replace a generic source with a loadable opened interface.
+// CHECK-LABEL: sil [ossa] @opened
+// CHECK: [[OPEN:%.*]] = open_com_existential %0
+// CHECK: init_com_existential [[OPEN]] : $@opened({{.*}}, any IExtended) Self
+// CHECK-SAME: type-defs: [[OPEN]]
+// CHECK: return
+sil [ossa] @opened : $@convention(thin) (@guaranteed IExtended) -> @owned IItem {
+bb0(%value : @guaranteed $IExtended):
+  %open = open_com_existential %value : $IExtended to $@opened(1, IExtended) Self
+  %result = init_com_existential %open : $@opened(1, IExtended) Self : $@opened(1, IExtended) Self, $IItem
+  return %result : $IItem
+}

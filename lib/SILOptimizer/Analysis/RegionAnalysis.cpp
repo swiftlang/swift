@@ -4811,6 +4811,17 @@ PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *i
   return TranslationSemantics::AssignDirect;
 }
 
+TranslationSemantics PartitionOpTranslator::visitInitCOMExistentialInst(
+    InitCOMExistentialInst *ieri) {
+  if (ieri->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(ieri->getResults(), ArrayRef<Operand *>(),
+                            makeOperandRefRange(ieri->getAllOperands()),
+                            RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+  return TranslationSemantics::AssignDirect;
+}
+
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialRefInst(
     InitExistentialRefInst *ieri) {

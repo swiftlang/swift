@@ -1,0 +1,58 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/native.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=NATIVE
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/result.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=RESULT
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/constraint.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CONSTRAINT
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/formal.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=FORMAL
+// REQUIRES: asserts
+
+// CONSTRAINT: init_com_existential operand must be a COM-constrained archetype
+// FORMAL: init_com_existential operand must be a lowering of the formal concrete type
+// NATIVE: init_com_existential operand must be a COM-constrained archetype
+// RESULT: init_com_existential result must be a COM existential value
+
+//--- native.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+public class Native: IItem {}
+sil [ossa] @invalid : $@convention(thin) (@guaranteed Native) -> @owned IItem {
+bb0(%value : @guaranteed $Native):
+  %result = init_com_existential %value : $Native : $Native, $IItem
+  return %result : $IItem
+}
+
+//--- result.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil [ossa] @invalid : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned AnyObject {
+bb0(%value : $*T):
+  %result = init_com_existential %value : $*T : $T, $AnyObject
+  return %result : $AnyObject
+}
+
+//--- constraint.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil [ossa] @invalid : $@convention(thin) <T, U: IItem> (@in_guaranteed T, @in_guaranteed U) -> @owned IItem {
+bb0(%value : $*T, %other : $*U):
+  %result = init_com_existential %value : $*T : $U, $IItem
+  return %result : $IItem
+}
+
+//--- formal.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil [ossa] @invalid : $@convention(thin) <T: IItem, U: IItem> (@in_guaranteed T, @in_guaranteed U) -> @owned IItem {
+bb0(%value : $*T, %other : $*U):
+  %result = init_com_existential %value : $*T : $U, $IItem
+  return %result : $IItem
+}

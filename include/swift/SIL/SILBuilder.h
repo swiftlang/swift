@@ -2285,6 +2285,15 @@ public:
         &getFunction()));
   }
 
+  InitCOMExistentialInst *
+  createInitCOMExistential(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, SILValue concrete,
+                           ArrayRef<ProtocolConformanceRef> conformances) {
+    return insert(InitCOMExistentialInst::create(
+        getSILDebugLocation(loc), existentialType, formalConcreteType, concrete,
+        conformances, &getFunction()));
+  }
+
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType, SILValue Concrete,
@@ -2299,7 +2308,9 @@ public:
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances,
                            ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(FormalConcreteType->isBridgeableObjectType());
+    ASSERT(FormalConcreteType->isBridgeableObjectType() ||
+           ExistentialType.canUseExistentialRepresentation(
+               ExistentialRepresentation::COM));
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), forwardingOwnershipKind));

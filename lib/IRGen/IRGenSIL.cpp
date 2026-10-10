@@ -19,6 +19,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -1415,6 +1416,7 @@ public:
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
+  void visitInitCOMExistentialInst(InitCOMExistentialInst *inst);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
   void visitDeinitExistentialValueInst(DeinitExistentialValueInst *i);
@@ -8571,8 +8573,36 @@ void IRGenSILFunction::visitInitExistentialMetatypeInst(
   setLoweredExplosion(i, result);
 }
 
+void IRGenSILFunction::visitInitCOMExistentialInst(
+    InitCOMExistentialInst *inst) {
+  llvm::Value *object;
+  if (inst->getOperand()->getType().isAddress()) {
+    Address storage(getLoweredAddress(inst->getOperand()).getAddress(),
+                    IGM.Int8PtrTy, IGM.getPointerAlignment());
+    object = Builder.CreateLoad(storage, "com.object");
+  } else {
+    object = getLoweredSingletonExplosion(inst->getOperand());
+  }
+  auto *interface =
+      inst->getType().getASTType().getExistentialLayout().getCOMInterface();
+  auto *projected = emitGenericCOMInterfaceProjection(
+      *this, object, inst->getFormalConcreteType(), interface);
+
+  Explosion borrowed;
+  borrowed.add(projected);
+  Explosion result;
+  cast<LoadableTypeInfo>(getTypeInfo(inst->getType()))
+      .copy(*this, borrowed, result, getDefaultAtomicity());
+  setLoweredExplosion(inst, result);
+}
+
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   Explosion instance = getLoweredExplosion(i->getOperand());
+  if (i->getType().getASTType().isCOMExistentialType()) {
+    // Refinement preserves the opened interface's address point and ownership.
+    setLoweredExplosion(i, instance);
+    return;
+  }
   Explosion result;
   emitClassExistentialContainer(*this,
                                result, i->getType(),

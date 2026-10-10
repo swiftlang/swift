@@ -454,6 +454,11 @@ void SILLinkerVisitor::visitInitExistentialAddrInst(
   linkInExistentialConformances(IEI->getConformances());
 }
 
+void SILLinkerVisitor::visitInitCOMExistentialInst(
+    InitCOMExistentialInst *IERI) {
+  linkInExistentialConformances(IERI->getConformances());
+}
+
 void SILLinkerVisitor::visitInitExistentialRefInst(
     InitExistentialRefInst *IERI) {
   linkInExistentialConformances(IERI->getConformances());

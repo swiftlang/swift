@@ -8580,6 +8580,39 @@ public:
   }
 };
 
+/// Project a COM interface from a borrowed generic value and retain the result.
+/// The source may be an opaque value or its lowered address. The result has
+/// independent ownership and need not have the same pointer as the source.
+class InitCOMExistentialInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitCOMExistentialInst, InitCOMExistentialInst,
+          SingleValueInstruction> {
+  friend SILBuilder;
+
+  CanType ConcreteType;
+  ArrayRef<ProtocolConformanceRef> Conformances;
+
+  InitCOMExistentialInst(SILDebugLocation DebugLoc, SILType ExistentialType,
+                         CanType FormalConcreteType, SILValue Instance,
+                         ArrayRef<SILValue> TypeDependentOperands,
+                         ArrayRef<ProtocolConformanceRef> Conformances)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
+        ConcreteType(FormalConcreteType), Conformances(Conformances) {}
+
+  static InitCOMExistentialInst *
+  create(SILDebugLocation DebugLoc, SILType ExistentialType,
+         CanType ConcreteType, SILValue Instance,
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
+
+public:
+  CanType getFormalConcreteType() const { return ConcreteType; }
+
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
+    return Conformances;
+  }
+};
+
 /// InitExistentialRefInst - Given a class instance reference and a set of
 /// conformances, creates a class existential value referencing the
 /// class instance.

@@ -3718,6 +3718,11 @@ protected:
     emi->setOperand(opAddr);
   }
 
+  void visitInitCOMExistentialInst(InitCOMExistentialInst *projection) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    projection->setOperand(opAddr);
+  }
+
   void visitCOMMethodInst(COMMethodInst *method) {
     SILValue opAddr = addrMat.materializeAddress(use->get());
     method->setOperand(opAddr);
@@ -3854,6 +3859,16 @@ protected:
       builder.createCopyAddr(copyInst->getLoc(), srcAddr, destAddr, IsNotTake,
                              IsInitialization);
     }
+    markRewritten(copyInst, destAddr);
+  }
+
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *copyInst) {
+    SILValue srcVal = copyInst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+    AddressMaterialization addrMat(pass, copyInst, builder);
+    SILValue destAddr = addrMat.materializeAddress(copyInst);
+    builder.createExplicitCopyAddr(copyInst->getLoc(), srcAddr, destAddr,
+                                   IsNotTake, IsInitialization);
     markRewritten(copyInst, destAddr);
   }
 

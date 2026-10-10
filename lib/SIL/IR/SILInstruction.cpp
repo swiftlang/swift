@@ -1228,6 +1228,7 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::AwaitAsyncContinuationInst:
     return false;
 
+  case SILInstructionKind::InitCOMExistentialInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst:

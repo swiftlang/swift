@@ -2394,11 +2394,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
-  // Initializing a borrow from the value as a referent counts as a liveness
-  // use.
-  if (isa<InitBorrowAddrInst>(user)) {
-    assert(op->getOperandNumber() == InitBorrowAddrInst::Referent
-           && "should have handled dest above in memInstMustInitialize");
+  // Borrowing the value, including projecting an independently owned COM
+  // interface, only requires the source to be live during the instruction.
+  if (isa<InitBorrowAddrInst>(user) || isa<InitCOMExistentialInst>(user)) {
+    assert((isa<InitCOMExistentialInst>(user) ||
+            op->getOperandNumber() == InitBorrowAddrInst::Referent) &&
+           "should have handled dest above in memInstMustInitialize");
 
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);

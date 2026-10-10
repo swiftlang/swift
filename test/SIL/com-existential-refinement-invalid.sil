@@ -1,0 +1,18 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -I %t %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// An opaque generic source requires init_com_existential. It cannot forward
+// its pointer to an interface without applying the conformance adjustment.
+// CHECK: init_existential_ref COM operand must be an opened interface value
+sil_stage raw
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil [ossa] [opaque] @invalid : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : @guaranteed $T):
+  %result = init_existential_ref %value : $T : $T, $IItem
+  %copy = copy_value %result : $IItem
+  return %copy : $IItem
+}

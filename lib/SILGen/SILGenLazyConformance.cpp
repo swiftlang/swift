@@ -312,6 +312,12 @@ public:
       SGM.useConformance(IEMI, conformance);
   }
 
+  void visitInitCOMExistentialInst(InitCOMExistentialInst *IERI) {
+    SGM.useConformancesFromType(IERI, IERI->getFormalConcreteType());
+    for (auto conformance : IERI->getConformances())
+      SGM.useConformance(IERI, conformance);
+  }
+
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI) {
     SGM.useConformancesFromType(IERI, IERI->getFormalConcreteType());
     SGM.useConformancesFromObjectiveCType(IERI, IERI->getFormalConcreteType());
