@@ -1,0 +1,70 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+// The printer emits !true_count/!false_count on checked_cast_addr_br, so the
+// parser has to read them back. Round-tripping twice is what catches a printer
+// and parser that disagree: the first pass proves they parse, the second that
+// they survive being re-printed.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+class D: C {}
+
+// CHECK-LABEL: sil @weights_take_always :
+// CHECK:         checked_cast_addr_br take_always C in %0 to D in %1, bb1, bb2 !true_count(7) !false_count(3)
+sil @weights_take_always : $@convention(thin) (@in C, @inout D) -> () {
+bb0(%0 : $*C, %1 : $*D):
+  checked_cast_addr_br take_always C in %0 : $*C to D in %1 : $*D, bb1, bb2, !true_count(7), !false_count(3)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A test_only cast has no destination operand, so the weights follow the
+// formal target type rather than a second `in` clause.
+// CHECK-LABEL: sil @weights_test_only :
+// CHECK:         checked_cast_addr_br test_only C in %0 to D, bb2, bb1 !true_count(11) !false_count(5)
+sil @weights_test_only : $@convention(thin) (@in_guaranteed C) -> Builtin.Int1 {
+bb0(%0 : $*C):
+  checked_cast_addr_br test_only C in %0 : $*C to D, bb2, bb1, !true_count(11), !false_count(5)
+
+bb1:
+  %f = integer_literal $Builtin.Int1, 0
+  br bb3(%f : $Builtin.Int1)
+
+bb2:
+  %t = integer_literal $Builtin.Int1, -1
+  br bb3(%t : $Builtin.Int1)
+
+bb3(%r : $Builtin.Int1):
+  return %r : $Builtin.Int1
+}
+
+// Weights are optional; omitting them must still parse.
+// CHECK-LABEL: sil @no_weights :
+// CHECK:         checked_cast_addr_br take_always C in %0 to D in %1, bb1, bb2
+// CHECK-NOT:     true_count
+sil @no_weights : $@convention(thin) (@in C, @inout D) -> () {
+bb0(%0 : $*C, %1 : $*D):
+  checked_cast_addr_br take_always C in %0 : $*C to D in %1 : $*D, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
