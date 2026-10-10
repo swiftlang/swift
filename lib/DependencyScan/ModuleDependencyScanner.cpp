@@ -184,6 +184,47 @@ std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
   return outputPath.str().str();
 }
 
+/// Parses \p sourceFile without reporting its errors. The compile job reports
+/// them, along with the semantic errors that a failed scan would hide, and the
+/// parser still recovers the file's imports. Warnings that parsing produces,
+/// such as those from evaluating `#if canImport`, are still reported.
+static void parseWithoutReportingErrors(SourceFile &sourceFile,
+                                        DiagnosticEngine &diags) {
+  /// Forwards diagnostics, except errors and the notes attached to them.
+  class ErrorDroppingConsumer : public DiagnosticConsumer {
+    ArrayRef<DiagnosticConsumer *> forwardTo;
+    bool droppingNotes = false;
+
+  public:
+    explicit ErrorDroppingConsumer(ArrayRef<DiagnosticConsumer *> forwardTo)
+        : forwardTo(forwardTo) {}
+
+    void handleDiagnostic(SourceManager &SM,
+                          const DiagnosticInfo &info) override {
+      if (info.Kind == DiagnosticKind::Error) {
+        droppingNotes = true;
+        return;
+      }
+      if (info.Kind == DiagnosticKind::Note && droppingNotes)
+        return;
+      droppingNotes = false;
+      for (auto *consumer : forwardTo)
+        consumer->handleDiagnostic(SM, info);
+    }
+  };
+
+  bool hadErrorBefore = diags.hadAnyError();
+  auto consumers = diags.takeConsumers();
+  ErrorDroppingConsumer filter(consumers);
+  diags.addConsumer(filter);
+  (void)sourceFile.getTopLevelItems();
+  diags.removeConsumer(filter);
+  for (auto *consumer : consumers)
+    diags.addConsumer(*consumer);
+  if (!hadErrorBefore)
+    diags.resetHadAnyError();
+}
+
 /// The clang system VFS overlay created by ClangImporter (see
 /// ClangImporter::getClangSystemOverlayFile) is a virtual in-memory file that
 /// does not exist on disk, so exclude it from any list of paths that is
@@ -958,11 +999,13 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
   // Add source-specified `import` dependencies
   {
+    auto &diags = mainModule->getASTContext().Diags;
     for (auto fileUnit : mainModule->getFiles()) {
       auto sourceFile = dyn_cast<SourceFile>(fileUnit);
       if (!sourceFile)
         continue;
 
+      parseWithoutReportingErrors(*sourceFile, diags);
       mainDependencies.addModuleImports(*sourceFile, alreadyAddedModules,
                                         &ScanASTContext.SourceMgr);
     }
@@ -2508,6 +2551,50 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   if (ScanASTContext.LangOpts.ClangTarget.has_value()) {
     swiftArgs.push_back("-clang-target");
     swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
+  }
+
+  // Pass the C++ interoperability mode so the frontend injects the same C++
+  // standard library module map (libstdc++ on Linux) that this module was
+  // scanned against. That module map exists only in ClangImporter's file
+  // system, so without it the -emit-pcm command cannot read the module map.
+  // The C++ standard library choice itself is already in the Clang arguments.
+  if (ScanASTContext.LangOpts.EnableCXXInterop)
+    swiftArgs.push_back("-cxx-interoperability-mode=default");
+
+  // The frontend rebuilds ClangImporter's injected file system from the Clang
+  // driver arguments, the sysroot and the resource directory, but this command
+  // gives Clang only cc1 arguments. Whenever the scan injected files, forward
+  // what it used, so that the frontend finds the same system libraries (for
+  // example a libstdc++ located with '--gcc-toolchain'). Caching builds read
+  // an include tree instead.
+  auto *clangImporter =
+      static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
+  const auto &fileMapping = clangImporter->getClangFileMapping();
+  if (!ScanASTContext.CASOpts.EnableCaching &&
+      (!fileMapping.redirectedFiles.empty() ||
+       !fileMapping.overridenFiles.empty())) {
+    for (const auto &arg : ScanASTContext.ClangImporterOpts.ExtraArgs) {
+      swiftArgs.push_back("-direct-clang-cc1-driver-arg");
+      swiftArgs.push_back(arg);
+    }
+    const auto &searchPathOpts = ScanASTContext.SearchPathOpts;
+    auto forwardOption = [&](StringRef option, std::optional<StringRef> value) {
+      if (!value)
+        return;
+      swiftArgs.push_back(option.str());
+      swiftArgs.push_back(value->str());
+    };
+    forwardOption("-sysroot", searchPathOpts.getSysRoot());
+    // The Windows SDK and Visual C++ tools hold the injected module maps.
+    forwardOption("-windows-sdk-root", searchPathOpts.getWinSDKRoot());
+    forwardOption("-windows-sdk-version", searchPathOpts.getWinSDKVersion());
+    forwardOption("-visualc-tools-root", searchPathOpts.getVCToolsRoot());
+    forwardOption("-visualc-tools-version", searchPathOpts.getVCToolsVersion());
+    const auto &resourceDir = searchPathOpts.RuntimeResourcePath;
+    if (!resourceDir.empty()) {
+      swiftArgs.push_back("-resource-dir");
+      swiftArgs.push_back(resourceDir);
+    }
   }
 
   // Add args reported by the scanner.

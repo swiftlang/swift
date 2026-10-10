@@ -22,7 +22,8 @@
 // RUN: %target-swift-frontend %s -typecheck -I %t -verify -verify-ignore-unrelated -show-diagnostics-after-fatal
 
 // Make sure we don't end up with duplicate search paths.
-// RUN: %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options
+// An explicit module build also records its dependencies' directories in this block.
+// RUN: %target-swiftc_driver -no-explicit-module-build -emit-module -o %t/has_xref.swiftmodule -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options
 // RUN: %target-swift-frontend %s -typecheck -I %t
 // RUN: %llvm-bcanalyzer -dump %t/has_xref.swiftmodule | %FileCheck %s
 
