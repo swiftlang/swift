@@ -915,7 +915,7 @@ suite.test("init(bytesOf:) from value")
 }
 
 suite.test("init(bytesOf:) from integer")
-.xfail(.always("https://github.com/swiftlang/swift/issues/92562"))
+.xfail(.always("https://github.com/swiftlang/swift/issues/93141"))
 .require(.minimumStdlib(.stdlib_6_5)).code {
   var value = 42
 
