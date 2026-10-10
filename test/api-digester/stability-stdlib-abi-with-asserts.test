@@ -40,6 +40,7 @@
 //                                            -- Your friendly stdlib engineers
 
 // REQUIRES: swift_stdlib_asserts
+// REQUIRES: runtime_function_counters
 // UNSUPPORTED: array_cow_checks
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
