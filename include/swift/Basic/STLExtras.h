@@ -609,6 +609,42 @@ void sortUnique(
   C.erase(std::unique(C.begin(), C.end()), C.end());
 }
 
+/// Merges the sorted elements of \p Added into the sorted container \p C, and
+/// removes each element that is the same as (per \p IsSame) the element
+/// preceding it.
+///
+/// The result is the same as appending \p Added to \p C, merging the two
+/// sorted ranges with std::inplace_merge with \p Less, then applying
+/// std::unique with \p IsSame, provided \p C has no consecutive elements that
+/// are the same. As with std::unique, of consecutive elements that are the
+/// same, the first one is kept.
+///
+/// Each element of \p Added is inserted into \p C in turn, searching from
+/// where the previous one was inserted. Merging k elements into n elements
+/// takes O(k log n) comparisons, instead of the O(n + k) comparisons of
+/// std::inplace_merge, which suits merging a few elements into a large
+/// container repeatedly.
+template <typename Container, typename Range, typename Compare,
+          typename BinaryPredicate>
+void mergeUnique(Container &C, const Range &Added, Compare Less,
+                 BinaryPredicate IsSame) {
+  auto SearchStart = C.begin();
+  for (const auto &Elem : Added) {
+    // Merging places Elem after every element that doesn't sort after it.
+    auto Pos = std::upper_bound(SearchStart, C.end(), Elem, Less);
+    if (Pos != C.begin() && IsSame(*std::prev(Pos), Elem)) {
+      // Elem follows the same element; keep that one.
+      SearchStart = Pos;
+    } else if (Pos != C.end() && IsSame(Elem, *Pos)) {
+      // Elem precedes the same element; keep Elem instead.
+      *Pos = Elem;
+      SearchStart = Pos;
+    } else {
+      SearchStart = C.insert(Pos, Elem);
+    }
+  }
+}
+
 /// Returns true if [II, IE) is a sorted and uniqued array. Returns false
 /// otherwise.
 template <typename IterTy>
