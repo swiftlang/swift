@@ -10,13 +10,8 @@
 // Note: we pass the libraries as command line arguments so that test runs using
 // remote-run will copy them across to the runner.
 
-// A client resolves an imported `@com` interface's `IID` and class's `CLSID`
-// from the deserialized synthesized extension and reaches them at runtime;
-// without routing that extension through a file unit, `IWidget.IID` was never
-// emitted and this failed to link.
-//
-// `data2`/`data3` are non-zero to catch a host-dependent field decomposition:
-// `swift::UUID` is native-endian on Windows, which would bake wrong literals.
+// Resolve imported interface and class identities through their metatype
+// conformances. Nonzero data2/data3 fields catch host-dependent byte ordering.
 
 import COM
 import Widget

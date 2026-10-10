@@ -3,7 +3,7 @@
 
 // The `@com` interface `IWidget` is defined in the SECONDARY file
 // `com_iwidget.swift`; this primary file references `IWidget.IID`.  The IID must
-// be synthesized even though the interface lives in a non-primary file.
+// resolve even though the interface lives in a non-primary file.
 // RUN: %target-swift-frontend -typecheck -verify -enable-experimental-com-interop -I %t -primary-file %s %S/Inputs/com_iwidget.swift
 
 // Inverse ordering: make `com_iwidget.swift` the primary file and this file the
