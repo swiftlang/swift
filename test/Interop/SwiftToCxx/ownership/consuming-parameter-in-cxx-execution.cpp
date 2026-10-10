@@ -64,6 +64,18 @@ int main() {
     assert(getRetainCount(k) == 3);
   }
 // CHECK-NEXT: destroy AKlass
+  assert(totalAllocs == 0);
+  {
+    auto k = AKlass::init();
+    auto x = createLargeStructNonTrivial(k);
+    auto c = TheGenericContainer<LargeStructNonTrivial>::init(x);
+    assert(getRetainCount(k) == 3);
+    auto buffersBeforeCall = allocCount;
+    c.takeGenericContainer();
+    assert(getRetainCount(k) == 3);
+    assert(allocCount == buffersBeforeCall);
+  }
+// CHECK-NEXT: destroy AKlass
   // verify that all of the opaque buffers are freed.
   assert(allocCount == 0);
   assert(totalAllocs != 0);

@@ -42,7 +42,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #else
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
+// CHECK-NEXT:   _storage.allocate(vwTable->size, vwTable->getAlignment());
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
@@ -141,7 +141,7 @@ public struct LargeStruct {
 // CHECK-NEXT: #else
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
+// CHECK-NEXT:   _storage.allocate(vwTable->size, vwTable->getAlignment());
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:

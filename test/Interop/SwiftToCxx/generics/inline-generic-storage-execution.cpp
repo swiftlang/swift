@@ -15,21 +15,36 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <string>
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
 
 static size_t allocations = 0;
 static size_t liveAllocations = 0;
 
 void *trackedAlloc(size_t size, size_t alignment) {
-  // The types in this test need no greater alignment than malloc provides.
-  assert(alignment <= alignof(std::max_align_t));
   ++allocations;
   ++liveAllocations;
-  return malloc(size);
+#if defined(_WIN32)
+  return _aligned_malloc(size, alignment);
+#else
+  void *pointer = nullptr;
+  if (alignment < sizeof(void *))
+    alignment = sizeof(void *);
+  int result = posix_memalign(&pointer, alignment, size);
+  assert(result == 0);
+  return pointer;
+#endif
 }
 
 void trackedFree(void *pointer) {
   --liveAllocations;
+#if defined(_WIN32)
+  _aligned_free(pointer);
+#else
   free(pointer);
+#endif
 }
 
 #define SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_alloc trackedAlloc
@@ -104,25 +119,94 @@ int main() {
   }
   assert(getLiveCount() == 0);
 
-  // Payload-dependent and resilient layouts must continue to use boxes.
+  // Small payload-dependent and resilient layouts do not need boxes either.
   {
     auto dependent = Dependent<int32_t>::init(42);
     assert(dependent.getValue() == 42);
-    assert(allocations == 1);
+    assert(allocations == 0);
     auto optional = swift::Optional<int32_t>::none();
     assert(optional.isNone());
-    assert(allocations == 2);
+    assert(allocations == 0);
     auto resilient = Resilient<int32_t>::init(9);
     assert(resilient.getValue() == 9);
-    assert(allocations == 3);
+    assert(allocations == 0);
     auto array = swift::Array<Resilient<int32_t>>::init();
-    assert(allocations == 3);
+    assert(allocations == 0);
     array.append(resilient);
     assert(array.getCount() == 1);
-    // append copies the boxed element before consuming the copy.
-    assert(allocations == 4 && liveAllocations == 3);
+    assert(allocations == 0);
     auto wrapper = Wrapper<int32_t>::init(resilient);
     assert(wrapper.getValue().getValue() == 9);
+  }
+
+  // Optional construction, copying, assignment and consuming calls must use
+  // value witnesses without relocating initialized inline storage as bytes.
+  {
+    using OptionalInt = swift::Optional<int32_t>;
+    auto value = OptionalInt::some(42);
+    auto copy = value;
+    value = OptionalInt::none();
+    assert(value.isNone() && copy.get() == 42);
+    value = copy;
+    auto &alias = value;
+    value = alias;
+    assert(value.get() == 42);
+    auto returned = identity(value);
+    consume(returned);
+    assert(returned.get() == 42);
+    resetOptional(returned);
+    assert(returned.isNone());
+
+    auto nested = swift::Optional<OptionalInt>::some(copy);
+    assert(identity(nested).get().get() == 42);
+    auto pair = swift::Optional<WordPair>::some(WordPair::init(23));
+    assert(identity(pair).get().getB() == 24);
+    auto string = makeOptionalString();
+    assert(std::string(identity(string).get()) == "inline optional");
+    auto array = swift::Optional<swift::Array<int32_t>>::some(makeArray());
+    assert(identity(array).get()[1] == 22);
+    consume(array);
+    assert(array.get().getCount() == 2);
+    assert(allocations == 0);
+  }
+
+  {
+    auto value = makeTrackedOptional();
+    auto copy = identity(value);
+    consume(copy);
+    resetOptional(value);
+    assert(getLiveCount() == 1 && copy.isSome());
+    copy = makeTrackedOptional();
+    assert(getLiveCount() == 1);
+    auto &alias = copy;
+    copy = alias;
+    assert(getLiveCount() == 1);
+    resetOptional(copy);
+    assert(getLiveCount() == 0);
+    assert(allocations == 0);
+  }
+
+  // Size and alignment are independent reasons to fall back to a heap box.
+  {
+    auto large = swift::Optional<LargePayload>::some(LargePayload::init(31));
+    assert(allocations == 1 && liveAllocations == 1);
+    auto copy = identity(large);
+    assert(copy.get().getD() == 31);
+    assert(allocations == 2 && liveAllocations == 2);
+    consume(copy);
+    assert(liveAllocations == 2);
+    copy = swift::Optional<LargePayload>::none();
+    assert(copy.isNone() && large.get().getA() == 31);
+    assert(liveAllocations == 2);
+  }
+  assert(liveAllocations == 0);
+  {
+    auto aligned = swift::Optional<AlignedByte>::some(AlignedByte::init(7));
+    assert(liveAllocations == 1);
+    auto copy = identity(aligned);
+    assert(copy.get().getValue() == 7 && liveAllocations == 2);
+    consume(copy);
+    assert(liveAllocations == 2);
   }
   assert(liveAllocations == 0);
 }
