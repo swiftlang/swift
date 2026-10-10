@@ -2049,6 +2049,24 @@ public:
       return checkLegalSILType(F, objectType, I);
     }
 
+    // Function values with execution semantics have a context. Thin
+    // functions, including closure bodies and thunks, never have execution
+    // semantics themselves; `partial_apply` or `thin_to_thick_function` adds
+    // them to the value. Calling an escaping value with execution semantics
+    // consumes its context; only a non-escaping one, such as a stack-promoted
+    // closure, can be `@callee_guaranteed`.
+    if (auto fnTy = dyn_cast<SILFunctionType>(rvalueType)) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
+        require(fnTy->getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+                "function types with execution semantics must be thick");
+        require(fnTy->isNoEscape() || fnTy->getCalleeConvention() ==
+                                          ParameterConvention::Direct_Owned,
+                "escaping function types with execution semantics must be "
+                "@callee_owned");
+      }
+    }
+
     // Metatypes should have explicit representations.
     if (auto metatype = dyn_cast<AnyMetatypeType>(rvalueType)) {
       require(metatype->hasRepresentation(),
@@ -2549,6 +2567,16 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+      // Only an exactly-once closure can capture an exactly-once value. The
+      // move checker diagnoses consumption of a value that is captured by
+      // address instead.
+      if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
+        require(p.value()->getType().isAddress() ||
+                    !argFnTy->isCalledOnce() ||
+                    PAI->getFunctionType()->isCalledOnce(),
+                "only an exactly-once closure can capture an exactly-once "
+                "value");
+      }
       if (PAI->isOnStack()) {
         // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
@@ -5475,11 +5503,13 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
+    // The result can add execution semantics, because it forms the value.
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
             .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
             .withNoEscape(resFTy->isNoEscape())
+            .withExecutionSemantics(resFTy->getExecutionSemantics())
             .build();
     require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
                                              useClangTypes(opFTy)),
@@ -5718,6 +5748,13 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+
+    require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
+                                         resTI->getExecutionSemantics()),
+            "convert_function cannot drop execution semantics");
+    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
+            "convert_function cannot form an exactly-once value; a thunk "
+            "must form it");
   }
 
   void checkThunkInst(ThunkInst *ti) {
