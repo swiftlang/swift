@@ -1,0 +1,238 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=dynamic_pack_index | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil [ossa] @fully_concrete_pack : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK:         scalar_pack_index 0
+// CHECK:         scalar_pack_index 1
+// CHECK:         scalar_pack_index 2
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'fully_concrete_pack'
+sil [ossa] @fully_concrete_pack : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  %three = integer_literal $Builtin.Word, 3
+
+  %dyn_idx0 = dynamic_pack_index %zero of $Pack{Int, Float, Double}
+  %tok0 = open_pack_element %dyn_idx0 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 0
+  %stk0 = alloc_stack $@pack_element(0) each U
+  dealloc_stack %stk0
+
+  %dyn_idx1 = dynamic_pack_index %one of $Pack{Int, Float, Double}
+  %tok1 = open_pack_element %dyn_idx1 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 1
+  %stk1 = alloc_stack $@pack_element(1) each U
+  dealloc_stack %stk1
+
+  %dyn_idx2 = dynamic_pack_index %two of $Pack{Int, Float, Double}
+  %tok2 = open_pack_element %dyn_idx2 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 2
+  %stk2 = alloc_stack $@pack_element(2) each U
+  dealloc_stack %stk2
+
+  %dyn_idx3 = dynamic_pack_index %three of $Pack{Int, Float, Double}
+  %tok3 = open_pack_element %dyn_idx3 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 3
+  %stk3 = alloc_stack $@pack_element(3) each U
+  dealloc_stack %stk3
+
+  %dyn_idx4 = dynamic_pack_index %0 of $Pack{Int, Float, Double}
+  %tok4 = open_pack_element %dyn_idx4 of <each U> at <Pack{Int, Float, Double}>, shape $each U, id 4
+  %stk4 = alloc_stack $@pack_element(4) each U
+  dealloc_stack %stk4
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @fully_generic_pack : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'fully_generic_pack'
+sil [ossa] @fully_generic_pack : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  %three = integer_literal $Builtin.Word, 3
+
+  %dyn_idx0 = dynamic_pack_index %zero of $Pack{repeat each T}
+  %tok0 = open_pack_element %dyn_idx0 of <each U> at <Pack{repeat each T}>, shape $each U, id 5
+  %stk0 = alloc_stack $@pack_element(5) each U
+  dealloc_stack %stk0
+
+  %dyn_idx1 = dynamic_pack_index %one of $Pack{repeat each T}
+  %tok1 = open_pack_element %dyn_idx1 of <each U> at <Pack{repeat each T}>, shape $each U, id 6
+  %stk1 = alloc_stack $@pack_element(6) each U
+  dealloc_stack %stk1
+
+  %dyn_idx2 = dynamic_pack_index %two of $Pack{repeat each T}
+  %tok2 = open_pack_element %dyn_idx2 of <each U> at <Pack{repeat each T}>, shape $each U, id 7
+  %stk2 = alloc_stack $@pack_element(7) each U
+  dealloc_stack %stk2
+
+  %dyn_idx3 = dynamic_pack_index %0 of $Pack{repeat each T}
+  %tok3 = open_pack_element %dyn_idx3 of <each U> at <Pack{repeat each T}>, shape $each U, id 8
+  %stk3 = alloc_stack $@pack_element(8) each U
+  dealloc_stack %stk3
+
+  %result = tuple ()
+  return %result
+}
+
+// While the type of the indexed element can be statically determined when a
+// pack is fully concrete and homogeneous, the index cannot.
+// 
+// CHECK-LABEL: sil [ossa] @homogeneous_pack : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK:         scalar_pack_index 0
+// CHECK:         scalar_pack_index 1
+// CHECK:         scalar_pack_index 2
+// CHECK:         dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'homogeneous_pack'
+sil [ossa] @homogeneous_pack : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  %three = integer_literal $Builtin.Word, 3
+
+  %dyn_idx0 = dynamic_pack_index %zero of $Pack{Int, Int, Int}
+  %tok0 = open_pack_element %dyn_idx0 of <each U> at <Pack{Int, Int, Int}>, shape $each U, id 9
+  %stk0 = alloc_stack $@pack_element(9) each U
+  dealloc_stack %stk0
+
+  %dyn_idx1 = dynamic_pack_index %one of $Pack{Int, Int, Int}
+  %tok1 = open_pack_element %dyn_idx1 of <each U> at <Pack{Int, Int, Int}>, shape $each U, id 10
+  %stk1 = alloc_stack $@pack_element(10) each U
+  dealloc_stack %stk1
+
+  %dyn_idx2 = dynamic_pack_index %two of $Pack{Int, Int, Int}
+  %tok2 = open_pack_element %dyn_idx2 of <each U> at <Pack{Int, Int, Int}>, shape $each U, id 11
+  %stk2 = alloc_stack $@pack_element(11) each U
+  dealloc_stack %stk2
+
+  %dyn_idx3 = dynamic_pack_index %0 of $Pack{Int, Int, Int}
+  %tok3 = open_pack_element %dyn_idx3 of <each U> at <Pack{Int, Int, Int}>, shape $each U, id 12
+  %stk3 = alloc_stack $@pack_element(12) each U
+  dealloc_stack %stk3
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @concrete_prefix_1 : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK:         scalar_pack_index 0
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'concrete_prefix_1'
+sil [ossa] @concrete_prefix_1 : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  %three = integer_literal $Builtin.Word, 3
+
+  %dyn_idx0 = dynamic_pack_index %zero of $Pack{Int, repeat each T}
+  %tok0 = open_pack_element %dyn_idx0 of <each U> at <Pack{Int, repeat each T}>, shape $each U, id 13
+  %stk0 = alloc_stack $@pack_element(13) each U
+  dealloc_stack %stk0
+
+  %dyn_idx1 = dynamic_pack_index %one of $Pack{Int, repeat each T}
+  %tok1 = open_pack_element %dyn_idx1 of <each U> at <Pack{Int, repeat each T}>, shape $each U, id 14
+  %stk1 = alloc_stack $@pack_element(14) each U
+  dealloc_stack %stk1
+
+  %dyn_idx2 = dynamic_pack_index %two of $Pack{Int, repeat each T}
+  %tok2 = open_pack_element %dyn_idx2 of <each U> at <Pack{Int, repeat each T}>, shape $each U, id 15
+  %stk2 = alloc_stack $@pack_element(15) each U
+  dealloc_stack %stk2
+
+  %dyn_idx3 = dynamic_pack_index %0 of $Pack{Int, repeat each T}
+  %tok3 = open_pack_element %dyn_idx3 of <each U> at <Pack{Int, repeat each T}>, shape $each U, id 16
+  %stk3 = alloc_stack $@pack_element(16) each U
+  dealloc_stack %stk3
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @concrete_prefix_2 : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK:         scalar_pack_index 0
+// CHECK:         scalar_pack_index 1
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'concrete_prefix_2'
+sil [ossa] @concrete_prefix_2 : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  %three = integer_literal $Builtin.Word, 3
+
+  %dyn_idx0 = dynamic_pack_index %zero of $Pack{Int, Int, repeat each T}
+  %tok0 = open_pack_element %dyn_idx0 of <each U> at <Pack{Int, Int, repeat each T}>, shape $each U, id 17
+  %stk0 = alloc_stack $@pack_element(17) each U
+  dealloc_stack %stk0
+
+  %dyn_idx1 = dynamic_pack_index %one of $Pack{Int, Int, repeat each T}
+  %tok1 = open_pack_element %dyn_idx1 of <each U> at <Pack{Int, Int, repeat each T}>, shape $each U, id 18
+  %stk1 = alloc_stack $@pack_element(18) each U
+  dealloc_stack %stk1
+
+  %dyn_idx2 = dynamic_pack_index %two of $Pack{Int, Int, repeat each T}
+  %tok2 = open_pack_element %dyn_idx2 of <each U> at <Pack{Int, Int, repeat each T}>, shape $each U, id 19
+  %stk2 = alloc_stack $@pack_element(19) each U
+  dealloc_stack %stk2
+
+  %dyn_idx3 = dynamic_pack_index %0 of $Pack{Int, Int, repeat each T}
+  %tok3 = open_pack_element %dyn_idx3 of <each U> at <Pack{Int, Int, repeat each T}>, shape $each U, id 20
+  %stk3 = alloc_stack $@pack_element(20) each U
+  dealloc_stack %stk3
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @concrete_suffix : $@convention(thin) <each T> (Builtin.Word) -> () {
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK:         dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'concrete_suffix'
+sil [ossa] @concrete_suffix : $@convention(thin) <each T> (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  %three = integer_literal $Builtin.Word, 3
+
+  %dyn_idx0 = dynamic_pack_index %zero of $Pack{repeat each T, Int}
+  %tok0 = open_pack_element %dyn_idx0 of <each U> at <Pack{repeat each T, Int}>, shape $each U, id 21
+  %stk0 = alloc_stack $@pack_element(21) each U
+  dealloc_stack %stk0
+
+  %dyn_idx1 = dynamic_pack_index %one of $Pack{repeat each T, Int}
+  %tok1 = open_pack_element %dyn_idx1 of <each U> at <Pack{repeat each T, Int}>, shape $each U, id 22
+  %stk1 = alloc_stack $@pack_element(22) each U
+  dealloc_stack %stk1
+
+  %dyn_idx2 = dynamic_pack_index %two of $Pack{repeat each T, Int}
+  %tok2 = open_pack_element %dyn_idx2 of <each U> at <Pack{repeat each T, Int}>, shape $each U, id 23
+  %stk2 = alloc_stack $@pack_element(23) each U
+  dealloc_stack %stk2
+
+  %dyn_idx3 = dynamic_pack_index %0 of $Pack{repeat each T, Int}
+  %tok3 = open_pack_element %dyn_idx3 of <each U> at <Pack{repeat each T, Int}>, shape $each U, id 24
+  %stk3 = alloc_stack $@pack_element(24) each U
+  dealloc_stack %stk3
+
+  %result = tuple ()
+  return %result
+}
