@@ -24,6 +24,14 @@ StdFunctionTestSuite.test("FunctionIntToInt.callAsFunction") {
   expectEqual(123, f(123))
 }
 
+StdFunctionTestSuite.test("FunctionIntToInt with a shared_ptr capture") {
+  let f = IntSharedCaptureFunctionFactory().makeFunction(42)
+  expectEqual(43, f(1))
+
+  let copied = f
+  expectEqual(44, copied(2))
+}
+
 StdFunctionTestSuite.test("FunctionIntToInt retrieve and pass back as parameter") {
   let res = invokeFunction(getIdentityFunction(), 456)
   expectEqual(456, res)

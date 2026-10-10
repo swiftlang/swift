@@ -87,7 +87,10 @@ public:
   }
 
   bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
-    callback(CXXCD);
+    // Constructor declarations can be visited before their implicit bodies are
+    // defined, for example when traversing a lambda. Only enqueue constructors
+    // from their uses, so we do not mark them as seen before we can discover
+    // the declarations referenced by their bodies.
     for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
       if (clang::FieldDecl *FD = CXXCI->getMember()) {
         callback(FD);
