@@ -217,6 +217,11 @@ public:
       const NominalTypeDecl *TD,
       ResilienceExpansion expansion = ResilienceExpansion::Maximal);
 
+  /// Whether the type has a fixed layout and can be copied and taken with a
+  /// byte copy and destroyed without any action, using only properties visible
+  /// to clients.
+  bool isTypeTrivial(const NominalTypeDecl *TD);
+
   /// Returns the abstract layout for a hidden nominal type.
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD);
 

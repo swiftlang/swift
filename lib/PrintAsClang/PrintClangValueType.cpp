@@ -233,6 +233,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   assert((!isNoncopyable || !isOpaqueLayout) &&
          "noncopyable types with an opaque layout are not exposed to C++");
 
+  bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
+                   interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
+
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
@@ -311,12 +314,17 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
-    os << '~' << baseName << "() noexcept {\n";
-    if (isNoncopyable)
-      os << "    if (_isMovedFrom) return;\n";
-    printVWTable(os);
-    os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
-    os << "  }\n";
+    os << '~' << baseName << "() noexcept";
+    if (isTrivial) {
+      os << " = default;\n";
+    } else {
+      os << " {\n";
+      if (isNoncopyable)
+        os << "    if (_isMovedFrom) return;\n";
+      printVWTable(os);
+      os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "  }\n";
+    }
 
     if (isNoncopyable) {
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
@@ -365,29 +373,40 @@ void ClangValueTypePrinter::printValueTypeDecl(
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
-      os << baseName << "(const " << baseName << " &other) noexcept {\n";
-      printVWTable(os);
-      if (isOpaqueLayout) {
-        os << "    _storage = ";
-        printer.printSwiftImplQualifier();
-        os << cxx_synthesis::getCxxOpaqueStorageClassName()
-           << "(vwTable->size, vwTable->getAlignment());\n";
+      os << baseName << "(const " << baseName << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        printVWTable(os);
+        if (isOpaqueLayout) {
+          os << "    _storage = ";
+          printer.printSwiftImplQualifier();
+          os << cxx_synthesis::getCxxOpaqueStorageClassName()
+             << "(vwTable->size, vwTable->getAlignment());\n";
+        }
+        os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  }\n";
       }
-      os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-            "const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
-      os << "  }\n";
 
       // copy assignment.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
-         << " &other) noexcept {\n";
-      printVWTable(os);
-      os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
-      os << "  return *this;\n";
-      os << "  }\n";
+         << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        printVWTable(os);
+        os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  return *this;\n";
+        os << "  }\n";
+      }
 
       // FIXME: implement the move assignment.
       // FIXME: implement the move constructor.
@@ -409,6 +428,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
             "_storage(vwTable->size, "
             "vwTable->getAlignment()) {}\n";
+    } else if (isTrivial) {
+      // A user-provided default constructor would make the C++ type nontrivial.
+      os << "() noexcept = default;\n";
     } else {
       os << "() noexcept {}\n";
     }
@@ -546,9 +568,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
-          printVWTable(os);
-          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
-                "metadata._0);\n";
+          if (isTrivial) {
+            os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
+               << ");\n";
+          } else {
+            printVWTable(os);
+            os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+                  "metadata._0);\n";
+          }
           os << "  }\n";
           os << "};\n";
         });

@@ -11,10 +11,23 @@
 // REQUIRES: executable_test
 
 #include <assert.h>
+#include <type_traits>
 #include "structs.h"
 
 int main() {
   using namespace Structs;
+
+  static_assert(std::is_trivial<StructOneI64>::value, "");
+  static_assert(std::is_trivial<StructOneI16AndOneStruct>::value, "");
+  static_assert(std::is_trivial<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copyable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_destructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copy_constructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copy_assignable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_move_constructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_move_assignable<StructDoubleAndFloat>::value, "");
+  // Storage must still be initialized through a Swift factory.
+  static_assert(!std::is_default_constructible<StructDoubleAndFloat>::value, "");
 
   static_assert(sizeof(StructOneI64) == 8, "");
   static_assert(sizeof(StructTwoI32) == 8, "");
@@ -47,6 +60,18 @@ int main() {
   auto structDoubleAndFloat = returnNewStructDoubleAndFloat(floatValue, doubleValue);
   assert(getStructDoubleAndFloat_x(structDoubleAndFloat) == doubleValue);
   assert(getStructDoubleAndFloat_y(structDoubleAndFloat) == floatValue);
+
+  // Exercise copying a value whose Swift size excludes its tail padding.
+  auto copy = structDoubleAndFloat;
+  auto assigned = returnNewStructDoubleAndFloat(0.0f, 0.0);
+  assigned = copy;
+  auto &alias = assigned;
+  assigned = alias;
+  inoutStructDoubleAndFloat(copy);
+  assert(getStructDoubleAndFloat_x(assigned) == 1.25);
+  assert(getStructDoubleAndFloat_y(assigned) == -5.0f);
+  assert(getStructDoubleAndFloat_x(copy) == -6.25);
+  assert(getStructDoubleAndFloat_y(copy) == -0.5f);
 
   // s = StructOneI16AndOneStruct(x: 0xFF, y: StructTwoI32(x: 5, y: 72))
   auto s = returnNewStructOneI16AndOneStruct();

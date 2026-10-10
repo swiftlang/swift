@@ -77,9 +77,9 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // Copyable types are unaffected.
 // CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::CopyableStruct> = true;
 // CHECK: class SWIFT_SYMBOL({{.*}}) CopyableStruct final {
-// CHECK:   SWIFT_INLINE_THUNK ~CopyableStruct() noexcept {
+// CHECK:   SWIFT_INLINE_THUNK ~CopyableStruct() noexcept = default;
 // CHECK-NOT:     if (_isMovedFrom) return;
-// CHECK:   SWIFT_INLINE_THUNK CopyableStruct(const CopyableStruct &other) noexcept {
+// CHECK:   SWIFT_INLINE_THUNK CopyableStruct(const CopyableStruct &other) noexcept = default;
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   friend class _impl::_impl_CopyableStruct;
 

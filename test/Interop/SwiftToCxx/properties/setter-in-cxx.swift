@@ -10,8 +10,7 @@ public struct FirstSmallStruct {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) FirstSmallStruct final {
 // CHECK: public:
-// CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept = default;
 // CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void setX(uint32_t value) noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   private:
@@ -32,8 +31,7 @@ public struct LargeStruct {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) LargeStruct final {
 // CHECK: public:
-// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept = default;
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX1() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: SWIFT_INLINE_THUNK void setX1(swift::Int value) noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX2() const noexcept SWIFT_SYMBOL({{.*}});
@@ -111,8 +109,7 @@ public struct SmallStructWithProps {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) SmallStructWithProps final {
 // CHECK: public:
-// CHECK: SWIFT_INLINE_THUNK SmallStructWithProps &operator =(const SmallStructWithProps &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK SmallStructWithProps &operator =(const SmallStructWithProps &other) noexcept = default;
 // CHECK-NEXT:    SWIFT_INLINE_THUNK uint32_t getStoredInt() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:    SWIFT_INLINE_THUNK void setStoredInt(uint32_t value) noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:    SWIFT_INLINE_THUNK swift::Int getComputedInt() const noexcept SWIFT_SYMBOL({{.*}});

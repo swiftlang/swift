@@ -57,16 +57,14 @@ public struct SmallStruct {
 // CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV6invertyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // invert()
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
-// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept = default;
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() const noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void double_() noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV6doubleyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK LargeStruct scale(swift::Int x, swift::Int y) noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV5scaleyACSi_SitF");
 // CHECK-NEXT: private
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11SmallStructV") SmallStruct final {
-// CHECK: SWIFT_INLINE_THUNK SmallStruct &operator =(const SmallStruct &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK SmallStruct &operator =(const SmallStruct &other) noexcept = default;
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() const noexcept SWIFT_SYMBOL("s:7Methods11SmallStructV4dumpyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK SmallStruct scale(float y) noexcept SWIFT_SYMBOL("s:7Methods11SmallStructV5scaleyACSfF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void invert() noexcept SWIFT_SYMBOL("s:7Methods11SmallStructV6invertyyF");
