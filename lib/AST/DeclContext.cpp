@@ -402,6 +402,13 @@ SourceFile *DeclContext::getParentSourceFile() const {
     return nullptr;
 
   auto fallbackSF = const_cast<SourceFile *>(dyn_cast<SourceFile>(DC));
+  if (fallbackSF && loc.isValid()) {
+    auto &sourceMgr = fallbackSF->getASTContext().SourceMgr;
+    if (sourceMgr.getReplacedRanges().empty() &&
+        sourceMgr.getRangeForBuffer(fallbackSF->getBufferID()).contains(loc))
+      return fallbackSF;
+  }
+
   if (auto module = DC->getParentModule()) {
     if (auto sf = module->getSourceFileContainingLocation(loc))
       return sf;
