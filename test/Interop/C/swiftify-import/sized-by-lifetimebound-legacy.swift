@@ -1,4 +1,5 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersLegacyNonconsumingLifetimebound
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
@@ -7,7 +8,10 @@
 // Mirrors sized-by-lifetimebound.swift but exercises the legacy opt-in
 // wrapper shape: without SafeInteropWrappersNullAsEmptySpan, normal Optional
 // pointer parameters / return values propagate as Optional in the wrapper.
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
+// SafeInteropWrappersLegacyNonconsumingLifetimebound additionally opts back
+// into the legacy 'inout' convention for __lifetimebound Mutable[Raw]Span
+// parameters, instead of the current 'consuming' default.
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersLegacyNonconsumingLifetimebound -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
@@ -222,8 +226,8 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 5288e0946bad6eb9ef10e07f00083d7d4b8ca4f5f6d4ee3d1e07e55f55d18462
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersLegacyNonconsumingLifetimebound -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: bc828f607531ee66a74238439370c9f68f62fac068c6e4294af725c6056d2cab
 import Test
 
 

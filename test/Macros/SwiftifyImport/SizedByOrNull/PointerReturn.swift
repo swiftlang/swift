@@ -82,8 +82,8 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len
 @__swiftmacro_4test24lifetimeDependentCopyMut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
-public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_disfavoredOverload
+public func lifetimeDependentCopyMut(_ p: consuming MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.byteCount)!
     let _pPtr = p.withUnsafeMutableBytes {
         unsafe $0

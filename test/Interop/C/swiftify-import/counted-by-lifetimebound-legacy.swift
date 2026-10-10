@@ -1,4 +1,5 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersLegacyNonconsumingLifetimebound
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
@@ -9,7 +10,10 @@
 // pointer parameters / return values propagate as Optional in the wrapper.
 // IUO (`_Null_unspecified`) parameters/returns still follow the modern
 // wrapper convention regardless of the flag.
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
+// SafeInteropWrappersLegacyNonconsumingLifetimebound additionally opts back
+// into the legacy 'inout' convention for __lifetimebound Mutable[Raw]Span
+// parameters, instead of the current 'consuming' default.
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersLegacyNonconsumingLifetimebound -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -verify-additional-prefix experimental- -eager-macro-checking
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
@@ -155,8 +159,8 @@ opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * p __counted_by
 // }}
 int * __counted_by(len) noncountedLifetime(int len, int * p __lifetimebound);
 
-// expected-experimental-warning@+26{{combining '__counted_by' with non-zero count (which cannot be null) and '_Nullable'; did you mean '__counted_by_or_null' instead?}}
-// expected-experimental-expansion@+25:60{{
+// expected-experimental-warning@+20{{combining '__counted_by' with non-zero count (which cannot be null) and '_Nullable'; did you mean '__counted_by_or_null' instead?}}
+// expected-experimental-expansion@+19:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func constant(_ p: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {|}}
 //   expected-experimental-remark@3{{macro content: |    if let _pCount = p?.count, _pCount != CInt(13) {|}}
@@ -252,8 +256,8 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: f628d5f0dd860edc854770761a379162c7970b88dacaf6106e9cc7d96f38a9eb
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersLegacyNonconsumingLifetimebound -enable-experimental-feature Lifetimes -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: 8476d10c0db1df2650fcc472ce02aac4bdc4498f8aa2b527764da0c3167d1624
 import Test
 
 func call_simple(_ len: CInt, _ len2: CInt, _ p: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointer<CInt>! {

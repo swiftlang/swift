@@ -50,6 +50,7 @@ protocol ParamInfo: CustomStringConvertible {
   var pointerIndex: SwiftifyExpr { get }
   var nonescaping: Bool { get set }
   var dependencies: [LifetimeDependence] { get set }
+  var mutableSpanSpecifier: MutableSpanSpecifier { get set }
 
   func getBoundsCheckedThunkBuilder(
     _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionParts
@@ -89,6 +90,7 @@ struct CxxSpan: ParamInfo {
   var pointerIndex: SwiftifyExpr
   var nonescaping: Bool
   var dependencies: [LifetimeDependence]
+  var mutableSpanSpecifier: MutableSpanSpecifier = .`inout`
   var typeMappings: [String: String]
   var original: SyntaxProtocol
 
@@ -103,7 +105,8 @@ struct CxxSpan: ParamInfo {
     case .param(let i):
       return CxxSpanThunkBuilder(
         base: base, index: i - 1, funcDecl: funcDecl,
-        typeMappings: typeMappings, node: original, nonescaping: nonescaping)
+        typeMappings: typeMappings, node: original, nonescaping: nonescaping,
+        mutableSpanSpecifier: mutableSpanSpecifier)
     case .return:
       if dependencies.isEmpty {
         return base
@@ -124,6 +127,7 @@ struct CountedBy: ParamInfo {
   var isOrNull: Bool
   var nonescaping: Bool
   var dependencies: [LifetimeDependence]
+  var mutableSpanSpecifier: MutableSpanSpecifier = .`inout`
   var original: SyntaxProtocol
   var emitBoundCheck: Bool = false
   // When true, non-`*OrNull` Optional pointers are exposed as
@@ -159,7 +163,8 @@ struct CountedBy: ParamInfo {
         funcDecl: funcDecl,
         nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull,
         nullableAsEmptySpan: nullableAsEmptySpan,
-        emitBoundCheck: emitBoundCheck)
+        emitBoundCheck: emitBoundCheck,
+        mutableSpanSpecifier: mutableSpanSpecifier)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
@@ -316,6 +321,11 @@ func getSafePointerName(mut: Mutability, generateSpan: Bool, isRaw: Bool) -> Tok
   }
 }
 
+enum MutableSpanSpecifier: String {
+  case `inout` = "inout"
+  case consuming = "consuming"
+}
+
 func hasOwnershipSpecifier(_ attrType: AttributedTypeSyntax) -> Bool {
   return attrType.specifiers.contains(where: { e in
     guard let simpleSpec = e.as(SimpleTypeSpecifierSyntax.self) else {
@@ -336,24 +346,26 @@ func hasOwnershipSpecifier(_ attrType: AttributedTypeSyntax) -> Bool {
 }
 
 func transformType(
-  _ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool, _ setMutableSpanInout: Bool
+  _ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool,
+  _ mutableSpanSpecifier: MutableSpanSpecifier?
 ) throws -> TypeSyntax {
   if let optType = prev.as(OptionalTypeSyntax.self) {
     return TypeSyntax(
       optType.with(
         \.wrappedType,
-        try transformType(optType.wrappedType, generateSpan, isSizedBy, setMutableSpanInout)))
+        try transformType(optType.wrappedType, generateSpan, isSizedBy, mutableSpanSpecifier)))
   }
   if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
-    return try transformType(impOptType.wrappedType, generateSpan, isSizedBy, setMutableSpanInout)
+    return try transformType(impOptType.wrappedType, generateSpan, isSizedBy, mutableSpanSpecifier)
   }
   if let attrType = prev.as(AttributedTypeSyntax.self) {
-    // We insert 'inout' by default for MutableSpan, but it shouldn't override existing ownership
-    let setMutableSpanInoutNext = setMutableSpanInout && !hasOwnershipSpecifier(attrType)
+    // We add an ownership specifier by default for MutableSpan, but it
+    // shouldn't override an existing one.
+    let nestedSpecifier = hasOwnershipSpecifier(attrType) ? nil : mutableSpanSpecifier
     return TypeSyntax(
       attrType.with(
         \.baseType,
-        try transformType(attrType.baseType, generateSpan, isSizedBy, setMutableSpanInoutNext)))
+        try transformType(attrType.baseType, generateSpan, isSizedBy, nestedSpecifier)))
   }
   let name = try getTypeName(prev)
   let text = name.text
@@ -374,8 +386,8 @@ func transformType(
     } else {
       try replaceTypeName(prev, token)
     }
-  if setMutableSpanInout && generateSpan && kind == .Mutable {
-    return TypeSyntax("inout \(mainType)")
+  if let mutableSpanSpecifier, generateSpan, kind == .Mutable {
+    return TypeSyntax("\(raw: mutableSpanSpecifier.rawValue) \(mainType)")
   }
   return mainType
 }
@@ -595,8 +607,8 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
   public let nonescaping: Bool
+  public let mutableSpanSpecifier: MutableSpanSpecifier?
   let isSizedBy: Bool = false
-  let isParameter: Bool = true
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
@@ -644,7 +656,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   public let funcDecl: FunctionParts
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
-  let isParameter: Bool = false
+  let mutableSpanSpecifier: MutableSpanSpecifier? = nil
 
   var oldType: TypeSyntax {
     return signature.returnClause!.type
@@ -685,7 +697,7 @@ extension BoundsThunkBuilder {
 protocol SpanBoundsThunkBuilder: BoundsThunkBuilder {
   var typeMappings: [String: String] { get }
   var node: SyntaxProtocol { get }
-  var isParameter: Bool { get }
+  var mutableSpanSpecifier: MutableSpanSpecifier? { get }
 }
 extension SpanBoundsThunkBuilder {
   var desugaredType: TypeSyntax {
@@ -734,8 +746,8 @@ extension SpanBoundsThunkBuilder {
       let mainType = replaceBaseType(
         oldType,
         TypeSyntax("\(raw: mutablePrefix)Span<\(raw: strippedArg)>"))
-      if !isConst && isParameter {
-        return TypeSyntax("inout \(mainType)")
+      if !isConst, let mutableSpanSpecifier {
+        return TypeSyntax("\(raw: mutableSpanSpecifier.rawValue) \(mainType)")
       }
       return mainType
     }
@@ -748,7 +760,7 @@ protocol PointerBoundsThunkBuilder: BoundsThunkBuilder {
   var isOrNull: Bool { get }
   var nullableAsEmptySpan: Bool { get }
   var generateSpan: Bool { get }
-  var isParameter: Bool { get }
+  var mutableSpanSpecifier: MutableSpanSpecifier? { get }
 }
 
 extension PointerBoundsThunkBuilder {
@@ -767,9 +779,10 @@ extension PointerBoundsThunkBuilder {
   var newType: TypeSyntax {
     get throws {
       if !nullable, let optType = oldType.as(OptionalTypeSyntax.self) {
-        return try transformType(optType.wrappedType, generateSpan, isSizedBy, isParameter)
+        return try transformType(
+          optType.wrappedType, generateSpan, isSizedBy, mutableSpanSpecifier)
       }
-      return try transformType(oldType, generateSpan, isSizedBy, isParameter)
+      return try transformType(oldType, generateSpan, isSizedBy, mutableSpanSpecifier)
     }
   }
 
@@ -806,7 +819,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let isOrNull: Bool
   public let nullableAsEmptySpan: Bool
   public let dependencies: [LifetimeDependence]
-  let isParameter: Bool = false
+  let mutableSpanSpecifier: MutableSpanSpecifier? = nil
 
   var generateSpan: Bool { !dependencies.isEmpty }
 
@@ -921,7 +934,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let isOrNull: Bool
   public let nullableAsEmptySpan: Bool
   public let emitBoundCheck: Bool
-  let isParameter: Bool = true
+  public let mutableSpanSpecifier: MutableSpanSpecifier?
 
   var generateSpan: Bool { nonescaping }
 
@@ -1488,11 +1501,25 @@ func setNonescapingPointers(_ args: inout [ParamInfo], _ nonescapingPointers: Se
 }
 
 func setLifetimeDependencies(
-  _ args: inout [ParamInfo], _ lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]]
+  _ args: inout [ParamInfo], _ lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]],
+  _ legacyNonconsumingLifetimebound: Bool
 ) {
+  // Pointers whose lifetime the return value copies, i.e. exactly those that
+  // getReturnLifetimes spells '@_lifetime(copy <param>)'. '.borrow' dependencies
+  // are deliberately excluded, since '@_lifetime(borrow <param>)' requires the
+  // parameter to be borrowed rather than consumed.
+  let copiedByReturn = Set(
+    lifetimeDependencies[.`return`, default: []].filter { $0.type == .copy }.map { $0.dependsOn })
   for i in args.indices {
     if let dependencies = lifetimeDependencies[args[i].pointerIndex] {
       args[i].dependencies = dependencies
+    }
+    // A Mutable[Raw]Span whose lifetime the return value copies is passed
+    // 'consuming' by default, since 'inout' cannot express that the returned
+    // span keeps borrowing the parameter after the call returns. Projects can
+    // opt back into the legacy 'inout' convention.
+    if !legacyNonconsumingLifetimebound && copiedByReturn.contains(args[i].pointerIndex) {
+      args[i].mutableSpanSpecifier = .consuming
     }
   }
 }
@@ -1594,6 +1621,16 @@ func isMutableSpan(_ type: TypeSyntax) -> Bool {
   return name == "MutableSpan" || name == "MutableRawSpan"
 }
 
+func isInoutMutableSpan(_ type: TypeSyntax) -> Bool {
+  if let optType = type.as(OptionalTypeSyntax.self) {
+    return isInoutMutableSpan(optType.wrappedType)
+  }
+  if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+    return isInoutMutableSpan(impOptType.wrappedType)
+  }
+  return isInout(type) && isMutableSpan(type)
+}
+
 func isAnySpan(_ type: TypeSyntax) -> Bool {
   guard let name = peeledIdentifierName(type) else {
     return false
@@ -1616,10 +1653,34 @@ func getAvailability(_ newSignature: FunctionSignatureSyntax, _ spanAvailability
 }
 
 // Mutable[Raw]Span parameters need explicit @_lifetime annotations since they are inout
+func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSyntax) -> Bool {
+  for elem in attrs {
+    guard let attr = elem.as(AttributeSyntax.self) else {
+      continue
+    }
+    if attr.attributeName != "_lifetime" {
+      continue
+    }
+    guard let args = attr.arguments?.as(LabeledExprListSyntax.self) else {
+      continue
+    }
+    for arg in args {
+      if arg.label == paramName {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+// 'inout' Mutable[Raw]Span parameters need explicit @_lifetime annotations,
+// since the compiler cannot infer the lifetime of the span the caller gets back.
+// 'consuming' Mutable[Raw]Span parameters are not handed back to the caller, so
+// they must not be annotated.
 func paramLifetimes(_ newSignature: FunctionSignatureSyntax) -> [LabeledExprSyntax] {
   var defaultLifetimes: [LabeledExprSyntax] = []
   for param in newSignature.parameterClause.parameters {
-    if !isMutableSpan(param.type) {
+    if !isInoutMutableSpan(param.type) {
       continue
     }
     let paramName = param.name
@@ -1828,6 +1889,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
                                args arguments: [ExprSyntax], spanAvailability: String?,
                                typeMappings: [String: String]?,
                                nullableAsEmptySpan: Bool,
+                               legacyNonconsumingLifetimebound: Bool,
                                parentNode: Syntax?) throws -> DeclSyntax {
   let origFuncComponents = try deconstructFunction(declaration)
   let (funcComponents, rewriter) = renameParameterNamesIfNeeded(origFuncComponents)
@@ -1843,7 +1905,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   parsedArgs.append(
     contentsOf: try parseCxxSpansInSignature(funcComponents.signature, typeMappings))
   setNonescapingPointers(&parsedArgs, nonescapingPointers)
-  setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
+  setLifetimeDependencies(&parsedArgs, lifetimeDependencies, legacyNonconsumingLifetimebound)
   // We only transform non-escaping spans.
   parsedArgs = parsedArgs.filter {
     if let cxxSpanArg = $0 as? CxxSpan {
@@ -1990,6 +2052,9 @@ public struct SwiftifyImportMacro: PeerMacro {
     do {
       let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
       var arguments = [LabeledExprSyntax](argumentList)
+      let legacyNonconsumingLifetimebound =
+        try takeTrailingArg(&arguments, labeled: "legacyNonconsumingLifetimebound")
+          .map(getBoolLiteralValue) ?? false
       let nullableAsEmptySpan =
         try takeTrailingArg(&arguments, labeled: "nullableAsEmptySpan")
           .map(getBoolLiteralValue) ?? false
@@ -2004,6 +2069,7 @@ public struct SwiftifyImportMacro: PeerMacro {
           spanAvailability: spanAvailability,
           typeMappings: typeMappings,
           nullableAsEmptySpan: nullableAsEmptySpan,
+          legacyNonconsumingLifetimebound: legacyNonconsumingLifetimebound,
           parentNode: context.lexicalContext.first)]
     } catch let error as DiagnosticError {
       context.diagnose(
@@ -2100,6 +2166,7 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
           spanAvailability: spanAvailability,
           typeMappings: typeMappings,
           nullableAsEmptySpan: false,
+          legacyNonconsumingLifetimebound: false,
           parentNode: context.lexicalContext.first)
         guard let resultFunc = result.as(FunctionDeclSyntax.self) else {
           throw RuntimeError("expected FunctionDeclSyntax but got \(result.kind) for \(method.description)")
