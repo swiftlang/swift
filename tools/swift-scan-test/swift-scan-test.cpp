@@ -33,6 +33,7 @@ namespace {
 enum Actions {
   compute_cache_key,
   compute_cache_key_from_index,
+  compute_cache_keys_from_indices,
   cache_query,
   replay_result,
   scan_dependency,
@@ -68,6 +69,8 @@ llvm::cl::opt<Actions>
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
                             clEnumVal(compute_cache_key_from_index,
                                       "compute cache key from index"),
+                            clEnumVal(compute_cache_keys_from_indices,
+                                      "compute cache keys from indices"),
                             clEnumVal(cache_query, "cache query"),
                             clEnumVal(replay_result, "replay result"),
                             clEnumVal(scan_dependency, "scan dependency"),
@@ -131,6 +134,37 @@ static int action_compute_cache_key_from_index(swiftscan_cas_t cas,
 
   os << toString(key) << "\n";
   swiftscan_string_dispose(key);
+
+  return EXIT_SUCCESS;
+}
+
+static int
+action_compute_cache_keys_from_indices(swiftscan_cas_t cas, StringRef indices,
+                                       std::vector<const char *> &Args,
+                                       llvm::raw_ostream &os) {
+  SmallVector<StringRef> indexStrs;
+  indices.split(indexStrs, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  std::vector<unsigned> inputIndices;
+  for (auto indexStr : indexStrs) {
+    unsigned inputIndex = 0;
+    if (!to_integer(indexStr, inputIndex)) {
+      llvm::errs() << "-input is not a list of numbers for "
+                      "compute_cache_keys_from_indices\n";
+      return EXIT_FAILURE;
+    }
+    inputIndices.push_back(inputIndex);
+  }
+
+  swiftscan_string_ref_t err_msg;
+  auto keys = swiftscan_cache_compute_keys_from_input_indices(
+      cas, Args.size(), Args.data(), inputIndices.data(), inputIndices.size(),
+      &err_msg);
+  if (!keys)
+    return printError(err_msg);
+
+  for (size_t i = 0; i < keys->count; ++i)
+    os << toString(keys->strings[i]) << "\n";
+  swiftscan_string_set_dispose(keys);
 
   return EXIT_SUCCESS;
 }
@@ -409,6 +443,9 @@ int main(int argc, char *argv[]) {
         break;
       case compute_cache_key_from_index:
         Ret += action_compute_cache_key_from_index(cas, Input, Args, os);
+        break;
+      case compute_cache_keys_from_indices:
+        Ret += action_compute_cache_keys_from_indices(cas, Input, Args, os);
         break;
       case cache_query:
         Ret += action_cache_query(cas, CASID.c_str(), os);
