@@ -359,6 +359,11 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::addClassAddressPoint();
     }
 
+    void addInstanceAddressPoint() {
+      Layout.InstanceAddressPoint = getNextOffset();
+      super::addInstanceAddressPoint();
+    }
+
     void addInstanceSize() {
       Layout.InstanceSize = getNextOffset();
       super::addInstanceSize();
@@ -470,6 +475,11 @@ Size ClassMetadataLayout::getMetadataSizeOffset() const {
 Size ClassMetadataLayout::getMetadataAddressPointOffset() const {
   assert(MetadataAddressPoint.isStatic());
   return MetadataAddressPoint.getStaticOffset();
+}
+
+Size ClassMetadataLayout::getInstanceAddressPointOffset() const {
+  assert(InstanceAddressPoint.isStatic());
+  return InstanceAddressPoint.getStaticOffset();
 }
 
 Size ClassMetadataLayout::getInstanceSizeOffset() const {

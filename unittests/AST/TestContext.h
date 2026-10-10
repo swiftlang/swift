@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
@@ -91,6 +92,17 @@ public:
     return result;
   }
 
+  ProtocolDecl *makeProtocol(StringRef name) {
+    ProtocolDecl *result =
+        new (Ctx) ProtocolDecl(FileForLookups, SourceLoc(), SourceLoc(),
+                               Ctx.getIdentifier(name),
+                               /*primaryAssociatedTypeNames=*/{},
+                               /*inherited=*/{}, /*trailingWhere=*/nullptr);
+    result->setImplicit();
+    result->setAccess(AccessLevel::Internal);
+    result->setRequirementSignature(RequirementSignature());
+    return result;
+  }
 };
 
 } // end namespace unittest

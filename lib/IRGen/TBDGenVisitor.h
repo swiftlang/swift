@@ -153,6 +153,8 @@ public:
   void addObjCMethod(AbstractFunctionDecl *AFD) override;
   void addProtocolWitnessThunk(RootProtocolConformance *C,
                                ValueDecl *requirementDecl) override;
+  void addCOMMethodWitnessThunk(RootProtocolConformance *C,
+                                ValueDecl *requirementDecl) override;
 };
 } // end namespace tbdgen
 } // end namespace swift

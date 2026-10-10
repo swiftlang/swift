@@ -206,6 +206,7 @@ private:
   StoredOffset MetadataSize;
   StoredOffset MetadataAddressPoint;
 
+  StoredOffset InstanceAddressPoint;
   StoredOffset InstanceSize;
   StoredOffset InstanceAlignMask;
 
@@ -266,6 +267,8 @@ public:
   Size getMetadataSizeOffset() const;
 
   Size getMetadataAddressPointOffset() const;
+
+  Size getInstanceAddressPointOffset() const;
 
   Size getInstanceSizeOffset() const;
 

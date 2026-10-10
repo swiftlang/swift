@@ -16,6 +16,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenClangDecl.cpp
   GenClangType.cpp
   GenClass.cpp
+  GenClassCOM.cpp
   GenConstant.cpp
   GenControl.cpp
   GenCoro.cpp

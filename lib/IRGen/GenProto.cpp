@@ -31,6 +31,8 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
@@ -47,6 +49,7 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/shims/Metadata.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -168,9 +171,8 @@ private:
   /// witness method.
   void considerWitnessSelf(CanSILFunctionType fnType);
 
-  /// Testify to generic parameters in the Self type of an @objc
-  /// generic or protocol method.
-  void considerObjCGenericSelf(CanSILFunctionType fnType);
+  /// Testify to generic parameters in the Self type of a foreign method.
+  void considerGenericClassSelf(CanSILFunctionType fnType);
 
   void considerParameter(SILParameterInfo param, unsigned paramIndex,
                          bool isSelfParameter);
@@ -232,10 +234,11 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
     // other arguments; doing so would potentially make the signature
     // incompatible with other witnesses for the same method.
     considerWitnessSelf(fnType);
-  } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
-    // Objective-C thunks for generic methods also always derive all
-    // polymorphic parameter information from the Self argument.
-    considerObjCGenericSelf(fnType);
+  } else if (rep == SILFunctionTypeRepresentation::ObjCMethod ||
+             rep == SILFunctionTypeRepresentation::COMMethod) {
+    // Foreign thunks for generic class methods derive all polymorphic
+    // parameter information from the Self argument.
+    considerGenericClassSelf(fnType);
   } else {
     // We don't need to pass anything extra as long as all of the
     // archetypes (and their requirements) are producible from
@@ -389,7 +392,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   addSelfWitnessTableFulfillment(selfTy, conformance);
 }
 
-void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
+void PolymorphicConvention::considerGenericClassSelf(CanSILFunctionType fnType) {
   // If this is a static method, get the instance type.
   CanType selfTy = fnType->getSelfInstanceType(
       IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
@@ -742,7 +745,18 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
                                   /*allow artificial subclasses*/ true);
-    IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+    IsExact_t exactness = IsInexact;
+    if (FnType->getRepresentation() ==
+            SILFunctionTypeRepresentation::COMMethod &&
+        FnType->hasSelfParam() &&
+        paramIndex == FnType->getParameters().size() - 1 &&
+        isa<ArchetypeType>(paramType)) {
+      // The generic Self of a native COM entry is the dynamic class recovered
+      // from the interface pointer, so the object's metadata describes it
+      // exactly even when its superclass bound is not final.
+      exactness = IsExact;
+    }
+    IGF.bindLocalTypeDataFromTypeMetadata(paramType, exactness, metadata,
                                           MetadataState::Complete);
     return;
   }
@@ -2813,6 +2827,11 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
+  // A COM conformance has no runtime witness table. Its SIL witness table is
+  // used only to emit the native COM vtables.
+  if (wt->getConformance()->getProtocol()->isCOMInterface())
+    return;
+
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
     return;
@@ -3908,6 +3927,31 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
                                       /*onHeapPacks=*/!NoEscape);
 }
 
+namespace {
+llvm::Constant *getOrCreateCOMClassID(IRGenModule &IGM, ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  ASSERT(info && info->isImplementation() && info->getImplementationID());
+
+  IRGenMangler decorator(IGM.Context);
+  std::string label =
+      (Twine("CLSID_") + decorator.mangleNominalTypeDescriptor(CD)).str();
+
+  if (auto GV = IGM.getModule()->getNamedGlobal(label))
+    return GV;
+
+  auto *initializer = IGM.getCOMIdentityConstant(*info->getImplementationID());
+  llvm::GlobalVariable *GV =
+      new llvm::GlobalVariable(*IGM.getModule(), initializer->getType(),
+                               /*isConstant=*/true,
+                               llvm::GlobalVariable::LinkOnceODRLinkage,
+                               initializer, label);
+  GV->setVisibility(llvm::GlobalVariable::HiddenVisibility);
+  GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+  GV->setAlignment(llvm::Align(4));
+  return GV;
+}
+}
+
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         ProtocolConformanceRef conformance) {
@@ -3936,6 +3980,16 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    // An abstract conformance whose conforming type is a metatype rather than
+    // an archetype arises from a `where T.Type: P` requirement. Its root
+    // witness table is supplied as a generic argument and bound against the
+    // metatype itself. Derive inherited protocol tables through the signature's
+    // conformance access path.
+    if (!isa<ArchetypeType>(srcType)) {
+      assert(srcType->is<AnyMetatypeType>());
+      return emitArchetypeMetatypeWitnessTableRef(IGF, srcType, proto);
+    }
+
     if (proto->isCOMInterface()) {
       auto archetype = cast<ArchetypeType>(srcType);
       for (auto *required : archetype->getConformsTo()) {
@@ -3963,12 +4017,55 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
   } else if (conformance.isPack()) {
-    auto pack = cast<PackType>(srcType);
+    auto kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
+    if (auto *wtable = IGF.tryGetLocalTypeData(srcType, kind))
+      return wtable;
+
+    auto pack = cast<PackType>(conformance.getType()->getCanonicalType());
     return emitWitnessTablePackRef(IGF, pack, conformance.getPack());
   } else {
     concreteConformance = conformance.getConcrete();
+
+    if (auto *BPC = dyn_cast<BuiltinProtocolConformance>(concreteConformance)) {
+      assert(BPC->getBuiltinConformanceKind() == BuiltinConformanceKind::COMIdentityMetatype &&
+             "unexpected builtin conformance requiring runtime evidence");
+      auto *metatype = BPC->getType()->castTo<AnyMetatypeType>();
+      if (proto->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+        auto *interface =
+            metatype->getInstanceType()->getExistentialLayout().getCOMInterface();
+        ASSERT(interface &&
+               "COMInterface metatype conformance without a COM interface");
+        auto *descriptor = IGF.IGM.getAddrOfProtocolDescriptor(interface);
+        auto *offset =
+            llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
+                                   sizeof(_SwiftProtocolDescriptorHeader));
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(IGF.IGM.Int8Ty,
+                                                            descriptor, offset);
+      } else if (proto->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+        auto *CD = metatype->getInstanceType()->getClassOrBoundGenericClass();
+        ASSERT(CD && "COMActivatable metatype conformance without a class");
+        return getOrCreateCOMClassID(IGF.IGM, CD);
+      }
+      assert(proto->isCOMIdentity());
+    }
   }
   assert(concreteConformance->getProtocol() == proto);
+
+  if (proto->isCOMInterface()) {
+    if (srcType->isExistentialType() || srcType->is<ExistentialArchetypeType>())
+      return getCOMExistentialAdjustment(IGF.IGM);
+
+    // A protocol-extension witness on a class can express Self as an
+    // archetype, and its mapped conformance can retain that archetypal type.
+    // The root conformance identifies the class whose native COM layout
+    // supplies the interface adjustment.
+    CanType layoutType = srcType;
+    if (srcType->is<ArchetypeType>()) {
+      auto *root = concreteConformance->getRootConformance();
+      layoutType = root->getType()->getCanonicalType();
+    }
+    return getCOMInterfaceAdjustment(IGF.IGM, layoutType, proto);
+  }
 
   auto cacheKind =
     LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance);
@@ -4621,13 +4718,17 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   return FunctionPointer::createSigned(fnType, fn, authInfo, signature);
 }
 
-llvm::Value *irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF,
-                                                      llvm::Value *value,
-                                                      CanType type,
-                                                      ProtocolDecl *protocol) {
-  assert(protocol->isCOMInterface());
-  auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
+llvm::Value *
+irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
+                                         CanType type,
+                                         ProtocolConformanceRef conformance) {
+  assert(conformance && conformance.getProtocol()->isCOMInterface());
+  assert(!IGF.IGM.isResilient(conformance.getProtocol(),
+                              ResilienceExpansion::Maximal));
+
   auto *adjustment = emitWitnessTableRef(IGF, type, conformance);
+  if (adjustment->getType()->isPointerTy())
+    adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
   return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, value, adjustment,
                                        "com.interface");
 }

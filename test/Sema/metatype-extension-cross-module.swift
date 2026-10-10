@@ -13,7 +13,7 @@ import Lib
 let _: Int = IWidget.tag
 let _: String = IWidget.describe()
 
-// The synthesized IID is still reachable too.
+// The descriptor-backed IID requirement is reachable too.
 let _: GUID = IWidget.IID
 
 // Declaration classification is reconstructed from the deserialized @com

@@ -401,7 +401,8 @@ public:
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
                       SerializedKind_t serializedKind, SILDeclRef requirement,
                       SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
-                      Witness witness);
+                      Witness witness,
+                      SILFunction **interfaceEntry = nullptr);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
