@@ -440,6 +440,10 @@ public:
   /// clauses of protocols.
   bool SuppressDeinitableProtocol = false;
 
+  /// Print the stdlib's CChar32 typealias with its old underlying type,
+  /// Unicode.Scalar.
+  bool SuppressCChar32IsUInt32 = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

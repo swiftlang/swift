@@ -6943,6 +6943,20 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       // or UInt to a C type.
       addTrivial(getIdentifier("Int"), stdlib);
       addTrivial(getIdentifier("UInt"), stdlib);
+
+      // Register Unicode.Scalar as foreign-representable on all platforms.
+      if (auto *unicodeEnum =
+              dyn_cast_or_null<EnumDecl>(findUnderlyingTypeInModule(
+                  *this, getIdentifier("Unicode"), stdlib))) {
+        for (auto *result :
+             unicodeEnum->lookupDirect(getIdentifier("Scalar"))) {
+          if (auto *scalarDecl = dyn_cast<StructDecl>(result)) {
+            getImpl().ForeignRepresentableCache.insert(
+                {scalarDecl, ForeignRepresentationInfo::forTrivial()});
+            break;
+          }
+        }
+      }
     }
 
     if (auto darwin = getLoadedModule(Id_Darwin)) {
