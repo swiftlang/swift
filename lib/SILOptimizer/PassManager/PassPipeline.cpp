@@ -123,7 +123,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addLetPropertyLowering();
   P.addRawSILInstLowering();
 
-  P.addAddressLowering();
 
   // TODO: remove this once CapturePromotion deletes specialized functions itself.
   P.addDiagnosticDeadFunctionElimination();
@@ -182,6 +181,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   //
   // End Ownership Optimizations
   //===---
+
+  P.addAddressLowering();
 
 #ifndef NDEBUG
   // Add a verification pass to check our work when skipping

@@ -490,6 +490,27 @@ swift::getNonEscapingClosureConversion(PartialApplyInst *pai) {
   return cvt;
 }
 
+/// Returns true if \p value stays live across each of a closure's
+/// \p lifetimeEnds.
+static bool isLiveAcrossClosureLifetime(
+    SILValue value, ArrayRef<SILInstruction *> lifetimeEnds) {
+  // A guaranteed function argument is live throughout the function.
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed)
+      return true;
+  if (lifetimeEnds.empty())
+    return false;
+  SSAPrunedLiveness liveness(value->getFunction());
+  liveness.initializeDef(value);
+  auto summary = liveness.computeSimple();
+  if (summary.innerBorrowKind != InnerBorrowKind::Contained ||
+      summary.addressUseKind != AddressUseKind::NonEscaping)
+    return false;
+  return llvm::all_of(lifetimeEnds, [&](SILInstruction *end) {
+    return liveness.isWithinBoundary(end);
+  });
+}
+
 /// Insert a mark_dependence for any non-trivial argument of a partial_apply.
 static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
                                                          SILBuilder &b) {
@@ -836,6 +857,26 @@ static SILValue tryRewriteToPartialApplyStack(
     LLVM_DEBUG(llvm::dbgs() << "considering whether to eliminate copy of capture\n";
                copy->printInContext(llvm::dbgs());
                llvm::dbgs() << "\n");
+
+    // With opaque values, SILGen's copy of an address-only capture is the
+    // copy_value borrowed above, not an alloc_stack. Borrow the original
+    // instead if it stays live for the closure's whole lifetime.
+    if (auto *borrow = dyn_cast<BeginBorrowInst>(copy)) {
+      auto *copyInst = dyn_cast<CopyValueInst>(borrow->getOperand());
+      if (copyInst && copyInst->hasOneUse() &&
+          site.getArgumentConvention(arg) ==
+              SILArgumentConvention::Indirect_In_Guaranteed &&
+          !newPA->hasCalledAtMostOnceSemantics() &&
+          (!DisableCopyEliminationOfCopyableCapture ||
+           copy->getType().isMoveOnly()) &&
+          isLiveAcrossClosureLifetime(copyInst->getOperand(), lifetimeEnds)) {
+        LLVM_DEBUG(llvm::dbgs() << "++ borrowing the original instead\n");
+        borrow->setOperand(copyInst->getOperand());
+        borrowedOriginals.insert(copyInst->getOperand());
+        saveDeleteInst(copyInst);
+      }
+      continue;
+    }
 
     auto stack = dyn_cast<AllocStackInst>(copy);
     if (!stack) {
