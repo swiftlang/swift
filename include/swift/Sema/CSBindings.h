@@ -25,6 +25,7 @@
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/Subtyping.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -407,21 +408,41 @@ enum class KnownLValueKind: uint8_t {
 
 /// Encodes the result of evaluating a new binding against an existing binding
 /// with BindingSet::subsumeBinding().
-enum class SubsumeBindingResult: uint8_t {
-  /// The new binding conflicts with some existing binding.
-  Conflict,
+class SubsumeBindingResult {
+public:
+  enum class BindingResultKind : uint8_t {
+    /// The new binding conflicts with some existing binding.
+    Conflict,
 
-  /// The new binding should not be added because it is strictly less precise
-  /// than the existing binding; recording it would give us no new information.
-  ExistingIsBetter,
+    /// The new binding should not be added because it is strictly less precise
+    /// than the existing binding; recording it would give us no new
+    /// information.
+    ExistingIsBetter,
 
-  /// The new binding is strictly more precise than the existing binding, so
-  /// the new binding should replace the existing binding.
-  NewIsBetter,
+    /// The new binding is strictly more precise than the existing binding, so
+    /// the new binding should replace the existing binding.
+    NewIsBetter,
 
-  /// The new binding is independent of the existing binding. Keep the existing
-  /// binding and record the new one.
-  KeepBoth
+    /// The new binding is independent of the existing binding. Keep the
+    /// existing
+    /// binding and record the new one.
+    KeepBoth
+  };
+  SubsumeBindingResult(BindingResultKind kind) : kind(kind) {}
+  SubsumeBindingResult(BindingResultKind kind, ConflictReason *reason)
+      : kind(kind), reason(reason) {}
+  BindingResultKind kind;
+  ConflictReason *reason;
+
+  static SubsumeBindingResult ExistingIsBetter() {
+    return SubsumeBindingResult(BindingResultKind::ExistingIsBetter);
+  }
+  static SubsumeBindingResult NewIsBetter() {
+    return SubsumeBindingResult(BindingResultKind::NewIsBetter);
+  }
+  static SubsumeBindingResult KeepBoth() {
+    return SubsumeBindingResult(BindingResultKind::KeepBoth);
+  }
 };
 
 class BindingSet {
@@ -738,9 +759,7 @@ private:
     IsDirty = true;
   }
 
-  void markConflicting() {
-    IsConflicting = true;
-  }
+  void markConflicting(ConflictReason *reason);
 
   /// Add a new binding to the set.
   ///

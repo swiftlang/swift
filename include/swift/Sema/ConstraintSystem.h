@@ -1317,6 +1317,9 @@ private:
   void incrementScopeCounter();
   void incrementLeafScopes();
 
+  /// All type variables seen with conflicting types while solving
+  MergeableTypes mergeableTypes;
+
 public:
   /// Introduces a new solver scope, which any changes to the
   /// solver state or constraint system are temporary and will be undone when
@@ -2070,6 +2073,9 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
+
+  void recordMergeable(TypeVariableType *root, Type conflict,
+                       ConstraintLocator *loc, ConflictReason *reason);
 
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);

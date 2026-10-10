@@ -168,6 +168,18 @@ bool TypeVariableType::Implementation::isSynthesizedArgument() const {
          locator->isLastElement<LocatorPathElt::SynthesizedArgument>();
 }
 
+bool TypeVariableType::Implementation::isToVoidViaEquivalence(constraints::ConstraintSystem *CS) {
+ auto &typeNode = CS->getConstraintGraph()[getTypeVariable()];
+ auto equivalenceClass = typeNode.getEquivalenceClass();
+ for(auto tv : equivalenceClass) {
+   auto tvRKind = CS->getImpliedResultConversionKind(tv->getImpl().getLocator());
+   if (tvRKind == constraints::ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+     return true;
+   }
+ }
+ return false;
+}
+
 TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
                                      unsigned options,
