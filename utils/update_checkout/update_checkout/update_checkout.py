@@ -140,9 +140,39 @@ def get_pr_branch(
         prefix=prefix,
     )
 
+    def get_remote_base_branch_object_id() -> Optional[str]:
+        """Return the object ID of the remote tip of the PR base branch, or
+        `None` if the base branch is not a branch on the remote. That happens
+        when the scheme pins the repository to a tag or a commit rather than a
+        branch."""
+        try:
+            remote_base_branch_object_id_and_ref, _, _ = Git.run(
+                repo_path,
+                [
+                    "ls-remote",
+                    # This command should fail if no matching refs are found.
+                    "--exit-code",
+                    "--heads",
+                    "origin",
+                    # Important for disambiguation. Just 'base_branch' matches
+                    # both 'base_branch' and '*/base_branch'.
+                    f"refs/heads/{base_branch}",
+                ],
+                echo=True,
+                prefix=prefix,
+            )
+        except GitException as e:
+            # Exit code 2 means that no matching refs were found.
+            if e.returncode == 2:
+                return None
+            raise  # Pass the error up the chain.
+
+        remote_base_branch_object_id, _ = remote_base_branch_object_id_and_ref.split()
+        return remote_base_branch_object_id
+
     # A PR merge ref is up to date if its first parent matches the remote tip
     # of the PR base branch.
-    def is_pr_merge_ref_up_to_date():
+    def is_pr_merge_ref_up_to_date(remote_base_branch_object_id: str):
         # The PR merge ref's first parent is the base branch tip at the time
         # GitHub last computed the ref. If that still matches the current remote
         # base branch tip, the merge ref is up to date and we can skip the
@@ -153,28 +183,22 @@ def get_pr_branch(
             echo=True,
             prefix=prefix,
         )
-        remote_base_branch_object_id_and_ref, _, _ = Git.run(
-            repo_path,
-            [
-                "ls-remote",
-                # This command should fail if no matching refs are found.
-                "--exit-code",
-                "--heads",
-                "origin",
-                # Important for disambiguation. Just 'base_branch' matches
-                # both 'base_branch' and '*/base_branch'.
-                f"refs/heads/{base_branch}",
-            ],
-            echo=True,
-            prefix=prefix,
-        )
-
-        remote_base_branch_object_id, _ = remote_base_branch_object_id_and_ref.split()
 
         return base_parent_object_id == remote_base_branch_object_id
 
     # 3. Check whether the merge ref is stale. If up to date, that's it.
-    if is_pr_merge_ref_up_to_date():
+    remote_base_branch_object_id = get_remote_base_branch_object_id()
+    if remote_base_branch_object_id is None:
+        # The scheme pins this repository to a tag or a commit, which says
+        # nothing about the branch the PR targets, so there is no base branch to
+        # check staleness against or to merge. Use the PR merge ref as GitHub
+        # computed it against the PR's actual base branch.
+        print(
+            f"{prefix}'{base_branch}' is not a branch on the remote; using the "
+            f"PR merge ref as-is"
+        )
+        return pr_branch
+    if is_pr_merge_ref_up_to_date(remote_base_branch_object_id):
         return pr_branch
 
     # The PR merge ref is out of date. This path exists because GitHub is not
