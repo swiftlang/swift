@@ -130,7 +130,7 @@ suite.test("Span.BorrowingIterator/basic")
 
   let arr = [10, 20, 30, 40, 50]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
 
   var iterSpan = iter.nextSpan(maxCount: .max)
   expectEqual(iterSpan.count, 5)
@@ -147,7 +147,7 @@ suite.test("Span.BorrowingIterator/partial-reads")
 
   let arr = [1, 2, 3, 4, 5]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
 
   var iterSpan = iter.nextSpan(maxCount: 2)
   expectEqual(iterSpan.count, 2)
@@ -172,7 +172,7 @@ suite.test("Span.BorrowingIterator/no-arg-convenience")
 
   let arr = [1, 2, 3]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
   // nextSpan() with no argument should return the whole remaining span
   let iterSpan = iter.nextSpan()
   expectEqual(iterSpan.count, 3)
@@ -185,7 +185,7 @@ suite.test("Span.BorrowingIterator/empty-span")
 
   let empty: [Int] = []
   let span = empty.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
   var iterSpan = iter.nextSpan(maxCount: .max)
   expectTrue(iterSpan.isEmpty)
   // Repeated calls on an exhausted iterator keep returning empty
@@ -199,7 +199,7 @@ suite.test("Span.BorrowingIterator/single-element")
 
   let arr = [99]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
   var iterSpan = iter.nextSpan(maxCount: .max)
   expectEqual(iterSpan.count, 1)
   expectEqual(iterSpan[0], 99)
@@ -213,14 +213,23 @@ suite.test("Span.BorrowingIterator/skip-basic")
 
   let arr = [1, 2, 3, 4, 5]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
-
+  
+  // skip(by:) -> Int
+  var iter = span.makeBorrowingIterator()
   let skipped = iter.skip(by: 2)
   expectEqual(skipped, 2)
-
   let iterSpan = iter.nextSpan(maxCount: .max)
   expectEqual(iterSpan.count, 3)
   expectEqual(iterSpan[0], 3)
+  
+  // skip(by: inout Int)
+  var iter2 = span.makeBorrowingIterator()
+  var skipAmount = 2
+  iter2.skip(by: &skipAmount)
+  expectEqual(skipAmount, 0)
+  let iterSpan2 = iter2.nextSpan(maxCount: .max)
+  expectEqual(iterSpan2.count, 3)
+  expectEqual(iterSpan2[0], 3)
 }
 
 suite.test("Span.BorrowingIterator/skip-past-end")
@@ -229,14 +238,22 @@ suite.test("Span.BorrowingIterator/skip-past-end")
 
   let arr = [1, 2, 3]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
-
   // Requesting to skip more than available returns only what existed
+
+  // skip(by:) -> Int
+  var iter = span.makeBorrowingIterator()
   let skipped = iter.skip(by: 100)
   expectEqual(skipped, 3)
-
   let iterSpan = iter.nextSpan(maxCount: .max)
   expectTrue(iterSpan.isEmpty)
+
+  // skip(by: inout Int)
+  var iter2 = span.makeBorrowingIterator()
+  var skipAmount = 100
+  iter2.skip(by: &skipAmount)
+  expectEqual(skipAmount, 97)
+  let iterSpan2 = iter2.nextSpan(maxCount: .max)
+  expectTrue(iterSpan2.isEmpty)
 }
 
 suite.test("Span.BorrowingIterator/skip-zero")
@@ -245,14 +262,23 @@ suite.test("Span.BorrowingIterator/skip-zero")
 
   let arr = [1, 2, 3]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
 
+  // skip(by:) -> Int
+  var iter = span.makeBorrowingIterator()
   let skipped = iter.skip(by: 0)
   expectEqual(skipped, 0)
-
   let iterSpan = iter.nextSpan(maxCount: .max)
   expectEqual(iterSpan.count, 3)
   expectEqual(iterSpan[0], 1)
+  
+  // skip(by: inout Int)
+  var iter2 = span.makeBorrowingIterator()
+  var skipAmount = 0
+  iter2.skip(by: &skipAmount)
+  expectEqual(skipAmount, 0)
+  let iterSpan2 = iter2.nextSpan(maxCount: .max)
+  expectEqual(iterSpan2.count, 3)
+  expectEqual(iterSpan2[0], 1)
 }
 
 suite.test("Span.BorrowingIterator/skip-negative")
@@ -260,11 +286,26 @@ suite.test("Span.BorrowingIterator/skip-negative")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
+  // skip(by:) -> Int
   let arr = [1, 2, 3]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
   expectCrashLater()
-  let skipped = iter.skip(by: -10)
+  _ = iter.skip(by: -10)
+}
+
+suite.test("Span.BorrowingIterator/skip-inout-negative")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  // skip(by: inout Int)
+  let arr = [1, 2, 3]
+  let span = arr.span
+  var iter = span.makeBorrowingIterator()
+  expectCrashLater()
+  var skipAmount = -10
+  iter.skip(by: &skipAmount)
 }
 
 suite.test("Span.BorrowingIterator/skip-then-partial-read")
@@ -273,7 +314,7 @@ suite.test("Span.BorrowingIterator/skip-then-partial-read")
 
   let arr = [10, 20, 30, 40, 50, 60]
   let span = arr.span
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
 
   let skipped = iter.skip(by: 3)
   expectEqual(skipped, 3)
@@ -299,7 +340,7 @@ suite.test("Span.BorrowingIterator/noncopyable-elements")
   let span = Span<NoncopyableInt>(_unsafeElements: buffer)
 
   // Skip 2, then read remaining 2
-  var iter = Span.BorrowingIterator(span)
+  var iter = span.makeBorrowingIterator()
   let skipped = iter.skip(by: 2)
   expectEqual(skipped, 2)
 
@@ -534,8 +575,6 @@ func testConformances() {
 
 // MARK: - Throwing Iterable tests
 
-#if false // error: lifetime-dependent value escapes its scope
-
 suite.test("ThrowingIterable/success-no-throw")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -604,7 +643,35 @@ suite.test("ThrowingIterable/exact-limit-no-throw")
     expectTrue(false)
   }
 }
-#endif
+
+suite.test("ThrowingIterable/skip-throw")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let arr = [1, 2, 3]
+  let span = arr.span
+  
+  // simple skip(by:) throws immediately when hitting an error
+  do {
+    let seq = LimitedSeq(span, limit: 1)
+    var iter = seq.makeBorrowingIterator()
+    _ = try iter.skip(by: 2)
+    expectTrue(false)
+  } catch {
+    // expected
+  }
+  
+  // inout skip(by:) updates offset param with remainder to skip
+  var skipAmount = 2
+  do {
+    let seq = LimitedSeq(span, limit: 1)
+    var iter = seq.makeBorrowingIterator()
+    try iter.skip(by: &skipAmount)
+    expectTrue(false)
+  } catch {
+    expectEqual(skipAmount, 1)
+  }
+}
 
 #if false // error: lifetime-dependent variable '$generator' escapes its scope
 
@@ -974,10 +1041,16 @@ struct LimitedIterator: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
   @_lifetime(&self)
   @_lifetime(self: copy self)
   mutating func nextSpan(maxCount: Int) throws(CountdownError) -> Span<Int> {
-    guard _remaining > 0 else { throw .limitReached }
-    let n = Swift.min(maxCount, _remaining)
+    // Request only up to _remaining, but at least one if _remaining is zero
+    let n = Swift.max(1, Swift.min(maxCount, _remaining))
     let span = _inner.nextSpan(maxCount: n)
     _remaining -= span.count
+
+    // Terminal conditions:
+    // - if span is empty, underlying iterator is exhausted (bc we always request at least one)
+    // - if remaining < 0, underlying iterator still has elements, but we reached limit on last call
+    if span.isEmpty { return span }
+    if _remaining < 0 { throw .limitReached }
     return span
   }
 }
