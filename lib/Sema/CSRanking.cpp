@@ -747,15 +747,22 @@ bool CompareDeclSpecializationRequest::evaluate(
   }
 
   // throws vs. typed throws. We are calling decl2 by passing parameters from
-  // decl1 as arguments, decl1 is affectively a context for decl2 call, let's
+  // decl1 as arguments, decl1 is effectively a context for decl2 call, let's
   // see if that's well-formed in presence of typed throws.
+  //
+  // This only models a real call for witness matching. When both thrown types
+  // are concrete there is nothing to infer, and an unsatisfiable constraint
+  // would veto a specialization verdict the parameter types already
+  // established, so only add it when one side is still open.
   if (isa<AbstractFunctionDecl>(decl1) && isa<AbstractFunctionDecl>(decl2)) {
     auto thrownError1 =
         openedType1->castTo<FunctionType>()->getEffectiveThrownErrorType();
     auto thrownError2 =
         openedType2->castTo<FunctionType>()->getEffectiveThrownErrorType();
 
-    if (thrownError1 && thrownError2) {
+    if (thrownError1 && thrownError2 &&
+        ((*thrownError1)->hasTypeVariable() ||
+         (*thrownError2)->hasTypeVariable())) {
       cs.addConstraint(ConstraintKind::Subtype, *thrownError2, *thrownError1,
                        locator);
     }
