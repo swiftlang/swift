@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes
 
 // REQUIRES: concurrency
 

@@ -152,6 +152,8 @@ public:
     return ParentOrFixed;
   }
 
+  bool isToVoidViaEquivalence(constraints::ConstraintSystem* CS);
+
   /// Record the current type-variable binding.
   void recordBinding(constraints::SolverTrail &trail) {
     trail.recordChange(constraints::SolverTrail::Change::UpdatedTypeVariable(

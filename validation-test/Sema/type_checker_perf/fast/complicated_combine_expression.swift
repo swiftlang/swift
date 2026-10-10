@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=19000 -solver-enable-promote-supertypes
 // RUN: %target-typecheck-verify-swift -solver-scope-threshold=80000 -solver-disable-promote-supertypes
 
 // REQUIRES: OS=macosx

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage- -solver-enable-promote-supertypes
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-disable-diagnose-valid-salvage
 
 // The next two sets of examples cause difficulties because our

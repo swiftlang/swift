@@ -1952,6 +1952,7 @@ namespace {
       }
 
       auto extInfo = CS.closureEffects(closure);
+
       auto resultLocator =
           CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
 
