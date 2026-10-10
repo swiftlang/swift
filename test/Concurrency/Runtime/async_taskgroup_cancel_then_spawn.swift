@@ -10,7 +10,10 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-import Dispatch
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s --dump-input=always %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s --dump-input=always %}
+
+import _Concurrency
 
 @available(SwiftStdlib 5.1, *)
 func asyncEcho(_ value: Int) async -> Int {
@@ -37,7 +40,7 @@ func test_taskGroup_cancel_then_add() async {
     print("added second: \(addedSecond)") // CHECK: added second: false
 
     let none = await group.next()
-    print("next second: \(none)") // CHECK: next second: nil
+    print("next second: \(none == nil ? "nil" : "unexpected value")") // CHECK: next second: nil
 
     group.spawn {
       print("child task isCancelled: \(Task.isCancelled)") // CHECK: child task isCancelled: true

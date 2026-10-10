@@ -11,6 +11,11 @@
 // rdar://143894191
 // REQUIRES: swift_test_mode_optimize_none
 
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift(-plugin-path %swift-plugin-dir -strict-concurrency=complete) | %FileCheck %s --dump-input=always %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift(-plugin-path %swift-plugin-dir -strict-concurrency=complete) | %FileCheck %s --dump-input=always %}
+
+import _Concurrency
+
 enum TL {
   @TaskLocal
   static var one: Int = 1

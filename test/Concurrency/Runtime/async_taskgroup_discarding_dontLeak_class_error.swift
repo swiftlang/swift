@@ -12,6 +12,9 @@
 // FIXME: enable discarding taskgroup on windows; rdar://104762037
 // UNSUPPORTED: OS=windows-msvc
 
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s --dump-input=always %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s --dump-input=always %}
+
 import _Concurrency
 
 actor SimpleCountDownLatch {
