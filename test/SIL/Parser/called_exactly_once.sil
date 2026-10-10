@@ -1,0 +1,78 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -emit-sib -module-name called_exactly_once %s -o %t/called_exactly_once.sib
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true -emit-sorted-sil -module-name called_exactly_once %t/called_exactly_once.sib | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// A `@called(exactlyOnce)` closure can capture a `@called(exactlyOnce)` value.
+// CHECK-LABEL: sil [ossa] @capture_called_exactly_once : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @called(exactlyOnce) @callee_owned () -> () {
+// CHECK:   [[F:%.*]] = function_ref @take_called_exactly_once : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [called(exactlyOnce)] [[F]](%0) : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> ()
+// CHECK: } // end sil function 'capture_called_exactly_once'
+sil [ossa] @capture_called_exactly_once : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @called(exactlyOnce) @callee_owned () -> () {
+bb0(%0 : @owned $@called(exactlyOnce) @callee_owned () -> ()):
+  %f = function_ref @take_called_exactly_once : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  %pa = partial_apply [called(exactlyOnce)] %f(%0) : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  return %pa : $@called(exactlyOnce) @callee_owned () -> ()
+}
+
+// The on-stack form, as produced by closure stack promotion.
+// CHECK-LABEL: sil [ossa] @on_stack_called_exactly_once : $@convention(thin) () -> () {
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called(exactlyOnce)] {{%.*}}() : $@convention(thin) () -> ()
+// CHECK: } // end sil function 'on_stack_called_exactly_once'
+sil [ossa] @on_stack_called_exactly_once : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @thin_callee : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] [called(exactlyOnce)] %f() : $@convention(thin) () -> ()
+  %use = function_ref @use_noescape_called_exactly_once : $@convention(thin) (@guaranteed @noescape @called(exactlyOnce) @callee_guaranteed () -> ()) -> ()
+  %r = apply %use(%pa) : $@convention(thin) (@guaranteed @noescape @called(exactlyOnce) @callee_guaranteed () -> ()) -> ()
+  destroy_value %pa : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @produce_called_exactly_once : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(exactlyOnce) @callee_owned () -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[F:%.*]] = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [called(exactlyOnce)] [[F]]([[ARG]]) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   return [[PA]] : $@called(exactlyOnce) @callee_owned () -> ()
+// CHECK: } // end sil function 'produce_called_exactly_once'
+sil [ossa] @produce_called_exactly_once : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(exactlyOnce) @callee_owned () -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %f = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %pa = partial_apply [called(exactlyOnce)] %f(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  return %pa : $@called(exactlyOnce) @callee_owned () -> ()
+}
+
+// `thin_to_thick_function` can form a `@called(exactlyOnce)` value from a
+// thin function, which never has execution semantics itself.
+// CHECK-LABEL: sil [ossa] @produce_called_exactly_once_captureless : $@convention(thin) () -> @owned @called(exactlyOnce) @callee_owned () -> () {
+// CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
+// CHECK:   [[T:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@called(exactlyOnce) @callee_owned () -> ()
+// CHECK:   return [[T]] : $@called(exactlyOnce) @callee_owned () -> ()
+// CHECK: } // end sil function 'produce_called_exactly_once_captureless'
+sil [ossa] @produce_called_exactly_once_captureless : $@convention(thin) () -> @owned @called(exactlyOnce) @callee_owned () -> () {
+bb0:
+  %f = function_ref @thin_callee : $@convention(thin) () -> ()
+  %t = thin_to_thick_function %f : $@convention(thin) () -> () to $@called(exactlyOnce) @callee_owned () -> ()
+  return %t : $@called(exactlyOnce) @callee_owned () -> ()
+}
+
+// CHECK-LABEL: sil [ossa] @take_called_exactly_once : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> () {
+// CHECK: bb0(%0 : @owned $@called(exactlyOnce) @callee_owned () -> ()):
+// CHECK:   apply %0() : $@called(exactlyOnce) @callee_owned () -> ()
+// CHECK: } // end sil function 'take_called_exactly_once'
+sil [ossa] @take_called_exactly_once : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> () {
+bb0(%0 : @owned $@called(exactlyOnce) @callee_owned () -> ()):
+  %1 = apply %0() : $@called(exactlyOnce) @callee_owned () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil @thin_callee : $@convention(thin) () -> ()
+sil @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil @use_noescape_called_exactly_once : $@convention(thin) (@guaranteed @noescape @called(exactlyOnce) @callee_guaranteed () -> ()) -> ()

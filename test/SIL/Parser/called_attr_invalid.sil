@@ -1,0 +1,20 @@
+// RUN: %target-sil-opt -verify %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @thin_at_most_once : $@convention(thin) (@convention(thin) @called(atMostOnce) () -> ()) -> ()
+// expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+sil @c_at_most_once : $@convention(thin) (@convention(c) @called(atMostOnce) () -> ()) -> ()
+// expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+sil @block_at_most_once : $@convention(thin) (@convention(block) @called(atMostOnce) () -> ()) -> ()
+// expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+
+sil @thin_exactly_once : $@convention(thin) (@convention(thin) @called(exactlyOnce) () -> ()) -> ()
+// expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+sil @c_exactly_once : $@convention(thin) (@convention(c) @called(exactlyOnce) () -> ()) -> ()
+// expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}
+sil @block_exactly_once : $@convention(thin) (@convention(block) @called(exactlyOnce) () -> ()) -> ()
+// expected-error@-1 {{'@convention' attribute is not allowed on '@called' types}}

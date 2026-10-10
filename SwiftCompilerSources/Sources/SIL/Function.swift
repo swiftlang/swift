@@ -26,6 +26,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
+  /// True if `sourceLoc` is within the function's declaration or closure expression.
+  public func contains(_ sourceLoc: SourceLoc) -> Bool {
+    bridged.isInSourceRange(sourceLoc.bridged)
+  }
+
+  /// True if `sourceLoc` is within the function's body.
+  public func bodyContains(_ sourceLoc: SourceLoc) -> Bool {
+    bridged.isInBodySourceRange(sourceLoc.bridged)
+  }
+
+  /// The location of the end of the function's body.
+  public var bodyEndLoc: SourceLoc? { SourceLoc(bridged: bridged.getBodyEndLoc()) }
+
   public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
 
   public var sourceFile: SourceFile? { declRef.sourceFile }

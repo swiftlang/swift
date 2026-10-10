@@ -290,6 +290,7 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
+  BRIDGED_INLINE bool isImplicitlyDestroyable() const;
   BRIDGED_INLINE bool
   isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const;
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
@@ -498,6 +499,7 @@ struct BridgedLocation {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc getSourceLocation() const;
   BRIDGED_INLINE bool isFilenameAndLocation() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE FilenameAndLocation getFilenameAndLocation() const;
+  bool isReturnOrThrowStatement() const;
   BRIDGED_INLINE bool hasSameSourceLocation(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getScope() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
@@ -571,6 +573,9 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  bool isInSourceRange(swift::SourceLoc loc) const;
+  bool isInBodySourceRange(swift::SourceLoc loc) const;
+  SWIFT_IMPORT_UNSAFE swift::SourceLoc getBodyEndLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParentModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArrayRef getFilesForModule() const;
   BRIDGED_INLINE bool isAccessor() const;

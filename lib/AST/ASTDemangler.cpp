@@ -513,17 +513,16 @@ void ASTBuilder::endPackExpansion() {
   ActivePackExpansions.pop_back();
 }
 
+/// A function type records its execution semantics as the invertible
+/// protocols that it suppresses: a `@called(atMostOnce)` function type isn't
+/// Copyable, and a `@called(exactlyOnce)` one isn't Deinitable either.
 static std::optional<ExecutionSemantics>
-getExecutionSemantics(FunctionMetadataExecutionSemantics semantics) {
-  switch (semantics) {
-  case FunctionMetadataExecutionSemantics::None:
+getExecutionSemantics(InvertibleProtocolSet inverted) {
+  if (!inverted.contains(InvertibleProtocolKind::Copyable))
     return std::nullopt;
-  case FunctionMetadataExecutionSemantics::AtMostOnce:
-    return ExecutionSemantics::AtMostOnce;
-  case FunctionMetadataExecutionSemantics::Once:
+  if (inverted.contains(InvertibleProtocolKind::Deinitable))
     return ExecutionSemantics::Once;
-  }
-  llvm_unreachable("unknown execution semantics");
+  return ExecutionSemantics::AtMostOnce;
 }
 
 Type ASTBuilder::createFunctionType(
@@ -620,7 +619,7 @@ Type ASTBuilder::createFunctionType(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
                    /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult(),
-                   getExecutionSemantics(extFlags.getExecutionSemantics()))
+                   getExecutionSemantics(extFlags.getInvertedProtocols()))
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();

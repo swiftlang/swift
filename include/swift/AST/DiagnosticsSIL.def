@@ -996,6 +996,14 @@ ERROR(sil_movekillscopyable_move_applied_to_nonlocal_memory, none,
       "'consume' cannot be applied to %select{globals|escaping captures}0",
       (unsigned))
 
+// Implicit destroy checker
+ERROR(sil_implicit_destroy_not_consumed, none,
+      "'%0' is not consumed on all paths", (StringRef))
+ERROR(sil_implicit_destroy_unnamed_not_consumed, none,
+      "value of type %0 is not consumed on all paths", (Type))
+NOTE(sil_implicit_destroy_path_exit, none,
+     "path exits here without a consume", ())
+
 
 // Implicit inout-to-UnsafeRawPointer conversions
 WARNING(nontrivial_to_rawpointer_conversion,none,

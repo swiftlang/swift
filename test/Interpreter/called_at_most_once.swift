@@ -292,7 +292,7 @@ testEmptyConsumingCaptureNeverCalledEscaping()
 
 // Passing a concrete closure through a generic passthrough forces a
 // representation-changing reabstraction thunk before the final
-// `partial_apply [called_once]` can attach `@called(atMostOnce)` to the result.
+// `partial_apply [called(atMostOnce)]` can attach `@called(atMostOnce)` to the result.
 func makeCalledAtMostOnce(_ f: @escaping (Payload) -> Void) -> @called(atMostOnce) (Payload) -> Void {
   return identity(f)
 }

@@ -2049,6 +2049,23 @@ public:
       return checkLegalSILType(F, objectType, I);
     }
 
+    // `@called` function values have a context. Thin functions, including
+    // closure bodies and thunks, never have execution semantics themselves;
+    // `partial_apply` or `thin_to_thick_function` adds them to the value.
+    // Calling an escaping `@called` value consumes its context; only a
+    // non-escaping one, such as a stack-promoted closure, can be
+    // `@callee_guaranteed`.
+    if (auto fnTy = dyn_cast<SILFunctionType>(rvalueType)) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
+        require(fnTy->getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+                "@called function types must be thick");
+        require(fnTy->isNoEscape() || fnTy->getCalleeConvention() ==
+                                          ParameterConvention::Direct_Owned,
+                "escaping @called function types must be @callee_owned");
+      }
+    }
+
     // Metatypes should have explicit representations.
     if (auto metatype = dyn_cast<AnyMetatypeType>(rvalueType)) {
       require(metatype->hasRepresentation(),
@@ -2549,6 +2566,14 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+      // Only a `@called(exactlyOnce)` closure can capture a
+      // `@called(exactlyOnce)` value.
+      if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
+        require(!argFnTy->isCalledOnce() ||
+                    PAI->getFunctionType()->isCalledOnce(),
+                "only a @called(exactlyOnce) closure can capture a "
+                "@called(exactlyOnce) value");
+      }
       if (PAI->isOnStack()) {
         // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
@@ -5475,11 +5500,13 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
+    // The result can add execution semantics, because it forms the value.
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
             .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
             .withNoEscape(resFTy->isNoEscape())
+            .withExecutionSemantics(resFTy->getExecutionSemantics())
             .build();
     require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
                                              useClangTypes(opFTy)),
@@ -5718,6 +5745,13 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+
+    require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
+                                         resTI->getExecutionSemantics()),
+            "convert_function cannot drop @called execution semantics");
+    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
+            "convert_function cannot form a @called(exactlyOnce) value; a "
+            "thunk must form it");
   }
 
   void checkThunkInst(ThunkInst *ti) {

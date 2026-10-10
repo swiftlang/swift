@@ -334,6 +334,16 @@ struct BridgedPassContext {
 
 bool BeginApply_canInline(BridgedInstruction beginApply);
 
+struct BridgedInferredVariableName {
+  /// Empty if no name could be inferred.
+  BridgedStringRef name;
+  OptionalBridgedValue root;
+};
+
+/// See `VariableNameInferrer::inferNameAndRoot()`.
+BridgedInferredVariableName
+VariableNameInferrer_inferNameAndRoot(BridgedValue value);
+
 enum class BridgedDynamicCastResult {
   willSucceed,
   maySucceed,

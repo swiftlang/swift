@@ -46,6 +46,9 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isTrivial(function.bridged)
   }
 
+  /// False if a value of this type can't be destroyed implicitly, because the type doesn't conform to `Deinitable`.
+  public var isImplicitlyDestroyable: Bool { bridged.isImplicitlyDestroyable() }
+
   /// Returns true if the type is non-trivial only because it is non-Escapable.
   public func isNonTrivialOnlyBecauseNonEscapable(in function: Function) -> Bool {
     return bridged.isNonTrivialOnlyBecauseNonEscapable(function.bridged)
