@@ -36,7 +36,7 @@ extension Unicode.ASCII: Unicode.Encoding {
   @inline(__always)
   @inlinable
   public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
-    return Unicode.Scalar(_unchecked: UInt32(
+    return unsafe Unicode.Scalar(_unchecked: UInt32(
         source.first._unsafelyUnwrappedUnchecked))
   }
   
