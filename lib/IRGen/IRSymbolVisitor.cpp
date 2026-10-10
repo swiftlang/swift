@@ -213,6 +213,26 @@ public:
     }
   }
 
+  void addEmbeddedSerializedWitness(SILDeclRef declRef) override {
+    // Clients emit their own copies of a witness without a unique definition.
+    if (declRef.hasNonUniqueDefinition())
+      return;
+
+    // The witness is public whatever its declaration's linkage, and so are
+    // the function pointers that refer to it.
+    Visitor.addFunction(declRef);
+
+    auto *func = declRef.getAbstractFunctionDecl();
+    if (func && func->hasAsync())
+      Visitor.addLinkEntity(LinkEntity::forAsyncFunctionPointer(declRef));
+
+    auto *accessor = dyn_cast_or_null<AccessorDecl>(func);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+        accessor->getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2)
+      Visitor.addLinkEntity(LinkEntity::forCoroFunctionPointer(declRef));
+  }
+
   void addEnumCase(EnumElementDecl *EED) override {
     addNonEmbeddedLinkEntity([&] { return LinkEntity::forEnumCase(EED); });
   }

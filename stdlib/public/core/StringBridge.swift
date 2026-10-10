@@ -849,6 +849,9 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
 
 #else // !_runtime(_ObjC)
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal class __SwiftNativeNSString {
   internal init() {}
   deinit {}

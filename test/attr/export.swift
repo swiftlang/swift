@@ -12,9 +12,15 @@ func f3() { }
 @export // expected-error{{expected '(' in 'export' attribute}}
 func f4() { }
 
-@export(interface) // expected-error{{'@export(interface)' cannot be used with '@usableFromInline'}}
+// A declaration with a unique definition can be referenced from code that
+// clients emit.
+@export(interface)
 @usableFromInline
 func f5() { }
+
+@export(implementation) // expected-error{{'@export(implementation)' cannot be used with '@usableFromInline'}}
+@usableFromInline
+func f5b() { }
 
 @export(interface) // expected-error{{'@export(interface)' cannot be used with '@inlinable'}}
 @inlinable

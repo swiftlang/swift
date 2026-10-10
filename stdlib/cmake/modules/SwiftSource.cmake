@@ -50,7 +50,7 @@ function(handle_swift_sources
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;NO_SWIFTMODULE"
-      "SDK;ARCHITECTURE;ARCHITECTURE_SUBDIR_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
+      "SDK;ARCHITECTURE;ARCHITECTURE_SUBDIR_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE;TBD_PATH"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -156,6 +156,7 @@ function(handle_swift_sources
         ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
         MODULE_NAME ${SWIFTSOURCES_MODULE_NAME}
         MODULE_DIR ${SWIFTSOURCES_MODULE_DIR}
+        TBD_PATH "${SWIFTSOURCES_TBD_PATH}"
         ${IS_MAIN_arg}
         ${IS_STDLIB_arg}
         ${IS_STDLIB_CORE_arg}
@@ -430,7 +431,7 @@ function(_compile_swift_files
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;NO_SWIFTMODULE"
-    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
+    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE;TBD_PATH"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
 
@@ -1105,6 +1106,20 @@ function(_compile_swift_files
     set(copy_legacy_layouts_dep)
   endif()
 
+  # If requested, emit a TBD file listing the library's exported symbols, and
+  # validate it against the IR, so that any declaration that would make the
+  # symbols unpredictable is an error. Only the object file compilation emits
+  # it, because the module compilation shares these flags.
+  set(tbd_options)
+  set(tbd_outputs)
+  if(SWIFTFILE_TBD_PATH)
+    set(tbd_options
+      "-emit-tbd" "-emit-tbd-path" "${SWIFTFILE_TBD_PATH}"
+      "-Xfrontend" "-tbd-install_name" "-Xfrontend" "${SWIFTFILE_MODULE_NAME}"
+      "-Xfrontend" "-validate-tbd-against-ir=all")
+    set(tbd_outputs "${SWIFTFILE_TBD_PATH}")
+  endif()
+
   add_custom_command_target(
       dependency_target
       COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
@@ -1112,9 +1127,9 @@ function(_compile_swift_files
         ${set_environment_args}
         "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
-        ${output_option} ${embed_bitcode_option} "@${file_path}"
+        ${output_option} ${embed_bitcode_option} ${tbd_options} "@${file_path}"
       ${command_touch_standard_outputs}
-      OUTPUT ${standard_outputs}
+      OUTPUT ${standard_outputs} ${tbd_outputs}
       DEPENDS
         "${line_directive_tool}"
         "${file_path_target}"

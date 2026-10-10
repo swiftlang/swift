@@ -49,6 +49,11 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
         !context.hadError,
         // Is `function` a global init function?
         let global = function.initializedGlobal,
+        // In Embedded Swift, clients can emit their own copy of a global, and
+        // of its serialized init code, unless it has the "interface" code
+        // generation model.
+        !(context.options.enableEmbeddedSwift && context.moduleIsSerialized &&
+          !global.isNeverEmittedIntoClient),
         // Even if the init value is a constant, the initializer can have side effects, e.g.
         //   let g = { print("hello"); return 27 }()
         !function.hasSideEffects(besideStoringTo: global),

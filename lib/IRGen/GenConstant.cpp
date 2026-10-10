@@ -489,7 +489,13 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
       auto *classDecl = IGM.getStaticArrayStorageDecl();
       assert(classDecl && "no __StaticArrayStorage in stdlib");
       CanType classTy = CanType(ClassType::get(classDecl, Type(), IGM.Context));
-      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+          classDecl->getModuleContext() == IGM.getSwiftModule()) {
+        // In embedded swift, the module that defines the array buffer class
+        // emits its metadata, which has the same name as the minimal copy
+        // below.
+        IGM.swiftStaticArrayMetadata = IGM.getAddrOfTypeMetadata(classTy);
+      } else if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint,
                                                         /*forceShared=*/ true);
         // In embedded swift, the metadata for the array buffer class only needs to be very minimal:

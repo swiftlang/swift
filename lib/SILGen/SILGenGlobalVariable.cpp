@@ -257,6 +257,19 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);
 
+  // The once-token and once-initializer have the same code generation model
+  // as the variables they initialize, so they are unique exactly when the
+  // variables' storage is.
+  if (auto *var = pd->getAnchoringVarDecl(pbdEntry)) {
+    auto cgModel = var->getExplicitCodeGenerationModel();
+    if (!cgModel && M.getOptions().EmbeddedSwift)
+      cgModel = var->getEffectiveCodeGenerationModel();
+    if (cgModel && *cgModel != CodeGenerationModel::Inlinable) {
+      onceToken->setCodeGenerationModel(*cgModel);
+      onceFunc->setCodeGenerationModel(*cgModel);
+    }
+  }
+
   // Generate accessor functions for all of the declared variables, which
   // Builtin.once the lazy global initializer we just generated then return
   // the address of the individual variable.

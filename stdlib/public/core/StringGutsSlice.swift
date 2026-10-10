@@ -16,17 +16,32 @@
 
 // A sliced _StringGuts, convenient for unifying String/Substring comparison,
 // hashing, and RRC.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal struct _StringGutsSlice {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var _guts: _StringGuts
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var _offsetRange: Range<Int>
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal init(_ guts: _StringGuts) {
     self._guts = guts
     self._offsetRange = unsafe Range(_uncheckedBounds: (0, guts.count))
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
     _internalInvariant(
@@ -68,6 +83,9 @@ internal struct _StringGutsSlice {
     }
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   internal var range: Range<String.Index> {
     @inline(__always) get {
       let lower = String.Index(_encodedOffset: _offsetRange.lowerBound)

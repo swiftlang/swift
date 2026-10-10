@@ -18,6 +18,9 @@ internal func _growStringCapacity(_ capacity: Int) -> Int {
 
 // COW helpers
 extension _StringGuts {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var nativeCapacity: Int? {
     @inline(never)
     @_effects(releasenone)
@@ -94,6 +97,9 @@ extension _StringGuts {
     }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal mutating func reserveCapacity(_ n: Int) {
     // Check if there's nothing to do
     if n <= _SmallString.capacity { return }
@@ -432,6 +438,9 @@ extension _StringGuts {
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal mutating func uniqueNativeReplaceSubrange(
     _ bounds: Range<Index>,
     with codeUnits: UnsafeBufferPointer<UInt8>,
@@ -494,6 +503,9 @@ extension _StringGuts {
   /// - Parameter body: The mutation operation to execute on `self`. The
   ///   returned offset range must correspond to `subrange` in the resulting
   ///   string.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal mutating func mutateSubrangeInSubstring(
     subrange: Range<Index>,
     startIndex: inout Index,

@@ -1242,8 +1242,23 @@ bool SILDeclRef::isBackDeployed() const {
 }
 
 bool SILDeclRef::hasNonUniqueDefinition() const {
-  if (auto decl = getDecl())
+  // A program's entry point is unique, whatever the model of its '@main' type.
+  if (kind == Kind::EntryPoint || kind == Kind::AsyncEntryPoint)
+    return false;
+
+  if (auto decl = getDecl()) {
+    // Default argument generators are always @export(implementation), so
+    // each client that uses one emits its own copy.
+    if (isDefaultArgGenerator() &&
+        decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return true;
+
     return declHasNonUniqueDefinition(decl);
+  }
+
+  // A closure is emitted wherever the code that contains it is.
+  if (auto *closure = getAbstractClosureExpr())
+    return closure->hasNonUniqueCode();
 
   return false;
 }

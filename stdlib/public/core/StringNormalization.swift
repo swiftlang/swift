@@ -53,6 +53,9 @@ extension UnsafeBufferPointer where Element == UInt8 {
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func _isScalarNFCQC(
   _ scalar: Unicode.Scalar,
   _ prevCCC: inout UInt8
@@ -128,6 +131,9 @@ extension _StringGutsSlice {
     }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
     unsafe withFastUTF8 { utf8 in
       isNFCQC = unsafe _nfcQuickCheck(utf8, prevCCC: &prevCCC)

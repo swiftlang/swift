@@ -11,7 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 /// Pseudo-namespace for pointer authentication primitives.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal enum _PtrAuth {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal struct Key {
     var _value: Int32
 

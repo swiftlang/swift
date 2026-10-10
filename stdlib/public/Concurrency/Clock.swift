@@ -126,6 +126,9 @@ extension Clock {
 }
 #endif
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2

@@ -64,7 +64,7 @@ public final class C {
 // We drop AEIC if the containing context does not have effective public
 // visibility.
 internal struct InternalContext {
-// CHECK-LABEL: sil hidden [ossa] @$s33always_emit_into_client_attribute15InternalContextV1vSivgZ
+// CHECK-LABEL: sil hidden [export_implementation] [ossa] @$s33always_emit_into_client_attribute15InternalContextV1vSivgZ
   @_alwaysEmitIntoClient
   internal static var v : Int { 1 }
 }
@@ -72,7 +72,7 @@ internal struct InternalContext {
 // We drop AEIC if the containing context does not have effective public
 // visibility.
 package struct PackageContext {
-// CHECK-LABEL: sil package [ossa] @$s33always_emit_into_client_attribute14PackageContextV1vSivgZ
+// CHECK-LABEL: sil package [export_implementation] [ossa] @$s33always_emit_into_client_attribute14PackageContextV1vSivgZ
 
   @_alwaysEmitIntoClient
   package static var v : Int { 1 }

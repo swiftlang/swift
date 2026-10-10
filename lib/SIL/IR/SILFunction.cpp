@@ -597,6 +597,54 @@ bool SILFunction::isNeverEmitIntoClient() const {
   return codeGenerationModel() == CodeGenerationModel::Interface;
 }
 
+bool SILFunction::isEmittedIntoClients() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  if (isNeverEmitIntoClient())
+    return false;
+
+  // Any module that uses a generic function can create the same
+  // specialization of it.
+  if (isSpecialization())
+    return true;
+
+  // A closure is emitted wherever the declaration containing it is.
+  if (auto declRef = getDeclRef()) {
+    if (auto *closure = declRef.getAbstractClosureExpr()) {
+      return closure->getCodeGenerationModelOfCode() !=
+             CodeGenerationModel::Interface;
+    }
+  }
+
+  // A protocol witness thunk is serialized along with its witness table, if
+  // clients can use the conformance.
+  if (isThunk() && getLoweredFunctionType()->getRepresentation() ==
+                       SILFunctionTypeRepresentation::WitnessMethod) {
+    auto conformance =
+        getLoweredFunctionType()->getWitnessMethodConformanceOrInvalid();
+    if (conformance.isConcrete())
+      return SILWitnessTable::isUsableByEmbeddedClients(
+          conformance.getConcrete()->getRootConformance());
+  }
+
+  // Other functions can be reached from serialized code, and clients need
+  // their bodies to specialize them.
+  return true;
+}
+
+bool SILFunction::wouldExposeBodyToClients(const SILFunction *caller) const {
+  // Once the module is serialized, clients can't see what gets inlined.
+  if (getModule().isSerialized())
+    return false;
+
+  // A serialized body is meant to be inlined into clients.
+  if (!isNeverEmitIntoClient() || isAnySerialized())
+    return false;
+
+  return caller->isEmittedIntoClients();
+}
+
 OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
   if (OptimizationMode(OptMode) != OptimizationMode::NotSet)
     return OptimizationMode(OptMode);
@@ -680,9 +728,29 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (isSpecialization())
     return true;
 
+  // A protocol witness thunk is serialized along with the witness table that
+  // refers to it, and clients that devirtualize calls through that table emit
+  // their own copy.
+  if (isThunk() && getLoweredFunctionType()->getRepresentation() ==
+                       SILFunctionTypeRepresentation::WitnessMethod)
+    return true;
+
   // If this is for a declaration, ask it.
   if (auto declRef = getDeclRef()) {
     return declRef.hasNonUniqueDefinition();
+  }
+
+  // A function without a declaration, such as a global's once-initializer,
+  // can record the code generation model of the code it was emitted for.
+  if (auto cgModel = codeGenerationModel()) {
+    switch (*cgModel) {
+    case CodeGenerationModel::Implementation:
+      return true;
+    case CodeGenerationModel::Interface:
+      return false;
+    case CodeGenerationModel::Inlinable:
+      break;
+    }
   }
 
   // If this function is from a different module than the one we are emitting

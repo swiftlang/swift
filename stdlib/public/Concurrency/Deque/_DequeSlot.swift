@@ -14,9 +14,18 @@
 
 import Swift
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal struct _DequeSlot {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var position: Int
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   init(at position: Int) {
     assert(position >= 0)
     self.position = position
@@ -24,12 +33,21 @@ internal struct _DequeSlot {
 }
 
 extension _DequeSlot {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   internal static var zero: Self { Self(at: 0) }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   internal func advanced(by delta: Int) -> Self {
     Self(at: position &+ delta)
   }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   internal func orIfZero(_ value: Int) -> Self {
     guard position > 0 else { return Self(at: value) }
     return self
@@ -37,23 +55,35 @@ extension _DequeSlot {
 }
 
 extension _DequeSlot: CustomStringConvertible {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var description: String {
     "@\(position)"
   }
 }
 
 extension _DequeSlot: Equatable {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   static func ==(left: Self, right: Self) -> Bool {
     left.position == right.position
   }
 }
 
 extension _DequeSlot: Comparable {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   static func <(left: Self, right: Self) -> Bool {
     left.position < right.position
   }
 }
 
 extension Range where Bound == _DequeSlot {
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   internal var _count: Int { upperBound.position - lowerBound.position }
 }

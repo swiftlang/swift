@@ -304,6 +304,13 @@ public:
   static SerializedKind_t
   conformanceSerializedKind(const RootProtocolConformance *conformance);
 
+  /// In Embedded Swift, whether clients can use the given conformance, so
+  /// cross-module optimization serializes its witness table and witness
+  /// thunks. Clients can only use conformances to protocols that are public
+  /// or '@usableFromInline'.
+  static bool
+  isUsableByEmbeddedClients(const RootProtocolConformance *conformance);
+
   /// Call \c fn on each (split apart) conditional requirement of \c conformance
   /// that should appear in a witness table, i.e., conformance requirements that
   /// need witness tables themselves.

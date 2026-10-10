@@ -69,6 +69,12 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
     return bridged.canBeInitializedStatically()
   }
 
+  /// True if the global has the "interface" code generation model, so that
+  /// clients refer to it by symbol rather than emitting their own copy.
+  public var isNeverEmittedIntoClient: Bool {
+    return bridged.isNeverEmittedIntoClient()
+  }
+
   /// True if the global has an attribute, like `@const` or `@section` which requires the global to be
   /// initialized statically.
   public var mustBeInitializedStatically: Bool {
