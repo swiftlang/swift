@@ -1,0 +1,285 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=begin_borrow | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=begin_borrow | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @captureInt : $@convention(thin) (Int) -> Int
+sil @useNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+sil @useThrowingNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+sil @useEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+
+// CHECK-LABEL: {{^}}sil [ossa] @noConvert_noLexical :
+// CHECK:         %[[#OWNER1:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// CHECK-NEXT:    %[[#NOESCAPE1:]] = convert_escape_to_noescape %[[#OWNER1]] to $@noescape @callee_guaranteed () -> Int
+// CHECK:         %[[#RESULT1:]] = apply %[[#]](%[[#NOESCAPE1]])
+// CHECK-NEXT:    destroy_value %[[#NOESCAPE1]]
+// CHECK-NEXT:    destroy_value %[[#OWNER1]]
+// CHECK-NEXT:    return %[[#RESULT1]]
+sil [ossa] @noConvert_noLexical : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  %3 = begin_borrow %2
+  %4 = convert_escape_to_noescape %3 to $@noescape @callee_guaranteed () -> Int
+  %5 = function_ref @useNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  destroy_value %4
+  end_borrow %3
+  destroy_value %2
+  return %6
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @noConvert_ownerLexical_borrowLexical :
+// CHECK:         %[[#OWNER2:]] = move_value [lexical] %[[#]]
+
+// ONONE-NEXT:    %[[#BORROW2:]] = begin_borrow [lexical] %[[#OWNER2]]
+// ONONE-NEXT:    %[[#NOESCAPE2:]] = convert_escape_to_noescape %[[#BORROW2]] to $@noescape @callee_guaranteed () -> Int
+// ONONE:         destroy_value %[[#NOESCAPE2]]
+// ONONE-NEXT:    end_borrow %[[#BORROW2]]
+
+// OPT-NEXT:      %[[#NOESCAPE2:]] = convert_escape_to_noescape %[[#OWNER2]] to $@noescape @callee_guaranteed () -> Int
+// OPT:           destroy_value %[[#NOESCAPE2]]
+
+// CHECK-NEXT:    // function_ref useEscapingClosure
+// CHECK-NEXT:    %[[#LATER_USE2:]] = function_ref @useEscapingClosure :
+// CHECK-NEXT:    apply %[[#LATER_USE2]](%[[#OWNER2]])
+// CHECK-NEXT:    destroy_value %[[#OWNER2]]
+// CHECK-NEXT:    return %[[#]]
+sil [ossa] @noConvert_ownerLexical_borrowLexical : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  %3 = move_value [lexical] %2
+  %4 = begin_borrow [lexical] %3
+  %5 = convert_escape_to_noescape %4 to $@noescape @callee_guaranteed () -> Int
+  %6 = function_ref @useNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  destroy_value %5
+  end_borrow %4
+  %8 = function_ref @useEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+  %9 = apply %8(%3) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+  destroy_value %3
+  return %7
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @withConvert_ownerLexical_borrowNoLexical :
+// CHECK:       bb0(%0 : $Int):
+// CHECK:         %[[#OWNER3:]] = move_value [lexical] %[[#]]
+// CHECK-NEXT:    debug_value %[[#OWNER3]], let, name "f"
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    %[[#FIRST3:]] = convert_function %[[#OWNER3]] to $@callee_guaranteed () -> (Int, @error any Error)
+// CHECK-NEXT:    %[[#LAST3:]] = convert_function %[[#FIRST3]] to $@callee_guaranteed () -> Int
+// CHECK-NEXT:    %[[#NOESCAPE3:]] = convert_escape_to_noescape %[[#LAST3]] to $@noescape @callee_guaranteed () -> Int
+// CHECK:         destroy_value %[[#NOESCAPE3]]
+// CHECK-NEXT:    destroy_value %[[#LAST3]]
+// CHECK-NEXT:    return %[[#]]
+sil [ossa] @withConvert_ownerLexical_borrowNoLexical : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  %3 = move_value [lexical] %2
+  debug_value %3, let, name "f"
+  %4 = begin_borrow %3
+  br bb1
+
+bb1:
+  %5 = convert_function %4 to $@callee_guaranteed () -> (Int, @error any Error)
+  %6 = convert_function %5 to $@callee_guaranteed () -> Int
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed () -> Int
+  %8 = function_ref @useNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  destroy_value %7
+  end_borrow %4
+  destroy_value %3
+  return %9
+}
+
+/// Rejection test cases prefixed with `keep_`: no transform performed
+
+// Change only the baseline borrow's lexical flag. A nonlexical owner cannot
+// preserve the constraint if this lexical borrow is removed.
+// CHECK-LABEL: {{^}}sil [ossa] @keep_borrowLexical :
+// CHECK:         %[[#OWNER4:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// CHECK-NEXT:    %[[#BORROW4:]] = begin_borrow [lexical] %[[#OWNER4]]
+// CHECK-NEXT:    %[[#NOESCAPE4:]] = convert_escape_to_noescape %[[#BORROW4]] to $@noescape @callee_guaranteed () -> Int
+// CHECK:         destroy_value %[[#NOESCAPE4]]
+// CHECK-NEXT:    end_borrow %[[#BORROW4]]
+// CHECK-NEXT:    destroy_value %[[#OWNER4]]
+sil [ossa] @keep_borrowLexical : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  %3 = begin_borrow [lexical] %2
+  %4 = convert_escape_to_noescape %3 to $@noescape @callee_guaranteed () -> Int
+  %5 = function_ref @useNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  destroy_value %4
+  end_borrow %3
+  destroy_value %2
+  return %6
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @keep_unsupportedOwnerUseWithConvert :
+// CHECK:         %[[#OWNER5:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// CHECK-NEXT:    %[[#BORROW5:]] = begin_borrow %[[#OWNER5]]
+// CHECK-NEXT:    %[[#CONVERTED5:]] = convert_function %[[#BORROW5]] to $@callee_guaranteed () -> (Int, @error any Error)
+// CHECK-NEXT:    %[[#NOESCAPE5:]] = convert_escape_to_noescape %[[#CONVERTED5]] to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+// CHECK:         destroy_value %[[#NOESCAPE5]]
+// CHECK-NEXT:    end_borrow %[[#BORROW5]]
+// CHECK:         %[[#LATER_USE5:]] = function_ref @useEscapingClosure :
+// CHECK-NEXT:    apply %[[#LATER_USE5]](%[[#OWNER5]])
+// CHECK-NEXT:    destroy_value %[[#OWNER5]]
+sil [ossa] @keep_unsupportedOwnerUseWithConvert : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  %3 = begin_borrow %2
+  %4 = convert_function %3 to $@callee_guaranteed () -> (Int, @error any Error)
+  %5 = convert_escape_to_noescape %4 to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  %6 = function_ref @useThrowingNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  destroy_value %5
+  end_borrow %3
+  %8 = function_ref @useEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+  %9 = apply %8(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+  destroy_value %2
+  return %7
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @keep_unsupportedBorrowUseWithConvert :
+// CHECK:         %[[#OWNER6:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// CHECK-NEXT:    %[[#BORROW6:]] = begin_borrow %[[#OWNER6]]
+// CHECK-NEXT:    %[[#CONVERTED6:]] = convert_function %[[#BORROW6]] to $@callee_guaranteed () -> (Int, @error any Error)
+// CHECK-NEXT:    %[[#NOESCAPE6:]] = convert_escape_to_noescape %[[#CONVERTED6]] to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+// CHECK:         destroy_value %[[#NOESCAPE6]]
+// CHECK:         %[[#EXTRA_USE6:]] = function_ref @useEscapingClosure :
+// CHECK-NEXT:    apply %[[#EXTRA_USE6]](%[[#BORROW6]])
+// CHECK-NEXT:    end_borrow %[[#BORROW6]]
+// CHECK-NEXT:    destroy_value %[[#OWNER6]]
+sil [ossa] @keep_unsupportedBorrowUseWithConvert : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  %3 = begin_borrow %2
+  %4 = convert_function %3 to $@callee_guaranteed () -> (Int, @error any Error)
+  %5 = convert_escape_to_noescape %4 to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  %6 = function_ref @useThrowingNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  destroy_value %5
+  %8 = function_ref @useEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+  %9 = apply %8(%3) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> ()
+  end_borrow %3
+  destroy_value %2
+  return %7
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @keep_withConvert_noDestroy :
+// CHECK:         %[[#OWNER7:]] = unchecked_ownership_conversion %0, @unowned to @owned
+// CHECK-NEXT:    %[[#BORROW7:]] = begin_borrow %[[#OWNER7]]
+// CHECK-NEXT:    %[[#CONVERTED7:]] = convert_function %[[#BORROW7]] to $@callee_guaranteed () -> (Int, @error any Error)
+// CHECK-NEXT:    %[[#NOESCAPE7:]] = convert_escape_to_noescape %[[#CONVERTED7]] to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+// CHECK:         %[[#RESULT7:]] = apply %[[#]](%[[#NOESCAPE7]])
+// CHECK-NEXT:    destroy_value %[[#NOESCAPE7]]
+// CHECK-NEXT:    end_borrow %[[#BORROW7]]
+// CHECK-NEXT:    return %[[#RESULT7]]
+sil [ossa] @keep_withConvert_noDestroy : $@convention(thin) (@callee_guaranteed () -> Int) -> Int {
+bb0(%0 : @unowned $@callee_guaranteed () -> Int):
+  %1 = unchecked_ownership_conversion %0, @unowned to @owned
+  %2 = begin_borrow %1
+  %3 = convert_function %2 to $@callee_guaranteed () -> (Int, @error any Error)
+  %4 = convert_escape_to_noescape %3 to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  %5 = function_ref @useThrowingNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  destroy_value %4
+  end_borrow %2
+  return %6
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @keep_withConvert_notDominatingAllDestroys :
+// CHECK:       bb0(%0 : $Int, %1 : $Builtin.Int1):
+// CHECK:         %[[#OWNER8:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// CHECK-NEXT:    %[[#BORROW8:]] = begin_borrow %[[#OWNER8]]
+// CHECK-NEXT:    cond_br %1, bb1, bb2
+// CHECK:       bb1:
+// CHECK-NEXT:    %[[#CONVERTED8:]] = convert_function %[[#BORROW8]] to $@callee_guaranteed () -> (Int, @error any Error)
+// CHECK-NEXT:    %[[#NOESCAPE8:]] = convert_escape_to_noescape %[[#CONVERTED8]] to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+// CHECK:         destroy_value %[[#NOESCAPE8]]
+// CHECK-NEXT:    end_borrow %[[#BORROW8]]
+// CHECK-NEXT:    destroy_value %[[#OWNER8]]
+// CHECK-NEXT:    br bb3(%[[#]])
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %[[#BORROW8]]
+// CHECK-NEXT:    destroy_value %[[#OWNER8]]
+// CHECK-NEXT:    br bb3(%[[#]])
+// CHECK:       bb3(%[[#RESULT8:]] : $Int):
+// CHECK-NEXT:    return %[[#RESULT8]]
+sil [ossa] @keep_withConvert_notDominatingAllDestroys : $@convention(thin) (Int, Builtin.Int1) -> Int {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
+  %2 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (Int) -> Int
+  %4 = begin_borrow %3
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = convert_function %4 to $@callee_guaranteed () -> (Int, @error any Error)
+  %6 = convert_escape_to_noescape %5 to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  %7 = function_ref @useThrowingNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> Int
+  destroy_value %6
+  end_borrow %4
+  destroy_value %3
+  br bb3(%8)
+
+bb2:
+  end_borrow %4
+  destroy_value %3
+  br bb3(%0)
+
+bb3(%9 : $Int):
+  return %9
+}
+
+// CHECK-LABEL: {{^}}sil [ossa] @keep_withConvert_repeatedConsume :
+// CHECK:       bb0(%0 : $Int, %1 : $Builtin.Int1):
+// CHECK:         %[[#OWNER9:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// CHECK-NEXT:    %[[#BORROW9:]] = begin_borrow %[[#OWNER9]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    %[[#FIRST9:]] = convert_function %[[#BORROW9]] to $@callee_guaranteed () -> (Int, @error any Error)
+// CHECK-NEXT:    cond_br %1, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1
+// CHECK:       bb3:
+// CHECK-NEXT:    %[[#LAST9:]] = convert_function %[[#FIRST9]] to $@callee_guaranteed () -> Int
+// CHECK-NEXT:    %[[#NOESCAPE9:]] = convert_escape_to_noescape %[[#LAST9]] to $@noescape @callee_guaranteed () -> Int
+// CHECK:         destroy_value %[[#NOESCAPE9]]
+// CHECK-NEXT:    end_borrow %[[#BORROW9]]
+// CHECK-NEXT:    destroy_value %[[#OWNER9]]
+sil [ossa] @keep_withConvert_repeatedConsume : $@convention(thin) (Int, Builtin.Int1) -> Int {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
+  %2 = function_ref @captureInt : $@convention(thin) (Int) -> Int
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (Int) -> Int
+  %4 = begin_borrow %3
+  br bb1
+
+bb1:
+  %5 = convert_function %4 to $@callee_guaranteed () -> (Int, @error any Error)
+  cond_br %1, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %6 = convert_function %5 to $@callee_guaranteed () -> Int
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed () -> Int
+  %8 = function_ref @useNoescape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  destroy_value %7
+  end_borrow %4
+  destroy_value %3
+  return %9
+}
