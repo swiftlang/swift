@@ -2192,7 +2192,7 @@ CaseBlocks::CaseBlocks(
   CaseInfos.reserve(rows.size());
   CaseCounts.reserve(rows.size());
 
-  auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+  auto enumDecl = sourceType.getEnumDecl();
 
   llvm::SmallDenseMap<EnumElementDecl *, unsigned, 16> caseToIndex;
   for (auto &row : rows) {
@@ -3910,7 +3910,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         getLoweredType(AbstractionPattern::getOpaque(), metatypeType);
     ManagedValue value = subject.getFinalManagedValue();
 
-    if (auto *singleEnumDecl = canSubjectTy->getEnumOrBoundGenericEnum()) {
+    if (auto *singleEnumDecl = canSubjectTy->getEnumDecl()) {
       if (singleEnumDecl->isObjC()) {
         auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
             B.createMetatype(loc, loweredMetatypeType));

@@ -1804,7 +1804,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
 
             return ManagedValue::forForwardedRValue(*this, exn);
           }).forward(*this);
-    } else if (destASTType->getClassOrBoundGenericClass()) {
+    } else if (destASTType->getClassDecl()) {
       // Class upcast: the in-flight error is a reference to a subclass of
       // the destination. SIL's `upcast` instruction additionally verifies
       // the subclass relationship in asserts builds; release builds rely

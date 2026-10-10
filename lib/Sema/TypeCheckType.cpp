@@ -2214,7 +2214,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
 
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
-      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal())
+      if (auto typeDecl = parentType->getNominalDecl())
         diagnose(typeDecl, diag::decl_declared_here, typeDecl);
     }
   }
@@ -4341,7 +4341,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
       // types.
-      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+      if (auto SD = ty->getStructDecl()) {
         if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
             ownership == ParamSpecifier::InOut) {
           diagnose(eltTypeRepr->getLoc(),

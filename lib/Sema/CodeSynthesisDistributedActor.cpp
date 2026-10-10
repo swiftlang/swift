@@ -657,7 +657,7 @@ bool swift::distributedThunkShouldBeNonisolatedNonsending(FuncDecl *func) {
   if (!systemTy)
     return false;
 
-  auto *systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  auto *systemNominal = systemTy->getNominalDecl();
   if (!systemNominal)
     return false;
 

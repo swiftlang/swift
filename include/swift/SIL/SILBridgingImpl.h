@@ -479,12 +479,12 @@ BridgedStringRef BridgedType::getFieldName(SwiftInt idx) const {
 }
 
 BridgedType::EnumElementIterator BridgedType::getFirstEnumCaseIterator() const {
-  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = unbridged().getEnumDecl();
   return bridge(enumDecl->getAllElements().begin());
 }
 
 bool BridgedType::isEndCaseIterator(EnumElementIterator i) const {
-  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = unbridged().getEnumDecl();
   return unbridge(i) == enumDecl->getAllElements().end();
 }
 
@@ -3789,7 +3789,7 @@ BridgedVTable BridgedContext::createSpecializedVTable(BridgedType classType,
   }
   swift::SILType classTy = classType.unbridged();
   return {swift::SILVTable::create(*context->getModule(),
-                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   classTy.getClassDecl(), classTy,
                                    serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                    entries)};
 }

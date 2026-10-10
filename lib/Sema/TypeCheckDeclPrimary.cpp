@@ -459,7 +459,7 @@ static void checkInheritanceClause(
     // If this is a class type, it may be the superclass. We end up here when
     // the inherited type is either itself a class, or when it is a subclass
     // existential via the existential type path above.
-    if (inheritedTy->getClassOrBoundGenericClass()) {
+    if (inheritedTy->getClassDecl()) {
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
@@ -2726,7 +2726,7 @@ public:
     // completely type checked at that point.
     auto &DE = Ctx.Diags;
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = VD->getInterfaceType()->getNominalDecl()) {
         if (!nom->canBeCopyable()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
@@ -2736,7 +2736,7 @@ public:
     }
 
     // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
-    if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = VD->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>()) {
         auto isProtocolContext = isa<ProtocolDecl>(DC);
 
@@ -3580,7 +3580,7 @@ public:
       });
 
     if (auto superclassTy = CD->getSuperclass()) {
-      ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+      ClassDecl *Super = superclassTy->getClassDecl();
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {
@@ -4538,7 +4538,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // If we have a noimplicitcopy parameter, make sure that the underlying type
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = param->getInterfaceType()->getNominalDecl()) {
         if (!nom->canBeCopyable()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
@@ -4548,7 +4548,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     // @_staticExclusiveOnly types cannot be passed as 'inout', only as either
     // a borrow or as consuming.
-    if (auto SD = param->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = param->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           param->isInOut()) {
         SD->getASTContext().Diags.diagnoseWithNotes(

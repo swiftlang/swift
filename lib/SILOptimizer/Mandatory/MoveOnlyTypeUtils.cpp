@@ -16,7 +16,7 @@ using namespace swift;
 using namespace swift::siloptimizer;
 
 static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
-  auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
+  auto structDecl = ktypeTy.getStructDecl();
   if (!structDecl || structDecl->hasUnreferenceableStorage())
     return nullptr;
   return structDecl;
@@ -100,7 +100,7 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
     llvm_unreachable("Not a child of this type?!");
   }
 
-  if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = ancestorType.getEnumDecl()) {
     if (enumDecl == fn->getASTContext().getOptionalDecl()) {
       // The only possible child of Optional is the wrapped type.
       return {{ancestorOffsetSize, ancestorType.getOptionalObjectType()}};
@@ -227,7 +227,7 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
     llvm_unreachable("Not a child of this type?!");
   }
 
-  if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = ancestorType.getEnumDecl()) {
     if (enumDecl == fn->getASTContext().getOptionalDecl()) {
       // The only possible child of Optional is the wrapped type.
       auto newValue
@@ -344,7 +344,7 @@ void TypeOffsetSizePair::constructPathString(
       llvm_unreachable("Not a child of this type?!");
     }
 
-    if (auto *enumDecl = iterType.getEnumOrBoundGenericEnum()) {
+    if (auto *enumDecl = iterType.getEnumDecl()) {
       unsigned childOffset = iterPair.startOffset;
       bool foundValue = false;
       if (enumDecl == fn->getASTContext().getOptionalDecl()) {

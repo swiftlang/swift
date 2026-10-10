@@ -1219,7 +1219,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (userValue->getType().getEnumOrBoundGenericEnum() ||
+  if (userValue->getType().getEnumDecl() ||
       userValue->getType().isExistentialType()) {
     storage.initializes = true;
   }
@@ -2024,7 +2024,7 @@ SILValue AddressMaterialization::materializeStructExtract(
     SILInstruction *extractInst, SILValue elementValue, unsigned fieldIdx) {
   auto structVal = extractInst->getOperand(0);
   SILValue srcAddr = pass.getMaterializedAddress(structVal);
-  auto *structType = structVal->getType().getStructOrBoundGenericStruct();
+  auto *structType = structVal->getType().getStructDecl();
   auto *varDecl = structType->getStoredProperties()[fieldIdx];
   return projectionBuilder.createStructElementAddr(
       pass.genLoc(), srcAddr, varDecl,
@@ -4342,7 +4342,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
   bool borrowed = enumVal->getOwnershipKind() == OwnershipKind::Guaranteed;
   bool borrowIntoScratch =
       borrowed && UncheckedEnumDataAddrInstBase::isDestructive(
-                      enumVal->getType().getEnumOrBoundGenericEnum(),
+                      enumVal->getType().getEnumDecl(),
                       pass.function);
 
   BeginAccessInst *access = nullptr;

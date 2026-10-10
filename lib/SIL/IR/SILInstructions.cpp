@@ -784,7 +784,7 @@ bool DebugValueInst::isExprTypeValid() const {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
       auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
       if (!FieldParent ||
-          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+          RunningType.getNominalDecl() != FieldParent)
         return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
@@ -1908,7 +1908,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBaseWithTrailingOperands(
       Elems, Loc, Ty, forwardingOwnershipKind)
 {
-  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
+  assert(!Ty.getStructDecl()->hasUnreferenceableStorage());
 }
 
 BorrowedFromInst *BorrowedFromInst::create(SILDebugLocation DebugLoc, SILValue borrowedValue,
@@ -3611,7 +3611,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootTy->getClassOrBoundGenericClass()) {
+      } else if (rootTy->getClassDecl()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       } else {
         keyPathClass = ctx.getWritableKeyPathDecl();
@@ -3709,7 +3709,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   CanType currentRoot = rootTy;
 
   for (const auto &comp : components) {
-    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+    bool rootIsClass = (bool)currentRoot->getClassDecl();
 
     switch (comp.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
@@ -3929,7 +3929,7 @@ DestructureStructInst::create(const SILFunction &F, SILDebugLocation Loc,
                               ValueOwnershipKind forwardingOwnershipKind) {
   auto &M = F.getModule();
 
-  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+  assert(Operand->getType().getStructDecl() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;

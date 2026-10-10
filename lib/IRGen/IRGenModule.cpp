@@ -2503,7 +2503,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (!Triple.isOSDarwin() && !Context.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  auto *clDecl = objectType.getClassDecl();
   if (!clDecl)
     return false;
 

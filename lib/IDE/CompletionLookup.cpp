@@ -2570,7 +2570,7 @@ void CompletionLookup::addObjCPoundKeywordCompletions(bool needPound) {
 
   for (auto T : expectedTypeContext.getPossibleTypes()) {
     T = T->lookThroughAllOptionalTypes();
-    if (auto structDecl = T->getStructOrBoundGenericStruct()) {
+    if (auto structDecl = T->getStructDecl()) {
       if (!addedSelector && structDecl->getName() == Ctx.Id_Selector &&
           structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
         addPoundSelector(needPound);

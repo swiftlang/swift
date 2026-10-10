@@ -249,7 +249,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     auto inheritedTypes = classDecl->getInherited();
     for (unsigned i : inheritedTypes.getIndices()) {
       if (auto inheritedType = inheritedTypes.getEntry(i).getType()) {
-        if (inheritedType->getClassOrBoundGenericClass()) {
+        if (inheritedType->getClassDecl()) {
           superclassLoc = inheritedTypes.getEntry(i).getSourceRange().Start;
           return superclassLoc;
         }

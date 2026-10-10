@@ -933,7 +933,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     auto argumentTy = argumentParam->getInterfaceType();
     auto argumentInContextTy = mapTypeIntoEnvironment(argumentTy);
     if (argumentInContextTy->getAnyNominal() == C.getRemoteCallArgumentDecl()) {
-      auto argGenericParams = argumentInContextTy->getStructOrBoundGenericStruct()
+      auto argGenericParams = argumentInContextTy->getStructDecl()
           ->getGenericParams()->getParams();
       if (argGenericParams.size() != 1) {
         return false;
@@ -1495,7 +1495,7 @@ swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
   if (actorOrSystem->isDistributedActor()) {
     if (auto systemTy =
             getConcreteReplacementForProtocolActorSystemType(actorOrSystem)) {
-      system = systemTy->getNominalOrBoundGenericNominal();
+      system = systemTy->getNominalDecl();
     }
   }
 
@@ -1623,7 +1623,7 @@ FuncDecl *swift::getMakeInvocationEncoderOnDistributedActorSystem(
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
   assert(systemTy && "No specific ActorSystem type found!");
 
-  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  auto systemNominal = systemTy->getNominalDecl();
   assert(systemNominal && "No system nominal type found!");
 
   for (auto result :

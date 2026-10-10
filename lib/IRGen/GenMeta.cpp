@@ -3084,7 +3084,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   if (layoutStringsEnabled(IGM)) {
 
     auto genericSig =
-        lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+        lowered.getNominalDecl()->getGenericSignature();
     hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
 
     if (!hasLayoutString &&
@@ -3181,17 +3181,17 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
   case TypeKind::Struct:
   case TypeKind::BoundGenericStruct:
     emitSpecializedGenericStructMetadata(IGM, type,
-                                         *type.getStructOrBoundGenericStruct());
+                                         *type.getStructDecl());
     break;
   case TypeKind::Enum:
   case TypeKind::BoundGenericEnum:
     emitSpecializedGenericEnumMetadata(IGM, type,
-                                       *type.getEnumOrBoundGenericEnum());
+                                       *type.getEnumDecl());
     break;
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
     emitSpecializedGenericClassMetadata(IGM, type,
-                                        *type.getClassOrBoundGenericClass());
+                                        *type.getClassDecl());
     break;
   default:
     llvm_unreachable(
@@ -3286,7 +3286,7 @@ void IRGenFunction::
 emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
                                 bool isVWTMutable,
                                 MetadataDependencyCollector *collector) {
-  auto *target = T.getNominalOrBoundGenericNominal();
+  auto *target = T.getNominalDecl();
 
   llvm::Value *fieldVector = nullptr;
   // @objc @implementation classes don't actually have a field vector; for them,
@@ -3415,7 +3415,7 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
       Feature::LayoutStringValueWitnessesInstantiation) &&
       IGM.getOptions().EnableLayoutStringValueWitnesses);
 
-  auto *target = T.getStructOrBoundGenericStruct();
+  auto *target = T.getStructDecl();
 
   llvm::Value *fieldVector =
       emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
@@ -3660,7 +3660,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+    if (T.getStructDecl()->hasValueTypeDestructor()) {
       rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                           IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
     } else {
@@ -3670,7 +3670,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
       rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+  } else if (T.getStructDecl()->hasValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }
@@ -3865,7 +3865,7 @@ namespace {
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
-          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+          lowered.getNominalDecl()->getGenericSignature();
 
       return typeLayoutEntry->layoutString(IGM, genericSig);
     }
@@ -4557,7 +4557,7 @@ namespace {
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
-          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+          lowered.getNominalDecl()->getGenericSignature();
 
       return typeLayoutEntry->layoutString(IGM, genericSig);
     }
@@ -5303,7 +5303,7 @@ namespace {
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
-          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+          lowered.getNominalDecl()->getGenericSignature();
 
       return typeLayoutEntry->layoutString(IGM, genericSig);
     }
@@ -5730,7 +5730,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   auto &fragileLayout =
       classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
 
-  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+  ClassDecl *classDecl = classType.getClassDecl();
   auto strategy = IGM.getClassMetadataStrategy(classDecl);
   assert(strategy == ClassMetadataStrategy::FixedOrUpdate ||
          strategy == ClassMetadataStrategy::Fixed);
@@ -5765,7 +5765,7 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   // module; importing modules reference them as external symbols rather than
   // lazily emitting their own copy.
   if (IGM.isEmbeddedWithExistentials()) {
-    if (auto *classDecl = classTy->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = classTy->getClassDecl()) {
       if (classDecl->getEffectiveCodeGenerationModel()
               == CodeGenerationModel::Interface)
         return;
@@ -5786,23 +5786,23 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   }
 
   if (hasEmbeddedWithExistentials) {
-    emitEmbeddedClassMetadata(IGM, classTy->getClassOrBoundGenericClass());
+    emitEmbeddedClassMetadata(IGM, classTy->getClassDecl());
     return;
   }
 
-  auto &context = classTy->getNominalOrBoundGenericNominal()->getASTContext();
+  auto &context = classTy->getNominalDecl()->getASTContext();
   PrettyStackTraceType stackTraceRAII(
     context, "emitting lazy class metadata for", classTy);
 
   SILType classType = SILType::getPrimitiveObjectType(classTy);
-  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+  ClassDecl *classDecl = classType.getClassDecl();
   SILVTable *vtable = IGM.getSILModule().lookUpVTable(classDecl);
   emitEmbeddedVTable(IGM, classTy, vtable);
 }
 
 void irgen::emitLazySpecializedClassMetadata(IRGenModule &IGM,
                                              CanType classTy) {
-  auto &context = classTy->getNominalOrBoundGenericNominal()->getASTContext();
+  auto &context = classTy->getNominalDecl()->getASTContext();
   PrettyStackTraceType stackTraceRAII(
     context, "emitting lazy specialized class metadata for", classTy);
 
@@ -5821,10 +5821,10 @@ void irgen::emitLazySpecializedValueMetadata(IRGenModule &IGM,
     emitLazyTupleMetadata(IGM, valueTy);
   } else if (isa<FunctionType>(valueTy)) {
     emitLazyFunctionMetadata(IGM, valueTy);
-  } else if (valueTy->getStructOrBoundGenericStruct()) {
+  } else if (valueTy->getStructDecl()) {
     emitSpecializedGenericStructMetadata(IGM, valueTy,
-                                         *valueTy.getStructOrBoundGenericStruct());
-  } else if (auto enumTy = valueTy->getEnumOrBoundGenericEnum()) {
+                                         *valueTy.getStructDecl());
+  } else if (auto enumTy = valueTy->getEnumDecl()) {
     emitSpecializedGenericEnumMetadata(IGM, valueTy, *enumTy);
   } else if (valueTy->isAnyExistentialType()) {
     emitLazyExistentialMetadata(IGM, valueTy);
@@ -5840,7 +5840,7 @@ void irgen::emitSpecializedGenericClassMetadata(IRGenModule &IGM, CanType type,
   assert(decl.isGenericContext());
   assert(IGM.getClassMetadataStrategy(&decl) ==
          ClassMetadataStrategy::Resilient);
-  auto &context = type->getNominalOrBoundGenericNominal()->getASTContext();
+  auto &context = type->getNominalDecl()->getASTContext();
   auto ty = type.getPointer();
   PrettyStackTraceType stackTraceRAII(
       context, "emitting prespecialized class metadata for", ty);
@@ -6101,7 +6101,7 @@ namespace {
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
-          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+          lowered.getNominalDecl()->getGenericSignature();
 
       return typeLayoutEntry->layoutString(IGM, genericSig);
     }
@@ -6460,7 +6460,7 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
                                                  StructDecl &decl) {
   Type ty = type.getPointer();
-  auto &context = type->getNominalOrBoundGenericNominal()->getASTContext();
+  auto &context = type->getNominalDecl()->getASTContext();
   PrettyStackTraceType stackTraceRAII(
       context, "emitting prespecialized metadata for", ty);
   ConstantInitBuilder initBuilder(IGM);
@@ -6824,7 +6824,7 @@ namespace {
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
-          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+          lowered.getNominalDecl()->getGenericSignature();
 
       return typeLayoutEntry->layoutString(IGM, genericSig);
     }
@@ -7147,7 +7147,7 @@ void irgen::emitSpecializedGenericEnumMetadata(IRGenModule &IGM, CanType type,
                                                EnumDecl &decl) {
   assert(decl.isGenericContext());
   Type ty = type.getPointer();
-  auto &context = type->getNominalOrBoundGenericNominal()->getASTContext();
+  auto &context = type->getNominalDecl()->getASTContext();
   PrettyStackTraceType stackTraceRAII(
       context, "emitting prespecialized metadata for", ty);
   ConstantInitBuilder initBuilder(IGM);

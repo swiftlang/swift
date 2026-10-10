@@ -420,7 +420,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_CXX:
       if (!isSelfParameter) return;
-      if (type->getNominalOrBoundGenericNominal()) {
+      if (type->getNominalDecl()) {
         considerNewTypeSource(IsExact,
                               MetadataSource::Kind::GenericLValueMetadata,
                               type, paramIndex);
@@ -440,7 +440,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
       // Classes are sources of metadata.
-      if (type->getClassOrBoundGenericClass()) {
+      if (type->getClassDecl()) {
         considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
                               type, paramIndex);
         return;
@@ -463,7 +463,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         // Thick metatypes for Objective-C parameterized classes are not
         // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
-        if (auto classDecl = objTy->getClassOrBoundGenericClass())
+        if (auto classDecl = objTy->getClassDecl())
           if (classDecl->isTypeErasedGenericClass())
             return;
 
@@ -633,7 +633,7 @@ void EmitPolymorphicParameters::bindExtraSource(
           IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
-      auto *CD = selfTy.getClassOrBoundGenericClass();
+      auto *CD = selfTy.getClassDecl();
       // The self metadata here corresponds to the conforming type.
       // For an inheritable conformance, that may be a subclass of the static
       // type, and so the self metadata will be inexact. Currently, all

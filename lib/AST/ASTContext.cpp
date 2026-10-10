@@ -2602,7 +2602,7 @@ void ASTContext::loadObjCMethods(
 
 ConstructorDecl *ASTContext::getOptionalTanInitDecl(CanType optionalTanType) {
   if (!getImpl().OptionalTanInitDecl) {
-    auto *optionalTanDecl = optionalTanType.getNominalOrBoundGenericNominal();
+    auto *optionalTanDecl = optionalTanType.getNominalDecl();
     // Look up the `Optional<T>.TangentVector.init` declaration.
     auto initLookup =
       optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
@@ -2630,14 +2630,14 @@ VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
   if (!getImpl().OptionalTanValueDecl) {
     // TODO: Maybe it would be better to have getters / setters here that we
     // can call and hide this implementation detail?
-    StructDecl *optStructDecl = optionalTanType.getStructOrBoundGenericStruct();
+    StructDecl *optStructDecl = optionalTanType.getStructDecl();
     assert(optStructDecl && "Unexpected type of Optional.TangentVector");
 
     ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
     assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
     VarDecl *wrappedValueVar = properties[0];
 
-    assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
+    assert(wrappedValueVar->getTypeInContext()->getEnumDecl() ==
            getOptionalDecl() && "Unexpected type of Optional.TangentVector");
 
     getImpl().OptionalTanValueDecl = wrappedValueVar;
@@ -4612,7 +4612,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // evaluator cycle to determine the init kind for actors, which are final.
     if (Ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
       if (wantDynamicSelf)
-        if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+        if (auto *classDecl = selfTy->getClassDecl())
           if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
             isDynamicSelf = true;
     }
@@ -7144,7 +7144,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
 }
 
 bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
-  auto clazz = t->getClassOrBoundGenericClass();
+  auto clazz = t->getClassDecl();
   if (!clazz)
     return false;
 

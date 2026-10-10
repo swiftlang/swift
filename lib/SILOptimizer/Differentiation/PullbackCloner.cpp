@@ -437,7 +437,7 @@ private:
           materializeAdjointIndirect(val.getAggregateElement(idx), eltBuf, loc);
         }
       } else if (auto *structDecl =
-                     val.getSwiftType()->getStructOrBoundGenericStruct()) {
+                     val.getSwiftType()->getStructDecl()) {
         auto fieldIt = structDecl->getStoredProperties().begin();
         for (unsigned i = 0; fieldIt != structDecl->getStoredProperties().end();
              ++fieldIt, ++i) {
@@ -1415,7 +1415,7 @@ public:
 #ifndef NDEBUG
         auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
         assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
-        assert(tangentVectorTy->getStructOrBoundGenericStruct());
+        assert(tangentVectorTy->getStructDecl());
 #endif
 
         // Accumulate adjoints for the fields of the `struct` operand.
@@ -1585,7 +1585,7 @@ public:
       auto tangentVectorSILTy =
           SILType::getPrimitiveObjectType(tangentVectorTy);
       auto *tangentVectorDecl =
-          tangentVectorTy->getStructOrBoundGenericStruct();
+          tangentVectorTy->getStructDecl();
       // Accumulate adjoint for the `ref_element_addr` operand.
       SmallVector<AdjointValue, 8> eltVals;
       for (auto *field : tangentVectorDecl->getStoredProperties()) {
@@ -2002,7 +2002,7 @@ public:
 
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
-    if (ei->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+    if (ei->getType().getEnumDecl() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unsupported enum type in PullbackCloner: " << *ei);
       getContext().emitNondifferentiabilityError(
@@ -2039,7 +2039,7 @@ public:
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
-    if (origEnum->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+    if (origEnum->getType().getEnumDecl() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unsupported enum type in PullbackCloner: " << *inject);
       getContext().emitNondifferentiabilityError(
@@ -2173,7 +2173,7 @@ public:
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
-    if (enumTy.getASTType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+    if (enumTy.getASTType().getEnumDecl() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unhandled instruction in PullbackCloner: " << *utedai);
       getContext().emitNondifferentiabilityError(
@@ -2352,7 +2352,7 @@ bool PullbackCloner::Implementation::run() {
       //
       // Do not diagnose `Optional`-typed values, which will have special-case
       // differentiation support.
-      if (type.getEnumOrBoundGenericEnum()) {
+      if (type.getEnumDecl()) {
         if (!type.getASTType()->isOptional()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);
@@ -3451,7 +3451,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
                          pullback.getLoweredFunctionType(),
                          TypeExpansionContext::minimal());
   auto tangentVectorTy = tangentVectorSILTy.getASTType();
-  auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
+  auto *tangentVectorDecl = tangentVectorTy->getStructDecl();
 
   // Look up the corresponding field in the tangent space.
   auto *origField = cast<VarDecl>(accessor->getStorage());
@@ -3831,7 +3831,7 @@ AdjointValue PullbackCloner::Implementation::accumulateAdjointsDirect(
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
         }
-      } else if (lhsTy->getStructOrBoundGenericStruct()) {
+      } else if (lhsTy->getStructDecl()) {
         auto elts =
             builder.createDestructureStruct(lhsVal.getLoc(), lhsValCopy);
         llvm::for_each(elts->getResults(),
@@ -4019,7 +4019,7 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   auto eltTanSILType = remapType(SILType::getPrimitiveAddressType(eltTanType));
   // Get `function_ref` and generic signature of
   // `Array.TangentVector.subscript.getter`.
-  auto *arrayTanStructDecl = arrayTanType->getStructOrBoundGenericStruct();
+  auto *arrayTanStructDecl = arrayTanType->getStructDecl();
   auto subscriptLookup =
       arrayTanStructDecl->lookupDirect(DeclBaseName::createSubscript());
   SubscriptDecl *subscriptDecl = nullptr;

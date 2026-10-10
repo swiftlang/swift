@@ -858,7 +858,7 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
     // Dig out the conforming nominal type.
     auto rootConformance = inherited->getRootConformance();
     auto conformingClass
-      = rootConformance->getType()->getClassOrBoundGenericClass();
+      = rootConformance->getType()->getClassDecl();
 
     // Map up to our superclass's type.
     auto superclassTy = type->getSuperclassForDecl(conformingClass);

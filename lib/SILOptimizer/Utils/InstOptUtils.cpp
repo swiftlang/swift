@@ -731,8 +731,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
               false};
     }
   }
-  NominalTypeDecl *srcNominal = srcTy.getNominalOrBoundGenericNominal();
-  NominalTypeDecl *destNominal = destTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *srcNominal = srcTy.getNominalDecl();
+  NominalTypeDecl *destNominal = destTy.getNominalDecl();
   if (srcNominal && srcNominal == destNominal &&
       !layoutIsTypeDependent(srcNominal) &&
       srcTy.isObject() && destTy.isObject()) {
@@ -2429,7 +2429,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
     SILBuilderWithScope builder(insertionPoint, ctx);
     return builder.createTuple(insertionPoint->getLoc(), ty, elements);
   }
-  if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *decl = ty.getStructDecl()) {
     TypeExpansionContext tec = *function;
     auto &module = function->getModule();
     if (decl->isResilient(tec.getContext()->getParentModule(),
@@ -2452,7 +2452,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
 }
 
 static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
-  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = ty.getStructDecl()) {
     return swift::findUnreferenceableStorage(structDecl, ty, func);
   }
   if (auto tupleTy = ty.getAs<TupleType>()) {

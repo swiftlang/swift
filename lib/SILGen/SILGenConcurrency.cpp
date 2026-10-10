@@ -345,7 +345,7 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
 
 std::pair<ManagedValue, CanType>
 SILGenFunction::emitLoadOfGlobalActorShared(SILLocation loc, CanType actorType) {
-  NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominal = actorType->getNominalDecl();
   VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
   assert(sharedInstanceDecl && "no shared actor field in global actor");
   SubstitutionMap subs =

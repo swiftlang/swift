@@ -1871,7 +1871,7 @@ private:
     return false;
   }
   static bool isObjCImplementation(CanType ty) {
-    return isObjCImplementation(ty->getClassOrBoundGenericClass());
+    return isObjCImplementation(ty->getClassDecl());
   }
 };
 

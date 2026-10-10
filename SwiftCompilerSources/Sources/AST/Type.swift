@@ -328,7 +328,7 @@ extension TypeProperties {
   public var isGenericAtAnyLevel: Bool { rawType.bridged.isGenericAtAnyLevel() }
 
   public var nominal: NominalTypeDecl? {
-    rawType.bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
+    rawType.bridged.getNominalDecl().getAs(NominalTypeDecl.self)
   }
 
   /// Performs a global conformance lookup for this type for `protocol`.

@@ -195,7 +195,7 @@ void LowerHopToActor::rewriteInstructions() {
 
 static bool isDefaultActorType(CanType actorType, ModuleDecl *M,
                                ResilienceExpansion expansion) {
-  if (auto cls = actorType.getClassOrBoundGenericClass())
+  if (auto cls = actorType.getClassDecl())
     return cls->isDefaultActor(M, expansion);
   return false;
 }

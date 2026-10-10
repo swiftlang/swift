@@ -251,7 +251,7 @@ bool ProtocolConformance::isRetroactive() const {
   }
 
   auto conformingTypeDecl =
-      ConformingType->getNominalOrBoundGenericNominal();
+      ConformingType->getNominalDecl();
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
     if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {

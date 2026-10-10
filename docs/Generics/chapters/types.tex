@@ -876,10 +876,10 @@ The \texttt{TypeVisitor} preserves information if it receives a sugared type; fo
 \paragraph{Nominal types.} The below methods on \texttt{TypeBase} perform a desugaring cast to a nominal type (so they will also accept a type alias type or other sugared type), and then they return the nominal type declaration, or \texttt{nullptr} if the type isn't of a nominal kind:
 \begin{itemize}
 \item \texttt{getAnyNominal()} returns the nominal type declaration of \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
-\item \texttt{getNominalOrBoundGenericNominal()} returns the nominal type declaration of a \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
-\item \texttt{getStructOrBoundGenericStruct()} returns the type declaration of a \texttt{StructType} or \texttt{BoundGenericStructType}, or \texttt{nullptr}.
-\item \texttt{getEnumOrBoundGenericEnum()} returns the enum declaration of an \texttt{EnumType} or \texttt{BoundGenericEnumType}, or \texttt{nullptr}.
-\item \texttt{getClassOrBoundGenericClass()} returns the class declaration of a \texttt{ClassType} or \texttt{BoundGenericClassType}, or \texttt{nullptr}.
+\item \texttt{getNominalDecl()} returns the nominal type declaration of a \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
+\item \texttt{getStructDecl()} returns the type declaration of a \texttt{StructType} or \texttt{BoundGenericStructType}, or \texttt{nullptr}.
+\item \texttt{getEnumDecl()} returns the enum declaration of an \texttt{EnumType} or \texttt{BoundGenericEnumType}, or \texttt{nullptr}.
+\item \texttt{getClassDecl()} returns the class declaration of a \texttt{ClassType} or \texttt{BoundGenericClassType}, or \texttt{nullptr}.
 \item \texttt{getNominalParent()} returns the parent type stored by an \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
 \end{itemize}
 
