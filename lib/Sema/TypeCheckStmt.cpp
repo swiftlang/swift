@@ -2615,7 +2615,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
-      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
+      if (auto classTy = selfTy->getClassDecl()) {
         assert(classTy->getSuperclass());
         auto &Diags = fromCtor->getASTContext().Diags;
         Diags.diagnose(apply->getArgs()->getLoc(), diag::chain_convenience_init,

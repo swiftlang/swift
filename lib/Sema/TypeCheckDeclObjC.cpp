@@ -196,7 +196,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for classes.
-  if (auto *CD = T->getClassOrBoundGenericClass()) {
+  if (auto *CD = T->getClassDecl()) {
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
           .highlight(TypeRange)
@@ -212,7 +212,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for structs.
-  if (auto *SD = T->getStructOrBoundGenericStruct()) {
+  if (auto *SD = T->getStructDecl()) {
     if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
       // This can be a non-trivial C++ record.
       diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class,
@@ -260,7 +260,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
     // See if the superclass is not @objc.
     if (auto superclass = layout.explicitSuperclass) {
-      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
+      if (!superclass->getClassDecl()->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_class_constraint,
                        superclass)
             .limitBehavior(behavior);
@@ -498,7 +498,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clazz = type->getClassOrBoundGenericClass();
+  auto clazz = type->getClassDecl();
   if (!clazz)
     return false;
 
@@ -4552,7 +4552,7 @@ private:
     // TODO: Support returning a foreign reference type unretained.
     const auto *resultClass = candFD->getResultInterfaceType()
                                   ->lookThroughAllOptionalTypes()
-                                  ->getClassOrBoundGenericClass();
+                                  ->getClassDecl();
     if (!resultClass || !resultClass->hasRefCountingAnnotations())
       return false;
     if (importer::getOwnershipOfReturnedFRT(clangFD, cand->getASTContext()) ==
@@ -5008,7 +5008,7 @@ static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
         /*isReceiver=*/false);
 
   for (auto [paramTy, isReceiver] : operands) {
-    auto *classDecl = paramTy->getClassOrBoundGenericClass();
+    auto *classDecl = paramTy->getClassDecl();
 
     // Immortal foreign reference types have no retain/release to implement.
     if (!classDecl || !classDecl->hasRefCountingAnnotations())

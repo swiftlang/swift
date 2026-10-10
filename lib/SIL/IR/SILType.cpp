@@ -109,13 +109,13 @@ void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
   printFlag("isAggregate", isAggregate());
   printFlag("isOrHasEnum", isOrHasEnum());
   StringRef nominalKind = "none";
-  if (getClassOrBoundGenericClass())
+  if (getClassDecl())
     nominalKind = "class";
-  else if (getStructOrBoundGenericStruct())
+  else if (getStructDecl())
     nominalKind = "struct";
-  else if (getEnumOrBoundGenericEnum())
+  else if (getEnumDecl())
     nominalKind = "enum";
-  else if (getNominalOrBoundGenericNominal())
+  else if (getNominalDecl())
     nominalKind = "other";
   OS << "  nominalKind: " << nominalKind << "\n";
   printOptionalSILType("optionalObjectType", getOptionalObjectType());
@@ -331,7 +331,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     return true;
   }
 
-  if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
+  if (StructDecl *structDecl = getStructDecl()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
     SILModule &module = F.getModule();
@@ -501,7 +501,7 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
 }
 
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
-  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
   return getIndexedField(decl, fieldIndex);
 }
@@ -527,10 +527,10 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
 
   // If this type is not a class type, then we propagate "move only"-ness to the
   // field. Example:
-  if (!getClassOrBoundGenericClass() && isMoveOnlyWrapped())
+  if (!getClassDecl() && isMoveOnlyWrapped())
     loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
-  if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
+  if (isAddress() || getClassDecl() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
     return SILType::getPrimitiveObjectType(loweredTy);
@@ -552,20 +552,20 @@ SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const 
 }
 
 StringRef SILType::getFieldName(intptr_t fieldIndex) const {
-  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *decl = getNominalDecl();
   VarDecl *field = getIndexedField(decl, fieldIndex);
   return field->getName().str();
 }
 
 unsigned SILType::getNumNominalFields() const {
-  auto *nominal = getNominalOrBoundGenericNominal();
+  auto *nominal = getNominalDecl();
   assert(nominal && "expected nominal type");
   return getNumFieldsInNominal(nominal);
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                                     TypeExpansionContext context) const {
-  assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
+  assert(elt->getDeclContext() == getEnumDecl());
   assert(elt->hasAssociatedValues());
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
@@ -603,7 +603,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
 }
 
 EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
-  EnumDecl *enumDecl = getEnumOrBoundGenericEnum();
+  EnumDecl *enumDecl = getEnumDecl();
   for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
     if ((int)elemWithIndex.index() == caseIndex)
       return elemWithIndex.value();
@@ -648,7 +648,7 @@ bool SILType::isHeapObjectReferenceType() const {
 }
 
 bool SILType::aggregateHasUnreferenceableStorage() const {
-  if (auto s = getStructOrBoundGenericStruct()) {
+  if (auto s = getStructDecl()) {
     return s->hasUnreferenceableStorage();
   }
   // Tuples with pack expansions don't *actually* have unreferenceable
@@ -1135,7 +1135,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
 }
 
 bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
-  EnumDecl *decl = getEnumOrBoundGenericEnum();
+  EnumDecl *decl = getEnumDecl();
   assert(decl && "Called for a non enum type");
 
   // Since unavailable enum elements cannot be referenced in canonical SIL,
@@ -1178,7 +1178,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     }
   }
 
-  if (auto structDecl = getStructOrBoundGenericStruct()) {
+  if (auto structDecl = getStructDecl()) {
     // If the struct has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (structDecl->isResilient(M.getSwiftModule(), expansion)) {
@@ -1216,7 +1216,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     return SILType();
   }
 
-  if (auto enumDecl = getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = getEnumDecl()) {
     // If the enum has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (enumDecl->isResilient(M.getSwiftModule(), expansion)) {
@@ -1319,7 +1319,7 @@ bool SILType::isMoveOnly(bool orWrapped) const {
 bool SILType::isValueTypeWithDeinit() const {
   // Do not look inside an aggregate type that has a user-deinit, for which
   // memberwise-destruction is not equivalent to aggregate destruction.
-  if (auto *nominal = getNominalOrBoundGenericNominal()) {
+  if (auto *nominal = getNominalDecl()) {
     return nominal->hasValueTypeDestructor();
   }
   return false;
@@ -1355,7 +1355,7 @@ static bool nominalIsMarkedAsImmortal(NominalTypeDecl *nominal) {
 }
 
 bool SILType::isMarkedAsImmortal() const {
-  NominalTypeDecl *nominal = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominal = getNominalDecl();
   if (!nominal)
     return false;
 
@@ -1387,7 +1387,7 @@ bool SILType::isAddressableForDeps(SILModule &M,
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
-  auto *nominal = getNominalOrBoundGenericNominal();
+  auto *nominal = getNominalDecl();
   if (!nominal)
     return -1;
 
@@ -1412,7 +1412,7 @@ intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
 }
 
 intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
-  auto *enumDecl = getEnumOrBoundGenericEnum();
+  auto *enumDecl = getEnumDecl();
   if (!enumDecl)
     return -1;
 
@@ -1493,7 +1493,7 @@ Type SILType::getRawLayoutSubstitutedLikeType() const {
   if (rawLayout->getSizeAndAlignment())
     return Type();
 
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   auto likeType = rawLayout->getResolvedLikeType(structDecl);
   auto astT = getASTType();
   auto subs = astT->getContextSubstitutionMap();
@@ -1509,7 +1509,7 @@ Type SILType::getRawLayoutSubstitutedCountType() const {
   if (rawLayout->getSizeAndAlignment() || rawLayout->getScalarLikeType())
     return Type();
 
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   auto countType = rawLayout->getResolvedCountType(structDecl);
   auto astT = getASTType();
   auto subs = astT->getContextSubstitutionMap();

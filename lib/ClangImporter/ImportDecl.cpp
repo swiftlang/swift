@@ -5117,7 +5117,7 @@ namespace {
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
             if (decl->getType()->isEnumeralType()) {
-              if (type->getEnumOrBoundGenericEnum()) {
+              if (type->getEnumDecl()) {
                 // When importing as an enum, also apply implicit force unwrap
                 convertKind = ConstantConvertKind::ConstructionWithUnwrap;
               } else {
@@ -5370,7 +5370,7 @@ namespace {
       // If the declaration we attached the 'objc' attribute to is within a
       // type, record it in the type.
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
-        if (auto tyDecl = contextTy->getNominalOrBoundGenericNominal()) {
+        if (auto tyDecl = contextTy->getNominalDecl()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (name)
               tyDecl->recordObjCMethod(method, *name);
@@ -6390,7 +6390,7 @@ namespace {
         if (!nsObjectTy)
           return nullptr;
         const ClassDecl *nsObjectDecl =
-          nsObjectTy->getClassOrBoundGenericClass();
+          nsObjectTy->getClassDecl();
 
         auto result = createFakeClass(Impl.SwiftContext.Id_Protocol,
                                           /* cacheResult */ false,
@@ -10707,7 +10707,7 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
               LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)));
         continue;
       }
-      if (inheritedType->getClassOrBoundGenericClass()) {
+      if (inheritedType->getClassDecl()) {
         requirements.push_back(
             Requirement(RequirementKind::Superclass, paramType, inheritedType));
         continue;

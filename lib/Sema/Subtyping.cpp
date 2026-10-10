@@ -157,10 +157,10 @@ void swift::constraints::getTypeVariablesWithVariance(
 
 /// Determine whether the candidate type is a subclass of the superclass type.
 bool swift::constraints::isSubclassOf(Type candidateType, Type superclassType) {
-  if (!superclassType->getClassOrBoundGenericClass())
+  if (!superclassType->getClassDecl())
     return false;
 
-  if (!candidateType->getClassOrBoundGenericClass()) {
+  if (!candidateType->getClassDecl()) {
     candidateType = candidateType->getSuperclass();
     if (!candidateType)
       return false;
@@ -459,7 +459,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
     if (type->is<DynamicSelfType>())
       return true;
 
-    auto *classDecl = type->getClassOrBoundGenericClass();
+    auto *classDecl = type->getClassDecl();
     return classDecl->getSuperclassDecl();
   }
   case ConversionBehavior::AnyHashable:
@@ -493,8 +493,8 @@ static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
 }
 
 static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
-  auto *lhsDecl = lhs->getClassOrBoundGenericClass();
-  auto *rhsDecl = rhs->getClassOrBoundGenericClass();
+  auto *lhsDecl = lhs->getClassDecl();
+  auto *rhsDecl = rhs->getClassDecl();
 
   if (lhsDecl == nullptr || rhsDecl == nullptr)
     return;
@@ -518,7 +518,7 @@ static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
 }
 
 static bool isCovariantInstanceType(Type t) {
-  return t->getClassOrBoundGenericClass() ||
+  return t->getClassDecl() ||
          t->is<ArchetypeType>();
 }
 
@@ -1005,7 +1005,7 @@ static void decomposeConstraintType(Type t,
 
     anyObject |= compositionTy->hasExplicitAnyObject();
     invertible |= compositionTy->getInverses();
-  } else if (t->getClassOrBoundGenericClass()) {
+  } else if (t->getClassDecl()) {
     superclass = t;
   } else {
     ABORT([&](auto &out) {
@@ -1585,7 +1585,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto result = existentialConstraintJoinMeetImpl(op, lhs, rhs);
       if (!result)
         return fail();
-      if (result->getClassOrBoundGenericClass())
+      if (result->getClassDecl())
         return result;
       ASSERT(!result->is<ExistentialType>());
       return ExistentialType::get(result);
@@ -1598,7 +1598,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
           op, lhsConstraint, rhsConstraint);
       if (!result)
         return fail();
-      if (result->getClassOrBoundGenericClass())
+      if (result->getClassDecl())
         return MetatypeType::get(result);
       ASSERT(!result->is<ExistentialType>());
       return ExistentialMetatypeType::get(result);

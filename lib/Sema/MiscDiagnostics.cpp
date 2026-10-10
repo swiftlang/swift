@@ -977,7 +977,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       BNK_Double,
     };
     BitcastableNumberKind getBitcastableNumberKind(Type t) const {
-      auto decl = t->getNominalOrBoundGenericNominal();
+      auto decl = t->getNominalDecl();
 #define MATCH_DECL(type) \
       if (decl == Ctx.get##type##Decl()) \
         return BNK_##type;
@@ -1096,7 +1096,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           auto d = Ctx.Diags.diagnose(DRE->getLoc(),
                               diag::bitcasting_to_change_pointer_kind,
                               fromTy, toTy,
-                              toTy->getStructOrBoundGenericStruct()->getName());
+                              toTy->getStructDecl()->getName());
           if (subExpr) {
             StringRef before, after;
             switch (toPTK) {

@@ -5076,7 +5076,7 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   }
 
   auto *moduleDecl = error.op->getSourceInst()->getModule().getSwiftModule();
-  if (auto *nominal = type->getNominalOrBoundGenericNominal()) {
+  if (auto *nominal = type->getNominalDecl()) {
     // If the nominal type is in the current module, suggest adding `Sendable`
     // if it makes sense.
     if (nominal->getParentModule() == moduleDecl &&

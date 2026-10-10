@@ -1163,15 +1163,15 @@ public:
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
-  ClassDecl *getClassOrBoundGenericClass() const;
+  ClassDecl *getClassDecl() const;
 
   /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
-  StructDecl *getStructOrBoundGenericStruct();
+  StructDecl *getStructDecl();
   
   /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
-  EnumDecl *getEnumOrBoundGenericEnum();
+  EnumDecl *getEnumDecl();
 
   /// If this is a class, check if this class is a foreign reference type.
   bool isForeignReferenceType();
@@ -1369,7 +1369,7 @@ public:
 
   /// If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
-  NominalTypeDecl *getNominalOrBoundGenericNominal();
+  NominalTypeDecl *getNominalDecl();
 
   /// If this is a nominal type, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
@@ -8699,11 +8699,11 @@ inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
   return isArchetypeOrExistential && !T.isAnyClassReferenceType();
 }
 
-inline ClassDecl *TypeBase::getClassOrBoundGenericClass() const {
-  return getCanonicalType().getClassOrBoundGenericClass();
+inline ClassDecl *TypeBase::getClassDecl() const {
+  return getCanonicalType().getClassDecl();
 }
 
-inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
+inline ClassDecl *CanType::getClassDecl() const {
   if (auto classTy = dyn_cast<ClassType>(*this))
     return classTy->getDecl();
 
@@ -8713,11 +8713,11 @@ inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
   return nullptr;
 }
 
-inline StructDecl *TypeBase::getStructOrBoundGenericStruct() {
-  return getCanonicalType().getStructOrBoundGenericStruct();
+inline StructDecl *TypeBase::getStructDecl() {
+  return getCanonicalType().getStructDecl();
 }
 
-inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
+inline StructDecl *CanType::getStructDecl() const {
   if (auto structTy = dyn_cast<StructType>(*this))
     return structTy->getDecl();
 
@@ -8727,11 +8727,11 @@ inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
   return nullptr;
 }
 
-inline EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
-  return getCanonicalType().getEnumOrBoundGenericEnum();
+inline EnumDecl *TypeBase::getEnumDecl() {
+  return getCanonicalType().getEnumDecl();
 }
 
-inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
+inline EnumDecl *CanType::getEnumDecl() const {
   if (auto enumTy = dyn_cast<EnumType>(*this))
     return enumTy->getDecl();
 
@@ -8741,17 +8741,17 @@ inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
   return nullptr;
 }
 
-inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
-  return getCanonicalType().getNominalOrBoundGenericNominal();
+inline NominalTypeDecl *TypeBase::getNominalDecl() {
+  return getCanonicalType().getNominalDecl();
 }
 
-inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
+inline NominalTypeDecl *CanType::getNominalDecl() const {
   if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
-    return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+    return Ty->getConstraintType()->getNominalDecl();
   if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
-    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
+    return Ty->getBaseType()->getNominalDecl();
   return nullptr;
 }
 

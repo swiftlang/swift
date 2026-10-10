@@ -1578,7 +1578,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     IsEnumExhaustive = ED->isFormallyExhaustive(nullptr) &&
                        !ED->getAttrs().hasAttribute<NonexhaustiveAttr>();
     if (auto RT = ED->getRawType()) {
-      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+      if (auto *D = RT->getNominalDecl()) {
         EnumRawTypeName = D->getName().str();
       }
     }

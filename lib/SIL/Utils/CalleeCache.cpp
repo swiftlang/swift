@@ -338,7 +338,7 @@ CalleeList CalleeCache::getDestructors(SILType type, bool isExactType) const {
   while (auto payloadTy = type.getOptionalObjectType()) {
     type = payloadTy;
   }
-  ClassDecl *classDecl = type.getClassOrBoundGenericClass();
+  ClassDecl *classDecl = type.getClassDecl();
   if (!classDecl || classDecl->hasClangNode())
     return CalleeList();
 

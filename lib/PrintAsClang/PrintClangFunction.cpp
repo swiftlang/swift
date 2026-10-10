@@ -79,7 +79,7 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
                                 : KnownTypeKind::Known;
   }
   if (auto *classType = dyn_cast<ClassType>(tPtr)) {
-    return (classType->getClassOrBoundGenericClass()->hasClangNode())
+    return (classType->getClassDecl()->hasClangNode())
                ? KnownTypeKind::Known
                : KnownTypeKind::Unknown;
   }
@@ -87,7 +87,7 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
     return typeMapping.getKnownSIMDTypeInfo(t, ctx) ? KnownTypeKind::KnownSIMD
                                                     : KnownTypeKind::Unknown;
 
-  if (auto *structDecl = t->getStructOrBoundGenericStruct())
+  if (auto *structDecl = t->getStructDecl())
     typeDecl = structDecl;
   else
     return KnownTypeKind::Unknown;
@@ -305,7 +305,7 @@ public:
     bool hasSwiftSuperClass = false;
     if (auto superClass = ty->getExistentialLayout()
           .getExplicitSuperclassOrProtocolSuperclass()) {
-      auto *CD = superClass->getClassOrBoundGenericClass();
+      auto *CD = superClass->getClassDecl();
       hasSwiftSuperClass = !CD->isObjC();
     }
     if (ty->isObjCExistentialType() && !hasSwiftSuperClass) {
@@ -402,14 +402,14 @@ public:
   ClangRepresentation
   visitEnumType(EnumType *ET, std::optional<OptionalTypeKind> optionalKind,
                 bool isInOutParam) {
-    return visitValueType(ET, ET->getNominalOrBoundGenericNominal(),
+    return visitValueType(ET, ET->getNominalDecl(),
                           optionalKind, isInOutParam);
   }
 
   ClangRepresentation
   visitStructType(StructType *ST, std::optional<OptionalTypeKind> optionalKind,
                   bool isInOutParam) {
-    return visitValueType(ST, ST->getNominalOrBoundGenericNominal(),
+    return visitValueType(ST, ST->getNominalDecl(),
                           optionalKind, isInOutParam);
   }
 
@@ -518,7 +518,7 @@ public:
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
     auto arg = args.front();
-    if (const auto *structDecl = arg->getStructOrBoundGenericStruct();
+    if (const auto *structDecl = arg->getStructDecl();
         structDecl && structDecl->getClangDecl()) {
       ClangTypeHandler handler(structDecl->getClangDecl());
       if (!handler.isRepresentable())
@@ -648,7 +648,7 @@ static void addABIRecordToTypeEncoding(llvm::raw_ostream &typeEncodingOS,
                                        ASTContext &ctx) {
   auto info = typeMapping.getKnownSIMDTypeInfo(t, ctx);
   if (!info)
-    info = typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+    info = typeMapping.getKnownCTypeInfo(t->getNominalDecl());
   assert(info);
   typeEncodingOS << '_';
   for (char c : info->name) {
@@ -696,7 +696,7 @@ static bool isOptionalObjCExistential(Type ty) {
 static bool isOptionalForeignReferenceType(Type ty) {
   if (auto obj = ty->getOptionalObjectType()) {
     if (const auto *cd =
-            dyn_cast_or_null<ClassDecl>(obj->getNominalOrBoundGenericNominal()))
+            dyn_cast_or_null<ClassDecl>(obj->getNominalDecl()))
       return cd->isForeignReferenceType() ||
              cd->getForeignClassKind() == ClassDecl::ForeignKind::CFType;
   }
@@ -764,7 +764,7 @@ static bool printDirectReturnOrParamCType(
           typeMapping.getKnownSIMDTypeInfo(t, emittedModule->getASTContext());
       if (!info)
         info =
-            typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+            typeMapping.getKnownCTypeInfo(t->getNominalDecl());
       os << "  " << info->name;
       if (info->canBeNullable)
         os << " _Nullable";
@@ -853,7 +853,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   llvm::SmallPtrSet<const ParamDecl *, 4> movedParams;
   for (const auto *param : consumedParams) {
     const auto *nominal =
-        param->getInterfaceType()->getNominalOrBoundGenericNominal();
+        param->getInterfaceType()->getNominalDecl();
     if (!nominal || nominal->canBeCopyable())
       continue;
     // Moving out of a parameter needs a move-only C++ class; moving out of
@@ -1243,7 +1243,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       namePrinter();
       return;
     }
-    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = type->getClassDecl()) {
       if (classDecl->hasClangNode()) {
         if (isInOut)
           os << '&';
@@ -1255,7 +1255,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       return;
     }
 
-    if (auto *decl = type->getNominalOrBoundGenericNominal()) {
+    if (auto *decl = type->getNominalDecl()) {
       if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
         if (!directTypeEncoding.empty()) {
           ClangSyntaxPrinter(moduleContext->getASTContext(), os).printBaseName(moduleContext);
@@ -1621,7 +1621,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       printGenericReturnSequence(os, gtpt, printCallToCFunc);
       return;
     }
-    if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = resultTy->getClassDecl()) {
       if (classDecl->hasClangNode()) {
         assert(!isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
         os << "return ";
@@ -1634,7 +1634,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           [&]() { printCallToCFunc(/*additionalParam=*/std::nullopt); });
       return;
     }
-    if (auto *decl = resultTy->getNominalOrBoundGenericNominal();
+    if (auto *decl = resultTy->getNominalDecl();
         decl && !resultTy->isObjCExistentialType() &&
         !isOptionalObjCExistential(resultTy)) {
       auto valueTypeReturnThunker = [&](StringRef resultPointerName) {
@@ -1681,7 +1681,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   auto nonOptResultType = resultTy->getOptionalObjectType();
   if (!nonOptResultType)
     nonOptResultType = resultTy;
-  if (auto *classDecl = nonOptResultType->getClassOrBoundGenericClass();
+  if (auto *classDecl = nonOptResultType->getClassDecl();
       (classDecl && isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) ||
       nonOptResultType->isObjCExistentialType()) {
     assert(!classDecl || classDecl->hasClangNode());
@@ -1917,9 +1917,9 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     Type type) {
   if (auto optionalObjectType = type->getOptionalObjectType()) {
     if (const auto *nominal =
-            optionalObjectType->getNominalOrBoundGenericNominal()) {
+            optionalObjectType->getNominalDecl()) {
       if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
-              optionalObjectType->getNominalOrBoundGenericNominal())) {
+              optionalObjectType->getNominalDecl())) {
         return typeInfo->canBeNullable;
       }
       if (const auto *cd = dyn_cast<ClassDecl>(nominal))
@@ -2052,7 +2052,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(
   // *_Nullable`.
   Type unwrapped = resultTy->lookThroughSingleOptionalType();
 
-  if (auto *classDecl = unwrapped->getClassOrBoundGenericClass()) {
+  if (auto *classDecl = unwrapped->getClassDecl()) {
     if (classDecl->hasClangNode()) {
       if (isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) {
         os << " NS_RETURNS_RETAINED";

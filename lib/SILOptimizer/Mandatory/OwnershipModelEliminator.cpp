@@ -554,7 +554,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto loc = destroy->getLoc();
   auto operand = destroy->getOperand();
   auto operandTy = operand->getType();
-  NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = operandTy.getNominalDecl();
 
   if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {

@@ -2741,7 +2741,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       // conditional conformances involving them. Check the full stack of nested
       // types for any obj-c ones.
       while (nestedType) {
-        if (auto clazz = nestedType->getClassOrBoundGenericClass()) {
+        if (auto clazz = nestedType->getClassDecl()) {
           if (clazz->isTypeErasedGenericClass()) {
             Context.Diags.diagnose(ComplainLoc,
                                    diag::objc_generics_cannot_conditionally_conform,
@@ -3033,7 +3033,7 @@ static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
     // witnesses, when we have them.
     auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
     auto substSelfTy = conformance->getType();
-    if (isResult && substSelfTy->getClassOrBoundGenericClass())
+    if (isResult && substSelfTy->getClassDecl())
       substSelfTy = DynamicSelfType::get(selfTy, req->getASTContext());
     return type.subst([&](SubstitutableType *dependentType) {
                         if (dependentType->isEqual(selfTy))
@@ -6266,7 +6266,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // missing things in the actor that don't help users diagnose the root problem.
   // Instead, we want to suggest adding the typealias.
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-    auto nominal = T->getNominalOrBoundGenericNominal();
+    auto nominal = T->getNominalDecl();
     if (!nominal)
       return;
 
@@ -6301,7 +6301,7 @@ void swift::diagnoseConformanceFailure(Type T,
 
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
-  if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = T->getEnumDecl()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         enumDecl->hasRawType() &&
         !enumDecl->getRawType()->is<ErrorType>()) {
@@ -6331,7 +6331,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // One cannot meaningfully declare conformance to the NSObject protocol
   // in Swift. Suggest inheritance from NSObject instead.
   if (isNSObjectProtocol(Proto)) {
-    if (T->getClassOrBoundGenericClass()) {
+    if (T->getClassDecl()) {
       auto diag =
           diags.diagnose(ComplainLoc, diag::type_cannot_conform_to_nsobject,
                          T);
@@ -6347,7 +6347,7 @@ void swift::diagnoseConformanceFailure(Type T,
 
         // If it's a class, we cannot suggest a different class to inherit
         // from.
-        if (inheritedTy->getClassOrBoundGenericClass())
+        if (inheritedTy->getClassDecl())
           return;
 
         // Is it the NSObject protocol?
@@ -6448,7 +6448,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto) {
     return true;
   
   // A non-final class might have a subclass that conforms to the protocol.
-  if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto *classDecl = type->getClassDecl()) {
     if (!classDecl->isSemanticallyFinal())
       return true;
   }

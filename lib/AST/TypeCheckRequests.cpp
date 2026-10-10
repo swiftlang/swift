@@ -210,7 +210,7 @@ void SuperclassTypeRequest::writeDependencySink(
 
   // FIXME: This is compatible with the existing name tracking scheme, but
   // ignoring this name when we fail to look up a class is bogus.
-  ClassDecl *Super = value->getClassOrBoundGenericClass();
+  ClassDecl *Super = value->getClassDecl();
   if (!Super)
     return;
   tracker.addPotentialMember(Super);

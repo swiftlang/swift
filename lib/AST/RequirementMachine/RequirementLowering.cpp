@@ -579,7 +579,7 @@ void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Conformance,
                                   subjectType, constraintType),
                       loc});
-  } else if (constraintType->getClassOrBoundGenericClass()) {
+  } else if (constraintType->getClassDecl()) {
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});

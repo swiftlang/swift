@@ -1937,13 +1937,13 @@ namespace {
         if (BaseFormalType) {
           auto selfTy = base.getType().getASTType();
           auto metatypeTy = MetatypeType::get(selfTy);
-          if (selfTy->getClassOrBoundGenericClass()) {
+          if (selfTy->getClassDecl()) {
             selfMetatype = SGF.B
                                .createValueMetatype(
                                    loc, SGF.getLoweredType(metatypeTy), base)
                                .getValue();
           } else {
-            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            assert(BaseFormalType->getStructDecl());
             selfMetatype =
                 SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy));
           }
@@ -4557,7 +4557,7 @@ void LValue::addMemberVarComponent(
         LV.add<RefElementComponent>(Storage, Options, varStorageType,
                                     typeData, ActorIso);
       } else {
-        assert(BaseFormalType->getStructOrBoundGenericStruct());
+        assert(BaseFormalType->getStructDecl());
         LV.add<StructElementComponent>(Storage, varStorageType, typeData,
                                        ActorIso);
       }

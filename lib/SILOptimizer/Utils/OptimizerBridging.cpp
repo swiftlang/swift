@@ -671,7 +671,7 @@ bool BridgedFunction::isAutodiffSubsetParametersThunk() const {
 // See also ASTMangler::mangleAutoDiffGeneratedDeclaration.
 bool BridgedType::isAutodiffBranchTracingEnumInVJP(BridgedFunction vjp) const {
   assert(vjp.isAutodiffVJP());
-  EnumDecl *ed = unbridged().getEnumOrBoundGenericEnum();
+  EnumDecl *ed = unbridged().getEnumDecl();
   if (ed == nullptr)
     return false;
 

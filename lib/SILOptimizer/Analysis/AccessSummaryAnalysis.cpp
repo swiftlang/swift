@@ -594,7 +594,7 @@ SILType AccessSummaryAnalysis::getSubPathType(SILType baseType,
 
   SILType iterType = baseType;
   for (unsigned index : llvm::reverse(reversedIndices)) {
-    if (StructDecl *decl = iterType.getStructOrBoundGenericStruct()) {
+    if (StructDecl *decl = iterType.getStructDecl()) {
       VarDecl *var = decl->getStoredProperties()[index];
       iterType = iterType.getFieldType(var, mod, context);
       continue;
@@ -633,7 +633,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
   for (unsigned index : llvm::reverse(reversedIndices)) {
     os << ".";
 
-    if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {
+    if (StructDecl *D = containingType.getStructDecl()) {
       VarDecl *var = D->getStoredProperties()[index];
       os << var->getBaseName();
       containingType = containingType.getFieldType(var, M, context);

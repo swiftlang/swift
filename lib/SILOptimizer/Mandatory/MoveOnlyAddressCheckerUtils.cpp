@@ -2005,7 +2005,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
-        && !targetType.getEnumOrBoundGenericEnum()) {
+        && !targetType.getEnumDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
 
@@ -2035,7 +2035,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // deinit. We know that it must be non-copyable since copyable types
     // cannot contain non-copyable types and that our parent root type must be
     // an enum, tuple, or struct.
-    if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
+    if (auto *nom = iterType.getNominalDecl()) {
       if (auto error = shouldEmitPartialMutationErrorForType(
               iterType, nom, user->getFunction())) {
         return error;
@@ -2047,7 +2047,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
       auto isAllowedPartialConsume =
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
-           useState.address->getType().getNominalOrBoundGenericNominal());
+           useState.address->getType().getNominalDecl());
       if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we

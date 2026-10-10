@@ -480,7 +480,7 @@ bool importer::isBoolOrBoolEnumType(Type ty) {
     return true;
 
   // Check if this is a C++ enum with an underlying type of "bool".
-  if (auto *SD = ty->getStructOrBoundGenericStruct()) {
+  if (auto *SD = ty->getStructDecl()) {
     if (auto *clangD = SD->getClangDecl()) {
       if (auto *ED = dyn_cast<clang::EnumDecl>(clangD)) {
         if (ED->getIntegerType()->isBooleanType())
@@ -6591,7 +6591,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
     if (getterDecl->getResultInterfaceType()->isForeignReferenceType()) {
       auto *frtClass = getterDecl->getResultInterfaceType()
                            ->lookThroughAllOptionalTypes()
-                           ->getClassOrBoundGenericClass();
+                           ->getClassDecl();
       if (auto *frtClangDecl = dyn_cast_or_null<clang::RecordDecl>(
               frtClass ? frtClass->getClangDecl() : nullptr)) {
         retainFn = ctx.getClangModuleLoader()
@@ -9616,7 +9616,7 @@ RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
 
   auto pointeeType = toRawPtrFunc->getResultInterfaceType()
                          ->lookThroughSingleOptionalType();
-  ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
+  ClassDecl *referenceDecl = pointeeType->getClassDecl();
 
   if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl)
     return {RefCountedPtrError::ToRawPointerWrongSignature, toRawPtrFunc};

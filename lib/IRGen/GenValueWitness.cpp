@@ -864,7 +864,7 @@ ValueWitnessFlags getValueWitnessFlags(IRGenModule &IGM,
     flags = flags.withIncomplete(true);
   }
 
-  if (concreteType.getEnumOrBoundGenericEnum())
+  if (concreteType.getEnumDecl())
     flags = flags.withEnumWitnesses(true);
 
   return flags;
@@ -1060,7 +1060,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
             typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
-        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+        auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
@@ -1094,7 +1094,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                            : concreteTI;
       if (auto *typeLayoutEntry = typeInfo.buildTypeLayoutEntry(
               IGM, ty, /*useStructLayouts*/ true)) {
-        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+        auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
@@ -1120,7 +1120,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
             typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
-        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+        auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
@@ -1147,7 +1147,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
             typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
-        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+        auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
@@ -1174,7 +1174,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
             typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
-        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+        auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
@@ -1201,7 +1201,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
             typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
-        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+        auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
@@ -1252,7 +1252,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::GetEnumTagSinglePayload: {
     if (boundGenericCharacteristics)
       if (auto *enumDecl = boundGenericCharacteristics->concreteType
-                               .getEnumOrBoundGenericEnum())
+                               .getEnumDecl())
         if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
           return addFunction(IGM.getGetMultiPayloadEnumTagSinglePayloadFn());
     goto standard;
@@ -1260,14 +1260,14 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::StoreEnumTagSinglePayload: {
     if (boundGenericCharacteristics)
       if (auto *enumDecl = boundGenericCharacteristics->concreteType
-                               .getEnumOrBoundGenericEnum())
+                               .getEnumDecl())
         if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
           return addFunction(IGM.getStoreMultiPayloadEnumTagSinglePayloadFn());
     goto standard;
   }
 
   case ValueWitness::GetEnumTag: {
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
 
     if (layoutStringsEnabled(IGM) &&
         concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
@@ -1280,7 +1280,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       if (auto *typeLayoutEntry = typeInfo.buildTypeLayoutEntry(
               IGM, ty, /*useStructLayouts*/ true)) {
         if (auto *enumLayoutEntry = typeLayoutEntry->getAsEnum()) {
-          auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+          auto genericSig = concreteType.getNominalDecl()
                               ->getGenericSignature();
           if (auto *fn = getEnumTagFunction(IGM, enumLayoutEntry, genericSig)) {
             return addFunction(fn);
@@ -1291,7 +1291,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     goto standard;
   }
   case ValueWitness::DestructiveInjectEnumTag: {
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
     if (layoutStringsEnabled(IGM) &&
         concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
@@ -1303,7 +1303,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       if (auto *typeLayoutEntry = typeInfo.buildTypeLayoutEntry(
               IGM, ty, /*useStructLayouts*/ true)) {
         if (auto *enumLayoutEntry = typeLayoutEntry->getAsEnum()) {
-          auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+          auto genericSig = concreteType.getNominalDecl()
                                 ->getGenericSignature();
           if (auto *fn = getDestructiveInjectEnumTagFunction(
                   IGM, enumLayoutEntry, genericSig)) {
@@ -1315,7 +1315,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     goto standard;
   }
   case ValueWitness::DestructiveProjectEnumData:
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
     goto standard;
   }
   llvm_unreachable("bad value witness kind");
@@ -1390,7 +1390,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
   // reasons to continue using "generic" value witness table functions i.e the
   // same once used for runtime instantiated generic metadata.
   if (!IGM.isEmbeddedWithExistentials()) {
-    auto *nomDecl = abstractType->getNominalOrBoundGenericNominal();
+    auto *nomDecl = abstractType->getNominalDecl();
     if (abstractType->isSpecialized() && nomDecl) {
       CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 

@@ -8308,7 +8308,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
   } else {
     if (SILParser(P).parseSILType(specializedClassTy))
       return true;
-    theClass = specializedClassTy.getClassOrBoundGenericClass();
+    theClass = specializedClassTy.getClassDecl();
     if (!theClass) {
       return true;
     }
@@ -8429,7 +8429,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   if (parser.Tok.is(tok::sil_dollar)) {
     if (SILParser(parser).parseSILType(specializedNominalTy))
       return true;
-    theNominalDecl = specializedNominalTy.getNominalOrBoundGenericNominal();
+    theNominalDecl = specializedNominalTy.getNominalDecl();
     if (!theNominalDecl)
       return true;
   } else {

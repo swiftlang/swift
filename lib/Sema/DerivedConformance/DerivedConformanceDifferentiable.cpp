@@ -520,7 +520,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       // to update these properties.
       if (!originalProperty->isSettable(DC)) {
         auto *wrapperDecl =
-            vd->getInterfaceType()->getNominalOrBoundGenericNominal();
+            vd->getInterfaceType()->getNominalDecl();
         auto loc =
             originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
         Context.Diags

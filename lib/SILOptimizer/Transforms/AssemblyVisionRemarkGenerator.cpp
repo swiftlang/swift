@@ -917,7 +917,7 @@ class AssemblyVisionRemarkGenerator : public SILFunctionTransform {
     if (fn->hasSelfParam()) {
       if (auto *nomType = fn->getSelfArgument()
                               ->getType()
-                              .getNominalOrBoundGenericNominal()) {
+                              .getNominalDecl()) {
         LLVM_DEBUG(llvm::dbgs() << "Checking for remark on: "
                                 << nomType->getName().get() << "\n");
         if (nomType->shouldEmitAssemblyVisionRemarksOnMethods()) {

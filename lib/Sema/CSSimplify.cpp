@@ -3843,12 +3843,12 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
                                        ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  auto classDecl2 = type2->getClassOrBoundGenericClass();
+  auto classDecl2 = type2->getClassDecl();
   SmallPtrSet<ClassDecl *, 4> superclasses1;
   for (auto super1 = type1->getSuperclass();
        super1;
        super1 = super1->getSuperclass()) {
-    auto superclass1 = super1->getClassOrBoundGenericClass();
+    auto superclass1 = super1->getClassDecl();
     if (superclass1 != classDecl2) {
       // Break if we have circular inheritance.
       if (superclass1 && !superclasses1.insert(superclass1).second)
@@ -5054,7 +5054,7 @@ static bool canBridgeThroughCast(ConstraintSystem &cs, Type fromType,
   // If we have a value of type AnyObject that we're trying to convert to
   // a class, force a downcast.
   // FIXME: Also allow types bridged through Objective-C classes.
-  if (fromType->isAnyObject() && toType->getClassOrBoundGenericClass())
+  if (fromType->isAnyObject() && toType->getClassDecl())
     return true;
 
   auto bridged = TypeChecker::getDynamicBridgedThroughObjCClass(cs.DC,
@@ -8002,7 +8002,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto instanceType2 = meta2->getInstanceType();
       if (isa<MetatypeType>(meta1) &&
           !(instanceType1->mayHaveSuperclass() &&
-            instanceType2->getClassOrBoundGenericClass())) {
+            instanceType2->getClassDecl())) {
         subKind = ConstraintKind::Bind;
       }
 
@@ -8187,15 +8187,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
-        type2->getClassOrBoundGenericClass() &&
-        type1->getClassOrBoundGenericClass()
-          != type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl() &&
+        type1->getClassDecl()
+          != type2->getClassDecl()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
 
     // Existential-to-superclass conversion.
     if (type1->isClassExistentialType() &&
-        type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
 
@@ -8266,7 +8266,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Single @objc protocol value metatypes can be converted to the ObjC
         // Protocol class type.
         auto isProtocolClassType = [&](Type t) -> bool {
-          if (auto classDecl = t->getClassOrBoundGenericClass())
+          if (auto classDecl = t->getClassDecl())
             if (classDecl->getName() == getASTContext().Id_Protocol
                 && classDecl->getModuleContext()->getName()
                     == getASTContext().Id_ObjectiveC)
@@ -8865,7 +8865,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
                                  Type classType,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
-  if (!classType->getClassOrBoundGenericClass())
+  if (!classType->getClassDecl())
     return SolutionKind::Error;
 
   // Dig out the fixed type to which this type refers.
@@ -8930,8 +8930,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
   if (type->satisfiesClassConstraint()) {
     // If we have an exact match of class declarations, ensure the
     // generic arguments match.
-    if (type->getClassOrBoundGenericClass() ==
-        classType->getClassOrBoundGenericClass()) {
+    if (type->getClassDecl() ==
+        classType->getClassDecl()) {
       auto result = matchTypes(type, classType, ConstraintKind::Bind,
                                flags, locator);
       if (result != SolutionKind::Error)
@@ -9923,7 +9923,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                             ->getAs<ProtocolCompositionType>()) {
           auto newConstraintTy = PCT->withoutMarkerProtocols();
           if (!newConstraintTy->isEqual(PCT)) {
-            fromType = newConstraintTy->getClassOrBoundGenericClass()
+            fromType = newConstraintTy->getClassDecl()
                            ? newConstraintTy
                            : ExistentialType::get(newConstraintTy);
           }
@@ -10002,8 +10002,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If casting among classes, and there are open
     // type variables remaining, introduce a subtype constraint to help resolve
     // them.
-    if (fromType->getClassOrBoundGenericClass()
-        && toType->getClassOrBoundGenericClass()
+    if (fromType->getClassDecl()
+        && toType->getClassDecl()
         && (fromType->hasTypeVariable() || toType->hasTypeVariable())) {
       addConstraint(ConstraintKind::Subtype, toType, fromType,
                     getConstraintLocator(locator));
@@ -11308,7 +11308,7 @@ static bool isNonFinalClass(Type type) {
   if (auto dynamicSelf = type->getAs<DynamicSelfType>())
     type = dynamicSelf->getSelfType();
 
-  if (auto classDecl = type->getClassOrBoundGenericClass())
+  if (auto classDecl = type->getClassDecl())
     return !classDecl->isSemanticallyFinal();
 
   if (auto archetype = type->getAs<ArchetypeType>())
@@ -15309,7 +15309,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    auto nativeClass = type1->getClassOrBoundGenericClass();
+    auto nativeClass = type1->getClassDecl();
     auto bridgedObjCClass
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 
@@ -15325,7 +15325,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    auto nativeClass = type2->getClassOrBoundGenericClass();
+    auto nativeClass = type2->getClassDecl();
     auto bridgedObjCClass
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 
