@@ -448,6 +448,17 @@ private:
     return;
   }
 
+  void trackMacroPlugins(const ModuleDependencyInfo &dependencyInfo) {
+    for (const auto &entry : dependencyInfo.getMacroDependencies()) {
+      // An executable plugin has no library and is the implementation itself,
+      // so it needs to be tracked. The plugin server paired with a library is
+      // from the toolchain and covered by the compiler version.
+      const auto &plugin = entry.second;
+      tracker->trackFile(plugin.LibraryPath.empty() ? plugin.ExecutablePath
+                                                    : plugin.LibraryPath);
+    }
+  }
+
   bool collectCASDependencies(ModuleDependencyInfo &dependencyInfoCopy) {
     if (!instance.getInvocation().getCASOptions().EnableCaching)
       return false;
@@ -461,10 +472,7 @@ private:
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
-                     [this](const auto &entry) {
-                       tracker->trackFile(entry.second.LibraryPath);
-                     });
+      trackMacroPlugins(dependencyInfoCopy);
       StringRef readLegacyTypeInfoPath =
           instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
       if (!readLegacyTypeInfoPath.empty()) {
@@ -510,10 +518,7 @@ private:
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
-                     [this](const auto &entry) {
-                       tracker->trackFile(entry.second.LibraryPath);
-                     });
+      trackMacroPlugins(dependencyInfoCopy);
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
