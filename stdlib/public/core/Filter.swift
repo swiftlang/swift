@@ -162,6 +162,22 @@ extension LazyFilterCollection: Collection {
     return _base.endIndex
   }
 
+  /// The first element of the collection.
+  ///
+  /// If the collection is empty, the value of this property is `nil`.
+  ///
+  /// This shadows `Collection.first` for concrete uses of a lazy filter.
+  /// The default implementation computes `startIndex` (which evaluates the
+  /// predicate, and any transforms beneath it, over the skipped prefix and
+  /// the winner) and then subscripts that index (which re-reads, and
+  /// therefore re-evaluates, the winning element). Pulling the first element
+  /// from an iterator instead evaluates each element at most once.
+  @inlinable // lazy-performance
+  public var first: Element? {
+    var iterator = makeIterator()
+    return iterator.next()
+  }
+
   // TODO: swift-3-indexing-model - add docs
   @inlinable // lazy-performance
   public func index(after i: Index) -> Index {
