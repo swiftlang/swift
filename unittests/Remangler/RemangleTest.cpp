@@ -183,3 +183,39 @@ TEST(TestSwiftRemangler, TooComplexIsReportedNotFatal) {
   Dem.clear();
   ASSERT_FALSE(Dem.isTooComplex());
 }
+
+TEST(TestSwiftRemangler, InvalidUTF8Identifier) {
+  using namespace swift::Demangle;
+  using Kind = swift::Demangle::Node::Kind;
+  Demangler dem;
+  NodeBuilder b(dem);
+
+  auto identifier = [&](const char *text) {
+    return b.GlobalType(b.Node(Kind::Structure, b.Node(Kind::Module, "M"),
+                               b.Node(Kind::Identifier, text)));
+  };
+  auto infixOperator = [&](const char *text) {
+    NodePointer voidType = b.Node(Kind::Type, b.Node(Kind::Tuple));
+    NodePointer fnType = b.Node(
+        Kind::Type,
+        b.Node(Kind::FunctionType, b.Node(Kind::ArgumentTuple, voidType),
+               b.Node(Kind::ReturnType, voidType)));
+    return b.Node(Kind::Global,
+                  b.Node(Kind::Function, b.Node(Kind::Module, "M"),
+                         b.Node(Kind::InfixOperator, text), fnType));
+  };
+
+  ASSERT_TRUE(b.remangleSuccess(identifier("\xc3\xa9")));
+  ASSERT_TRUE(b.remangleSuccess(infixOperator("+\xc3\xa9")));
+
+  const char *invalid[] = {
+      "\xb0",         "\xc0",         "\xe0",         "\xf0",
+      "\xf8",         "\xff",         "\xc0\xff",     "\xe0\x80\xff",
+      "\xf0\x80\xff", "\xf0\x80\x80\xff", "\xed\xa2\x80", "a\xff",
+  };
+  for (const char *text : invalid) {
+    SCOPED_TRACE(text);
+    ASSERT_FALSE(b.remangleSuccess(identifier(text)));
+    ASSERT_FALSE(b.remangleSuccess(infixOperator(text)));
+  }
+}

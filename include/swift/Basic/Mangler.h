@@ -39,7 +39,7 @@ void printManglingStats();
 class Mangler {
 protected:
   template <typename Mangler>
-  friend void mangleIdentifier(Mangler &M, StringRef ident);
+  friend bool mangleIdentifier(Mangler &M, StringRef ident);
   friend class SubstitutionMerging;
 
   /// The storage for the mangled symbol.
