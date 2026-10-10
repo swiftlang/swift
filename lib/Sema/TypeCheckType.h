@@ -93,6 +93,11 @@ enum class TypeResolutionFlags : uint32_t {
 
   /// We are in @yield_once coroutine declaration
   Coroutine = 1 << 16,
+
+  /// Whether an 'is'/'as' pattern is being matched against a value whose
+  /// extra optionals are implicitly unwrapped, which makes the test
+  /// conditional even if the cast itself is a coercion.
+  ImplicitlyUnwrappedIsPattern = 1 << 17,
 };
 
 /// Type resolution contexts that require special handling.

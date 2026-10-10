@@ -1422,7 +1422,8 @@ Pattern *TypeChecker::coercePatternToType(
 
       P = sub;
       return coercePatternToType(
-          pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options,
+          pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
+          options | TypeResolutionFlags::ImplicitlyUnwrappedIsPattern,
           tryRewritePattern);
     }
 
@@ -1453,8 +1454,10 @@ Pattern *TypeChecker::coercePatternToType(
       // If this is an 'as' pattern coercing between two different types, then
       // it is "useful" because it is providing a different type to the
       // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
-      // types are the same, then produce a warning.
-      if (!IP->getSubPattern() || type->isEqual(IP->getCastType())) {
+      // types are the same, then produce a warning, unless optionals were
+      // implicitly unwrapped to get here, in which case the test can fail.
+      if (!options.contains(TypeResolutionFlags::ImplicitlyUnwrappedIsPattern) &&
+          (!IP->getSubPattern() || type->isEqual(IP->getCastType()))) {
         diags.diagnose(IP->getLoc(), diag::isa_is_always_true,
                        IP->getSubPattern() ? "as" : "is");
       }
@@ -1473,6 +1476,7 @@ Pattern *TypeChecker::coercePatternToType(
     
     // Coerce the subpattern to the destination type.
     if (Pattern *sub = IP->getSubPattern()) {
+      subOptions -= TypeResolutionFlags::ImplicitlyUnwrappedIsPattern;
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false),
           IP->getCastType(),
