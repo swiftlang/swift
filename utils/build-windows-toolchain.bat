@@ -24,6 +24,7 @@ echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
 echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo set HOST_ARCH_NAME=%HOST_ARCH_NAME%>> %TEMP%\call-build.cmd
+echo set ARTIFACT_CACHE=%ARTIFACT_CACHE%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -40,13 +41,32 @@ if defined PYTHON_HOME path !Path!;!PYTHON_HOME:"=!
 cd %~dp0\..\..
 set SourceRoot=%CD%
 
+:: Build the CI image and rerun this script in it.
+if defined SWIFT_CI_IN_CONTAINER goto :InContainer
+
+:: `call` cannot be used with `||` inside a parenthesized block: the exit code
+:: is lost.
+call :CloneRepositories || (exit /b 1)
+call :BuildInContainer || (exit /b 1)
+goto :end
+
+:InContainer
+
 :: Identify the BuildRoot
-set BuildRoot=%SourceRoot%\build
+:: Build in the container's own storage rather than in the SourceRoot bind
+:: mount. The on-disk CAS memory-maps its database files, and on the bind mount
+:: a database written by one process fails to reopen in the next one with
+:: "database: bad magic", which breaks the CAS tests.
+set BuildRoot=C:\Build
 
 md %BuildRoot%
 subst T: /d
 subst T: %BuildRoot% || (exit /b 1)
 set BuildRoot=T:
+
+:: Use the prepopulated artifact cache of the CI image, if any.
+set "ArtifactCache=%BuildRoot%\ArtifactCache"
+if defined ARTIFACT_CACHE set "ArtifactCache=%ARTIFACT_CACHE%"
 
 :: Identify the PackageRoot
 set PackageRoot=%BuildRoot%\artifacts
@@ -102,7 +122,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
-  -ArtifactCache %BuildRoot%\ArtifactCache ^
+  -ArtifactCache %ArtifactCache% ^
   -BuildRoot %BuildRoot% ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
@@ -110,7 +130,10 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %TestArg% ^
   %SBoMArg% ^
   %DebugInfoArg% ^
-  -Summary || (exit /b 1)
+  -KeepGoing ^
+  -Summary
+set "BuildExitCode=%errorlevel%"
+if not "%BuildExitCode%"=="0" goto :ExportArtifacts
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
 :: CI can upload the archive to the Swift debug-symbols server.
@@ -118,13 +141,20 @@ if not "%DEBUG_INFO%"=="" (
   powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0CreateSymStore.ps1 ^
     -Search "%BuildRoot%\bin" ^
     -SymbolStore "%BuildRoot%\symstore" ^
-    -Destination "%PackageRoot%\swift-windows-symbols.zip" || (exit /b 1)
+    -Destination "%PackageRoot%\swift-windows-symbols.zip"
 )
+if not "%DEBUG_INFO%"=="" set "BuildExitCode=%errorlevel%"
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
 
-goto :end
+:ExportArtifacts
+:: CI collects the artifacts from the SourceRoot, which is the only directory
+:: shared with the host. Export them even when the build failed.
+robocopy "%PackageRoot%" "%SourceRoot%\build\artifacts" /E /NFL /NDL /NP
+:: robocopy exit codes below 8 mean success.
+if %errorlevel% geq 8 (exit /b 1)
+exit /b %BuildExitCode%
 endlocal
 
 :CloneRepositories
@@ -148,6 +178,49 @@ set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
 
 call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "!ghprbCommentBody!"
+
+goto :eof
+endlocal
+
+:BuildInContainer
+setlocal enableextensions enabledelayedexpansion
+
+set "Image=swift-windows-ci:local"
+set "Utils=%SourceRoot%\swift\utils"
+
+:: CI only keeps the console log, so record the Docker host configuration.
+docker version
+docker info
+
+:: Process isolation needs a base image that matches the host's Windows build,
+:: including the patch level; a mismatch can hang the container (for example
+:: in WMI calls). Use the servercore tag for the host build when it exists.
+set "BuildArgs="
+for /f %%v in ('powershell.exe -NoProfile -Command "$v = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'; '10.0.{0}.{1}' -f $v.CurrentBuild, $v.UBR"') do set "HostBuild=%%v"
+set "BaseImage=mcr.microsoft.com/windows/servercore:%HostBuild%"
+docker pull %BaseImage% && (
+  set "BuildArgs=--build-arg BASE_IMAGE=%BaseImage%"
+) || (
+  echo warning: %BaseImage% is not available; using the Dockerfile's default base image.
+)
+
+docker build %BuildArgs% --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY -t %Image% -f "%Utils%\windows-docker\Dockerfile" "%Utils%" || (exit /b 1)
+
+:: The build tree is in the container's storage, which is 20GB by default; the
+:: toolchain build and tests need far more. Only the artifacts are copied back
+:: to the mounted SourceRoot.
+docker run --rm ^
+  --storage-opt size=512GB ^
+  -v "%SourceRoot%:C:\Source" ^
+  -e SWIFT_CI_IN_CONTAINER=1 ^
+  -e SKIP_UPDATE_CHECKOUT=1 ^
+  -e SKIP_TESTS ^
+  -e INCLUDE_PACKAGING ^
+  -e WINDOWS_SDKS ^
+  -e HOST_ARCH_NAME ^
+  -e DEBUG_INFO ^
+  -e TOOLCHAIN_VERSION ^
+  %Image% cmd.exe /c C:\Source\swift\utils\build-windows-toolchain.bat || (exit /b 1)
 
 goto :eof
 endlocal
