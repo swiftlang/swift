@@ -3342,10 +3342,6 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendCall->setDoesNotThrow();
   suspendCall->setTailCallKind(IGM.AsyncTailCallKind);
 
-  llvm::AttributeList attrs = suspendCall->getAttributes();
-  IGM.addSwiftAsyncContextAttributes(attrs, /*context arg index*/ 0);
-  suspendCall->setAttributes(attrs);
-
   Builder.CreateRetVoid();
   return suspendFn;
 }
