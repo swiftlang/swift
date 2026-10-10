@@ -6154,30 +6154,13 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   if (auto witnesses = shape->getSuggestedValueWitnesses())
     return witnesses;
 
-  // The type head must name all the type parameters, so we must not have
-  // multiple type parameters if we have an opaque type head.
-  auto sigSizeInWords = shape->ReqSigHeader.getArgumentLayoutSizeInWords();
-
-#ifndef NDEBUG
-  auto layout =
-      GenericSignatureLayout<InProcess>(shape->getRequirementSignature());
-  assert(layout.NumKeyParameters == shape->ReqSigHeader.NumParams &&
-         "requirement signature for existential includes a "
-         "redundant parameter?");
-  assert(layout.NumWitnessTables
-            == sigSizeInWords - shape->ReqSigHeader.NumParams &&
-         "requirement signature for existential includes an "
-         "unexpected key argument?");
-#endif
-
   // We're lowering onto existing witnesses for existential types,
   // which are parameterized only by the number of witness tables they
   // need to copy around.
   // TODO: variadic-parameter-packs?  Or is a memcpy okay, because we
   // can assume existentials store permanent packs, in the unlikely
   // case that the requirement signature includes a pack parameter?
-  unsigned wtableStorageSizeInWords =
-    sigSizeInWords - shape->ReqSigHeader.NumParams;
+  unsigned wtableStorageSizeInWords = shape->getNumContainerWitnessTables();
 
   using SpecialKind = ExtendedExistentialTypeShape::SpecialKind;
   switch (shape->Flags.getSpecialKind()) {
