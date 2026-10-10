@@ -47,8 +47,7 @@ protected:
         Builder(IGF.IGM.getLLVMContext(), /*DebugInfo*/ false),
         Subject(Subject) {
     // Start our builder off at IGF's current insertion point.
-    Builder.SetInsertPoint(IGF.Builder.GetInsertBlock(),
-                           IGF.Builder.GetInsertPoint());
+    Builder.SetInsertPoint(IGF.Builder.GetInsertPoint());
   }
 
 public:

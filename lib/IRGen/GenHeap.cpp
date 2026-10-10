@@ -2162,7 +2162,7 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
                       ? std::next(llvm::BasicBlock::iterator(
                             cast<llvm::Instruction>(SelfValue)))
                       : CurFn->getEntryBlock().begin();
-  Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
+  Builder.SetInsertPoint(insertPt);
   // Do not inherit the debug location of this insertion point, it could be
   // anything (e.g. the location of a dbg.declare).
   Builder.SetCurrentDebugLocation(llvm::DebugLoc());
