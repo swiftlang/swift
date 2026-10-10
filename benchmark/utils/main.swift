@@ -221,6 +221,7 @@ import Suffix
 import SuperChars
 import TaskGroups
 import TaskIsCancelledCancellationScopes
+import TaskIDBenchmark
 import TaskLocalGet
 import TaskRegistryStress
 import ToddCoxeter
@@ -446,6 +447,7 @@ register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskIsCancelledCancellationScopes.benchmarks)
+register(TaskIDBenchmark.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)
