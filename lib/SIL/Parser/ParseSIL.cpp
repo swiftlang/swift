@@ -4805,7 +4805,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
+    // The printer emits !true_count/!false_count, so read them back; without
+    // this the weights are silently dropped on a SIL round trip.
+    ProfileCounter trueCount, falseCount;
     if (parseConditionalBranchDestinations() ||
+        parseSILCondBranchProfileCounters(*this, trueCount, falseCount) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
@@ -4813,7 +4817,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         InstLoc, options, consumptionKind, SourceAddr, SourceType,
         DestAddr, TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
-        getBBForReference(FailureBBName, FailureBBLoc));
+        getBBForReference(FailureBBName, FailureBBLoc), trueCount, falseCount);
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst:
