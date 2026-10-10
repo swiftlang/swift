@@ -76,6 +76,7 @@ class FoundationTests(product.Product):
             'test',
             '--toolchain', self.install_toolchain_path(host_target),
             '--configuration', self.configuration(),
+            '-j', str(self.args.build_jobs),
             '--scratch-path', self.build_dir,
             '--package-path', package_path
         ]

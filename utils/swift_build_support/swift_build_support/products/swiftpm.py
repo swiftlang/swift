@@ -77,6 +77,8 @@ class SwiftPM(product.Product):
             helper_cmd += ["--build-dir", self.build_dir]
             shell.call(helper_cmd)
             return
+        else:
+            helper_cmd += ["--jobs", str(self.args.build_jobs)]
 
         if self.is_release():
             helper_cmd.append("--release")
