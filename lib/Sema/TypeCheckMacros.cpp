@@ -525,6 +525,12 @@ ArrayRef<unsigned> ExpandSynthesizedMemberMacroRequest::evaluate(
 
 ArrayRef<unsigned>
 ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  // `@c @implementation` synthesizes an `@_Unswiftify` peer macro attribute
+  // lazily. This request is the single, cached entry point for that work, so
+  // it runs exactly once per decl; do it before walking the attached macros
+  // below so the synthesized macro is present.
+  attachUnswiftifyMacroIfNeeded(decl);
+
   SmallVector<unsigned, 2> bufferIDs;
   decl->forEachAttachedMacro(MacroRole::Peer,
       [&](CustomAttr *attr, MacroDecl *macro) {
@@ -1171,8 +1177,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     return nullptr;
 
   case MacroDefinition::Kind::Internal:
-    // Internal macros are only ever attached; they are never freestanding.
-    return nullptr;
+    llvm_unreachable("internal macro is never freestanding");
 
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
@@ -1299,10 +1304,12 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   switch (auto definition = macro->getDefinition()) {
   case MacroDefinition::Kind::Expanded:
   case MacroDefinition::Kind::External:
-  case MacroDefinition::Kind::Internal:
   case MacroDefinition::Kind::Invalid:
   case MacroDefinition::Kind::Undefined:
     break;
+
+  case MacroDefinition::Kind::Internal:
+    llvm_unreachable("internal macro is never freestanding");
 
   case MacroDefinition::Kind::Builtin:
     switch (definition.getBuiltinKind()) {

@@ -21,10 +21,14 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/InternalMacro.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -42,8 +46,12 @@
 #include "clang/Basic/Module.h"
 #include "clang/Sema/Overload.h"
 #include "llvm-c/Types.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include <optional>
 
 using namespace swift;
@@ -94,6 +102,21 @@ static bool isStdSpanType(clang::QualType clangType) {
   return decl && decl->isInStdNamespace() && decl->getName() == "span";
 }
 
+/// Escape an imported C identifier for use in generated Swift source, wrapping
+/// Swift keywords (e.g. a C parameter named `guard`) in backticks.
+static std::string escapeSwiftIdentifier(Identifier name) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  printIdentifierEscapingIfNeeded(name.str(), os);
+  return result;
+}
+
+static void
+printSwiftIdentifier(Identifier name, llvm::raw_ostream &os,
+                     PrintNameContext context = PrintNameContext::Normal) {
+  printIdentifierEscapingIfNeeded(name.str(), os, context);
+}
+
 // Walks a clang `Expr` tree that appears as a `__counted_by` /
 // `__sized_by` count expression and emits an equivalent Swift expression.
 // `Visit(expr)` returns true on success and the result can be retrieved via
@@ -116,7 +139,8 @@ struct SwiftCountExprEmitter
       DLOG("Unsupported decl name in count expr\n");
       return false;
     }
-    out << e->getDecl()->getName();
+
+    printIdentifierEscapingIfNeeded(e->getDecl()->getName(), out);
     return true;
   }
 
@@ -1056,3 +1080,545 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   }
 }
 
+namespace {
+using namespace swift;
+
+struct UnswiftifyParamInfo {
+  /// Swift source for the bound expression (an element count for
+  /// `__counted_by`, a byte size for `__sized_by`).
+  std::string boundsExprSource;
+  /// Has a `__counted_by` / `__sized_by` annotation.
+  bool hasBoundsAnnotation = false;
+  /// The bound is a byte size rather than an element count.
+  bool sizedBy = false;
+  /// Has the `_or_null` variant.
+  bool orNull = false;
+  /// Construct a (Mutable)(Raw)Span rather than a buffer pointer.
+  bool nonescaping = false;
+  /// Referenced purely as another parameter's bound, so dropped from the
+  /// forwarding call.
+  bool isElidedBoundsParam = false;
+};
+
+/// If \p expr (ignoring implicit casts) is a reference to one of \p clangFD's
+/// parameters, return that parameter's index. Any parameter identified by this
+/// function will be dropped from the safe signature.
+std::optional<unsigned>
+getReferencedParamIndex(const clang::Expr *expr,
+                        const clang::FunctionDecl *clangFD) {
+  expr = expr->IgnoreImpCasts();
+  const auto *declRef = dyn_cast<clang::DeclRefExpr>(expr);
+  if (!declRef)
+    return std::nullopt;
+  const auto *param = dyn_cast<clang::ParmVarDecl>(declRef->getDecl());
+  if (!param)
+    return std::nullopt;
+  // The count expression's `DeclRefExpr` may name the parameter of a different
+  // redeclaration (prototype vs. definition) than `clangFD`. Parameter indices
+  // are stable across redeclarations, so verify the owner is a redeclaration of
+  // `clangFD` and use that redecl's index.
+  const auto *owner = dyn_cast<clang::FunctionDecl>(param->getDeclContext());
+  if (!owner || owner->getCanonicalDecl() != clangFD->getCanonicalDecl())
+    return std::nullopt;
+  return param->getFunctionScopeIndex();
+}
+
+/// The classification of a (possibly optional) pointer type.
+struct PointerClassification {
+  Type pointee;   // Element type for typed pointers; null for raw/non-pointer.
+  bool isMutable; // True for `UnsafeMutable*Pointer` families.
+};
+
+/// Peel an optional (`?`/`!`) pointer type and classify the underlying pointer.
+PointerClassification classifyPointerType(Type ty) {
+  if (Type object = ty->getOptionalObjectType())
+    ty = object;
+  PointerTypeKind ptk;
+  Type pointee = ty->getAnyPointerElementType(ptk);
+  if (!pointee)
+    return {Type(), /*isMutable=*/false};
+  bool isMutable = false;
+  switch (ptk) {
+  case PTK_UnsafeMutablePointer:
+  case PTK_AutoreleasingUnsafeMutablePointer:
+  case PTK_UnsafeMutableRawPointer:
+    isMutable = true;
+    break;
+  case PTK_UnsafePointer:
+  case PTK_UnsafeRawPointer:
+    isMutable = false;
+    break;
+  }
+  // Raw pointers report the empty tuple as their "element"; treat that as
+  // having no pointee for the purposes of `Span<Pointee>()`.
+  if (pointee->isVoid())
+    return {Type(), isMutable};
+  return {pointee, isMutable};
+}
+
+/// The buffer/span type the swiftify transform maps an annotated pointer
+/// to, and the information necessary to construct one.
+struct SafeBufferSpelling {
+  StringRef name;       // "Span", "UnsafeBufferPointer", ...
+  StringRef initLabel;  // "start" or "_unsafeStart".
+  StringRef countLabel; // "count" or "byteCount".
+  Type pointee;         // empty if RawSpan/RawBufferPointer
+  /// The pointer is an `OpaquePointer`, which the raw buffer initializers do
+  /// not accept directly; it has to be converted to an `UnsafeRawPointer`.
+  bool castToRawPointer = false;
+
+  /// Select the type for a parameter based on its bounds flags and mutability.
+  static SafeBufferSpelling forParam(const UnswiftifyParamInfo &info,
+                                     Type pty) {
+    auto [pointee, isMutable] = classifyPointerType(pty);
+    bool span = info.nonescaping;
+    bool raw = info.sizedBy;
+
+    // Each (span, raw) combination maps to a distinct type family; within a
+    // family, mutability picks the concrete spelling.
+    StringRef name;
+    if (span && raw)
+      name = isMutable ? "MutableRawSpan" : "RawSpan";
+    else if (span)
+      name = isMutable ? "MutableSpan" : "Span";
+    else if (raw)
+      name = isMutable ? "UnsafeMutableRawBufferPointer"
+                       : "UnsafeRawBufferPointer";
+    else
+      name = isMutable ? "UnsafeMutableBufferPointer" : "UnsafeBufferPointer";
+
+    StringRef initLabel = span ? "_unsafeStart" : "start";
+    // Only a RawSpan deals in absolute bytes.
+    StringRef countLabel = (span && raw) ? "byteCount" : "count";
+
+    Type unwrapped = pty;
+    if (Type object = unwrapped->getOptionalObjectType())
+      unwrapped = object;
+    bool isOpaque = raw && unwrapped->getAnyNominal() ==
+                               pty->getASTContext().getOpaquePointerDecl();
+    return {name, initLabel, countLabel, raw ? Type() : pointee, isOpaque};
+  }
+
+  /// Emit the initializer expression producing the safe value from a pointer
+  /// and an already-`Int`-typed count expression, e.g.
+  /// `unsafe Span(_unsafeStart: x, count: _count0)`.
+  void printInitializer(llvm::raw_ostream &os, const llvm::Twine &ptrExpr,
+                        const llvm::Twine &countExpr) const {
+    os << "unsafe " << name << "(" << initLabel << ": ";
+    // `UnsafeRawPointer.init?(_: OpaquePointer?)` preserves optionality.
+    if (castToRawPointer)
+      os << "UnsafeRawPointer(" << ptrExpr << ")";
+    else
+      os << ptrExpr;
+    os << ", " << countLabel << ": " << countExpr << ")";
+  }
+
+  void printTypeName(llvm::raw_ostream &os) const {
+    os << name;
+    if (pointee)
+      os << "<" << pointee << ">";
+  }
+};
+
+/// One argument of the forwarding call the generated peer makes to the safe
+/// original: its argument label, the Swift source spelling to pass, whether it
+/// is passed `inout`, and whether its type is unsafe (so the call needs
+/// `unsafe`).
+struct CallArg {
+  Identifier label;
+  std::string name;
+  bool isInout;
+  /// The forwarded value has an unsafe type (a pointer / buffer pointer), so
+  /// the forwarding call must be marked `unsafe`.
+  bool isUnsafe;
+
+  CallArg(Identifier label, std::string name, bool isInout,
+          bool isUnsafe = false)
+      : label(label), name(std::move(name)), isInout(isInout),
+        isUnsafe(isUnsafe) {}
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const CallArg &arg) {
+  if (!arg.label.empty())
+    os << arg.label.str() << ": ";
+  if (arg.isInout)
+    os << "&";
+  os << arg.name;
+  return os;
+}
+
+/// Emit a pre-call `let`/`var` binding that constructs the bufferpointer/span
+/// for a single annotated unsafe pointer parameter, returning the name of the
+/// local variable to pass at the call site.
+std::string emitSafeValueBinding(const UnswiftifyParamInfo &info,
+                                 const ParamDecl *targetParam, Type safeType,
+                                 std::string bindingName, std::string countName,
+                                 bool isInout, llvm::raw_ostream &os) {
+  DLOG_SCOPE("Binding safe buffer\n");
+  std::string pointerName = escapeSwiftIdentifier(targetParam->getName());
+  Type pty = targetParam->getInterfaceType();
+  StringRef bindKeyword = isInout ? "var" : "let";
+
+  SafeBufferSpelling typeInfo = SafeBufferSpelling::forParam(info, pty);
+
+  bool isOptionalPointer = !pty->getOptionalObjectType().isNull();
+
+  // The count comes straight from the C caller. Bind it as an `Int` and
+  // validate it (`>= 0`) before constructing any buffer: an UnsafeBufferPointer
+  // with a negative count is UB.
+  //
+  // For a `_or_null` pointer, however, a null pointer carries no buffer and its
+  // count is not meaningful (the C contract permits it to be negative). Clamp
+  // the count to 0 in that case so the null branch constructs an empty
+  // collection and the precondition only constrains the non-null case.
+  os << "    let " << countName << " = ";
+  if (info.orNull && isOptionalPointer) {
+    os << "(";
+    if (pty->isUnsafe())
+      os << "unsafe ";
+    os << pointerName << " != nil) ? Int(" << info.boundsExprSource
+       << ") : 0\n";
+    os << "    precondition(" << countName
+      << " >= 0, \"non-null buffer with negative count\")\n";
+  } else {
+    os << "Int(" << info.boundsExprSource << ")\n";
+    os << "    precondition(" << countName
+       << " >= 0, \"buffer with negative count\")\n";
+    if (isOptionalPointer)
+      os << "    precondition(unsafe " << pointerName
+         << " != nil || " << countName
+         << " == 0, \"null buffer with non-zero count\")\n";
+  }
+  StringRef countExpr = countName;
+
+  bool safeTypeIsOptional =
+      safeType && !safeType->getOptionalObjectType().isNull();
+  bool generateSpan = info.nonescaping;
+
+  // Bind argument to a local variable even when not strictly necessary.
+  // This simplifies generating the forwarding call.
+  os << "    " << bindKeyword << " " << bindingName;
+  if (isOptionalPointer && safeTypeIsOptional) {
+    // Nullable pointer, Optional safe value: a null pointer maps to `nil`.
+    if (generateSpan) {
+      os << ": ";
+      typeInfo.printTypeName(os);
+      os << "? = if unsafe " << pointerName << " != nil { ";
+      typeInfo.printInitializer(os, pointerName + "!", countExpr);
+      os << " } else { nil }\n";
+    } else {
+      os << " = unsafe " << pointerName << ".map { ";
+      typeInfo.printInitializer(os, "$0", countExpr);
+      os << " }\n";
+    }
+  } else if (isOptionalPointer && generateSpan) {
+    // Nullable pointer, non-Optional Span: a null pointer maps to an empty span.
+    os << " = if unsafe " << pointerName << " != nil { ";
+    typeInfo.printInitializer(os, pointerName + "!", countExpr);
+    os << " } else { ";
+    typeInfo.printTypeName(os);
+    os << "() }\n";
+  } else {
+    // The remaining cases need no nil-guard: either the pointer is
+    // non-nullable, or it is a nullable buffer pointer whose own initializer
+    // accepts a null base (mapping null to an empty buffer).
+    os << " = ";
+    typeInfo.printInitializer(os, pointerName, countExpr);
+    os << "\n";
+  }
+
+  return bindingName;
+}
+
+/// Derive per-parameter bounds/nonescaping info by walking \p clangFD into
+/// \p infos, and flag the parameters referenced purely as another parameter's
+/// count (which are dropped from the forwarding call). \p infos is indexed by
+/// clang parameter position (`clangFD->getNumParams()` entries).
+void deriveParamInfo(const clang::FunctionDecl *clangFD,
+                     llvm::SmallVectorImpl<UnswiftifyParamInfo> &infos) {
+  DLOG_SCOPE("Deriving parameter info\n");
+  infos.assign(clangFD->getNumParams(), UnswiftifyParamInfo());
+  clang::ASTContext &clangCtx = clangFD->getASTContext();
+  for (auto [index, clangParam] : llvm::enumerate(clangFD->parameters())) {
+    UnswiftifyParamInfo &info = infos[index];
+    clang::QualType clangParamTy = clangParam->getType();
+    if (const auto *CAT = clangParamTy->getAs<clang::CountAttributedType>()) {
+      SwiftCountExprEmitter emitter(clangCtx);
+      if (emitter.Visit(CAT->getCountExpr())) {
+        info.hasBoundsAnnotation = true;
+        info.sizedBy = CAT->isCountInBytes();
+        info.orNull = CAT->isOrNull();
+        info.boundsExprSource = emitter.str().str();
+        if (auto countIndex =
+                getReferencedParamIndex(CAT->getCountExpr(), clangFD);
+            countIndex && *countIndex < infos.size())
+          infos[*countIndex].isElidedBoundsParam = true;
+      }
+    }
+    if (clangParam->hasAttr<clang::NoEscapeAttr>())
+      info.nonescaping = true;
+  }
+}
+
+/// Emit the generated peer's `@c @implementation func NAME(PARAMS) -> RET {`
+/// header, inheriting access from the safe original \p safeDecl and taking the
+/// signature \p targetParams of the imported C entry point.
+void emitPeerSignature(llvm::raw_ostream &os,
+                       const AbstractFunctionDecl *safeDecl,
+                       const AbstractFunctionDecl *importedAFD,
+                       const ParameterList *targetParams, Type resultTy) {
+  DLOG_SCOPE("Emitting peer signature\n");
+  os << "@c @implementation\n";
+  if (StringRef access = getAccessLevelSpelling(safeDecl->getFormalAccess());
+      !access.empty())
+    os << access << " ";
+  os << "func ";
+  printSwiftIdentifier(importedAFD->getBaseIdentifier(), os);
+  os << "(";
+  llvm::interleaveComma(*targetParams, os, [&os](auto *param) {
+    os << "_ ";
+    printSwiftIdentifier(param->getName(), os,
+                         PrintNameContext::FunctionParameterLocal);
+    os << ": " << param->getInterfaceType();
+  });
+  os << ")";
+  if (resultTy)
+    os << " -> " << resultTy;
+  os << " {\n";
+}
+
+/// Emit the pre-call bindings that reconstruct each safe value (Span,
+/// UnsafeBufferPointer, ...) from the unsafe pointer/count pair, collecting the
+/// arguments to forward into \p callArgs. Returns false if the safe
+/// original's parameters cannot be reconciled with the imported unsafe
+/// signature for some reason (this shouldn't happen).
+bool emitArgumentBindings(llvm::raw_ostream &os,
+                          const ParameterList *targetParams,
+                          const ParameterList *sourceParams,
+                          ArrayRef<UnswiftifyParamInfo> infos,
+                          llvm::SmallVectorImpl<CallArg> &callArgs) {
+  DLOG_SCOPE("Emitting argument bindings\n");
+  llvm::StringSet<> reservedNames;
+  for (auto *param : *targetParams)
+    reservedNames.insert(param->getName().str());
+  auto uniqueLocalName = [&](const llvm::Twine &base) -> std::string {
+    std::string candidate = base.str();
+    // It's quite unlikely that we clash with one of the human written parameter
+    // names, so just appending '_' until we no longer clash should be fine.
+    while (!reservedNames.insert(candidate).second)
+      candidate += "_";
+    return candidate;
+  };
+  auto assertExpr = [](bool pred) -> bool {
+    assert(pred && "mismatching signature");
+    return pred;
+  };
+
+  // Dense index for the locals we actually emit. It advances only when a
+  // binding is written. N.B: the generated `_safeArgN`/`_countN` names have no
+  // gaps (plainly-forwarded parameters bind no local).
+  unsigned localIdx = 0;
+  unsigned callArgIdx = 0;
+  // Walk the unsafe parameters in order (skipping elided count parameters),
+  // construct the appropriate safe(r) buffer type for each annotated pointer
+  // parameter, and collect the variable name to forward.
+  for (auto [index, param] : llvm::enumerate(*targetParams)) {
+    DLOG_SCOPE("Emitting '" << param->getParameterName() << "'\n");
+    const UnswiftifyParamInfo &info = infos[index];
+    if (info.isElidedBoundsParam)
+      continue;
+    if (!assertExpr(callArgIdx <= sourceParams->size()))
+      return false;
+    const ParamDecl *sourceParam = sourceParams->get(callArgIdx);
+    bool isInout = sourceParam->isInOut();
+    Identifier label = sourceParam->getArgumentName();
+    if (info.hasBoundsAnnotation) {
+      Type srcType = sourceParam->getInterfaceType();
+      callArgs.emplace_back(
+          label,
+          emitSafeValueBinding(
+              info, param, srcType,
+              uniqueLocalName("_safeArg" + llvm::Twine(localIdx)),
+              uniqueLocalName("_count" + llvm::Twine(localIdx)), isInout, os),
+          isInout, /*isUnsafe=*/!info.nonescaping);
+      ++localIdx;
+    } else {
+      assert(!isInout); // plain C params should never be 'inout'
+      callArgs.emplace_back(label, escapeSwiftIdentifier(param->getName()),
+                            false, param->getInterfaceType()->isUnsafe());
+    }
+    ++callArgIdx;
+  }
+
+  return assertExpr(sourceParams->size() == callArgs.size());
+}
+
+void emitForwardingCall(llvm::raw_ostream &os, ArrayRef<CallArg> callArgs,
+                        const AbstractFunctionDecl *safeDecl,
+                        const AbstractFunctionDecl *importedAFD,
+                        Type resultTy) {
+  bool forwardsUnsafe =
+      safeDecl->getExplicitSafety() == ExplicitSafety::Unsafe ||
+      (resultTy && resultTy->isUnsafe()) ||
+      llvm::any_of(callArgs, [](const CallArg &arg) { return arg.isUnsafe; });
+  os << "    " << (resultTy ? "return " : "")
+     << (forwardsUnsafe ? "unsafe " : "");
+  printSwiftIdentifier(importedAFD->getBaseIdentifier(), os);
+  os << "(";
+  llvm::interleaveComma(callArgs, os);
+  os << ")\n}";
+}
+
+/// The compiler-internal implementation of the `_Unswiftify` macro. Given an
+/// `@c @implementation` Swift function, it synthesizes a C-callable
+/// (`@c @implementation`) peer with the unsafe signature of the imported C
+/// entry point, forwarding to the safe original by constructing safe(r) values
+/// (Span, UnsafeBufferPointer, ...) from each unsafe pointer/count pair.
+class UnswiftifyMacro : public InternalMacro {
+public:
+  std::string expandAttached(ASTContext &ctx, Decl *attachedTo) const override;
+};
+
+#ifndef NDEBUG
+static StringRef tryGetName(const Decl *D, SmallVectorImpl<char> &scratch) {
+  if (!D)
+    return "<null>";
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    DeclName Name = VD->getName();
+    if (Name.isSpecial())
+      return "<special-name>";
+    return VD->getName().getString(scratch);
+  }
+  return "<not-a-named-decl>";
+}
+#endif
+
+std::string UnswiftifyMacro::expandAttached(ASTContext &ctx,
+                                            Decl *attachedTo) const {
+#ifndef NDEBUG
+  SmallVector<char, 0> scratch;
+#endif
+  DLOG_SCOPE("Expanding @_Unswiftify for " << tryGetName(attachedTo, scratch) << "\n");
+  // Every bail-out below means we committed to synthesizing a C entry point
+  // (attachUnswiftifyMacroIfNeeded attached this macro) but then could not.
+  // Returning an empty expansion would silently drop the C symbol and surface
+  // only as a link error, so each failure should emit some error message.
+  auto cannotLower = [&](Decl *at) -> std::string {
+    if (auto *vd = dyn_cast_or_null<ValueDecl>(at))
+      ctx.Diags.diagnose(vd->getLoc(), diag::implementation_safe_cannot_lower,
+                         vd);
+    return "";
+  };
+
+  auto *safeDecl = dyn_cast<AbstractFunctionDecl>(attachedTo);
+  if (!safeDecl) {
+    DLOG("Safe decl is not a function\n");
+    return cannotLower(attachedTo);
+  }
+
+  // Fetch the unsafe signature directly from the safe overload: its imported
+  // clang counterpart is the unsafe C entry point we must expose.
+  auto *importedAFD = dyn_cast_or_null<AbstractFunctionDecl>(
+      safeDecl->getImplementedObjCDecl());
+  if (!importedAFD) {
+    DLOG("Cannot find original C function\n");
+    return cannotLower(safeDecl);
+  }
+  const auto *clangFD =
+      dyn_cast_or_null<clang::FunctionDecl>(importedAFD->getClangDecl());
+  if (!clangFD) {
+    DLOG("Cannot find clang decl\n");
+    return cannotLower(safeDecl);
+  }
+
+  auto *importedFD = dyn_cast<FuncDecl>(importedAFD);
+  if (!importedFD) {
+    DLOG("Imported decl is not a normal function\n");
+    return cannotLower(safeDecl);
+  }
+
+  auto *targetParams = importedAFD->getParameters();
+  auto *sourceParams = safeDecl->getParameters();
+
+  // The forwarding loop below indexes `infos` (clang parameter domain) by the
+  // imported Swift parameter position. The signatures always align for a plain
+  // top level C function, but a `swift_name`/`swift_error` remapping could make
+  // them diverge in the future when ObjC or C++ support is added.
+  if (targetParams->size() != clangFD->getNumParams()) {
+    DLOG("Mismatching parameter lists between Swift and clang decls\n");
+    return cannotLower(safeDecl);
+  }
+
+  llvm::SmallVector<UnswiftifyParamInfo, 16> infos;
+  deriveParamInfo(clangFD, infos);
+
+  Type resultTy = importedFD->getResultInterfaceType();
+  if (resultTy && resultTy->isVoid())
+    resultTy = Type();
+
+  // Emit directly into the final buffer, in source order.
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  emitPeerSignature(os, safeDecl, importedAFD, targetParams, resultTy);
+  llvm::SmallVector<CallArg, 16> callArgs;
+  if (!emitArgumentBindings(os, targetParams, sourceParams, infos, callArgs)) {
+    DLOG("Could not bind arguments\n");
+    return cannotLower(safeDecl);
+  }
+  emitForwardingCall(os, callArgs, safeDecl, importedAFD, resultTy);
+  return result;
+}
+
+} // namespace
+
+static constexpr llvm::StringLiteral UnswiftifyMacroName = "_Unswiftify";
+
+MacroDecl *ClangImporter::Implementation::createUnswiftifyMacroDecl(
+    DeclName introducedName) {
+  ASTContext &ctx = SwiftContext;
+  DeclContext *dc = ctx.getStdlibModule();
+  if (!dc)
+    dc = ctx.MainModule;
+
+  auto *macro = new (ctx) MacroDecl(
+      /*macroLoc=*/SourceLoc(),
+      DeclName(ctx.getIdentifier(UnswiftifyMacroName)),
+      /*nameLoc=*/SourceLoc(), /*genericParams=*/nullptr,
+      /*parameterList=*/nullptr, /*arrowLoc=*/SourceLoc(),
+      /*resultType=*/nullptr, /*definition=*/nullptr, dc);
+  macro->setImplicit();
+
+  // `@attached(peer, names: named(<introducedName>))`: the peer is an unsafe
+  // overload of the safe original whose compound name matches the C interface
+  // (e.g. `foo(_:_:)` taking pointer and count), which may differ in arity from
+  // the safe original (e.g. `foo(_:)` taking a Span).
+  // This is important because @implementation processing does a compound name
+  // lookup, which won't trigger expansion of the macro based on the attached
+  // decl's compound name since it doesn't match (the base name is the same).
+  // Simply declaring `overloaded` wouldn't work - I'm not entirely convinced
+  // that isn't just because of a macro expansion bug, but this works.
+  MacroIntroducedDeclName named =
+      MacroIntroducedDeclName::getNamed(introducedName);
+  auto *roleAttr = MacroRoleAttr::create(
+      ctx, /*atLoc=*/SourceLoc(), /*range=*/SourceRange(),
+      MacroSyntax::Attached,
+      /*lParenLoc=*/SourceLoc(), MacroRole::Peer, named,
+      /*conformances=*/{}, /*rParenLoc=*/SourceLoc(), /*implicit=*/true);
+  macro->getAttrs().add(roleAttr);
+
+  static UnswiftifyMacro unswiftifyMacro;
+  macro->setDefinition(MacroDefinition::forInternal(&unswiftifyMacro));
+
+  return macro;
+}
+
+void ClangImporter::Implementation::attachUnswiftifyForSafeImplementation(
+    AbstractFunctionDecl *safeSwiftDecl, DeclName introducedPeerName) {
+  // `_Unswiftify` is never declared in source. Synthesize the internal macro
+  // decl, then let the generic AST plumbing attach it and register its
+  // introduced names.
+  MacroDecl *macro = createUnswiftifyMacroDecl(introducedPeerName);
+  safeSwiftDecl->attachInternalMacro(macro, MacroRole::Peer);
+
+  DLOG("Attached @_Unswiftify to '" << safeSwiftDecl->getNameStr() << "'\n");
+}

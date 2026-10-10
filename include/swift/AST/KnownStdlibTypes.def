@@ -105,7 +105,10 @@ KNOWN_STDLIB_TYPE_DECL(Result, NominalTypeDecl, 2)
 KNOWN_STDLIB_TYPE_DECL(InlineArray, NominalTypeDecl, 2)
 KNOWN_STDLIB_TYPE_DECL(_InlineArray, NominalTypeDecl, 2)
 
+KNOWN_STDLIB_TYPE_DECL(Span, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(RawSpan, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(MutableSpan, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(MutableRawSpan, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(Ref, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(MutableRef, NominalTypeDecl, 1)
