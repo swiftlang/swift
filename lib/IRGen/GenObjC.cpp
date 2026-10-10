@@ -1360,7 +1360,7 @@ getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
     auto clangDecl = d->getClangNode().castAsDecl();
     auto &clangASTContext = IGM.getClangASTContext();
     std::string typeStr;
-    CStringSectionType sectionType;
+    CStringSectionType sectionType = CStringSectionType::Default;
     if (auto objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
       typeStr = clangASTContext.getObjCEncodingForMethodDecl(
           objcMethodDecl, useExtendedEncoding /*extended*/);

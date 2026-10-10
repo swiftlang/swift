@@ -812,8 +812,8 @@ _swift_parseBacktracingSettings(const char *settings)
 {
   const char *ptr = settings;
   const char *key = ptr;
-  const char *keyEnd;
-  const char *value;
+  const char *keyEnd = nullptr;
+  const char *value = nullptr;
   const char *valueEnd;
   enum {
     ScanningKey,
@@ -1029,7 +1029,7 @@ _swift_backtrace_demangle(const char *mangledName,
     // This is a Swift mangling
     auto options = DemangleOptions::SimplifiedUIDemangleOptions();
     auto result = Demangle::demangleSymbolAsString(name, options);
-    size_t bufferSize;
+    size_t bufferSize = 0;
 
     if (outputBufferSize) {
       bufferSize = *outputBufferSize;
@@ -1057,7 +1057,7 @@ _swift_backtrace_demangle(const char *mangledName,
     char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
 
     if (result) {
-      size_t bufferSize;
+      size_t bufferSize = 0;
 
       if (outputBufferSize) {
         bufferSize = *outputBufferSize;

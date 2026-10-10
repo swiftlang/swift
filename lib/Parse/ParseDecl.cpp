@@ -1268,7 +1268,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   consumeToken(tok::identifier);
 
   // Parse @_extern(wasm, module: "x", name: "y") or @_extern(c[, "x"])
-  ExternKind kind;
+  std::optional<ExternKind> kind;
   std::optional<StringRef> importModuleName, importName;
 
   if (kindTok.getText() == "wasm") {
@@ -1300,7 +1300,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto AttrRange = SourceRange(Loc, rParenLoc);
 
   // Reject duplicate attributes with the same kind.
-  if (!DiscardAttribute && ExternAttr::find(Attributes, kind)) {
+  if (!DiscardAttribute && ExternAttr::find(Attributes, kind.value())) {
     diagnose(Loc, diag::duplicate_attribute, false);
     DiscardAttribute = true;
   }
@@ -1308,7 +1308,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   if (!DiscardAttribute) {
     Attributes.add(new (Context)
                        ExternAttr(importModuleName, importName, AtLoc,
-                                  lParenLoc, rParenLoc, AttrRange, kind,
+                                  lParenLoc, rParenLoc, AttrRange, kind.value(),
                                   /*Implicit=*/false));
   }
   return false;
@@ -3203,7 +3203,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     bool ParseSymbolName = true;
 
-    ExposureKind ExpKind;
+    std::optional<ExposureKind> ExpKind;
     if (DK == DeclAttrKind::Expose) {
       auto diagnoseExpectOption = [&]() {
         diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName,
@@ -3297,7 +3297,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         }
         Attributes.add(new (Context) ExposeAttr(
             AsmName ? AsmName.value() : StringRef(""), AtLoc, AttrRange,
-            ExpKind, /*Implicit=*/false));
+            ExpKind.value(), /*Implicit=*/false));
       } else
         llvm_unreachable("out of sync with switch");
     }

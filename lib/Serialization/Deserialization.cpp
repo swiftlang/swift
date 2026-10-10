@@ -4498,19 +4498,20 @@ public:
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind;
+    std::optional<uint8_t> rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
-    unsigned numNameComponentsBiased;
+    unsigned numNameComponentsBiased = 0;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
     bool isIUO;
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool overriddenAffectsABI, needsNewTableEntry, isTransparent;
+    bool overriddenAffectsABI, needsNewTableEntry;
+    bool isTransparent = false;
     DeclID opaqueReturnTypeID;
-    bool isUserAccessible;
+    bool isUserAccessible = false;
     bool isDistributedThunk;
     bool hasSendingResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
@@ -4559,7 +4560,7 @@ public:
 
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
-    AccessorKind accessorKind;
+    std::optional<AccessorKind> accessorKind;
     if (isAccessor) {
       auto storageResult = MF.getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -4571,7 +4572,8 @@ public:
             errorFlags, numTableEntries);
       }
 
-      if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind))
+      if (auto accessorKindResult =
+              getActualAccessorKind(rawAccessorKind.value()))
         accessorKind = *accessorKindResult;
       else
         return MF.diagnoseFatal();
@@ -4580,7 +4582,7 @@ public:
       // into this code.  When we come out, don't create the accessor twice.
       // TODO: find some better way of breaking this cycle, like lazily
       // deserializing the accessors.
-      if (auto accessor = storage->getAccessor(accessorKind))
+      if (auto accessor = storage->getAccessor(accessorKind.value()))
         return accessor;
     }
 
@@ -4670,9 +4672,9 @@ public:
                                         async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
-      auto *accessor =
-          AccessorDecl::createDeserialized(ctx, accessorKind, storage, async,
-                                           throws, thrownType, resultType, DC);
+      auto *accessor = AccessorDecl::createDeserialized(
+          ctx, accessorKind.value(), storage, async, throws, thrownType,
+          resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;

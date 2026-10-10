@@ -162,7 +162,7 @@ public:
     // The remainder of the longer mask must be
     // all zero bits.
     unsigned mustBeZeroSize = std::max(size, rhs.size) - common;
-    uint8_t *mustBeZero;
+    uint8_t *mustBeZero = nullptr;
     if (size < rhs.size) {
       mustBeZero = rhs.mask + size;
     } else if (size > rhs.size) {
