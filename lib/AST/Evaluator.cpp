@@ -87,6 +87,8 @@ void Evaluator::finishedRequest(const ActiveRequest &request) {
 }
 
 void Evaluator::diagnoseCycle(const ActiveRequest &request) {
+  ++numDiagnosedCycles;
+
   if (debugDumpCycles) {
     const auto printIndent = [](llvm::raw_ostream &OS, unsigned indent) {
       OS.indent(indent);

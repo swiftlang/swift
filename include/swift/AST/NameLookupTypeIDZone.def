@@ -72,10 +72,11 @@ SWIFT_REQUEST(NameLookup, QualifiedLookupRequest,
                   const DeclContext *, SmallVector<NominalTypeDecl *, 4>,
                   DeclNameRef, NLOptions),
               Uncached, NoLocationInfo)
-SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
-              SelfBounds(llvm::PointerUnion<const TypeDecl *,
-                                            const ExtensionDecl *>),
-              Uncached, NoLocationInfo)
+SWIFT_REQUEST(
+    NameLookup, SelfBoundsFromWhereClauseRequest,
+    SelfBounds(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+               RecomputableDecls *),
+    Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, SelfBoundsFromGenericSignatureRequest,
               SelfBounds(const ExtensionDecl * extDecl),
               Uncached, NoLocationInfo)

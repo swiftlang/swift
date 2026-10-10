@@ -7911,6 +7911,8 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.ExistentialConformsToSelf = false;
   Bits.ProtocolDecl.InheritedProtocolsValid = false;
   Bits.ProtocolDecl.AllInheritedProtocolsValid = false;
+  Bits.ProtocolDecl.InheritedProtocolsUnresolved = false;
+  Bits.ProtocolDecl.AllInheritedProtocolsUnresolved = false;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
   Bits.ProtocolDecl.HasAssociatedTypes = false;
@@ -7952,7 +7954,8 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
 ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
   // Avoid evaluator overhead because we call this from Symbol::compare()
   // in the Requirement Machine.
-  if (Bits.ProtocolDecl.AllInheritedProtocolsValid)
+  if (Bits.ProtocolDecl.AllInheritedProtocolsValid &&
+      !Bits.ProtocolDecl.AllInheritedProtocolsUnresolved)
     return AllInheritedProtocols;
 
   auto *mutThis = const_cast<ProtocolDecl *>(this);
