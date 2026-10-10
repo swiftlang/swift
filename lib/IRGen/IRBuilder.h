@@ -101,9 +101,9 @@ public:
     IRBuilderBase::SetInsertPoint(BB);
   }
   
-  void SetInsertPoint(llvm::BasicBlock *BB, llvm::BasicBlock::iterator before) {
+  void SetInsertPoint(llvm::BasicBlock::iterator before) {
     ClearedIP = nullptr;
-    IRBuilderBase::SetInsertPoint(BB, before);
+    IRBuilderBase::SetInsertPoint(before);
   }
 
   void SetInsertPoint(llvm::Instruction *I) {
@@ -526,10 +526,9 @@ public:
     builder.SetInsertPoint(newInsertionPoint);
   }
 
-  SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock *block,
-                          llvm::BasicBlock::iterator iter)
+  SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock::iterator iter)
       : SavedInsertionPointRAII(b) {
-    builder.SetInsertPoint(block, iter);
+    builder.SetInsertPoint(iter);
   }
 
   SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock *insertionBlock)

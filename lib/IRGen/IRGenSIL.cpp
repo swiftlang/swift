@@ -745,8 +745,7 @@ public:
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
-    ZeroInitBuilder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
-                                   getEarliestInsertionPoint()->getIterator());
+    ZeroInitBuilder.SetInsertPoint(getEarliestInsertionPoint()->getIterator());
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     // note that this memset is before lifetime.start which is Undefined

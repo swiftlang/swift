@@ -654,7 +654,7 @@ void IRGenModule::emitRuntimeRegistration() {
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
     IRBuilder Builder(getLLVMContext(),
                       DebugInfo && !Context.LangOpts.DebuggerSupport);
-    Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    Builder.llvm::IRBuilderBase::SetInsertPoint(IP);
     if (DebugInfo && !Context.LangOpts.DebuggerSupport)
       DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(fnTy, RegistrationFunction, {});
