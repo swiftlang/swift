@@ -18,10 +18,10 @@
 // RUN: not %target-swift-emit-module-interface(%t.swiftinterface) %s -disable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary 2>/dev/null
 
 //
-// Should fail by default
+// Should pass by default
 //
 
-// RUN: not %target-swift-emit-module-interface(%t.swiftinterface) %s -I %t/lib/swift -module-name ClientLibrary -swift-version 5 2>/dev/null
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -I %t/lib/swift -module-name ClientLibrary -swift-version 5 2>/dev/null
 
 
 import DeclaringLibrary
