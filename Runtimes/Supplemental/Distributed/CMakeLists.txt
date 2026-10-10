@@ -120,7 +120,8 @@ target_compile_definitions(swiftDistributed PRIVATE
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftDistributed>)
 target_compile_options(swiftDistributed PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
-  $<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>)
+  $<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>")
 
 if(APPLE AND BUILD_SHARED_LIBS)
   target_link_options(swiftDistributed PRIVATE

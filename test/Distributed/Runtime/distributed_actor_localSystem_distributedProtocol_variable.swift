@@ -2,11 +2,17 @@
 // RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name main -j2 -parse-as-library -I %t %s -plugin-path %swift-plugin-dir -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out | %FileCheck %s --color
 
 // Run again with library evolution:
 // RUN: %target-build-swift -module-name main -j2 -parse-as-library -enable-library-evolution -I %t %s -plugin-path %swift-plugin-dir -o %t/evo.out
 // RUN: %target-codesign %t/evo.out
 // RUN: %target-run %t/evo.out | %FileCheck %s --color
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name main -j2 -parse-as-library -enable-library-evolution -I %t %s -plugin-path %swift-plugin-dir -o %t/evo-opaque-values.out
+// RUN: %target-codesign %t/evo-opaque-values.out
+// RUN: %target-run %t/evo-opaque-values.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
