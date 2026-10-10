@@ -33,7 +33,7 @@ struct PImpl: P {
   }
 }
 
-// CHECK: @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG.3" = linkonce_odr hidden constant <{ i8, i32, i8 }> <{ i8 9, i32 trunc (i64 sub (i64 ptrtoint (ptr @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i8, i32, i8 }>, ptr @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG.3", i32 0, i32 1) to i64)) to i32), i8 0 }>
+// CHECK: @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG.3" = linkonce_odr hidden constant <{ i8, i32, i8 }> <{ i8 9, i32 trunc (i64 sub (i64 ptrtoint (ptr @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG" to i64), i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG.3", i64 1) to i64)) to i32), i8 0 }>
 // CHECK: define linkonce_odr hidden ptr @"$s31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcGACyxGAA0F0AAWl"() #1 {
 // CHECK:   call swiftcc %swift.metadata_response @"$s31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcGMa"(i64 255)
 // CHECK: }

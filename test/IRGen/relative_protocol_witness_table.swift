@@ -139,9 +139,9 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME: [i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7AStructVAA8FuncOnlyAAMc" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7AStructVAA8FuncOnlyAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7AStructVAA8FuncOnlyA2aDP1ayyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7AStructVAA8FuncOnlyAAWP", i32 0, i32 1) to i64)) to i32),
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7AStructVAA8FuncOnlyAAWP", i64 4) to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7AStructVAA8FuncOnlyA2aDP1byyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7AStructVAA8FuncOnlyAAWP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7AStructVAA8FuncOnlyAAWP", i64 8) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
 // Simple Table with parent.
@@ -150,9 +150,9 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME: [i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedAAMc" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA8FuncOnlyAAWP" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7BStructVAA9InheritedAAWP", i32 0, i32 1) to i64)) to i32),
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7BStructVAA9InheritedAAWP", i64 4) to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedA2aDP1cyyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7BStructVAA9InheritedAAWP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7BStructVAA9InheritedAAWP", i64 8) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
 
@@ -162,31 +162,31 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME: [i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7CStructVAA9WithAssocAAMc" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7CStructVAA9WithAssocAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"symbolic Si", i64 1) to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7CStructVAA9WithAssocAAWP", i32 0, i32 1) to i64)) to i32),
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7CStructVAA9WithAssocAAWP", i64 4) to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7CStructVAA9WithAssocA2aDP1ayyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7CStructVAA9WithAssocAAWP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7CStructVAA9WithAssocAAWP", i64 8) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
 // CHECK: @"$s1A7DStructVAA20WithAssocConformanceAAWP" = hidden constant [4 x i32]
 // CHECK-SAME: [i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7DStructVAA20WithAssocConformanceAAMc" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr (i8, ptr @"associated conformance 1A7DStructVAA20WithAssocConformanceAA0C4TypeAaDP_AA8FuncOnly", i64 1) to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP", i32 0, i32 1) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP", i64 4) to i64)) to i32)
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"symbolic _____ 1A7AStructV", i64 1) to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP", i64 8) to i64)) to i32)
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7DStructVAA20WithAssocConformanceA2aDP04initC00C4TypeQzyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP", i32 0, i32 3) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7DStructVAA20WithAssocConformanceAAWP", i64 12) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
 // CHECK: @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP" = hidden constant [4 x i32]
 // CHECK-SAME: [i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAMc" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr (i8, ptr @"associated conformance 1A7GStructVyxGAA20WithAssocConformanceAA0C4TypeAaEP_AA8FuncOnly", i64 1) to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP", i32 0, i32 1) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP", i64 4) to i64)) to i32)
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"symbolic x", i64 1) to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP", i64 8) to i64)) to i32)
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7GStructVyxGAA20WithAssocConformanceA2aEP04initC00C4TypeQzyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP", i32 0, i32 3) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A7GStructVyxGAA20WithAssocConformanceAAWP", i64 12) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
 // Conditional conformance
@@ -195,11 +195,11 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME: [i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlMc" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr (i8, ptr @"associated conformance 1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzl0D4TypeAaEP_AaF", i64 1) to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i32 0, i32 1) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i64 4) to i64)) to i32)
 // CHECK-SAME: i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"symbolic x", i64 1) to i64),
-// CHECK-SAME:                     i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:                     i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i64 8) to i64)) to i32)
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlAaEP04initD00D4TypeQzyFTW" to i64),
-// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([4 x i32], ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i32 0, i32 3) to i64)) to i32)
+// CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i64 12) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
 // Make sure value witness table lookup is done right.

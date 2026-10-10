@@ -84,8 +84,8 @@ class B : A {}
 //   Override table entry #1: base class.
 // CHECK-SAME: @"$s14class_metadata1ACMn"
 //   Override table entry #1: base method.
-// CHECK-DIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 13
-// CHECK-INDIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 16
+// CHECK-DIRECT-SAME: @"$s14class_metadata1ACMn", i{{32|64}} 52
+// CHECK-INDIRECT-SAME: @"$s14class_metadata1ACMn", i{{32|64}} 64
 //   Override table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1BCACycfC"
 
@@ -141,8 +141,8 @@ class C<T> : B {}
 //   Override table entry #1: base class.
 // CHECK-SAME: @"$s14class_metadata1ACMn"
 //   Override table entry #1: base method.
-// CHECK-DIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 13
-// CHECK-INDIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 16
+// CHECK-DIRECT-SAME: @"$s14class_metadata1ACMn", i{{32|64}} 52
+// CHECK-INDIRECT-SAME: @"$s14class_metadata1ACMn", i{{32|64}} 64
 //   Override table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1CCACyxGycfC"
 // CHECK-SAME: }>, section

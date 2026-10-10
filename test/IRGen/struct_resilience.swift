@@ -314,7 +314,7 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
 // public let n: Int
 
 // CHECK: [[FIELD_3:%.*]] = getelementptr inbounds ptr, ptr [[FIELDS_ADDR]], i32 2
-// CHECK: store ptr getelementptr inbounds (ptr, ptr @"$sBi{{32|64}}_WV", i32 {{.*}}), ptr [[FIELD_3]]
+// CHECK: store ptr getelementptr inbounds (i8, ptr @"$sBi{{32|64}}_WV", i{{32|64}} {{32|64}}), ptr [[FIELD_3]]
 
 // Resilient aggregate with one field -- make sure we don't look inside it
 // public let i: ResilientInt

@@ -204,8 +204,7 @@ void IRGenFunction::setupAsync(unsigned asyncContextIndex) {
 
   IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
   // Insert the stores after the coro.begin.
-  builder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
-                         getEarliestInsertionPoint()->getIterator());
+  builder.SetInsertPoint(getEarliestInsertionPoint()->getIterator());
   builder.CreateStore(c, asyncContextLocation);
 }
 
@@ -5616,7 +5615,7 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
                                              bool isTypedError) {
 
   IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
-  builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
+  builder.SetInsertPoint(AllocaIP->getIterator());
 
   auto errorStorageType = isTypedError ? IGM.Int8PtrTy :
     cast<FixedTypeInfo>(getTypeInfo(errorType)).getStorageType();
@@ -5636,8 +5635,7 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
                            errorAlignment, "swifterror");
 
   if (!isAsync) {
-    builder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
-                           getEarliestInsertionPoint()->getIterator());
+    builder.SetInsertPoint(getEarliestInsertionPoint()->getIterator());
   }
 
   // Only add the swifterror attribute on ABIs that pass it in a register.
