@@ -108,3 +108,19 @@ do {
     _ = Data(value: n) // Ok
   }
 }
+
+// https://github.com/swiftlang/swift/issues/83806
+// Adding or removing labels on nested tuples must also work through ternaries.
+func testNestedTupleLabelConversions(_ i: Int) {
+  let _: (Int, (x: Int, Bool))? = true ? (i, (i, true)) : nil
+  let _: (Int, (x: Int, Bool))? = true ? nil : (i, (i, false))
+  let _: (Int, (x: Int, Bool)) = true ? (i, (i, true)) : (i, (i, false))
+
+  let _: (Int, (Int, Bool))? = true ? (i, (x: i, true)) : nil
+  let _: (Int, (Int, Bool)) = true ? (i, (x: i, true)) : (i, (x: i, false))
+
+  let _: (Int, (Int, (x: Int, Bool))) =
+    true ? (i, (i, (i, true))) : (i, (i, (i, false)))
+  let _: (Int, (Int, (Int, Bool))) =
+    true ? (i, (i, (x: i, true))) : (i, (i, (x: i, false)))
+}
