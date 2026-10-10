@@ -2597,8 +2597,20 @@ namespace {
         return SrcMgr.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
       }
 
-      // The declarations are in different source files (or unknown source
-      // files) of the same module. Let's just try to find *something* to
+      // If the declarations are in different source files of the same module,
+      // order deterministically by filename or buffer ID.
+      if (lhsSF != rhsSF) {
+        if (!lhsSF || !rhsSF)
+          return lhsSF != nullptr;
+
+        if (lhsSF->getFilename() != rhsSF->getFilename())
+          return lhsSF->getFilename() < rhsSF->getFilename();
+
+        return lhsSF->getBufferID() < rhsSF->getBufferID();
+      }
+
+      // The declarations are in unknown source files (e.g. clang or
+      // synthesized) of the same module. Let's just try to find *something* to
       // differentiate them.
       auto leftName = getName(lhs);
       auto rightName = getName(rhs);
