@@ -108,6 +108,8 @@ def run_build_script_helper(action, host_target, product, args):
         '--ninja-bin', product.toolchain.ninja,
         '--cmake-bin', product.toolchain.cmake,
     ]
+    if action != 'clean':
+        helper_cmd += ["--jobs", str(args.build_jobs)]
     if os.path.exists(dispatch_build_dir):
         helper_cmd += [
             '--dispatch-build-dir', dispatch_build_dir
