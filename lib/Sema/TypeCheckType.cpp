@@ -5108,9 +5108,19 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  // Function values with execution semantics own their context, so they must
+  // be thick.
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto *called = claim<CalledTypeAttr>(attrs))
-    executionSemantics = called->getExecutionSemantics();
+  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+    if (representation != SILFunctionType::Representation::Thick) {
+      assert(conventionAttr);
+      diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                      diag::invalid_called_and_attr_attributes, conventionAttr);
+      hasError = true;
+    } else {
+      executionSemantics = called->getExecutionSemantics();
+    }
+  }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,

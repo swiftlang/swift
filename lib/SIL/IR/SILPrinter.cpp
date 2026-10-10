@@ -1875,8 +1875,15 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      switch (*semantics) {
+      case ExecutionSemantics::AtMostOnce:
+        *this << "[called_at_most_once] ";
+        break;
+      case ExecutionSemantics::Once:
+        *this << "[called_once] ";
+        break;
+      }
     }
     visitApplyInstBase(CI);
   }

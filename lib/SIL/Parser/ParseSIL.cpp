@@ -7370,9 +7370,15 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
-    if (AttrName == "called_once") {
+    if (AttrName == "called_at_most_once") {
       assert(!bool(AttrValue));
       PartialApplySemantics = ExecutionSemantics::AtMostOnce;
+      continue;
+    }
+
+    if (AttrName == "called_once") {
+      assert(!bool(AttrValue));
+      PartialApplySemantics = ExecutionSemantics::Once;
       continue;
     }
 
