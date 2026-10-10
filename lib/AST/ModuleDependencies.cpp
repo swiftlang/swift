@@ -709,6 +709,8 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
   // by-name module lookup to resolve Swift overlay and cross-import overlay
   // dependencies, so opt into having Clang report them.
   opts.ReportVisibleModules = true;
+  // Check directory dependencies against the reported paths.
+  opts.ValidateAgainstInvalidatedPaths = true;
 
   std::shared_ptr<llvm::cas::ObjectStore> cas;
   if (invocation.requiresCAS()) {
@@ -731,7 +733,29 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
       [this](StringRef str) { return save(str); });
 
   ClangScanningService.emplace(std::move(opts));
+
+  // Apply any paths reported before the service was created.
+  for (const auto &Path : PendingInvalidatedPaths)
+    ClangScanningService->addInvalidatedPath(Path);
+  PendingInvalidatedPaths.clear();
+
   return false;
+}
+
+void SwiftDependencyScanningService::addInvalidatedPath(StringRef Path) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  if (!ClangScanningService)
+    PendingInvalidatedPaths.push_back(Path.str());
+  else
+    ClangScanningService->addInvalidatedPath(Path);
+}
+
+bool SwiftDependencyScanningService::isDirectoryInvalidated(
+    StringRef Directory) {
+  assert(ClangScanningService && "dependency scanning service was not set up");
+  return ClangScanningService->getModuleCacheEntries()
+      .isDirectoryInvalidated(Directory)
+      .value_or(false);
 }
 
 StringRef SwiftDependencyScanningService::save(StringRef str) {

@@ -238,6 +238,10 @@ REMARK(remark_scanner_stale_result_invalidate, none,
        "Incremental module scan: Dependency info for module '%0' invalidated due to a modified input"
        " since last scan: '%1'.", (StringRef, StringRef))
 
+REMARK(remark_scanner_invalidate_directory, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to a"
+       " change in directory: '%1'.", (StringRef, StringRef))
+
 REMARK(remark_scanner_invalidate_upstream, none,
        "Incremental module scan: Dependency info for module '%0' invalidated due to an out-of-date"
        " dependency.", (StringRef))

@@ -295,6 +295,10 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()) {}
 
+void DependencyScanningTool::addInvalidatedPath(StringRef Path) {
+  ScanningService->addInvalidatedPath(Path);
+}
+
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
                                         StringRef WorkingDirectory) {

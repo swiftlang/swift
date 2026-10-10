@@ -104,6 +104,7 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
     swiftscan_string_dispose(details_impl->clang_details.context_hash);
     swiftscan_string_set_dispose(details_impl->clang_details.command_line);
+    swiftscan_string_set_dispose(details_impl->clang_details.directory_deps);
     swiftscan_string_dispose(details_impl->clang_details.module_cache_key);
     break;
   }
@@ -500,6 +501,11 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return details->clang_details.command_line;
 }
 
+swiftscan_string_set_t *
+swiftscan_clang_detail_get_directory_deps(swiftscan_module_details_t details) {
+  return details->clang_details.directory_deps;
+}
+
 swiftscan_string_ref_t
 swiftscan_clang_detail_get_cas_fs_root_id(swiftscan_module_details_t details) {
   return swift::c_string_utils::create_null();
@@ -650,6 +656,13 @@ swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
 void
 swiftscan_scanner_diagnostics_reset(swiftscan_scanner_t scanner) {
   // This method is deprecated
+}
+
+void swiftscan_scanner_add_invalidated_paths(swiftscan_scanner_t scanner,
+                                             const char **paths,
+                                             size_t num_paths) {
+  for (size_t I = 0; I != num_paths; ++I)
+    unwrap(scanner)->addInvalidatedPath(paths[I]);
 }
 
 swiftscan_string_ref_t
