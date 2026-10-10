@@ -5,6 +5,24 @@
 
 ## Swift (next)
 
+* [SE-0551][]:
+  `Span` and `MutableSpan` have new initializers that form a single-element span over a value, borrowing it (or mutating it) in place: `Span(ofOne:)` and `MutableSpan(ofOne:)`.
+  Because they do not need to copy the value, they can support noncopyable types.
+  `RawSpan` and `MutableRawSpan` have matching initializers over the bytes of a single value: `RawSpan(bytesOf:)` and `MutableRawSpan(bytesOf:)`.
+
+  ```swift
+  let header = PacketHeader(...)
+  let c = checksum(Span(ofOne: header).bytes) // borrows `header` in place
+
+  var timestamp = UInt64.zero
+  var bytes = MutableRawSpan(bytesOf: &timestamp)
+  parser.read(into: bytes)                    // writes into `timestamp`
+  ```
+
+  These initializers are safe alternatives for `withUnsafePointer(to:)`,
+  `withUnsafeMutablePointer(to:)`, `withUnsafeBytes(of:)` and
+  `withUnsafeMutableBytes(of:)`.
+
 * [SE-0526][]:
   Introduced task deadlines, available as `withDeadline(in:)`, which runs
   an operation within a time limit, and cancels the operation's scope when
@@ -11293,6 +11311,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [SE-0526]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0526-deadline.md
+[SE-0551]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0551-span-of-one.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
