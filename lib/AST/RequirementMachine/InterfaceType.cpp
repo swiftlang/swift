@@ -225,7 +225,8 @@ AssociatedTypeDecl *PropertyBag::getAssociatedType(Identifier name) {
     }
   }
 
-  ASSERT(assocType != nullptr && "Need to look harder");
+  if (assocType == nullptr)
+    return nullptr;
 
   auto inserted = AssocTypes.insert(std::make_pair(name, assocType)).second;
   ASSERT(inserted);
@@ -239,6 +240,8 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       const PropertyMap &map) {
   auto &ctx = map.getRewriteContext();
+  auto &astCtx = ctx.getASTContext();
+  auto getErrorType = [&] { return ErrorType::get(astCtx); };
   Type result;
 
   auto handleRoot = [&](GenericTypeParamType *genericParam) {
@@ -348,6 +351,9 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
     if (props == nullptr) {
+      if (astCtx.hadError())
+        return getErrorType();
+
       ABORT([&](auto &out) {
         out << "Cannot build interface type for term "
             << MutableTerm(begin, end) << "\n";
@@ -358,15 +364,29 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     // Assert that the associated type's protocol appears among the set
     // of protocols that the prefix conforms to.
-    if (CONDITIONAL_ASSERT_enabled()) {
-      auto conformsTo = props->getConformsTo();
-      ASSERT(std::find(conformsTo.begin(), conformsTo.end(),
-                       symbol.getProtocol())
-             != conformsTo.end());
+    auto conformsTo = props->getConformsTo();
+    if (std::find(conformsTo.begin(), conformsTo.end(),
+                  symbol.getProtocol()) == conformsTo.end()) {
+      if (astCtx.hadError())
+        return getErrorType();
+
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix does not conform to "
+            << symbol.getProtocol()->getName() << ": " << prefix << "\n";
+        out << "Property map entry: ";
+        props->dump(out);
+        out << "\n\n";
+        map.dump(out);
+      });
     }
 
     auto *assocType = props->getAssociatedType(symbol.getName());
     if (assocType == nullptr) {
+      if (astCtx.hadError())
+        return getErrorType();
+
       ABORT([&](auto &out) {
         out << "Cannot build interface type for term "
             << MutableTerm(begin, end) << "\n";
