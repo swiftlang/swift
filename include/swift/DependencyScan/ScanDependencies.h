@@ -15,6 +15,7 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/ErrorOr.h"
@@ -84,29 +85,36 @@ void validateInterModuleDependenciesCache(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks = false);
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    bool emitRemarks = false);
 
 /// Perform a postorder DFS to locate modules whose build recipe is out-of-date
 /// with respect to their inputs. Upon encountering such a module, add it to the
 /// set of invalidated modules, along with the path from the root to this
 /// module.
-void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
-                         const ModuleDependenciesCache &cache,
-                         std::shared_ptr<llvm::cas::ObjectStore> cas,
-                         std::shared_ptr<llvm::cas::ActionCache> actionCache,
-                         const llvm::sys::TimePoint<> &cacheTimeStamp,
-                         llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
-                         bool emitRemarks, ModuleDependencyIDSet &visited,
-                         ModuleDependencyIDSet &modulesRequiringRescan);
+void outOfDateModuleScan(
+    const ModuleDependencyID &sourceModuleID,
+    const ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::shared_ptr<llvm::cas::ActionCache> actionCache,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    bool emitRemarks, ModuleDependencyIDSet &visited,
+    ModuleDependencyIDSet &modulesRequiringRescan);
 
 /// Validate whether all inputs of a given module dependency
-/// are older than the cache serialization time.
+/// are older than the cache serialization time and none of its directory
+/// dependencies have been invalidated.
 bool verifyModuleDependencyUpToDate(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks);
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    bool emitRemarks);
 } // end namespace incremental
 } // end namespace dependencies
 } // end namespace swift

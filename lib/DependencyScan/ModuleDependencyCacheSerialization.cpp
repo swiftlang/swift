@@ -789,12 +789,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
       unsigned pcmOutputPathID, mappedPCMPathID, moduleMapPathID, contextHashID,
-          commandLineArrayID, fileDependenciesArrayID, clangIncludeTreeRootID,
+          commandLineArrayID, fileDependenciesArrayID,
+          directoryDependenciesArrayID, clangIncludeTreeRootID,
           moduleCacheKeyID, isSystem;
       ClangModuleDetailsLayout::readRecord(
           Scratch, pcmOutputPathID, mappedPCMPathID, moduleMapPathID,
           contextHashID, commandLineArrayID, fileDependenciesArrayID,
-          clangIncludeTreeRootID, moduleCacheKeyID, isSystem);
+          directoryDependenciesArrayID, clangIncludeTreeRootID,
+          moduleCacheKeyID, isSystem);
       auto pcmOutputPath = getIdentifier(pcmOutputPathID);
       if (!pcmOutputPath)
         llvm::report_fatal_error("Bad pcm output path");
@@ -813,6 +815,9 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       auto fileDependencies = getStringArray(fileDependenciesArrayID);
       if (!fileDependencies)
         llvm::report_fatal_error("Bad file dependencies");
+      auto directoryDependencies = getStringArray(directoryDependenciesArrayID);
+      if (!directoryDependencies)
+        llvm::report_fatal_error("Bad directory dependencies");
       auto clangIncludeTreeRoot = getIdentifier(clangIncludeTreeRootID);
       if (!clangIncludeTreeRoot)
         llvm::report_fatal_error("Bad clang include tree ID");
@@ -823,8 +828,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forClangModule(
           *pcmOutputPath, *mappedPCMPath, *moduleMapPath, *contextHash,
-          *commandLineArgs, *fileDependencies, linkLibraries,
-          *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
+          *commandLineArgs, *fileDependencies, *directoryDependencies,
+          linkLibraries, *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
       addCommonDependencyInfo(moduleDep);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep));
@@ -1084,6 +1089,7 @@ enum ModuleIdentifierArrayKind : uint8_t {
   BridgingHeaderBuildCommandLine,
   NonPathCommandLine,
   FileDependencies,
+  DirectoryDependencies,
   VisibleClangModulesFromLookup,
   DependencyOnlyImports,
   LastArrayKind
@@ -1708,6 +1714,8 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
                              ModuleIdentifierArrayKind::NonPathCommandLine),
         getIdentifierArrayID(moduleID,
                              ModuleIdentifierArrayKind::FileDependencies),
+        getIdentifierArrayID(moduleID,
+                             ModuleIdentifierArrayKind::DirectoryDependencies),
         getIdentifier(clangDeps->CASClangIncludeTreeRootID),
         getIdentifier(clangDeps->moduleCacheKey), clangDeps->IsSystem);
 
@@ -2000,6 +2008,9 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                        clangDeps->buildCommandLine);
         addStringArray(moduleID, ModuleIdentifierArrayKind::FileDependencies,
                        clangDeps->fileDependencies);
+        addStringArray(moduleID,
+                       ModuleIdentifierArrayKind::DirectoryDependencies,
+                       clangDeps->directoryDependencies);
         addIdentifier(clangDeps->CASClangIncludeTreeRootID);
         addIdentifier(clangDeps->moduleCacheKey);
         break;

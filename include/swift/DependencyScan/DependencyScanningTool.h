@@ -137,6 +137,9 @@ public:
       std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
           &initializationDiagnostics);
 
+  /// Report that \p Path changed since the previous build.
+  void addInvalidatedPath(StringRef Path);
+
 private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.

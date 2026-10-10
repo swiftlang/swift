@@ -58,6 +58,9 @@ llvm::cl::opt<unsigned> Threads("threads",
                                 llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
                                             llvm::cl::cat(Category));
+llvm::cl::list<std::string> InvalidatedPaths("invalidated-path",
+                                             llvm::cl::desc("<path>"),
+                                             llvm::cl::cat(Category));
 llvm::cl::opt<bool>
     NonRecursive("non-recursive",
                  llvm::cl::desc("avoid recursing when ingesting a directory"),
@@ -388,6 +391,19 @@ int main(int argc, char *argv[]) {
     if (scanner)
       swiftscan_scanner_dispose(scanner);
   };
+  if (scanner && !InvalidatedPaths.empty()) {
+    // Spell these like Clang's directory dependencies, which are matched
+    // textually.
+    std::vector<const char *> Paths;
+    for (const auto &Path : InvalidatedPaths) {
+      SmallString<256> Canonical(Path);
+      llvm::sys::fs::make_absolute(Canonical);
+      llvm::sys::path::remove_dots(Canonical, /*remove_dot_dot=*/true);
+      Paths.push_back(Saver.save(Canonical.str()).data());
+    }
+    swiftscan_scanner_add_invalidated_paths(scanner, Paths.data(),
+                                            Paths.size());
+  }
 
   std::atomic<int> Ret = 0;
   llvm::raw_null_ostream nullOS;

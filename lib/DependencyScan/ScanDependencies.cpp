@@ -915,6 +915,7 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
             create_set(clangDeps->buildCommandLine),
+            create_set(clangDeps->directoryDependencies),
             create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())};
       }
@@ -1424,6 +1425,7 @@ performModuleScanImpl(
           mainModuleID, cache, instance->getSharedCASInstance(),
           instance->getSharedCacheInstance(), serializedCacheTimeStamp,
           *instance->getSourceMgr().getFileSystem(), ctx.Diags,
+          [&](StringRef dir) { return service.isDirectoryInvalidated(dir); },
           opts.EmitDependencyScannerCacheRemarks);
     }
   }
@@ -1623,11 +1625,14 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks) {
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    bool emitRemarks) {
   ModuleDependencyIDSet visited;
   ModuleDependencyIDSet modulesRequiringRescan;
   outOfDateModuleScan(rootModuleID, cache, cas, actionCache, cacheTimeStamp, fs,
-                      diags, emitRemarks, visited, modulesRequiringRescan);
+                      diags, isDirectoryInvalidated, emitRemarks, visited,
+                      modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
   // Regardless of invalidation, always re-scan main module.
@@ -1639,7 +1644,9 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks, ModuleDependencyIDSet &visited,
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    bool emitRemarks, ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan) {
   // Visit the module's dependencies
   bool hasOutOfDateModuleDependency = false;
@@ -1647,7 +1654,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     // If we have not already visited this module, recurse.
     if (visited.find(depID) == visited.end())
       outOfDateModuleScan(depID, cache, cas, actionCache, cacheTimeStamp, fs,
-                          diags, emitRemarks, visited, modulesRequiringRescan);
+                          diags, isDirectoryInvalidated, emitRemarks, visited,
+                          modulesRequiringRescan);
 
     // Even if we're not revisiting a dependency, we must check if it's
     // already known to be out of date.
@@ -1660,9 +1668,9 @@ void swift::dependencies::incremental::outOfDateModuleScan(
       diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_upstream,
                      moduleID.ModuleName);
     modulesRequiringRescan.insert(moduleID);
-  } else if (!verifyModuleDependencyUpToDate(moduleID, cache, cas, actionCache,
-                                             cacheTimeStamp, fs, diags,
-                                             emitRemarks))
+  } else if (!verifyModuleDependencyUpToDate(
+                 moduleID, cache, cas, actionCache, cacheTimeStamp, fs, diags,
+                 isDirectoryInvalidated, emitRemarks))
     modulesRequiringRescan.insert(moduleID);
 
   visited.insert(moduleID);
@@ -1673,7 +1681,9 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks) {
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    bool emitRemarks) {
   const auto &moduleInfo = cache.findKnownDependency(moduleID);
   auto verifyInputOlderThanCacheTimeStamp = [&cacheTimeStamp, &fs, &diags,
                                              emitRemarks](StringRef moduleName,
@@ -1783,10 +1793,21 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
       return false;
 
   // Check header/modulemap source files for a Clang dependency
-  if (const auto &clangModuleDetails = moduleInfo.getAsClangModule())
+  if (const auto &clangModuleDetails = moduleInfo.getAsClangModule()) {
     for (const auto &fileInput : clangModuleDetails->fileDependencies)
       if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, fileInput))
         return false;
+
+    // Check whether any directory dependency was invalidated
+    for (const auto &dir : clangModuleDetails->directoryDependencies) {
+      if (isDirectoryInvalidated(dir)) {
+        if (emitRemarks)
+          diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_directory,
+                         moduleID.ModuleName, dir);
+        return false;
+      }
+    }
+  }
 
   return true;
 }
