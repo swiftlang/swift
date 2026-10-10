@@ -83,7 +83,7 @@ MARKUP_AST_NODE(PrivateExtension, MarkupASTNode)
   MARKUP_AST_NODE(RecommendedField, PrivateExtension)
   MARKUP_AST_NODE(RecommendedoverField, PrivateExtension)
 
-MARKUP_AST_NODE_RANGE(Private, ParamField, WarningField)
+MARKUP_AST_NODE_RANGE(Private, ParamField, RecommendedoverField)
 #undef MARKUP_AST_NODE
 #undef ABSTRACT_MARKUP_AST_NODE
 #undef MARKUP_AST_NODE_RANGE

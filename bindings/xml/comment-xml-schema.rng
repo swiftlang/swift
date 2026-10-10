@@ -533,6 +533,30 @@
     </element>
   </define>
 
+  <define name="Keyword">
+    <element name="Keyword">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Mutatingvariant">
+    <element name="Mutatingvariant">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Nonmutatingvariant">
+    <element name="Nonmutatingvariant">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
   <define name="Note">
     <element name="Note">
       <zeroOrMore>
@@ -551,6 +575,22 @@
 
   <define name="Precondition">
     <element name="Precondition">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Recommended">
+    <element name="Recommended">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Recommendedover">
+    <element name="Recommendedover">
       <zeroOrMore>
         <ref name="BlockContent"/>
       </zeroOrMore>
@@ -821,9 +861,14 @@
       <ref name="Experiment"/>
       <ref name="Important"/>
       <ref name="Invariant"/>
+      <ref name="Keyword"/>
+      <ref name="Mutatingvariant"/>
+      <ref name="Nonmutatingvariant"/>
       <ref name="Note"/>
       <ref name="Postcondition"/>
       <ref name="Precondition"/>
+      <ref name="Recommended"/>
+      <ref name="Recommendedover"/>
       <ref name="Remark"/>
       <ref name="Remarks"/>
       <ref name="Requires"/>
