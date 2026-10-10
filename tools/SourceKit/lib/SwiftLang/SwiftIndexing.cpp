@@ -357,11 +357,13 @@ static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
       break;
   }
 
+  bool indexBinaryModules = Invocation.getFrontendOptions().IndexBinaryModules;
   (void) index::indexAndRecord(&PrimarySourceFile,
                                IndexOpts.IndexUnitOutputPath,
                                IndexOpts.IndexStorePath,
                                !IndexOpts.IgnoreClangModules,
                                IndexOpts.IncludeSystemModules,
+                               indexBinaryModules,
                                IndexOpts.IgnoreStdlib,
                                IndexOpts.IncludeLocals,
                                IndexOpts.Compress,
