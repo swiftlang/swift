@@ -19,7 +19,14 @@ import contextlib
 from io import StringIO
 
 from . import scheme_mock
-from update_checkout.update_checkout import obtain_all_additional_swift_sources, main
+from update_checkout.cli_arguments import CliArguments
+from update_checkout.update_checkout import (
+    _check_git_config,
+    check_missing_clones,
+    load_config,
+    main,
+    obtain_all_additional_swift_sources,
+)
 
 
 class CloneTestCase(scheme_mock.SchemeMockTestCase):
@@ -186,6 +193,35 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         ]
         with contextlib.redirect_stdout(StringIO()):
             main()
+
+    def test_git_config_check_with_unrecognized_scheme(self):
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+            ]
+        )
+
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+        ]
+        args = CliArguments.parse_args()
+        config = load_config(args.configs)
+
+        # This is what get_scheme_map(config, "does-not-exist") returns.
+        scheme_map = None
+
+        with contextlib.redirect_stdout(StringIO()):
+            self.assertEqual(check_missing_clones(args, config, scheme_map), [])
+            _check_git_config(args, config, scheme_map)
 
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
