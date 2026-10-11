@@ -460,15 +460,24 @@ bb4:
   return %8 : $()
 }
 
-// CHECK-LABEL: sil @dont_copy_stack_allocation_with_dealloc_outside_loop
-// CHECK:   = alloc_ref [stack]
-// CHECK: bb2:
-// CHECK:   dealloc_stack_ref
-// CHECK: bb3:
-// CHECK:   dealloc_stack_ref
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @dont_copy_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
+// Each iteration deallocates its own stack allocation when it exits the loop.
+//
+// CHECK-LABEL: sil @unroll_stack_allocation_with_dealloc_outside_loop :
+// CHECK:         [[A0:%.*]] = alloc_ref [stack]
+// CHECK:         cond_br {{%.*}}, [[EXIT0:bb[0-9]+]], [[LATCH0:bb[0-9]+]]
+// CHECK:       [[LATCH0]]:
+// CHECK-NEXT:    dealloc_stack_ref [[A0]]
+// CHECK:         [[A1:%.*]] = alloc_ref [stack]
+// CHECK:         dealloc_stack_ref [[A1]]
+// CHECK-NEXT:    br [[MERGE:bb[0-9]+]]
+// CHECK:       [[EXIT0]]:
+// CHECK-NEXT:    dealloc_stack_ref [[A0]]
+// CHECK-NEXT:    br [[MERGE]]
+// CHECK:       [[MERGE]]:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'unroll_stack_allocation_with_dealloc_outside_loop'
+sil @unroll_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Int64, 0
  %1 = integer_literal $Builtin.Int64, 1
