@@ -1186,13 +1186,23 @@ void swift_continuation_awaitSplit(SplitContinuation *continuation);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_destroySplit(SplitContinuation *continuation);
 
-/// Tell the next resume of the given split continuation which executors the
-/// resuming thread is running on, offering that thread to run the resumed task
-/// inline instead of enqueuing the task on its executor.
+/// Resume a continuation, offering the current thread to run the resumed task
+/// instead of enqueuing it.
+///
+/// `continuation` may be an normal continuation or a split continuation.
+/// If `error` is null, the continuation returns `result`, which is moved into
+/// the continuation; otherwise it throws `error`, and `result` is destroyed.
+/// Both are passed at +1.
+///
+/// If the executors passed match the awaiting task, the task runs on the
+/// current thread before this returns; otherwise it is enqueued.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_setResumingExecutors(SplitContinuation *continuation,
-                                             SerialExecutorRef serialExecutor,
-                                             TaskExecutorRef taskExecutor);
+void swift_continuation_resumeOnExecutors(AsyncTask *continuation,
+                                          /* +1 */ OpaqueValue *result,
+                                          /* +1 */ SwiftError *error,
+                                          SerialExecutorRef serialExecutor,
+                                          TaskExecutorRef taskExecutor,
+                                          const Metadata *resultType);
 
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)

@@ -1419,17 +1419,46 @@ bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
                      TaskExecutorRef currentTaskExecutor,
                      TaskExecutorRef newTaskExecutor);
 
+// ==== Continuations ---------------------------------------------------------
+
+/// The executor a continuation awaited on the current thread resumes on: the
+/// executor the thread is running on, or the generic executor if it is not
+/// running on any.
+SerialExecutorRef getCurrentContinuationResumeExecutor();
+
+/// The executors a thread resuming a continuation is running on,
+/// offering itself to run the resumed task instead of enqueuing it.
+struct ContinuationResumingExecutors {
+  SerialExecutorRef SerialExecutor;
+  TaskExecutorRef TaskExecutor;
+};
+
+/// Make `task`, which was suspended awaiting a continuation that has just been
+/// resumed, runnable on `targetExecutor`.
+///
+/// The task resumes on `targetExecutor` together with its own preferred task
+/// executor, which is read from the task: it cannot change while the task is
+/// suspended. If `resumingExecutors` is non-null and they are compatible with
+/// those, the task is run on the current thread before this returns;
+/// otherwise it is enqueued on `targetExecutor`.
+void makeResumedTaskRunnable(
+    AsyncTask *task, SerialExecutorRef targetExecutor,
+    const ContinuationResumingExecutors *resumingExecutors);
+
 // ==== Split continuations ---------------------------------------------------
 
-/// Resume `continuation` if it is a split continuation, storing `error` as the
-/// result first when it is non-null.
+/// Returns the context of `continuation` if it is a split continuation, or null
+/// if it is an ordinary task.
 ///
 /// A raw continuation is either a task or the task-shaped storage of a split
-/// continuation; this tells them apart by reading the marker word. Returns
-/// false for an ordinary task, leaving it untouched, so that the ordinary
-/// swift_continuation_*Resume* entry points can fall through to their own
-/// implementation.
-bool tryResumeSplitContinuation(void *continuation, SwiftError *error);
+/// continuation; this tells them apart by reading the marker word.
+ContinuationAsyncContext *getSplitContinuationContext(void *continuation);
+
+/// Resume the split continuation with the given context, whose result (or
+/// error) has already been stored into the context.
+void resumeSplitContinuation(
+    ContinuationAsyncContext *context,
+    const ContinuationResumingExecutors *resumingExecutors);
 
 // ==== Task Local Values -----------------------------------------------------
 
