@@ -817,6 +817,16 @@ bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
                                              const Metadata *sourceValueType,
                                              const Metadata *targetValueType);
 
+// internal func _arrayDownCastTestIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ targetType: TargetValue.Type
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_arrayDownCastTestIndirect(OpaqueValue *source,
+                                      const Metadata *targetType,
+                                      const Metadata *sourceValueType,
+                                      const Metadata *targetValueType);
+
 // internal func _setDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Set<SourceValue>>,
 //   _ target: UnsafeMutablePointer<Set<TargetValue>>)
@@ -1060,13 +1070,11 @@ tryCastToArray(
       auto sourceArgs = srcType->getGenericArgs();
       auto destArgs = destType->getGenericArgs();
       if (isTestOnlyCast(destLocation)) {
-        // Try building a new array in a temporary, then discard.
-        // TODO: Make array tests more efficient by avoiding the copy
-        return testByProducingIntoTemporary(
-            destType, [&](OpaqueValue *temporary) {
-              return _swift_arrayDownCastConditionalIndirect(
-                  srcValue, temporary, sourceArgs[0], destArgs[0]);
-            });
+        // Check the elements in place; no result array is built.
+        return _swift_arrayDownCastTestIndirect(
+                   srcValue, destArgs[0], sourceArgs[0], destArgs[0])
+                   ? DynamicCastResult::TestSuccess
+                   : DynamicCastResult::Failure;
       }
       if (mayDeferChecks) {
         _swift_arrayDownCastIndirect(

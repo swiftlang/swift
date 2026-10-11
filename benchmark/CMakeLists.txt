@@ -31,6 +31,7 @@ set(SWIFT_BENCH_MODULES
     single-source/AnyHashableWithAClass
     single-source/Array2D
     single-source/ArrayAppend
+    single-source/ArrayCastTest
     single-source/ArrayInClass
     single-source/ArrayLiteral
     single-source/ArrayOfGenericPOD
