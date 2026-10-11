@@ -3915,6 +3915,15 @@ function(add_embedded_swift_target_library prefix library_name)
           "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
     endif()
 
+    # A Darwin triple with its own SDK needs it as `-isysroot`. With
+    # `--sysroot` its availability attributes don't apply, so declarations
+    # such as pthread's look unavailable on that platform.
+    if(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH AND "${triple}" MATCHES "-apple-")
+      set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
+    else()
+      set(SWIFT_SDK_embedded_USE_ISYSROOT FALSE)
+    endif()
+
     # Non-core embedded libraries always need the embedded swiftCore for the
     # same target to be built first.
     set(per_target_depends ${EMBLIB_DEPENDS})
