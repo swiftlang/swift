@@ -5019,7 +5019,10 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
     // If the storage was unused, e.g. because all uses were projected into
     // users, then delete the allocation.
     if (auto *allocInst = storage.storageAddress->getDefiningInstruction()) {
-      pass.deleter.deleteIfDead(allocInst);
+      // Two entries can share a storage address, so this instruction
+      // may already have been deleted.
+      if (!allocInst->isDeleted())
+        pass.deleter.deleteIfDead(allocInst);
     }
     auto *deadInst = val->getDefiningInstruction();
     if (!deadInst || deadInst->isDeleted())
