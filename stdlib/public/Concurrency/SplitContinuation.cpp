@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ExecutorTracking.h"
 #include "TaskPrivate.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
@@ -43,13 +42,14 @@ using namespace swift;
 //     *current* task, records the awaiting task on the context, publishes any
 //     handler records together with the suspension, and performs the
 //     Pending->Awaited transition.
-//   * resume: the regular swift_continuation_resume* entry points, which read
-//     the marker word and route to the split implementation. The resume works
-//     *by context* (the value/error is stored into the context by the caller
-//     first), because task->ResumeContext cannot be relied on: a resume may
-//     arrive before the await. It enqueues the recorded awaiting task, or
-//     donates the resuming thread if asked to and if that thread belongs to the
-//     executor the task resumes on.
+//   * resume: the regular swift_continuation_resume* entry points, and
+//     swift_continuation_resumeOnExecutors, which read the marker word and
+//     route to the split implementation. The resume works *by context* (the
+//     value/error is stored into the context first), because
+//     task->ResumeContext cannot be relied on: a resume may arrive before the
+//     await. It enqueues the recorded awaiting task, or donates the resuming
+//     thread if one was offered and it belongs to the executor the task
+//     resumes on.
 
 namespace {
 
@@ -68,24 +68,12 @@ struct SplitContinuationStorage {
   char TaskPrefixPadding[offsetof(AsyncTask, ResumeContext) - sizeof(uintptr_t)];
 
   /// Points at the ContinuationAsyncContext that follows in this allocation.
-  void *ResumeContext;
+  AsyncContext * __ptrauth_swift_task_resume_context ResumeContext;
 
   /// The task awaiting the continuation, recorded at await time so that a
   /// resume-by-context can make it runnable. Null until then, which is also how
   /// a resume that races ahead of the await is recognised.
   AsyncTask *AwaitingTask;
-
-  /// Whether the resumer has said which executors it is running on, by calling
-  /// swift_continuation_setResumingExecutors before the resume. A resumer that
-  /// has not said is simply enqueued, as a regular continuation is.
-  bool ResumingExecutorsKnown;
-
-  /// The executors the caller of swift_continuation_setResumingExecutors said
-  /// the resuming thread is running on. Only meaningful when
-  /// `ResumingExecutorsKnown` is set, and compared against the executors the
-  /// task will actually resume on to decide whether the thread may be donated.
-  SerialExecutorRef ResumingSerialExecutor;
-  TaskExecutorRef ResumingTaskExecutor;
 };
 
 /// Written into `SplitContinuationStorage::Marker`, where a task keeps its
@@ -130,14 +118,14 @@ storageOfContext(ContinuationAsyncContext *context) {
 
 } // end anonymous namespace
 
-/// Shared tail of the split resume entry points: perform the Pending/Awaited ->
-/// Resumed transition and, if a task was awaiting, make it runnable. The result
-/// value (or error) must already be stored in the context. Mirrors
-/// resumeTaskAfterContinuation, but works purely from the context (there is no
-/// task->ResumeContext to recover) and tolerates the resume-before-await race
-/// where no awaiting task has been recorded yet.
-static void
-resumeSplitTaskAfterContinuation(ContinuationAsyncContext *context) {
+/// Perform the Pending/Awaited -> Resumed transition and, if a task was
+/// awaiting, make it runnable. Mirrors resumeTaskAfterContinuation, but works
+/// purely from the context (there is no task->ResumeContext to recover) and
+/// tolerates the resume-before-await race where no awaiting task has been
+/// recorded yet.
+void swift::resumeSplitContinuation(
+    ContinuationAsyncContext *context,
+    const ContinuationResumingExecutors *resumingExecutors) {
   auto &sync = context->AwaitSynchronization;
 
   auto status = sync.load(std::memory_order_acquire);
@@ -172,39 +160,14 @@ resumeSplitTaskAfterContinuation(ContinuationAsyncContext *context) {
   sync.store(ContinuationStatus::Resumed, std::memory_order_relaxed);
   context->Cond->signal();
 #else
-  // A resumer that said which executors it is running on is offering its thread
-  // to run the resumed task inline. The offer is taken only if that thread
-  // belongs to the executor the task actually resumes on; otherwise, and when
-  // no offer was made at all, the task is enqueued as usual.
-  if (storage->ResumingExecutorsKnown) {
-    auto resumeExecutor = context->ResumeToExecutor;
-
-    // Which executor the task resumes on is decided at *await* time, and the
-    // resumer learns which executors it is on when it is handed the
-    // continuation, which is necessarily earlier. So the two can disagree when
-    // the awaiting side may have moved isolation, or taken a task executor
-    // preference, between being handed the continuation and awaiting it. A
-    // disagreement is therefore not a misuse: the offered thread simply cannot
-    // be used, and the task is enqueued instead.
-    //
-    // mustSwitchToRun already treats an undefined task executor as the default
-    // executor on both sides, so a task that resumes with no isolation and no
-    // task executor preference only takes the offer when what was offered is
-    // itself the default. Never some other, unrelated executor the resumer
-    // merely happened to be running on.
-    auto preferredTaskExecutor = task->getPreferredTaskExecutor();
-    if (!mustSwitchToRun(storage->ResumingSerialExecutor, resumeExecutor,
-                         storage->ResumingTaskExecutor, preferredTaskExecutor)) {
-      // Donate the current thread to the resumed task like
-      // ExecutorJob.runSynchronously / swift_job_run, which establishes the
-      // tracking context *before* flagAsRunning and save/restores the active
-      // task.
-      _swift_tsan_acquire(static_cast<Job *>(task));
-      return swift_job_run(task, resumeExecutor);
-    }
-  }
-
-  task->flagAsAndEnqueueOnExecutor(context->ResumeToExecutor);
+  // Which executor the task resumes on is decided at *await* time, and the
+  // resumer learns which executors it is on when it is handed the
+  // continuation, which is necessarily earlier. So the two can disagree when
+  // the awaiting side has moved isolation, or taken a task executor
+  // preference, between being handed the continuation and awaiting it. That is
+  // not a misuse: the offered thread simply cannot be used, and the task is
+  // enqueued instead.
+  makeResumedTaskRunnable(task, context->ResumeToExecutor, resumingExecutors);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
@@ -248,7 +211,7 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   context->ErrorResult = nullptr;
   context->NormalResult = reinterpret_cast<OpaqueValue *>(llvm::alignTo(
       reinterpret_cast<uintptr_t>(allocation) + resultOffset, resultAlign));
-  // The fallback for an await that finds no executor tracking info to record.
+  // Overwritten by the await.
   context->ResumeToExecutor = SerialExecutorRef::generic();
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   context->Cond = nullptr;
@@ -257,9 +220,6 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   auto *storage = static_cast<SplitContinuationStorage *>(allocation);
   storage->Marker = SplitContinuationMarker;
   storage->AwaitingTask = nullptr;
-  storage->ResumingExecutorsKnown = false;
-  storage->ResumingSerialExecutor = SerialExecutorRef::generic();
-  storage->ResumingTaskExecutor = TaskExecutorRef::undefined();
 
   // Relaxed is fine: resumption must happen-after this call returns and the
   // continuation is handed to the executor.
@@ -288,14 +248,10 @@ void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
   task->ResumeContext = context;
   task->ResumeTask = context->ResumeParent;
 
-  // Record where this task resumes. Unlike a regular continuation, which
-  // resumes to the generic executor and hops back to its isolation afterwards,
-  // a split continuation records the task's actual executor: a synchronous
-  // resume is checked against it, and donating a thread to a task that is
-  // already on the right executor avoids the hop altogether.
-  if (auto *tracking = ExecutorTrackingInfo::current()) {
-    context->ResumeToExecutor = tracking->getActiveExecutor();
-  }
+  // Record where this task resumes: the executor it is suspending on. This
+  // happens here rather than at create, because the task may change isolation
+  // in between.
+  context->ResumeToExecutor = getCurrentContinuationResumeExecutor();
 
   // Record ourselves as the awaiting task *before* transitioning to Awaited, so
   // that a racing resume that observes Awaited finds a valid task to enqueue.
@@ -364,32 +320,10 @@ void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
   return context->ResumeParent(context);
 }
 
-bool swift::tryResumeSplitContinuation(void *continuation, SwiftError *error) {
+ContinuationAsyncContext *swift::getSplitContinuationContext(void *continuation) {
   if (!isSplitContinuation(continuation))
-    return false;
-
-  auto *context = contextOfStorage(storageOfContinuation(continuation));
-  concurrency::trace::task_continuation_resume(context, error != nullptr);
-  if (error)
-    context->ErrorResult = error;
-  resumeSplitTaskAfterContinuation(context);
-  return true;
-}
-
-SWIFT_CC(swift)
-void swift::swift_continuation_setResumingExecutors(
-    SplitContinuation *continuation, SerialExecutorRef serialExecutor,
-    TaskExecutorRef taskExecutor) {
-  // Setting the resume executors is only supported on split continuations.
-  if (!isSplitContinuation(continuation))
-    return;
-
-  // Written by the resuming thread before it resumes, and read only by the
-  // resume itself, so no synchronization is needed.
-  auto *storage = storageOfContinuation(continuation);
-  storage->ResumingSerialExecutor = serialExecutor;
-  storage->ResumingTaskExecutor = taskExecutor;
-  storage->ResumingExecutorsKnown = true;
+    return nullptr;
+  return contextOfStorage(storageOfContinuation(continuation));
 }
 
 SWIFT_CC(swift)
