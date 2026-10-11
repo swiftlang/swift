@@ -2204,6 +2204,7 @@ public:
   // Array literal initialization address projections.
   NO_ADJOINT(PointerToAddress)
   NO_ADJOINT(IndexAddr)
+  NO_ADJOINT(AddressToPointer)
 
   // Memory allocation/access.
   NO_ADJOINT(AllocStack)
@@ -2382,9 +2383,14 @@ bool PullbackCloner::Implementation::run() {
       if (isa_and_nonnull<BeginApplyInst>(v.getDefiningInstruction()))
         return false;
 
+      if (isa<AddressToPointerInst>(v))
+        return false;
+
       // Check that active values are differentiable. Otherwise we may crash
       // later when tangent space is required, but not available.
       if (!getTangentSpace(remapType(type).getASTType())) {
+        LLVM_DEBUG(getADDebugStream()
+                   << "No tangent space for: " << type << "\n");
         getContext().emitNondifferentiabilityError(
             v, getInvoker(), diag::autodiff_expression_not_differentiable_note);
         errorOccurred = true;

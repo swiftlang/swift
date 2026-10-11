@@ -19,6 +19,7 @@ endif()
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Differentiable.swift
   DifferentialOperators.swift
+  DifferentialOperators+Async.swift
   DifferentiationUtilities.swift
   AnyDifferentiable.swift
   ArrayDifferentiation.swift
@@ -32,6 +33,8 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
     FloatingPointDifferentiation.swift.gyb
     TgmathDerivatives.swift.gyb
     ${swiftDifferentiationSIMDFiles}
+
+  SWIFT_MODULE_DEPENDS _Concurrency
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
