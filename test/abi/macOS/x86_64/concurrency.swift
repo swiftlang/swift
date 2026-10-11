@@ -591,4 +591,4 @@ Added: _$ss19ContinuationAwaiterVsRi_zrlEfD
 Added: _swift_continuation_createSplit
 Added: _swift_continuation_awaitSplit
 Added: _swift_continuation_destroySplit
-Added: _swift_continuation_setResumingExecutors
+Added: _swift_continuation_resumeOnExecutors

@@ -522,6 +522,15 @@ void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+  swift_task_enqueue(flagAsEnqueuedOnExecutor(newExecutor), newExecutor);
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+}
+
+Job *AsyncTask::flagAsEnqueuedOnExecutor(SerialExecutorRef newExecutor) {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
+  return nullptr;
+#else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   // swift_task_escalate will first increase the priority in the
   // ActiveTaskStatus without taking the Task Status Lock, then early out
   // if there is no dependency record, then take the lock to iterate the
@@ -623,7 +632,7 @@ void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
     });
   }
   assert(job && "Should have populated a Job to enqueue in one of the branches");
-  swift_task_enqueue(job, newExecutor);
+  return job;
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
@@ -2290,6 +2299,22 @@ static void willResume(AsyncTask *task) {
 
 } // namespace continuationChecking
 
+SerialExecutorRef swift::getCurrentContinuationResumeExecutor() {
+  auto *tracking = ExecutorTrackingInfo::current();
+  if (!tracking)
+    return SerialExecutorRef::generic();
+
+  // Every executor with the generic identity resumes on the plain generic
+  // executor. That drops the marker Task.immediate puts on the generic
+  // executor during its synchronous start: it only stops the frame that
+  // started the task from giving up its thread, and must not carry over to a
+  // task resumed later, possibly on another thread.
+  auto active = tracking->getActiveExecutor();
+  if (active.isGeneric())
+    return SerialExecutorRef::generic();
+  return active;
+}
+
 SWIFT_CC(swift)
 static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                               AsyncContinuationFlags flags) {
@@ -2299,10 +2324,16 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
     context->Flags.setIsExecutorSwitchForced(true);
   context->ErrorResult = nullptr;
 
-  // Set the generic executor as the target executor unless there's
-  // an executor override.
+  // Resume on the executor the task is suspending on, unless there's an
+  // executor override. Code after the await hops back to its own isolation
+  // anyway, which is then already done; and a resumer offering its thread can
+  // only be taken up on it if this is the executor the task really runs on.
+  //
+  // The executor is recorded here rather than at the await because nothing
+  // between the two can change it: they are separated only by the synchronous
+  // body that receives the continuation.
   if (!flags.hasExecutorOverride())
-    context->ResumeToExecutor = SerialExecutorRef::generic();
+    context->ResumeToExecutor = getCurrentContinuationResumeExecutor();
 
   // We can initialize this with a relaxed store because resumption
   // must happen-after this call.
@@ -2441,8 +2472,9 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   return context->ResumeParent(context);
 }
 
-static void resumeTaskAfterContinuation(AsyncTask *task,
-                                        ContinuationAsyncContext *context) {
+static void resumeTaskAfterContinuation(
+    AsyncTask *task, ContinuationAsyncContext *context,
+    const ContinuationResumingExecutors *resumingExecutors) {
   auto &sync = context->AwaitSynchronization;
 
   auto status = sync.load(std::memory_order_acquire);
@@ -2486,44 +2518,129 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   // TODO: maybe in some mode we should set the status to Resumed here
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
-  task->flagAsAndEnqueueOnExecutor(context->ResumeToExecutor);
+  makeResumedTaskRunnable(task, context->ResumeToExecutor, resumingExecutors);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
+void swift::makeResumedTaskRunnable(
+    AsyncTask *task, SerialExecutorRef targetExecutor,
+    const ContinuationResumingExecutors *resumingExecutors) {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
+#else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+  // A resumer that passed which executors it is running on is offering its
+  // thread to run the resumed task. The offer is taken only if that thread
+  // belongs to the executors the task resumes on; otherwise, and when no offer
+  // was made at all, the task is enqueued as usual.
+  //
+  // mustSwitchToRun treats an undefined task executor as the default executor
+  // on both sides, so a task that resumes with no isolation and no task
+  // executor preference only takes an offer of the default executor itself.
+  if (resumingExecutors &&
+      !mustSwitchToRun(resumingExecutors->SerialExecutor, targetExecutor,
+                       resumingExecutors->TaskExecutor,
+                       task->getPreferredTaskExecutor())) {
+    // Make the task runnable exactly as an enqueue on targetExecutor would, but
+    // run the resulting job here, as targetExecutor would after dequeuing it.
+    // Going through the enqueue bookkeeping matters: if priority escalation
+    // left the task linked into some executor's queue, the job is a stealer
+    // rather than the task itself, and whichever of them runs first is the one
+    // that starts the task.
+    Job *job = task->flagAsEnqueuedOnExecutor(targetExecutor);
+    _swift_tsan_acquire(static_cast<Job *>(task));
+
+    // Set the thread up as the resumer said it is running. On an actor's
+    // executor, swift_job_run would record no task executor, and the task's
+    // next hop onto the actor would then see one other than its preference
+    // and enqueue it again. On the generic executor, swift_job_run already
+    // takes the task executor from the task's preference, which the offer
+    // matched, and unlike the serial-and-task variant leaves a task without a
+    // preference able to take over an idle default actor.
+    if (!targetExecutor.isGeneric() &&
+        resumingExecutors->TaskExecutor.isDefined())
+      return swift_job_run_on_serial_and_task_executor(
+          job, targetExecutor, resumingExecutors->TaskExecutor);
+    return swift_job_run(job, targetExecutor);
+  }
+
+  task->flagAsAndEnqueueOnExecutor(targetExecutor);
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+}
+
+namespace {
+
+/// A continuation being resumed: either a task suspended (or about to suspend)
+/// on a normal continuation, or a split continuation.
+struct ResumingContinuation {
+  /// The task of an ordinary continuation, or null for a split continuation.
+  AsyncTask *Task;
+
+  /// The context the result is stored into.
+  ContinuationAsyncContext *Context;
+
+  explicit ResumingContinuation(void *continuation) {
+    if (auto *splitContext = getSplitContinuationContext(continuation)) {
+      Task = nullptr;
+      Context = splitContext;
+      return;
+    }
+
+    Task = static_cast<AsyncTask *>(continuation);
+    continuationChecking::willResume(Task);
+    Context = static_cast<ContinuationAsyncContext *>(Task->ResumeContext);
+  }
+
+  /// Store `error` as the result if it is non-null, and resume. A normal result
+  /// must already have been stored.
+  void resume(/* +1 */ SwiftError *error,
+              const ContinuationResumingExecutors *resumingExecutors) {
+    concurrency::trace::task_continuation_resume(Context, error != nullptr);
+    if (error)
+      Context->ErrorResult = error;
+
+    if (Task)
+      resumeTaskAfterContinuation(Task, Context, resumingExecutors);
+    else
+      resumeSplitContinuation(Context, resumingExecutors);
+  }
+};
+
+} // end anonymous namespace
+
 SWIFT_CC(swift)
 static void swift_continuation_resumeImpl(AsyncTask *task) {
-  if (tryResumeSplitContinuation(task, /*error=*/nullptr))
-    return;
-
-  continuationChecking::willResume(task);
-  auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
-  concurrency::trace::task_continuation_resume(context, false);
-  resumeTaskAfterContinuation(task, context);
+  ResumingContinuation(task).resume(/*error=*/nullptr,
+                                    /*resumingExecutors=*/nullptr);
 }
 
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
-  if (tryResumeSplitContinuation(task, /*error=*/nullptr))
-    return;
-
-  continuationChecking::willResume(task);
-  auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
-  concurrency::trace::task_continuation_resume(context, false);
-  resumeTaskAfterContinuation(task, context);
+  ResumingContinuation(task).resume(/*error=*/nullptr,
+                                    /*resumingExecutors=*/nullptr);
 }
-
 
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
                                                 /* +1 */ SwiftError *error) {
-  if (tryResumeSplitContinuation(task, error))
-    return;
+  ResumingContinuation(task).resume(error, /*resumingExecutors=*/nullptr);
+}
 
-  continuationChecking::willResume(task);
-  auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
-  concurrency::trace::task_continuation_resume(context, true);
-  context->ErrorResult = error;
-  resumeTaskAfterContinuation(task, context);
+SWIFT_CC(swift)
+void swift::swift_continuation_resumeOnExecutors(
+    AsyncTask *continuation, /* +1 */ OpaqueValue *result,
+    /* +1 */ SwiftError *error, SerialExecutorRef serialExecutor,
+    TaskExecutorRef taskExecutor, const Metadata *resultType) {
+  ResumingContinuation resuming(continuation);
+
+  // The result is passed at +1 either way: move it into the continuation, or
+  // destroy it when resuming by throwing.
+  if (error)
+    resultType->vw_destroy(result);
+  else
+    resultType->vw_initializeWithTake(resuming.Context->NormalResult, result);
+
+  ContinuationResumingExecutors resumingExecutors{serialExecutor, taskExecutor};
+  resuming.resume(error, &resumingExecutors);
 }
 
 bool swift::swift_task_isCancelled(AsyncTask *task) {

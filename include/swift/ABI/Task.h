@@ -578,6 +578,12 @@ public:
   /// enqueue it.
   void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
 
+  /// Flag that the task is to be enqueued on the provided executor, but return
+  /// the job to enqueue instead of enqueuing it. This is either the task itself
+  /// or a stealer for it, and the caller must either enqueue it on
+  /// `newExecutor` or run it on the current thread as `newExecutor` would.
+  Job *flagAsEnqueuedOnExecutor(SerialExecutorRef newExecutor);
+
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
   void flagAsDestroyed();
