@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes
 
 func useInt(_ x: Int) {}
 func useDouble(_ x: Double) {}
