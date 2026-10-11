@@ -81,6 +81,18 @@ extension IndexAddrInst : Simplifiable, SILCombineSimplifiable {
   }
 }
 
+extension IndexAddrInst : DebugReconstructionBlockSimplifiable {
+  /// An undef base or index makes the whole address undef. Otherwise the regular
+  /// simplifications apply: `salvageDebugInfo` clones the index literal into the block, so
+  /// `index_addr %arg, (integer_literal 0)` is a shape it routinely produces.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
+  }
+}
+
 extension IndexRawPointerInst : Simplifiable, SILCombineSimplifiable {
 
   func simplify(_ context: SimplifyContext) {
@@ -142,5 +154,15 @@ extension IndexRawPointerInst : Simplifiable, SILCombineSimplifiable {
     self.replace(with: newIndexRawPointer, context)
 
     return true
+  }
+}
+
+extension IndexRawPointerInst : DebugReconstructionBlockSimplifiable {
+  /// See `IndexAddrInst.simplifyForDebugReconstructionBlock`.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
   }
 }
