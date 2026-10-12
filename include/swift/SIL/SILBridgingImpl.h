@@ -2301,6 +2301,11 @@ BridgedCanType BridgedInstruction::AnyPackIndexInst_getIndexedPackType() const {
   return getAs<swift::AnyPackIndexInst>()->getIndexedPackType();
 }
 
+BridgedGenericEnvironment
+BridgedInstruction::OpenPackElementInst_getOpenedGenericEnvironment() const {
+  return {getAs<swift::OpenPackElementInst>()->getOpenedGenericEnvironment()};
+}
+
 bool BridgedInstruction::DifferentiableFunctionInst_hasExtractee(
     SwiftInt extractee) const {
   return getAs<swift::DifferentiableFunctionInst>()->hasExtractee(
