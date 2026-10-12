@@ -72,6 +72,16 @@ tests.test("Invalids") {
   expectParseFails("&")
   expectParseFails("+x")
   expectParseFails("x")
+  expectParseFails("1e5 ")
+  expectParseFails(" 1e5")
+  expectParseFails(" 1e5 ")
+  expectParseFails("1 e5")
+  expectParseFails("1e 5")
+  expectParseFails("1 ")
+  expectParseFails(" 1")
+  expectParseFails("1. ")
+  expectParseFails("1e ")
+  expectParseFails("1e+ ")
 }
 
 tests.test("Infinities") {
