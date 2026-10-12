@@ -3395,9 +3395,12 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-             
-      // Proceed if the storage reference is a force unwrap.
-      if (!forceUnwrap) {
+
+      // Proceed for a force unwrap or a noncopyable tuple. Tuples must be
+      // borrowed in place rather than copied while forming an RValue.
+      bool isNoncopyableTuple = declRef->getType()->is<TupleType>() &&
+                                declRef->getType()->isNoncopyable();
+      if (!forceUnwrap && !isNoncopyableTuple) {
         // Proceed if the storage references a global or static let.
         // TODO: We should treat any storage reference as a borrow, it seems, but
         // that currently disrupts what the move checker expects. It would also
@@ -4115,9 +4118,20 @@ private:
   void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
     assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
-    // Handle yields of storage reference expressions specially so that we
-    // don't emit them as +1 r-values and then expand.
-    if (Options.contains(Flag::IsYield)) {
+    // Borrow a noncopyable tuple argument in place when none of its expanded
+    // parameters consume it. Forming an owned RValue before expansion would
+    // consume the tuple even though the callee only borrows its elements.
+    bool borrowTuple = false;
+    if (arg.getSubstRValueType()->isNoncopyable() &&
+        !origParamType.doesTupleContainPackExpansionType()) {
+      auto params = ParamInfos.slice(0, origParamType.getFlattenedValueCount());
+      borrowTuple = llvm::none_of(params, [](SILParameterInfo param) {
+        return param.isConsumedInCaller();
+      });
+    }
+
+    // Handle yields of storage reference expressions the same way.
+    if (Options.contains(Flag::IsYield) || borrowTuple) {
       if (auto result = std::move(arg)
             .findStorageReferenceExprForBorrow(SGF.SGM.M)) {
         emitExpandedBorrowed(result, origParamType);

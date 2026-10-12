@@ -2949,6 +2949,16 @@ RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
          "RValueEmitter shouldn't be called on lvalues");
 
   auto tupleType = cast<TupleType>(E->getBase()->getType()->getCanonicalType());
+  if (tupleType->isNoncopyable() &&
+      SGF.findStorageReferenceExprForMoveOnly(
+          E->getBase(), StorageReferenceOperationKind::Borrow)) {
+    // Project from the original tuple instead of consuming all its elements
+    // to form an RValue, including the elements that are not being accessed.
+    FormalEvaluationScope scope(SGF);
+    LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
+    return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
+  }
+
   auto projectedEltInit = C.getEmitInto();
 
   std::optional<CollectValueInitialization> collection;

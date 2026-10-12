@@ -497,6 +497,20 @@ static void foldRedundantBeginBorrow(BeginBorrowInst *bbi) {
   bbi->eraseFromParent();
 }
 
+/// SILGen reconstructs a borrowed tuple parameter from its exploded arguments.
+/// Its borrow lasts for the entire function only if every borrow introducer is
+/// a function argument. A tuple containing a local borrow needs a scope check.
+static bool isBorrowedFunctionArgumentTuple(SILValue value) {
+  if (!isa<TupleInst>(value))
+    return false;
+
+  SmallVector<BorrowedValue, 4> introducers;
+  return getAllBorrowIntroducingValues(value, introducers) &&
+         llvm::all_of(introducers, [](BorrowedValue introducer) {
+           return introducer.kind == BorrowedValueKind::SILFunctionArgument;
+         });
+}
+
 /// Erase a copy_value operand of MarkUnresolvedNonCopyableValueInst.
 bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
   MarkUnresolvedNonCopyableValueInst *markedInst)
@@ -552,15 +566,15 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
   //   %copy = copy_value %arg
   //   %mark = mark_unresolved_non_copyable_value [no_consume_or_assign]
   //   %copy
-  if (auto *arg = dyn_cast<SILArgument>(orig)) {
-    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+  if (isa<SILArgument>(orig) || isBorrowedFunctionArgumentTuple(orig)) {
+    if (orig->getOwnershipKind() == OwnershipKind::Guaranteed) {
       for (auto *use : markedInst->getConsumingUses()) {
         destroys.push_back(cast<DestroyValueInst>(use->getUser()));
       }
       while (!destroys.empty())
         destroys.pop_back_val()->eraseFromParent();
 
-      // Once the mark is replaced by the guaranteed argument, any begin_borrow
+      // Once the mark is replaced by the guaranteed value, any begin_borrow
       // of it becomes a redundant nested borrow; fold those away.
       auto borrowUsers = markedInst->getUsersOfType<BeginBorrowInst>();
       SmallVector<BeginBorrowInst *, 2> borrows(borrowUsers.begin(),
