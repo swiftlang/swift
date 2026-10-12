@@ -3582,13 +3582,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
-    // Find the last path element, skipping GenericArgument elements
+    // Find the last path element, skipping OptionalPayload elements
     // so that we allow this exception in cases of optional types, and
     // skipping OptionalInjection elements so that we allow this
     // exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
-          return elt.getKind() != ConstraintLocator::GenericArgument &&
+          return elt.getKind() != ConstraintLocator::OptionalPayload &&
                  elt.getKind() != ConstraintLocator::OptionalInjection;
         });
 
@@ -3908,6 +3908,7 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
   // and for function argument/result positions if generic argument is
   // bound to a function type.
   if (!last || !(last->is<LocatorPathElt::GenericArgument>() ||
+                 last->is<LocatorPathElt::OptionalPayload>() ||
                  last->is<LocatorPathElt::FunctionArgument>() ||
                  last->is<LocatorPathElt::FunctionResult>()))
     return false;
@@ -3928,7 +3929,8 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
         continue;
       }
 
-      if (elt.is<LocatorPathElt::GenericArgument>()) {
+      if (elt.is<LocatorPathElt::GenericArgument>() ||
+          elt.is<LocatorPathElt::OptionalPayload>()) {
         inGenericArgumentContext = true;
         continue;
       }
@@ -4344,14 +4346,14 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           if (shouldAttemptFixes()) {
             llvm::SmallVector<LocatorPathElt, 4> path;
             if (auto anchor = locator.getLocatorParts(path)) {
-              // Let's drop `optional` or `generic argument` bits from
-              // locator because that helps to diagnose reference equality
+              // Let's drop `optional injection` or `optional payload` bits from
+              // the locator because that helps to diagnose reference equality
               // operators ("===" and "!==") since there is always a
               // `value-to-optional` or `optional-to-optional` conversion
               // associated with them (expected argument is `AnyObject?`).
               if (!path.empty() &&
                   (path.back().is<LocatorPathElt::OptionalInjection>() ||
-                   path.back().is<LocatorPathElt::GenericArgument>()))
+                   path.back().is<LocatorPathElt::OptionalPayload>()))
                 path.pop_back();
 
               auto *fixLoc = getConstraintLocator(anchor, path);
@@ -4472,7 +4474,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           // Fail here and let the generic argument matching handle the failure
           // because we need to present complete types in the diagnostic and
           // point to the mismatching location(s).
-          if (last.is<LocatorPathElt::GenericArgument>())
+          if (last.is<LocatorPathElt::GenericArgument>() ||
+              last.is<LocatorPathElt::OptionalPayload>())
             return SolutionKind::Error;
 
           if (last.is<LocatorPathElt::CoercionOperand>()) {
@@ -6807,7 +6810,8 @@ bool ConstraintSystem::repairFailures(
     // If the mismatch is a part of either optional-to-optional or
     // value-to-optional conversions, let's allow fix refer to a complete
     // top level type and not just a part of it.
-    if (tupleLocator->findLast<LocatorPathElt::OptionalInjection>())
+    if (tupleLocator->findLast<LocatorPathElt::OptionalInjection>() ||
+        tupleLocator->findLast<LocatorPathElt::OptionalPayload>())
       break;
 
     if (tupleLocator->isForContextualType()) {
@@ -7082,7 +7086,8 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::GenericArgument: {
+  case ConstraintLocator::GenericArgument:
+  case ConstraintLocator::OptionalPayload: {
     // If any of the types is a hole, consider it fixed.
     if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
@@ -7091,8 +7096,14 @@ bool ConstraintSystem::repairFailures(
     // failure e.g. `String bind T.Element`, so let's drop the generic argument
     // path element and recurse in repairFailures to check and potentially
     // record the requirement failure fix.
-    auto genericArgElt =
-        path.pop_back_val().castTo<LocatorPathElt::GenericArgument>();
+    unsigned genericArgIndex;
+    auto elt = path.pop_back_val();
+    if (elt.is<LocatorPathElt::GenericArgument>()) {
+      genericArgIndex = elt.castTo<LocatorPathElt::GenericArgument>().getIndex();
+    } else {
+      ASSERT(elt.is<LocatorPathElt::OptionalPayload>());
+      genericArgIndex = 0;
+    }
 
     // If we have something like ... -> type req # -> pack element #, we're
     // solving a requirement of the form T : P where T is a type parameter pack
@@ -7195,7 +7206,7 @@ bool ConstraintSystem::repairFailures(
                                                           fixLoc);
     } else {
       fix = GenericArgumentsMismatch::create(
-          *this, fromType, toType, {genericArgElt.getIndex()}, fixLoc);
+          *this, fromType, toType, {genericArgIndex}, fixLoc);
     }
 
     if (!fix)
@@ -9730,7 +9741,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     SmallVector<Type, 4> toOptionals,
     ConstraintSystem::TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
-  if (locator.endsWith<LocatorPathElt::GenericArgument>())
+  if (locator.endsWith<LocatorPathElt::GenericArgument>() ||
+      locator.endsWith<LocatorPathElt::OptionalPayload>())
     return nullptr;
 
   // Both types have to be resolved, `typeCheckCheckedCast` doesn't support
@@ -15042,7 +15054,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           auto result = matchTypes(
               generic1->getGenericArgs()[0], generic2->getGenericArgs()[0],
               matchKind, subflags,
-              locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+              locator.withPathElement(ConstraintLocator::OptionalPayload));
 
           if (!(shouldAttemptFixes() && result == SolutionKind::Error))
             return result;
@@ -15354,7 +15366,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     ArrayRef<LocatorPathElt> path(originalPath);
     simplifyLocator(anchor, path, range);
 
-    if (!path.empty() && path.back().is<LocatorPathElt::GenericArgument>()) {
+    if (!path.empty() &&
+        (path.back().is<LocatorPathElt::GenericArgument>() ||
+         path.back().is<LocatorPathElt::OptionalPayload>())) {
       impact += 11;
     }
 

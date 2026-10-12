@@ -1779,7 +1779,7 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
   switch (getConversionBehavior(type)) {
   case ConversionBehavior::Optional: {
     auto result = rec(type->getOptionalObjectType(),
-                      LocatorPathElt::GenericArgument(0));
+                      ConstraintLocator::OptionalPayload);
     return OptionalType::get(result);
   }
 
