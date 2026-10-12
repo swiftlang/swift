@@ -8224,22 +8224,17 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 ///   leak out of the constraint system -- currently we handle this by just
 ///   always folding them away, see `replaceTypeVariablesAndHolesWithErrors`.
 class HoleType : public TypeBase {
-  // NOTE: If you add a new Type-based originator, you'll need to update the
-  // recursive property logic in HoleType::get.
-  using Originator =
-      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
-                         VarDecl *, TypeRepr *>;
+  Type OrigTy;
 
-  Originator O;
-
-  HoleType(ASTContext &C, Originator originator,
-           RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Hole, &C, properties), O(originator) {}
+  HoleType(ASTContext &C, Type origTy, RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Hole, &C, properties), OrigTy(origTy) {}
 
 public:
-  static Type get(ASTContext &ctx, Originator originator);
+  static Type get(Type origTy);
 
-  Originator getOriginator() const { return O; }
+  /// Retrieve the original type, which in most cases is a TypeVariableType or
+  /// DependentMemberType, but can also be an arbitrary type with an error.
+  Type getOriginator() const { return OrigTy; }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Hole;

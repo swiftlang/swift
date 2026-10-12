@@ -151,8 +151,7 @@ struct PotentialBinding {
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
-    return {HoleType::get(typeVar->getASTContext(), typeVar),
-            AllowedBindingKind::Exact,
+    return {HoleType::get(typeVar), AllowedBindingKind::Exact,
             /*source=*/locator, /*originator=*/nullptr};
   }
 

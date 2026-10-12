@@ -6345,21 +6345,7 @@ namespace {
 
     void visitHoleType(HoleType *T, Label label) {
       printCommon("hole_type", label);
-      auto originator = T->getOriginator();
-      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
-        printRec(typeVar, Label::always("type_variable"));
-      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
-                            Label::optional("originating_var"), DeclColor);
-      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
-        printRec(errTy, Label::always("error_type"));
-      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
-        printRec(DMT, Label::always("dependent_member_type"));
-      } else if (isa<TypeRepr *>(originator)) {
-        printFlag("type_repr");
-      } else {
-        assert(false && "unknown originator");
-      }
+      printRec(T->getOriginator(), Label::always("originator"));
       printFoot();
     }
 

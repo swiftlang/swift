@@ -919,8 +919,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
             unsigned numHoles = 0;
             for (auto *typeVar : CS.getTypeVariables()) {
               if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
-                CS.assignFixedType(typeVar,
-                                   HoleType::get(CS.getASTContext(), typeVar));
+                CS.assignFixedType(typeVar, HoleType::get(typeVar));
                 ++numHoles;
               }
             }

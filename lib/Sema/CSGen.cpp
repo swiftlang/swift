@@ -1132,7 +1132,7 @@ namespace {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
 
-        return HoleType::get(CS.getASTContext(), repr);
+        return HoleType::get(result);
       }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1404,7 +1404,7 @@ namespace {
           }
           CS.recordFix(IgnoreInvalidASTNode::create(
               CS, CS.getConstraintLocator(argLocator)));
-          result = HoleType::get(ctx, specializationArg);
+          result = HoleType::get(result);
         }
         specializationArgTypes.push_back(result);
       }
@@ -1931,7 +1931,7 @@ namespace {
             if (declaredTy->hasError()) {
               CS.recordFix(AllowRefToInvalidDecl::create(
                   CS, CS.getConstraintLocator(param)));
-              declaredTy = HoleType::get(CS.getASTContext(), param);
+              declaredTy = HoleType::get(declaredTy);
             }
 
             externalType = CS.replaceInferableTypesWithTypeVars(declaredTy,
@@ -4131,7 +4131,7 @@ bool ConstraintSystem::generateConstraints(
             // For ErrorTypes we want to eagerly produce a hole since we know
             // this is where the issue is.
             if (auto *errTy = dyn_cast<ErrorType>(tyPtr)) {
-              return HoleType::get(getASTContext(), errTy);
+              return HoleType::get(errTy);
             }
             return std::nullopt;
           });

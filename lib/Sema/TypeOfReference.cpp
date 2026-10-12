@@ -281,7 +281,7 @@ public:
   Type transformErrorType(ErrorType *errTy) {
     // For ErrorTypes we want to eagerly produce a hole since we know this is
     // where the issue is.
-    return HoleType::get(cs.getASTContext(), errTy);
+    return HoleType::get(errTy);
   }
 
   Type transformDependentMemberType(DependentMemberType *DMT) {
@@ -292,7 +292,7 @@ public:
     // DependentMemberType.
     auto newBase = transform(DMT->getBase());
     if (newBase->is<HoleType>())
-      return HoleType::get(cs.getASTContext(), DMT);
+      return HoleType::get(DMT);
 
     return DependentMemberType::get(newBase, assocTy);
   }
@@ -1089,9 +1089,7 @@ static Type replaceParamErrorTypeByHole(Type type, ValueDecl *value,
   for (auto i : indices(typeParams)) {
     AnyFunctionType::Param param = typeParams[i];
     if (param.getPlainType()->is<ErrorType>()) {
-      auto paramDecl = declParams[i];
-      auto hole = HoleType::get(paramDecl->getASTContext(), paramDecl);
-      newParams.push_back(param.withType(hole));
+      newParams.push_back(param.withType(HoleType::get(param.getPlainType())));
     } else {
       newParams.push_back(param);
     }

@@ -6848,21 +6848,7 @@ public:
   void visitHoleType(HoleType *T, NonRecursivePrintOptions nrOptions) {
     if (Options.PrintTypesForDebugging) {
       Printer << "<<hole for ";
-      auto originator = T->getOriginator();
-      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
-        visit(typeVar);
-      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        Printer << "decl = ";
-        Printer << VD->getName();
-      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
-        visit(errTy);
-      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
-        visit(DMT);
-      } else if (isa<TypeRepr *>(originator)) {
-        Printer << "type_repr";
-      } else {
-        assert(false && "unknown originator");
-      }
+      visit(T->getOriginator());
       Printer << ">>";
     } else {
       Printer << "<<hole>>";

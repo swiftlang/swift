@@ -592,7 +592,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
     llvm::FoldingSet<ErrorUnionType> ErrorUnionTypes;
-    llvm::DenseMap<void *, HoleType *> HoleTypes;
+    llvm::DenseMap<Type, HoleType *> HoleTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
     llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
@@ -4109,25 +4109,14 @@ Type PlaceholderType::get(ASTContext &ctx, PlaceholderTypeRepr *repr) {
   return entry;
 }
 
-Type HoleType::get(ASTContext &ctx, Originator originator) {
-  assert(originator);
+Type HoleType::get(Type origTy) {
+  ASSERT(origTy);
 
-  auto originatorProps = [&]() -> RecursiveTypeProperties {
-    if (auto *tv = originator.dyn_cast<TypeVariableType *>())
-      return tv->getRecursiveProperties();
-
-    if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
-      return depTy->getRecursiveProperties();
-
-    if (auto *errTy = originator.dyn_cast<ErrorType *>())
-      return errTy->getRecursiveProperties();
-
-    return RecursiveTypeProperties();
-  }();
+  auto originatorProps = origTy->getRecursiveProperties();
   auto arena = getArena(originatorProps);
 
-  auto &cache = ctx.getImpl().getArena(arena).HoleTypes;
-  auto &entry = cache[originator.getOpaqueValue()];
+  auto &ctx = origTy->getASTContext();
+  auto &entry = ctx.getImpl().getArena(arena).HoleTypes[origTy];
   if (entry)
     return entry;
 
@@ -4138,7 +4127,7 @@ Type HoleType::get(ASTContext &ctx, Originator originator) {
   if (originatorProps.isSolverAllocated())
     properties |= RecursiveTypeProperties::SolverAllocated;
 
-  entry = new (ctx, arena) HoleType(ctx, originator, properties);
+  entry = new (ctx, arena) HoleType(ctx, origTy, properties);
   return entry;
 }
 

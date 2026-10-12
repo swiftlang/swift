@@ -1705,7 +1705,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       Type newBase = simplify(depMemTy->getBase());
 
       if (newBase->is<HoleType>())
-        return HoleType::get(CS.getASTContext(), depMemTy);
+        return HoleType::get(depMemTy);
 
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
@@ -1746,7 +1746,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
           // order to continue solving.
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
           if (CS.inSalvageMode())
-            return HoleType::get(CS.getASTContext(), memberTy);
+            return HoleType::get(memberTy);
 
           return memberTy;
         }
@@ -1842,7 +1842,7 @@ getGenericParamForHoleTypeVar(TypeVariableType *tv, const Solution &S) {
   // the same hole bound to a generic parameter type variable.
   for (auto &binding : S.typeBindings) {
     if (auto *hole = binding.second->getAs<HoleType>()) {
-      if (hole->getOriginator().dyn_cast<TypeVariableType *>() == tv) {
+      if (hole->getOriginator()->getAs<TypeVariableType>() == tv) {
         if (auto *gp = getGenericParam(binding.first))
           return gp;
       }
@@ -1853,19 +1853,8 @@ getGenericParamForHoleTypeVar(TypeVariableType *tv, const Solution &S) {
 
 static Type replaceHoleType(HoleType *hole, const Solution &S,
                             bool forCompletion) {
-  auto &ctx = S.getConstraintSystem().getASTContext();
-  auto origTy = [&]() -> Type {
-    auto orig = hole->getOriginator();
-    if (auto *tv = orig.dyn_cast<TypeVariableType *>())
-      return tv;
-    if (auto *dmt = orig.dyn_cast<DependentMemberType *>())
-      return dmt;
-    return Type();
-  }();
-  if (!origTy)
-    return ErrorType::get(ctx);
-
   // Try replace the type variable with its original generic parameter type.
+  auto origTy = hole->getOriginator();
   auto replacement = origTy.transformRec([&](Type ty) -> std::optional<Type> {
     auto *tv = dyn_cast<TypeVariableType>(ty.getPointer());
     if (!tv)

@@ -4804,7 +4804,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 
     // Don't allow the invalid pack reference to propagate to other
     // bindings.
-    type = HoleType::get(typeVar->getASTContext(), typeVar);
+    type = HoleType::get(typeVar);
   }
 
   // Binding to a pack expansion type is always an error in Swift 6 mode.
@@ -4836,7 +4836,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 
       // Don't allow the pack expansion type to propagate to other
       // bindings.
-      type = HoleType::get(typeVar->getASTContext(), typeVar);
+      type = HoleType::get(typeVar);
     }
   }
 
@@ -11655,9 +11655,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // or it is certain that base type can't be bound to any other
       // type but a hole.
       auto shouldRecordFixForHole = [&](HoleType *baseType) {
-        auto *originator =
-            baseType->getOriginator().dyn_cast<TypeVariableType *>();
-
+        auto *originator = baseType->getOriginator()->getAs<TypeVariableType>();
         if (!originator)
           return false;
 
@@ -12472,7 +12470,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (!shouldAttemptFixes())
       return false;
 
-    assignFixedType(typeVar, HoleType::get(getASTContext(), typeVar));
+    assignFixedType(typeVar, HoleType::get(typeVar));
     recordTypeVariablesAsHoles(inferredClosureType);
 
     return !recordFix(
@@ -15740,7 +15738,7 @@ void ConstraintSystem::recordTypeVariablesAsHoles(Type type) {
       if (typeVar->getImpl().hasRepresentativeOrFixed())
         return;
 
-      assignFixedType(typeVar, HoleType::get(getASTContext(), typeVar));
+      assignFixedType(typeVar, HoleType::get(typeVar));
     }
   });
 }
