@@ -7101,6 +7101,8 @@ bool ConstraintSystem::repairFailures(
     if (elt.is<LocatorPathElt::GenericArgument>()) {
       genericArgIndex = elt.castTo<LocatorPathElt::GenericArgument>().getIndex();
     } else {
+      // FIXME: It is unclear if this case matters at all, because we seem to
+      // always have a restriction below, which causes us to skip most of this.
       ASSERT(elt.is<LocatorPathElt::OptionalPayload>());
       genericArgIndex = 0;
     }
@@ -7159,22 +7161,28 @@ bool ConstraintSystem::repairFailures(
     Type fromType;
     Type toType;
 
-    if (path.size() >= 2) {
-      if (path[path.size() - 2].is<LocatorPathElt::GenericType>()) {
-        fromType = path[path.size() - 2]
+    if (elt.is<LocatorPathElt::GenericArgument>()) {
+      if (path.size() >= 2) {
+        if (path[path.size() - 2].is<LocatorPathElt::GenericType>()) {
+          fromType = path[path.size() - 2]
+                         .castTo<LocatorPathElt::GenericType>()
+                         .getType();
+        }
+
+        if (path[path.size() - 1].is<LocatorPathElt::GenericType>()) {
+          toType = path[path.size() - 1]
                        .castTo<LocatorPathElt::GenericType>()
                        .getType();
-      }
-
-      if (path[path.size() - 1].is<LocatorPathElt::GenericType>()) {
-        toType = path[path.size() - 1]
-                     .castTo<LocatorPathElt::GenericType>()
-                     .getType();
+        }
       }
     }
 
     if (!fromType || !toType)
       break;
+
+    // Drop both `GenericType` elements.
+    path.pop_back();
+    path.pop_back();
 
     Type fromObjectType, toObjectType;
     unsigned fromUnwraps, toUnwraps;
@@ -7188,10 +7196,6 @@ bool ConstraintSystem::repairFailures(
       (void)matchTypes(fromObjectType, toObjectType, ConstraintKind::Bind,
                        TMF_ApplyingFix, locator);
     }
-
-    // Drop both `GenericType` elements.
-    path.pop_back();
-    path.pop_back();
 
     ConstraintFix *fix = nullptr;
     auto *fixLoc = getConstraintLocator(anchor, path);
@@ -8099,9 +8103,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::BoundGenericStruct: {
       auto bound1 = cast<BoundGenericType>(desugar1);
       auto bound2 = cast<BoundGenericType>(desugar2);
-      
-      if (bound1->getDecl() == bound2->getDecl())
-        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+
+      if (bound1->getDecl() == bound2->getDecl()) {
+        if (kind >= ConstraintKind::Subtype &&
+            bound1->getDecl()->isOptionalDecl() &&
+            getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::OptionalToOptional);
+        } else {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+        }
+      }
       break;
     }
 
@@ -8549,11 +8560,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // A value of type T, T?, or T! can be converted to type U? or U! if
   // T is convertible to U.
   if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
-    enumerateOptionalConversionRestrictions(
-        type1, type2, kind, locator,
-        [&](ConversionRestrictionKind restriction) {
-      conversionsOrFixes.push_back(restriction);
-    });
+    if (getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
+      if (!type1->getOptionalObjectType() && type2->getOptionalObjectType()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::ValueToOptional);
+      }
+    } else {
+      enumerateOptionalConversionRestrictions(
+          type1, type2, kind, locator,
+          [&](ConversionRestrictionKind restriction) {
+        conversionsOrFixes.push_back(restriction);
+      });
+    }
   }
 
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
@@ -15044,7 +15061,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   // also:
   //   T <c U ===> T? <c U!
   case ConversionRestrictionKind::OptionalToOptional: {
-    addContextualScore();
+    // When short conversions are on, we use this restriction kind for all
+    // optional conversions, without trying deep equality first.
+    if (!getASTContext().TypeCheckerOpts.SolverEnableShortConversions)
+      addContextualScore();
 
     assert(matchKind >= ConstraintKind::Subtype);
     if (auto generic1 = type1->getAs<BoundGenericType>()) {
@@ -15054,7 +15074,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           auto result = matchTypes(
               generic1->getGenericArgs()[0], generic2->getGenericArgs()[0],
               matchKind, subflags,
-              locator.withPathElement(ConstraintLocator::OptionalPayload));
+              locator.withPathElement(LocatorPathElt::OptionalPayload()));
 
           if (!(shouldAttemptFixes() && result == SolutionKind::Error))
             return result;

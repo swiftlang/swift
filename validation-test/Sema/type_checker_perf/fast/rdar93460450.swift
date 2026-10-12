@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12 -swift-version 5 -solver-scope-threshold=10000
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12 -swift-version 5 -solver-scope-threshold=10000 -solver-enable-short-conversions
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
@@ -43,10 +43,8 @@ struct MyView: View {
     }, set: { newValue in
     })) {
       ForEach(data, id: \.id) { v in
-        // Note: This is on a single line to ensure we get the correct location
-        // for the diagnostic on all the SDKs we test in CI.
         NavigationLink(value: v.name) { HStack { MySettingsView(x: 42, y: v.name) } }
-        // expected-error@-1 {{reasonable time}}
+        // expected-error@-1 {{argument passed to call that takes no arguments}}
       }
     }
   }
