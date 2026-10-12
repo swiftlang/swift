@@ -63,6 +63,7 @@ func nameOfCurrentSerialExecutor() -> String {
   switch Unmanaged<AnyObject>.fromOpaque(identity).takeUnretainedValue() {
   case let executor as ManualExecutor: return executor.name
   case let actor as DefaultActor: return actor.name
+  case let actor as DeinitLoggingDefaultActor: return actor.name
   case is CountingMainExecutor: return "main"
   default: return "unknown"
   }
@@ -110,19 +111,24 @@ enum PassedRoles {
 // With `runsJobsUnlessHeld`, it runs a job as soon as it is enqueued, passing
 // itself as the task executor, unless it is held. The default executor of the
 // tests works like that, so that the jobs of the test harness itself run.
+//
+// With an `exclusiveContextGroup`, it opts into complex equality, and counts
+// as the same serial executor as every other executor of its group.
 final class ManualExecutor: SerialExecutor, TaskExecutor, Sendable {
   let name: String
   private let pool: ManualExecutor?
   private let state = Mutex<(jobs: [UnownedJob], held: Bool)>(([], false))
   private let runsJobsUnlessHeld: Bool
+  private let exclusiveContextGroup: Int?
   var pendingJobCount: Int { state.withLock { $0.jobs.count } }
 
   init(
     _ name: String, pool: ManualExecutor? = nil,
-    runsJobsUnlessHeld: Bool = false
+    runsJobsUnlessHeld: Bool = false, exclusiveContextGroup: Int? = nil
   ) {
     self.pool = pool
     self.runsJobsUnlessHeld = runsJobsUnlessHeld
+    self.exclusiveContextGroup = exclusiveContextGroup
     self.name = name
   }
 
@@ -143,7 +149,15 @@ final class ManualExecutor: SerialExecutor, TaskExecutor, Sendable {
   }
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: self)
+    exclusiveContextGroup == nil
+      ? UnownedSerialExecutor(ordinary: self)
+      : UnownedSerialExecutor(complexEquality: self)
+  }
+
+  func isSameExclusiveExecutionContext(other: ManualExecutor) -> Bool {
+    self === other
+      || (exclusiveContextGroup != nil
+          && exclusiveContextGroup == other.exclusiveContextGroup)
   }
 
   func asUnownedTaskExecutor() -> UnownedTaskExecutor {
@@ -245,6 +259,45 @@ actor CustomActor {
     executor.asUnownedSerialExecutor()
   }
   init(_ executor: ManualExecutor) { self.executor = executor }
+}
+
+// An actor isolated to a `ManualExecutor` whose isolated deinit records where it
+// runs.
+actor DeinitLoggingActor {
+  private let executor: ManualExecutor
+  private let log: EventLog
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    executor.asUnownedSerialExecutor()
+  }
+  init(_ executor: ManualExecutor, _ log: EventLog) {
+    self.executor = executor
+    self.log = log
+  }
+
+  isolated deinit {
+    log.record(here("isolated deinit"))
+  }
+}
+
+// A default actor whose isolated deinit records where it runs.
+actor DeinitLoggingDefaultActor {
+  let name: String
+  private let log: EventLog
+  init(_ name: String, _ log: EventLog) {
+    self.name = name
+    self.log = log
+  }
+
+  isolated deinit {
+    log.record(here("isolated deinit"))
+  }
+}
+
+// Holds the only reference to an object until `release()`.
+final class ReferenceHolder<Object: AnyObject & Sendable>: Sendable {
+  private let object: Mutex<Object?>
+  init(_ object: Object) { self.object = Mutex(object) }
+  func release() { object.withLock { $0 = nil } }
 }
 
 extension Actor {
@@ -1565,6 +1618,96 @@ struct Main {
       expectEqual(0, pool.pendingJobCount)
       expectEqual(0, loop.pendingJobCount)
       await task.value
+    }
+
+    // MARK: Isolated deinit
+
+    tests.test("isolated deinit: releasing an actor outside its isolation enqueues the deinit on its serial executor") {
+      let executor = ManualExecutor("E")
+      let log = EventLog()
+      let holder = ReferenceHolder(DeinitLoggingActor(executor, log))
+      holder.release()
+      log.record(here("released"))
+      log.expectNext(["released [none, default executor]"])
+      expectEqual(1, executor.pendingJobCount)
+      executor.runNextJob(passing: .serialExecutorOnly)
+      log.expectNext(["isolated deinit [E, E]"])
+    }
+
+    tests.test("isolated deinit: releasing an actor in code isolated to its serial executor runs the deinit inline") {
+      let executor = ManualExecutor("E")
+      let log = EventLog()
+      let holder = ReferenceHolder(DeinitLoggingActor(executor, log))
+      let runner = CustomActor(executor)
+      let task = Task.detached {
+        await runner.run {
+          holder.release()
+          log.record(here("released"))
+        }
+      }
+      executor.runNextJob(passing: .serialExecutorOnly)
+      log.expectNext([
+        "isolated deinit [E, E]",
+        "released [E, E]",
+      ])
+      expectEqual(0, executor.pendingJobCount)
+      await task.value
+    }
+
+    tests.test("isolated deinit: complex equality decides whether the deinit runs inline") {
+      let log = EventLog()
+      let target = ManualExecutor("target", exclusiveContextGroup: 1)
+      let sameGroup = ManualExecutor("same group", exclusiveContextGroup: 1)
+      let otherGroup = ManualExecutor("other group", exclusiveContextGroup: 2)
+
+      // Released in code isolated to an executor of the same group: inline.
+      let inlineHolder = ReferenceHolder(DeinitLoggingActor(target, log))
+      let sameGroupRunner = CustomActor(sameGroup)
+      let inlineTask = Task.detached {
+        await sameGroupRunner.run {
+          inlineHolder.release()
+          log.record(here("released in the same group"))
+        }
+      }
+      sameGroup.runNextJob(passing: .serialExecutorOnly)
+      log.expectNext([
+        "isolated deinit [same group, same group]",
+        "released in the same group [same group, same group]",
+      ])
+      expectEqual(0, target.pendingJobCount)
+      await inlineTask.value
+
+      // Released in code isolated to an executor of another group: enqueued.
+      let enqueuedHolder = ReferenceHolder(DeinitLoggingActor(target, log))
+      let otherGroupRunner = CustomActor(otherGroup)
+      let enqueuedTask = Task.detached {
+        await otherGroupRunner.run {
+          enqueuedHolder.release()
+          log.record(here("released in another group"))
+        }
+      }
+      otherGroup.runNextJob(passing: .serialExecutorOnly)
+      expectEqual(1, target.pendingJobCount)
+      target.runNextJob(passing: .serialExecutorOnly)
+      log.expectNext([
+        "released in another group [other group, other group]",
+        "isolated deinit [target, target]",
+      ])
+      await enqueuedTask.value
+    }
+
+    tests.test("isolated deinit: releasing an idle default actor elsewhere locks it and runs the deinit inline") {
+      let log = EventLog()
+      let holder = ReferenceHolder(DeinitLoggingDefaultActor("default actor", log))
+      testDefaultExecutor.hold()
+      holder.release()
+      log.record(here("released"))
+      log.expectNext([
+        "isolated deinit [default actor, default executor]",
+        "released [none, default executor]",
+      ])
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
+      testDefaultExecutor.drainAndRelease()
     }
 
     await runAllTestsAsync()
