@@ -120,6 +120,9 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 }
 
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
+  // A mutable global placed in a read-only section would be emitted as a
+  // writable .rodata section on ELF.
+  assert(var->isConstant() && "true-const global must be constant");
   disableAddressSanitizer(*this, var);
   
   switch (TargetInfo.OutputObjectFormat) {

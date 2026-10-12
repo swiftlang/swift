@@ -575,10 +575,11 @@ emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type,
   auto constant = IGM.getTypeRef(type, sig, MangledTypeRefRole::Metadata).first;
   
   // Mask the bottom bit to tell the key path runtime this is a mangled name
-  // rather than a direct reference.
+  // rather than a direct reference. Inbounds, so that relative references to
+  // the tagged string are still recognized as link-time constants.
   auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
-  return llvm::ConstantExpr::getGetElementPtr(IGM.Int8Ty, constant,
-                                              bitConstant);
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(IGM.Int8Ty, constant,
+                                                      bitConstant);
 }
 
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
@@ -1214,13 +1215,12 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   fields.fillPlaceholder(headerPlaceholder,
                          llvm::ConstantInt::get(Int32Ty, header.getData()));
   
-  // Create the global variable.
-  // TODO: The pattern could be immutable if
-  // it isn't instantiable in place, and if we made the type metadata accessor
-  // references private, it could go in true-const memory.
+  // Create the global variable. The pattern is never written to at runtime;
+  // the one-time instantiation cache lives in the separate keypath_once
+  // variable.
   auto patternVar = fields.finishAndCreateGlobal("keypath",
                                           getPointerAlignment(),
-                                          /*constant*/ false,
+                                          /*constant*/ true,
                                           llvm::GlobalVariable::PrivateLinkage);
   setTrueConstGlobal(patternVar);
   KeyPathPatterns.insert({pattern, patternVar});

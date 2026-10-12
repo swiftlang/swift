@@ -745,10 +745,14 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Drill down to the i8* at the beginning of the constant.
   auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
 
-  // Set the low bit.
+  // Set the low bit. The GEP is inbounds (the string is at least two bytes
+  // long) so LLVM can see through it and recognize the relative references to
+  // this string as link-time constants; otherwise, on ELF, the referencing
+  // descriptors would be placed in a writable .rodata section.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
+  addr = llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, addr,
+                                                      bitConstant);
 
   // Update the entry.
   entry = {var, addr};
