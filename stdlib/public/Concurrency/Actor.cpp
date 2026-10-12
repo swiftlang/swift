@@ -198,16 +198,14 @@ public:
 } // namespace
 #endif
 
-/// This function establishes the Task's context and attempts to invoke
-/// it. The invocation may fail and the Task may not be run if the
-/// passed in exclusion value is not what is in the ActiveTaskStatus
-/// during the cas loop to mark the Task as running. If Task
-/// priority escalation is not enabled, this will always succeed.
+/// Start `task` in the current record and run it until it suspends or
+/// finishes. Starting the task fails, and the task doesn't run, if
+/// `allowedStealerExclusionValue` isn't the task's current exclusion value,
+/// because another job already started it. That can only happen with priority
+/// escalation.
 SWIFT_ALWAYS_INLINE
 static inline void taskInvokeWithExclusionValue(
-    AsyncTask *task, SerialExecutorRef serialExecutor,
-    TaskExecutorRef taskExecutor,
-    AsyncTask::ExclusionValue allowedStealerExclusionValue,
+    AsyncTask *task, AsyncTask::ExclusionValue allowedStealerExclusionValue,
     AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlagsFromTask) {
   // Update the task status to say that it's running on the current
   // thread.  If the task suspends somewhere, it should update the
@@ -218,8 +216,10 @@ static inline void taskInvokeWithExclusionValue(
     // Update the active task in the current thread.
     auto oldTask = ActiveTask::swap(task);
 
-    auto traceHandle =
-        concurrency::trace::job_run_begin(task, serialExecutor, taskExecutor);
+    auto *record = ExecutorTrackingInfo::current();
+    auto traceHandle = concurrency::trace::job_run_begin(
+        task, record->getCurrentSerialExecutor(),
+        tracedTaskExecutor(record->getTaskExecutor()));
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
 
@@ -233,9 +233,8 @@ static inline void taskInvokeWithExclusionValue(
   }
 }
 
-void swift::runJobInEstablishedExecutorContext(Job *job,
-                                               SerialExecutorRef serialExecutor,
-                                               TaskExecutorRef taskExecutor) {
+/// Run `job` in the current record.
+static void runJobInCurrentRecord(Job *job) {
   _swift_tsan_acquire(job);
   SWIFT_TASK_DEBUG_LOG("Run job in established context %p", job);
 
@@ -244,7 +243,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    taskInvokeWithExclusionValue(task, serialExecutor, taskExecutor,
+    taskInvokeWithExclusionValue(task,
                                  task->_private().LocalStealerExclusionValue,
                                  AsyncTask::InvokeFlagsFromTask);
   } else {
@@ -266,12 +265,8 @@ void AsyncTaskStealer::process(Job *_job) {
   auto *stealer = cast<AsyncTaskStealer>(_job);
   SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
 
-  auto *trackingInfo = ExecutorTrackingInfo::current();
-
-  taskInvokeWithExclusionValue(
-      stealer->Task, trackingInfo->getCurrentSerialExecutor(),
-      tracedTaskExecutor(trackingInfo->getTaskExecutor()),
-      stealer->ExclusionValue, AsyncTask::InvokeFlagsFromStealer);
+  taskInvokeWithExclusionValue(stealer->Task, stealer->ExclusionValue,
+                               AsyncTask::InvokeFlagsFromStealer);
 
   swift_release(stealer->Task);
 
@@ -1964,9 +1959,7 @@ static void defaultActorDrain(DefaultActorImpl *actor,
           break;
         }
       } else {
-        runJobInEstablishedExecutorContext(
-            job, SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
-            tracedTaskExecutor(trackingInfo.getTaskExecutor()));
+        runJobInCurrentRecord(job);
         ranJob = true;
 
         auto currentExecutor = trackingInfo.getCurrentSerialExecutor();
@@ -2332,8 +2325,7 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
   trackingInfo.enter(serialExecutor,
                      ContextTaskExecutor::forJob(serialExecutor, taskExecutor));
 
-  runJobInEstablishedExecutorContext(
-      job, serialExecutor, tracedTaskExecutor(trackingInfo.getTaskExecutor()));
+  runJobInCurrentRecord(job);
 
   trackingInfo.leave();
 
