@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes
 
 func markUsed<T>(_ t: T) {}
 
@@ -622,10 +622,12 @@ do {
   }
 
   func f2(children: [[SubEntity]]) -> Int {
-    return children.reduce([], +).compactMap { $0?.property?.count }.reduce(0, +)  // no error
+    return children.reduce([], +).compactMap { $0?.property?.count }.reduce(0, +)
+    // expected-error@-1 {{cannot use optional chaining on non-optional value of type 'SubEntity'}}
   }
 
   func f3(entities: [Entity]) -> Int {
-    return entities.map { $0.children }.reduce([], +).compactMap { $0?.property?.count }.reduce(0, +)  // no error
+    return entities.map { $0.children }.reduce([], +).compactMap { $0?.property?.count }.reduce(0, +)
+    // expected-error@-1 {{cannot use optional chaining on non-optional value of type 'SubEntity'}}
   }
 }
