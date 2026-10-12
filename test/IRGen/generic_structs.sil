@@ -79,14 +79,14 @@ import Builtin
 //   --       protocol requirement with key arg
 // CHECK-SAME: i32 128
 //   --       param 0
-// CHECK-SAME: i32 0
+// CHECK-SAME: @"symbolic x"
 //   --       protocol Req1
 // CHECK-SAME: @"$s15generic_structs4Req1Mp"
 
 //   --       protocol requirement with key arg
 // CHECK-SAME: i32 128
 //   --       param 1
-// CHECK-SAME: i32 2
+// CHECK-SAME: @"symbolic q_"
 //   --       protocol Req2
 // CHECK-SAME: @"$s15generic_structs4Req2Mp"
 // CHECK-SAME: }>

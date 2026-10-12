@@ -614,6 +614,10 @@ void importer::getNormalInvocationArguments(
 
       languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
+#if LLVM_VERSION_MAJOR >= 24
+      // Retain documentation comments in the AST; we import them.
+      "-fretain-comments",
+#endif
       "-fretain-comments-from-system-headers",
 
       "-isystem", searchPathOpts.RuntimeResourcePath

@@ -169,7 +169,7 @@ enum GenericFixedLayout<T> {
 //   Pattern flags.  0x4020_0000 == (MetadataKind::Enum << 21).
 // CHECK-SAME:    i32 1075838976,
 //   Value witness table.
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32, i32 }>, ptr @"$s20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s20enum_value_semantics18GenericFixedLayoutOMP", i64 12) to i64)) to i32)
 // CHECK-SAME:  }>
 
 sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
