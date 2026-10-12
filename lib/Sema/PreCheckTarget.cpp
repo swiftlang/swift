@@ -420,9 +420,10 @@ static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
   return true;
 }
 
-static bool isCompositionOperator(Expr *expr) {
+/// Check whether this expression refers to the operator spelled \p op.
+static bool refersToOperator(Expr *expr, StringRef op) {
   auto nameMatches = [&](DeclName name) {
-    return name.isOperator() && name.getBaseName().getIdentifier().is("&");
+    return name.isOperator() && name.getBaseName().getIdentifier().is(op);
   };
 
   if (auto overload = dyn_cast<OverloadedDeclRefExpr>(expr)) {
@@ -435,7 +436,16 @@ static bool isCompositionOperator(Expr *expr) {
     return nameMatches(unresolved->getName().getFullName());
   }
 
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+    return nameMatches(declRef->getDecl()->getName());
+  }
+
   return false;
+}
+
+/// Check whether this expression refers to the & operator.
+static bool isCompositionOperator(Expr *expr) {
+  return refersToOperator(expr, "&");
 }
 
 /// Checks whether this is a BinaryExpr with operator `&` and returns the
@@ -1135,20 +1145,35 @@ void markDirectCallee(Expr *callee) {
   }
 }
 
+/// Fold type sugar that was parsed as an expression into a TypeExpr.
 class TypeExprSimplifier final {
+public:
+  enum class Mode {
+    /// Pre-check has resolved names, and its walker simplifies children
+    /// before their parents and puts the results in the tree.
+    PreCheck,
+    /// Build the repr that the type parser would have built for the same
+    /// syntax, for the type interpretation of a generic argument. Names and
+    /// members stay unresolved. '&' and '->' are read by spelling instead of
+    /// being folded. Nothing has walked the expression, so the folds simplify
+    /// their operands on demand.
+    Unresolved,
+  };
+
+private:
   ASTContext &Ctx;
   DeclContext *DC;
   llvm::function_ref<bool(DiscardAssignmentExpr *)>
       canSimplifyDiscardAssignmentExprCheck;
-  bool inGenericArgumentContext;
+  Mode mode;
 
   TypeExprSimplifier(DeclContext *dc,
                      llvm::function_ref<bool(DiscardAssignmentExpr *)>
                          canSimplifyDiscardAssignmentExpr,
-                     bool inGenericArgumentContext)
+                     Mode mode)
       : Ctx(dc->getASTContext()), DC(dc),
         canSimplifyDiscardAssignmentExprCheck(canSimplifyDiscardAssignmentExpr),
-        inGenericArgumentContext(inGenericArgumentContext) {}
+        mode(mode) {}
 
   ASTContext &getASTContext() const { return Ctx; }
 
@@ -1165,15 +1190,32 @@ class TypeExprSimplifier final {
   /// such simplification (see \c canSimplifyPlaceholderTypes above).
   bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
 
+  /// The operand \p E of a fold as a simplified type, or null if it is not a
+  /// type. In pre-check, the walker has already simplified it, so this only
+  /// looks at E itself. In Unresolved mode, nothing has, this simplifies it now.
   TypeExpr *getTypeOperand(Expr *E);
+
+  /// Read an unfolded sequence of '&' and '->' the way the type parser does.
+  /// Unresolved mode only. Pre-check folds sequences with \c foldSequence
+  /// instead.
+  TypeExpr *simplifySequenceTypeExpr(SequenceExpr *SE);
+
+  /// Like \c Parser::parseTypeScalar, reads
+  ///   type-scalar ::= composition (effects? '->' type-scalar)?
+  /// from the front of \p elements, the operands and operators of a sequence.
+  TypeRepr *readTypeScalar(ArrayRef<Expr *> &elements);
+
+  /// Like \c Parser::parseTypeSimpleOrComposition, reads
+  ///   composition ::= type-simple ('&' type-simple)*
+  /// from the front of \p elements.
+  TypeRepr *readComposition(ArrayRef<Expr *> &elements);
 
 public:
   static TypeExpr *simplify(Expr *E, DeclContext *DC,
                             llvm::function_ref<bool(DiscardAssignmentExpr *)>
                                 canSimplifyDiscardAssignmentExpr,
-                            bool inGenericArgumentContext = false) {
-    TypeExprSimplifier simplifier(DC, canSimplifyDiscardAssignmentExpr,
-                                  inGenericArgumentContext);
+                            Mode mode = Mode::PreCheck) {
+    TypeExprSimplifier simplifier(DC, canSimplifyDiscardAssignmentExpr, mode);
     return simplifier.simplifyTypeExpr(E);
   }
 };
@@ -1978,6 +2020,13 @@ TypeExpr *TypeExprSimplifier::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
+  if (mode == Mode::Unresolved) {
+    if (Name.isOperator())
+      return nullptr;
+    return new (Ctx) TypeExpr(QualifiedIdentTypeRepr::create(
+        Ctx, InnerTypeRepr, UDE->getNameLoc(), Name));
+  }
+
   // Fold 'T.U' into a nested type.
 
   // Resolve the TypeRepr to get the base type for the lookup.
@@ -2058,7 +2107,7 @@ bool PreCheckTarget::possiblyInTypeContext(Expr *E) {
 /// been explicitly marked as correct, and the current AST state allows it.
 bool TypeExprSimplifier::canSimplifyDiscardAssignmentExpr(
     DiscardAssignmentExpr *DAE) {
-  if (inGenericArgumentContext) {
+  if (mode == Mode::Unresolved) {
     ASSERT(canSimplifyDiscardAssignmentExprCheck(DAE));
     return true;
   }
@@ -2255,27 +2304,7 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 }
 
 /// Check whether this expression refers to the ~ operator.
-static bool isTildeOperator(Expr *expr) {
-  auto nameMatches = [&](DeclName name) {
-    return name.isOperator() && name.getBaseName().getIdentifier().is("~");
-  };
-
-  if (auto overload = dyn_cast<OverloadedDeclRefExpr>(expr)) {
-    return llvm::any_of(overload->getDecls(), [=](auto *decl) -> bool {
-      return nameMatches(decl->getName());
-    });
-  }
-
-  if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-    return nameMatches(unresolved->getName().getFullName());
-  }
-
-  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-    return nameMatches(declRef->getDecl()->getName());
-  }
-
-  return false;
-}
+static bool isTildeOperator(Expr *expr) { return refersToOperator(expr, "~"); }
 
 /// Returns \p repr as the input of a function type, diagnosing missing
 /// parentheses the way the type parser does.
@@ -2304,16 +2333,24 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   if (auto typeExpr = dyn_cast<TypeExpr>(E))
     return typeExpr;
 
+  if (mode == Mode::Unresolved) {
+    // A name is unresolved and we build the repr the type parser
+    // would have built for it.
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+      auto name = UDRE->getName();
+      if (!name.isSimpleName() || name.isSpecial() || name.isOperator())
+        return nullptr;
+      return new (Ctx) TypeExpr(
+          UnqualifiedIdentTypeRepr::create(Ctx, UDRE->getNameLoc(), name));
+    }
+
+    if (auto *SE = dyn_cast<SequenceExpr>(E))
+      return simplifySequenceTypeExpr(SE);
+  }
+
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
-  }
-
-  // In a generic argument context, a value generic parameter reference
-  // (TypeValueExpr) can be treated as a type — its inner TypeRepr
-  // resolves to a GenericTypeParamType through normal type resolution.
-  if (auto *TVE = dyn_cast<TypeValueExpr>(E); TVE && inGenericArgumentContext) {
-    return new (Ctx) TypeExpr(TVE->getRepr());
   }
 
   // Fold unresolved specializations.
@@ -2322,10 +2359,18 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     if (auto *te = getTypeOperand(USE->getSubExpr())) {
       if (auto *declRefTR =
               dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
+        SourceRange angles(USE->getLAngleLoc(), USE->getRAngleLoc());
+        // `createForSpecializedDecl` requires a bound decl, which `Unresolved`
+        // mode does not have yet.
+        if (mode == Mode::Unresolved) {
+          if (declRefTR->hasGenericArgList())
+            return nullptr;
+          return new (Ctx) TypeExpr(DeclRefTypeRepr::create(
+              Ctx, declRefTR->getBase(), declRefTR->getNameLoc(),
+              declRefTR->getNameRef(), USE->getUnresolvedParams(), angles));
+        }
         return TypeExpr::createForSpecializedDecl(
-            declRefTR, USE->getUnresolvedParams(),
-            SourceRange(USE->getLAngleLoc(), USE->getRAngleLoc()),
-            getASTContext());
+            declRefTR, USE->getUnresolvedParams(), angles, getASTContext());
       }
     }
     return nullptr;
@@ -2401,7 +2446,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
     if (TE->getNumElements() == 0)
-      return inGenericArgumentContext
+      return mode == Mode::Unresolved
                  ? new (Ctx) TypeExpr(
                        TupleTypeRepr::createEmpty(Ctx, TE->getSourceRange()))
                  : nullptr;
@@ -2490,6 +2535,8 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
+  // Reached in `PreCheck` mode after sequence folding; `Unresolved` mode
+  // handles unfolded `SequenceExpr`s in `simplifySequenceTypeExpr`.
   // FIXME: support 'inout', etc.
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
     if (!AE->isFolded()) return nullptr;
@@ -2497,9 +2544,6 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     auto extractInputTypeRepr = [&](Expr *E) -> TupleTypeRepr * {
       if (!E)
         return nullptr;
-
-      if (auto *TyE = dyn_cast<TypeExpr>(E))
-        return asFunctionInputRepr(Ctx, TyE->getTypeRepr());
 
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
@@ -2516,8 +2560,6 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     auto extractTypeRepr = [&](Expr *E) -> TypeRepr * {
       if (!E)
         return nullptr;
-      if (auto *TyE = dyn_cast<TypeExpr>(E))
-        return TyE->getTypeRepr();
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
           return TupleTypeRepr::createEmpty(Ctx, TE->getSourceRange());
@@ -2635,7 +2677,67 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
 }
 
 TypeExpr *TypeExprSimplifier::getTypeOperand(Expr *E) {
+  if (mode == Mode::Unresolved)
+    return simplifyTypeExpr(E);
   return dyn_cast<TypeExpr>(E);
+}
+
+TypeExpr *TypeExprSimplifier::simplifySequenceTypeExpr(SequenceExpr *SE) {
+  ASSERT(mode == Mode::Unresolved);
+  ArrayRef<Expr *> elements = SE->getElements();
+  if (auto *repr = readTypeScalar(elements))
+    return new (Ctx) TypeExpr(repr);
+  return nullptr;
+}
+
+TypeRepr *TypeExprSimplifier::readTypeScalar(ArrayRef<Expr *> &elements) {
+  // '&' binds more tightly than '->' because the composition is read first,
+  // and '->' associates to the right because the result is read recursively.
+  TypeRepr *input = readComposition(elements);
+  if (!input || elements.empty())
+    return input;
+
+  // In an unfolded sequence, `ArrowExpr` holds `async`/`throws`/`->` between
+  // the input read above and the result read below.
+  auto *arrow = dyn_cast<ArrowExpr>(elements.consume_front());
+  if (!arrow || arrow->isFolded())
+    return nullptr;
+  TypeRepr *thrown = nullptr;
+  if (auto *thrownExpr = arrow->getThrownTypeExpr()) {
+    auto *thrownType = getTypeOperand(thrownExpr);
+    if (!thrownType)
+      return nullptr;
+    thrown = thrownType->getTypeRepr();
+  }
+  TypeRepr *result = readTypeScalar(elements);
+  if (!result)
+    return nullptr;
+  return new (Ctx) FunctionTypeRepr(
+      /*genericParams=*/nullptr, asFunctionInputRepr(Ctx, input),
+      arrow->getAsyncLoc(), arrow->getThrowsLoc(), thrown,
+      /*yieldsTy=*/nullptr, arrow->getArrowLoc(), result);
+}
+
+TypeRepr *TypeExprSimplifier::readComposition(ArrayRef<Expr *> &elements) {
+  SmallVector<TypeRepr *, 2> members;
+  SourceLoc firstAmpersandLoc;
+  while (true) {
+    auto *member = getTypeOperand(elements.consume_front());
+    if (!member)
+      return nullptr;
+    members.push_back(member->getTypeRepr());
+    if (elements.empty() || !isCompositionOperator(elements.front()))
+      break;
+    SourceLoc ampersandLoc = elements.consume_front()->getLoc();
+    if (members.size() == 1)
+      firstAmpersandLoc = ampersandLoc;
+  }
+  if (members.size() == 1)
+    return members.front();
+  // Like the type parser, locate the composition at its first '&'.
+  return CompositionTypeRepr::create(
+      Ctx, members, members.front()->getStartLoc(),
+      {firstAmpersandLoc, members.back()->getEndLoc()});
 }
 
 void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
@@ -2918,58 +3020,15 @@ Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
 
 TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
                                                        Expr *E) {
-  /// An ASTWalker for simplifying type expressions inside generic argument
-  /// positions.
-  /// The inner expression of a GenericArgumentExprTypeRepr is not walked by
-  /// the outer PreCheckTarget (to avoid exposing it to CSGen/CSApply walkers),
-  /// so we use this walker to resolve names and fold type sugar.
-  class GenericArgumentSimplifierWalker : public ASTWalker {
-    DeclContext *DC;
-  public:
-    GenericArgumentSimplifierWalker(DeclContext *dc) : DC(dc) {}
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
-    }
-    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-      // Fold sequence expressions (e.g. 'P1 & P2') into BinaryExprs so that the
-      // type-sugar folding in walkToExprPost can recognize them. This matches
-      // the main PreCheckExpression walker, without it a parenthesized
-      // composition that was parsed as a value expression (such as a generic
-      // argument '(P1 & P2, ...)') does not simplify to a type.
-      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
-        auto *folded = TypeChecker::foldSequence(seqExpr, DC);
-        folded = folded->walk(*this);
-        if (!folded)
-          return Action::Stop();
-        return Action::SkipNode(folded);
-      }
-
-      // Resolve unqualified name references
-      if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);
-        if (!resolved)
-          return Action::Stop();
-        return Action::Continue(resolved);
-      }
-      return Action::Continue(expr);
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      auto canSimplifyDiscardAssignmentExpr =
-          [](DiscardAssignmentExpr *DAE) { return true; };
-      if (auto *simplified = TypeExprSimplifier::simplify(
-              expr, DC, canSimplifyDiscardAssignmentExpr,
-              /*inGenericArgumentContext=*/true))
-        return Action::Continue(simplified);
-      return Action::Continue(expr);
-    }
-  };
-
-  GenericArgumentSimplifierWalker walker(DC);
-  auto *walked = E->walk(walker);
-  if (!walked)
-    return nullptr;
-  return dyn_cast<TypeExpr>(walked);
+  // `simplify` can diagnose an earlier subexpression before a later one fails,
+  // keep those diagnostics only if the whole expression simplifies to a type.
+  DiagnosticTransaction diagnostics(DC->getASTContext().Diags);
+  auto *typeInterpretation = TypeExprSimplifier::simplify(
+      E, DC, [](DiscardAssignmentExpr *) { return true; },
+      TypeExprSimplifier::Mode::Unresolved);
+  if (!typeInterpretation)
+    diagnostics.abort();
+  return typeInterpretation;
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {

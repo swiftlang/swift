@@ -6198,6 +6198,28 @@ static SourceLoc findClosureExpr(Expr *expr) {
   return closureFinder.foundLoc;
 }
 
+/// Whether \p repr uses only syntax that can also spell a value expression
+/// (allowing generic arguments only on a member base such as `G<X>.member`).
+static bool couldBeLiteralExpression(TypeRepr *repr,
+                                     bool isMemberBase = false) {
+  if (auto *declRef = dyn_cast<DeclRefTypeRepr>(repr)) {
+    if (declRef->hasGenericArgList() && !isMemberBase)
+      return false;
+    auto *base = declRef->getBase();
+    return !base || couldBeLiteralExpression(base, /*isMemberBase=*/true);
+  }
+  if (auto *tuple = dyn_cast<TupleTypeRepr>(repr))
+    return tuple->isParenType() &&
+           couldBeLiteralExpression(tuple->getElementType(0), isMemberBase);
+  if (auto *composition = dyn_cast<CompositionTypeRepr>(repr))
+    return llvm::all_of(composition->getTypes(), [](TypeRepr *member) {
+      return couldBeLiteralExpression(member);
+    });
+  if (auto *inverse = dyn_cast<InverseTypeRepr>(repr))
+    return couldBeLiteralExpression(inverse->getConstraint());
+  return false;
+}
+
 NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
     GenericArgumentExprTypeRepr *repr, DeclContext *dc,
     TypeResolutionOptions options) {
@@ -6233,16 +6255,16 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
   if (!getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions)) {
     if (auto litExpr = dyn_cast<IntegerLiteralExpr>(originalValueExpr))
       return resolveIntegerLiteralExpr(litExpr);
-    else
-      return failedToResolveValue(diag::nonliteral_integer_generic_value);
+    return failedToResolveValue(diag::nonliteral_integer_generic_value);
   }
 
   // We have already attempted to resolve this TypeRepr
   if (repr->failedToResolve())
     return ErrorType::get(getASTContext());
-  else if (auto *typeExpr = repr->getAsResolvedTypeExpr())
+
+  if (auto *typeExpr = repr->getAsResolvedTypeExpr())
     return resolveType(typeExpr->getTypeRepr(), options);
-  else if (auto *intLitExpr = repr->getAsResolvedIntegerLiteralExpr())
+  if (auto *intLitExpr = repr->getAsResolvedIntegerLiteralExpr())
     return resolveIntegerLiteralExpr(intLitExpr);
 
   // For now, crudely diagnose and reject
@@ -6251,11 +6273,31 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
     return failedToResolveValue(
         diag::integer_generic_expr_closure_not_supported, closureLoc);
 
-  // Attempt to see if we can resolve the TypeExpr to a type
-  if (auto *simplifiedTyExpr =
+  auto commitToType = [&](TypeExpr *typeExpr) {
+    repr->setArgExpr(typeExpr);
+    return resolveType(typeExpr->getTypeRepr(), options);
+  };
+
+  // A parenthesized argument is a type if it can be interpreted as one, and
+  // is type-checked as an 'Int' literal expression otherwise (SE-0531).
+  if (auto *typeInterpretation =
           TypeChecker::simplifyGenericArgumentTypeExpr(dc, originalValueExpr)) {
-    repr->setArgExpr(simplifiedTyExpr);
-    return resolveType(simplifiedTyExpr->getTypeRepr(), options);
+    // If it has no literal-expression interpretation can only be a type.
+    if (!couldBeLiteralExpression(typeInterpretation->getTypeRepr()))
+      return commitToType(typeInterpretation);
+
+    // Otherwise, resolve it silently in the current resolution and stage.
+    // Reuse a successful result instead of re-resolving, which would open
+    // unbound generics twice in a constraint system and repeat warnings.
+    auto speculation = resolution.withOptions(
+        options | TypeResolutionFlags::SilenceDiagnostics);
+    auto trialType = TypeResolver(speculation, silContext)
+                         .resolveType(typeInterpretation->getTypeRepr(),
+                                      speculation.getOptions());
+    if (!trialType->hasError()) {
+      repr->setArgExpr(typeInterpretation);
+      return trialType;
+    }
   }
 
   // Attempt to type-check and constant-fold
@@ -6270,8 +6312,8 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
   if (auto foldedExpr = dyn_cast<IntegerLiteralExpr>(
           foldLiteralExpression(originalValueExpr, &getASTContext())))
     return resolveIntegerLiteralExpr(foldedExpr);
-  else
-    return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
+
+  return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
 }
 
 NeverNullType
