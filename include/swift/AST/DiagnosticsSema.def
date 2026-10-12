@@ -3092,7 +3092,7 @@ ERROR(deinitable_nominal_inverse_requires_noncopyable,none,
       "'Copyable'", (const ValueDecl *))
 ERROR(nondeinitable_storage,none,
       "%select{global variable|static property|lazy property|"
-      "'async let' binding}0 %1 cannot have non-Deinitable type %2",
+      "'async let' binding}0 %1 cannot have nondeinitable type %2",
       (unsigned, DeclName, Type))
 ERROR(deinitable_illegal_deinit,none,
       "deinitializer cannot be declared in %kind0, which suppresses "
@@ -4676,7 +4676,7 @@ ERROR(eagermove_and_lexical_combined,none,
       "'@_eagerMove' and '@_noEagerMove' are alternate styles of lifetimes "
       "and can't be combined", ())
 ERROR(eagermove_and_noncopyable_combined,none,
-      "'@_eagerMove' cannot be applied to NonCopyable types", ())
+      "'@_eagerMove' cannot be applied to noncopyable types", ())
 
 ERROR(autoclosure_function_type,none,
       "'@autoclosure' only applies to function types",
@@ -6964,10 +6964,10 @@ ERROR(tuple_move_only_not_supported,none,
       "tuple with noncopyable element type %0 is not supported", (Type))
 ERROR(deinitable_closure_nondeinitable_capture,none,
       "%select{consumed capture|capture list entry}0 %1 of "
-      "'Deinitable'-conforming closure has non-Deinitable type %2",
+      "'Deinitable'-conforming closure has nondeinitable type %2",
       (unsigned, const ValueDecl *, Type))
 ERROR(tuple_nondeinitable_element,none,
-      "tuple cannot contain non-Deinitable element type %0", (Type))
+      "tuple cannot contain nondeinitable element type %0", (Type))
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
@@ -7828,17 +7828,17 @@ ERROR(availability_escapable_generics_casting_only_version_newer, none,
       (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_copyable_existential_casting_only_version_newer, none,
-      "runtime support for casting a non-'Copyable' existential "
+      "runtime support for casting a noncopyable existential "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_escapable_existential_casting_only_version_newer, none,
-      "runtime support for casting a non-'Escapable' existential "
+      "runtime support for casting a nonescapable existential "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_noncopyable_existential_casting_only_version_newer, none,
-      "runtime support for casting out of a non-'Copyable' existential "
+      "runtime support for casting out of a noncopyable existential "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
@@ -8919,8 +8919,9 @@ ERROR(inverse_cannot_be_conditional_on_requirement, none,
       (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'%4'-conforming %kind3 has non-%4 type %0",
-      (Type, bool, DeclName, const ValueDecl *, StringRef))
+      "'%4'-conforming %kind3 has "
+      "%select{noncopyable|nonescapable|nondeinitable}5 type %0",
+      (Type, bool, DeclName, const ValueDecl *, StringRef, unsigned))
 NOTE(add_inverse,none,
      "consider adding '~%1' to %kind0",
      (const ValueDecl *, StringRef))
@@ -9176,21 +9177,21 @@ ERROR(lifetime_dependence_unknown_type, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_feature_required_return, none,
-      "%0 cannot return a ~Escapable result", (StringRef))
+      "%0 cannot return a nonescapable result", (StringRef))
 ERROR(lifetime_dependence_feature_required_mutating, none,
-      "%0 cannot have a ~Escapable 'self'", (StringRef))
+      "%0 cannot have a nonescapable 'self'", (StringRef))
 ERROR(lifetime_dependence_feature_required_inout, none,
-      "%0 cannot have a ~Escapable 'inout' parameter '%1' in addition to other ~Escapable parameters",
+      "%0 cannot have a nonescapable 'inout' parameter '%1' in addition to other nonescapable parameters",
       // this arg list must be compatible with
       // lifetime_dependence_cannot_infer_inout
       (StringRef, StringRef))
 
 ERROR(lifetime_dependence_cannot_infer_return, none,
-      "%0 with a ~Escapable result requires '@_lifetime(...)'", (StringRef))
+      "%0 with a nonescapable result requires '@_lifetime(...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_mutating, none,
-      "%0 with a ~Escapable 'self' requires '@_lifetime(self: ...)'", (StringRef))
+      "%0 with a nonescapable 'self' requires '@_lifetime(self: ...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_inout, none,
-      "%0 with a ~Escapable 'inout' parameter requires '@_lifetime(%1: ...)'",
+      "%0 with a nonescapable 'inout' parameter requires '@_lifetime(%1: ...)'",
       (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
@@ -9198,7 +9199,7 @@ ERROR(lifetime_dependence_cannot_infer_inout, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_cannot_infer_return_no_param, none,
-      "%0 with a ~Escapable result needs a parameter to depend on",
+      "%0 with a nonescapable result needs a parameter to depend on",
       (StringRef))
 NOTE(lifetime_dependence_cannot_infer_return_immortal, none,
      "'@_lifetime(immortal)' can be used to indicate that values produced by "
@@ -9208,7 +9209,7 @@ ERROR(lifetime_dependence_cannot_infer_bitwisecopyable, none,
       "specify '@_lifetime(borrow self)'",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_infer_kind, none,
-      "cannot infer the lifetime dependence scope on %0 with a ~Escapable "
+      "cannot infer the lifetime dependence scope on %0 with a nonescapable "
       "parameter, specify '@_lifetime(borrow %1)' or '@_lifetime(copy %1)'",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
@@ -9230,7 +9231,7 @@ ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
 
 ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
       "cannot infer lifetime dependence%0, no parameters found that are either "
-      "~Escapable or Escapable with a borrowing ownership", (StringRef))
+      "nonescapable or escapable with a borrowing ownership", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence%0, multiple parameters qualify as a candidate", (StringRef))
 

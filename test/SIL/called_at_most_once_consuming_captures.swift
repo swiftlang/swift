@@ -185,7 +185,7 @@ func testCaptureNotConsumedWhenOnlyBorrowedAcrossNesting(r: consuming Resource) 
   let inner = { @called(atMostOnce) in r.peek() }
   let outer = { @called(atMostOnce) in inner() }
   outer()
-  r.use() // expected-error {{noncopyable 'r' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+  r.use() // expected-error {{noncopyable 'r' cannot be consumed when captured by an escaping closure or borrowed by a nonescapable type}}
 }
 
 func testConsumingCalledAtMostOnceNestedInRegularClosure(r: consuming Resource) { // expected-error {{reinitialization of closure capture 'r' after consume}}

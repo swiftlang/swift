@@ -11,7 +11,7 @@ func a<T: ~Copyable>(x: Builtin.Borrow<T>) -> Builtin.Borrow<T> {
 }
 
 struct EscapableContainingBorrow<T> { // expected-note {{consider adding '~Escapable'}}
-	var x: Builtin.Borrow<T> // expected-error {{has non-Escapable type}}
+	var x: Builtin.Borrow<T> // expected-error {{has nonescapable type}}
 }
 struct NonescapableContainingBorrow<T>: ~Escapable {
 	var x: Builtin.Borrow<T>

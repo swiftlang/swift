@@ -46,13 +46,13 @@ func foo() {
 
 struct MoveOnly : ~Copyable {}
 
-@_eagerMove struct MoveOnlyEagerly : ~Copyable {} // expected-error {{'@_eagerMove' cannot be applied to NonCopyable types}}
+@_eagerMove struct MoveOnlyEagerly : ~Copyable {} // expected-error {{'@_eagerMove' cannot be applied to noncopyable types}}
 
-func zoo(@_eagerMove _ : consuming MoveOnly) {} // expected-error {{'@_eagerMove' cannot be applied to NonCopyable types}}
+func zoo(@_eagerMove _ : consuming MoveOnly) {} // expected-error {{'@_eagerMove' cannot be applied to noncopyable types}}
 
 func zooo(@_noEagerMove  _ : consuming C) {} // ok, only way to spell this behavior
 
 extension MoveOnly {
-  @_eagerMove // expected-error {{'@_eagerMove' cannot be applied to NonCopyable types}}
+  @_eagerMove // expected-error {{'@_eagerMove' cannot be applied to noncopyable types}}
   func zoo() {}
 }

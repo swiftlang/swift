@@ -142,7 +142,7 @@ struct Wrapper : ~Escapable {
     }
     @_lifetime(self: &self)
     nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
-      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
+      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a nonescapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
     }
   }
 

@@ -51,7 +51,7 @@ struct Tag<T: ~Copyable & ~Escapable> { var n = 0 }
 func nonescapableExistential(_ x: consuming any P & ~Escapable) -> Bool {
   // expected-pre57-note @-1 {{add '@available' attribute to enclosing global function}}
   return x is NE
-  // expected-pre57-error @-1 {{runtime support for casting a non-'Escapable' existential is only available in macOS 13.0.0 or newer}}
+  // expected-pre57-error @-1 {{runtime support for casting a nonescapable existential is only available in macOS 13.0.0 or newer}}
   // expected-pre57-note @-2 {{add 'if #available' version check}}
 }
 

@@ -285,9 +285,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
         break;
       }
 
-      storage->diagnose(diag::inverse_type_member_in_conforming_type,
-                        type, isEnum, storage->getName(), Nominal,
-                        getProtocolName(getKnownProtocolKind(IP)));
+      storage->diagnose(diag::inverse_type_member_in_conforming_type, type,
+                        isEnum, storage->getName(), Nominal,
+                        getProtocolName(getKnownProtocolKind(IP)),
+                        unsigned(IP));
 
       tryEmitContainmentFixits(Nominal, CanAddInverse, type, IP);
       return true;

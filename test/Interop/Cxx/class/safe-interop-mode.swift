@@ -80,25 +80,25 @@ using UnsafeTuple = std::tuple<int, int*, int>;
 
 View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 // Second non-escapable type is not annotated in any way.
-void unsafeFunc(View v1 [[clang::noescape]], View v2); // expected-note {{non-escapable parameter 'v2' has no lifetime annotation}}
+void unsafeFunc(View v1 [[clang::noescape]], View v2); // expected-note {{nonescapable parameter 'v2' has no lifetime annotation}}
 
-// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-View returnsViewNoAnnotation(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+// expected-warning@+1{{the returned type 'View' is annotated as nonescapable; its lifetime dependencies must be annotated}}
+View returnsViewNoAnnotation(const Owner &o); // expected-note {{this returns a nonescapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 
 struct InferredNonEscapable {
   View v;
 };
-InferredNonEscapable returnsInferredNonEscapable(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+InferredNonEscapable returnsInferredNonEscapable(const Owner &o); // expected-note {{this returns a nonescapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 
 struct HasUnannotatedViewGetter {
-  // expected-warning@+2{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+  // expected-warning@+2{{the returned type 'View' is annotated as nonescapable; its lifetime dependencies must be annotated}}
   // expected-error@+1{{cannot infer lifetime dependence on a method because 'self' is BitwiseCopyable, specify '@_lifetime(borrow self)'}}
-  View getView() const; // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+  View getView() const; // expected-note {{this returns a nonescapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 };
 
-// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as nonescapable; its lifetime dependencies must be annotated}}
 struct SWIFT_NONESCAPABLE ViewWithUnannotatedCtor {
-    ViewWithUnannotatedCtor(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+    ViewWithUnannotatedCtor(const Owner &o); // expected-note {{this returns a nonescapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 private:
     const int *member;
 };
@@ -122,7 +122,7 @@ __attribute__((swift_attr("@lifetime(borrow byValue)")))
 View returnsViewByValueLifetime(Owner byValue);
 
 __attribute__((swift_attr("safe")))
-// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+1{{the returned type 'View' is annotated as nonescapable; its lifetime dependencies must be annotated}}
 View returnsViewAuditedSafe(const Owner &o);
 
 class SharedObject {

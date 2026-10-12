@@ -377,8 +377,8 @@ func call_lifetimeboundEscapableReturn(_ len: CInt, _ p: UnsafeMutablePointer<CI
   return unsafe lifetimeboundEscapableReturn(p)
 }
 
-// expected-stable-error@+2{{a function with a ~Escapable result requires '@_lifetime(...)'}}
-// expected-experimental-error@+1{{a function with a ~Escapable result requires '@_lifetime(...)'}}
+// expected-stable-error@+2{{a function with a nonescapable result requires '@_lifetime(...)'}}
+// expected-experimental-error@+1{{a function with a nonescapable result requires '@_lifetime(...)'}}
 func call_lifetimeboundNonescapableReturn(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) -> NonescapableStruct {
   return unsafe lifetimeboundNonescapableReturn(len, p)
 }

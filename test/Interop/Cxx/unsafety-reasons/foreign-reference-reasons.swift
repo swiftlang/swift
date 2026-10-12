@@ -42,9 +42,9 @@ inline void retainUnsafeRef(UnsafeRef *) {}
 inline void releaseUnsafeRef(UnsafeRef *) {}
 
 struct Ref {
-  // expected-note@+1 {{non-escapable parameter 'v' has no lifetime annotation}}
+  // expected-note@+1 {{nonescapable parameter 'v' has no lifetime annotation}}
   void takeView(View v) const;
-  // expected-note@+1 {{non-escapable parameter 'v' has no lifetime annotation}}
+  // expected-note@+1 {{nonescapable parameter 'v' has no lifetime annotation}}
   virtual void virtualTakeView(View v) const;
 } SWIFT_SHARED_REFERENCE(retainRef, releaseRef);
 

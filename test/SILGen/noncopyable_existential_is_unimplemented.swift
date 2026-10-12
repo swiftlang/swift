@@ -26,7 +26,7 @@ struct Unrelated: ~Copyable, P {}
 func switchWithLetBinding(_ box: consuming any P & ~Copyable) -> Int {
   switch box {
   case let b as Big: return b.tag
-  // expected-error @-1 {{binding the payload of a non-'Copyable' value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
+  // expected-error @-1 {{binding the payload of a noncopyable value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
   default: return -1
   }
 }
@@ -34,7 +34,7 @@ func switchWithLetBinding(_ box: consuming any P & ~Copyable) -> Int {
 func switchWithVarBinding(_ box: consuming any P & ~Copyable) -> Int {
   switch box {
   case var b as Big: b.tag += 1; return b.tag
-  // expected-error @-1 {{binding the payload of a non-'Copyable' value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
+  // expected-error @-1 {{binding the payload of a noncopyable value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
   default: return -1
   }
 }
@@ -43,7 +43,7 @@ func switchWithBindingAmongTests(_ box: consuming any P & ~Copyable) -> Int {
   switch box {
   case is Unrelated: return 0
   case let b as Big: return b.tag
-  // expected-error @-1 {{binding the payload of a non-'Copyable' value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
+  // expected-error @-1 {{binding the payload of a noncopyable value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
   default: return -1
   }
 }
@@ -56,7 +56,7 @@ func switchWithBindingAmongTests(_ box: consuming any P & ~Copyable) -> Int {
 func multipleLabelItems(_ box: borrowing any P & ~Copyable) -> Int {
   switch box {
   case is Big, is Unrelated: return 1
-  // expected-error @-1 {{matching a non-'Copyable' value using a case label that has multiple patterns is not implemented}}
+  // expected-error @-1 {{matching a noncopyable value using a case label that has multiple patterns is not implemented}}
   default: return -1
   }
 }
@@ -65,7 +65,7 @@ func fallthroughBetweenCases(_ box: borrowing any P & ~Copyable) -> Int {
   switch box {
   case is Big: fallthrough
   case is Unrelated: return 1
-  // expected-error @-1 {{matching a non-'Copyable' value using a case label that has multiple patterns is not implemented}}
+  // expected-error @-1 {{matching a noncopyable value using a case label that has multiple patterns is not implemented}}
   default: return -1
   }
 }

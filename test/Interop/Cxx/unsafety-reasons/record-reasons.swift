@@ -33,7 +33,7 @@ struct HasBadBase : Bad {};
 
 // A non-escapable type is a safe "view" only if what it points to is
 // self-contained. A 'void *' could point at anything, so this one is not.
-// expected-note@+1 {{this is a non-escapable view whose lifetime dependency Swift cannot track}}
+// expected-note@+1 {{this is a nonescapable view whose lifetime dependency Swift cannot track}}
 struct SWIFT_NONESCAPABLE Indirect {
   void *p;
 };

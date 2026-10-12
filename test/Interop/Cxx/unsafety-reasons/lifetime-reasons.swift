@@ -25,7 +25,7 @@ struct SWIFT_NONESCAPABLE View {
 };
 
 // A non-escapable parameter with no lifetime annotation: the note names it.
-// expected-note@+1 {{non-escapable parameter 'v' has no lifetime annotation}}
+// expected-note@+1 {{nonescapable parameter 'v' has no lifetime annotation}}
 void takeView(View v);
 
 // Annotating the parameter as non-escaping settles it, so this one is safe and

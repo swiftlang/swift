@@ -59,6 +59,19 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
 - When referring to attributes by name, use *either* `attribute 'foo'` or 
   `'@foo'`, rather than `attribute '@foo'`.
 
+- Describe a type or value that doesn't conform to an invertible protocol with
+  a single unquoted adjective: "noncopyable" for `Copyable`, "nonescapable" for
+  `Escapable`, and "nondeinitable" for `Deinitable`. Don't use variations such
+  as "non-copyable", "non-'Copyable'", or "~Escapable". Use the inverse syntax
+  only when the diagnostic tells the developer what to write, or when it refers
+  to a generic signature that contains an inverse.
+  For example:
+  - `key path cannot refer to noncopyable type 'File'`.
+  - `a function cannot return a nonescapable result`.
+  - `tuple cannot contain nondeinitable element type 'ND'`, but
+    `'@_moveOnly' attribute is deprecated and will be removed; use '~Copyable' instead`
+    and `'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance`.
+
 - Match the tone and phrasing of other diagnostics. Some common phrases:
 
   - "\<noun> '\<name>'" (e.g. "type 'Set<Int>'")

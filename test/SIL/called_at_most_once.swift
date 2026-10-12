@@ -156,8 +156,8 @@ func captureInRegularClosure(
   g: @escaping @called(atMostOnce) () -> Void,
   optF: consuming (@called(atMostOnce) () -> Void)? = nil
 ) {
-  _ = { [f] in f() } // expected-error {{noncopyable 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
-  _ = { g() } // expected-error {{noncopyable 'g' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+  _ = { [f] in f() } // expected-error {{noncopyable 'f' cannot be consumed when captured by an escaping closure or borrowed by a nonescapable type}}
+  _ = { g() } // expected-error {{noncopyable 'g' cannot be consumed when captured by an escaping closure or borrowed by a nonescapable type}}
 
   guard let optF else { return }
   _ = { @called(atMostOnce) in optF() } // Ok

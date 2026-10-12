@@ -6,7 +6,7 @@ func orElse<T: ~Copyable>(
 ) rethrows -> T? {
   switch x {
   case .some(let value):
-    return value // expected-warning{{returning the non-'Copyable' value of a pattern binding from a switch that borrows by default}}
+    return value // expected-warning{{returning the noncopyable value of a pattern binding from a switch that borrows by default}}
   case .none:
     return try defaultValue()
   }

@@ -22,7 +22,7 @@
 
 // SILGen issues.
 WARNING(return_borrowing_switch_binding,none,
-        "returning the non-'Copyable' value of a pattern binding from a "
+        "returning the noncopyable value of a pattern binding from a "
         "switch that borrows by default; the switch will be performed as a "
         "consume for compatibility for now, but this will require an explicit "
         "'switch consume' in the future", ())
@@ -900,7 +900,7 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type",
+      "noncopyable '%0' cannot be consumed when captured by an escaping closure or borrowed by a nonescapable type",
       (StringRef))
 ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
@@ -1342,7 +1342,7 @@ ERROR(executor_factory_must_conform, none,
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
-      "deinit of non-copyable type %0 not visible in the current module", (Type))
+      "deinit of noncopyable type %0 not visible in the current module", (Type))
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
@@ -1372,10 +1372,10 @@ NOTE(lifetime_outside_scope_escape, none,
 NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRef))
 
 ERROR(noncopyable_shared_case_block_unimplemented, none,
-      "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
+      "matching a noncopyable value using a case label that has multiple patterns is not implemented", ())
 
 ERROR(noncopyable_cast_pattern_binding_unimplemented, none,
-      "binding the payload of a non-'Copyable' value with a cast pattern is not "
+      "binding the payload of a noncopyable value with a cast pattern is not "
       "implemented; use 'case is' to test the type without binding", ())
 
 
